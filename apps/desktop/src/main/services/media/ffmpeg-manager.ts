@@ -9,11 +9,17 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
-import type { FfmpegDownloadProgress, FfmpegStatus } from "@guizhi/shared/types";
+import type {
+  FfmpegDownloadProgress,
+  FfmpegStatus,
+  ToolUpdateCheck,
+} from "@guizhi/shared/types";
 import { getToolsDir } from "../../runtime-paths";
+import { fetchWithNetworkProxy } from "../network-proxy";
 import { downloadToFile } from "./tool-download";
 
 const VERSION_PROBE_TIMEOUT_MS = 10_000;
+const BUILD_DATE_TIMEOUT_MS = 8_000;
 
 export function getManagedFfmpegBinaryName(
   platform: NodeJS.Platform = process.platform,
@@ -45,6 +51,78 @@ export function getFfmpegDownloadUrls(
     `https://gh-proxy.com/${official}`,
     `https://hub.gitmirror.com/${official}`,
   ];
+}
+
+/**
+ * FFmpeg-Builds 的 release tag 恒为 `latest`，没有版本号可比；但它构建出的
+ * ffmpeg 版本串尾部带构建日期，形如 `N-125753-g6095372a70-20260724`，
+ * 而远端资产的 Last-Modified 正是同一天。于是用「构建日期」当作可比标识。
+ */
+export function parseFfmpegBuildDate(
+  version: string | null | undefined,
+): string | null {
+  const match = version?.match(/-(\d{8})$/);
+  return match ? match[1] : null;
+}
+
+/** Last-Modified → YYYYMMDD（按 UTC，与构建日期口径一致） */
+export function toBuildDate(lastModified: string | null): string | null {
+  if (!lastModified) {
+    return null;
+  }
+  const at = new Date(lastModified);
+  if (Number.isNaN(at.getTime())) {
+    return null;
+  }
+  return [
+    at.getUTCFullYear(),
+    String(at.getUTCMonth() + 1).padStart(2, "0"),
+    String(at.getUTCDate()).padStart(2, "0"),
+  ].join("");
+}
+
+export type BuildDateFetch = () => Promise<string | null>;
+
+/**
+ * 查远端最新构建日期：只发 HEAD 读响应头，不下载那 160 多 MB 的 zip。
+ * 逐源尝试，全部失败返回 null（UI 据此报「检查失败」）。
+ */
+export async function fetchLatestFfmpegBuildDate(
+  fetchImpl: typeof fetchWithNetworkProxy = fetchWithNetworkProxy,
+): Promise<string | null> {
+  for (const url of getFfmpegDownloadUrls()) {
+    try {
+      const response = await fetchImpl(url, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(BUILD_DATE_TIMEOUT_MS),
+      });
+      await response.body?.cancel();
+      const date = response.ok
+        ? toBuildDate(response.headers.get("last-modified"))
+        : null;
+      if (date) {
+        return date;
+      }
+    } catch {
+      // 换下一个源
+    }
+  }
+  console.warn("[ffmpeg] 无法获取远端构建日期");
+  return null;
+}
+
+/** 检查内置版是否有新构建——只读响应头，不下载 */
+export async function checkFfmpegUpdate(
+  currentVersion: string | null,
+  fetchLatest: BuildDateFetch = fetchLatestFfmpegBuildDate,
+): Promise<ToolUpdateCheck> {
+  const current = parseFfmpegBuildDate(currentVersion);
+  const latest = await fetchLatest();
+  return {
+    current,
+    latest,
+    updateAvailable: Boolean(latest && current && latest > current),
+  };
 }
 
 export type FfmpegVersionProbe = (

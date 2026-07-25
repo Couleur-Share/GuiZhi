@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
+import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
 import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
 import { hasMediaSummarySection } from "@guizhi/shared/utils/media-summary";
 import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
@@ -212,18 +213,32 @@ export function useMediaSummaryAction(
     t,
   ]);
 
+  const isForum = item.itemType === "forum";
   const isAudio = item.itemType === "audio";
-  const hasSummary = hasMediaSummarySection(item.content);
-  const label = hasSummary
-    ? isAudio
-      ? t("library.mediaSummaryRegenerateAudio", "重新生成音频总结")
-      : t("library.mediaSummaryRegenerateVideo", "重新生成视频总结")
-    : isAudio
-      ? t("library.mediaSummaryGenerateAudio", "生成音频总结")
-      : t("library.mediaSummaryGenerateVideo", "生成视频总结");
+  // 论坛条目的素材是正文里的逐楼回复，音视频的是文字稿
+  const forumSections = isForum
+    ? splitForumNoteSections(item.content)
+    : null;
+  const hasSummary = isForum
+    ? Boolean(forumSections?.summary)
+    : hasMediaSummarySection(item.content);
+
+  const label = isForum
+    ? hasSummary
+      ? t("library.forumSummaryRegenerate", "重新生成讨论总结")
+      : t("library.forumSummaryGenerate", "生成讨论总结")
+    : hasSummary
+      ? isAudio
+        ? t("library.mediaSummaryRegenerateAudio", "重新生成音频总结")
+        : t("library.mediaSummaryRegenerateVideo", "重新生成视频总结")
+      : isAudio
+        ? t("library.mediaSummaryGenerateAudio", "生成音频总结")
+        : t("library.mediaSummaryGenerateVideo", "生成视频总结");
 
   return {
-    available: Boolean(item.transcript?.trim()),
+    available: isForum
+      ? Boolean(forumSections?.replies)
+      : Boolean(item.transcript?.trim()),
     hasSummary,
     isRunning,
     label,

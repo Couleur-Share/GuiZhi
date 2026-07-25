@@ -16,6 +16,19 @@ import type Database from "./adapter";
 export interface Migration {
   /** 唯一名称，写入 schema_migrations 后不可更改 */
   name: string;
+  /**
+   * 执行期间关闭外键强制（重建表类迁移必须开启）。
+   *
+   * SQLite 改不了已有的 CHECK / 外键约束，只能「建新表 → 拷数据 → 删旧表 →
+   * 改名」。但开着 `foreign_keys` 时 `DROP TABLE` 会先隐式 DELETE 一遍，
+   * 把所有 ON DELETE CASCADE 的子表数据（标签关联、来源记录、Wiki 关联、
+   * 语义向量）一并清空。而 `PRAGMA foreign_keys` 在事务内是空操作，
+   * 必须由执行器在 BEGIN 之前关掉、COMMIT 之后恢复。
+   *
+   * 开启后本执行器会在提交前跑 `PRAGMA foreign_key_check`，
+   * 留下孤儿行就整条回滚。
+   */
+  foreignKeysOff?: boolean;
   up: (db: Database.Database) => void;
 }
 
@@ -46,6 +59,47 @@ export function addColumnIfMissing(
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
+/** 建表语句原文；表不存在时为空串。重建表类迁移靠它判断是否已经做过 */
+export function getTableDefinition(
+  db: Database.Database,
+  table: string,
+): string {
+  const row = db.get(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+    table,
+  ) as { sql?: string } | undefined;
+  return row?.sql ?? "";
+}
+
+/**
+ * knowledge_items 的完整定义。重建表时新旧结构必须逐字一致（除 CHECK 之外），
+ * 所以这里与 schema.ts 的建表语句共用同一份列清单。
+ */
+const KNOWLEDGE_ITEMS_COLUMNS = [
+  "id",
+  "title",
+  "content",
+  "summary",
+  "transcript",
+  "item_type",
+  "status",
+  "collection_id",
+  "is_favorite",
+  "is_pinned",
+  "deleted_at",
+  "created_at",
+  "updated_at",
+] as const;
+
+/** DROP TABLE 会连带删掉表上的索引，重建后要一并补回 */
+const KNOWLEDGE_ITEMS_INDEXES = [
+  "CREATE INDEX IF NOT EXISTS idx_items_status ON knowledge_items(status)",
+  "CREATE INDEX IF NOT EXISTS idx_items_collection ON knowledge_items(collection_id)",
+  "CREATE INDEX IF NOT EXISTS idx_items_updated ON knowledge_items(updated_at DESC)",
+  "CREATE INDEX IF NOT EXISTS idx_items_deleted ON knowledge_items(deleted_at)",
+  "CREATE INDEX IF NOT EXISTS idx_items_favorite ON knowledge_items(is_favorite)",
+] as const;
+
 /**
  * 迁移清单。
  *
@@ -72,6 +126,45 @@ export const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, "wiki_ingestions", "next_attempt_at", "INTEGER");
     },
   },
+  {
+    // 论坛帖子采集：item_type 的 CHECK 要放行 'forum'。
+    // 老库的 CHECK 写死了七种类型，不重建表的话论坛条目一入库就被约束打回。
+    name: "0003-item-type-forum",
+    foreignKeysOff: true,
+    up: (db) => {
+      const definition = getTableDefinition(db, "knowledge_items");
+      // 表不存在（单测建了半个库）或已放行则跳过，保持幂等
+      if (!definition || definition.includes("'forum'")) {
+        return;
+      }
+
+      const columns = KNOWLEDGE_ITEMS_COLUMNS.join(", ");
+      db.exec(`
+        CREATE TABLE knowledge_items_migrate (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL DEFAULT '',
+          content TEXT NOT NULL DEFAULT '',
+          summary TEXT,
+          transcript TEXT,
+          item_type TEXT NOT NULL DEFAULT 'note'
+            CHECK(item_type IN ('note','webpage','video','image','audio','document','snippet','forum')),
+          status TEXT NOT NULL DEFAULT 'inbox'
+            CHECK(status IN ('inbox','ready','archived')),
+          collection_id TEXT REFERENCES collections(id) ON DELETE SET NULL,
+          is_favorite INTEGER NOT NULL DEFAULT 0,
+          is_pinned INTEGER NOT NULL DEFAULT 0,
+          deleted_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        INSERT INTO knowledge_items_migrate (${columns})
+          SELECT ${columns} FROM knowledge_items;
+        DROP TABLE knowledge_items;
+        ALTER TABLE knowledge_items_migrate RENAME TO knowledge_items;
+        ${KNOWLEDGE_ITEMS_INDEXES.join(";\n        ")};
+      `);
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */
@@ -82,6 +175,55 @@ export function getSchemaVersion(db: Database.Database): number {
     | { user_version?: number }
     | undefined;
   return row?.user_version ?? 0;
+}
+
+interface ForeignKeyViolation {
+  table?: string;
+  rowid?: number;
+}
+
+/** 重建表后校验没有留下悬空引用；有就让整条迁移回滚 */
+function assertNoForeignKeyViolations(db: Database.Database): void {
+  const violations = db.pragma("foreign_key_check") as ForeignKeyViolation[];
+  if (!Array.isArray(violations) || violations.length === 0) {
+    return;
+  }
+  const tables = [...new Set(violations.map((row) => row.table ?? "?"))];
+  throw new Error(
+    `迁移后存在外键孤儿行（${violations.length} 行，涉及 ${tables.join(", ")}）`,
+  );
+}
+
+/**
+ * 执行单条迁移。
+ *
+ * foreignKeysOff 的迁移要在事务外先关掉外键强制——`PRAGMA foreign_keys`
+ * 在事务内部是空操作，写在 up() 里不起任何作用。
+ */
+function applyMigration(db: Database.Database, migration: Migration): void {
+  const run = db.transaction(() => {
+    migration.up(db);
+    if (migration.foreignKeysOff) {
+      assertNoForeignKeyViolations(db);
+    }
+    db.run(
+      "INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)",
+      migration.name,
+      Date.now(),
+    );
+  });
+
+  if (!migration.foreignKeysOff) {
+    run();
+    return;
+  }
+
+  db.pragma("foreign_keys = OFF");
+  try {
+    run();
+  } finally {
+    db.pragma("foreign_keys = ON");
+  }
 }
 
 /**
@@ -108,15 +250,7 @@ export function runMigrations(db: Database.Database): string[] {
     if (applied.has(migration.name)) {
       continue;
     }
-    const run = db.transaction(() => {
-      migration.up(db);
-      db.run(
-        "INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)",
-        migration.name,
-        Date.now(),
-      );
-    });
-    run();
+    applyMigration(db, migration);
     executed.push(migration.name);
   }
 

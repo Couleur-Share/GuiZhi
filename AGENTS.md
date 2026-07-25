@@ -87,6 +87,31 @@ v0.6.0（2026-07）围绕抖音采集：抖音脱离 yt-dlp（见下），图文
 `.prose` 没恢复被 preflight 清掉的 `list-style`（列表没序号），以及 rehype-sanitize
 与 react-markdown 的 `urlTransform` 双双拦掉 `local-image://`（正文图是破图）。
 
+论坛帖子采集（V2EX）：`import/v2ex.ts` 走官方 v1 只读接口
+（`/api/topics/show.json` + `/api/replies/show.json`），无需 token，
+限额 600 次/小时，一次采集用两次；回复接口不分页，总是一次返回整帖。
+不解析 HTML 是有实测依据的——同一帖 Readability 只抽到 107 条回复里的 72 条
+（丢掉最早的 1~5 楼），且 37% 的字符是头像图片 URL 这类噪音。
+条目类型是新增的 `forum`，正文结构为「元数据引用块 + `## 讨论总结` +
+`## 正文` + `## 讨论（N 条）`」，三个小节标题同时是详情页分段锚点
+（`shared/utils/forum-note.ts`），改一处要同步另一处。元数据两行必须紧邻，
+中间空行会让 `parseVideoMetaBlock` 只吃掉首行、把「发布」漏进正文。
+讨论总结（`import/forum-summary.ts`）与视频总结分开：口播稿顺着讲一遍即可，
+论坛帖要按方案聚类、统计支持人数、交代共识与分歧，走 mainText 路由，
+未配置模型时静默跳过并在正文注明。排版协议是 `### 小标题 + 「- 」列表`，
+`sanitizeForumSummary` 会把模型吐出的 `#`/`##`/独占一行的 `**加粗**` 统一升成 `###`：
+`##` 会和 `## 正文`/`## 讨论` 这两个分段锚点撞车；而「**标题**」独占一行时，
+Markdown 只认单换行会把它和下一行正文渲染进同一段，页面上就是
+「**方案名** 多人推荐此方案…」黏成一坨（v0.6 实际踩到过）。
+提示词管不住模型排版，这层确定性清洗不能省。
+详情页可以重新生成讨论总结：复用 `media:summarize` 频道，主进程按 `itemType`
+分派到 `regenerateForumSummary`。素材用 `parseForumReplies` 从库中正文还原逐楼
+回复，不重新抓网页——原帖可能已删或又多了几十楼，条目自己那份才与用户看到的一致。
+回写走 `upsertForumSummarySection`，顺带清掉采集期留下的「未配置文本模型」
+「生成失败」注记，免得和新总结自相矛盾。
+没做通用论坛协议：Discourse 的 `/t/{id}.json` 在 linux.do 会被 Cloudflare
+挡成 403，逐站适配是唯一可行路径，`detectForumPlatform` 因此是白名单式判定。
+
 抖音不走 yt-dlp：yt-dlp 的 Douyin 提取器打 `douyin.com/aweme/v1/web/aweme/detail/`，
 该接口对没有签名 cookie（`__ac_signature` / `ttwid`，由页面 JS 挑战生成）的请求
 返回空 body，报「Fresh cookies are needed」。`import/douyin.ts` 改走
@@ -114,7 +139,9 @@ v0.6.0（2026-07）围绕抖音采集：抖音脱离 yt-dlp（见下），图文
 - `import/douyin.ts` 依赖未公开的页面结构（历史上叫过 `RENDER_DATA` 且是
   URL 编码的），抖音改版就要跟着修。小红书仍走 yt-dlp，同样会被登录墙拦下。
 - 图文采集的 OCR 按张调用视觉模型，默认上限 9 张（`OCR_IMAGE_LIMIT`），
-  超出的图片只入库不识别。上限是硬编码常量，没有做成设置项。
+ 超出的图片只入库不识别。上限是硬编码常量，没有做成设置项。
+- 论坛采集只认 V2EX。超长帖的总结按回复分块，上限 8 块（`MAX_CHUNKS`），
+ 再长的部分不进总结素材，但回复本身完整入库。
 
 fork 遗留的 WebDAV / S3 同步通道已在 v0.4.1 整体删除（主进程 transport、
 preload 白名单、settings 的 36 个字段与 69 条 i18n 文案）。归知目前不提供

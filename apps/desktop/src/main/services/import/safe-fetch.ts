@@ -20,11 +20,14 @@ import {
 /** 无数据往来的最长等待；流式下载期间只要还在收字节就不会触发 */
 const IDLE_TIMEOUT_MS = 30_000;
 const HTML_MAX_BYTES = 10 * 1024 * 1024;
+/** 论坛接口一次会吐出整帖回复，千楼长帖约 1~2MB */
+const JSON_MAX_BYTES = 8 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 GuiZhi/0.3";
 const HTML_ACCEPT =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+const JSON_ACCEPT = "application/json,text/plain;q=0.9,*/*;q=0.8";
 
 export interface SafeRequestOptions {
   signal?: AbortSignal;
@@ -215,6 +218,39 @@ export async function fetchHtml(
         "页面超过大小上限",
       );
       return { finalUrl, html: decodeHtmlBody(body, contentType), contentType };
+    },
+  );
+}
+
+/**
+ * 抓取 JSON 接口（论坛采集走平台的只读 API）。
+ * 与 fetchHtml 共用同一套 SSRF 防护与重定向校验，不要绕开它自己发请求。
+ */
+export async function fetchJson<T>(
+  rawUrl: string,
+  signal?: AbortSignal,
+  options: Omit<SafeRequestOptions, "signal"> = {},
+): Promise<T> {
+  return requestFollowingRedirects(
+    rawUrl,
+    { accept: JSON_ACCEPT, ...options, signal },
+    async (response) => {
+      const contentType = String(response.headers["content-type"] ?? "");
+      // 被登录墙或 WAF 拦下时返回的是 HTML，早点报错比让 JSON.parse 抛乱码强
+      if (contentType && !/json|text\/plain/i.test(contentType)) {
+        response.resume();
+        throw new Error(`接口未返回 JSON: ${contentType.split(";")[0]}`);
+      }
+      const body = await readBody(
+        response,
+        JSON_MAX_BYTES,
+        "接口响应超过大小上限",
+      );
+      try {
+        return JSON.parse(body.toString("utf8")) as T;
+      } catch {
+        throw new Error("接口响应不是合法的 JSON");
+      }
     },
   );
 }

@@ -3,6 +3,7 @@ import {
   AudioLinesIcon,
   ImageIcon,
   Loader2Icon,
+  MessagesSquareIcon,
   RotateCcwIcon,
   ScanTextIcon,
   ScrollTextIcon,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
+import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
 import { splitImageNoteSections } from "@guizhi/shared/utils/image-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { useSettingsStore } from "../../stores/settings.store";
@@ -22,7 +24,13 @@ import {
   useTranscriptActions,
 } from "./use-media-actions";
 
-type PanelTab = "body" | "transcript" | "images" | "recognized";
+type PanelTab =
+  | "body"
+  | "transcript"
+  | "images"
+  | "recognized"
+  | "summary"
+  | "replies";
 
 function TabButton({
   active,
@@ -110,9 +118,15 @@ export function ContentPanel({
       return;
     }
     lastViewItemIdRef.current = item.id;
-    setTab("body");
-    setIsPreview(editorMarkdownPreview && Boolean(item.content.trim()));
-  }, [item.id, item.content, editorMarkdownPreview]);
+    const preview = editorMarkdownPreview && Boolean(item.content.trim());
+    setIsPreview(preview);
+    // 论坛帖打开先看讨论总结：主楼往往只是提问，结论都在回复里
+    const preferSummary =
+      preview &&
+      item.itemType === "forum" &&
+      Boolean(splitForumNoteSections(item.content).summary);
+    setTab(preferSummary ? "summary" : "body");
+  }, [item.id, item.content, item.itemType, editorMarkdownPreview]);
 
   const isMediaItem = item.itemType === "audio" || item.itemType === "video";
   const showTranscriptTab =
@@ -128,23 +142,44 @@ export function ContentPanel({
   const showImagesTab = sections !== null;
   const showRecognizedTab = Boolean(sections?.recognized);
 
+  // 论坛条目：讨论总结 / 主楼 / 逐楼回复同样拆开看，一屏滚到一百楼没法读
+  const forumSections =
+    item.itemType === "forum" && !isTrashed && isPreview
+      ? splitForumNoteSections(item.content)
+      : null;
+  const showForumSummaryTab = Boolean(forumSections?.summary);
+  const showRepliesTab = Boolean(forumSections?.replies);
+
   const availableTabs: Record<PanelTab, boolean> = {
     body: true,
     transcript: showTranscriptTab,
     images: showImagesTab,
     recognized: showRecognizedTab,
+    summary: showForumSummaryTab,
+    replies: showRepliesTab,
   };
   const activeTab: PanelTab = availableTabs[tab] ? tab : "body";
 
   // 渲染视图中元数据引用块交给来源 chip 展示，正文只渲染剩余部分
   const previewContent = isMediaItem
     ? parseVideoMetaBlock(item.content)?.body ?? item.content
-    : (sections?.caption ?? item.content);
+    : forumSections
+      ? forumSections.body
+      : (sections?.caption ?? item.content);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border app-wallpaper-panel">
         <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/60 px-2">
+          {showForumSummaryTab ? (
+            <TabButton
+              active={activeTab === "summary"}
+              onClick={() => setTab("summary")}
+            >
+              <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
+              {t("library.forumSummarySection", "讨论总结")}
+            </TabButton>
+          ) : null}
           <TabButton
             active={activeTab === "body"}
             onClick={() => setTab("body")}
@@ -153,6 +188,15 @@ export function ContentPanel({
               ? t("library.captionSection", "文案")
               : t("library.bodySection", "正文")}
           </TabButton>
+          {showRepliesTab ? (
+            <TabButton
+              active={activeTab === "replies"}
+              onClick={() => setTab("replies")}
+            >
+              <MessagesSquareIcon className="h-3 w-3" aria-hidden="true" />
+              {t("library.forumRepliesSection", "讨论")}
+            </TabButton>
+          ) : null}
           {showImagesTab ? (
             <TabButton
               active={activeTab === "images"}
@@ -190,7 +234,7 @@ export function ContentPanel({
 
           <span className="min-w-0 flex-1" />
 
-          {activeTab === "body" || activeTab === "images" || activeTab === "recognized" ? (
+          {activeTab !== "transcript" ? (
             <>
               {!isTrashed && summaryAction.available ? (
                 <ToolButton
@@ -246,6 +290,10 @@ export function ContentPanel({
             <ImageGallery content={item.content} />
           ) : activeTab === "recognized" ? (
             <MarkdownPreview content={sections?.recognized ?? ""} />
+          ) : activeTab === "summary" ? (
+            <MarkdownPreview content={forumSections?.summary ?? ""} />
+          ) : activeTab === "replies" ? (
+            <MarkdownPreview content={forumSections?.replies ?? ""} />
           ) : isTrashed || isPreview ? (
             // 回收站视图不显示元数据卡片，保留完整原文避免信息丢失
             <MarkdownPreview

@@ -6,6 +6,7 @@ import path from "path";
 import https from "https";
 import { getHttpRequestAgent } from "./services/network-proxy";
 import { createBackupSafe } from "./services/backup";
+import { logStartupEvent } from "./startup-log";
 import { compareVersions, isPrereleaseVersion } from "../utils/version";
 import {
   extractChangelogRange,
@@ -32,9 +33,28 @@ export type MacInstallSource = "direct" | "homebrew" | "unknown";
 
 type UpdateChannel = "stable" | "preview";
 
+/** 检查来源：manual 为用户点开更新弹窗，其余为渲染进程的自动检查 */
+const UPDATE_CHECK_TRIGGERS = [
+  "manual",
+  "startup",
+  "interval",
+  "visibility",
+] as const;
+type UpdateCheckTrigger = (typeof UPDATE_CHECK_TRIGGERS)[number];
+
+/** 自动检查被跳过的原因，与 renderer/services/update-check.ts 保持一致 */
+const AUTO_SKIP_REASONS = [
+  "disabled",
+  "hidden",
+  "offline",
+  "in-flight",
+  "cooldown",
+] as const;
+
 interface UpdateRequestOptions {
   useMirror?: boolean;
   channel?: UpdateChannel;
+  trigger?: UpdateCheckTrigger;
 }
 
 const OFFICIAL_REPO = {
@@ -48,12 +68,50 @@ function normalizeUpdateOptions(
   input?: boolean | UpdateRequestOptions,
 ): Required<UpdateRequestOptions> {
   if (typeof input === "boolean") {
-    return { useMirror: input, channel: "stable" };
+    return { useMirror: input, channel: "stable", trigger: "manual" };
   }
+  const trigger = UPDATE_CHECK_TRIGGERS.includes(
+    input?.trigger as UpdateCheckTrigger,
+  )
+    ? (input?.trigger as UpdateCheckTrigger)
+    : "manual";
   return {
     useMirror: Boolean(input?.useMirror),
     channel: input?.channel === "preview" ? "preview" : "stable",
+    trigger,
   };
+}
+
+/**
+ * 把每次检查的结果写进 startup.log。
+ *
+ * 自动检查在界面上是无声的（没有新版本或失败都不改变任何 UI），没有这条日志
+ * 就无法在事后回答「那次到底有没有检查、结果是什么」。
+ */
+function logUpdateCheck(entry: {
+  trigger: UpdateCheckTrigger;
+  channel?: UpdateChannel;
+  useMirror?: boolean;
+  result: "available" | "not-available" | "error" | "dev-disabled";
+  version?: string;
+  durationMs?: number;
+  error?: string;
+}): void {
+  logStartupEvent({
+    event: "updater:check",
+    currentVersion: app.getVersion(),
+    ...entry,
+    error: entry.error ? entry.error.slice(0, 300) : undefined,
+  });
+}
+
+function readCheckedVersion(result: unknown): string | undefined {
+  if (!result || typeof result !== "object") {
+    return undefined;
+  }
+  const updateInfo = (result as { updateInfo?: { version?: unknown } })
+    .updateInfo;
+  return typeof updateInfo?.version === "string" ? updateInfo.version : undefined;
 }
 
 function getFeedSuffix(channel: UpdateChannel, releaseTag?: string): string {
@@ -567,6 +625,7 @@ const UPDATER_IPC_CHANNELS = [
   "updater:version",
   "updater:installSource",
   "updater:check",
+  "updater:logAutoSkip",
   "updater:download",
   "updater:install",
   "updater:platform",
@@ -598,14 +657,20 @@ export function registerUpdaterIPC() {
   ipcMain.handle(
     "updater:check",
     async (_event, request?: boolean | UpdateRequestOptions) => {
+      const { useMirror, channel, trigger } = normalizeUpdateOptions(request);
+
       if (isDev) {
+        logUpdateCheck({ trigger, channel, result: "dev-disabled" });
+        // devDisabled 让渲染进程区分「真的失败」与「开发模式本就不检查」，
+        // 否则每次 electron:dev 启动都会弹一次自动检查失败
         return {
           success: false,
+          devDisabled: true,
           error: "Update check disabled in development mode",
         };
       }
 
-      const { useMirror, channel } = normalizeUpdateOptions(request);
+      const startedAt = Date.now();
       applyUpdaterPreferences(channel);
       applyMirrorDownloadSettings(useMirror);
       let context: FeedContext;
@@ -614,10 +679,16 @@ export function registerUpdaterIPC() {
         context = await resolveFeedContext(channel);
         lastFeedContext = context;
       } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
+        const message = error instanceof Error ? error.message : String(error);
+        logUpdateCheck({
+          trigger,
+          channel,
+          useMirror,
+          result: "error",
+          durationMs: Date.now() - startedAt,
+          error: message,
+        });
+        return { success: false, error: message };
       }
 
       // If mirror is enabled, use mirror sources directly
@@ -634,17 +705,32 @@ export function registerUpdaterIPC() {
             applyFeedContext(true, context, mirrorUrl);
             const result = await autoUpdater.checkForUpdates();
             console.log(`[Updater] Mirror check succeeded: ${mirrorUrl}`);
-            return toCheckResult(result);
+            const checkResult = toCheckResult(result);
+            logUpdateCheck({
+              trigger,
+              channel: context.channel,
+              useMirror,
+              result: checkResult.updateAvailable ? "available" : "not-available",
+              version: readCheckedVersion(result),
+              durationMs: Date.now() - startedAt,
+            });
+            return checkResult;
           } catch (mirrorError) {
             console.warn(`[Updater] Mirror check failed: ${mirrorUrl}`);
           }
         }
         // All mirrors failed
-        return {
-          success: false,
-          error:
-            "All mirror sources failed. Please try disabling mirror acceleration.",
-        };
+        const mirrorError =
+          "All mirror sources failed. Please try disabling mirror acceleration.";
+        logUpdateCheck({
+          trigger,
+          channel: context.channel,
+          useMirror,
+          result: "error",
+          durationMs: Date.now() - startedAt,
+          error: mirrorError,
+        });
+        return { success: false, error: mirrorError };
       }
 
       // Mirror disabled, use official source
@@ -655,12 +741,53 @@ export function registerUpdaterIPC() {
         );
         applyFeedContext(false, context);
         const result = await autoUpdater.checkForUpdates();
-        return toCheckResult(result);
+        const checkResult = toCheckResult(result);
+        logUpdateCheck({
+          trigger,
+          channel: context.channel,
+          useMirror,
+          result: checkResult.updateAvailable ? "available" : "not-available",
+          version: readCheckedVersion(result),
+          durationMs: Date.now() - startedAt,
+        });
+        return checkResult;
       } catch (officialError) {
         const errMsg =
           (officialError as Error).message || String(officialError);
+        logUpdateCheck({
+          trigger,
+          channel: context.channel,
+          useMirror,
+          result: "error",
+          durationMs: Date.now() - startedAt,
+          error: errMsg,
+        });
         return { success: false, error: `Update check failed: ${errMsg}` };
       }
+    },
+  );
+
+  // 记录被跳过的自动检查（窗口隐藏 / 离线 / 开关关闭等）
+  // 渲染进程只上报枚举值，不接受自由文本，避免日志被写入任意内容
+  ipcMain.handle(
+    "updater:logAutoSkip",
+    (_event, payload?: { trigger?: unknown; reason?: unknown }) => {
+      const trigger = UPDATE_CHECK_TRIGGERS.includes(
+        payload?.trigger as UpdateCheckTrigger,
+      )
+        ? (payload?.trigger as UpdateCheckTrigger)
+        : null;
+      const reason = AUTO_SKIP_REASONS.includes(
+        payload?.reason as (typeof AUTO_SKIP_REASONS)[number],
+      )
+        ? (payload?.reason as (typeof AUTO_SKIP_REASONS)[number])
+        : null;
+      if (!trigger || !reason) {
+        return { success: false };
+      }
+
+      logStartupEvent({ event: "updater:auto_skip", trigger, reason });
+      return { success: true };
     },
   );
 

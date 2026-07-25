@@ -7,11 +7,17 @@
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
-import type { YtDlpDownloadProgress, YtDlpStatus } from "@guizhi/shared/types";
+import type {
+  ToolUpdateCheck,
+  YtDlpDownloadProgress,
+  YtDlpStatus,
+} from "@guizhi/shared/types";
 import { getToolsDir } from "../../runtime-paths";
+import { fetchWithNetworkProxy } from "../network-proxy";
 import { downloadToFile } from "./tool-download";
 
 const VERSION_PROBE_TIMEOUT_MS = 10_000;
+const LATEST_VERSION_TIMEOUT_MS = 6_000;
 
 export function getManagedBinaryName(
   platform: NodeJS.Platform = process.platform,
@@ -42,6 +48,75 @@ export function getYtDlpDownloadUrls(
     `https://gh-proxy.com/${official}`,
     `https://hub.gitmirror.com/${official}`,
   ];
+}
+
+/**
+ * GitHub 的 /releases/latest 会 302 到 /releases/tag/<tag>，
+ * 而 yt-dlp 的 tag 就是 `--version` 输出的版本号（如 2026.07.04），
+ * 因此不下载资产也能判断本地是不是最新。镜像源与下载同一组。
+ */
+export function getYtDlpLatestReleaseUrls(): string[] {
+  const official = "https://github.com/yt-dlp/yt-dlp/releases/latest";
+  return [
+    official,
+    `https://ghfast.top/${official}`,
+    `https://gh-proxy.com/${official}`,
+    `https://hub.gitmirror.com/${official}`,
+  ];
+}
+
+/** 从 302 的 Location（或跟随重定向后的终点 URL）里取出 release tag */
+export function parseReleaseTag(location: string | null | undefined): string | null {
+  const match = location?.match(/\/releases\/tag\/([^/?#]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+export type LatestVersionFetch = () => Promise<string | null>;
+
+/**
+ * 查询远端最新版本号：只读 302 的 Location，不拉正文。
+ * 任一源命中即返回；全部失败返回 null（调用方照常走下载流程）。
+ */
+export async function fetchLatestYtDlpVersion(
+  fetchImpl: typeof fetchWithNetworkProxy = fetchWithNetworkProxy,
+): Promise<string | null> {
+  for (const url of getYtDlpLatestReleaseUrls()) {
+    try {
+      const response = await fetchImpl(url, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(LATEST_VERSION_TIMEOUT_MS),
+      });
+      // 镜像可能自行跟随重定向并回正文，尽早断流
+      await response.body?.cancel();
+      const tag =
+        parseReleaseTag(response.headers.get("location")) ??
+        parseReleaseTag(response.url);
+      if (tag) {
+        return tag;
+      }
+    } catch {
+      // 换下一个源
+    }
+  }
+  console.warn("[ytdlp] 无法获取远端最新版本号，将直接下载");
+  return null;
+}
+
+/**
+ * 检查内置版是否有更新——只查版本号，不下载。
+ * 版本比较沿用应用自身更新器的写法（数值感知），避免把 nightly 判成需要回退。
+ */
+export async function checkYtDlpUpdate(
+  current: string | null,
+  fetchLatest: LatestVersionFetch = fetchLatestYtDlpVersion,
+): Promise<ToolUpdateCheck> {
+  const latest = await fetchLatest();
+  const updateAvailable = Boolean(
+    latest &&
+      current &&
+      latest.localeCompare(current, undefined, { numeric: true }) > 0,
+  );
+  return { current, latest, updateAvailable };
 }
 
 export type VersionProbe = (executable: string) => Promise<string | null>;
@@ -147,6 +222,9 @@ let installInFlight = false;
 /**
  * 下载并安装托管版 yt-dlp：逐源尝试 → 临时文件校验可执行 → 原子替换。
  * 返回安装的版本号；全部下载源失败时抛错。
+ *
+ * 这里不做「是否需要更新」的判断——那是 checkYtDlpUpdate 的职责，
+ * UI 只在确认有新版本（或用户主动要求安装）时才调到这里。
  */
 export async function installYtDlp(
   onProgress?: (progress: YtDlpDownloadProgress) => void,

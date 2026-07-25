@@ -25,6 +25,15 @@ ipcRenderer.on(IPC_CHANNELS.APP_COMMAND, (_event, command: AppCommand) => {
 
 type DataPathChangeAction = "migrate" | "switch" | "overwrite";
 
+/** 更新检查来源与自动检查跳过原因，取值与 main/updater.ts 的白名单一致 */
+type UpdateCheckTrigger = "manual" | "startup" | "interval" | "visibility";
+type AutoUpdateSkipReason =
+  | "disabled"
+  | "hidden"
+  | "offline"
+  | "in-flight"
+  | "cooldown";
+
 const api = {
   // Window controls
   // 窗口控制 (Windows)
@@ -178,8 +187,16 @@ contextBridge.exposeInMainWorld("electron", {
     check: (
       options?:
         | boolean
-        | { useMirror?: boolean; channel?: "stable" | "preview" },
+        | {
+            useMirror?: boolean;
+            channel?: "stable" | "preview";
+            trigger?: UpdateCheckTrigger;
+          },
     ) => ipcRenderer.invoke("updater:check", options),
+    logAutoSkip: (payload: {
+      trigger: UpdateCheckTrigger;
+      reason: AutoUpdateSkipReason;
+    }) => ipcRenderer.invoke("updater:logAutoSkip", payload),
     download: (
       options?:
         | boolean
@@ -334,8 +351,21 @@ declare global {
         check: (
           options?:
             | boolean
-            | { useMirror?: boolean; channel?: "stable" | "preview" },
-        ) => Promise<{ success: boolean; result?: any; error?: string }>;
+            | {
+                useMirror?: boolean;
+                channel?: "stable" | "preview";
+                trigger?: UpdateCheckTrigger;
+              },
+        ) => Promise<{
+          success: boolean;
+          result?: any;
+          error?: string;
+          devDisabled?: boolean;
+        }>;
+        logAutoSkip?: (payload: {
+          trigger: UpdateCheckTrigger;
+          reason: AutoUpdateSkipReason;
+        }) => Promise<{ success: boolean }>;
         download: (
           options?:
             | boolean

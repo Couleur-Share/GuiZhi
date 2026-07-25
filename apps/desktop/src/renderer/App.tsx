@@ -14,6 +14,13 @@ import { BackgroundImageBackdrop } from "./components/ui/BackgroundImageBackdrop
 import { isWebRuntime } from "./runtime";
 import { waitForPersistHydration } from "./utils/persist-hydration";
 import { DesktopAppCommandBridge } from "./components/app/DesktopAppCommandBridge";
+import { useToast } from "./components/ui/Toast";
+import { useUpdaterStore } from "./stores/updater.store";
+import {
+  AUTO_UPDATE_CHECK_INTERVAL_MS,
+  resolveAutoUpdateSkipReason,
+  type AutoUpdateCheckTrigger,
+} from "./services/update-check";
 
 const SettingsPage = lazy(() =>
   import("./components/settings/SettingsPage").then((m) => ({
@@ -70,6 +77,16 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageType>("home");
   const isUpdateCheckInFlightRef = useRef(false);
   const isWindowVisibleRef = useRef(true);
+  const lastAutoCheckAtRef = useRef(0);
+  const lastAutoCheckFailedRef = useRef(false);
+  const autoCheckFailureNotifiedRef = useRef(false);
+  const { showToast } = useToast();
+  // showToast 的引用会随语言与通知设置变化，用 ref 传进只挂载一次的更新检查
+  // 副作用里，避免语言切换把定时器和 IPC 监听整体重建一遍
+  const showToastRef = useRef(showToast);
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
 
   // OS-level fullscreen state (synced from main process events)
   // OS 级全屏状态（通过主进程事件同步）
@@ -299,6 +316,64 @@ function App() {
       return;
     }
 
+    // 自动检查更新：跳过原因与失败都要留下痕迹，否则界面上无法区分
+    // 「没检查」「检查了没有新版本」「检查失败了」
+    const checkForUpdates = (trigger: AutoUpdateCheckTrigger) => {
+      const settings = useSettingsStore.getState();
+      const skipReason = resolveAutoUpdateSkipReason({
+        trigger,
+        enabled: settings.autoCheckUpdate,
+        windowVisible: isWindowVisibleRef.current,
+        online: navigator.onLine !== false,
+        inFlight: isUpdateCheckInFlightRef.current,
+        now: Date.now(),
+        lastAttemptAt: lastAutoCheckAtRef.current,
+        lastAttemptFailed: lastAutoCheckFailedRef.current,
+      });
+
+      if (skipReason) {
+        void window.electron?.updater?.logAutoSkip?.({
+          trigger,
+          reason: skipReason,
+        });
+        return;
+      }
+
+      isUpdateCheckInFlightRef.current = true;
+      lastAutoCheckAtRef.current = Date.now();
+      void Promise.resolve(
+        window.electron?.updater?.check({
+          useMirror: settings.useUpdateMirror,
+          channel: settings.updateChannel,
+          trigger,
+        }),
+      )
+        .then((result) => {
+          // 开发模式下主进程本就不检查，不算失败，也不该弹提示
+          const failed = Boolean(result && !result.success && !result.devDisabled);
+          const error = failed ? result?.error || "" : null;
+          lastAutoCheckFailedRef.current = failed;
+          if (error === null) {
+            return;
+          }
+          useUpdaterStore.getState().recordFailure(error);
+          // 自动检查失败每个会话只提示一次，避免长期不可达时反复打扰
+          if (!autoCheckFailureNotifiedRef.current) {
+            autoCheckFailureNotifiedRef.current = true;
+            showToastRef.current(
+              i18n.t("settings.autoUpdateCheckFailed"),
+              "error",
+            );
+          }
+        })
+        .catch(() => {
+          lastAutoCheckFailedRef.current = true;
+        })
+        .finally(() => {
+          isUpdateCheckInFlightRef.current = false;
+        });
+    };
+
     // Listen for OS fullscreen state changes from main process
     // 监听主进程发送的 OS 全屏状态变化事件
     const handleFullscreenChanged = (isFullscreen: boolean) => {
@@ -308,6 +383,11 @@ function App() {
 
     const handleWindowVisibilityChanged = (isVisible: boolean) => {
       isWindowVisibleRef.current = isVisible;
+      // 窗口隐藏期间的检查会被跳过（含「启动即最小化到托盘」的首检），
+      // 这里在窗口重新显示时补一次，冷却窗口由 resolveAutoUpdateSkipReason 控制
+      if (isVisible) {
+        checkForUpdates("visibility");
+      }
     };
     window.api?.on?.(
       "window:visibility-changed",
@@ -332,6 +412,7 @@ function App() {
       }
 
       lastUpdateStatusRef.current = status;
+      useUpdaterStore.getState().recordStatus(status);
 
       if (status.status === "available" || status.status === "downloaded") {
         setUpdateAvailable(status);
@@ -372,44 +453,22 @@ function App() {
 
     // Check for updates on startup and periodically
     // 启动时和周期性检查更新
-    const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
     let updateCheckTimer: NodeJS.Timeout | null = null;
     let startupUpdateCheckTimer: NodeJS.Timeout | null = null;
 
-    const checkForUpdates = () => {
-      const settings = useSettingsStore.getState();
-      const isVisible = isWindowVisibleRef.current;
-      const isOnline = navigator.onLine !== false;
-      if (
-        !settings.autoCheckUpdate ||
-        !isVisible ||
-        !isOnline ||
-        isUpdateCheckInFlightRef.current
-      ) {
-        return;
-      }
-
-      isUpdateCheckInFlightRef.current = true;
-      const p = window.electron?.updater?.check({
-        useMirror: settings.useUpdateMirror,
-        channel: settings.updateChannel,
-      });
-      if (p && typeof (p as Promise<unknown>).finally === "function") {
-        (p as Promise<unknown>).finally(() => {
-          isUpdateCheckInFlightRef.current = false;
-        });
-      } else {
-        isUpdateCheckInFlightRef.current = false;
-      }
-    };
-
     // Initial check after 3 seconds
     // 启动后 3 秒进行首次检查
-    startupUpdateCheckTimer = setTimeout(checkForUpdates, 3000);
+    startupUpdateCheckTimer = setTimeout(
+      () => checkForUpdates("startup"),
+      3000,
+    );
 
     // Periodic check every hour
     // 每小时周期性检查
-    updateCheckTimer = setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL);
+    updateCheckTimer = setInterval(
+      () => checkForUpdates("interval"),
+      AUTO_UPDATE_CHECK_INTERVAL_MS,
+    );
 
     // Listen for manual check trigger - always force a fresh check
     const handleOpenUpdate = () => {

@@ -2,9 +2,7 @@ import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Select } from "../ui/Select";
-import { FfmpegSettings } from "./FfmpegSettings";
-import { FunasrSettings } from "./FunasrSettings";
-import { YtDlpSettings } from "./YtDlpSettings";
+import { CaptureSection } from "./capture/CaptureSection";
 
 const LANGUAGE_OPTIONS = [
   { value: "zh", label: "简体中文" },
@@ -85,11 +83,7 @@ export function GeneralSettings() {
         </SettingItem>
       </SettingSection>
 
-      <SettingSection title={t("settings.captureSection", "采集")}>
-        <YtDlpSettings />
-        <FfmpegSettings />
-        <FunasrSettings />
-      </SettingSection>
+      <CaptureSection />
 
       <SettingSection title={t("settings.languageAndRegion", "语言与地区")}>
         <SettingItem

@@ -11,6 +11,7 @@ export const KNOWLEDGE_ITEM_TYPES = [
   "audio",
   "document",
   "snippet",
+  "forum",
 ] as const;
 
 export type KnowledgeItemType = (typeof KNOWLEDGE_ITEM_TYPES)[number];

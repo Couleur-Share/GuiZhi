@@ -80,6 +80,8 @@ export const IPC_CHANNELS = {
 
   // yt-dlp 工具管理（在线视频解析引擎）
   YTDLP_STATUS: "ytdlp:status",
+  /** 只查远端版本号判断有无更新，不下载 */
+  YTDLP_CHECK_UPDATE: "ytdlp:checkUpdate",
   YTDLP_INSTALL: "ytdlp:install",
   YTDLP_REMOVE: "ytdlp:remove",
   YTDLP_PICK_BINARY: "ytdlp:pickBinary",
@@ -88,6 +90,8 @@ export const IPC_CHANNELS = {
 
   // ffmpeg 工具管理（转写前音频转码引擎）
   FFMPEG_STATUS: "ffmpeg:status",
+  /** 只读远端资产的构建日期判断有无新构建，不下载 */
+  FFMPEG_CHECK_UPDATE: "ffmpeg:checkUpdate",
   FFMPEG_INSTALL: "ffmpeg:install",
   FFMPEG_REMOVE: "ffmpeg:remove",
   FFMPEG_PICK_BINARY: "ffmpeg:pickBinary",

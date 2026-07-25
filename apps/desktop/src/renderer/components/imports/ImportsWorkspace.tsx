@@ -61,6 +61,7 @@ const STAGE_LABELS: Record<ImportStage, { key: string; fallback: string }> = {
     fallback: "下载配图",
   },
   "image-ocr": { key: "imports.stageImageOcr", fallback: "识别图中文字" },
+  "forum-replies": { key: "imports.stageForumReplies", fallback: "整理讨论区" },
 };
 
 function StatusBadge({ task }: { task: ImportTask }) {

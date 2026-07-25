@@ -4,6 +4,7 @@ import {
   GlobeIcon,
   ImageIcon,
   FileIcon,
+  MessagesSquareIcon,
   MusicIcon,
   ScissorsIcon,
   VideoIcon,
@@ -51,6 +52,11 @@ export const ITEM_TYPE_META: Record<
     labelKey: "library.typeSnippet",
     fallback: "片段",
     icon: <ScissorsIcon className="h-3.5 w-3.5" aria-hidden="true" />,
+  },
+  forum: {
+    labelKey: "library.typeForum",
+    fallback: "论坛",
+    icon: <MessagesSquareIcon className="h-3.5 w-3.5" aria-hidden="true" />,
   },
 };
 

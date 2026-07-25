@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
+import { useUpdaterStore } from "../../stores/updater.store";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
@@ -32,6 +33,9 @@ export function AboutSettings() {
   const [latestVersion, setLatestVersion] = useState<string>("");
   const [isPreviewConfirmOpen, setIsPreviewConfirmOpen] =
     useState<boolean>(false);
+  const lastCheckAt = useUpdaterStore((state) => state.lastCheckAt);
+  const lastCheckOutcome = useUpdaterStore((state) => state.lastCheckOutcome);
+  const lastCheckVersion = useUpdaterStore((state) => state.lastCheckVersion);
 
   useEffect(() => {
     window.electron?.updater?.getVersion().then((v) => setAppVersion(v || ""));
@@ -88,6 +92,40 @@ export function AboutSettings() {
   const confirmPreviewChannel = () => {
     settings.setUpdateChannel("preview");
     setIsPreviewConfirmOpen(false);
+  };
+
+  // 自动检查在无新版本时不会改动界面，这行是它唯一的可见痕迹
+  const buildLastCheckLabel = (): string => {
+    if (!lastCheckAt || !lastCheckOutcome) {
+      return "";
+    }
+    const time = new Date(lastCheckAt).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (lastCheckOutcome === "available") {
+      return t("settings.lastCheckAvailable", {
+        time,
+        version: lastCheckVersion || "",
+      });
+    }
+    if (lastCheckOutcome === "error") {
+      return t("settings.lastCheckFailed", { time });
+    }
+    return t("settings.lastCheckLatest", { time });
+  };
+
+  const desktopUpdateDescription = (): string => {
+    const base =
+      settings.updateChannel === "preview"
+        ? t("settings.previewChannelActiveDesc", {
+            version: appVersion || "...",
+          })
+        : `${t("settings.version")}: ${appVersion || "..."} \u00b7 ${t(
+            "settings.stableChannel",
+          )}`;
+    const lastCheckLabel = buildLastCheckLabel();
+    return lastCheckLabel ? `${base} \u00b7 ${lastCheckLabel}` : base;
   };
 
   return (
@@ -191,15 +229,7 @@ export function AboutSettings() {
             </SettingItem>
             <SettingItem
               label={t("settings.checkUpdate")}
-              description={
-                settings.updateChannel === "preview"
-                  ? t("settings.previewChannelActiveDesc", {
-                      version: appVersion || "...",
-                    })
-                  : `${t("settings.version")}: ${appVersion || "..."} · ${t(
-                      "settings.stableChannel",
-                    )}`
-              }
+              description={desktopUpdateDescription()}
             >
               <button
                 type="button"

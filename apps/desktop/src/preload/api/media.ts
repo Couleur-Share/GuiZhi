@@ -7,6 +7,7 @@ import type {
   FunasrOperationResult,
   FunasrStatus,
   KnowledgeItem,
+  ToolUpdateCheck,
   YtDlpInstallResult,
   YtDlpStatus,
 } from "@guizhi/shared/types";
@@ -43,8 +44,12 @@ export const mediaApi = {
 };
 
 export const ytDlpApi = {
-  status: (): Promise<YtDlpStatus> =>
-    ipcRenderer.invoke(IPC_CHANNELS.YTDLP_STATUS),
+  /** force 为 true 时绕过主进程状态缓存，重新 spawn 探测 */
+  status: (force?: boolean): Promise<YtDlpStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.YTDLP_STATUS, force),
+  /** 只查远端版本号判断有无更新，不下载任何资产 */
+  checkUpdate: (): Promise<ToolUpdateCheck> =>
+    ipcRenderer.invoke(IPC_CHANNELS.YTDLP_CHECK_UPDATE),
   install: (): Promise<YtDlpInstallResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.YTDLP_INSTALL),
   remove: (): Promise<boolean> =>
@@ -54,8 +59,12 @@ export const ytDlpApi = {
 };
 
 export const ffmpegApi = {
-  status: (): Promise<FfmpegStatus> =>
-    ipcRenderer.invoke(IPC_CHANNELS.FFMPEG_STATUS),
+  /** force 为 true 时绕过主进程状态缓存，重新 spawn 探测 */
+  status: (force?: boolean): Promise<FfmpegStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FFMPEG_STATUS, force),
+  /** 只读远端构建日期判断有无新构建，不下载那 160 多 MB 的 zip */
+  checkUpdate: (): Promise<ToolUpdateCheck> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FFMPEG_CHECK_UPDATE),
   install: (): Promise<FfmpegInstallResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.FFMPEG_INSTALL),
   remove: (): Promise<boolean> =>
@@ -65,8 +74,9 @@ export const ffmpegApi = {
 };
 
 export const funasrApi = {
-  status: (): Promise<FunasrStatus> =>
-    ipcRenderer.invoke(IPC_CHANNELS.FUNASR_STATUS),
+  /** force 为 true 时绕过主进程状态缓存，重新发起健康检查 */
+  status: (force?: boolean): Promise<FunasrStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FUNASR_STATUS, force),
   install: (): Promise<FunasrInstallResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.FUNASR_INSTALL),
   uninstall: (): Promise<FunasrOperationResult> =>

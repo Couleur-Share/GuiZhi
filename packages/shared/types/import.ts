@@ -38,6 +38,8 @@ export const IMPORT_STAGES = [
   // ── 图文子阶段 ──
   "image-download",
   "image-ocr",
+  // ── 论坛帖子子阶段 ──
+  "forum-replies",
 ] as const;
 
 export type ImportStage = (typeof IMPORT_STAGES)[number];

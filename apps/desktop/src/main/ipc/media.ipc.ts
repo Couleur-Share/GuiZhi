@@ -19,9 +19,15 @@ import type {
   FunasrOperationResult,
   FunasrStatus,
   KnowledgeItem,
+  ToolUpdateCheck,
   YtDlpInstallResult,
   YtDlpStatus,
 } from "@guizhi/shared/types";
+import {
+  parseForumReplies,
+  splitForumNoteSections,
+  upsertForumSummarySection,
+} from "@guizhi/shared/utils/forum-note";
 import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
 import {
   appendOriginalTitleNote,
@@ -48,7 +54,9 @@ import {
 } from "../services/import/video-url";
 import { prepareAudioForTranscription } from "../services/media/audio-preprocess";
 import { rememberPickedBinaryPath } from "../services/picked-binary-paths";
+import { createStatusCache } from "../services/media/engine-status-cache";
 import {
+  checkFfmpegUpdate,
   getFfmpegStatus,
   installFfmpeg,
   removeManagedFfmpeg,
@@ -73,11 +81,13 @@ import {
   generateMediaSummary,
   resolveMediaSummaryConfig,
 } from "../services/media/media-summary";
+import { generateForumSummary } from "../services/import/forum-summary";
 import {
   formatTranscript,
   resolveTranscriptFormatterConfig,
 } from "../services/media/transcript-format";
 import {
+  checkYtDlpUpdate,
   getYtDlpStatus,
   installYtDlp,
   removeManagedYtDlp,
@@ -144,6 +154,58 @@ async function applyMediaSummarySafely(
   } catch (error) {
     console.warn("[media] 内容总结生成失败，保留文字稿:", error);
     return { content };
+  }
+}
+
+/**
+ * 重新生成论坛条目的讨论总结。
+ *
+ * 素材取自库里正文已存的逐楼回复，不重新抓网页：原帖可能已被删或又多了几十楼，
+ * 用条目自己那份才与用户看到的内容一致，也省掉一次平台请求。
+ */
+async function regenerateForumSummary(
+  items: KnowledgeItemDB,
+  item: KnowledgeItem,
+): Promise<MediaTranscribeResult> {
+  const replies = parseForumReplies(item.content);
+  if (replies.length === 0) {
+    return { success: false, error: "该条目没有可用于总结的讨论内容" };
+  }
+
+  const config = resolveMediaSummaryConfig();
+  if (!config) {
+    return {
+      success: false,
+      notConfigured: true,
+      error: "未配置可用的文本模型",
+    };
+  }
+
+  try {
+    const summary = await generateForumSummary(
+      {
+        title: item.title,
+        // 只喂主楼，别把上一版总结和回复原文重复塞进提示词
+        content: splitForumNoteSections(item.content).body,
+        replies,
+      },
+      config,
+    );
+    if (!summary) {
+      return { success: false, error: "模型未返回有效的讨论总结" };
+    }
+    const updated = items.update(item.id, {
+      content: upsertForumSummarySection(item.content, summary),
+    });
+    console.log(
+      `[import] 讨论总结重新生成完成（item=${item.id}，${summary.length} 字）`,
+    );
+    return { success: true, item: updated ?? undefined };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -279,6 +341,13 @@ async function pickExecutable(
   return result.filePaths[0];
 }
 
+// 采集引擎状态缓存：模块级持有，registerMediaIPC 重入（数据目录切换）不清空——
+// 缓存键是各自的配置路径，配置变了自然未命中。
+const ytDlpStatusCache = createStatusCache<YtDlpStatus>();
+const ffmpegStatusCache = createStatusCache<FfmpegStatus>();
+const funasrStatusCache = createStatusCache<FunasrStatus>();
+const FUNASR_STATUS_CACHE_KEY = "funasr";
+
 export function registerMediaIPC(db: Database.Database): void {
   ipcMain.handle(
     IPC_CHANNELS.MEDIA_TRANSCRIBE,
@@ -389,6 +458,9 @@ export function registerMediaIPC(db: Database.Database): void {
       if (!item) {
         return { success: false, error: "条目不存在" };
       }
+      if (item.itemType === "forum") {
+        return await regenerateForumSummary(items, item);
+      }
       if (item.itemType !== "audio" && item.itemType !== "video") {
         return { success: false, error: "仅音频 / 视频条目支持内容总结" };
       }
@@ -469,7 +541,26 @@ export function registerMediaIPC(db: Database.Database): void {
 
   ipcMain.handle(
     IPC_CHANNELS.YTDLP_STATUS,
-    (): Promise<YtDlpStatus> => getYtDlpStatus(readYtDlpPathSetting(db)),
+    (_event, force?: boolean): Promise<YtDlpStatus> => {
+      const configuredPath = readYtDlpPathSetting(db);
+      return ytDlpStatusCache.read(
+        configuredPath ?? "",
+        () => getYtDlpStatus(configuredPath),
+        force === true,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.YTDLP_CHECK_UPDATE,
+    async (): Promise<ToolUpdateCheck> => {
+      // 只有当前就跑在内置版上才谈得上「更新」：来源是 PATH / 自定义路径时
+      // 用户面对的动作是「安装内置版」，不存在版本比较。
+      const current = await getYtDlpStatus(readYtDlpPathSetting(db));
+      return checkYtDlpUpdate(
+        current.source === "managed" ? current.version ?? null : null,
+      );
+    },
   );
 
   ipcMain.handle(
@@ -487,11 +578,16 @@ export function registerMediaIPC(db: Database.Database): void {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         };
+      } finally {
+        ytDlpStatusCache.invalidate();
       }
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.YTDLP_REMOVE, () => removeManagedYtDlp());
+  ipcMain.handle(IPC_CHANNELS.YTDLP_REMOVE, () => {
+    ytDlpStatusCache.invalidate();
+    return removeManagedYtDlp();
+  });
 
   ipcMain.handle(IPC_CHANNELS.YTDLP_PICK_BINARY, (event) =>
     pickExecutable(event, "选择 yt-dlp 可执行文件"),
@@ -501,7 +597,24 @@ export function registerMediaIPC(db: Database.Database): void {
 
   ipcMain.handle(
     IPC_CHANNELS.FFMPEG_STATUS,
-    (): Promise<FfmpegStatus> => getFfmpegStatus(readFfmpegPathSetting(db)),
+    (_event, force?: boolean): Promise<FfmpegStatus> => {
+      const configuredPath = readFfmpegPathSetting(db);
+      return ffmpegStatusCache.read(
+        configuredPath ?? "",
+        () => getFfmpegStatus(configuredPath),
+        force === true,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.FFMPEG_CHECK_UPDATE,
+    async (): Promise<ToolUpdateCheck> => {
+      const current = await getFfmpegStatus(readFfmpegPathSetting(db));
+      return checkFfmpegUpdate(
+        current.source === "managed" ? current.version ?? null : null,
+      );
+    },
   );
 
   ipcMain.handle(
@@ -519,11 +632,16 @@ export function registerMediaIPC(db: Database.Database): void {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         };
+      } finally {
+        ffmpegStatusCache.invalidate();
       }
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.FFMPEG_REMOVE, () => removeManagedFfmpeg());
+  ipcMain.handle(IPC_CHANNELS.FFMPEG_REMOVE, () => {
+    ffmpegStatusCache.invalidate();
+    return removeManagedFfmpeg();
+  });
 
   ipcMain.handle(IPC_CHANNELS.FFMPEG_PICK_BINARY, (event) =>
     pickExecutable(event, "选择 ffmpeg 可执行文件"),
@@ -533,7 +651,9 @@ export function registerMediaIPC(db: Database.Database): void {
 
   ipcMain.handle(
     IPC_CHANNELS.FUNASR_STATUS,
-    (): Promise<FunasrStatus> => getFunasrStatus(),
+    (_event, force?: boolean): Promise<FunasrStatus> =>
+      // 无配置输入，缓存键固定；running 会随转写按需启动而变，靠 TTL 与手动重新检测收敛
+      funasrStatusCache.read(FUNASR_STATUS_CACHE_KEY, getFunasrStatus, force === true),
   );
 
   ipcMain.handle(
@@ -551,6 +671,8 @@ export function registerMediaIPC(db: Database.Database): void {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         };
+      } finally {
+        funasrStatusCache.invalidate();
       }
     },
   );
@@ -566,6 +688,8 @@ export function registerMediaIPC(db: Database.Database): void {
           success: false,
           error: error instanceof Error ? error.message : String(error),
         };
+      } finally {
+        funasrStatusCache.invalidate();
       }
     },
   );

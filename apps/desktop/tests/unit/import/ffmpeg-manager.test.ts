@@ -13,11 +13,15 @@ vi.mock("electron", () => ({
 }));
 
 import {
+  checkFfmpegUpdate,
   extractFfmpegFromZip,
+  fetchLatestFfmpegBuildDate,
   getFfmpegDownloadUrls,
   getFfmpegStatus,
   getManagedFfmpegBinaryName,
+  parseFfmpegBuildDate,
   resolveFfmpegExecutable,
+  toBuildDate,
 } from "../../../src/main/services/media/ffmpeg-manager";
 
 let workDir: string;
@@ -28,6 +32,79 @@ beforeEach(() => {
 
 afterEach(() => {
   fs.rmSync(workDir, { recursive: true, force: true });
+});
+
+/**
+ * FFmpeg-Builds 的 release tag 恒为 `latest`，没有版本号可比。可比的是构建日期：
+ * 版本串尾部的 -YYYYMMDD 与远端资产 Last-Modified 是同一天（已对真实资产核对过）。
+ */
+describe("检查更新（只读响应头，不下载 160MB 的 zip）", () => {
+  it("从版本串尾部取出构建日期", () => {
+    expect(parseFfmpegBuildDate("N-125753-g6095372a70-20260724")).toBe(
+      "20260724",
+    );
+    // gyan.dev 等其他来源的版本串没有日期后缀
+    expect(parseFfmpegBuildDate("8.1-essentials_build-www.gyan.dev")).toBeNull();
+    expect(parseFfmpegBuildDate(undefined)).toBeNull();
+  });
+
+  it("Last-Modified 按 UTC 归到 YYYYMMDD", () => {
+    expect(toBuildDate("Fri, 24 Jul 2026 15:50:17 GMT")).toBe("20260724");
+    expect(toBuildDate("not a date")).toBeNull();
+    expect(toBuildDate(null)).toBeNull();
+  });
+
+  it("HEAD 命中即返回，不读正文", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: { "last-modified": "Fri, 24 Jul 2026 15:50:17 GMT" },
+      }),
+    );
+
+    await expect(fetchLatestFfmpegBuildDate(fetchImpl as never)).resolves.toBe(
+      "20260724",
+    );
+    expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method: "HEAD" });
+  });
+
+  it("逐源失败 → null，UI 报检查失败而不是「已是最新」", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn().mockRejectedValue(new Error("网络不可达"));
+
+    await expect(
+      fetchLatestFfmpegBuildDate(fetchImpl as never),
+    ).resolves.toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(getFfmpegDownloadUrls().length);
+  });
+
+  it("同一天构建 → 没有更新", async () => {
+    await expect(
+      checkFfmpegUpdate("N-125753-g6095372a70-20260724", async () => "20260724"),
+    ).resolves.toEqual({
+      current: "20260724",
+      latest: "20260724",
+      updateAvailable: false,
+    });
+  });
+
+  it("远端有更新的构建 → 提示更新", async () => {
+    const result = await checkFfmpegUpdate(
+      "N-125753-g6095372a70-20260724",
+      async () => "20260725",
+    );
+    expect(result.updateAvailable).toBe(true);
+    expect(result.latest).toBe("20260725");
+  });
+
+  it("本地版本串没有日期后缀 → 无从比较，不谎称有更新", async () => {
+    const result = await checkFfmpegUpdate(
+      "8.1-essentials_build-www.gyan.dev",
+      async () => "20260725",
+    );
+    expect(result.current).toBeNull();
+    expect(result.updateAvailable).toBe(false);
+  });
 });
 
 describe("getManagedFfmpegBinaryName / getFfmpegDownloadUrls", () => {

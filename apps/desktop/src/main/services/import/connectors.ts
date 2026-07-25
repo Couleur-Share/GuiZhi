@@ -222,13 +222,14 @@ export async function extractContent(
     case "file":
       return extractFile(input);
     case "url": {
+      const url = input.trim();
       const { detectVideoPlatform, extractVideoUrl } = await import(
         "./video-url"
       );
-      const platform = detectVideoPlatform(input.trim());
+      const platform = detectVideoPlatform(url);
       if (platform) {
         return extractVideoUrl(
-          input.trim(),
+          url,
           platform,
           {
             getYtDlpPath: context?.getYtDlpPath ?? (() => null),
@@ -238,7 +239,23 @@ export async function extractContent(
           signal,
         );
       }
-      return extractWebpage(input, signal);
+
+      // 论坛帖子走平台接口取结构化的主楼与回复：通用抓取会把头像、
+      // 楼层号一并卷进正文，还抓不全回复（见 import/v2ex.ts）
+      const { detectForumPlatform } = await import(
+        "@guizhi/shared/utils/forum-platforms"
+      );
+      const forumTarget = detectForumPlatform(url);
+      if (forumTarget) {
+        const { extractForumPost } = await import("./forum-post");
+        return extractForumPost(
+          forumTarget,
+          { onStage: context?.onStage },
+          signal,
+        );
+      }
+
+      return extractWebpage(url, signal);
     }
     default:
       throw new Error(`未知的导入类型: ${kind satisfies never}`);

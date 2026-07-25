@@ -11,3 +11,4 @@ export * from "./semantic";
 export * from "./ytdlp";
 export * from "./ffmpeg";
 export * from "./funasr";
+export * from "./tool-update";

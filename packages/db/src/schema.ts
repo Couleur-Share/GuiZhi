@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS knowledge_items (
   summary TEXT,
   transcript TEXT,
   item_type TEXT NOT NULL DEFAULT 'note'
-    CHECK(item_type IN ('note','webpage','video','image','audio','document','snippet')),
+    CHECK(item_type IN ('note','webpage','video','image','audio','document','snippet','forum')),
   status TEXT NOT NULL DEFAULT 'inbox'
     CHECK(status IN ('inbox','ready','archived')),
   collection_id TEXT REFERENCES collections(id) ON DELETE SET NULL,

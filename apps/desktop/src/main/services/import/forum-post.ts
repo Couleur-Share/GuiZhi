@@ -1,0 +1,195 @@
+/**
+ * 论坛帖子的条目组装：元数据引用块 + 讨论总结 + 主楼正文 + 逐楼回复。
+ *
+ * 帖子的价值往往不在主楼而在讨论区——几十上百条回复里散着方案、参数与
+ * 踩坑经验。因此这里把回复完整入库（全文检索与语义索引都吃得到），
+ * 同时在正文顶部放一份 AI 按方案聚类的总结，用户不必逐楼翻。
+ *
+ * 三个小节标题同时是详情页分段的锚点，改动需同步 shared/utils/forum-note.ts。
+ */
+import type { ImportStage } from "@guizhi/shared/types";
+import type { ForumTarget } from "@guizhi/shared/utils/forum-platforms";
+import {
+  FORUM_BODY_HEADING,
+  FORUM_REPLIES_HEADING,
+  FORUM_SUMMARY_HEADING,
+} from "@guizhi/shared/utils/forum-note";
+import type { AIClientConfig } from "@guizhi/core";
+import type { ExtractedContent } from "./connectors";
+import { generateForumSummary, type ForumSummaryInput } from "./forum-summary";
+import { fetchV2exThread, type ForumReply, type ForumThread } from "./v2ex";
+import { resolveMediaSummaryConfig } from "../media/media-summary";
+
+const PLATFORM_LABELS: Record<ForumTarget["platform"], string> = {
+  v2ex: "V2EX",
+};
+
+/** 失败原因写进正文时的截断长度 */
+const SUMMARY_ERROR_MAX_LENGTH = 120;
+
+export interface ForumPostDeps {
+  /** 测试注入：帖子抓取 */
+  fetchThread?: (
+    target: ForumTarget,
+    signal?: AbortSignal,
+  ) => Promise<ForumThread>;
+  /** 测试注入：总结模型解析（默认读 ai-config.json 的 mainText 路由） */
+  getSummaryConfig?: () => AIClientConfig | null;
+  /** 测试注入：讨论总结 */
+  summarize?: (
+    input: ForumSummaryInput,
+    config: AIClientConfig,
+    options?: { signal?: AbortSignal },
+  ) => Promise<string | null>;
+  onStage?: (stage: ImportStage) => void;
+}
+
+async function fetchThreadByPlatform(
+  target: ForumTarget,
+  signal?: AbortSignal,
+): Promise<ForumThread> {
+  switch (target.platform) {
+    case "v2ex":
+      return fetchV2exThread(target.topicId, {}, signal);
+    default:
+      throw new Error(
+        `暂不支持的论坛: ${target.platform satisfies never}`,
+      );
+  }
+}
+
+/** 本地时区的 YYYY-MM-DD */
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * 元数据引用块。首字段沿用「平台：」，让详情页的来源 chip
+ * （parseVideoMetaBlock）不必为论坛条目另开一套解析。
+ *
+ * 两行之间只能是换行不能空行——元数据块的解析靠「连续的 > 行」界定，
+ * 中间断开会让后面几行漏进正文。
+ */
+export function buildForumMetaBlock(thread: ForumThread): string {
+  const facts = [`平台：${PLATFORM_LABELS[thread.platform]}`];
+  if (thread.author) {
+    facts.push(`作者：${thread.author}`);
+  }
+  if (thread.node) {
+    facts.push(`节点：${thread.node}`);
+  }
+  facts.push(`${thread.replyCount} 条回复`);
+
+  return [
+    `> ${facts.join(" · ")}`,
+    `> 发布：${formatDate(thread.createdAt)}`,
+  ].join("\n");
+}
+
+/** 逐楼回复。楼层与作者写进加粗行，正文另起一段，保证 Markdown 列表/代码块不被打断 */
+function buildRepliesSection(replies: ForumReply[]): string[] {
+  if (replies.length === 0) {
+    return [];
+  }
+  const parts = [`${FORUM_REPLIES_HEADING}（${replies.length} 条）`];
+  for (const reply of replies) {
+    parts.push(
+      `**${reply.floor} 楼 · ${reply.author || "匿名"}**`,
+      reply.content,
+    );
+  }
+  return parts;
+}
+
+/**
+ * 生成讨论总结；未配置模型或生成失败都不阻断采集，
+ * 改为在正文里如实交代，原始讨论照常入库。
+ */
+async function buildSummarySection(
+  thread: ForumThread,
+  deps: ForumPostDeps,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  if (thread.replies.length === 0) {
+    return [];
+  }
+
+  const config = (deps.getSummaryConfig ?? resolveMediaSummaryConfig)();
+  if (!config) {
+    return ["> 未配置文本模型，讨论总结未生成；原始讨论已完整入库。"];
+  }
+
+  deps.onStage?.("summarizing");
+  try {
+    const summarize = deps.summarize ?? generateForumSummary;
+    const summary = await summarize(
+      {
+        title: thread.title,
+        content: thread.content,
+        replies: thread.replies,
+      },
+      config,
+      { signal },
+    );
+    return summary ? [FORUM_SUMMARY_HEADING, summary] : [];
+  } catch (error) {
+    if (signal?.aborted) {
+      throw new Error("已取消");
+    }
+    console.warn("[import] 论坛讨论总结失败:", error);
+    const reason = (
+      error instanceof Error ? error.message : String(error)
+    ).slice(0, SUMMARY_ERROR_MAX_LENGTH);
+    return [`> 讨论总结生成失败：${reason}。原始讨论已完整入库。`];
+  }
+}
+
+/**
+ * 抓取论坛帖子并组装为知识条目。
+ * 抓取失败返回带 degradedReason 的空壳，由队列标记任务失败（不入库）。
+ */
+export async function extractForumPost(
+  target: ForumTarget,
+  deps: ForumPostDeps = {},
+  signal?: AbortSignal,
+): Promise<ExtractedContent> {
+  // 抓取主楼与整帖回复要串两个请求，先把阶段报出去，
+  // 否则这段时间界面只显示笼统的「抓取中」
+  deps.onStage?.("forum-replies");
+
+  let thread: ForumThread;
+  try {
+    const fetchThread = deps.fetchThread ?? fetchThreadByPlatform;
+    thread = await fetchThread(target, signal);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "已取消") {
+      throw error;
+    }
+    return {
+      title: "",
+      content: "",
+      itemType: "forum",
+      sourceUri: null,
+      degradedReason: `论坛帖子抓取失败：${message}`,
+    };
+  }
+
+  const parts = [buildForumMetaBlock(thread)];
+  parts.push(...(await buildSummarySection(thread, deps, signal)));
+
+  if (thread.content) {
+    parts.push(FORUM_BODY_HEADING, thread.content);
+  }
+  parts.push(...buildRepliesSection(thread.replies));
+
+  return {
+    title: thread.title,
+    content: parts.join("\n\n"),
+    itemType: "forum",
+    sourceUri: thread.webpageUrl,
+  };
+}
