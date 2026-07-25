@@ -5,12 +5,49 @@
 
 export type LocalAssetProtocol = "local-image" | "local-video";
 
+const ASSET_NAME_PATTERN = "([A-Za-z0-9_.-]+)";
+
 export function extractLocalAssetRef(
   content: string,
   protocol: LocalAssetProtocol,
 ): string | null {
-  const match = content.match(
-    new RegExp(`${protocol}://([A-Za-z0-9_.-]+)`),
-  );
+  const match = content.match(new RegExp(`${protocol}://${ASSET_NAME_PATTERN}`));
   return match?.[1] ?? null;
+}
+
+/**
+ * 提取全部资产引用（一条笔记可以引用多个资产）。
+ *
+ * 删除条目后要据此清理磁盘文件，所以这里必须取全，
+ * 只看首个匹配会漏掉同一条目里的其余附件。
+ */
+export function extractAllLocalAssetRefs(content: string): string[] {
+  if (!content) {
+    return [];
+  }
+  const refs = new Set<string>();
+  for (const protocol of ["local-image", "local-video"] as const) {
+    const pattern = new RegExp(`${protocol}://${ASSET_NAME_PATTERN}`, "g");
+    for (const match of content.matchAll(pattern)) {
+      if (isSafeAssetFileName(match[1])) {
+        refs.add(match[1]);
+      }
+    }
+  }
+  return [...refs];
+}
+
+/**
+ * 资产文件名是否可以安全地拼进资产目录。
+ *
+ * 引用来自条目正文，而正文是用户可编辑的：`local-image://..` 拼出来就是
+ * 资产目录的父目录。删除路径上尤其不能信任它。
+ */
+export function isSafeAssetFileName(fileName: string): boolean {
+  return (
+    /^[A-Za-z0-9_.-]+$/.test(fileName) &&
+    fileName !== "." &&
+    fileName !== ".." &&
+    !fileName.startsWith(".")
+  );
 }

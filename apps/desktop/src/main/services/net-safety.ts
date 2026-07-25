@@ -7,7 +7,7 @@
 import * as dns from "dns/promises";
 import * as nodeNet from "net";
 
-interface ResolvedAddress {
+export interface ResolvedAddress {
   address: string;
   family: 4 | 6;
 }
@@ -109,6 +109,52 @@ export function isPrivateIPv6(address: string): boolean {
     // NAT64
     (firstHextet === 0x0064 && secondHextet === 0xff9b)
   );
+}
+
+/**
+ * AI 接口地址的禁止目标。
+ *
+ * AI 端点必须允许回环与局域网——本地 Ollama / LM Studio、局域网推理服务
+ * 都是常规用法，套用抓取那套「一律禁私网」会直接废掉这些场景。
+ * 这里只挡没有任何合法 AI 用途、却是经典攻击目标的地址段：
+ * link-local（含云元数据 169.254.169.254）、组播、保留段。
+ */
+export function isForbiddenAIEndpointAddress(address: string): boolean {
+  const family = nodeNet.isIP(address);
+  if (family === 4) {
+    const parts = address.split(".").map(Number);
+    const [a, b] = parts;
+    return (
+      (a === 169 && b === 254) ||
+      (a >= 224 && a <= 239) ||
+      a >= 240 ||
+      a === 0
+    );
+  }
+  if (family === 6) {
+    const normalized = address.toLowerCase().split("%")[0];
+    if (normalized.startsWith("::ffff:")) {
+      const mapped = normalized.slice("::ffff:".length);
+      return (
+        nodeNet.isIP(mapped) === 4 && isForbiddenAIEndpointAddress(mapped)
+      );
+    }
+    const decoded = decodeTrustedCompatibilityIPv6(normalized);
+    if (decoded) {
+      return isForbiddenAIEndpointAddress(decoded);
+    }
+    const firstHextet = Number.parseInt(normalized.split(":")[0], 16);
+    if (Number.isNaN(firstHextet)) {
+      return false;
+    }
+    return (
+      // Link-local fe80::/10
+      (firstHextet & 0xffc0) === 0xfe80 ||
+      // Multicast ff00::/8
+      (firstHextet & 0xff00) === 0xff00
+    );
+  }
+  return false;
 }
 
 export function isPrivateAddress(address: string): boolean {

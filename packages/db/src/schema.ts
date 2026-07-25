@@ -107,12 +107,42 @@ CREATE TABLE IF NOT EXISTS wiki_page_sources (
 );
 
 -- Wiki 编译指纹（素材哈希 + 提示词版本，增量编译的失效判定）
+-- prompt_version 为空表示上次尝试失败；failure_count / next_attempt_at 用于退避，
+-- 避免一条模型始终解析不出来的「毒条目」每轮都白烧两次调用
 CREATE TABLE IF NOT EXISTS wiki_ingestions (
   item_id TEXT PRIMARY KEY REFERENCES knowledge_items(id) ON DELETE CASCADE,
   content_hash TEXT NOT NULL,
   model TEXT NOT NULL DEFAULT '',
   prompt_version TEXT NOT NULL DEFAULT '',
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER,
   updated_at INTEGER NOT NULL
+);
+
+-- Wiki 页面历史版本（整体覆盖前的快照，可回滚）
+CREATE TABLE IF NOT EXISTS wiki_page_revisions (
+  id TEXT PRIMARY KEY,
+  page_id TEXT NOT NULL REFERENCES wiki_pages(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL DEFAULT '',
+  aliases_json TEXT,
+  model TEXT NOT NULL DEFAULT '',
+  prompt_version TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+
+-- AI 用量（按天 × 场景 × 模型聚合；provider 不回报 usage 时 token 记 0）
+CREATE TABLE IF NOT EXISTS ai_usage_daily (
+  day TEXT NOT NULL,
+  scenario TEXT NOT NULL,
+  model TEXT NOT NULL,
+  calls INTEGER NOT NULL DEFAULT 0,
+  prompt_tokens INTEGER NOT NULL DEFAULT 0,
+  completion_tokens INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (day, scenario, model)
 );
 
 -- 语义索引（embedding 向量按分块存储；vector 为 L2 归一化的 Float32 BLOB）
@@ -178,7 +208,10 @@ CREATE INDEX IF NOT EXISTS idx_import_tasks_status ON import_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_created ON import_tasks(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_wiki_links_to ON wiki_page_links(to_page_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_sources_item ON wiki_page_sources(item_id);
+CREATE INDEX IF NOT EXISTS idx_wiki_revisions_page ON wiki_page_revisions(page_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ask_sessions_updated ON ask_sessions(updated_at DESC);
+-- 语义检索按 model 过滤全部分块；换模型后旧向量仍在表中，没有索引会全表扫
+CREATE INDEX IF NOT EXISTS idx_embeddings_model ON knowledge_embeddings(model);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
   item_id UNINDEXED,

@@ -4,6 +4,15 @@ export type { default as Database } from "./adapter";
 
 // Schema
 export { SCHEMA_TABLES, SCHEMA_INDEXES, SCHEMA } from "./schema";
+export {
+  addColumnIfMissing,
+  getSchemaVersion,
+  hasColumn,
+  runMigrations,
+  MIGRATIONS,
+  SCHEMA_VERSION,
+} from "./migrations";
+export type { Migration } from "./migrations";
 
 // Initialization
 export { initDatabase, getDatabase, closeDatabase, db } from "./init";
@@ -28,6 +37,7 @@ export { TagDB } from "./tag";
 export { ImportTaskDB } from "./import-task";
 export { WikiDB } from "./wiki";
 export { AskSessionDB } from "./ask-session";
+export { AIUsageDB, toLocalDay } from "./ai-usage";
 export { SemanticIndexDB, vectorToBlob, blobToVector } from "./semantic";
 export type { SemanticChunkRecord, SemanticItemState } from "./semantic";
 export {

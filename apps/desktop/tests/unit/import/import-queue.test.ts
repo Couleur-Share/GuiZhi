@@ -14,10 +14,12 @@ import type { ExtractedContent } from "../../../src/main/services/import/connect
 /** 内存版任务存储：模拟 ImportTaskDB 行为 */
 function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask & { forceDuplicate: boolean }> } {
   const rows = new Map<string, ImportTask & { forceDuplicate: boolean }>();
+  // 单调递增，避免同毫秒创建的任务排序不稳定
+  let sequence = 0;
   return {
     rows,
     create(input: EnqueueImportInput) {
-      const now = Date.now();
+      const now = Date.now() + sequence++;
       const task: ImportTask & { forceDuplicate: boolean } = {
         id: randomUUID(),
         sourceKind: input.kind,
@@ -43,8 +45,19 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
     isForceDuplicate(id) {
       return rows.get(id)?.forceDuplicate ?? false;
     },
-    list() {
-      return [...rows.values()].map((row) => ({ ...row }));
+    // 与 ImportTaskDB.list 一致：最近 limit 条、按创建时间倒序。
+    // 这个窗口正是 recover() 不能用 list() 的原因，替身必须如实模拟。
+    list(limit = 200) {
+      return [...rows.values()]
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .slice(0, limit)
+        .map((row) => ({ ...row }));
+    },
+    listByStatus(statuses) {
+      return [...rows.values()]
+        .filter((row) => statuses.includes(row.status))
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .map((row) => ({ ...row }));
     },
     update(id, patch) {
       const row = rows.get(id);
@@ -280,5 +293,54 @@ describe("ImportQueue", () => {
 
     expect(store.get(stale.id)!.status).toBe("completed");
     expect(savedItems).toEqual(["遗留任务"]);
+  });
+
+  it("重启恢复：待处理任务超过 list() 的 200 条窗口时也不丢", async () => {
+    const harness = createHarness({ concurrency: 8 });
+    const tasks = harness.queue.enqueue(
+      Array.from({ length: 250 }, (_, index) => ({
+        kind: "text" as const,
+        input: `任务 ${index}`,
+      })),
+    );
+    await harness.queue.drain();
+
+    // 全部复位为 pending，模拟上次退出时这 250 条都还没跑完
+    for (const task of tasks) {
+      harness.store.update(task.id, { status: "pending", resultItemId: null });
+    }
+    harness.savedItems.length = 0;
+
+    harness.queue.recover();
+    await harness.queue.drain();
+
+    const unfinished = tasks.filter(
+      (task) => harness.store.get(task.id)!.status !== "completed",
+    );
+    expect(unfinished).toHaveLength(0);
+    expect(harness.savedItems).toHaveLength(250);
+  });
+
+  it("抽取降级：标记 failed 并透出原因，不入库", async () => {
+    const harness = createHarness({
+      extract: async () => ({
+        title: "https://example.com/gone",
+        content: "",
+        itemType: "webpage" as const,
+        sourceUri: null,
+        degradedReason: "网页抓取失败：HTTP 403",
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://example.com/gone" },
+    ]);
+    await harness.queue.drain();
+
+    const finished = harness.store.get(task.id)!;
+    expect(finished.status).toBe("failed");
+    expect(finished.error).toBe("网页抓取失败：HTTP 403");
+    // 不入库是关键：空壳条目会占住该链接的 normalized_uri，让重试永远判重
+    expect(finished.resultItemId).toBeNull();
+    expect(harness.savedItems).toHaveLength(0);
   });
 });

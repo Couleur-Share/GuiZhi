@@ -46,8 +46,10 @@ async function isValidExternalUrl(url: string): Promise<boolean> {
       return false;
     }
 
-    // Resolve hostname and verify all addresses are public
-    await resolvePublicAddress(host);
+    // Resolve hostname and verify all addresses are public.
+    // 允许 198.18/15：Clash 等代理的 fake-ip 池落在这一段，
+    // 开着系统代理的用户本地 DNS 拿到的全是合成地址。
+    await resolvePublicAddress(host, { allowProxyCompatibilityAddress: true });
     return true;
   } catch {
     return false;
@@ -105,7 +107,9 @@ async function downloadImageBuffer(
     throw new Error("Invalid or blocked URL");
   }
 
-  const resolvedAddress = await resolvePublicAddress(parsedUrl.hostname);
+  const resolvedAddress = await resolvePublicAddress(parsedUrl.hostname, {
+    allowProxyCompatibilityAddress: true,
+  });
   const requestModule = getRequestModule(parsedUrl.protocol);
   const agent = getHttpRequestAgent(parsedUrl);
 

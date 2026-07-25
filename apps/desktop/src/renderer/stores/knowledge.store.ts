@@ -14,6 +14,11 @@ import { useSettingsStore } from "./settings.store";
 import { useTagStore } from "./tag.store";
 
 const AUTO_SAVE_DEBOUNCE_MS = 800;
+export const DEFAULT_PAGE_SIZE = 20;
+export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+/** fetchList 的请求序号：只有最后一次发出的请求可以写回结果 */
+let listRequestSeq = 0;
 
 /** 可本地编辑并防抖持久化的字段 */
 type EditablePatch = Pick<
@@ -34,9 +39,11 @@ interface KnowledgeState {
   // ── 排序（搜索态下由相关度接管） ──
   sortBy: KnowledgeSortField;
   sortOrder: KnowledgeSortOrder;
-  // ── 列表 ──
+  // ── 列表（服务端分页：entries 只含当前页，total 是过滤后的总数）──
   entries: KnowledgeItemListEntry[];
   total: number;
+  page: number;
+  pageSize: number;
   isLoading: boolean;
   // ── 计数 ──
   counts: KnowledgeCounts | null;
@@ -46,6 +53,8 @@ interface KnowledgeState {
   isSaving: boolean;
   /** 有未落盘的编辑（autoSave 关闭时由保存按钮 / Ctrl+S 落盘） */
   hasUnsavedChanges: boolean;
+  /** 上次保存失败的原因；改动已退回待保存队列，可重试。成功保存后清空 */
+  saveError: string | null;
   // ── 批量多选 ──
   selectionIds: string[];
   selectionAnchorId: string | null;
@@ -55,6 +64,8 @@ interface KnowledgeState {
   selectTag: (tagId: string | null) => void;
   setSearchQuery: (query: string) => void;
   setSort: (sortBy: KnowledgeSortField, sortOrder: KnowledgeSortOrder) => void;
+  setPage: (page: number) => void;
+  setPageSize: (pageSize: number) => void;
 
   /** Ctrl/Cmd+点击：切换单条选中态 */
   toggleSelection: (id: string) => void;
@@ -103,6 +114,8 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       search: state.searchQuery.trim() || undefined,
       sortBy: state.sortBy,
       sortOrder: state.sortOrder,
+      limit: state.pageSize,
+      offset: (state.page - 1) * state.pageSize,
     };
   };
 
@@ -151,12 +164,15 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     sortOrder: "desc",
     entries: [],
     total: 0,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
     isLoading: false,
     counts: null,
     selectedId: null,
     selectedItem: null,
     isSaving: false,
     hasUnsavedChanges: false,
+    saveError: null,
     selectionIds: [],
     selectionAnchorId: null,
 
@@ -166,6 +182,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         scope,
         collectionId: null,
         tagId: null,
+        page: 1,
         selectedId: null,
         selectedItem: null,
         selectionIds: [],
@@ -179,6 +196,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         scope: "all",
         collectionId,
         tagId: null,
+        page: 1,
         selectedId: null,
         selectedItem: null,
         selectionIds: [],
@@ -192,6 +210,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         scope: "all",
         collectionId: null,
         tagId,
+        page: 1,
         selectedId: null,
         selectedItem: null,
         selectionIds: [],
@@ -200,12 +219,28 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       void get().fetchList();
     },
     setSearchQuery: (query) => {
-      set({ searchQuery: query, selectionIds: [], selectionAnchorId: null });
+      set({
+        searchQuery: query,
+        page: 1,
+        selectionIds: [],
+        selectionAnchorId: null,
+      });
       void get().fetchList();
     },
 
     setSort: (sortBy, sortOrder) => {
-      set({ sortBy, sortOrder });
+      set({ sortBy, sortOrder, page: 1 });
+      void get().fetchList();
+    },
+
+    setPage: (page) => {
+      set({ page: Math.max(1, page) });
+      void get().fetchList();
+    },
+
+    setPageSize: (pageSize) => {
+      // 换每页条数后停留在原页码会越过总页数，统一回到第一页
+      set({ pageSize: Math.max(1, pageSize), page: 1 });
       void get().fetchList();
     },
 
@@ -264,21 +299,42 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     fetchList: async () => {
+      const requestId = ++listRequestSeq;
       set({ isLoading: true });
       try {
         const result = await window.api.knowledge.list(buildQuery());
-        set((state) => ({
+        // 快速切换范围时，先发出的慢请求可能后到；只认最后一次
+        if (requestId !== listRequestSeq) {
+          return;
+        }
+
+        // 当前页越界（例如删光了最后一页）：回退到最后一页重取
+        const state = get();
+        const lastPage = Math.max(
+          1,
+          Math.ceil(result.total / state.pageSize) || 1,
+        );
+        if (result.entries.length === 0 && state.page > lastPage) {
+          set({ page: lastPage });
+          await get().fetchList();
+          return;
+        }
+
+        set((current) => ({
           entries: result.entries,
           total: result.total,
-          // 清掉已不在当前列表中的选中项（被移出视图 / 删除）
-          selectionIds: state.selectionIds.filter((id) =>
+          // 清掉已不在当前页的选中项（被移出视图 / 删除 / 翻页）
+          selectionIds: current.selectionIds.filter((id) =>
             result.entries.some((entry) => entry.id === id),
           ),
         }));
       } catch (error) {
         console.error("加载知识条目列表失败:", error);
       } finally {
-        set({ isLoading: false });
+        // 只有最后一次请求负责收起加载态，避免先返回的请求提前关掉 Spinner
+        if (requestId === listRequestSeq) {
+          set({ isLoading: false });
+        }
       }
     },
 
@@ -353,25 +409,35 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (!itemId || Object.keys(patch).length === 0) {
         return;
       }
-      set({ isSaving: true });
+      set({ isSaving: true, saveError: null });
       try {
         const updated = await window.api.knowledge.update(itemId, patch);
-        if (updated) {
-          applyItemToList(updated);
-          if (get().selectedId === updated.id) {
-            // 保留用户可能仍在输入的本地内容，仅同步服务器权威字段
-            set((state) => ({
-              selectedItem: state.selectedItem
-                ? {
-                    ...state.selectedItem,
-                    updatedAt: updated.updatedAt,
-                    tags: updated.tags,
-                  }
-                : updated,
-            }));
-          }
+        if (!updated) {
+          throw new Error("条目不存在或已被删除");
+        }
+        applyItemToList(updated);
+        if (get().selectedId === updated.id) {
+          // 保留用户可能仍在输入的本地内容，仅同步服务器权威字段
+          set((state) => ({
+            selectedItem: state.selectedItem
+              ? {
+                  ...state.selectedItem,
+                  updatedAt: updated.updatedAt,
+                  tags: updated.tags,
+                }
+              : updated,
+          }));
         }
       } catch (error) {
+        // 改动退回待保存队列——patch 在 await 之前就被取走了，
+        // 这里不放回去，用户这段编辑就随异常一起消失了。
+        // await 期间可能又有新输入，新值优先。
+        pendingItemId = itemId;
+        pendingPatch = { ...patch, ...pendingPatch };
+        set({
+          hasUnsavedChanges: true,
+          saveError: error instanceof Error ? error.message : String(error),
+        });
         console.error("保存条目失败:", error);
       } finally {
         set({ isSaving: false });

@@ -10,7 +10,12 @@ import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
 import { coreAIConfigService } from "@guizhi/core";
-import { getBaseUrl } from "@guizhi/shared/utils/ai-protocol";
+import {
+  buildTranscriptionsEndpointFromBase,
+  resolveAIProtocol,
+  resolveProtocolBase,
+} from "@guizhi/shared/utils/ai-protocol";
+import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
 
 const TRANSCRIBE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -20,6 +25,8 @@ export interface TranscriptionModelConfig {
   apiUrl: string;
   apiKey: string;
   model: string;
+  apiProtocol?: AIProtocol;
+  provider?: string;
 }
 
 /** 从共享 AI 配置解析 audioText 路由模型；未配置返回 null */
@@ -43,6 +50,8 @@ export function resolveTranscriptionConfig(): TranscriptionModelConfig | null {
       apiUrl: model.apiUrl.trim(),
       apiKey: model.apiKey.trim(),
       model: model.model.trim(),
+      apiProtocol: model.apiProtocol,
+      provider: model.provider,
     };
   } catch (error) {
     console.warn("[media] 读取转写模型配置失败:", error);
@@ -50,11 +59,23 @@ export function resolveTranscriptionConfig(): TranscriptionModelConfig | null {
   }
 }
 
-export function buildTranscriptionsEndpoint(apiUrl: string): string {
-  const base = getBaseUrl(apiUrl.replace(/#$/, "")).replace(/\/$/, "");
-  return base.match(/\/v\d+$/)
-    ? `${base}/audio/transcriptions`
-    : `${base}/v1/audio/transcriptions`;
+/**
+ * 转写端点。
+ *
+ * 只有 OpenAI 兼容协议提供 multipart 的 /audio/transcriptions：Anthropic
+ * 根本没有转写 API，Gemini 的音频要走 generateContent 内联。此前一律拼
+ * /v1/audio/transcriptions，配错协议的用户只会撞上一个莫名的 404。
+ */
+export function buildTranscriptionsEndpoint(
+  config: Pick<
+    TranscriptionModelConfig,
+    "apiUrl" | "apiProtocol" | "provider"
+  >,
+): string {
+  const protocol = resolveAIProtocol(config);
+  return buildTranscriptionsEndpointFromBase(
+    resolveProtocolBase(config.apiUrl, protocol),
+  );
 }
 
 /** 发起转写请求并返回原始文本（可能为空串——测试静音样本时属正常） */
@@ -63,7 +84,12 @@ async function requestTranscription(
   config: TranscriptionModelConfig,
   signal: AbortSignal,
 ): Promise<string> {
-  const endpoint = buildTranscriptionsEndpoint(config.apiUrl);
+  const endpoint = buildTranscriptionsEndpoint(config);
+  if (!endpoint) {
+    throw new Error(
+      "当前模型的接口协议不支持语音转写：请改用 OpenAI 兼容的转写服务，或在设置里启用内置转写引擎",
+    );
+  }
 
   const form = new FormData();
   form.append("file", await openAsBlob(filePath), path.basename(filePath));

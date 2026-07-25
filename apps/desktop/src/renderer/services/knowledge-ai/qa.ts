@@ -58,7 +58,12 @@ export interface QaDeps {
   /** 已绑定 qa 场景配置的对话调用 */
   chat: (
     messages: { role: "system" | "user"; content: string }[],
-    options: { temperature: number; maxTokens: number },
+    options: {
+      temperature: number;
+      maxTokens: number;
+      /** 必须透传到底层请求，否则「停止」只能等这一轮自然返回 */
+      signal?: AbortSignal;
+    },
   ) => Promise<{ content: string; model: string }>;
   /** 知识库全文检索（含归档，排除回收站） */
   searchItems: (query: string, limit: number) => Promise<QaSearchHit[]>;
@@ -378,7 +383,7 @@ async function askByAgentLoop(
           content: buildQaAgentPrompt(question, history, transcript),
         },
       ],
-      { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS },
+      { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS, signal },
     );
     throwIfAborted(signal);
 
@@ -634,7 +639,7 @@ async function askSingleShot(
         content: buildQaUserPrompt(question, contextBlocks, history),
       },
     ],
-    { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS },
+    { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS, signal },
   );
 
   // 引用对齐：来源列表只保留回答实际标注引用的条目；未标注时退回完整列表保底可回溯

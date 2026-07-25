@@ -7,6 +7,7 @@ import {
   Loader2Icon,
   RefreshCwIcon,
   Trash2Icon,
+  XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -232,13 +233,15 @@ export function FfmpegSettings() {
         label={t("settings.ffmpegCustomPath", "ffmpeg 自定义路径（高级）")}
         description={t(
           "settings.ffmpegCustomPathDesc",
-          "指定后优先于内置版与系统 PATH；留空自动选择",
+          "指定后优先于内置版与系统 PATH；请通过右侧按钮选择文件，留空自动选择",
         )}
       >
         <div className="flex shrink-0 items-center gap-2">
+          {/* 只读：该路径会被主进程 spawn，只接受文件选择器返回的值 */}
           <Input
             value={ffmpegPath}
-            onChange={(event) => setFfmpegPath(event.target.value)}
+            readOnly
+            title={ffmpegPath}
             placeholder={t(
               "settings.ffmpegCustomPathPlaceholder",
               "留空自动选择",
@@ -254,6 +257,17 @@ export function FfmpegSettings() {
           >
             <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
           </button>
+          {ffmpegPath ? (
+            <button
+              type="button"
+              onClick={() => setFfmpegPath("")}
+              title={t("settings.ffmpegClearPath", "清除自定义路径")}
+              aria-label={t("settings.ffmpegClearPath", "清除自定义路径")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <XIcon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </SettingItem>
     </>

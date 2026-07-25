@@ -49,8 +49,11 @@ import { registerAppRuntimeIPC } from "./ipc/app-runtime.ipc";
 import { logStartupEvent, scrubPath } from "./startup-log";
 import { openDirectoryPath } from "./shell-open-path";
 import { shouldOpenStartupDevTools } from "./devtools-policy";
-import { handleExternalWindowOpen } from "./external-links";
 import { resolveLocalMediaProtocolPath } from "./local-media-protocol";
+import {
+  applySessionSecurity,
+  applyWebContentsSecurity,
+} from "./window-security";
 import { applyNetworkProxySettings } from "./services/network-proxy";
 import { startBackupScheduler } from "./services/backup";
 import { createTrayController } from "./tray-controller";
@@ -167,6 +170,13 @@ configureRuntimePaths({
   platform: process.platform,
 });
 const isDev = shouldUseDevServer(app.isPackaged);
+/** 渲染进程唯一允许停留的远程源；生产构建走 file://，这里为 null */
+const devServerUrl = isDev
+  ? process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173"
+  : null;
+/** 打包后的渲染产物目录；file:// 导航只允许停留在这里面 */
+const rendererDir = path.join(__dirname, "../renderer");
+const windowSecurityOptions = { devServerUrl, rendererDir };
 
 const trayController = createTrayController({
   agentManagementEnabled: false,
@@ -322,9 +332,7 @@ async function createWindow() {
 
   // Load renderer page
   // 加载页面
-  if (isDev) {
-    const devServerUrl =
-      process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173";
+  if (isDev && devServerUrl) {
     console.log("Loading dev server:", devServerUrl);
     try {
       await mainWindow.loadURL(devServerUrl);
@@ -335,7 +343,7 @@ async function createWindow() {
       console.error("Failed to load dev server:", error);
     }
   } else {
-    await mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+    await mainWindow.loadFile(path.join(rendererDir, "index.html"));
     // Handle DevTools shortcuts in production
     // 生产环境处理开发者工具快捷键
     mainWindow.webContents.on("before-input-event", (event, input) => {
@@ -352,10 +360,6 @@ async function createWindow() {
       }
     });
   }
-
-  // Open external links in system browser
-  // 处理外部链接
-  mainWindow.webContents.setWindowOpenHandler(handleExternalWindowOpen);
 
   // Close behavior: decide based on settings whether to minimize to tray or close
   // 关闭行为：根据设置决定是最小化到托盘还是关闭
@@ -884,6 +888,11 @@ ipcMain.handle(
   },
 );
 
+// 每个 webContents（主窗口、未来可能的子窗口）统一装上导航与开窗拦截
+app.on("web-contents-created", (_event, contents) => {
+  applyWebContentsSecurity(contents, windowSecurityOptions);
+});
+
 // App startup
 // 应用启动
 app.whenReady().then(async () => {
@@ -899,6 +908,9 @@ app.whenReady().then(async () => {
     // Register updater IPC as early as possible so renderer calls do not depend on
     // later startup work completing.
     registerUpdaterIPC();
+
+    // CSP 响应头 + 拒绝全部 web 权限请求
+    applySessionSecurity(session.defaultSession, windowSecurityOptions);
 
     // Register local-image protocol
     // 注册 local-image 协议

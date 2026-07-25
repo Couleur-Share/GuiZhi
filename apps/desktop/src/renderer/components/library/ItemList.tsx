@@ -9,6 +9,7 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ItemBulkBar } from "./ItemBulkBar";
 import { ItemConfirmDialog, useItemMenus } from "./item-menus";
 import { ItemListToolbar } from "./ItemListToolbar";
+import { ItemPagination } from "./ItemPagination";
 import { ITEM_TYPE_META } from "./type-meta";
 
 /** 卡片预估高度（含行间距）：标题最多两行 */
@@ -76,6 +77,7 @@ function ItemRow({
 /**
  * 卡片视图的条目列表（虚拟化）。右键菜单与批量动作和列表视图共用同一套实现。
  * Ctrl/Cmd+点击、Shift+点击进入多选，顶部换成批量工具条。
+ * 分页与列表视图共用 store 里的同一套状态，两边数据范围始终一致。
  */
 export function ItemList() {
   const { t } = useTranslation();
@@ -202,6 +204,8 @@ export function ItemList() {
           </div>
         )}
       </div>
+
+      <ItemPagination />
 
       {menuState ? (
         <ContextMenu

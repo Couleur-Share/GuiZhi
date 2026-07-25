@@ -25,23 +25,25 @@ import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
 import { ITEM_TYPE_META, formatItemTime } from "./type-meta";
 
+const CHIP_TONES = {
+  muted: "border-border/70 text-muted-foreground",
+  warning: "border-amber-500/40 text-amber-500",
+  danger: "border-destructive/50 text-destructive",
+} as const;
+
 function MetaChip({
   icon,
   children,
   tone = "muted",
+  title,
 }: {
   icon?: ReactNode;
   children: ReactNode;
-  tone?: "muted" | "warning";
+  tone?: keyof typeof CHIP_TONES;
+  title?: string;
 }) {
   return (
-    <span
-      className={`${CHIP_BASE} ${
-        tone === "warning"
-          ? "border-amber-500/40 text-amber-500"
-          : "border-border/70 text-muted-foreground"
-      }`}
-    >
+    <span className={`${CHIP_BASE} ${CHIP_TONES[tone]}`} title={title}>
       {icon}
       <span className="max-w-[12rem] truncate">{children}</span>
     </span>
@@ -164,6 +166,7 @@ export function ItemDetailHeader({
   const hasUnsavedChanges = useKnowledgeStore(
     (state) => state.hasUnsavedChanges,
   );
+  const saveError = useKnowledgeStore((state) => state.saveError);
   const updateSelected = useKnowledgeStore((state) => state.updateSelected);
   const flushPendingSave = useKnowledgeStore(
     (state) => state.flushPendingSave,
@@ -176,8 +179,23 @@ export function ItemDetailHeader({
   const autoSave = useSettingsStore((state) => state.autoSave);
 
   const typeMeta = ITEM_TYPE_META[item.itemType];
-  const isDirty = hasUnsavedChanges && !autoSave;
+  // 保存失败与 autoSave 无关：改动已退回待保存队列，此时必须提示未落盘
+  const isDirty = hasUnsavedChanges && (!autoSave || saveError !== null);
   const wordCount = item.content.trim().length;
+
+  let saveTone: "muted" | "warning" | "danger" = "muted";
+  let saveLabel = t("library.updatedAt", "更新于 {{time}}", {
+    time: formatItemTime(item.updatedAt),
+  });
+  if (isSaving) {
+    saveLabel = t("library.saving", "保存中…");
+  } else if (saveError) {
+    saveTone = "danger";
+    saveLabel = t("library.saveFailed", "保存失败，改动未丢失");
+  } else if (isDirty) {
+    saveTone = "warning";
+    saveLabel = t("library.unsaved", "未保存");
+  }
 
   return (
     <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-4">
@@ -282,15 +300,10 @@ export function ItemDetailHeader({
         <SourceChip item={item} />
         <MetaChip
           icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
-          tone={!isSaving && isDirty ? "warning" : "muted"}
+          tone={saveTone}
+          title={saveError ?? undefined}
         >
-          {isSaving
-            ? t("library.saving", "保存中…")
-            : isDirty
-              ? t("library.unsaved", "未保存")
-              : t("library.updatedAt", "更新于 {{time}}", {
-                  time: formatItemTime(item.updatedAt),
-                })}
+          {saveLabel}
         </MetaChip>
         {wordCount > 0 ? (
           <MetaChip

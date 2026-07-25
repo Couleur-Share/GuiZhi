@@ -6,6 +6,7 @@ import {
   Loader2Icon,
   NetworkIcon,
   RefreshCwIcon,
+  RotateCcwIcon,
   SearchIcon,
   SparklesIcon,
 } from "lucide-react";
@@ -162,6 +163,10 @@ function PageDetail() {
   const { showToast } = useToast();
   const detail = useWikiStore((state) => state.pageDetail);
   const selectedPageId = useWikiStore((state) => state.selectedPageId);
+  const pageRevisions = useWikiStore((state) => state.pageRevisions);
+  const restorePreviousRevision = useWikiStore(
+    (state) => state.restorePreviousRevision,
+  );
   const openByLinkTarget = useWikiStore((state) => state.openByLinkTarget);
   const selectPage = useWikiStore((state) => state.selectPage);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
@@ -201,6 +206,17 @@ function PageDetail() {
     await selectItem(itemId);
   };
 
+  const previousRevision = pageRevisions[0];
+  const restorePrevious = async () => {
+    const ok = await restorePreviousRevision();
+    showToast(
+      ok
+        ? t("wiki.revisionRestored", "已恢复上一版内容")
+        : t("wiki.revisionRestoreFailed", "恢复失败"),
+      ok ? "success" : "error",
+    );
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-6 py-5">
@@ -210,12 +226,27 @@ function PageDetail() {
           </h1>
           <KindBadge kind={page.kind} />
         </div>
-        <p className="mb-4 text-xs text-muted-foreground/70">
-          {t("wiki.generatedAt", "由 {{model}} 生成于 {{time}}", {
-            model: page.model || "AI",
-            time: formatItemTime(page.generatedAt),
-          })}
-        </p>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground/70">
+            {t("wiki.generatedAt", "由 {{model}} 生成于 {{time}}", {
+              model: page.model || "AI",
+              time: formatItemTime(page.generatedAt),
+            })}
+          </p>
+          {previousRevision ? (
+            <button
+              type="button"
+              onClick={() => void restorePrevious()}
+              title={t("wiki.restorePreviousHint", "恢复到 {{time}} 的内容", {
+                time: formatItemTime(previousRevision.createdAt),
+              })}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <RotateCcwIcon className="h-3 w-3" aria-hidden="true" />
+              {t("wiki.restorePrevious", "恢复上一版")}
+            </button>
+          ) : null}
+        </div>
 
         <WikiMarkdown body={page.body} onNavigate={navigateLink} />
 

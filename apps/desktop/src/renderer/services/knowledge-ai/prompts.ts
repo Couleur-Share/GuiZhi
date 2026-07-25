@@ -69,7 +69,10 @@ export const WIKI_COMPILE_SYSTEM_PROMPT =
   '{"pages":[{"title":"页面标题","kind":"topic|entity|concept","summary":"一行摘要",' +
   '"aliases":["别名"],"body":"Markdown 正文"}]}\n' +
   "规则：\n" +
-  "1. 本次输出 1~4 个页面；更新现有页面时 title 必须与清单中的标题完全一致，并输出该页合并新旧知识后的完整正文；\n" +
+  "1. 本次输出 1~4 个页面。只有「相关页面当前内容」里附了完整正文的页面才可以更新——" +
+  "更新时 title 必须与其完全一致，并输出合并新旧知识后的完整正文。" +
+  "清单中其余页面只供你用 [[链接]] 引用，不要输出它们（你看不到它们的正文，重写会丢失原有内容）；" +
+  "如果新知识不属于任何可更新页面，请新建页面；\n" +
   "2. kind 取值：topic（主题）、entity（人物/产品/项目等实体）、concept（方法/理论等概念）；\n" +
   "3. body 用简体中文 Markdown，不超过 1200 字，条理清晰（要点列表、小标题不超过二级）；\n" +
   "4. 引用其他 Wiki 页面时使用 [[页面标题]] 语法，只允许引用现有页面清单中的页面或本次输出的页面，不要引用不存在的页面；\n" +
@@ -82,11 +85,21 @@ export const WIKI_COMPILE_ITEM_CONTENT_LIMIT = 3000;
 /** 随编译请求附带的现有页面目录上限（条）。 */
 export const WIKI_COMPILE_CATALOG_LIMIT = 30;
 
-/** 随编译请求附带完整正文的相关页面数上限。 */
-export const WIKI_COMPILE_CONTEXT_PAGES_LIMIT = 3;
+/**
+ * 随编译请求附带完整正文的相关页面数上限。
+ *
+ * 这个数同时决定了「本轮允许被重写的页面集合」——落库侧只信任这批 id，
+ * 太小会让相关页面反复错过更新窗口，太大则每次编译都要多搬正文。
+ */
+export const WIKI_COMPILE_CONTEXT_PAGES_LIMIT = 5;
 
-/** 相关页面正文节选上限（字符）。 */
-export const WIKI_COMPILE_CONTEXT_BODY_LIMIT = 800;
+/**
+ * 相关页面正文节选上限（字符）。
+ *
+ * 必须显著大于 body 的目标长度（约 1200 字），否则模型看到的是被截断的
+ * 半页内容，"合并新旧知识"会把截掉的部分一起丢掉。
+ */
+export const WIKI_COMPILE_CONTEXT_BODY_LIMIT = 2000;
 
 /** 构造 Wiki 编译用户消息：条目素材 + 现有页面目录 + 相关页面正文节选。 */
 export function buildWikiCompilePrompt(

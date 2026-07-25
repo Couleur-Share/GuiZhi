@@ -14,7 +14,7 @@ import {
   CopyIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ImportTask } from "@guizhi/shared/types";
+import type { ImportStage, ImportTask } from "@guizhi/shared/types";
 import { useImportStore } from "../../stores/import.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
@@ -39,6 +39,25 @@ function SourceIcon({ task }: { task: ImportTask }) {
   );
 }
 
+/**
+ * 子阶段文案。视频链路会跑元数据 → 下载 → 转码 → 转写 → 排版 → 总结六步，
+ * 全程可达几十分钟，只显示「抓取中」用户无法判断是在推进还是卡死了。
+ */
+const STAGE_LABELS: Record<ImportStage, { key: string; fallback: string }> = {
+  fetching: { key: "imports.stageFetching", fallback: "抓取中" },
+  extracting: { key: "imports.stageExtracting", fallback: "解析中" },
+  saving: { key: "imports.stageSaving", fallback: "入库中" },
+  "video-metadata": {
+    key: "imports.stageVideoMetadata",
+    fallback: "解析视频信息",
+  },
+  "video-audio": { key: "imports.stageVideoAudio", fallback: "下载音轨" },
+  transcoding: { key: "imports.stageTranscoding", fallback: "音频转码" },
+  transcribing: { key: "imports.stageTranscribing", fallback: "语音转写" },
+  formatting: { key: "imports.stageFormatting", fallback: "文字稿排版" },
+  summarizing: { key: "imports.stageSummarizing", fallback: "生成总结" },
+};
+
 function StatusBadge({ task }: { task: ImportTask }) {
   const { t } = useTranslation();
 
@@ -50,12 +69,8 @@ function StatusBadge({ task }: { task: ImportTask }) {
         </span>
       );
     case "processing": {
-      const stageLabel =
-        task.stage === "fetching"
-          ? t("imports.stageFetching", "抓取中")
-          : task.stage === "extracting"
-            ? t("imports.stageExtracting", "解析中")
-            : t("imports.stageSaving", "入库中");
+      const stage = STAGE_LABELS[task.stage ?? "fetching"] ?? STAGE_LABELS.saving;
+      const stageLabel = t(stage.key, stage.fallback);
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
           <Loader2Icon className="h-3 w-3 animate-spin" aria-hidden="true" />

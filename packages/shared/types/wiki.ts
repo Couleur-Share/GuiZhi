@@ -65,8 +65,27 @@ export interface WikiIngestion {
   itemId: string;
   contentHash: string;
   model: string;
+  /** 空串表示上次尝试失败，尚未成功编译过 */
   promptVersion: string;
+  /** 连续失败次数；超过上限后不再自动重试 */
+  failureCount: number;
+  /** 早于该时刻不再尝试（指数退避） */
+  nextAttemptAt: number | null;
   updatedAt: number;
+}
+
+/** 页面被整体覆盖前的快照 */
+export interface WikiPageRevision {
+  id: string;
+  pageId: string;
+  title: string;
+  kind: WikiPageKind;
+  summary: string;
+  body: string;
+  aliasesJson: string | null;
+  model: string;
+  promptVersion: string;
+  createdAt: number;
 }
 
 /** 编译状态快照（Wiki 页头展示） */
@@ -101,6 +120,13 @@ export interface WikiApplyCompilationInput {
   provider: string;
   model: string;
   promptVersion: string;
+  /**
+   * 本次 prompt 里附了完整正文的既有页面 id。
+   *
+   * 只有这些页允许整体覆盖 body——模型只看到目录里的标题和摘要时，
+   * 它"更新"出来的正文是凭空编的，覆盖上去等于把原页内容丢掉。
+   */
+  contextPageIds?: string[];
   pages: {
     title: string;
     normalizedTitle: string;

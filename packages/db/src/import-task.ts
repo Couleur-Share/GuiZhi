@@ -27,9 +27,14 @@ interface TaskRow {
   updated_at: number;
 }
 
-const FINISHED_STATUSES: ImportTaskStatus[] = [
+/**
+ * 「清理已完成」的清理范围。
+ *
+ * 有意排除 failed：失败任务保留着原始输入与失败原因，是用户唯一的重试入口，
+ * 一并清掉等于让这批链接彻底消失。
+ */
+const CLEARABLE_STATUSES: ImportTaskStatus[] = [
   "completed",
-  "failed",
   "canceled",
   "duplicate",
 ];
@@ -178,10 +183,10 @@ export class ImportTaskDB {
   }
 
   clearFinished(): number {
-    const placeholders = FINISHED_STATUSES.map(() => "?").join(", ");
+    const placeholders = CLEARABLE_STATUSES.map(() => "?").join(", ");
     return this.db.run(
       `DELETE FROM import_tasks WHERE status IN (${placeholders})`,
-      ...FINISHED_STATUSES,
+      ...CLEARABLE_STATUSES,
     ).changes;
   }
 }

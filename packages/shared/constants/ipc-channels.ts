@@ -48,6 +48,9 @@ export const IPC_CHANNELS = {
   WIKI_STATUS: "wiki:status",
   WIKI_CLEAR: "wiki:clear",
   WIKI_GRAPH: "wiki:graph",
+  WIKI_RECORD_FAILURE: "wiki:recordCompilationFailure",
+  WIKI_LIST_REVISIONS: "wiki:listRevisions",
+  WIKI_RESTORE_REVISION: "wiki:restoreRevision",
 
   // Legacy data migration (one-time, from .NET GuiZhi)
   MIGRATION_DETECT_LEGACY: "migration:detectLegacy",
@@ -128,7 +131,11 @@ export const IPC_CHANNELS = {
   AI_HTTP_STREAM: "ai:httpStream",
   AI_HTTP_STREAM_CHUNK: "ai:httpStreamChunk",
   AI_HTTP_STREAM_ERROR: "ai:httpStreamError",
-  AI_HTTP_STREAM_CANCEL: "ai:httpStreamCancel",
+  /** 中断在途的 AI 请求（流式与非流式共用，按 requestId 定位） */
+  AI_HTTP_CANCEL: "ai:httpCancel",
+  AI_USAGE_RECORD: "ai:usageRecord",
+  AI_USAGE_SUMMARY: "ai:usageSummary",
+  AI_USAGE_CLEAR: "ai:usageClear",
 
   // Dialogs
   DIALOG_SELECT_IMAGE: "dialog:selectImage",

@@ -92,7 +92,7 @@ describe("语义索引 pending 判定与状态", () => {
 });
 
 describe("searchSemanticByVector（余弦 top-k）", () => {
-  it("按点积倒序返回条目级最高分，维度不匹配的分块被跳过", () => {
+  it("按点积倒序返回条目级最高分，维度不匹配的分块被跳过", async () => {
     const db = createTestDb();
     const items = new KnowledgeItemDB(db);
     const semantic = new SemanticIndexDB(db);
@@ -118,7 +118,12 @@ describe("searchSemanticByVector（余弦 top-k）", () => {
       chunks: [{ text: "反向", vector: new Float32Array([-1, 0]) }],
     });
 
-    const hits = searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 5);
+    const hits = await searchSemanticByVector(
+      db,
+      MODEL,
+      new Float32Array([1, 0]),
+      5,
+    );
     expect(hits).toHaveLength(2);
     expect(hits[0].itemId).toBe(close.id);
     expect(hits[0].snippet).toContain("高分块内容");
@@ -126,10 +131,48 @@ describe("searchSemanticByVector（余弦 top-k）", () => {
     expect(hits[1].score).toBeLessThan(0);
 
     // limit 生效
-    expect(searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 1)).toHaveLength(1);
+    expect(
+      await searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 1),
+    ).toHaveLength(1);
     // 维度不匹配 → 无命中
     expect(
-      searchSemanticByVector(db, MODEL, new Float32Array([1, 0, 0]), 5),
+      await searchSemanticByVector(db, MODEL, new Float32Array([1, 0, 0]), 5),
     ).toHaveLength(0);
+  });
+
+  it("分块数超过单批上限时跨批次结果一致", async () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const semantic = new SemanticIndexDB(db);
+
+    // 600 个条目各一块，跨过 500 的批次边界；最后一个条目最贴近查询向量
+    for (let index = 0; index < 600; index++) {
+      const item = items.create({ title: `条目 ${index}`, content: "x" });
+      const angle = (Math.PI / 2) * (1 - index / 600);
+      semantic.replaceItemChunks({
+        itemId: item.id,
+        contentHash: `h-${index}`,
+        model: MODEL,
+        dims: 2,
+        chunks: [
+          {
+            text: `分块 ${index}`,
+            vector: new Float32Array([Math.cos(angle), Math.sin(angle)]),
+          },
+        ],
+      });
+    }
+
+    const hits = await searchSemanticByVector(
+      db,
+      MODEL,
+      new Float32Array([1, 0]),
+      3,
+    );
+    expect(hits).toHaveLength(3);
+    expect(hits[0].snippet).toContain("分块 599");
+    // 分数单调递减，说明跨批次的 top-k 归并没有丢结果
+    expect(hits[0].score).toBeGreaterThan(hits[1].score);
+    expect(hits[1].score).toBeGreaterThan(hits[2].score);
   });
 });

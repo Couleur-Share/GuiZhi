@@ -4,6 +4,7 @@ import type {
   WikiCompilationStatus,
   WikiGraph,
   WikiPageDetail,
+  WikiPageRevision,
 } from "@guizhi/shared/types";
 import {
   compilePendingItems,
@@ -25,6 +26,8 @@ interface WikiState {
   status: WikiCompilationStatus | null;
   selectedPageId: string | null;
   pageDetail: WikiPageDetail | null;
+  /** 当前页的历史版本（每次被编译覆盖前的快照，最多 10 份） */
+  pageRevisions: WikiPageRevision[];
   isLoading: boolean;
   isCompiling: boolean;
   compileProgress: WikiCompileProgress | null;
@@ -36,6 +39,8 @@ interface WikiState {
 
   refresh: () => Promise<void>;
   selectPage: (id: string | null) => Promise<void>;
+  /** 把当前页回滚到最近一次被覆盖前的内容 */
+  restorePreviousRevision: () => Promise<boolean>;
   /** 按 [[链接]] 目标跳转：标题精确匹配优先，其次别名 */
   openByLinkTarget: (target: string) => Promise<boolean>;
   compileNow: () => Promise<void>;
@@ -52,6 +57,7 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   status: null,
   selectedPageId: null,
   pageDetail: null,
+  pageRevisions: [],
   isLoading: false,
   isCompiling: false,
   compileProgress: null,
@@ -106,15 +112,33 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
 
   selectPage: async (id) => {
     if (!id) {
-      set({ selectedPageId: null, pageDetail: null });
+      set({ selectedPageId: null, pageDetail: null, pageRevisions: [] });
       return;
     }
     set({ selectedPageId: id });
-    const detail = await window.api.wiki.getPage(id);
+    const [detail, revisions] = await Promise.all([
+      window.api.wiki.getPage(id),
+      window.api.wiki.listRevisions(id),
+    ]);
     // 防串页：等待期间用户可能又点了别的页
     if (get().selectedPageId === id) {
-      set({ pageDetail: detail });
+      set({ pageDetail: detail, pageRevisions: revisions });
     }
+  },
+
+  restorePreviousRevision: async () => {
+    const pageId = get().selectedPageId;
+    const latest = get().pageRevisions[0];
+    if (!pageId || !latest) {
+      return false;
+    }
+    const restored = await window.api.wiki.restoreRevision(latest.id);
+    if (restored) {
+      // 回滚本身也会存一份快照，重新拉详情与版本列表
+      await get().selectPage(pageId);
+      await get().refresh();
+    }
+    return restored;
   },
 
   openByLinkTarget: async (target) => {

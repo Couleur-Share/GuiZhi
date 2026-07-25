@@ -15,7 +15,7 @@ import { useImportStore } from "../../stores/import.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
-import { isHttpUrlLike } from "./capture-utils";
+import { parseCaptureDraft } from "./capture-utils";
 
 interface CaptureDialogProps {
   isOpen: boolean;
@@ -53,18 +53,25 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     }
   }, [isOpen, fetchCollections]);
 
-  const draftIsUrl = useMemo(() => isHttpUrlLike(draft), [draft]);
-  const canSubmit = draft.trim().length > 0 || filePaths.length > 0;
+  const parsedDraft = useMemo(() => parseCaptureDraft(draft), [draft]);
+  const canSubmit = parsedDraft.kind !== "empty" || filePaths.length > 0;
 
   const submit = async () => {
     const inputs: EnqueueImportInput[] = [];
     const targetCollection = collectionId || null;
 
-    const trimmed = draft.trim();
-    if (trimmed) {
+    if (parsedDraft.kind === "urls") {
+      for (const url of parsedDraft.urls) {
+        inputs.push({
+          kind: "url",
+          input: url,
+          collectionId: targetCollection,
+        });
+      }
+    } else if (parsedDraft.kind === "text") {
       inputs.push({
-        kind: draftIsUrl ? "url" : "text",
-        input: trimmed,
+        kind: "text",
+        input: parsedDraft.text,
         collectionId: targetCollection,
       });
     }
@@ -75,7 +82,17 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
       return;
     }
 
-    await enqueue(inputs);
+    try {
+      await enqueue(inputs);
+    } catch (error) {
+      showToast(
+        t("capture.enqueueFailed", "加入导入队列失败：{{message}}", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+        "error",
+      );
+      return;
+    }
     showToast(
       t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
         count: inputs.length,
@@ -152,12 +169,18 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             className="w-full resize-none rounded-xl bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-            {draftIsUrl ? (
+            {parsedDraft.kind === "urls" ? (
               <span className="inline-flex items-center gap-1 text-primary">
                 <GlobeIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {t("capture.detectedUrl", "识别为网页链接，将抓取正文")}
+                {parsedDraft.urls.length > 1
+                  ? t(
+                      "capture.detectedUrls",
+                      "识别到 {{count}} 个链接，将逐个抓取正文",
+                      { count: parsedDraft.urls.length },
+                    )
+                  : t("capture.detectedUrl", "识别为网页链接，将抓取正文")}
               </span>
-            ) : draft.trim() ? (
+            ) : parsedDraft.kind === "text" ? (
               <span className="inline-flex items-center gap-1">
                 <ClipboardPasteIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 {t("capture.detectedText", "将保存为文本笔记")}

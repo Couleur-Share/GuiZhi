@@ -5,7 +5,11 @@
 import * as http from "http";
 import * as https from "https";
 import { getHttpRequestAgent } from "../network-proxy";
-import { isBlockedHostname, resolvePublicAddress } from "../net-safety";
+import {
+  isBlockedHostname,
+  resolvePublicAddress,
+  type ResolvedAddress,
+} from "../net-safety";
 
 const FETCH_TIMEOUT_MS = 30_000;
 const FETCH_MAX_BYTES = 10 * 1024 * 1024;
@@ -19,7 +23,16 @@ export interface FetchHtmlResult {
   contentType: string;
 }
 
-async function assertSafeTarget(parsed: URL): Promise<void> {
+/**
+ * 校验目标并返回要钉扎的 IP。
+ *
+ * 走代理时返回 null：目标域名由代理解析，本地解析结果与实际连接无关，
+ * 钉扎反而会绕过代理按域名分流的规则。
+ */
+async function assertSafeTarget(
+  parsed: URL,
+  viaProxy: boolean,
+): Promise<ResolvedAddress | null> {
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error(`不支持的协议: ${parsed.protocol}`);
   }
@@ -27,24 +40,38 @@ async function assertSafeTarget(parsed: URL): Promise<void> {
   if (isBlockedHostname(host)) {
     throw new Error("不允许访问本地网络地址");
   }
-  await resolvePublicAddress(host);
+  if (viaProxy) {
+    return null;
+  }
+  // Clash / Surge 的 fake-ip 池就在 198.18/15，国内用户开着系统代理时
+  // 本地 DNS 拿到的全是这个段；一律拒绝会让网页导入完全不可用。
+  return await resolvePublicAddress(host, {
+    allowProxyCompatibilityAddress: true,
+  });
 }
 
 function requestOnce(
   targetUrl: string,
   signal: AbortSignal | undefined,
+  pinnedAddress: ResolvedAddress | null,
 ): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; body: Buffer; }> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(targetUrl);
-    const requestModule = parsed.protocol === "https:" ? https : http;
+    const isHttps = parsed.protocol === "https:";
+    const requestModule = isHttps ? https : http;
     const request = requestModule.request(
       {
         protocol: parsed.protocol,
-        hostname: parsed.hostname,
-        port: parsed.port || undefined,
+        // 钉扎到刚校验过的 IP，堵住「校验后 DNS 再变」的 rebinding 窗口。
+        // servername 保 SNI、Host 头保虚拟主机，站点侧行为不变。
+        hostname: pinnedAddress ? pinnedAddress.address : parsed.hostname,
+        family: pinnedAddress?.family,
+        servername: isHttps ? parsed.hostname : undefined,
+        port: parsed.port ? Number(parsed.port) : isHttps ? 443 : 80,
         path: `${parsed.pathname}${parsed.search}`,
         method: "GET",
         headers: {
+          Host: parsed.host,
           "User-Agent": USER_AGENT,
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -100,9 +127,10 @@ export async function fetchHtml(
 
   for (let redirect = 0; redirect <= FETCH_MAX_REDIRECTS; redirect++) {
     const parsed = new URL(currentUrl);
-    await assertSafeTarget(parsed);
+    const viaProxy = getHttpRequestAgent(parsed) !== undefined;
+    const pinnedAddress = await assertSafeTarget(parsed, viaProxy);
 
-    const response = await requestOnce(currentUrl, signal);
+    const response = await requestOnce(currentUrl, signal, pinnedAddress);
 
     if (
       response.statusCode >= 300 &&

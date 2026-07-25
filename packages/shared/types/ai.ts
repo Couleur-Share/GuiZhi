@@ -1,4 +1,5 @@
 export interface AITransportRequest {
+  /** 取消用的标识；流式与非流式都需要，缺省则该请求不可中断 */
   requestId?: string;
   method: "GET" | "POST";
   url: string;

@@ -9,6 +9,7 @@ import {
   initDatabase as dbInit,
   getDatabase,
   closeDatabase,
+  KnowledgeItemDB,
 } from "@guizhi/db";
 import type { InitDatabaseHooks } from "@guizhi/db";
 import { getDatabasePath } from "../runtime-paths";
@@ -28,5 +29,14 @@ export function initDatabase(): DatabaseAdapter.Database {
     // Main-process initialization runs only after Electron's single-instance gate.
     recoverUnregisteredLock: true,
   };
-  return dbInit(dbPath, hooks);
+  const db = dbInit(dbPath, hooks);
+
+  // 老库里回收站条目没有 FTS 行（旧版本软删时会移出索引），补上后回收站可搜索。
+  // 无缺失时只花一次 NOT EXISTS 查询。
+  const backfilled = new KnowledgeItemDB(db).backfillMissingFtsRows();
+  if (backfilled > 0) {
+    console.log(`[db] 补齐 ${backfilled} 条缺失的全文索引`);
+  }
+
+  return db;
 }

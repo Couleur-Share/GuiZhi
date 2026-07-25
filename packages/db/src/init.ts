@@ -2,6 +2,7 @@ import Database from "./adapter";
 import path from "path";
 import fs from "fs";
 import { SCHEMA_TABLES, SCHEMA_INDEXES } from "./schema";
+import { runMigrations } from "./migrations";
 import {
   acquireDatabaseClientLease,
   type DatabaseClientLease,
@@ -234,19 +235,12 @@ export function initDatabase(
     throw error;
   }
 
-  // Run all migrations in a single transaction to avoid lock contention.
-  // 迁移在单事务中执行；表结构本身走 CREATE IF NOT EXISTS 增量创建。
-  const runMigrations = db.transaction(() => {
-    db!.exec(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        name TEXT PRIMARY KEY,
-        applied_at INTEGER NOT NULL
-      )
-    `);
-  });
-
   try {
-    runMigrations();
+    // 结构演进：新表由 SCHEMA_TABLES 覆盖，列级变更走迁移执行器
+    const executed = runMigrations(db);
+    if (executed.length > 0) {
+      console.log(`[DB] 已应用 schema 迁移: ${executed.join(", ")}`);
+    }
     // Now that all columns exist, create indexes + FTS
     if (SCHEMA_INDEXES.trim().length > 0) {
       db.exec(SCHEMA_INDEXES);

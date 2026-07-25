@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { CollectionDB, KnowledgeItemDB, TagDB } from "@guizhi/db";
 import type Database from "../database/sqlite";
+import { cleanupOrphanAssets } from "../services/asset-cleanup";
 import type {
   CreateCollectionInput,
   CreateKnowledgeItemInput,
@@ -58,11 +59,24 @@ export function registerKnowledgeIPC(db: Database.Database): void {
   ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_RESTORE, (_event, ids: unknown) =>
     items.restore(normalizeIds(ids)),
   );
+  // 彻底删除要连带清理磁盘资产：先取引用（此时正文还在），删完再回收
   ipcMain.handle(
     IPC_CHANNELS.KNOWLEDGE_DELETE_FOREVER,
-    (_event, ids: unknown) => items.deleteForever(normalizeIds(ids)),
+    (_event, ids: unknown) => {
+      const targetIds = normalizeIds(ids);
+      const assetRefs = items.listAssetRefs(targetIds);
+      const changed = items.deleteForever(targetIds);
+      cleanupOrphanAssets(items, assetRefs);
+      return changed;
+    },
   );
-  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH, () => items.emptyTrash());
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH, () => {
+    const trashedIds = items.listTrashedIds();
+    const assetRefs = items.listAssetRefs(trashedIds);
+    const changed = items.emptyTrash();
+    cleanupOrphanAssets(items, assetRefs);
+    return changed;
+  });
   ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_COUNTS, () => items.counts());
 
   // ── 集合 ──────────────────────────────────────────────────────────────────

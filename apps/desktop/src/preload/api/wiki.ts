@@ -8,6 +8,7 @@ import type {
   WikiGraph,
   WikiIngestion,
   WikiPageDetail,
+  WikiPageRevision,
 } from "@guizhi/shared/types";
 
 export const wikiApi = {
@@ -25,4 +26,19 @@ export const wikiApi = {
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_STATUS),
   graph: (): Promise<WikiGraph> => ipcRenderer.invoke(IPC_CHANNELS.WIKI_GRAPH),
   clear: (): Promise<void> => ipcRenderer.invoke(IPC_CHANNELS.WIKI_CLEAR),
+  recordCompilationFailure: (
+    itemId: string,
+    contentHash: string,
+    nextAttemptAt: number | null,
+  ): Promise<number> =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.WIKI_RECORD_FAILURE,
+      itemId,
+      contentHash,
+      nextAttemptAt,
+    ),
+  listRevisions: (pageId: string): Promise<WikiPageRevision[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_LIST_REVISIONS, pageId),
+  restoreRevision: (revisionId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_RESTORE_REVISION, revisionId),
 };

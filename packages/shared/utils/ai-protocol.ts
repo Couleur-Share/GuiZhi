@@ -124,6 +124,98 @@ export function buildEmbeddingsEndpointFromBase(
     : `${baseUrl}/v1/embeddings`;
 }
 
+/**
+ * 转写端点：只有 OpenAI 兼容协议提供 multipart 的 /audio/transcriptions。
+ *
+ * Anthropic 没有转写 API；Gemini 的音频要走 generateContent 内联，
+ * 与 multipart 上传完全不同。两者都返回空串，由调用方给出可读提示——
+ * 此前一律拼 /v1/audio/transcriptions，用户只会撞上一个莫名的 404。
+ */
+export function buildTranscriptionsEndpointFromBase(
+  resolved: ResolvedAIProtocolBase,
+): string {
+  const baseUrl = resolved.baseUrl.replace(/\/$/, "");
+  if (!baseUrl) return "";
+  if (resolved.explicit) return baseUrl;
+  if (resolved.protocol !== "openai") return "";
+  return baseUrl.match(/\/v\d+$/)
+    ? `${baseUrl}/audio/transcriptions`
+    : `${baseUrl}/v1/audio/transcriptions`;
+}
+
+/** OpenAI 风格的多模态消息片段（各协议的共同输入形态） */
+export type MultimodalPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+/**
+ * 把 OpenAI 风格的多模态内容转成 Anthropic 的 content 块。
+ *
+ * Anthropic 不认 image_url，图片必须拆成 base64 的 source 对象。
+ */
+export function toAnthropicContentParts(
+  parts: MultimodalPart[],
+): Array<Record<string, unknown>> {
+  return parts.flatMap((part): Array<Record<string, unknown>> => {
+    if (part.type === "text") {
+      return [{ type: "text", text: part.text }];
+    }
+    const match = part.image_url.url.match(/^data:(.+?);base64,(.+)$/);
+    if (!match) {
+      return [];
+    }
+    return [
+      {
+        type: "image",
+        source: { type: "base64", media_type: match[1], data: match[2] },
+      },
+    ];
+  });
+}
+
+/**
+ * 从各协议的对话响应里提取纯文本。
+ *
+ * OpenAI / Gemini 兼容层是 `choices[0].message.content`，
+ * Anthropic 是顶层的 `content` 块数组——两者结构不同，取错就会
+ * 得到「响应缺少文本内容」这种看不出原因的报错。
+ */
+export function extractTextFromChatResponse(
+  payload: unknown,
+  protocol: AIProtocol,
+): string | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const flattenParts = (value: unknown): string | null => {
+    if (typeof value === "string") {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((part) =>
+          part && typeof part === "object" && "text" in part
+            ? String((part as { text: unknown }).text ?? "")
+            : "",
+        )
+        .join("");
+    }
+    return null;
+  };
+
+  if (protocol === "anthropic") {
+    return flattenParts((payload as { content?: unknown }).content);
+  }
+
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
+  const message = (choices[0] as { message?: { content?: unknown } })?.message;
+  return flattenParts(message?.content);
+}
+
 export function buildModelsEndpointFromBase(
   resolved: ResolvedAIProtocolBase,
 ): string {

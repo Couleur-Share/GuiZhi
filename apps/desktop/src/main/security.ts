@@ -1,9 +1,20 @@
 import crypto from 'crypto';
 import type Database from './database/sqlite';
 
+/**
+ * 主密码存储。
+ *
+ * 历史格式把 scrypt 派生出的密钥（`hash` 字段）原样写进 settings 表——
+ * 那既是校验值也是 AES 密钥，等于密钥和密文躺在同一个文件里，scrypt 的
+ * 口令加固失去意义。新格式只存密钥的 sha256（`verifier`），密钥本身
+ * 只在解锁期间留在内存。老记录在下次成功解锁时就地升级。
+ */
 interface StoredMasterPassword {
   salt: string; // base64
-  hash: string; // base64 derived key
+  /** 新格式：sha256(derivedKey) 的 base64 */
+  verifier?: string;
+  /** 历史格式：派生密钥本身的 base64，解锁成功后会被替换为 verifier */
+  hash?: string;
 }
 
 let inMemoryKey: Buffer | null = null;
@@ -18,28 +29,57 @@ function deriveKey(password: string, salt: Buffer): Buffer {
   return crypto.scryptSync(password, salt, 32);
 }
 
+function toVerifier(key: Buffer): Buffer {
+  return crypto.createHash('sha256').update(key).digest();
+}
+
 function isStoredMasterPassword(value: unknown): value is StoredMasterPassword {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   const candidate = value as Partial<StoredMasterPassword>;
-  return typeof candidate.salt === 'string' && typeof candidate.hash === 'string';
+  return (
+    typeof candidate.salt === 'string' &&
+    (typeof candidate.verifier === 'string' || typeof candidate.hash === 'string')
+  );
 }
 
-function decodeStored(stored: StoredMasterPassword): { salt: Buffer; hash: Buffer } | null {
+interface DecodedMasterPassword {
+  salt: Buffer;
+  expected: Buffer;
+  /** true 表示存的是密钥本身（历史格式），需要在解锁后升级 */
+  isLegacyKeyMaterial: boolean;
+}
+
+function decodeStored(
+  stored: StoredMasterPassword,
+): DecodedMasterPassword | null {
   try {
     const salt = Buffer.from(stored.salt, 'base64');
-    const hash = Buffer.from(stored.hash, 'base64');
-
-    if (salt.length !== 16 || hash.length !== 32) {
+    const raw = stored.verifier ?? stored.hash;
+    if (salt.length !== 16 || !raw) {
+      return null;
+    }
+    const expected = Buffer.from(raw, 'base64');
+    if (expected.length !== 32) {
       return null;
     }
 
-    return { salt, hash };
+    return {
+      salt,
+      expected,
+      isLegacyKeyMaterial: stored.verifier === undefined,
+    };
   } catch {
     return null;
   }
+}
+
+/** 口令是否匹配。历史格式比对派生密钥，新格式比对密钥的 sha256。 */
+function matchesStored(key: Buffer, decoded: DecodedMasterPassword): boolean {
+  const candidate = decoded.isLegacyKeyMaterial ? key : toVerifier(key);
+  return crypto.timingSafeEqual(candidate, decoded.expected);
 }
 
 function getStored(db: Database.Database): StoredMasterPassword | null {
@@ -79,7 +119,10 @@ export function hasMasterPasswordConfigured(db: Database.Database): boolean {
 export function setMasterPassword(db: Database.Database, password: string) {
   const salt = crypto.randomBytes(16);
   const key = deriveKey(password, salt);
-  saveStored(db, { salt: salt.toString('base64'), hash: key.toString('base64') });
+  saveStored(db, {
+    salt: salt.toString('base64'),
+    verifier: toVerifier(key).toString('base64'),
+  });
   inMemoryKey = key;
   isUnlocked = true;
 }
@@ -101,10 +144,7 @@ export function changeMasterPassword(
     return false;
   }
 
-  const derived = deriveKey(oldPassword, decoded.salt);
-  const ok = crypto.timingSafeEqual(derived, decoded.hash);
-
-  if (!ok) {
+  if (!matchesStored(deriveKey(oldPassword, decoded.salt), decoded)) {
     clearUnlockedState();
     return false;
   }
@@ -127,14 +167,23 @@ export function unlock(db: Database.Database, password: string): boolean {
   }
 
   const derived = deriveKey(password, decoded.salt);
-  const ok = crypto.timingSafeEqual(derived, decoded.hash);
-  if (ok) {
-    inMemoryKey = derived;
-    isUnlocked = true;
-  } else {
+  const ok = matchesStored(derived, decoded);
+  if (!ok) {
     clearUnlockedState();
+    return false;
   }
-  return ok;
+
+  inMemoryKey = derived;
+  isUnlocked = true;
+
+  // 历史记录里存的是密钥本身，验证通过后就地换成校验值，密钥不再落盘
+  if (decoded.isLegacyKeyMaterial) {
+    saveStored(db, {
+      salt: decoded.salt.toString('base64'),
+      verifier: toVerifier(derived).toString('base64'),
+    });
+  }
+  return true;
 }
 
 export function lock() {

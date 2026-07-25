@@ -22,16 +22,20 @@ const HITS: QaSearchHit[] = [
 /** 按脚本依次返回模型输出的假 deps */
 function createScriptedDeps(script: string[]): QaDeps & {
   chatCalls: string[];
+  chatSignals: (AbortSignal | undefined)[];
   searchCalls: string[];
 } {
   let index = 0;
   const chatCalls: string[] = [];
+  const chatSignals: (AbortSignal | undefined)[] = [];
   const searchCalls: string[] = [];
   return {
     chatCalls,
+    chatSignals,
     searchCalls,
-    chat: async (messages) => {
+    chat: async (messages, options) => {
       chatCalls.push(messages[messages.length - 1].content);
+      chatSignals.push(options.signal);
       const content = script[Math.min(index, script.length - 1)];
       index++;
       return { content, model: "test-model" };
@@ -69,6 +73,42 @@ describe("askKnowledgeBase - Agent 循环", () => {
     });
     expect(steps.some((step) => step.startsWith("检索："))).toBe(true);
     expect(steps.some((step) => step.startsWith("阅读："))).toBe(true);
+  });
+
+  it("signal 透传到每一次对话调用（否则「停止」中断不了在途请求）", async () => {
+    const deps = createScriptedDeps([
+      '{"action":"search","query":"架构"}',
+      '{"action":"answer","text":"归知基于 Electron 构建 [1]。"}',
+    ]);
+    const controller = new AbortController();
+
+    await askKnowledgeBase(
+      "归知用什么技术栈？",
+      undefined,
+      deps,
+      undefined,
+      controller.signal,
+    );
+
+    expect(deps.chatSignals.length).toBeGreaterThan(0);
+    for (const signal of deps.chatSignals) {
+      expect(signal).toBe(controller.signal);
+    }
+  });
+
+  it("单发兜底管线同样带上 signal", async () => {
+    // 协议连续失败会退回单发管线
+    const deps = createScriptedDeps(["这不是 JSON"]);
+
+    await askKnowledgeBase(
+      "归知用什么技术栈？",
+      undefined,
+      deps,
+      undefined,
+      new AbortController().signal,
+    );
+
+    expect(deps.chatSignals.at(-1)).toBeInstanceOf(AbortSignal);
   });
 
   it("回答未标注引用时退回全部已读资料", async () => {

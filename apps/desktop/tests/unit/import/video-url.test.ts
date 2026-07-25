@@ -96,7 +96,7 @@ describe("extractVideoUrl", () => {
     cleanup: () => {},
   });
 
-  it("yt-dlp 未安装 → 降级保存链接并附安装指引", async () => {
+  it("yt-dlp 未安装 → 降级并附安装指引，不登记来源 URI", async () => {
     const run: RunCommand = async () => {
       throw new YtDlpNotFoundError();
     };
@@ -105,10 +105,11 @@ describe("extractVideoUrl", () => {
       run,
       getTranscriptionConfig: () => null,
     });
-    expect(extracted.degraded).toBe(true);
+    expect(extracted.degradedReason).toContain("yt-dlp");
+    expect(extracted.degradedReason).toContain("重试");
     expect(extracted.itemType).toBe("video");
-    expect(extracted.content).toContain("yt-dlp");
-    expect(extracted.content).toContain(url);
+    // 降级不入库，sourceUri 必须为空，否则该链接会被空壳占住判重
+    expect(extracted.sourceUri).toBeNull();
   });
 
   it("未配置转写模型 → 仅保存元数据并附提示", async () => {
@@ -120,7 +121,7 @@ describe("extractVideoUrl", () => {
       run,
       getTranscriptionConfig: () => null,
     });
-    expect(extracted.degraded).toBeUndefined();
+    expect(extracted.degradedReason).toBeUndefined();
     expect(extracted.title).toBe("测试视频标题");
     expect(extracted.transcript).toBeNull();
     expect(extracted.content).toContain("测试UP主");
@@ -330,7 +331,58 @@ describe("extractVideoUrl", () => {
     expect(extracted.content).toContain("这是简介");
   });
 
-  it("元数据解析失败 → 降级保存链接", async () => {
+  it("按序上报子阶段，长链路不再全程停在「抓取中」", async () => {
+    const stages: string[] = [];
+    const extracted = await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run: buildAudioAwareRun(),
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      transcribe: async () => "这是转写出来的文字稿",
+      prepareAudio: passthroughPrepareAudio,
+      getFormatterConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "fast-model",
+        apiProtocol: "openai",
+      }),
+      formatTranscript: async (text) => text,
+      getSummaryConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "main-model",
+        apiProtocol: "openai",
+      }),
+      summarize: async () => ({ summary: "总结正文", title: "AI 标题" }),
+      onStage: (stage) => stages.push(stage),
+    });
+
+    expect(extracted.transcript).toBe("这是转写出来的文字稿");
+    expect(stages).toEqual([
+      "video-metadata",
+      "video-audio",
+      "transcoding",
+      "transcribing",
+      "formatting",
+      "summarizing",
+    ]);
+  });
+
+  it("未配置转写时只上报元数据阶段", async () => {
+    const stages: string[] = [];
+    await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run: buildAudioAwareRun(),
+      getTranscriptionConfig: () => null,
+      onStage: (stage) => stages.push(stage),
+    });
+    expect(stages).toEqual(["video-metadata"]);
+  });
+
+  it("元数据解析失败 → 降级并透出 yt-dlp 原始错误", async () => {
     const run: RunCommand = async () => {
       throw new Error("yt-dlp 退出码 1: Unsupported URL");
     };
@@ -339,8 +391,9 @@ describe("extractVideoUrl", () => {
       run,
       getTranscriptionConfig: () => null,
     });
-    expect(extracted.degraded).toBe(true);
-    expect(extracted.content).toContain("解析失败");
+    expect(extracted.degradedReason).toContain("解析失败");
+    expect(extracted.degradedReason).toContain("Unsupported URL");
+    expect(extracted.sourceUri).toBeNull();
   });
 });
 

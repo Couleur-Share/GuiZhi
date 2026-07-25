@@ -39,4 +39,23 @@ describe("buildFtsMatchQuery", () => {
   it("双引号被转义", () => {
     expect(buildFtsMatchQuery('a"b')).toBe('"a""b"*');
   });
+
+  it("纯标点片段被丢弃，不产生匹配 0 行的空 phrase", () => {
+    // 标点分词后是空 phrase，与其他子句 AND 会把整个查询清零
+    expect(buildFtsMatchQuery("归知(测试)")).toBe('"归 知" AND "测 试"');
+    expect(buildFtsMatchQuery("第一章：概述")).toBe('"第 一 章" AND "概 述"');
+    expect(buildFtsMatchQuery("React —— 入门")).toBe(
+      '"React"* AND "入 门"',
+    );
+  });
+
+  it("含字母数字的片段照常保留", () => {
+    expect(buildFtsMatchQuery(".NET")).toBe('".NET"*');
+    expect(buildFtsMatchQuery("C++")).toBe('"C++"*');
+  });
+
+  it("全标点查询视为无可检索内容", () => {
+    expect(buildFtsMatchQuery("???")).toBeNull();
+    expect(buildFtsMatchQuery("——")).toBeNull();
+  });
 });

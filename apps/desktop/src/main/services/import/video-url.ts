@@ -14,6 +14,7 @@ import {
   detectVideoPlatform,
   type VideoPlatform,
 } from "@guizhi/shared/utils/video-platforms";
+import type { ImportStage } from "@guizhi/shared/types";
 import type { ExtractedContent } from "./connectors";
 import { prepareAudioForTranscription } from "../media/audio-preprocess";
 import { resolveFfmpegExecutable } from "../media/ffmpeg-manager";
@@ -211,6 +212,8 @@ export interface VideoUrlDeps {
   getSummaryConfig?: () => AIClientConfig | null;
   /** 测试注入：视频总结生成 */
   summarize?: typeof generateMediaSummary;
+  /** 上报当前子阶段（元数据 / 下载 / 转码 / 转写 / 排版 / 总结） */
+  onStage?: (stage: ImportStage) => void;
 }
 
 /**
@@ -269,13 +272,11 @@ export function stripTranscriptionNote(content: string): string {
     .join("\n\n");
 }
 
-function buildNotInstalledContent(url: string, platform: VideoPlatform): string {
-  return [
-    `> 检测到${PLATFORM_LABELS[platform]}视频链接，但尚未安装 yt-dlp，无法解析视频信息。`,
-    "打开「设置 → 应用设置 → 采集」点击**一键安装**（应用会自动下载并托管 yt-dlp），",
-    "完成后回到导入任务列表点击「重试」即可解析。",
-    `原始链接：<${url}>`,
-  ].join("\n\n");
+function buildNotInstalledReason(platform: VideoPlatform): string {
+  return (
+    `检测到${PLATFORM_LABELS[platform]}视频链接，但尚未安装 yt-dlp，无法解析视频信息。` +
+    "打开「设置 → 应用设置 → 采集」一键安装后，回到本列表点击「重试」。"
+  );
 }
 
 /** 下载最佳音轨到临时目录（不依赖 ffmpeg），返回音频文件路径 */
@@ -319,6 +320,7 @@ export async function extractVideoUrl(
   const executable = resolveYtDlpExecutable(deps.getYtDlpPath());
 
   let metadata: YtDlpMetadata;
+  deps.onStage?.("video-metadata");
   try {
     const result = await run(
       executable,
@@ -333,19 +335,19 @@ export async function extractVideoUrl(
     if (error instanceof YtDlpNotFoundError) {
       return {
         title: url,
-        content: buildNotInstalledContent(url, platform),
+        content: "",
         itemType: "video",
-        sourceUri: url,
-        degraded: true,
+        sourceUri: null,
+        degradedReason: buildNotInstalledReason(platform),
       };
     }
     const message = error instanceof Error ? error.message : String(error);
     return {
       title: url,
-      content: `> 视频信息解析失败：${message}\n\n原始链接：<${url}>`,
+      content: "",
       itemType: "video",
-      sourceUri: url,
-      degraded: true,
+      sourceUri: null,
+      degradedReason: `视频信息解析失败：${message}`,
     };
   }
 
@@ -363,13 +365,16 @@ export async function extractVideoUrl(
     try {
       // 目标是托管本地引擎时先确保服务已启动
       await ensureLocalTranscriptionService(transcriptionConfig.apiUrl);
+      deps.onStage?.("video-audio");
       const audio = await downloadBestAudio(executable, url, run, signal);
       tempDir = audio.dir;
+      deps.onStage?.("transcoding");
       prepared = await prepareAudio(
         audio.filePath,
         resolveFfmpegExecutable(deps.getFfmpegPath?.() ?? null),
         signal,
       );
+      deps.onStage?.("transcribing");
       transcript = await transcribe(
         prepared.filePath,
         transcriptionConfig,
@@ -393,6 +398,7 @@ export async function extractVideoUrl(
         deps.getFormatterConfig ?? resolveTranscriptFormatterConfig
       )();
       if (formatterConfig) {
+        deps.onStage?.("formatting");
         try {
           transcript = await (deps.formatTranscript ?? formatTranscript)(
             transcript,
@@ -420,6 +426,7 @@ export async function extractVideoUrl(
       deps.getSummaryConfig ?? resolveMediaSummaryConfig
     )();
     if (summaryConfig) {
+      deps.onStage?.("summarizing");
       try {
         const result = await (deps.summarize ?? generateMediaSummary)(
           {

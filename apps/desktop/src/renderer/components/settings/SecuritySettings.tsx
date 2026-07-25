@@ -303,7 +303,7 @@ export function SecuritySettings() {
           <p className="text-xs text-muted-foreground leading-relaxed">
             {t(
               "settings.securityDesc",
-              "Master password unlocks private content. GuiZhi stores only a salted hash, never the plain text password. Private content is hidden until unlocked.",
+              "GuiZhi stores only a salted verifier — never the plain text password, and never a key that could decrypt anything. No content is wired to the master password yet: setting one does not hide or encrypt any item, so do not rely on it for sensitive material.",
             )}
           </p>
         </div>

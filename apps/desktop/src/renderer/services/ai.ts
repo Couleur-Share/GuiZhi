@@ -18,8 +18,23 @@ import type {
   ChatMessageContentPart,
   FetchModelsResult,
   ModelInfo,
+  ResponseLike,
   StreamCallbacks,
 } from "./ai-types";
+import { getFormattedErrorMessageFromResponse } from "./ai-errors";
+import {
+  createStreamState,
+  finalizeStreamState,
+  handleStreamResponse,
+  processStreamTextChunk,
+} from "./ai-stream";
+import {
+  createFetchResponseLike,
+  createResponseLike,
+  getAITransport,
+  requestAIEndpoint,
+  withCancellation,
+} from "./ai-transport";
 
 export type * from "./ai-types";
 
@@ -27,6 +42,9 @@ export {
   getBaseUrl,
   normalizeApiUrlInput,
 } from "@guizhi/shared/utils/ai-protocol";
+
+// ai.ts 是 AI 能力的公开入口，拆分出去的模块仍从这里透出
+export { fetchAvailableModels, getApiEndpointPreview } from "./ai-models";
 
 /**
  * AI Service - Call various AI model APIs
@@ -46,274 +64,9 @@ type AnthropicMessageContentPart =
       };
     };
 
-interface ResponseLike {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: Record<string, string>;
-  text: () => Promise<string>;
-  json: <T = unknown>() => Promise<T>;
-  error?: string;
-}
-
-interface StreamState {
-  fullContent: string;
-  thinkingContent: string;
-  buffer: string;
-  chunkCount: number;
-}
-
 const AI_CONNECTION_TEST_MAX_TOKENS = 8;
 const AI_CONNECTION_TEST_TIMEOUT_MS = 12_000;
 const AI_CONNECTION_TEST_PROMPT = "Reply with exactly: OK";
-
-function getAITransport() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-  return window.api?.ai ?? null;
-}
-
-function createResponseLike(response: AITransportResponse): ResponseLike {
-  return {
-    ok: response.ok,
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-    text: async () => response.body,
-    json: async <T = unknown>() => JSON.parse(response.body) as T,
-    error: response.error,
-  };
-}
-
-function createFetchResponseLike(response: Response): ResponseLike {
-  return {
-    ok: response.ok,
-    status: response.status,
-    statusText: response.statusText,
-    headers: Object.fromEntries(response.headers.entries()),
-    text: async () => response.text(),
-    json: async <T = unknown>() => response.json() as Promise<T>,
-  };
-}
-
-async function requestAIEndpoint(request: {
-  method: "GET" | "POST";
-  url: string;
-  headers: Record<string, string>;
-  body?: string;
-  timeoutMs?: number;
-}): Promise<ResponseLike> {
-  const transport = getAITransport();
-  if (transport) {
-    return createResponseLike(await transport.request(request));
-  }
-
-  return createFetchResponseLike(
-    await fetch(request.url, {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-    }),
-  );
-}
-
-function getResponseHeader(
-  headers: Record<string, string>,
-  name: string,
-): string {
-  const lowerName = name.toLowerCase();
-  const match = Object.entries(headers).find(
-    ([key]) => key.toLowerCase() === lowerName,
-  );
-  return match?.[1] ?? "";
-}
-
-function isHtmlErrorPayload(
-  text: string,
-  headers: Record<string, string>,
-): boolean {
-  const contentType = getResponseHeader(headers, "content-type").toLowerCase();
-  const trimmed = text.trimStart().toLowerCase();
-  return (
-    contentType.includes("text/html") ||
-    trimmed.startsWith("<!doctype html") ||
-    trimmed.startsWith("<html")
-  );
-}
-
-function extractHtmlTitle(text: string): string | null {
-  const match = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return match?.[1]?.replace(/\s+/g, " ").trim() || null;
-}
-
-function formatGatewayTimeoutMessage(
-  operation: string,
-  status: number,
-): string {
-  return `${operation} gateway timed out (${status}). The provider or proxy did not finish before its own timeout.`;
-}
-
-function parseStructuredErrorMessage(text: string): string | null {
-  try {
-    const errorJson = JSON.parse(text);
-    const message =
-      errorJson.error?.message ||
-      errorJson.error?.status ||
-      errorJson.error?.type ||
-      errorJson.message ||
-      errorJson.detail ||
-      (typeof errorJson.error === "string" ? errorJson.error : null);
-
-    if (!message) {
-      return null;
-    }
-
-    if (errorJson.error?.code) {
-      return `${message} (code: ${errorJson.error.code})`;
-    }
-    if (errorJson.error?.type && errorJson.error.type !== message) {
-      return `[${errorJson.error.type}] ${message}`;
-    }
-    return message;
-  } catch {
-    return null;
-  }
-}
-
-async function getFormattedErrorMessageFromResponse(
-  response: ResponseLike,
-  options: {
-    operation?: string;
-    fallback?: string;
-    maxTextLength?: number;
-  } = {},
-): Promise<string> {
-  const errorText = response.error ?? (await response.text());
-  const operation = options.operation ?? "API request";
-  const fallback = options.fallback ?? `API 请求失败 (${response.status})`;
-
-  if (response.status === 504) {
-    return formatGatewayTimeoutMessage(operation, response.status);
-  }
-
-  const structuredMessage = parseStructuredErrorMessage(errorText);
-  if (structuredMessage) {
-    return structuredMessage;
-  }
-
-  if (errorText && isHtmlErrorPayload(errorText, response.headers)) {
-    const title = extractHtmlTitle(errorText);
-    return title ? `${fallback}: ${title}` : fallback;
-  }
-
-  if (errorText) {
-    return errorText.slice(0, options.maxTextLength ?? 200);
-  }
-
-  return fallback;
-}
-
-function createStreamState(): StreamState {
-  return {
-    fullContent: "",
-    thinkingContent: "",
-    buffer: "",
-    chunkCount: 0,
-  };
-}
-
-function isGeminiApiHost(apiUrl: string): boolean {
-  return apiUrl.includes("generativelanguage.googleapis.com");
-}
-
-function isGeminiOpenAICompatEndpoint(endpoint: string): boolean {
-  return (
-    endpoint.includes("generativelanguage.googleapis.com") &&
-    endpoint.includes("/openai/")
-  );
-}
-
-function yieldToEventLoop() {
-  return new Promise<void>((resolve) => {
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(() => resolve());
-    } else {
-      setTimeout(resolve, 0);
-    }
-  });
-}
-
-async function processStreamTextChunk(
-  chunkText: string,
-  state: StreamState,
-  onStream?: (chunk: string) => void,
-  streamCallbacks?: StreamCallbacks,
-  options?: {
-    flush?: boolean;
-    yieldToUi?: boolean;
-  },
-): Promise<void> {
-  state.buffer += chunkText;
-  const lines = state.buffer.split("\n");
-  state.buffer = options?.flush ? "" : lines.pop() || "";
-  let deltasSinceYield = 0;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed === "data: [DONE]") continue;
-    if (!trimmed.startsWith("data: ")) continue;
-
-    try {
-      const json = JSON.parse(trimmed.slice(6));
-      const delta = json.choices?.[0]?.delta;
-
-      if (!delta) {
-        continue;
-      }
-
-      state.chunkCount++;
-      deltasSinceYield++;
-
-      if (delta.reasoning_content) {
-        state.thinkingContent += delta.reasoning_content;
-        streamCallbacks?.onThinking?.(delta.reasoning_content);
-      }
-
-      if (delta.content) {
-        state.fullContent += delta.content;
-        onStream?.(delta.content);
-        streamCallbacks?.onContent?.(delta.content);
-      }
-
-      if (options?.yieldToUi && deltasSinceYield >= 20) {
-        deltasSinceYield = 0;
-        await yieldToEventLoop();
-      }
-    } catch {
-      // 忽略解析错误 / Ignore parse errors
-    }
-  }
-
-  if (options?.yieldToUi) {
-    await yieldToEventLoop();
-  }
-}
-
-function finalizeStreamState(
-  state: StreamState,
-  streamCallbacks?: StreamCallbacks,
-): ChatCompletionResult {
-  streamCallbacks?.onComplete?.(
-    state.fullContent,
-    state.thinkingContent || undefined,
-  );
-
-  return {
-    content: state.fullContent,
-    thinkingContent: state.thinkingContent || undefined,
-  };
-}
 
 function normalizeAssistantContent(content: ChatMessageContent): string {
   if (typeof content === "string") {
@@ -363,12 +116,6 @@ function toAnthropicMessageContent(
   });
 
   return parts.length > 0 ? parts : "";
-}
-
-async function getErrorMessageFromResponse(
-  response: ResponseLike,
-): Promise<string> {
-  return getFormattedErrorMessageFromResponse(response);
 }
 
 /**
@@ -487,7 +234,7 @@ export async function chatCompletion(
         );
 
     if (!response.ok) {
-      throw new Error(await getErrorMessageFromResponse(response));
+      throw new Error(await getFormattedErrorMessageFromResponse(response));
     }
 
     const data = await response.json<{
@@ -590,27 +337,33 @@ export async function chatCompletion(
       const streamState = createStreamState();
       let streamError: string | null = null;
 
-      const response = await transport.requestStream(
-        {
-          method: "POST",
-          url: endpoint,
-          headers,
-          body: requestBody,
-          timeoutMs: options?.timeoutMs,
-        },
-        {
-          onChunk: (chunk) => {
-            void processStreamTextChunk(
-              chunk,
-              streamState,
-              options?.onStream,
-              options?.streamCallbacks,
-            );
-          },
-          onError: (error) => {
-            streamError = error;
-          },
-        },
+      const response = await withCancellation(
+        transport,
+        options?.signal,
+        (requestId) =>
+          transport.requestStream(
+            {
+              method: "POST",
+              url: endpoint,
+              headers,
+              body: requestBody,
+              timeoutMs: options?.timeoutMs,
+              requestId,
+            },
+            {
+              onChunk: (chunk) => {
+                void processStreamTextChunk(
+                  chunk,
+                  streamState,
+                  options?.onStream,
+                  options?.streamCallbacks,
+                );
+              },
+              onError: (error) => {
+                streamError = error;
+              },
+            },
+          ),
       );
 
       if (!response.ok) {
@@ -638,13 +391,19 @@ export async function chatCompletion(
     }
 
     if (transport) {
-      const response = await transport.request({
-        method: "POST",
-        url: endpoint,
-        headers,
-        body: requestBody,
-        timeoutMs: options?.timeoutMs,
-      });
+      const response = await withCancellation(
+        transport,
+        options?.signal,
+        (requestId) =>
+          transport.request({
+            method: "POST",
+            url: endpoint,
+            headers,
+            body: requestBody,
+            timeoutMs: options?.timeoutMs,
+            requestId,
+          }),
+      );
       return { response: createResponseLike(response) };
     }
 
@@ -652,6 +411,7 @@ export async function chatCompletion(
       method: "POST",
       headers,
       body: requestBody,
+      signal: options?.signal,
     });
 
     if (mergedParams.stream) {
@@ -672,7 +432,7 @@ export async function chatCompletion(
     let response = requestResult.response;
 
     if (response && !response.ok) {
-      const errorMessage = await getErrorMessageFromResponse(response);
+      const errorMessage = await getFormattedErrorMessageFromResponse(response);
 
       // Check for token parameter compatibility issues (Issue #21)
       // 检查 Token 参数兼容性问题
@@ -706,7 +466,7 @@ export async function chatCompletion(
         response = requestResult.response;
 
         if (response && !response.ok) {
-          throw new Error(await getErrorMessageFromResponse(response));
+          throw new Error(await getFormattedErrorMessageFromResponse(response));
         }
       } else if (isThinkingParamError) {
         console.warn(
@@ -718,7 +478,7 @@ export async function chatCompletion(
         response = requestResult.response;
 
         if (response && !response.ok) {
-          throw new Error(await getErrorMessageFromResponse(response));
+          throw new Error(await getFormattedErrorMessageFromResponse(response));
         }
       } else {
         throw new Error(errorMessage);
@@ -745,6 +505,12 @@ export async function chatCompletion(
     return {
       content: normalizeAssistantContent(message.content),
       thinkingContent: message.reasoning_content,
+      usage: data.usage
+        ? {
+            promptTokens: data.usage.prompt_tokens ?? 0,
+            completionTokens: data.usage.completion_tokens ?? 0,
+          }
+        : undefined,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -753,54 +519,6 @@ export async function chatCompletion(
     throw new Error("网络请求失败，请检查网络连接");
     // Network request failed, please check network connection
   }
-}
-
-/**
- * 处理流式响应
- * Handle streaming response
- */
-async function handleStreamResponse(
-  response: Response,
-  onStream?: (chunk: string) => void,
-  streamCallbacks?: StreamCallbacks,
-): Promise<ChatCompletionResult> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("无法读取响应流");
-    // Cannot read response stream
-  }
-
-  const decoder = new TextDecoder();
-  const state = createStreamState();
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      await processStreamTextChunk(
-        decoder.decode(value, { stream: true }),
-        state,
-        onStream,
-        streamCallbacks,
-        { yieldToUi: true },
-      );
-    }
-
-    await processStreamTextChunk(
-      decoder.decode(),
-      state,
-      onStream,
-      streamCallbacks,
-      { flush: true, yieldToUi: true },
-    );
-  } finally {
-    reader.releaseLock();
-  }
-
-  return finalizeStreamState(state, streamCallbacks);
 }
 
 /**
@@ -849,232 +567,6 @@ export async function testAIConnection(
       latency: Date.now() - startTime,
       model: config.model,
       provider: config.provider,
-    };
-  }
-}
-
-// ============ 获取模型列表 ============
-// ============ Get Model List ============
-
-interface AnthropicModelsPayload {
-  data?: Array<{
-    id?: string;
-    display_name?: string;
-    created_at?: string;
-  }>;
-}
-
-interface OpenAIModelsPayload {
-  data?: Array<{
-    id?: string;
-    owned_by?: string;
-    created?: number;
-  }>;
-}
-
-interface GeminiModelsPayload {
-  models?: Array<{
-    name?: string;
-    displayName?: string;
-    description?: string;
-  }>;
-}
-
-interface ArrayModelPayloadItem {
-  id?: string;
-  model?: string;
-  name?: string;
-}
-
-/**
- * Get complete API endpoint preview (for display)
- * 如果用户输入以 # 结尾，则不自动填充后续路径
- * 如果用户没有输入 /v1，会自动补全
- * 对于 Gemini API，使用 OpenAI 兼容端点
- * Get complete API endpoint preview (for display)
- * If the input ends with #, do not auto-fill the subsequent path
- * Auto-complete /v1 if user didn't input it
- * Use OpenAI-compatible endpoint for Gemini API
- */
-export function getApiEndpointPreview(
-  apiUrl: string,
-  protocol: AIProtocol = "openai",
-): string {
-  if (!apiUrl) return "";
-  return buildChatEndpointFromBase(resolveProtocolBase(apiUrl, protocol));
-}
-
-/**
- * Fetch available model list from API
- * 从 API 获取可用模型列表
- */
-export async function fetchAvailableModels(
-  apiUrl: string,
-  apiKey: string,
-  apiProtocol: AIProtocol = "openai",
-): Promise<FetchModelsResult> {
-  if (!apiKey || !apiUrl) {
-    return {
-      success: false,
-      models: [],
-      error: "Please fill in API Key and API URL first",
-    };
-    // 请先填写 API Key 和 API 地址
-  }
-
-  try {
-    const endpoint = buildModelsEndpointFromBase(
-      resolveProtocolBase(apiUrl, apiProtocol),
-    );
-    const resolvedProtocol = resolveAIProtocol({
-      apiProtocol,
-      provider: "",
-      apiUrl,
-    });
-    const headers = buildHeadersForProtocol(resolvedProtocol, apiKey, {
-      accept: "application/json",
-      useNativeGeminiAuth: resolvedProtocol === "gemini",
-    });
-
-    const transport = getAITransport();
-    const response = transport
-      ? createResponseLike(
-          await transport.request({
-            method: "GET",
-            url: endpoint,
-            headers,
-            timeoutMs: 12_000,
-          }),
-        )
-      : createFetchResponseLike(
-          await fetch(endpoint, {
-            method: "GET",
-            headers,
-          }),
-        );
-
-    if (!response.ok) {
-      const errorText = response.error ?? (await response.text());
-      const reason =
-        response.status === 401 || response.status === 403
-          ? "auth"
-          : response.status === 0 && /timeout/i.test(errorText)
-            ? "network"
-            : response.status === 404 ||
-                response.status === 405 ||
-                response.status === 501
-              ? "unsupported"
-              : "http";
-      return {
-        success: false,
-        models: [],
-        error:
-          response.status === 0
-            ? errorText.substring(0, 120)
-            : `获取模型列表失败: ${response.status} - ${errorText.substring(0, 100)}`,
-        reason,
-        endpoint,
-        status: response.status,
-        // Failed to get model list
-      };
-    }
-
-    const data = await response.json<
-      | AnthropicModelsPayload
-      | OpenAIModelsPayload
-      | GeminiModelsPayload
-      | ArrayModelPayloadItem[]
-    >();
-
-    if (
-      apiProtocol === "anthropic" &&
-      "data" in data &&
-      Array.isArray(data.data)
-    ) {
-      const models = data.data
-        .filter((m: { id?: string }) => typeof m.id === "string")
-        .map(
-          (m: { id: string; display_name?: string; created_at?: string }) => ({
-            id: m.id,
-            name: m.display_name || m.id,
-            owned_by: "Anthropic",
-            created: m.created_at ? Date.parse(m.created_at) : undefined,
-          }),
-        )
-        .sort((a: ModelInfo, b: ModelInfo) => a.id.localeCompare(b.id));
-
-      return { success: true, models };
-    }
-
-    // OpenAI 格式的响应
-    // OpenAI format response
-    if ("data" in data && Array.isArray(data.data)) {
-      const models = data.data
-        .filter((m: { id?: string }) => m.id) // 过滤掉没有 id 的 / Filter out those without id
-        .map((m: { id: string; owned_by?: string; created?: number }) => ({
-          id: m.id,
-          name: m.id,
-          owned_by: m.owned_by,
-          created: m.created,
-        }))
-        .sort((a: ModelInfo, b: ModelInfo) => a.id.localeCompare(b.id));
-
-      return { success: true, models };
-    }
-
-    // Gemini 格式的响应 / Gemini format response
-    if ("models" in data && Array.isArray(data.models)) {
-      const models = data.models
-        .filter((m: { name?: string }) => m.name)
-        .map(
-          (m: { name: string; displayName?: string; description?: string }) => {
-            // Gemini returns "models/gemini-pro", we need "gemini-pro" for OpenAI compatible endpoint
-            const id = m.name.replace(/^models\//, "");
-            return {
-              id: id,
-              name: m.displayName ? `${m.displayName} (${id})` : id,
-              owned_by: "Google",
-              description: m.description,
-            };
-          },
-        )
-        .sort((a: ModelInfo, b: ModelInfo) => a.id.localeCompare(b.id));
-
-      return { success: true, models };
-    }
-
-    // 某些 API 直接返回数组
-    // Some APIs return array directly
-    if (Array.isArray(data)) {
-      const models = data
-        .filter((m: { id?: string; model?: string }) => m.id || m.model)
-        .map((m: { id?: string; model?: string; name?: string }) => ({
-          id: m.id || m.model || "",
-          name: m.name || m.id || m.model,
-        }));
-      return { success: true, models };
-    }
-
-    return {
-      success: false,
-      models: [],
-      error: "无法解析模型列表响应",
-      reason: "unsupported",
-      endpoint,
-    };
-    // Cannot parse model list response
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "获取模型列表失败";
-    return {
-      success: false,
-      models: [],
-      error: message,
-      reason:
-        message.toLowerCase().includes("failed to fetch") ||
-        message.toLowerCase().includes("network")
-          ? "network"
-          : "http",
-      // Failed to get model list
     };
   }
 }

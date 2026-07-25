@@ -13,6 +13,7 @@ import path from "path";
 import Database from "../database/sqlite";
 import { getDatabase } from "../database";
 import { getBackupsDir, getDatabasePath } from "../runtime-paths";
+import { getSchemaVersion, SCHEMA_VERSION } from "@guizhi/db";
 import type {
   BackupCreateResult,
   BackupFileInfo,
@@ -186,6 +187,16 @@ export function validateBackupFile(filePath: string): {
       if (!row) {
         return { ok: false, error: `备份文件缺少数据表: ${table}` };
       }
+    }
+
+    // 来自更新版本的备份可能带着本版本读不懂的结构，恢复后只会更难排查。
+    // 反向（旧备份）没问题：恢复后迁移执行器会把结构补齐。
+    const backupVersion = getSchemaVersion(probe);
+    if (backupVersion > SCHEMA_VERSION) {
+      return {
+        ok: false,
+        error: `备份来自更新版本的归知（数据结构 v${backupVersion}，当前支持 v${SCHEMA_VERSION}），请先升级应用`,
+      };
     }
     return { ok: true };
   } catch (error) {

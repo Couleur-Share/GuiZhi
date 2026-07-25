@@ -46,6 +46,7 @@ import { ModelFetchModal } from "./ai-workbench/ModelFetchModal";
 import { ModelFormModal } from "./ai-workbench/ModelFormModal";
 import { ScenarioDefaultsSection } from "./ai-workbench/ScenarioDefaultsSection";
 import { StatusCard } from "./ai-workbench/shared";
+import { UsageSection } from "./ai-workbench/UsageSection";
 import type {
   EndpointDraft,
   EndpointGroup,
@@ -965,6 +966,8 @@ export function AISettingsPrototype() {
           settings.setModelRouteDefault(route, value)
         }
       />
+
+      <UsageSection />
     </div>
   );
 

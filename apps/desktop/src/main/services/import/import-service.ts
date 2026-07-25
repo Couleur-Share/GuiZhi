@@ -111,10 +111,11 @@ export function createImportService(
   const queue = new ImportQueue({
     store: taskDb,
     persistence: createPersistence(db),
-    extract: (kind, input, signal) =>
+    extract: (kind, input, signal, onStage) =>
       extractContent(kind, input, signal, {
         getYtDlpPath: () => readYtDlpPathSetting(db),
         getFfmpegPath: () => readFfmpegPathSetting(db),
+        onStage,
       }),
     onTaskChanged: broadcast,
   });

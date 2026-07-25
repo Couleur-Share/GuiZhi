@@ -41,7 +41,12 @@ export interface ScenarioChatResult {
 export async function runScenarioChat(
   scenario: AIUsageScenario,
   messages: ChatMessage[],
-  options?: { temperature?: number; maxTokens?: number },
+  options?: {
+    temperature?: number;
+    maxTokens?: number;
+    /** 传下去才能真正中断在途请求，否则「停止」只是标记状态 */
+    signal?: AbortSignal;
+  },
 ): Promise<ScenarioChatResult> {
   const config = resolveConfig(scenario);
   if (!config) {
@@ -52,6 +57,21 @@ export async function runScenarioChat(
     maxTokens: options?.maxTokens,
     stream: false,
     enableThinking: false,
+    signal: options?.signal,
   });
+
+  // 知识域的每一次模型调用都经过这里，是唯一的计量点。
+  // 统计失败不能影响业务结果。
+  void window.api?.ai
+    ?.recordUsage({
+      scenario,
+      model: config.model,
+      promptTokens: result.usage?.promptTokens ?? 0,
+      completionTokens: result.usage?.completionTokens ?? 0,
+    })
+    .catch((error: unknown) => {
+      console.warn("记录 AI 用量失败:", error);
+    });
+
   return { content: result.content, model: config.model };
 }

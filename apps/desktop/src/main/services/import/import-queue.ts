@@ -18,6 +18,7 @@ export interface ImportTaskStore {
   get(id: string): ImportTask | null;
   isForceDuplicate(id: string): boolean;
   list(limit?: number): ImportTask[];
+  listByStatus(statuses: ImportTask["status"][]): ImportTask[];
   update(
     id: string,
     patch: Partial<{
@@ -55,6 +56,7 @@ export interface ImportQueueOptions {
     kind: ImportTask["sourceKind"],
     input: string,
     signal: AbortSignal,
+    onStage: (stage: ImportStage) => void,
   ) => Promise<ExtractedContent>;
   onTaskChanged: (task: ImportTask) => void;
   concurrency?: number;
@@ -80,12 +82,16 @@ export class ImportQueue {
     this.concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
   }
 
-  /** 启动恢复：把上次遗留的 processing 复位并连同 pending 一起入队。 */
+  /**
+   * 启动恢复：把上次遗留的 processing 复位并连同 pending 一起入队。
+   *
+   * 必须按状态查询——list() 是「最近 200 条」，一次入队几百个文件后重启，
+   * 最早的那批 pending 会落在 200 条窗口之外，永远不再被调度。
+   */
   recover(): void {
     this.store.resetProcessingToPending();
     const pending = this.store
-      .list()
-      .filter((task) => task.status === "pending")
+      .listByStatus(["pending"])
       .sort((left, right) => left.createdAt - right.createdAt);
     for (const task of pending) {
       if (!this.pendingIds.includes(task.id)) {
@@ -201,10 +207,22 @@ export class ImportQueue {
         task.sourceKind,
         task.sourceInput,
         controller.signal,
+        (stage) => this.updateAndNotify(id, { stage }),
       );
 
       this.throwIfAborted(controller);
       this.updateAndNotify(id, { stage: "extracting" });
+
+      // 降级结果按失败处理：不入库，也不登记来源，
+      // 否则空壳条目会占住该链接的 normalized_uri，重试永远判重为重复
+      if (extracted.degradedReason) {
+        this.updateAndNotify(id, {
+          status: "failed",
+          stage: null,
+          error: extracted.degradedReason,
+        });
+        return;
+      }
 
       const normalizedUri =
         task.sourceKind === "url" && extracted.sourceUri

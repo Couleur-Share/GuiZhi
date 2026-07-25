@@ -20,10 +20,41 @@ import {
   normalizeLanguage,
   normalizeShortcutModes,
 } from "./settings-normalizers";
+import { createDefaultSettingsValues } from "./settings-defaults";
 import type { SettingsState } from "./settings-types";
 
+/**
+ * 持久化允许出现的字段集合。
+ *
+ * v0.4.1 删掉 WebDAV / S3 同步后，老用户 localStorage 里仍留着那 36 个字段——
+ * 合并是无过滤展开、partialize 又原样写回，脏键的生命周期等于 localStorage
+ * 的生命周期。其中 `webdavPassword` / `s3SecretAccessKey` 是明文凭据，而
+ * 界面上已经看不到这些配置项，用户无从知晓、更无从删除。
+ *
+ * 用默认值的键集合做白名单，读写两个方向都过一遍，未知字段自然消失。
+ */
+let knownSettingsKeys: Set<string> | null = null;
+
+function getKnownSettingsKeys(): Set<string> {
+  // 懒求值：默认值会读 i18n.language，模块加载期取值时它可能还没初始化
+  knownSettingsKeys ??= new Set(Object.keys(createDefaultSettingsValues()));
+  return knownSettingsKeys;
+}
+
+function pickKnownSettings<T extends object>(state: T): T {
+  const known = getKnownSettingsKeys();
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(state)) {
+    // 保留 actions（函数）：它们不参与序列化，但 merge 后的对象仍需可用
+    if (known.has(key) || typeof value === "function") {
+      result[key] = value;
+    }
+  }
+  return result as T;
+}
+
 export function stripEphemeralSettings(state: SettingsState): SettingsState {
-  return state;
+  return pickKnownSettings(state);
 }
 
 function normalizeSharedSettingsState(next: SettingsState): void {
@@ -78,7 +109,7 @@ export function mergeSettingsState(
 ): SettingsState {
   const next = {
     ...currentState,
-    ...(persistedState as Partial<SettingsState>),
+    ...pickKnownSettings((persistedState ?? {}) as Partial<SettingsState>),
   };
   return normalizeMergedState(next);
 }
@@ -88,8 +119,9 @@ export function migrateSettingsState(
   _version: number,
 ): SettingsState {
   if (!state || typeof state !== "object") return state as SettingsState;
-  // 版本差异不做逐版本分支：normalizeMergedState 对任意历史快照做归一
-  return normalizeMergedState({ ...(state as SettingsState) });
+  // 版本差异不做逐版本分支：pickKnownSettings 丢弃已下线字段，
+  // normalizeMergedState 对任意历史快照做归一
+  return normalizeMergedState(pickKnownSettings({ ...(state as SettingsState) }));
 }
 
 export function rehydrateSettingsState(

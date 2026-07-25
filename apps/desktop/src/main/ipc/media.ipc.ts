@@ -43,6 +43,7 @@ import {
   YtDlpNotFoundError,
 } from "../services/import/video-url";
 import { prepareAudioForTranscription } from "../services/media/audio-preprocess";
+import { rememberPickedBinaryPath } from "../services/picked-binary-paths";
 import {
   getFfmpegStatus,
   installFfmpeg,
@@ -245,9 +246,12 @@ async function pickExecutable(
   const result = owner
     ? await dialog.showOpenDialog(owner, options)
     : await dialog.showOpenDialog(options);
-  return result.canceled || result.filePaths.length === 0
-    ? null
-    : result.filePaths[0];
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  // 登记后 settings:set 才允许把它写进配置（见 picked-binary-paths.ts）
+  rememberPickedBinaryPath(result.filePaths[0]);
+  return result.filePaths[0];
 }
 
 export function registerMediaIPC(db: Database.Database): void {

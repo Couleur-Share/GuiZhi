@@ -86,10 +86,14 @@ describe("WikiDB", () => {
   it("再次编译按 normalized_title 更新既有页（id 不变）", () => {
     wiki.applyCompilation(compilationInput(itemId));
     const before = wiki.getCatalog();
+    const kmId = before.find(
+      (entry) => entry.normalizedTitle === "知识管理",
+    )!.id;
 
     wiki.applyCompilation(
       compilationInput(itemId, {
         contentHash: "hash-2",
+        contextPageIds: [kmId],
         pages: [
           {
             title: "知识管理",
@@ -107,11 +111,10 @@ describe("WikiDB", () => {
     const after = wiki.getCatalog();
     expect(after).toHaveLength(2);
     const km = after.find((entry) => entry.normalizedTitle === "知识管理")!;
-    expect(km.id).toBe(
-      before.find((entry) => entry.normalizedTitle === "知识管理")!.id,
-    );
+    expect(km.id).toBe(kmId);
     expect(km.summary).toBe("更新后的摘要");
     expect(km.kind).toBe("concept");
+    expect(wiki.getPage(kmId)!.page.body).toBe("更新后的正文");
     expect(wiki.listIngestions()[0].contentHash).toBe("hash-2");
 
     // 出链已替换为空
@@ -119,6 +122,116 @@ describe("WikiDB", () => {
       (entry) => entry.normalizedTitle === "ELECTRON",
     )!;
     expect(wiki.getPage(electron.id)!.backlinks).toHaveLength(0);
+  });
+
+  it("未进入本轮上下文的页面保留原正文，只更新元数据", () => {
+    wiki.applyCompilation(compilationInput(itemId));
+    const kmId = wiki.findPageIdByNormalizedTitle("知识管理")!;
+    const originalBody = wiki.getPage(kmId)!.page.body;
+
+    // contextPageIds 为空：模型只看到目录里的标题和摘要，
+    // 它"更新"出来的正文是凭空编的，覆盖上去等于丢掉原页内容
+    wiki.applyCompilation(
+      compilationInput(itemId, {
+        contentHash: "hash-3",
+        contextPageIds: [],
+        pages: [
+          {
+            title: "知识管理",
+            normalizedTitle: "知识管理",
+            kind: "concept",
+            summary: "凭空编的摘要",
+            body: "凭空编的正文",
+            aliasesJson: null,
+            linkTargets: [],
+          },
+        ],
+      }),
+    );
+
+    expect(wiki.getPage(kmId)!.page.body).toBe(originalBody);
+    // 摘要与类型仍会更新——它们本来就只依赖标题层面的信息
+    expect(wiki.getPage(kmId)!.page.summary).toBe("凭空编的摘要");
+  });
+
+  it("覆盖前存快照，可回滚到上一版", () => {
+    wiki.applyCompilation(compilationInput(itemId));
+    const kmId = wiki.findPageIdByNormalizedTitle("知识管理")!;
+    const originalBody = wiki.getPage(kmId)!.page.body;
+
+    wiki.applyCompilation(
+      compilationInput(itemId, {
+        contentHash: "hash-2",
+        contextPageIds: [kmId],
+        pages: [
+          {
+            title: "知识管理",
+            normalizedTitle: "知识管理",
+            kind: "topic",
+            summary: "新摘要",
+            body: "被覆盖后的正文",
+            aliasesJson: null,
+            linkTargets: [],
+          },
+        ],
+      }),
+    );
+    expect(wiki.getPage(kmId)!.page.body).toBe("被覆盖后的正文");
+
+    const revisions = wiki.listRevisions(kmId);
+    expect(revisions.length).toBeGreaterThan(0);
+    expect(revisions[0].body).toBe(originalBody);
+
+    expect(wiki.restoreRevision(revisions[0].id)).toBe(true);
+    expect(wiki.getPage(kmId)!.page.body).toBe(originalBody);
+  });
+
+  it("每页历史版本不超过保留上限", () => {
+    wiki.applyCompilation(compilationInput(itemId));
+    const kmId = wiki.findPageIdByNormalizedTitle("知识管理")!;
+
+    for (let round = 0; round < 15; round++) {
+      wiki.applyCompilation(
+        compilationInput(itemId, {
+          contentHash: `hash-${round}`,
+          contextPageIds: [kmId],
+          pages: [
+            {
+              title: "知识管理",
+              normalizedTitle: "知识管理",
+              kind: "topic",
+              summary: `第 ${round} 轮`,
+              body: `第 ${round} 轮正文`,
+              aliasesJson: null,
+              linkTargets: [],
+            },
+          ],
+        }),
+      );
+    }
+
+    expect(wiki.listRevisions(kmId)).toHaveLength(10);
+  });
+
+  it("编译失败记录退避，成功后清零", () => {
+    const first = wiki.recordCompilationFailure(itemId, "hash-x", 1_000);
+    expect(first).toBe(1);
+    let ingestion = wiki.listIngestions()[0];
+    expect(ingestion).toMatchObject({
+      failureCount: 1,
+      nextAttemptAt: 1_000,
+      // 空 promptVersion 表示尚未成功编译过，指纹判定仍视其为待编译
+      promptVersion: "",
+    });
+
+    expect(wiki.recordCompilationFailure(itemId, "hash-x", 2_000)).toBe(2);
+    expect(wiki.listIngestions()[0].failureCount).toBe(2);
+
+    wiki.applyCompilation(compilationInput(itemId, { contentHash: "hash-x" }));
+    ingestion = wiki.listIngestions()[0];
+    expect(ingestion.failureCount).toBe(0);
+    expect(ingestion.nextAttemptAt).toBeNull();
+    expect(ingestion.promptVersion).toBe("wiki-compile-v1");
   });
 
   it("getStatus 统计页面与已编译条目", () => {

@@ -14,6 +14,7 @@ import type {
   WikiPage,
   WikiPageDetail,
   WikiPageKind,
+  WikiPageRevision,
   WikiSourceRef,
 } from "@guizhi/shared/types";
 
@@ -41,6 +42,37 @@ interface CatalogRow {
   summary: string;
   aliases_json: string | null;
   updated_at: number;
+}
+
+interface RevisionRow {
+  id: string;
+  page_id: string;
+  title: string;
+  kind: WikiPageKind;
+  summary: string;
+  body: string;
+  aliases_json: string | null;
+  model: string;
+  prompt_version: string;
+  created_at: number;
+}
+
+/** 每个页面保留的历史版本数 */
+const REVISION_KEEP_COUNT = 10;
+
+function mapRevision(row: RevisionRow): WikiPageRevision {
+  return {
+    id: row.id,
+    pageId: row.page_id,
+    title: row.title,
+    kind: row.kind,
+    summary: row.summary,
+    body: row.body,
+    aliasesJson: row.aliases_json,
+    model: row.model,
+    promptVersion: row.prompt_version,
+    createdAt: row.created_at,
+  };
 }
 
 function mapPage(row: PageRow): WikiPage {
@@ -170,6 +202,8 @@ export class WikiDB {
       content_hash: string;
       model: string;
       prompt_version: string;
+      failure_count: number | null;
+      next_attempt_at: number | null;
       updated_at: number;
     }[];
     return rows.map((row) => ({
@@ -177,6 +211,8 @@ export class WikiDB {
       contentHash: row.content_hash,
       model: row.model,
       promptVersion: row.prompt_version,
+      failureCount: row.failure_count ?? 0,
+      nextAttemptAt: row.next_attempt_at ?? null,
       updatedAt: row.updated_at,
     }));
   }
@@ -219,20 +255,36 @@ export class WikiDB {
         pageIdByNormalized.set(row.normalized_title, row.id);
       }
 
+      // 本次 prompt 里带了完整正文的页面；只有它们才允许整体覆盖 body
+      const contextPageIds = new Set(input.contextPageIds ?? []);
+
       // 页面 upsert
       for (const draft of input.pages) {
         const existingId = pageIdByNormalized.get(draft.normalizedTitle);
         if (existingId) {
+          this.saveRevision(existingId, now);
+          // 模型只看到目录里的标题和摘要就重写正文，等于凭空编一份覆盖原文。
+          // 这类页面保留原 body，只更新摘要与别名，下一轮它进了上下文再重写。
+          const canReplaceBody = contextPageIds.has(existingId);
           this.db.run(
-            `UPDATE wiki_pages SET
-               title = ?, kind = ?, summary = ?, body = ?, aliases_json = ?,
-               provider = ?, model = ?, prompt_version = ?, generated_at = ?, updated_at = ?
-             WHERE id = ?`,
-            draft.title,
-            draft.kind,
-            draft.summary,
-            draft.body,
-            draft.aliasesJson,
+            canReplaceBody
+              ? `UPDATE wiki_pages SET
+                   title = ?, kind = ?, summary = ?, body = ?, aliases_json = ?,
+                   provider = ?, model = ?, prompt_version = ?, generated_at = ?, updated_at = ?
+                 WHERE id = ?`
+              : `UPDATE wiki_pages SET
+                   title = ?, kind = ?, summary = ?, aliases_json = ?,
+                   provider = ?, model = ?, prompt_version = ?, generated_at = ?, updated_at = ?
+                 WHERE id = ?`,
+            ...(canReplaceBody
+              ? [
+                  draft.title,
+                  draft.kind,
+                  draft.summary,
+                  draft.body,
+                  draft.aliasesJson,
+                ]
+              : [draft.title, draft.kind, draft.summary, draft.aliasesJson]),
             input.provider,
             input.model,
             input.promptVersion,
@@ -295,14 +347,17 @@ export class WikiDB {
         );
       }
 
-      // 指纹刷新
+      // 指纹刷新（成功即清零失败计数与退避）
       this.db.run(
-        `INSERT INTO wiki_ingestions (item_id, content_hash, model, prompt_version, updated_at)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO wiki_ingestions
+           (item_id, content_hash, model, prompt_version, failure_count, next_attempt_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, NULL, ?)
          ON CONFLICT(item_id) DO UPDATE SET
            content_hash = excluded.content_hash,
            model = excluded.model,
            prompt_version = excluded.prompt_version,
+           failure_count = 0,
+           next_attempt_at = NULL,
            updated_at = excluded.updated_at`,
         input.itemId,
         input.contentHash,
@@ -314,12 +369,123 @@ export class WikiDB {
     run();
   }
 
+  /**
+   * 记录一次编译失败并排下次重试时间。
+   *
+   * prompt_version 留空表示「这条还没成功编译过」，指纹判定因此仍视其为待编译；
+   * next_attempt_at 负责把它挡在退避窗口外，避免每轮都白烧两次模型调用。
+   */
+  recordCompilationFailure(
+    itemId: string,
+    contentHash: string,
+    nextAttemptAt: number | null,
+  ): number {
+    const now = Date.now();
+    const existing = this.db.get(
+      "SELECT failure_count FROM wiki_ingestions WHERE item_id = ?",
+      itemId,
+    ) as { failure_count: number } | undefined;
+    const failureCount = (existing?.failure_count ?? 0) + 1;
+    this.db.run(
+      `INSERT INTO wiki_ingestions
+         (item_id, content_hash, model, prompt_version, failure_count, next_attempt_at, updated_at)
+       VALUES (?, ?, '', '', ?, ?, ?)
+       ON CONFLICT(item_id) DO UPDATE SET
+         content_hash = excluded.content_hash,
+         prompt_version = '',
+         failure_count = excluded.failure_count,
+         next_attempt_at = excluded.next_attempt_at,
+         updated_at = excluded.updated_at`,
+      itemId,
+      contentHash,
+      failureCount,
+      nextAttemptAt,
+      now,
+    );
+    return failureCount;
+  }
+
+  /** 覆盖前存一份快照；每页只保留最近 REVISION_KEEP_COUNT 份 */
+  private saveRevision(pageId: string, now: number): void {
+    const page = this.db.get(
+      "SELECT * FROM wiki_pages WHERE id = ?",
+      pageId,
+    ) as PageRow | undefined;
+    if (!page) {
+      return;
+    }
+    this.db.run(
+      `INSERT INTO wiki_page_revisions
+         (id, page_id, title, kind, summary, body, aliases_json, model, prompt_version, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      randomUUID(),
+      pageId,
+      page.title,
+      page.kind,
+      page.summary,
+      page.body,
+      page.aliases_json,
+      page.model,
+      page.prompt_version,
+      now,
+    );
+    this.db.run(
+      `DELETE FROM wiki_page_revisions
+       WHERE page_id = ? AND id NOT IN (
+         SELECT id FROM wiki_page_revisions
+         WHERE page_id = ? ORDER BY created_at DESC LIMIT ?
+       )`,
+      pageId,
+      pageId,
+      REVISION_KEEP_COUNT,
+    );
+  }
+
+  listRevisions(pageId: string): WikiPageRevision[] {
+    const rows = this.db.all(
+      `SELECT id, page_id, title, kind, summary, body, aliases_json, model, prompt_version, created_at
+       FROM wiki_page_revisions WHERE page_id = ? ORDER BY created_at DESC`,
+      pageId,
+    ) as RevisionRow[];
+    return rows.map(mapRevision);
+  }
+
+  /** 把页面回滚到指定版本；回滚本身也会先存一份当前快照 */
+  restoreRevision(revisionId: string): boolean {
+    const revision = this.db.get(
+      "SELECT * FROM wiki_page_revisions WHERE id = ?",
+      revisionId,
+    ) as RevisionRow | undefined;
+    if (!revision) {
+      return false;
+    }
+    const now = Date.now();
+    const run = this.db.transaction(() => {
+      this.saveRevision(revision.page_id, now);
+      this.db.run(
+        `UPDATE wiki_pages SET
+           title = ?, kind = ?, summary = ?, body = ?, aliases_json = ?, updated_at = ?
+         WHERE id = ?`,
+        revision.title,
+        revision.kind,
+        revision.summary,
+        revision.body,
+        revision.aliases_json,
+        now,
+        revision.page_id,
+      );
+    });
+    run();
+    return true;
+  }
+
   /** 清空 Wiki 四表（全量重建的第一步） */
   clearAll(): void {
     const run = this.db.transaction(() => {
       this.db.run("DELETE FROM wiki_page_links");
       this.db.run("DELETE FROM wiki_page_sources");
       this.db.run("DELETE FROM wiki_ingestions");
+      this.db.run("DELETE FROM wiki_page_revisions");
       this.db.run("DELETE FROM wiki_pages");
     });
     run();

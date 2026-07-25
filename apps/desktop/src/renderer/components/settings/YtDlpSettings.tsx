@@ -7,6 +7,7 @@ import {
   RefreshCwIcon,
   Trash2Icon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { YtDlpDownloadProgress, YtDlpStatus } from "@guizhi/shared/types";
@@ -219,13 +220,15 @@ export function YtDlpSettings() {
         label={t("settings.ytDlpCustomPath", "自定义路径（高级）")}
         description={t(
           "settings.ytDlpCustomPathDesc",
-          "指定后优先于内置版与系统 PATH；留空使用内置版",
+          "指定后优先于内置版与系统 PATH；请通过右侧按钮选择文件，留空使用内置版",
         )}
       >
         <div className="flex shrink-0 items-center gap-2">
+          {/* 只读：该路径会被主进程 spawn，只接受文件选择器返回的值 */}
           <Input
             value={ytDlpPath}
-            onChange={(event) => setYtDlpPath(event.target.value)}
+            readOnly
+            title={ytDlpPath}
             placeholder={t("settings.ytDlpCustomPathPlaceholder", "留空使用内置版")}
             className="w-56"
           />
@@ -238,6 +241,17 @@ export function YtDlpSettings() {
           >
             <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
           </button>
+          {ytDlpPath ? (
+            <button
+              type="button"
+              onClick={() => setYtDlpPath("")}
+              title={t("settings.ytDlpClearPath", "清除自定义路径")}
+              aria-label={t("settings.ytDlpClearPath", "清除自定义路径")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <XIcon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </SettingItem>
     </>

@@ -107,40 +107,65 @@ export function getSemanticStatus(
   };
 }
 
+/** 每批取用的分块数：内存峰值与让出频率的折中 */
+const SEARCH_BATCH_SIZE = 500;
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 /**
  * 余弦 top-k：向量均已 L2 归一化，点积即余弦相似度；
  * 条目分数取其分块最高分，返回按分数倒序的前 limit 个条目。
+ *
+ * 没有 ANN 索引，这里是全量扫描。分批取用并在批间让出事件循环——
+ * 一次性搬完整份索引再连着算完，会把主进程占满：所有 IPC 排队，
+ * 卡住的不只是问答，而是整个界面。
  */
-export function searchSemanticByVector(
+export async function searchSemanticByVector(
   db: Database.Database,
   model: string,
   queryVector: Float32Array,
   limit: number,
-): SemanticSearchHit[] {
-  const chunks = new SemanticIndexDB(db).loadChunksForSearch(model);
+): Promise<SemanticSearchHit[]> {
+  const index = new SemanticIndexDB(db);
   const bestByItem = new Map<string, SemanticSearchHit>();
+  const dims = queryVector.length;
 
-  for (const chunk of chunks) {
-    if (chunk.vector.length !== queryVector.length) {
-      continue;
+  for (let offset = 0; ; offset += SEARCH_BATCH_SIZE) {
+    const batch = index.loadChunksForSearch(model, SEARCH_BATCH_SIZE, offset);
+    if (batch.length === 0) {
+      break;
     }
-    let dot = 0;
-    for (let i = 0; i < queryVector.length; i++) {
-      dot += queryVector[i] * chunk.vector[i];
+
+    for (const chunk of batch) {
+      // 维度不一致说明这批向量出自别的模型，跳过
+      if (chunk.vector.length !== dims) {
+        continue;
+      }
+      let dot = 0;
+      for (let i = 0; i < dims; i++) {
+        dot += queryVector[i] * chunk.vector[i];
+      }
+      const existing = bestByItem.get(chunk.itemId);
+      if (!existing || dot > existing.score) {
+        const snippet = chunk.chunkText.replace(/\s+/g, " ").trim();
+        bestByItem.set(chunk.itemId, {
+          itemId: chunk.itemId,
+          title: chunk.title,
+          snippet:
+            snippet.length > SNIPPET_MAX_LENGTH
+              ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
+              : snippet,
+          score: dot,
+        });
+      }
     }
-    const existing = bestByItem.get(chunk.itemId);
-    if (!existing || dot > existing.score) {
-      const snippet = chunk.chunkText.replace(/\s+/g, " ").trim();
-      bestByItem.set(chunk.itemId, {
-        itemId: chunk.itemId,
-        title: chunk.title,
-        snippet:
-          snippet.length > SNIPPET_MAX_LENGTH
-            ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
-            : snippet,
-        score: dot,
-      });
+
+    if (batch.length < SEARCH_BATCH_SIZE) {
+      break;
     }
+    await yieldToEventLoop();
   }
 
   return [...bestByItem.values()]

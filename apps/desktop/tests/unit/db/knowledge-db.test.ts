@@ -150,6 +150,18 @@ describe("KnowledgeItemDB", () => {
     expect(result.entries[0].title).toBe("zzz 归知 归知 归知");
   });
 
+  it("标题命中排在正文命中之前（bm25 列权重）", () => {
+    // 两条文档长度相近、各命中一次，排序只由列权重决定。
+    // bm25 的权重按列序位置映射，UNINDEXED 的 item_id 也占一位——
+    // 漏掉那个占位会让权重整体错开一列，变成正文优先。
+    items.create({ title: "斑马", content: "这段正文与关键词毫无关系" });
+    items.create({ title: "毫无关系的标题", content: "这段正文提到了斑马" });
+
+    const result = items.list({ scope: "all", search: "斑马" });
+    expect(result.total).toBe(2);
+    expect(result.entries[0].title).toBe("斑马");
+  });
+
   it("按集合与标签过滤", () => {
     const collections = new CollectionDB(db);
     const work = collections.create({ name: "工作" });
@@ -177,6 +189,43 @@ describe("KnowledgeItemDB", () => {
     items.restore([item.id]);
     expect(items.list({ scope: "all" }).total).toBe(1);
     expect(items.list({ scope: "all", search: "删除测试" }).total).toBe(1);
+  });
+
+  it("回收站范围内可以搜索（找回误删条目）", () => {
+    const keep = items.create({ title: "留着的", content: "会议纪要" });
+    const trashed = items.create({ title: "误删的", content: "会议纪要草稿" });
+    items.moveToTrash([trashed.id]);
+
+    const inTrash = items.list({ scope: "trash", search: "会议纪要" });
+    expect(inTrash.total).toBe(1);
+    expect(inTrash.entries[0].id).toBe(trashed.id);
+
+    // 回收站条目保留索引不会污染常规检索
+    const normal = items.list({ scope: "all", search: "会议纪要" });
+    expect(normal.total).toBe(1);
+    expect(normal.entries[0].id).toBe(keep.id);
+  });
+
+  it("backfillMissingFtsRows 补齐老库里缺索引的回收站条目", () => {
+    const item = items.create({ title: "老库遗留", content: "会议纪要草稿" });
+    items.moveToTrash([item.id]);
+    // 模拟旧版本行为：软删时把索引行删掉
+    db.run("DELETE FROM knowledge_fts WHERE item_id = ?", item.id);
+    expect(items.list({ scope: "trash", search: "会议纪要" }).total).toBe(0);
+
+    expect(items.backfillMissingFtsRows()).toBe(1);
+    expect(items.list({ scope: "trash", search: "会议纪要" }).total).toBe(1);
+    // 幂等：没有缺失时不重复写
+    expect(items.backfillMissingFtsRows()).toBe(0);
+  });
+
+  it("回收站条目彻底删除后移出索引", () => {
+    const item = items.create({ title: "彻底删除", content: "索引清理验证" });
+    items.moveToTrash([item.id]);
+    items.deleteForever([item.id]);
+
+    expect(items.list({ scope: "trash", search: "索引清理" }).total).toBe(0);
+    expect(items.list({ scope: "all", search: "索引清理" }).total).toBe(0);
   });
 
   it("彻底删除与清空回收站", () => {

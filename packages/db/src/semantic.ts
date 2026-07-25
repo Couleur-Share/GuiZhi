@@ -106,15 +106,31 @@ export class SemanticIndexDB {
     this.db.run("DELETE FROM knowledge_embeddings WHERE item_id = ?", itemId);
   }
 
-  /** 加载指定模型的全部分块向量（排除回收站条目） */
-  loadChunksForSearch(model: string): SemanticChunkRecord[] {
+  /**
+   * 加载指定模型的分块向量（排除回收站条目）。
+   *
+   * 支持分页：全量取回会把整份索引一次性搬过 wasm 边界（万级条目约几百 MB），
+   * 检索侧按批取用，内存峰值和事件循环占用都能控制住。
+   */
+  loadChunksForSearch(
+    model: string,
+    limit?: number,
+    offset = 0,
+  ): SemanticChunkRecord[] {
+    const params: unknown[] = [model];
+    let pageClause = "";
+    if (limit !== undefined) {
+      // rowid 排序稳定，保证分页不重不漏
+      pageClause = " ORDER BY e.rowid LIMIT ? OFFSET ?";
+      params.push(limit, offset);
+    }
     const rows = this.db.all(
       `SELECT e.item_id, e.chunk_index, e.chunk_text, e.dims, e.vector,
               i.title AS title
        FROM knowledge_embeddings e
        JOIN knowledge_items i ON i.id = e.item_id AND i.deleted_at IS NULL
-       WHERE e.model = ?`,
-      model,
+       WHERE e.model = ?${pageClause}`,
+      ...params,
     ) as ChunkRow[];
     return rows.map((row) => ({
       itemId: row.item_id,

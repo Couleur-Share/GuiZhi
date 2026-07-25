@@ -32,4 +32,20 @@ export function registerWikiIPC(db: Database.Database): void {
   ipcMain.handle(IPC_CHANNELS.WIKI_CLEAR, () => {
     wiki.clearAll();
   });
+  ipcMain.handle(
+    IPC_CHANNELS.WIKI_RECORD_FAILURE,
+    (
+      _event,
+      itemId: string,
+      contentHash: string,
+      nextAttemptAt: number | null,
+    ) => wiki.recordCompilationFailure(itemId, contentHash, nextAttemptAt),
+  );
+  ipcMain.handle(IPC_CHANNELS.WIKI_LIST_REVISIONS, (_event, pageId: string) =>
+    wiki.listRevisions(pageId),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.WIKI_RESTORE_REVISION,
+    (_event, revisionId: string) => wiki.restoreRevision(revisionId),
+  );
 }

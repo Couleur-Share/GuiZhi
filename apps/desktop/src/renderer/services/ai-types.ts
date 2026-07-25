@@ -88,9 +88,32 @@ export interface StreamCallbacks {
   onComplete?: (fullContent: string, thinkingContent?: string) => void;
 }
 
+/**
+ * 传输层响应的统一形态。
+ *
+ * 桌面端经 IPC 拿到的是一个纯数据对象，web 回退路径拿到的是 fetch 的
+ * Response；两者包成同一个接口，上层不必区分。
+ */
+export interface ResponseLike {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  text: () => Promise<string>;
+  json: <T = unknown>() => Promise<T>;
+  error?: string;
+}
+
+export interface ChatCompletionUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
 export interface ChatCompletionResult {
   content: string;
   thinkingContent?: string;
+  /** provider 回报的 token 用量；流式与部分中转站不返回，此时为 undefined */
+  usage?: ChatCompletionUsage;
 }
 
 export interface ChatCompletionOptions {
@@ -113,6 +136,8 @@ export interface ChatCompletionOptions {
     };
   };
   timeoutMs?: number;
+  /** 中断在途请求；桌面端经 requestId 转达到主进程 */
+  signal?: AbortSignal;
 }
 
 export interface AITestResult {

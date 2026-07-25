@@ -1,9 +1,1 @@
-{
-  "apps/desktop/resources/codex-dream-skin/macos/scripts/injector.mjs": 1822,
-  "apps/desktop/src/main/index.ts": 1974,
-  "apps/desktop/src/main/services/skill-installer.ts": 1960,
-  "apps/desktop/src/renderer/components/prompt/AiTestModal.tsx": 1540,
-  "apps/desktop/src/renderer/components/prompt/EditPromptModal.tsx": 1830,
-  "apps/desktop/src/renderer/services/ai.ts": 1979,
-  "packages/core/src/mcp-library.ts": 1914
-}
+{}

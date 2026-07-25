@@ -267,12 +267,12 @@ export function migrateLegacyDatabase(
       stats.sources++;
     }
 
-    // ── FTS 重建（未删除条目） ──
+    // ── FTS 重建（含回收站条目，使回收站范围内可搜索） ──
     for (const row of target.all(
       `SELECT i.id, i.title, i.content,
               (SELECT GROUP_CONCAT(t.name, ' ') FROM knowledge_item_tags kit
                JOIN tags t ON t.id = kit.tag_id WHERE kit.item_id = i.id) AS tag_names
-       FROM knowledge_items i WHERE i.deleted_at IS NULL`,
+       FROM knowledge_items i`,
     ) as { id: string; title: string; content: string; tag_names: string | null }[]) {
       target.run(
         "INSERT INTO knowledge_fts (item_id, title, content, tags) VALUES (?, ?, ?, ?)",

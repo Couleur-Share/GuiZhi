@@ -8,6 +8,7 @@ import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import type {
   ImportSourceKind,
+  ImportStage,
   KnowledgeItemType,
 } from "@guizhi/shared/types";
 import { fetchHtml } from "./fetch-html";
@@ -31,8 +32,14 @@ export interface ExtractedContent {
   sourceUri: string | null;
   /** 口播转写稿（在线视频导入时生成） */
   transcript?: string | null;
-  /** 网页抽取失败时的降级标记（仅保存元数据） */
-  degraded?: boolean;
+  /**
+   * 抽取降级的用户可读原因（抓取失败 / 抽不出正文 / 依赖缺失）。
+   *
+   * 有值时队列不会入库：写进知识库只会留下一条空壳，而它的 sourceUri
+   * 还会占住 source_records.normalized_uri，让同一链接此后永远判重为重复。
+   * 任务改标 failed，用户可以在导入列表里看到原因并重试。
+   */
+  degradedReason?: string;
 }
 
 /** 连接器运行环境（由 import-service 注入，避免连接器直接依赖 DB） */
@@ -41,6 +48,8 @@ export interface ImportConnectorContext {
   getYtDlpPath?: () => string | null;
   /** 设置里配置的 ffmpeg 路径（空表示托管版 / PATH） */
   getFfmpegPath?: () => string | null;
+  /** 上报当前子阶段：视频链路可跑几十分钟，只报「抓取中」等于没有进度 */
+  onStage?: (stage: ImportStage) => void;
 }
 
 function firstLineTitle(text: string): string {
@@ -151,18 +160,16 @@ async function extractWebpage(
   try {
     fetched = await fetchHtml(url, signal);
   } catch (error) {
-    // 抓取失败：降级为仅保存链接的条目，方便用户稍后手动处理
-    // （与 .NET 版「不可读页面自动降级元数据」一致）
     const message = error instanceof Error ? error.message : String(error);
     if (message === "已取消") {
       throw error;
     }
     return {
       title: url,
-      content: `> 网页抓取失败：${message}\n\n原始链接：<${url}>`,
+      content: "",
       itemType: "webpage",
-      sourceUri: url,
-      degraded: true,
+      sourceUri: null,
+      degradedReason: `网页抓取失败：${message}`,
     };
   }
 
@@ -182,10 +189,11 @@ async function extractWebpage(
   if (!article?.content) {
     return {
       title: pageTitle || fetched.finalUrl,
-      content: `> 未能抽取正文，已保存页面元数据。\n\n原始链接：<${fetched.finalUrl}>`,
+      content: "",
       itemType: "webpage",
-      sourceUri: fetched.finalUrl,
-      degraded: true,
+      sourceUri: null,
+      degradedReason:
+        "未能抽取网页正文（页面可能由脚本动态渲染，或需要登录后才能访问）",
     };
   }
 
@@ -225,6 +233,7 @@ export async function extractContent(
           {
             getYtDlpPath: context?.getYtDlpPath ?? (() => null),
             getFfmpegPath: context?.getFfmpegPath,
+            onStage: context?.onStage,
           },
           signal,
         );

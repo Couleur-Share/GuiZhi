@@ -1,3 +1,10 @@
+/**
+ * 文件行数门禁。
+ *
+ * baseline 是「历史遗留文件的临时豁免额度」，不是长期许可：条目一旦指向
+ * 已删除的文件，或对应文件已经缩到 PREFERRED_LIMIT 以下，本脚本会报错要求
+ * 删掉该条目。否则豁免会在重构之后继续留着，变成给大文件开的后门。
+ */
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -40,9 +47,11 @@ function countLines(content) {
 const files = (await Promise.all(ROOTS.map(collectSourceFiles))).flat();
 const violations = [];
 const inventory = [];
+const lineCounts = new Map();
 for (const file of files) {
   const normalizedPath = file.split(path.sep).join("/");
   const lines = countLines(await readFile(file, "utf8"));
+  lineCounts.set(normalizedPath, lines);
   if (lines >= REPORT_THRESHOLD)
     inventory.push({ file: normalizedPath, lines });
   const allowedLegacyLines = baseline[normalizedPath];
@@ -61,6 +70,28 @@ for (const file of files) {
   }
 }
 
+const staleBaselineEntries = [];
+for (const entryPath of Object.keys(baseline)) {
+  const actualLines = lineCounts.get(entryPath);
+  if (actualLines === undefined) {
+    staleBaselineEntries.push(`${entryPath}: 文件已不存在`);
+  } else if (actualLines <= PREFERRED_LIMIT) {
+    staleBaselineEntries.push(
+      `${entryPath}: 已降到 ${actualLines} 行（<= ${PREFERRED_LIMIT}），豁免可以删除`,
+    );
+  }
+}
+
+if (staleBaselineEntries.length > 0) {
+  console.error(
+    "config/file-line-limit-baseline.json 存在失效豁免，请删除以下条目:",
+  );
+  for (const entry of staleBaselineEntries) {
+    console.error(`- ${entry}`);
+  }
+  process.exitCode = 1;
+}
+
 if (violations.length > 0) {
   console.error(`File line limit exceeded:`);
   for (const violation of violations) {
@@ -73,7 +104,7 @@ if (violations.length > 0) {
     console.error(`- ${violation.file}: ${violation.lines}; ${limits.join(", ")}`);
   }
   process.exitCode = 1;
-} else {
+} else if (staleBaselineEntries.length === 0) {
   console.log(
     `File line limit passed: new files <= ${PREFERRED_LIMIT}; legacy files did not grow; hard limit ${HARD_LIMIT}.`,
   );

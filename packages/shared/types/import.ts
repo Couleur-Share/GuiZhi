@@ -17,7 +17,25 @@ export const IMPORT_TASK_STATUSES = [
 
 export type ImportTaskStatus = (typeof IMPORT_TASK_STATUSES)[number];
 
-export const IMPORT_STAGES = ["fetching", "extracting", "saving"] as const;
+/**
+ * 导入子阶段。
+ *
+ * 视频链路会串起元数据解析、音频下载、转码、转写、排版、总结六步，
+ * 最长可达几十分钟；此前它们全部落在 fetching 一个状态里，界面从头到尾
+ * 只显示「抓取中」，用户无从判断是在正常工作还是卡死了。
+ */
+export const IMPORT_STAGES = [
+  "fetching",
+  "extracting",
+  "saving",
+  // ── 在线视频子阶段 ──
+  "video-metadata",
+  "video-audio",
+  "transcoding",
+  "transcribing",
+  "formatting",
+  "summarizing",
+] as const;
 
 export type ImportStage = (typeof IMPORT_STAGES)[number];
 

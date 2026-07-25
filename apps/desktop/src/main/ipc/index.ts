@@ -59,6 +59,12 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.ASK_SESSION_SAVE,
   IPC_CHANNELS.ASK_SESSION_DELETE,
   IPC_CHANNELS.SEMANTIC_STATUS,
+  IPC_CHANNELS.AI_USAGE_RECORD,
+  IPC_CHANNELS.AI_USAGE_SUMMARY,
+  IPC_CHANNELS.AI_USAGE_CLEAR,
+  IPC_CHANNELS.WIKI_RECORD_FAILURE,
+  IPC_CHANNELS.WIKI_LIST_REVISIONS,
+  IPC_CHANNELS.WIKI_RESTORE_REVISION,
   IPC_CHANNELS.SEMANTIC_LIST_PENDING,
   IPC_CHANNELS.SEMANTIC_APPLY_EMBEDDINGS,
   IPC_CHANNELS.SEMANTIC_SEARCH,
@@ -129,5 +135,5 @@ export function registerAllIPC(
   registerIpcGroup("settings", () => registerSettingsIPC(db));
   registerIpcGroup("security", () => registerSecurityIPC(db));
   registerIpcGroup("image", () => registerImageIPC());
-  registerIpcGroup("ai", () => registerAIIPC());
+  registerIpcGroup("ai", () => registerAIIPC(db));
 }

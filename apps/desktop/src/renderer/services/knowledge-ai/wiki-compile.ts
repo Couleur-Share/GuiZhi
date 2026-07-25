@@ -29,6 +29,10 @@ const TITLE_MAX_LENGTH = 120;
 const SUMMARY_MAX_LENGTH = 300;
 const BODY_MAX_LENGTH = 8000;
 const WIKI_LINK_REGEX = /\[\[([^[\]]+)\]\]/g;
+/** 连续失败到这个次数后不再自动重试，等素材变化或手动全量重建 */
+const WIKI_COMPILE_MAX_FAILURES = 3;
+/** 首次重试的退避时长，之后每次 ×4（30 分钟 → 2 小时 → 8 小时） */
+const WIKI_COMPILE_RETRY_BASE_MS = 30 * 60 * 1000;
 
 /** 规范化标题：去首尾空白、内部连续空白折叠、不区分大小写（[[链接]] 锚点与唯一性判定）。 */
 export function normalizeWikiTitle(title: string): string {
@@ -293,17 +297,29 @@ export async function compilePendingItems(
 
   // 指纹失效集：无指纹 / 素材变化 / 提示词版本升级
   // 素材 trim 后哈希：与旧版 .NET ContentHasher 口径一致，迁移来的指纹保持有效
+  const now = Date.now();
   const pending: { item: WikiCompilableItem; hash: string }[] = [];
   for (const item of items) {
     const hash = await sha256Hex(buildMaterial(item).trim());
     const ingestion = ingestionByItem.get(item.id);
-    if (
+    const isStale =
       !ingestion ||
       ingestion.contentHash !== hash ||
-      ingestion.promptVersion !== WIKI_COMPILE_PROMPT_VERSION
-    ) {
-      pending.push({ item, hash });
+      ingestion.promptVersion !== WIKI_COMPILE_PROMPT_VERSION;
+    if (!isStale) {
+      continue;
     }
+    // 素材变了就重新给机会，否则遵守退避窗口与失败上限——
+    // 一条模型始终解析不出来的条目，此前会每轮白烧两次调用，永不停止
+    if (ingestion && ingestion.contentHash === hash) {
+      if (ingestion.failureCount >= WIKI_COMPILE_MAX_FAILURES) {
+        continue;
+      }
+      if (ingestion.nextAttemptAt !== null && ingestion.nextAttemptAt > now) {
+        continue;
+      }
+    }
+    pending.push({ item, hash });
   }
 
   if (pending.length === 0) {
@@ -322,9 +338,26 @@ export async function compilePendingItems(
       compiled++;
     } else {
       skipped++;
+      await recordFailure(item.id, hash, ingestionByItem.get(item.id));
     }
   }
   return { compiled, pending: pending.length, skipped };
+}
+
+/** 失败落库并排下次重试：退避按失败次数指数增长，到上限后不再自动重试 */
+async function recordFailure(
+  itemId: string,
+  hash: string,
+  previous: { contentHash: string; failureCount: number } | undefined,
+): Promise<void> {
+  const attempts =
+    previous && previous.contentHash === hash ? previous.failureCount + 1 : 1;
+  const nextAttemptAt =
+    attempts >= WIKI_COMPILE_MAX_FAILURES
+      ? null
+      : Date.now() +
+        WIKI_COMPILE_RETRY_BASE_MS * Math.pow(4, Math.min(attempts - 1, 4));
+  await window.api.wiki.recordCompilationFailure(itemId, hash, nextAttemptAt);
 }
 
 /** 单条目编译：候选检索 → LLM 生成（1 次纠错重试）→ 净化 → 链接清洗 → 落库。失败返回 false（跳过）。 */
@@ -348,10 +381,13 @@ async function compileSingleItem(
     .slice(0, WIKI_COMPILE_CONTEXT_PAGES_LIMIT)
     .map((candidate) => candidate.entry.id);
   const contextPages: { title: string; body: string }[] = [];
+  // 只有进了这里的页面才允许被整体覆盖：模型没看到原文就重写，等于凭空编一份
+  const contextPageIds: string[] = [];
   for (const id of contextIds) {
     const detail = await window.api.wiki.getPage(id);
     if (detail) {
       contextPages.push({ title: detail.page.title, body: detail.page.body });
+      contextPageIds.push(detail.page.id);
     }
   }
 
@@ -415,6 +451,7 @@ async function compileSingleItem(
     provider: "guizhi",
     model,
     promptVersion: WIKI_COMPILE_PROMPT_VERSION,
+    contextPageIds,
     pages: compiledPages,
   });
   return true;

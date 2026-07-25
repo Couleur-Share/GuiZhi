@@ -3,11 +3,14 @@
  *
  * FTS 索引内容需要中文按字分词预处理，无法用 SQL 触发器维护，
  * 因此所有写路径都在本类的同一事务内同步维护 knowledge_fts。
- * 回收站中的条目不参与全文检索（软删时移出索引、恢复时重建）。
+ * 回收站中的条目保留索引（列表查询自带 deleted_at 过滤，
+ * 因此不会污染正常检索，同时让回收站范围内的搜索可用），
+ * 索引仅在彻底删除时移除。
  */
 import { randomUUID } from "crypto";
 import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
+import { extractAllLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
 import type {
   CreateKnowledgeItemInput,
   KnowledgeCounts,
@@ -165,8 +168,10 @@ export class KnowledgeItemDB {
     let joinClause = "";
     let orderClause = buildOrderClause(query.sortBy, query.sortOrder);
     if (matchQuery) {
+      // bm25 的权重按列序位置映射，UNINDEXED 的 item_id 也占一位，
+      // 首个 0.0 是它的占位，其后依次为 title / content / tags
       joinClause = `JOIN (
-        SELECT item_id, bm25(knowledge_fts, 10.0, 1.0, 5.0) AS fts_rank
+        SELECT item_id, bm25(knowledge_fts, 0.0, 10.0, 1.0, 5.0) AS fts_rank
         FROM knowledge_fts
         WHERE knowledge_fts MATCH ?
       ) f ON f.item_id = i.id`;
@@ -371,10 +376,7 @@ export class KnowledgeItemDB {
         tags = this.loadTagsFor([id]).get(id) ?? [];
       }
 
-      // 回收站条目不入索引
-      if (existing.deleted_at === null) {
-        this.writeFts(id, next.title, next.content, tags);
-      }
+      this.writeFts(id, next.title, next.content, tags);
     });
     run();
 
@@ -409,16 +411,12 @@ export class KnowledgeItemDB {
     let changed = 0;
     const run = this.db.transaction(() => {
       for (const id of ids) {
-        const result = this.db.run(
+        changed += this.db.run(
           "UPDATE knowledge_items SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
           now,
           now,
           id,
-        );
-        if (result.changes > 0) {
-          changed += result.changes;
-          this.db.run("DELETE FROM knowledge_fts WHERE item_id = ?", id);
-        }
+        ).changes;
       }
     });
     run();
@@ -433,22 +431,11 @@ export class KnowledgeItemDB {
     let changed = 0;
     const run = this.db.transaction(() => {
       for (const id of ids) {
-        const result = this.db.run(
+        changed += this.db.run(
           "UPDATE knowledge_items SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
           now,
           id,
-        );
-        if (result.changes > 0) {
-          changed += result.changes;
-          const row = this.db.get(
-            "SELECT * FROM knowledge_items WHERE id = ?",
-            id,
-          ) as ItemRow | undefined;
-          if (row) {
-            const tags = this.loadTagsFor([id]).get(id) ?? [];
-            this.writeFts(id, row.title, row.content, tags);
-          }
-        }
+        ).changes;
       }
     });
     run();
@@ -473,18 +460,79 @@ export class KnowledgeItemDB {
     return changed;
   }
 
-  emptyTrash(): number {
+  /** 回收站里的全部条目 id */
+  listTrashedIds(): string[] {
     const rows = this.db.all(
       "SELECT id FROM knowledge_items WHERE deleted_at IS NOT NULL",
     ) as Array<{ id: string }>;
-    return this.deleteForever(rows.map((row) => row.id));
+    return rows.map((row) => row.id);
+  }
+
+  emptyTrash(): number {
+    return this.deleteForever(this.listTrashedIds());
+  }
+
+  /** 这些条目正文里引用的资产文件名（彻底删除前取，用于清理磁盘） */
+  listAssetRefs(ids: string[]): string[] {
+    if (ids.length === 0) {
+      return [];
+    }
+    const placeholders = ids.map(() => "?").join(", ");
+    const rows = this.db.all(
+      `SELECT content FROM knowledge_items WHERE id IN (${placeholders})`,
+      ...ids,
+    ) as Array<{ content: string }>;
+    const refs = new Set<string>();
+    for (const row of rows) {
+      for (const ref of extractAllLocalAssetRefs(row.content)) {
+        refs.add(ref);
+      }
+    }
+    return [...refs];
+  }
+
+  /** 是否还有条目引用该资产（决定删除条目后能否清理磁盘文件） */
+  isAssetReferenced(fileName: string): boolean {
+    // 适配器无结果时返回 null（不是 undefined），这里只能用宽松判空
+    const row = this.db.get(
+      "SELECT 1 AS hit FROM knowledge_items WHERE content LIKE ? LIMIT 1",
+      `%${fileName}%`,
+    ) as { hit: number } | null;
+    return row != null;
+  }
+
+  /**
+   * 补齐缺失的 FTS 行，返回补写条数。
+   *
+   * v0.4.1 之前软删会把条目移出索引，那些库里的回收站条目至今没有索引行，
+   * 回收站范围内搜不到。全量重建对大库太贵，这里只补缺失的。
+   */
+  backfillMissingFtsRows(): number {
+    const rows = this.db.all(
+      `SELECT * FROM knowledge_items i
+       WHERE NOT EXISTS (SELECT 1 FROM knowledge_fts WHERE item_id = i.id)`,
+    ) as ItemRow[];
+    if (rows.length === 0) {
+      return 0;
+    }
+    const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
+    const run = this.db.transaction(() => {
+      for (const row of rows) {
+        this.writeFts(
+          row.id,
+          row.title,
+          row.content,
+          tagsByItem.get(row.id) ?? [],
+        );
+      }
+    });
+    run();
+    return rows.length;
   }
 
   /** 重建整个 FTS 索引（数据修复 / 迁移后使用）。 */
   rebuildFtsIndex(): number {
-    const rows = this.db.all(
-      "SELECT * FROM knowledge_items WHERE deleted_at IS NULL",
-    ) as ItemRow[];
+    const rows = this.db.all("SELECT * FROM knowledge_items") as ItemRow[];
     const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
     const run = this.db.transaction(() => {
       this.db.run("DELETE FROM knowledge_fts");

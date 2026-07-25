@@ -51,6 +51,16 @@ function quoteFtsString(value: string): string {
 }
 
 /**
+ * 片段是否含可被 unicode61 tokenizer 切出 token 的字符。
+ *
+ * 纯标点片段（"("、"："、"——"）分词后是空 phrase，空 phrase 匹配 0 行，
+ * 再与其他子句 AND 会把整个查询清零——搜「归知(测试)」必然无结果。
+ */
+function hasSearchableToken(value: string): boolean {
+  return /[\p{L}\p{N}]/u.test(value);
+}
+
+/**
  * 把用户搜索串构造成 FTS5 MATCH 查询。
  *
  * - 连续 CJK 片段 → 按字 phrase（"归 知"），保证字序相邻
@@ -77,7 +87,7 @@ export function buildFtsMatchQuery(search: string): string | null {
   };
   const flushAscii = () => {
     const word = asciiBuffer.trim();
-    if (word) {
+    if (word && hasSearchableToken(word)) {
       // 引号包裹后缀 * 实现安全的前缀匹配（token 内含特殊字符也不会破坏语法）
       clauses.push(`${quoteFtsString(word)}*`);
     }

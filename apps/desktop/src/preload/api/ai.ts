@@ -6,6 +6,8 @@ import type {
   AITransportResponse,
   AITransportStreamChunk,
   AITransportStreamError,
+  AIUsageRecordInput,
+  AIUsageSummary,
 } from "@guizhi/shared/types";
 
 function createRequestId(): string {
@@ -16,8 +18,20 @@ function createRequestId(): string {
 }
 
 export const aiApi = {
+  /** 生成一个可用于 cancel 的请求 id */
+  createRequestId,
+  /** 中断在途请求；未带 requestId 发出的请求不可中断 */
+  cancel: (requestId: string): void => {
+    ipcRenderer.send(IPC_CHANNELS.AI_HTTP_CANCEL, requestId);
+  },
   request: (request: AITransportRequest): Promise<AITransportResponse> =>
     ipcRenderer.invoke(IPC_CHANNELS.AI_HTTP_REQUEST, request),
+  recordUsage: (entry: AIUsageRecordInput): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_USAGE_RECORD, entry),
+  usageSummary: (days: number): Promise<AIUsageSummary> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_USAGE_SUMMARY, days),
+  clearUsage: (): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.AI_USAGE_CLEAR),
   requestStream: async (
     request: AITransportRequest,
     handlers?: {

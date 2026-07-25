@@ -73,18 +73,22 @@ describe("ImportTaskDB", () => {
     expect(tasks.get(done.id)!.status).toBe("completed");
   });
 
-  it("clearFinished 清掉终态任务，保留进行中的", () => {
+  it("clearFinished 清掉终态任务，保留进行中的与失败的", () => {
     const pending = tasks.create({ kind: "text", input: "待处理" });
     const failed = tasks.create({ kind: "text", input: "失败" });
     const duplicate = tasks.create({ kind: "text", input: "重复" });
+    const completed = tasks.create({ kind: "text", input: "已完成" });
     tasks.update(failed.id, { status: "failed", error: "err" });
     tasks.update(duplicate.id, { status: "duplicate" });
+    tasks.update(completed.id, { status: "completed" });
 
     const removed = tasks.clearFinished();
     expect(removed).toBe(2);
-    const remaining = tasks.list();
-    expect(remaining).toHaveLength(1);
-    expect(remaining[0].id).toBe(pending.id);
+    // failed 必须留下：它保存着原始输入与失败原因，是用户唯一的重试入口
+    const remainingIds = tasks.list().map((task) => task.id);
+    expect(remainingIds).toHaveLength(2);
+    expect(remainingIds).toContain(pending.id);
+    expect(remainingIds).toContain(failed.id);
   });
 
   it("listByStatus 按状态过滤", () => {

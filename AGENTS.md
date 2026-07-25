@@ -74,11 +74,26 @@ v0.4.0（2026-07，首个公开发布）在此之上重构了知识库界面：�
 表格列配置与分页（`library/ItemTableView.tsx`、`item-table-config.ts`）、
 标签选择浮层（`TagPickerPopover.tsx`）、详情全屏弹窗（`ItemDetailModal.tsx`）。
 
+v0.5.0（2026-07）是一轮集中整改：知识库列表改服务端分页（`page`/`pageSize`
+进 store 直落 SQL）、AI 请求打通取消链路（`ai:httpCancel` + signal 贯穿到
+`runScenarioChat`）、Wiki 编译不再整体覆盖未进上下文的页面并新增
+`wiki_page_revisions` 快照、补上 `schema_migrations` 执行器与 `user_version`
+版本戳、Electron 侧加 CSP 与 `will-navigate` 拦截、settings 双向字段白名单。
+
 待办：平台登录采集（cookies）延后；macOS 平台暂不考虑。
 
-已知的技术债：OCR / embedding / 转写按 OpenAI 请求响应格式硬编码，
-Gemini 与 Anthropic 只在对话补全上完整可用；语义检索是全量余弦扫描，
-没有 ANN 索引；列表视图分页在客户端进行，单次最多加载 200 条。
+已知的技术债：
+- 语义检索仍是全量余弦扫描，没有 ANN 索引。已改为分批取用并在批间让出
+  事件循环（不再阻塞主进程），但总耗时随索引规模线性增长。
+- embedding 仍按 OpenAI 请求响应格式硬编码（Anthropic 有防护会明确报错，
+  Gemini 走 OpenAI 兼容层）。OCR 已适配 Anthropic，转写在不支持的协议上
+  会给出可读提示而非撞 404。
+- `ai:httpRequest` 只做到「已配置 host + 回环放行、未知目标限速」，没有
+  真正的端点白名单。彻底收敛需要把连接测试与模型列表拉取搬进主进程。
+- 主密码功能没有任何内容接入（`encryptText` / `decryptText` 零调用方），
+  设置页已如实说明，但功能本身仍是半成品。
+- 媒体文件按内容哈希去重尚未实现：同一文件重复导入会产生多份磁盘拷贝
+  （删除条目时会回收，但导入期间不去重）。
 
 fork 遗留的 WebDAV / S3 同步通道已在 v0.4.1 整体删除（主进程 transport、
 preload 白名单、settings 的 36 个字段与 69 条 i18n 文案）。归知目前不提供
