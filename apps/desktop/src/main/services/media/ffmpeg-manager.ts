@@ -86,11 +86,15 @@ export type BuildDateFetch = () => Promise<string | null>;
 /**
  * 查远端最新构建日期：只发 HEAD 读响应头，不下载那 160 多 MB 的 zip。
  * 逐源尝试，全部失败返回 null（UI 据此报「检查失败」）。
+ *
+ * platform 可注入：托管版 ffmpeg 只有 Windows 构建，非 win32 平台下载源列表
+ * 为空，不显式传的话这条链路在 Linux 上永远走不到（CI 就跑在 Linux）。
  */
 export async function fetchLatestFfmpegBuildDate(
   fetchImpl: typeof fetchWithNetworkProxy = fetchWithNetworkProxy,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
-  for (const url of getFfmpegDownloadUrls()) {
+  for (const url of getFfmpegDownloadUrls(platform)) {
     try {
       const response = await fetchImpl(url, {
         method: "HEAD",

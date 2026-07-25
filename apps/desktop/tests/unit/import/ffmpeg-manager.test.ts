@@ -54,6 +54,9 @@ describe("检查更新（只读响应头，不下载 160MB 的 zip）", () => {
     expect(toBuildDate(null)).toBeNull();
   });
 
+  // 托管版 ffmpeg 只有 Windows 构建，平台必须显式传：
+  // 跟着 process.platform 走的话，这两条在 Linux（CI）上下载源列表为空，
+  // 循环一次都不执行，测不到任何东西
   it("HEAD 命中即返回，不读正文", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(null, {
@@ -62,9 +65,9 @@ describe("检查更新（只读响应头，不下载 160MB 的 zip）", () => {
       }),
     );
 
-    await expect(fetchLatestFfmpegBuildDate(fetchImpl as never)).resolves.toBe(
-      "20260724",
-    );
+    await expect(
+      fetchLatestFfmpegBuildDate(fetchImpl as never, "win32"),
+    ).resolves.toBe("20260724");
     expect(fetchImpl.mock.calls[0][1]).toMatchObject({ method: "HEAD" });
   });
 
@@ -73,9 +76,22 @@ describe("检查更新（只读响应头，不下载 160MB 的 zip）", () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("网络不可达"));
 
     await expect(
-      fetchLatestFfmpegBuildDate(fetchImpl as never),
+      fetchLatestFfmpegBuildDate(fetchImpl as never, "win32"),
     ).resolves.toBeNull();
-    expect(fetchImpl).toHaveBeenCalledTimes(getFfmpegDownloadUrls().length);
+    expect(fetchImpl).toHaveBeenCalledTimes(
+      getFfmpegDownloadUrls("win32").length,
+    );
+    expect(getFfmpegDownloadUrls("win32").length).toBeGreaterThan(0);
+  });
+
+  it("非 Windows 平台没有托管源，不发任何请求", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn();
+
+    await expect(
+      fetchLatestFfmpegBuildDate(fetchImpl as never, "linux"),
+    ).resolves.toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
   it("同一天构建 → 没有更新", async () => {
