@@ -44,7 +44,9 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
 
   const hasLocalAsset =
     extractLocalAssetRef(item.content, "local-video") !== null;
+  // 图文条目的来源链接同样是抖音，但它没有音轨，不能据此提供转写入口
   const isOnlineVideo =
+    item.itemType !== "image" &&
     !hasLocalAsset &&
     detectVideoPlatform(item.sourceUri?.trim() ?? "") !== null;
 

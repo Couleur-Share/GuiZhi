@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "main": "out/main/index.js",
@@ -75,7 +75,8 @@
     "smol-toml": "^1.7.0",
     "socks-proxy-agent": "^7.0.0",
     "turndown": "^7.2.4",
-    "undici": "^7.24.8"
+    "undici": "^7.24.8",
+    "yet-another-react-lightbox": "^3.32.1"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",

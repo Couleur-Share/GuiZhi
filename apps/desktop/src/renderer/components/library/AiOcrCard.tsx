@@ -2,23 +2,43 @@ import { useEffect, useState } from "react";
 import { Loader2Icon, ScanTextIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
-import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
+import { extractLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
+import { OCR_SECTION_HEADING } from "@guizhi/shared/utils/ocr-request";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useToast } from "../ui/Toast";
 import { recognizeImageText } from "../../services/knowledge-ai/ocr";
 import { AiNotConfiguredError } from "../../services/knowledge-ai/ai-invoke";
-
-const OCR_SECTION_MARKER = "## 图中文字";
+import { ACTION_CHIP } from "./detail-chips";
 
 /** 把 OCR 结果写进内容：已有「图中文字」小节则整节替换，否则追加 */
 export function applyOcrTextToContent(content: string, text: string): string {
-  const section = `${OCR_SECTION_MARKER}\n\n${text}`;
-  const markerIndex = content.indexOf(OCR_SECTION_MARKER);
+  const section = `${OCR_SECTION_HEADING}\n\n${text}`;
+  const markerIndex = content.indexOf(OCR_SECTION_HEADING);
   if (markerIndex >= 0) {
     return `${content.slice(0, markerIndex)}${section}`;
   }
   return `${content.trimEnd()}\n\n${section}`;
+}
+
+/**
+ * 多图条目的识别结果拼成一节：加 `### 图 N` 小标题，
+ * 与采集时自动写入的形态保持一致。
+ */
+export function buildOcrSectionBody(
+  texts: (string | null)[],
+): string {
+  const recognized = texts
+    .map((text, index) => ({ text, index }))
+    .filter((entry): entry is { text: string; index: number } =>
+      Boolean(entry.text),
+    );
+  if (texts.length === 1) {
+    return recognized[0]?.text ?? "";
+  }
+  return recognized
+    .map(({ text, index }) => `### 图 ${index + 1}\n\n${text}`)
+    .join("\n\n");
 }
 
 /**
@@ -38,8 +58,8 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
     setIsRunning(false);
   }, [item.id]);
 
-  const assetFileName = extractLocalAssetRef(item.content, "local-image");
-  if (!assetFileName) {
+  const assetFileNames = extractLocalAssetRefs(item.content, "local-image");
+  if (assetFileNames.length === 0) {
     return null;
   }
 
@@ -50,9 +70,25 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
     setIsRunning(true);
     const itemId = item.id;
     try {
-      const text = await recognizeImageText(assetFileName);
+      // 图文条目会有多张配图，逐张识别；单张失败不影响其余
+      const texts: (string | null)[] = [];
+      for (const assetFileName of assetFileNames) {
+        try {
+          texts.push(await recognizeImageText(assetFileName));
+        } catch (error) {
+          if (error instanceof AiNotConfiguredError) {
+            throw error;
+          }
+          console.warn(`[ocr] ${assetFileName} 识别失败:`, error);
+          texts.push(null);
+        }
+      }
+      const body = buildOcrSectionBody(texts);
+      if (!body) {
+        throw new Error("所有图片都未识别出文字");
+      }
       const updated = await window.api.knowledge.update(itemId, {
-        content: applyOcrTextToContent(item.content, text),
+        content: applyOcrTextToContent(item.content, body),
       });
       if (updated) {
         applyServerItem(updated);
@@ -78,12 +114,13 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
     }
   };
 
+  const hasResult = item.content.includes(OCR_SECTION_HEADING);
   return (
     <button
       type="button"
       onClick={() => void recognize()}
       disabled={isRunning}
-      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 transition-colors hover:text-primary disabled:opacity-60"
+      className={ACTION_CHIP}
     >
       {isRunning ? (
         <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -92,7 +129,9 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
       )}
       {isRunning
         ? t("library.ocrRunning", "正在识别图中文字…")
-        : t("library.ocrGenerate", "识别图中文字")}
+        : hasResult
+          ? t("library.ocrRegenerate", "重新识别图中文字")
+          : t("library.ocrGenerate", "识别图中文字")}
     </button>
   );
 }

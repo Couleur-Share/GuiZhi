@@ -67,7 +67,8 @@ M8 已完成：embedding 语义检索——`knowledge_embeddings` 表存归一�
 M9 已完成：媒体采集——本地图片/音视频资产化导入（`import/media-files.ts`）、
 图片 OCR（`knowledge-ai/ocr.ts`，visionText 路由）、音视频转写
 （`media/transcribe.ts`，新增 audioText 路由）、yt-dlp 在线视频解析
-（`import/video-url.ts`，B站/YouTube/抖音/小红书，未安装时降级）。
+（`import/video-url.ts`，B站/YouTube/小红书，未安装时降级）。抖音例外，
+见下方「抖音不走 yt-dlp」。
 M10 已完成：Wiki 关系图谱（`WikiGraphView.tsx`，react-force-graph-2d 懒加载）。
 
 v0.4.0（2026-07，首个公开发布）在此之上重构了知识库界面：卡片 / 列表双视图、
@@ -79,6 +80,22 @@ v0.5.0（2026-07）是一轮集中整改：知识库列表改服务端分页（`
 `runScenarioChat`）、Wiki 编译不再整体覆盖未进上下文的页面并新增
 `wiki_page_revisions` 快照、补上 `schema_migrations` 执行器与 `user_version`
 版本戳、Electron 侧加 CSP 与 `will-navigate` 拦截、settings 双向字段白名单。
+
+v0.6.0（2026-07）围绕抖音采集：抖音脱离 yt-dlp（见下），图文作品补成完整能力
+（配图入资产库 + 逐图 OCR + `ImageLightbox` 查看器 + 正文拆成文案/图片/图中文字
+三个标签，`shared/utils/image-note.ts`）。顺带修了两个影响全应用的渲染缺陷——
+`.prose` 没恢复被 preflight 清掉的 `list-style`（列表没序号），以及 rehype-sanitize
+与 react-markdown 的 `urlTransform` 双双拦掉 `local-image://`（正文图是破图）。
+
+抖音不走 yt-dlp：yt-dlp 的 Douyin 提取器打 `douyin.com/aweme/v1/web/aweme/detail/`，
+该接口对没有签名 cookie（`__ac_signature` / `ttwid`，由页面 JS 挑战生成）的请求
+返回空 body，报「Fresh cookies are needed」。`import/douyin.ts` 改走
+`iesdouyin.com` 的分享页——移动端 UA 下服务端渲染，作品信息全在
+`window._ROUTER_DATA`，播放地址 `playwm` 换 `play` 即无水印源，全程无需 cookie。
+桌面 UA 会被 302 到 `douyin.com`，UA 是这条路的前提，别改。
+图文作品走 `import/douyin-note.ts`：配图入资产库 + 逐图 OCR（`media/ocr.ts`
+读 visionText 路由，与渲染进程共用 `shared/utils/ocr-request`）。判定图文只看
+`images` 字段——抖音给图文也生成了 play_addr（图片合成的幻灯片视频）。
 
 待办：平台登录采集（cookies）延后；macOS 平台暂不考虑。
 
@@ -94,6 +111,10 @@ v0.5.0（2026-07）是一轮集中整改：知识库列表改服务端分页（`
   设置页已如实说明，但功能本身仍是半成品。
 - 媒体文件按内容哈希去重尚未实现：同一文件重复导入会产生多份磁盘拷贝
   （删除条目时会回收，但导入期间不去重）。
+- `import/douyin.ts` 依赖未公开的页面结构（历史上叫过 `RENDER_DATA` 且是
+  URL 编码的），抖音改版就要跟着修。小红书仍走 yt-dlp，同样会被登录墙拦下。
+- 图文采集的 OCR 按张调用视觉模型，默认上限 9 张（`OCR_IMAGE_LIMIT`），
+  超出的图片只入库不识别。上限是硬编码常量，没有做成设置项。
 
 fork 遗留的 WebDAV / S3 同步通道已在 v0.4.1 整体删除（主进程 transport、
 preload 白名单、settings 的 36 个字段与 69 条 i18n 文案）。归知目前不提供

@@ -2,24 +2,12 @@ import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
 import type { KnowledgeItem } from "@guizhi/shared/types";
 
 /**
- * 媒体条目预览：图片 / 视频 / 音频的内联播放。
- * 资产引用从内容中的 local-image:// / local-video:// 链接解析。
+ * 媒体条目预览：视频 / 音频的内联播放。
+ * 资产引用从内容中的 local-video:// 链接解析。
+ *
+ * 图片不在这里预览——正文标签页里有专门的「图片」页，顶部再放一份是重复占版面。
  */
 export function MediaPreview({ item }: { item: KnowledgeItem }) {
-  if (item.itemType === "image") {
-    const ref = extractLocalAssetRef(item.content, "local-image");
-    if (!ref) {
-      return null;
-    }
-    return (
-      <img
-        src={`local-image://${ref}`}
-        alt={item.title}
-        className="max-h-72 max-w-full rounded-xl border border-border/60 object-contain"
-      />
-    );
-  }
-
   if (item.itemType === "video") {
     const ref = extractLocalAssetRef(item.content, "local-video");
     if (!ref) {

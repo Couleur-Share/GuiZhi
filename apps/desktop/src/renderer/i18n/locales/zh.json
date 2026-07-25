@@ -1282,7 +1282,18 @@
     "aiSummaryEmpty": "内容为空，无法生成摘要",
     "aiSummaryFailed": "摘要生成失败：{{message}}",
     "ocrGenerate": "识别图中文字",
+    "ocrRegenerate": "重新识别图中文字",
     "ocrRunning": "正在识别图中文字…",
+    "imageViewer": "图片查看器",
+    "imageIndex": "图 {{index}}",
+    "imagesSection": "图片",
+    "imagesEmpty": "这条内容没有配图",
+    "captionSection": "文案",
+    "recognizedSection": "图中文字",
+    "imageZoomOpen": "点击查看大图",
+    "imageZoomIn": "放大",
+    "imageZoomOut": "缩小",
+    "imageZoomReset": "复位",
     "ocrDone": "文字识别完成",
     "ocrFailed": "文字识别失败：{{message}}",
     "ocrNotConfigured": "尚未配置视觉模型（visionText 路由）",
@@ -1444,6 +1455,8 @@
     "stageTranscoding": "音频转码",
     "stageTranscribing": "语音转写",
     "stageFormatting": "文字稿排版",
-    "stageSummarizing": "生成总结"
+    "stageSummarizing": "生成总结",
+    "stageImageDownload": "下载配图",
+    "stageImageOcr": "识别图中文字"
   }
 }

@@ -35,6 +35,9 @@ export const IMPORT_STAGES = [
   "transcribing",
   "formatting",
   "summarizing",
+  // ── 图文子阶段 ──
+  "image-download",
+  "image-ocr",
 ] as const;
 
 export type ImportStage = (typeof IMPORT_STAGES)[number];

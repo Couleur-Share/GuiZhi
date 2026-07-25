@@ -56,6 +56,11 @@ const STAGE_LABELS: Record<ImportStage, { key: string; fallback: string }> = {
   transcribing: { key: "imports.stageTranscribing", fallback: "语音转写" },
   formatting: { key: "imports.stageFormatting", fallback: "文字稿排版" },
   summarizing: { key: "imports.stageSummarizing", fallback: "生成总结" },
+  "image-download": {
+    key: "imports.stageImageDownload",
+    fallback: "下载配图",
+  },
+  "image-ocr": { key: "imports.stageImageOcr", fallback: "识别图中文字" },
 };
 
 function StatusBadge({ task }: { task: ImportTask }) {

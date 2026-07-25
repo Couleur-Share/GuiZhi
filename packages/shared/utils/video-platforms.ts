@@ -5,6 +5,13 @@
 
 export type VideoPlatform = "bilibili" | "youtube" | "douyin" | "xiaohongshu";
 
+/** 域名归属判定：必须是该域本身或它的子域，`evildouyin.com` 这类后缀碰撞不算 */
+function isHostOrSubdomain(hostname: string, ...domains: string[]): boolean {
+  return domains.some(
+    (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+  );
+}
+
 /** 识别视频平台链接（其余 URL 走网页抓取） */
 export function detectVideoPlatform(url: string): VideoPlatform | null {
   let hostname: string;
@@ -31,7 +38,8 @@ export function detectVideoPlatform(url: string): VideoPlatform | null {
       ? "youtube"
       : null;
   }
-  if (hostname.endsWith("douyin.com")) {
+  // iesdouyin.com 是抖音的分享域，采集走它的移动端分享页（见 import/douyin.ts）
+  if (isHostOrSubdomain(hostname, "douyin.com", "iesdouyin.com")) {
     return "douyin";
   }
   if (hostname.endsWith("xiaohongshu.com") || hostname === "xhslink.com") {

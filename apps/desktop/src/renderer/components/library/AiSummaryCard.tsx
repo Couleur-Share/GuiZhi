@@ -8,6 +8,7 @@ import { useToast } from "../ui/Toast";
 import { generateSummary } from "../../services/knowledge-ai/summarize";
 import { AiNotConfiguredError } from "../../services/knowledge-ai/ai-invoke";
 import { MarkdownBody } from "./MarkdownPreview";
+import { ACTION_CHIP } from "./detail-chips";
 
 /**
  * AI 摘要区块：有摘要时展示卡片（附重新生成），
@@ -65,19 +66,16 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
 
   if (!item.summary && !isGenerating) {
     return (
-      <button
-        type="button"
-        onClick={() => void generate()}
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 transition-colors hover:text-primary"
-      >
+      <button type="button" onClick={() => void generate()} className={ACTION_CHIP}>
         <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
         {t("library.aiSummaryGenerate", "生成 AI 摘要")}
       </button>
     );
   }
 
+  // 与动作按钮同处一个 flex 行，摘要卡片占满整行另起一排
   return (
-    <div className="rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3">
+    <div className="w-full rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3">
       <div className="mb-1.5 flex items-center gap-1.5">
         <SparklesIcon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
         <span className="text-xs font-medium text-primary">

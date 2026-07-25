@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 // transcribe 服务链路引用 electron（network-proxy），单测中替换为空实现
@@ -393,6 +394,125 @@ describe("extractVideoUrl", () => {
     });
     expect(extracted.degradedReason).toContain("解析失败");
     expect(extracted.degradedReason).toContain("Unsupported URL");
+    expect(extracted.sourceUri).toBeNull();
+  });
+});
+
+describe("extractVideoUrl（抖音）", () => {
+  const douyinUrl = "https://www.iesdouyin.com/share/video/7663897644049173802/";
+  const videoAweme = {
+    awemeId: "7663897644049173802",
+    kind: "video" as const,
+    title: "抖音视频文案",
+    description: "",
+    author: "曲率出逃",
+    durationSeconds: 243,
+    playUrl: "https://aweme.snssdk.com/aweme/v1/play/?video_id=v02",
+    imageMirrors: [] as string[][],
+    webpageUrl: "https://www.douyin.com/video/7663897644049173802",
+  };
+
+  /** 抖音链路一旦调用 yt-dlp 就说明分流没生效 */
+  const forbiddenRun: RunCommand = async () => {
+    throw new Error("抖音链路不应调用 yt-dlp");
+  };
+
+  it("元数据走分享页解析，全程不碰 yt-dlp", async () => {
+    const extracted = await extractVideoUrl(douyinUrl, "douyin", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchDouyin: async (url) => {
+        expect(url).toBe(douyinUrl);
+        return videoAweme;
+      },
+      getTranscriptionConfig: () => null,
+    });
+    expect(extracted.degradedReason).toBeUndefined();
+    expect(extracted.title).toBe("抖音视频文案");
+    expect(extracted.content).toContain("平台：抖音");
+    expect(extracted.content).toContain("作者：曲率出逃");
+    expect(extracted.content).toContain("4:03");
+    // 短链 / 分享链都收敛到规范来源，去重才不会漏
+    expect(extracted.sourceUri).toBe(videoAweme.webpageUrl);
+  });
+
+  it("配置转写模型 → 直下无水印视频，不经 yt-dlp 下载音轨", async () => {
+    let downloaded = "";
+    const extracted = await extractVideoUrl(douyinUrl, "douyin", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchDouyin: async () => videoAweme,
+      downloadDouyin: async (playUrl) => {
+        downloaded = playUrl;
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-douyin-test-"));
+        const filePath = path.join(dir, "douyin.mp4");
+        fs.writeFileSync(filePath, "fake-video");
+        return { dir, filePath };
+      },
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: async (filePath) => ({ filePath, cleanup: () => {} }),
+      transcribe: async () => "抖音口播文字稿",
+      getFormatterConfig: () => null,
+      getSummaryConfig: () => null,
+    });
+    expect(downloaded).toBe(videoAweme.playUrl);
+    expect(extracted.transcript).toBe("抖音口播文字稿");
+  });
+
+  it("图文作品 → 图片条目，走配图落盘而非转写链路", async () => {
+    const stages: string[] = [];
+    const extracted = await extractVideoUrl(douyinUrl, "douyin", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchDouyin: async () => ({
+        ...videoAweme,
+        kind: "note" as const,
+        title: "图文文案",
+        playUrl: null,
+        imageMirrors: [["https://p1.douyinpic.com/a.webp"]],
+      }),
+      // 配了转写模型也不该进转写：图文没有音轨
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      douyinNote: {
+        downloadImage: async () => {
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-note-"));
+          const filePath = path.join(dir, "image.webp");
+          fs.writeFileSync(filePath, "fake-image");
+          return { dir, filePath };
+        },
+        saveAsset: async () => "asset.webp",
+        getOcrConfig: () => null,
+        // 不读真实 ai-config.json，单测不该发出网络请求
+        getTitleConfig: () => null,
+      },
+      onStage: (stage) => stages.push(stage),
+    });
+    expect(extracted.itemType).toBe("image");
+    expect(extracted.title).toBe("图文文案");
+    expect(extracted.content).toContain("图文 1 张");
+    expect(extracted.content).toContain("![图 1](local-image://asset.webp)");
+    expect(extracted.transcript).toBeUndefined();
+    expect(stages).toEqual(["video-metadata", "image-download"]);
+  });
+
+  it("分享页解析失败 → 降级并透出原因，不占住去重", async () => {
+    const extracted = await extractVideoUrl(douyinUrl, "douyin", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchDouyin: async () => {
+        throw new Error("该作品已被作者删除");
+      },
+      getTranscriptionConfig: () => null,
+    });
+    expect(extracted.degradedReason).toContain("该作品已被作者删除");
     expect(extracted.sourceUri).toBeNull();
   });
 });

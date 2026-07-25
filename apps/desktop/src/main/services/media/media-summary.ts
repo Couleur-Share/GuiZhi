@@ -303,6 +303,53 @@ export async function generateMediaSummary(
   return finalizeSummary(reduced);
 }
 
+const TITLE_SYSTEM_PROMPT =
+  "你是内容标题助手。用户会提供一条图文内容的文案与图中文字，请为它拟一个准确的标题。要求：\n" +
+  "1. 15~30 字，准确概括核心内容；\n" +
+  "2. 书面语，不用夸张修辞与营销话术；不加书名号或引号；\n" +
+  "3. 只输出标题本身，不要任何解释、前缀或后缀。";
+
+/** 拟标题只需要很短的输出 */
+const TITLE_MAX_TOKENS = 256;
+/** 素材上限：标题只需抓主旨，喂全文既慢又贵 */
+const TITLE_SOURCE_MAX_CHARS = 4000;
+
+/**
+ * 为图文内容拟标题（无总结）。
+ *
+ * 图文没有口播文字稿，套用视频总结那套提示词会答非所问；
+ * 这里只做拟题，素材是文案 + 图中文字。模型输出无效时返回 null，调用方保留原标题。
+ */
+export async function generateContentTitle(
+  source: string,
+  config: AIClientConfig,
+  options?: MediaSummaryOptions,
+): Promise<string | null> {
+  const material = source.trim().slice(0, TITLE_SOURCE_MAX_CHARS);
+  if (!material) {
+    return null;
+  }
+  const chat = options?.chat ?? chatCompletion;
+  const result = await chat(
+    config,
+    [
+      { role: "system", content: TITLE_SYSTEM_PROMPT },
+      { role: "user", content: material },
+    ],
+    {
+      temperature: SUMMARY_TEMPERATURE,
+      maxTokens: TITLE_MAX_TOKENS,
+      signal: options?.signal,
+      timeoutMs: SUMMARY_TIMEOUT_MS,
+    },
+  );
+  // 部分模型仍会按「标题：xxx」作答，一并归一
+  const raw = stripWrappingCodeFence(result.content.trim());
+  const line = raw.split("\n").find((entry) => entry.trim()) ?? "";
+  const matched = TITLE_LINE_PATTERN.exec(line.trim());
+  return normalizeAiTitle(matched ? matched[1] : line);
+}
+
 function finalizeSummary(content: string): MediaSummaryResult {
   const { title, body } = splitTitleFromSummary(
     stripWrappingCodeFence(content.trim()),

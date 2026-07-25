@@ -16,6 +16,27 @@ export function extractLocalAssetRef(
 }
 
 /**
+ * 按出现顺序提取某一协议的全部资产引用。
+ * 图文条目会引用多张图片，逐张 OCR 时需要拿全。
+ */
+export function extractLocalAssetRefs(
+  content: string,
+  protocol: LocalAssetProtocol,
+): string[] {
+  if (!content) {
+    return [];
+  }
+  const pattern = new RegExp(`${protocol}://${ASSET_NAME_PATTERN}`, "g");
+  const refs: string[] = [];
+  for (const match of content.matchAll(pattern)) {
+    if (isSafeAssetFileName(match[1]) && !refs.includes(match[1])) {
+      refs.push(match[1]);
+    }
+  }
+  return refs;
+}
+
+/**
  * 提取全部资产引用（一条笔记可以引用多个资产）。
  *
  * 删除条目后要据此清理磁盘文件，所以这里必须取全，

@@ -819,6 +819,24 @@ body {
   padding-left: 1.5em;
   margin-bottom: 0.75em;
 }
+/* Tailwind preflight 把 ul/ol 的 list-style 清成 none，这里按浏览器默认恢复，
+   否则 Markdown 里的序号与圆点全都不显示 */
+.prose ul {
+  list-style: disc outside;
+}
+.prose ul ul {
+  list-style-type: circle;
+}
+.prose ul ul ul {
+  list-style-type: square;
+}
+.prose ol {
+  list-style: decimal outside;
+}
+/* GFM 任务列表自带复选框，再加圆点就是两个记号并排 */
+.prose li.task-list-item {
+  list-style: none;
+}
 .prose li {
   margin-bottom: 0.25em;
 }

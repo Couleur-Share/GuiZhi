@@ -1282,7 +1282,18 @@
     "aiSummaryEmpty": "Content is empty, nothing to summarize",
     "aiSummaryFailed": "Summary failed: {{message}}",
     "ocrGenerate": "Extract text from image",
+    "ocrRegenerate": "Re-extract text from image",
     "ocrRunning": "Extracting text from image…",
+    "imageViewer": "Image viewer",
+    "imageIndex": "Image {{index}}",
+    "imagesSection": "Images",
+    "imagesEmpty": "No images in this item",
+    "captionSection": "Caption",
+    "recognizedSection": "Text in image",
+    "imageZoomOpen": "Click to view full size",
+    "imageZoomIn": "Zoom in",
+    "imageZoomOut": "Zoom out",
+    "imageZoomReset": "Reset",
     "ocrDone": "Text extraction finished",
     "ocrFailed": "Text extraction failed: {{message}}",
     "ocrNotConfigured": "No vision model configured (visionText route)",
@@ -1444,6 +1455,8 @@
     "stageTranscoding": "Transcoding audio",
     "stageTranscribing": "Transcribing",
     "stageFormatting": "Formatting transcript",
-    "stageSummarizing": "Summarizing"
+    "stageSummarizing": "Summarizing",
+    "stageImageDownload": "Downloading images",
+    "stageImageOcr": "Extracting text from images"
   }
 }

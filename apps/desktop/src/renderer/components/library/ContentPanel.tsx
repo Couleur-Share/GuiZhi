@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AudioLinesIcon,
+  ImageIcon,
   Loader2Icon,
   RotateCcwIcon,
+  ScanTextIcon,
   ScrollTextIcon,
   SparklesIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
+import { splitImageNoteSections } from "@guizhi/shared/utils/image-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
+import { ImageGallery } from "./ImageGallery";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
 import {
@@ -18,7 +22,7 @@ import {
   useTranscriptActions,
 } from "./use-media-actions";
 
-type PanelTab = "body" | "transcript";
+type PanelTab = "body" | "transcript" | "images" | "recognized";
 
 function TabButton({
   active,
@@ -114,13 +118,28 @@ export function ContentPanel({
   const showTranscriptTab =
     !isTrashed &&
     (transcriptActions.canTranscribe || transcriptActions.transcript.length > 0);
-  const activeTab: PanelTab =
-    tab === "transcript" && !showTranscriptTab ? "body" : tab;
+
+  // 图片条目：文案 / 图片 / 图中文字 混在一屏里很难读，渲染视图下拆成三个标签。
+  // 「显示原文」是看完整 Markdown 源码，此时不再分段。
+  const sections =
+    item.itemType === "image" && !isTrashed && isPreview
+      ? splitImageNoteSections(item.content)
+      : null;
+  const showImagesTab = sections !== null;
+  const showRecognizedTab = Boolean(sections?.recognized);
+
+  const availableTabs: Record<PanelTab, boolean> = {
+    body: true,
+    transcript: showTranscriptTab,
+    images: showImagesTab,
+    recognized: showRecognizedTab,
+  };
+  const activeTab: PanelTab = availableTabs[tab] ? tab : "body";
 
   // 渲染视图中元数据引用块交给来源 chip 展示，正文只渲染剩余部分
   const previewContent = isMediaItem
     ? parseVideoMetaBlock(item.content)?.body ?? item.content
-    : item.content;
+    : (sections?.caption ?? item.content);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
@@ -130,8 +149,28 @@ export function ContentPanel({
             active={activeTab === "body"}
             onClick={() => setTab("body")}
           >
-            {t("library.bodySection", "正文")}
+            {sections
+              ? t("library.captionSection", "文案")
+              : t("library.bodySection", "正文")}
           </TabButton>
+          {showImagesTab ? (
+            <TabButton
+              active={activeTab === "images"}
+              onClick={() => setTab("images")}
+            >
+              <ImageIcon className="h-3 w-3" aria-hidden="true" />
+              {t("library.imagesSection", "图片")}
+            </TabButton>
+          ) : null}
+          {showRecognizedTab ? (
+            <TabButton
+              active={activeTab === "recognized"}
+              onClick={() => setTab("recognized")}
+            >
+              <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
+              {t("library.recognizedSection", "图中文字")}
+            </TabButton>
+          ) : null}
           {showTranscriptTab ? (
             <TabButton
               active={activeTab === "transcript"}
@@ -151,7 +190,7 @@ export function ContentPanel({
 
           <span className="min-w-0 flex-1" />
 
-          {activeTab === "body" ? (
+          {activeTab === "body" || activeTab === "images" || activeTab === "recognized" ? (
             <>
               {!isTrashed && summaryAction.available ? (
                 <ToolButton
@@ -203,6 +242,10 @@ export function ContentPanel({
         <div className="min-h-0 flex-1">
           {activeTab === "transcript" ? (
             <TranscriptPane actions={transcriptActions} />
+          ) : activeTab === "images" ? (
+            <ImageGallery content={item.content} />
+          ) : activeTab === "recognized" ? (
+            <MarkdownPreview content={sections?.recognized ?? ""} />
           ) : isTrashed || isPreview ? (
             // 回收站视图不显示元数据卡片，保留完整原文避免信息丢失
             <MarkdownPreview

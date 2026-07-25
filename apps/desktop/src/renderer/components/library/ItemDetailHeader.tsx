@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -24,6 +24,9 @@ import { TagEditor } from "./TagEditor";
 import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
 import { ITEM_TYPE_META, formatItemTime } from "./type-meta";
+
+/** 标题最多撑到三行（text-xl / leading-snug 约 28px 一行），再长就内部滚动 */
+const TITLE_MAX_HEIGHT_PX = 84;
 
 const CHIP_TONES = {
   muted: "border-border/70 text-muted-foreground",
@@ -178,6 +181,20 @@ export function ItemDetailHeader({
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const autoSave = useSettingsStore((state) => state.autoSave);
 
+  // 长标题（AI 拟题偶尔较长、导入条目更是整句文案）单行输入框只能看到开头，
+  // 这里让标题随内容增高，超过三行再滚动
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const node = titleRef.current;
+    if (!node) {
+      return;
+    }
+    node.style.height = "auto";
+    node.style.height = `${Math.min(node.scrollHeight, TITLE_MAX_HEIGHT_PX)}px`;
+    node.style.overflowY =
+      node.scrollHeight > TITLE_MAX_HEIGHT_PX ? "auto" : "hidden";
+  }, [item.title]);
+
   const typeMeta = ITEM_TYPE_META[item.itemType];
   // 保存失败与 autoSave 无关：改动已退回待保存队列，此时必须提示未落盘
   const isDirty = hasUnsavedChanges && (!autoSave || saveError !== null);
@@ -200,15 +217,22 @@ export function ItemDetailHeader({
   return (
     <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-4">
       <div className="flex items-start gap-2">
-        <input
-          type="text"
+        <textarea
+          ref={titleRef}
+          rows={1}
           data-testid="item-title-input"
           value={item.title}
           onChange={(event) => updateSelected({ title: event.target.value })}
+          // 标题是单行语义，回车不该在里面换行
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+            }
+          }}
           readOnly={isTrashed}
           title={item.title}
           placeholder={t("library.titlePlaceholder", "标题")}
-          className="min-w-0 flex-1 bg-transparent pt-0.5 text-xl font-semibold text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          className="min-w-0 flex-1 resize-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
         <div className="flex shrink-0 items-center gap-0.5">
           {isTrashed ? (

@@ -1,9 +1,11 @@
 /**
- * 在线视频采集：平台链接检测 → yt-dlp 元数据 / 音频下载 → 可选远程转写。
+ * 在线视频采集：平台链接检测 → 元数据 / 音频获取 → 可选远程转写。
  *
- * yt-dlp 是外部工具：优先用设置里配置的路径，否则查 PATH；
- * 未安装时降级保存链接并附安装指引（任务可在安装后重试）。
- * 命令执行以接口注入，便于单测用假实现驱动。
+ * 元数据与音轨默认由 yt-dlp 提供（外部工具：优先用设置里配置的路径，
+ * 否则查 PATH；未安装时降级保存链接并附安装指引，任务可在安装后重试）。
+ * 抖音例外——它的接口需要签名 cookie，yt-dlp 拿不到，改走
+ * `./douyin.ts` 的移动端分享页解析，不依赖 yt-dlp。
+ * 命令执行与抖音抓取都以接口注入，便于单测用假实现驱动。
  */
 import { randomUUID } from "crypto";
 import { spawn } from "child_process";
@@ -16,6 +18,12 @@ import {
 } from "@guizhi/shared/utils/video-platforms";
 import type { ImportStage } from "@guizhi/shared/types";
 import type { ExtractedContent } from "./connectors";
+import {
+  downloadDouyinMedia,
+  fetchDouyinAweme,
+  type DouyinAweme,
+} from "./douyin";
+import { buildDouyinNoteEntry, type DouyinNoteDeps } from "./douyin-note";
 import { prepareAudioForTranscription } from "../media/audio-preprocess";
 import { resolveFfmpegExecutable } from "../media/ffmpeg-manager";
 import { ensureLocalTranscriptionService } from "../media/funasr-service";
@@ -194,6 +202,18 @@ export interface VideoUrlDeps {
   /** 设置里配置的 ffmpeg 路径（空表示托管版 / PATH），用于转写前音频转码 */
   getFfmpegPath?: () => string | null;
   run?: RunCommand;
+  /** 测试注入：抖音分享页解析（默认走 douyin.ts） */
+  fetchDouyin?: (
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<DouyinAweme>;
+  /** 测试注入：抖音无水印视频下载 */
+  downloadDouyin?: (
+    playUrl: string,
+    signal?: AbortSignal,
+  ) => Promise<{ dir: string; filePath: string }>;
+  /** 测试注入：抖音图文的配图下载与 OCR */
+  douyinNote?: Omit<DouyinNoteDeps, "onStage">;
   /** 测试注入：转写配置解析（默认读 ai-config.json 的 audioText 路由） */
   getTranscriptionConfig?: () => TranscriptionModelConfig | null;
   /** 测试注入：转写执行 */
@@ -310,6 +330,74 @@ export async function downloadBestAudio(
   return { dir, filePath: path.join(dir, files[0]) };
 }
 
+/** 平台差异收敛点：元数据从哪来、音轨怎么下 */
+interface MediaSource {
+  metadata: YtDlpMetadata;
+  /** 下载可供转码转写的音轨 / 视频到临时目录 */
+  downloadAudio: (
+    signal?: AbortSignal,
+  ) => Promise<{ dir: string; filePath: string }>;
+  /** 抖音图文作品：没有音轨，直接给出成品笔记条目 */
+  note?: ExtractedContent;
+}
+
+async function resolveDouyinSource(
+  url: string,
+  deps: VideoUrlDeps,
+  signal?: AbortSignal,
+): Promise<MediaSource> {
+  const aweme = await (deps.fetchDouyin ?? fetchDouyinAweme)(url, signal);
+  const metadata: YtDlpMetadata = {
+    title: aweme.title,
+    uploader: aweme.author,
+    durationSeconds: aweme.durationSeconds,
+    description: aweme.description,
+    webpageUrl: aweme.webpageUrl,
+  };
+
+  if (aweme.kind === "note") {
+    return {
+      metadata,
+      downloadAudio: () => Promise.reject(new Error("图文作品没有音轨")),
+      note: await buildDouyinNoteEntry(
+        aweme,
+        { ...deps.douyinNote, onStage: deps.onStage },
+        signal,
+      ),
+    };
+  }
+
+  const playUrl = aweme.playUrl;
+  if (!playUrl) {
+    throw new Error("未能取到视频播放地址（页面结构可能已变化）");
+  }
+
+  const download = deps.downloadDouyin ?? downloadDouyinMedia;
+  return {
+    metadata,
+    downloadAudio: (downloadSignal) => download(playUrl, downloadSignal),
+  };
+}
+
+async function resolveYtDlpSource(
+  url: string,
+  deps: VideoUrlDeps,
+  run: RunCommand,
+  signal?: AbortSignal,
+): Promise<MediaSource> {
+  const executable = resolveYtDlpExecutable(deps.getYtDlpPath());
+  const result = await run(
+    executable,
+    ["--dump-json", "--no-download", "--no-warnings", "--no-playlist", url],
+    { timeoutMs: METADATA_TIMEOUT_MS, signal },
+  );
+  return {
+    metadata: parseYtDlpMetadata(result.stdout),
+    downloadAudio: (downloadSignal) =>
+      downloadBestAudio(executable, url, run, downloadSignal),
+  };
+}
+
 export async function extractVideoUrl(
   url: string,
   platform: VideoPlatform,
@@ -317,17 +405,14 @@ export async function extractVideoUrl(
   signal?: AbortSignal,
 ): Promise<ExtractedContent> {
   const run = deps.run ?? runCommand;
-  const executable = resolveYtDlpExecutable(deps.getYtDlpPath());
 
-  let metadata: YtDlpMetadata;
+  let source: MediaSource;
   deps.onStage?.("video-metadata");
   try {
-    const result = await run(
-      executable,
-      ["--dump-json", "--no-download", "--no-warnings", "--no-playlist", url],
-      { timeoutMs: METADATA_TIMEOUT_MS, signal },
-    );
-    metadata = parseYtDlpMetadata(result.stdout);
+    source =
+      platform === "douyin"
+        ? await resolveDouyinSource(url, deps, signal)
+        : await resolveYtDlpSource(url, deps, run, signal);
   } catch (error) {
     if (error instanceof Error && error.message === "已取消") {
       throw error;
@@ -351,6 +436,11 @@ export async function extractVideoUrl(
     };
   }
 
+  if (source.note) {
+    return source.note;
+  }
+  const metadata = source.metadata;
+
   // 配置了转写模型才下载音频（元数据条目本身不依赖下载）
   let transcript: string | null = null;
   let transcriptionNote: string | undefined;
@@ -366,7 +456,7 @@ export async function extractVideoUrl(
       // 目标是托管本地引擎时先确保服务已启动
       await ensureLocalTranscriptionService(transcriptionConfig.apiUrl);
       deps.onStage?.("video-audio");
-      const audio = await downloadBestAudio(executable, url, run, signal);
+      const audio = await source.downloadAudio(signal);
       tempDir = audio.dir;
       deps.onStage?.("transcoding");
       prepared = await prepareAudio(

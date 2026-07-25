@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOcrRequestBody,
   parseOcrResponse,
-} from "../../../src/renderer/services/knowledge-ai/ocr";
+} from "@guizhi/shared/utils/ocr-request";
 import { applyOcrTextToContent } from "../../../src/renderer/components/library/AiOcrCard";
 
 describe("buildOcrRequestBody", () => {

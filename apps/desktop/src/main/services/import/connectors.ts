@@ -11,7 +11,7 @@ import type {
   ImportStage,
   KnowledgeItemType,
 } from "@guizhi/shared/types";
-import { fetchHtml } from "./fetch-html";
+import { fetchHtml } from "./safe-fetch";
 import {
   classifyMediaFile,
   MEDIA_SIZE_LIMITS,
