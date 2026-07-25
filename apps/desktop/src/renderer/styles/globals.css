@@ -1,0 +1,955 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Theme variables - Morandi palette */
+    /* 主题色变量 - 莫兰迪色系 */
+    --theme-hue: 210;
+    --theme-saturation: 35;
+    --base-font-size: 16px;
+
+    /* Light mode colors */
+    /* 浅色模式配色 */
+    --background: 220 14% 96%;
+    --foreground: 220 20% 25%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 25%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 25%;
+
+    /* Morandi theme colors - soft and elegant */
+    /* 莫兰迪主题色 - 柔和淡雅 */
+    --primary: var(--theme-hue) var(--theme-saturation) 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 25%;
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 12% 50%;
+    --accent: var(--theme-hue) calc(var(--theme-saturation) * 0.5) 94%;
+    --accent-foreground: var(--theme-hue) var(--theme-saturation) 40%;
+    --destructive: 0 45% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 90%;
+    --input: 220 13% 90%;
+    --ring: var(--theme-hue) var(--theme-saturation) 55%;
+    --radius: 0.75rem;
+
+    /* Sidebar - light mode */
+    /* 侧边栏 - 浅色模式 */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-accent: 220 14% 95%;
+    --sidebar-border: 220 13% 90%;
+
+    /* Shadows */
+    /* 阴影 */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+
+    /* Semantic UI surface tokens */
+    --app-ui-shell-bg: hsl(var(--background));
+    --app-ui-shell-backdrop: none;
+    --app-glass-blur-soft: blur(0px);
+    --app-glass-blur-medium: blur(0px);
+    --app-glass-blur-strong: blur(0px);
+    --app-glass-tint-soft: hsl(var(--card));
+    --app-glass-tint-medium: hsl(var(--card));
+    --app-glass-tint-strong: hsl(var(--card));
+    --app-glass-stroke-soft: hsl(var(--border));
+    --app-glass-stroke-medium: hsl(var(--border));
+    --app-glass-stroke-strong: hsl(var(--border));
+    --app-glass-specular-soft: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-glass-specular-medium: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-glass-specular-strong: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-glass-shadow-soft: none;
+    --app-glass-shadow-medium: none;
+    --app-glass-shadow-strong: none;
+    --app-ui-panel-bg: hsl(var(--card));
+    --app-ui-panel-border: hsl(var(--border));
+    --app-ui-panel-shadow: none;
+    --app-ui-panel-backdrop: none;
+    --app-ui-panel-strong-bg: hsl(var(--card));
+    --app-ui-panel-strong-border: hsl(var(--border));
+    --app-ui-panel-strong-shadow: var(--shadow-sm);
+    --app-ui-panel-strong-backdrop: none;
+    --app-ui-section-bg: hsl(var(--background));
+    --app-ui-section-border: hsl(var(--border));
+    --app-ui-section-backdrop: none;
+    --app-ui-toolbar-bg: var(--app-ui-panel-strong-bg);
+    --app-ui-toolbar-border: var(--app-ui-panel-strong-border);
+    --app-ui-toolbar-shadow: var(--app-ui-panel-strong-shadow);
+    --app-ui-toolbar-backdrop: var(--app-ui-panel-strong-backdrop);
+    --app-ui-toolbar-highlight: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-ui-search-bg: var(--app-ui-surface-strong-bg);
+    --app-ui-search-border: var(--app-ui-surface-strong-border);
+    --app-ui-search-shadow: var(--app-ui-surface-strong-shadow);
+    --app-ui-search-backdrop: var(--app-ui-surface-strong-backdrop);
+    --app-ui-search-highlight: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-ui-search-ornament: transparent;
+    --app-ui-chip-bg: transparent;
+    --app-ui-chip-border: transparent;
+    --app-ui-chip-shadow: none;
+    --app-ui-chip-backdrop: none;
+    --app-ui-chip-highlight: linear-gradient(180deg, transparent 0%, transparent 100%);
+    --app-ui-surface-bg: hsl(var(--card));
+    --app-ui-surface-border: hsl(var(--border));
+    --app-ui-surface-shadow: none;
+    --app-ui-surface-backdrop: none;
+    --app-ui-surface-strong-bg: hsl(var(--muted));
+    --app-ui-surface-strong-border: hsl(var(--border));
+    --app-ui-surface-strong-shadow: var(--shadow-sm);
+    --app-ui-surface-strong-backdrop: none;
+    --app-ui-blanket-bg:
+      linear-gradient(
+        180deg,
+        hsl(var(--background) / 0.16) 0%,
+        hsl(var(--background) / 0.08) 22%,
+        hsl(var(--background) / 0.14) 100%
+      );
+
+    --app-settings-card-bg: hsl(var(--card));
+    --app-settings-card-border: hsl(var(--border));
+    --app-settings-card-shadow: var(--shadow-sm);
+    --app-settings-subtle-bg: hsl(var(--muted) / 0.45);
+    --app-settings-subtle-border: hsl(var(--border) / 0.68);
+    --app-settings-input-bg: hsl(var(--background) / 0.92);
+    --app-settings-input-border: hsl(var(--input));
+    --app-settings-segment-color: hsl(var(--foreground) / 0.74);
+    --app-settings-segment-hover-bg: hsl(var(--accent) / 0.72);
+    --app-settings-segment-hover-color: hsl(var(--foreground));
+    --app-settings-segment-active-bg: hsl(var(--card));
+    --app-settings-segment-active-color: hsl(var(--foreground));
+    --app-settings-segment-active-border: hsl(var(--border) / 0.85);
+    --app-settings-segment-active-shadow: var(--shadow-sm);
+
+    --app-library-list-pane-bg: hsl(var(--card) / 0.5);
+    --app-library-list-pane-border: hsl(var(--border));
+    --app-library-list-pane-backdrop: none;
+    --app-library-list-card-bg: hsl(var(--card));
+    --app-library-list-card-shadow: none;
+    --app-library-list-card-hover-bg: hsl(var(--accent));
+    --app-library-list-card-hover-shadow: none;
+  }
+
+  .dark {
+    /* Dark mode colors - deeper and more premium */
+    /* 深色模式配色 - 更深邃、更高级 */
+    --background: 220 25% 7%;
+    --foreground: 220 15% 92%;
+    --card: 220 22% 10%;
+    --card-foreground: 220 15% 92%;
+    --popover: 220 22% 12%;
+    --popover-foreground: 220 15% 92%;
+
+    /* Morandi theme colors */
+    --primary: var(--theme-hue) var(--theme-saturation) 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 220 15% 92%;
+    --muted: 220 20% 12%;
+    --muted-foreground: 220 12% 60%;
+    --accent: var(--theme-hue) 20% 15%;
+    --accent-foreground: var(--theme-hue) var(--theme-saturation) 85%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 20% 14%;
+    --input: 220 20% 14%;
+    --ring: var(--theme-hue) var(--theme-saturation) 55%;
+
+    /* Sidebar - unified dark look */
+    /* 侧边栏 - 统一的深色外观 */
+    --sidebar: 220 25% 7%;
+    --sidebar-foreground: 220 15% 92%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-border: 220 20% 12%;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.4);
+    --shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    font-size: var(--base-font-size, 16px);
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+  /* Remove default yellow focus outline and use custom style */
+  /* 移除默认的黄色 focus 边框，使用自定义样式 */
+  button:focus,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+  }
+  /* Add custom focus style for elements that need it */
+  /* 为需要的元素添加自定义 focus 样式 */
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply ring-2 ring-primary/50 ring-offset-0;
+  }
+}
+
+/* Custom scrollbar */
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+/* macOS-style title bar drag region */
+/* macOS 风格标题栏拖拽区域 */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+.titlebar-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ============================================================
+ * Motion system
+ * 动画系统
+ *
+ * Source of truth: src/renderer/styles/motion-tokens.ts.
+ * Three layers:
+ *   1) CSS variables for any handwritten transition / animation
+ *   2) prefers-reduced-motion media query for OS-level accessibility
+ *   3) [data-motion] attribute hooks for the in-app preference
+ *      (off / reduced / standard) set on <html> by the renderer.
+ *
+ * Token 的唯一来源是 src/renderer/styles/motion-tokens.ts。这里有三层：
+ *   1) CSS 变量供手写 transition / animation 使用
+ *   2) prefers-reduced-motion 媒体查询负责 OS 级别的 a11y 默认
+ *   3) [data-motion] 属性钩子配合应用内的 motionPreference 偏好
+ *      （off / reduced / standard），由 renderer 写到 <html> 上
+ * ============================================================ */
+
+:root {
+  --motion-duration-instant: 80ms;
+  --motion-duration-quick: 120ms;
+  --motion-duration-base: 180ms;
+  --motion-duration-smooth: 280ms;
+  --motion-duration-slow: 420ms;
+
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-enter: cubic-bezier(0, 0, 0.2, 1);
+  --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* OS-level accessibility default. Users who turn on "Reduce motion" at the
+ * OS level get near-instant transitions globally — UNLESS they have explicitly
+ * picked "Standard" in the in-app motion preference, in which case we want
+ * the app to keep animating on this machine. We scope the media query with
+ * :not([data-motion="standard"]) so the override is *not applied at all*
+ * when the user opts in, instead of trying (and failing) to revert it.
+ *
+ * 系统级 a11y 默认。如果用户在 OS 中开启了 "减少动态效果"，所有动画近乎瞬切；
+ * 但如果用户在应用内显式选择了 "标准" 档，则跳过这条降级（用 :not() 限定作用
+ * 范围，而不是用 revert 撤销，因为 revert 会回到浏览器默认的 0s）。 */
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="standard"]) *,
+  html:not([data-motion="standard"]) *::before,
+  html:not([data-motion="standard"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* In-app motion preference. The renderer mirrors settings.motionPreference
+ * onto <html data-motion="..."> at startup and on change.
+ *   - "standard": full motion (default; also opts out of OS-level reduced-
+ *     motion via the :not() selector above)
+ *   - "reduced": durations scale to ~60%; achieved by overriding the CSS
+ *     variables consumed by handwritten transitions/animations
+ *   - "off": forces near-instant durations on every element
+ * 应用内动画偏好。 */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+html[data-motion="reduced"] {
+  /* Roughly 60% of standard speed; crisp but still hint of motion.
+   * The Tailwind utility classes (duration-base, etc.) resolve to
+   * var(--motion-duration-*), so overriding the variables here
+   * automatically rescales every utility-driven transition / animation
+   * in addition to any handwritten CSS that reads the variables.
+   * Tailwind utility 编译成 var(--motion-duration-*)，所以这里改变量会
+   * 同时对 utility-driven 与手写 CSS 的过渡 / 动画都生效。 */
+  --motion-duration-instant: 50ms;
+  --motion-duration-quick: 80ms;
+  --motion-duration-base: 110ms;
+  --motion-duration-smooth: 170ms;
+  --motion-duration-slow: 250ms;
+}
+
+/* Selected text color */
+/* 选中文本颜色 */
+::selection {
+  background: hsl(var(--primary) / 0.2);
+  color: hsl(var(--primary));
+}
+
+/* Smooth font rendering */
+/* 平滑字体渲染 */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Disable text selection (e.g. for buttons) */
+/* 禁用文本选择（用于按钮等） */
+.select-none {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Glassmorphism effect */
+/* 玻璃态效果 */
+.glass {
+  background: hsl(var(--card) / 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+
+.app-wallpaper-shell {
+  background: var(--app-ui-shell-bg) !important;
+  backdrop-filter: var(--app-ui-shell-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-shell-backdrop) !important;
+}
+
+.app-wallpaper-panel {
+  background: var(--app-ui-panel-bg) !important;
+  border-color: var(--app-ui-panel-border) !important;
+  box-shadow: var(--app-ui-panel-shadow) !important;
+  backdrop-filter: var(--app-ui-panel-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-panel-backdrop) !important;
+}
+
+.app-wallpaper-panel-strong {
+  background: var(--app-ui-panel-strong-bg) !important;
+  border-color: var(--app-ui-panel-strong-border) !important;
+  box-shadow: var(--app-ui-panel-strong-shadow) !important;
+  backdrop-filter: var(--app-ui-panel-strong-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-panel-strong-backdrop) !important;
+}
+
+.app-wallpaper-section {
+  background: var(--app-ui-section-bg) !important;
+  border-color: var(--app-ui-section-border) !important;
+  backdrop-filter: var(--app-ui-section-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-section-backdrop) !important;
+}
+
+.app-wallpaper-toolbar {
+  position: relative;
+  overflow: hidden;
+  background: var(--app-ui-toolbar-bg) !important;
+  border-color: var(--app-ui-toolbar-border) !important;
+  box-shadow: var(--app-ui-toolbar-shadow) !important;
+  backdrop-filter: var(--app-ui-toolbar-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-toolbar-backdrop) !important;
+}
+
+.app-wallpaper-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--app-ui-toolbar-highlight) !important;
+}
+
+.app-wallpaper-search {
+  position: relative;
+  overflow: hidden;
+  background: var(--app-ui-search-bg) !important;
+  border-color: var(--app-ui-search-border) !important;
+  box-shadow: var(--app-ui-search-shadow) !important;
+  backdrop-filter: var(--app-ui-search-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-search-backdrop) !important;
+}
+
+.app-wallpaper-search::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--app-ui-search-highlight) !important;
+}
+
+.app-wallpaper-search::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at top left, var(--app-ui-search-ornament) 0%, transparent 55%),
+    radial-gradient(circle at bottom right, var(--app-ui-search-ornament) 0%, transparent 50%) !important;
+}
+
+.app-wallpaper-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.app-background-mode-image .app-wallpaper-chip {
+  background: var(--app-ui-chip-bg) !important;
+  border-color: var(--app-ui-chip-border) !important;
+  box-shadow: var(--app-ui-chip-shadow) !important;
+  backdrop-filter: var(--app-ui-chip-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-chip-backdrop) !important;
+}
+
+.app-background-mode-image .app-wallpaper-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--app-ui-chip-highlight) !important;
+}
+
+.app-wallpaper-surface {
+  background: var(--app-ui-surface-bg) !important;
+  border-color: var(--app-ui-surface-border) !important;
+  box-shadow: var(--app-ui-surface-shadow) !important;
+  backdrop-filter: var(--app-ui-surface-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-surface-backdrop) !important;
+}
+
+.app-wallpaper-surface-strong {
+  background: var(--app-ui-surface-strong-bg) !important;
+  border-color: var(--app-ui-surface-strong-border) !important;
+  box-shadow: var(--app-ui-surface-strong-shadow) !important;
+  backdrop-filter: var(--app-ui-surface-strong-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-surface-strong-backdrop) !important;
+}
+
+.app-wallpaper-blanket {
+  background: var(--app-ui-blanket-bg);
+}
+
+.app-settings-card {
+  background: var(--app-settings-card-bg);
+  border: 1px solid var(--app-settings-card-border);
+  border-radius: 1rem;
+  box-shadow: var(--app-settings-card-shadow);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-settings-subtle {
+  background: var(--app-settings-subtle-bg);
+  border: 1px solid var(--app-settings-subtle-border);
+  border-radius: 1rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-settings-input {
+  background: var(--app-settings-input-bg);
+  border: 1px solid var(--app-settings-input-border);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-settings-input::placeholder {
+  color: hsl(var(--muted-foreground) / 0.72);
+}
+
+.app-settings-segment {
+  color: var(--app-settings-segment-color);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.app-settings-segment:hover {
+  background: var(--app-settings-segment-hover-bg);
+  color: var(--app-settings-segment-hover-color);
+}
+
+.app-settings-segment-active {
+  background: var(--app-settings-segment-active-bg);
+  color: var(--app-settings-segment-active-color);
+  border: 1px solid var(--app-settings-segment-active-border);
+  box-shadow: var(--app-settings-segment-active-shadow);
+}
+
+.data-settings-shell .app-settings-card {
+  border-radius: 1.25rem;
+  box-shadow: none;
+}
+
+.data-settings-shell .app-settings-card > div {
+  border-color: hsl(var(--border) / 0.78);
+}
+
+.dark .data-settings-shell .app-settings-card {
+  box-shadow: none;
+}
+
+.library-list-pane {
+  background: var(--app-library-list-pane-bg);
+  border-color: var(--app-library-list-pane-border);
+  backdrop-filter: var(--app-library-list-pane-backdrop);
+  -webkit-backdrop-filter: var(--app-library-list-pane-backdrop);
+}
+
+.library-list-card {
+  background: var(--app-library-list-card-bg);
+  box-shadow: var(--app-library-list-card-shadow);
+}
+
+.library-list-card:hover {
+  background: var(--app-library-list-card-hover-bg);
+  box-shadow: var(--app-library-list-card-hover-shadow);
+}
+
+
+/* =========================================
+   Image Mode Theme (Glass)
+   ========================================= */
+
+.app-background-mode-image {
+  --app-glass-blur-soft: blur(14px);
+  --app-glass-blur-medium: blur(18px);
+  --app-glass-blur-strong: blur(24px);
+
+  --background: 212 30% 96%;
+  --foreground: 220 26% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 26% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 26% 10%;
+  --secondary: 210 26% 94%;
+  --secondary-foreground: 220 24% 14%;
+  --muted: 210 24% 92%;
+  --muted-foreground: 220 18% 24%;
+  --accent: 210 32% 90%;
+  --accent-foreground: 220 26% 10%;
+  --border: 214 22% 72%;
+  --input: 214 22% 80%;
+  --sidebar: 210 30% 96%;
+  --sidebar-foreground: 220 22% 14%;
+  --sidebar-accent: 210 24% 91%;
+  --sidebar-border: 214 22% 74%;
+
+  --app-ui-shell-bg: transparent;
+  
+  --app-glass-stroke-soft: hsl(0 0% 100% / 0.18);
+  --app-glass-stroke-medium: hsl(0 0% 100% / 0.24);
+  --app-glass-stroke-strong: hsl(0 0% 100% / 0.3);
+  
+  --app-glass-shadow-soft: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --app-glass-shadow-medium: 0 10px 28px rgba(15, 23, 42, 0.1);
+  --app-glass-shadow-strong: 0 18px 40px rgba(15, 23, 42, 0.12);
+
+  /* Component Mappings */
+  --app-ui-panel-bg: hsl(0 0% 100% / 0.36);
+  --app-ui-panel-border: var(--app-glass-stroke-soft);
+  --app-ui-panel-shadow: var(--app-glass-shadow-soft);
+  --app-ui-panel-backdrop: none;
+
+  --app-ui-panel-strong-bg: hsl(0 0% 100% / 0.42);
+  --app-ui-panel-strong-border: var(--app-glass-stroke-medium);
+  --app-ui-panel-strong-shadow: var(--app-glass-shadow-medium);
+  --app-ui-panel-strong-backdrop: none;
+
+  --app-ui-section-bg: hsl(0 0% 100% / 0.16);
+  --app-ui-section-border: var(--app-glass-stroke-soft);
+  --app-ui-section-backdrop: none;
+
+  --app-ui-toolbar-bg: hsl(0 0% 100% / 0.28);
+  --app-ui-toolbar-border: var(--app-glass-stroke-soft);
+  --app-ui-toolbar-shadow: var(--app-glass-shadow-soft);
+  --app-ui-toolbar-backdrop: none;
+  --app-ui-toolbar-highlight: transparent;
+
+  --app-ui-search-bg: hsl(0 0% 100% / 0.24);
+  --app-ui-search-border: var(--app-glass-stroke-soft);
+  --app-ui-search-shadow: none;
+  --app-ui-search-backdrop: none;
+  --app-ui-search-highlight: transparent;
+  --app-ui-search-ornament: transparent;
+
+  --app-ui-chip-bg: hsl(0 0% 100% / 0.22);
+  --app-ui-chip-border: var(--app-glass-stroke-soft);
+  --app-ui-chip-shadow: none;
+  --app-ui-chip-backdrop: none;
+  --app-ui-chip-highlight: transparent;
+
+  --app-ui-surface-bg: hsl(0 0% 100% / 0.3);
+  --app-ui-surface-border: var(--app-glass-stroke-soft);
+  --app-ui-surface-shadow: none;
+  --app-ui-surface-backdrop: none;
+
+  --app-ui-surface-strong-bg: hsl(0 0% 100% / 0.4);
+  --app-ui-surface-strong-border: var(--app-glass-stroke-medium);
+  --app-ui-surface-strong-shadow: none;
+  --app-ui-surface-strong-backdrop: none;
+  
+  --app-ui-blanket-bg: hsl(210 40% 98% / 0.1);
+
+  --app-settings-card-bg: hsl(0 0% 100% / 0.34);
+  --app-settings-card-border: var(--app-glass-stroke-medium);
+  --app-settings-card-shadow: var(--app-glass-shadow-medium);
+  
+  --app-settings-subtle-bg: hsl(0 0% 100% / 0.18);
+  --app-settings-subtle-border: var(--app-glass-stroke-soft);
+  
+  --app-settings-input-bg: hsl(0 0% 100% / 0.24);
+  --app-settings-input-border: var(--app-glass-stroke-soft);
+  
+  --app-settings-segment-color: hsl(220 22% 18%);
+  --app-settings-segment-hover-bg: hsl(0 0% 100% / 0.3);
+  --app-settings-segment-hover-color: hsl(220 26% 10%);
+  --app-settings-segment-active-bg: hsl(0 0% 100% / 0.42);
+  --app-settings-segment-active-color: hsl(220 26% 10%);
+  --app-settings-segment-active-border: var(--app-glass-stroke-soft);
+  --app-settings-segment-active-shadow: var(--app-glass-shadow-soft);
+
+  --app-library-list-pane-bg: hsl(0 0% 100% / 0.32);
+  --app-library-list-pane-border: var(--app-glass-stroke-soft);
+  --app-library-list-pane-backdrop: none;
+  --app-library-list-card-bg: hsl(0 0% 100% / 0.24);
+  --app-library-list-card-shadow: none;
+  --app-library-list-card-hover-bg: hsl(0 0% 100% / 0.34);
+  --app-library-list-card-hover-shadow: var(--app-glass-shadow-soft);
+}
+
+.dark .app-background-mode-image {
+  --app-glass-blur-soft: blur(14px);
+  --app-glass-blur-medium: blur(18px);
+  --app-glass-blur-strong: blur(24px);
+
+  --background: 220 24% 10%;
+  --foreground: 220 18% 97%;
+  --card: 220 22% 12%;
+  --card-foreground: 220 18% 97%;
+  --popover: 220 22% 12%;
+  --popover-foreground: 220 18% 97%;
+  --secondary: 220 18% 14%;
+  --secondary-foreground: 220 18% 96%;
+  --muted: 220 18% 16%;
+  --muted-foreground: 220 14% 78%;
+  --accent: 220 20% 18%;
+  --accent-foreground: 220 18% 96%;
+  --border: 220 18% 30%;
+  --input: 220 18% 34%;
+  --sidebar: 220 24% 10%;
+  --sidebar-foreground: 220 18% 96%;
+  --sidebar-accent: 220 18% 18%;
+  --sidebar-border: 220 18% 28%;
+
+  --app-glass-stroke-soft: hsl(220 30% 96% / 0.08);
+  --app-glass-stroke-medium: hsl(220 30% 96% / 0.12);
+  --app-glass-stroke-strong: hsl(220 30% 96% / 0.16);
+  
+  --app-glass-shadow-soft: 0 8px 20px rgba(0, 0, 0, 0.18);
+  --app-glass-shadow-medium: 0 16px 36px rgba(0, 0, 0, 0.26);
+  --app-glass-shadow-strong: 0 24px 52px rgba(0, 0, 0, 0.34);
+
+  /* Component Mappings */
+  --app-ui-panel-bg: hsl(220 30% 10% / 0.28);
+  --app-ui-panel-border: var(--app-glass-stroke-soft);
+  --app-ui-panel-shadow: var(--app-glass-shadow-soft);
+  --app-ui-panel-backdrop: none;
+
+  --app-ui-panel-strong-bg: hsl(220 30% 10% / 0.36);
+  --app-ui-panel-strong-border: var(--app-glass-stroke-medium);
+  --app-ui-panel-strong-shadow: var(--app-glass-shadow-medium);
+  --app-ui-panel-strong-backdrop: none;
+
+  --app-ui-section-bg: hsl(220 30% 10% / 0.14);
+  --app-ui-section-border: var(--app-glass-stroke-soft);
+  --app-ui-section-backdrop: none;
+
+  --app-ui-toolbar-bg: hsl(220 30% 10% / 0.22);
+  --app-ui-toolbar-border: var(--app-glass-stroke-soft);
+  --app-ui-toolbar-shadow: var(--app-glass-shadow-soft);
+  --app-ui-toolbar-backdrop: none;
+  --app-ui-toolbar-highlight: transparent;
+
+  --app-ui-search-bg: hsl(220 30% 15% / 0.22);
+  --app-ui-search-border: var(--app-glass-stroke-soft);
+  --app-ui-search-shadow: none;
+  --app-ui-search-backdrop: none;
+  --app-ui-search-highlight: transparent;
+  --app-ui-search-ornament: transparent;
+
+  --app-ui-chip-bg: hsl(220 30% 20% / 0.18);
+  --app-ui-chip-border: var(--app-glass-stroke-soft);
+  --app-ui-chip-shadow: none;
+  --app-ui-chip-backdrop: none;
+  --app-ui-chip-highlight: transparent;
+
+  --app-ui-surface-bg: hsl(220 30% 10% / 0.28);
+  --app-ui-surface-border: var(--app-glass-stroke-soft);
+  --app-ui-surface-shadow: none;
+  --app-ui-surface-backdrop: none;
+
+  --app-ui-surface-strong-bg: hsl(220 30% 10% / 0.36);
+  --app-ui-surface-strong-border: var(--app-glass-stroke-medium);
+  --app-ui-surface-strong-shadow: none;
+  --app-ui-surface-strong-backdrop: none;
+  
+  --app-ui-blanket-bg: hsl(220 30% 0% / 0.1);
+
+  --app-settings-card-bg: hsl(220 30% 12% / 0.28);
+  --app-settings-card-border: var(--app-glass-stroke-medium);
+  --app-settings-card-shadow: var(--app-glass-shadow-medium);
+  
+  --app-settings-subtle-bg: hsl(220 30% 12% / 0.14);
+  --app-settings-subtle-border: var(--app-glass-stroke-soft);
+  
+  --app-settings-input-bg: hsl(220 30% 15% / 0.22);
+  --app-settings-input-border: var(--app-glass-stroke-soft);
+  
+  --app-settings-segment-color: hsl(220 16% 84%);
+  --app-settings-segment-hover-bg: hsl(220 30% 25% / 0.2);
+  --app-settings-segment-hover-color: hsl(220 18% 97%);
+  --app-settings-segment-active-bg: hsl(220 30% 30% / 0.3);
+  --app-settings-segment-active-color: hsl(220 18% 97%);
+  --app-settings-segment-active-border: var(--app-glass-stroke-soft);
+  --app-settings-segment-active-shadow: var(--app-glass-shadow-soft);
+
+  --app-library-list-pane-bg: hsl(220 30% 10% / 0.32);
+  --app-library-list-pane-border: var(--app-glass-stroke-soft);
+  --app-library-list-pane-backdrop: none;
+  --app-library-list-card-bg: hsl(220 30% 15% / 0.22);
+  --app-library-list-card-shadow: none;
+  --app-library-list-card-hover-bg: hsl(220 30% 20% / 0.3);
+  --app-library-list-card-hover-shadow: var(--app-glass-shadow-soft);
+}
+
+.app-background-mode-image .app-left-rail-glass {
+  --app-ui-panel-backdrop: var(--app-glass-blur-medium);
+  --app-ui-panel-strong-backdrop: var(--app-glass-blur-strong);
+  --app-ui-surface-backdrop: var(--app-glass-blur-soft);
+  --app-ui-surface-strong-backdrop: var(--app-glass-blur-medium);
+}
+
+.app-background-mode-image .sidebar-tag-section {
+  background: var(--app-ui-section-bg) !important;
+  border-color: var(--app-ui-section-border) !important;
+  box-shadow: none !important;
+  backdrop-filter: var(--app-ui-section-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-section-backdrop) !important;
+}
+
+.app-background-mode-image .app-wallpaper-toolbar::before,
+.app-background-mode-image .app-wallpaper-search::before,
+.app-background-mode-image .app-wallpaper-search::after,
+.app-background-mode-image .app-wallpaper-chip::before {
+  background: none !important;
+}
+
+/* Markdown rendering styles */
+/* Markdown 渲染样式 */
+.prose {
+  color: hsl(var(--foreground));
+  line-height: 1.6;
+}
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+.prose h1 {
+  font-size: 1.5em;
+}
+.prose h2 {
+  font-size: 1.25em;
+}
+.prose h3 {
+  font-size: 1.1em;
+}
+.prose p {
+  margin-bottom: 0.75em;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+.prose li {
+  margin-bottom: 0.25em;
+}
+.prose code {
+  background: hsl(var(--muted));
+  padding: 0.15em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.9em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.prose pre {
+  background: hsl(var(--muted));
+  padding: 0.75em 1em;
+  border-radius: 0.5em;
+  overflow-x: auto;
+  margin-bottom: 0.75em;
+}
+.prose pre code {
+  background: transparent;
+  padding: 0;
+}
+.prose blockquote {
+  border-left: 3px solid hsl(var(--primary));
+  padding-left: 1em;
+  margin-left: 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.prose a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+.prose strong {
+  font-weight: 600;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1em 0;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+/* Reduce hard white blocks in wallpaper mode */
+.app-background-mode-image .bg-background {
+  background-color: hsl(var(--background) / 0.22) !important;
+}
+
+.app-background-mode-image .bg-card {
+  background-color: hsl(var(--card) / 0.22) !important;
+}
+
+.app-background-mode-image .bg-popover {
+  background-color: hsl(var(--popover) / 0.24) !important;
+}
+
+.app-background-mode-image .bg-muted {
+  background-color: hsl(var(--muted) / 0.26) !important;
+}
+
+.app-background-mode-image .bg-accent {
+  background-color: hsl(var(--accent) / 0.24) !important;
+}
+
+.app-background-mode-image .bg-secondary {
+  background-color: hsl(var(--secondary) / 0.24) !important;
+}
+
+.app-background-mode-image .library-list-toolbar {
+  background: var(--app-ui-toolbar-bg) !important;
+  border-color: var(--app-ui-toolbar-border) !important;
+  box-shadow: var(--app-ui-toolbar-shadow) !important;
+  backdrop-filter: var(--app-ui-toolbar-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-toolbar-backdrop) !important;
+}
+
+.app-background-mode-image .library-table-sticky {
+  background: var(--app-ui-surface-strong-bg) !important;
+  backdrop-filter: var(--app-ui-surface-strong-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-surface-strong-backdrop) !important;
+}
+
+.app-background-mode-image .library-list-view-toggle {
+  background: var(--app-ui-surface-bg) !important;
+  border-color: var(--app-ui-surface-border) !important;
+  box-shadow: var(--app-ui-surface-shadow) !important;
+  backdrop-filter: var(--app-ui-surface-backdrop) !important;
+  -webkit-backdrop-filter: var(--app-ui-surface-backdrop) !important;
+}
+
+.app-background-mode-image .bg-sidebar-accent,
+.app-background-mode-image .bg-sidebar-accent\/40,
+.app-background-mode-image .bg-sidebar-accent\/50,
+.app-background-mode-image .bg-sidebar-accent\/80 {
+  background-color: hsl(var(--sidebar-accent) / 0.18) !important;
+}
+
+.dark .app-background-mode-image .bg-background {
+  background-color: hsl(var(--background) / 0.3) !important;
+}
+
+.dark .app-background-mode-image .bg-card {
+  background-color: hsl(var(--card) / 0.3) !important;
+}
+
+.dark .app-background-mode-image .bg-popover {
+  background-color: hsl(var(--popover) / 0.32) !important;
+}
+
+.dark .app-background-mode-image .bg-muted {
+  background-color: hsl(var(--muted) / 0.34) !important;
+}
+
+.dark .app-background-mode-image .bg-accent {
+  background-color: hsl(var(--accent) / 0.32) !important;
+}
+
+.dark .app-background-mode-image .bg-secondary {
+  background-color: hsl(var(--secondary) / 0.32) !important;
+}
+
+.dark .app-background-mode-image .bg-sidebar-accent,
+.dark .app-background-mode-image .bg-sidebar-accent\/40,
+.dark .app-background-mode-image .bg-sidebar-accent\/50,
+.dark .app-background-mode-image .bg-sidebar-accent\/80 {
+  background-color: hsl(var(--sidebar-accent) / 0.24) !important;
+}

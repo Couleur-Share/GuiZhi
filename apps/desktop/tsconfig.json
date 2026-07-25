@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@guizhi/core": ["../../packages/core/src/index.ts"],
+      "@guizhi/core/*": ["../../packages/core/src/*"],
+      "@/*": ["src/*"],
+      "@shared/*": ["../../packages/shared/*"],
+      "@guizhi/shared/*": ["../../packages/shared/*"],
+      "@guizhi/db": ["../../packages/db/src/index.ts"],
+      "@guizhi/db/*": ["../../packages/db/src/*"],
+      "@renderer/*": ["src/renderer/*"]
+    }
+  },
+  "include": ["src/**/*", "../../packages/**/*"],
+  "exclude": ["node_modules", "out"]
+}

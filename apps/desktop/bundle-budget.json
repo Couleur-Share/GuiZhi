@@ -1,0 +1,80 @@
+{
+  "$comment": "Bundle size budgets for the desktop renderer. Sizes are gzipped bytes, measured at apps/desktop/out/renderer/. Budgets sit ~5-10% above the actual baseline so organic small changes do not red-flag the CI; they are intentionally NOT a hard ratchet. Tighten an entry only when a deliberate optimization landed and we want to lock in the win.",
+  "rendererOutDir": "out/renderer",
+  "entries": [
+    {
+      "name": "main entry (index-*.js)",
+      "pattern": "assets/index-*.js",
+      "aggregation": "max",
+      "maxGzipBytes": 153600,
+      "$baseline": "122.95 KB after 2026-06-10 lazy loading of the built-in skill registry and embedded skill icons."
+    },
+    {
+      "name": "markdown vendor",
+      "pattern": "assets/markdown-vendor-*.js",
+      "maxGzipBytes": 122880,
+      "required": false,
+      "$baseline": "100 KB on 2026-05-16. P6 removes this manual chunk; entry becomes optional after that."
+    },
+    {
+      "name": "settings page bundle",
+      "pattern": "assets/SettingsPage-*.js",
+      "maxGzipBytes": 6144,
+      "$baseline": "2.59 KB after 2026-06-06 route-level settings section lazy loading."
+    },
+    {
+      "name": "settings data section",
+      "pattern": "assets/DataSettings-*.js",
+      "maxGzipBytes": 15360,
+      "$baseline": "11.84 KB after 2026-06-06 route-level settings section lazy loading."
+    },
+    {
+      "name": "settings ai section",
+      "pattern": "assets/AISettingsPrototype-*.js",
+      "maxGzipBytes": 32768,
+      "$baseline": "27.07 KB after 2026-06-06 route-level settings section lazy loading."
+    },
+    {
+      "name": "settings skill section",
+      "pattern": "assets/SkillSettings-*.js",
+      "maxGzipBytes": 10240,
+      "$baseline": "6.89 KB after 2026-06-06 route-level settings section lazy loading."
+    },
+    {
+      "name": "skill file editor",
+      "pattern": "assets/SkillFileEditor-*.js",
+      "maxGzipBytes": 153600,
+      "$baseline": "130.37 KB after 2026-06-10 CodeMirror language extension lazy loading."
+    },
+    {
+      "name": "ui vendor (dnd-kit)",
+      "pattern": "assets/ui-vendor-*.js",
+      "maxGzipBytes": 22528,
+      "$baseline": "16.35 KB on 2026-05-16 after framer-motion was removed; budget locks in the ~38 KB savings with a small headroom."
+    },
+    {
+      "name": "react vendor",
+      "pattern": "assets/react-vendor-*.js",
+      "maxGzipBytes": 51200,
+      "$baseline": "45 KB on 2026-05-16."
+    },
+    {
+      "name": "icons (lucide-react)",
+      "pattern": "assets/icons-*.js",
+      "maxGzipBytes": 18432,
+      "$baseline": "14 KB on 2026-05-16."
+    },
+    {
+      "name": "i18n vendor",
+      "pattern": "assets/i18n-vendor-*.js",
+      "maxGzipBytes": 20480,
+      "$baseline": "15 KB on 2026-05-16."
+    },
+    {
+      "name": "renderer css total",
+      "pattern": "assets/*.css",
+      "maxGzipBytes": 30720,
+      "$baseline": "~20 KB gzip estimated on 2026-05-16 (raw 99 KB)."
+    }
+  ]
+}

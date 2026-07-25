@@ -1,0 +1,183 @@
+import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { useSettingsStore } from "../../stores/settings.store";
+import { useToast } from "../ui/Toast";
+import { SettingSection, ShortcutItem } from "./shared";
+
+export function ShortcutsSettings() {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const settings = useSettingsStore();
+  const mountedRef = useRef(true);
+
+  // Shortcut state
+  // 快捷键状态
+  // 与主进程 shortcuts.ts 的 DEFAULT_SHORTCUTS 一致，避免读取到真实配置前闪错值
+  const [shortcuts, setShortcuts] = useState<Record<string, string>>({
+    showApp: "Alt+Shift+P",
+    newItem: "Alt+Shift+N",
+    search: "Alt+Shift+F",
+    settings: "Alt+Shift+S",
+  });
+  const [shortcutConflicts, setShortcutConflicts] = useState<
+    Record<string, string | undefined>
+  >({});
+
+  // Load shortcut settings
+  // 加载快捷键设置
+  useEffect(() => {
+    mountedRef.current = true;
+
+    async function loadShortcuts() {
+      try {
+        const savedShortcuts = await window.electron?.getShortcuts?.();
+        if (mountedRef.current && savedShortcuts) {
+          setShortcuts(savedShortcuts);
+        }
+      } catch {
+        if (mountedRef.current) {
+          showToast(t("settings.shortcutLoadFailed"), "error");
+        }
+      }
+    }
+
+    void loadShortcuts();
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [showToast, t]);
+
+  const persistShortcuts = async (
+    newShortcuts: Record<string, string>,
+    successMessage: string,
+  ) => {
+    const previousShortcuts = shortcuts;
+    setShortcuts(newShortcuts);
+
+    try {
+      await window.electron?.setShortcuts?.(newShortcuts);
+      if (mountedRef.current) {
+        showToast(successMessage, "success");
+      }
+    } catch {
+      if (mountedRef.current) {
+        setShortcuts(previousShortcuts);
+        showToast(t("settings.shortcutSaveFailed"), "error");
+      }
+    }
+  };
+
+  // Check shortcut conflicts
+  // 检查快捷键冲突
+  const checkShortcutConflict = (
+    key: string,
+    shortcut: string,
+  ): string | undefined => {
+    for (const [k, v] of Object.entries(shortcuts)) {
+      if (k !== key && v === shortcut) {
+        return k;
+      }
+    }
+    return undefined;
+  };
+
+  // Handle shortcut change
+  // 处理快捷键更改
+  const handleShortcutChange = async (key: string, shortcut: string) => {
+    const conflict = checkShortcutConflict(key, shortcut);
+    if (conflict) {
+      setShortcutConflicts({ ...shortcutConflicts, [key]: conflict });
+      showToast(
+        t("settings.shortcutConflict", {
+          key: t(
+            `settings.shortcut${conflict.charAt(0).toUpperCase() + conflict.slice(1)}`,
+          ),
+        }),
+        "error",
+      );
+      return;
+    }
+    setShortcutConflicts({ ...shortcutConflicts, [key]: undefined });
+    const newShortcuts = { ...shortcuts, [key]: shortcut };
+    await persistShortcuts(newShortcuts, t("settings.shortcutUpdated"));
+  };
+
+  // Clear shortcut
+  // 清除快捷键
+  const handleShortcutClear = async (key: string) => {
+    const newShortcuts = { ...shortcuts, [key]: "" };
+    setShortcutConflicts({ ...shortcutConflicts, [key]: undefined });
+    await persistShortcuts(newShortcuts, t("settings.shortcutCleared"));
+  };
+
+  return (
+    <div className="space-y-6">
+      <SettingSection title={t("settings.shortcutOptions")}>
+        <div>
+          <ShortcutItem
+            label={t("settings.shortcutShowApp")}
+            description={t("settings.shortcutShowAppDesc")}
+            shortcut={shortcuts.showApp || ""}
+            onShortcutChange={(shortcut) =>
+              handleShortcutChange("showApp", shortcut)
+            }
+            onClear={() => handleShortcutClear("showApp")}
+            conflict={shortcutConflicts.showApp}
+            mode={settings.shortcutModes?.showApp || "global"}
+            onModeChange={(mode) => settings.setShortcutMode?.("showApp", mode)}
+          />
+          <ShortcutItem
+            label={t("settings.shortcutNewItem")}
+            description={t("settings.shortcutNewItemDesc")}
+            shortcut={shortcuts.newItem || ""}
+            onShortcutChange={(shortcut) =>
+              handleShortcutChange("newItem", shortcut)
+            }
+            onClear={() => handleShortcutClear("newItem")}
+            conflict={shortcutConflicts.newItem}
+            mode={settings.shortcutModes?.newItem || "local"}
+            onModeChange={(mode) =>
+              settings.setShortcutMode?.("newItem", mode)
+            }
+          />
+          <ShortcutItem
+            label={t("settings.shortcutSearch")}
+            description={t("settings.shortcutSearchDesc")}
+            shortcut={shortcuts.search || ""}
+            onShortcutChange={(shortcut) =>
+              handleShortcutChange("search", shortcut)
+            }
+            onClear={() => handleShortcutClear("search")}
+            conflict={shortcutConflicts.search}
+            mode={settings.shortcutModes?.search || "local"}
+            onModeChange={(mode) => settings.setShortcutMode?.("search", mode)}
+          />
+          <ShortcutItem
+            label={t("settings.shortcutSettings")}
+            description={t("settings.shortcutSettingsDesc")}
+            shortcut={shortcuts.settings || ""}
+            onShortcutChange={(shortcut) =>
+              handleShortcutChange("settings", shortcut)
+            }
+            onClear={() => handleShortcutClear("settings")}
+            conflict={shortcutConflicts.settings}
+            mode={settings.shortcutModes?.settings || "local"}
+            onModeChange={(mode) =>
+              settings.setShortcutMode?.("settings", mode)
+            }
+          />
+        </div>
+      </SettingSection>
+
+      <SettingSection title={t("settings.shortcutTips")}>
+        <div className="p-4 text-sm text-muted-foreground space-y-2">
+          <p>• {t("settings.shortcutTip1")}</p>
+          <p>• {t("settings.shortcutTip2")}</p>
+          <p>• {t("settings.shortcutTip3")}</p>
+          <p>• {t("settings.shortcutModeDesc")}</p>
+        </div>
+      </SettingSection>
+    </div>
+  );
+}

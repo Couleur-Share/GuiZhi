@@ -1,0 +1,28 @@
+{
+  "name": "@guizhi/shared",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./types/index.ts",
+    "./types": "./types/index.ts",
+    "./types/*": "./types/*.ts",
+    "./constants": "./constants/index.ts",
+    "./constants/*": "./constants/*.ts",
+    "./utils/*": "./utils/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "files": [
+    "types",
+    "constants",
+    "utils"
+  ],
+  "dependencies": {
+    "ignore": "7.0.5"
+  }
+}

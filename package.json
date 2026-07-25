@@ -1,0 +1,35 @@
+{
+  "name": "guizhi-monorepo",
+  "version": "0.4.0",
+  "private": true,
+  "description": "GuiZhi monorepo - local-first AI personal knowledge base",
+  "license": "AGPL-3.0",
+  "packageManager": "pnpm@11.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Couleur-Share/GuiZhi.git"
+  },
+  "scripts": {
+    "build": "pnpm --filter @guizhi/desktop build",
+    "dev": "node scripts/run-with-system-node.mjs pnpm --filter @guizhi/desktop dev",
+    "electron:dev": "pnpm --filter @guizhi/desktop electron:dev",
+    "electron:build": "pnpm --filter @guizhi/desktop electron:build",
+    "electron:build:mac": "pnpm --filter @guizhi/desktop electron:build:mac",
+    "electron:build:win": "pnpm --filter @guizhi/desktop electron:build:win",
+    "electron:build:linux": "pnpm --filter @guizhi/desktop electron:build:linux",
+    "lint": "pnpm lint:file-size && pnpm --filter @guizhi/desktop lint",
+    "lint:file-size": "node scripts/check-file-line-limits.mjs",
+    "lint:file-size:report": "node scripts/check-file-line-limits.mjs --report",
+    "format": "pnpm --filter @guizhi/desktop format",
+    "test": "pnpm --filter @guizhi/desktop test",
+    "test:unit": "pnpm --filter @guizhi/desktop test:unit",
+    "test:integration": "pnpm --filter @guizhi/desktop test:integration",
+    "test:run": "pnpm --filter @guizhi/desktop test:run",
+    "test:e2e": "pnpm --filter @guizhi/desktop test:e2e",
+    "test:e2e:smoke": "pnpm --filter @guizhi/desktop test:e2e:smoke",
+    "test:release": "pnpm --filter @guizhi/desktop test:release",
+    "typecheck": "pnpm -r typecheck",
+    "verify:release": "node --experimental-strip-types scripts/verify-release.mts",
+    "verify:release:quick": "node --experimental-strip-types scripts/verify-release.mts --profile quick"
+  }
+}

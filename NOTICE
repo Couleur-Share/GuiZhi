@@ -1,0 +1,20 @@
+GuiZhi 归知
+Copyright (C) 2026 Couleur-Share
+
+本软件基于 PromptHub 改造而来：
+This software is based on PromptHub:
+
+  PromptHub — An all-in-one AI toolbox for prompt, agent, and skills management
+  Copyright (C) 2025-2026 legeling
+  https://github.com/legeling/PromptHub
+  Licensed under the GNU Affero General Public License v3.0
+
+归知保留了 PromptHub 的应用骨架（Electron 多进程结构、Liquid Glass 主题系统、
+设置框架、AI Provider 管理、同步传输与构建发布链），并将业务域替换为
+本地优先的 AI 个人知识库。两个项目均以 AGPL-3.0 许可证发布。
+
+GuiZhi keeps PromptHub's application shell (Electron process model, Liquid
+Glass theme system, settings framework, AI provider management, sync
+transports and the build/release pipeline) and replaces the business domain
+with a local-first AI personal knowledge base. Both projects are licensed
+under AGPL-3.0.

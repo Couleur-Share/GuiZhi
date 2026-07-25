@@ -1,0 +1,239 @@
+/**
+ * Network-level SSRF protection utilities.
+ *
+ * DNS 解析 + 私网地址检测，防止渲染进程发起的远程抓取
+ * （图片下载、网页采集）被用于访问内网资源。
+ */
+import * as dns from "dns/promises";
+import * as nodeNet from "net";
+
+interface ResolvedAddress {
+  address: string;
+  family: 4 | 6;
+}
+
+export interface ResolvePublicAddressOptions {
+  allowPrivateNetwork?: boolean;
+  /**
+   * Allows synthetic 198.18/15 DNS answers used by a configured local proxy.
+   * Real private addresses remain blocked unless allowPrivateNetwork is set.
+   */
+  allowProxyCompatibilityAddress?: boolean;
+}
+
+export function isBlockedHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "localhost.localdomain" ||
+    normalized.endsWith(".localdomain")
+  );
+}
+
+export function isPrivateIPv4(address: string): boolean {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
+    return false;
+  }
+
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    // CGNAT (Carrier-grade NAT)
+    (a === 100 && b >= 64 && b <= 127) ||
+    // Multicast
+    (a >= 224 && a <= 239) ||
+    // Reserved for future use
+    a >= 240 ||
+    // Benchmark testing
+    (a === 198 && (b === 18 || b === 19)) ||
+    // Documentation ranges (TEST-NET-1, TEST-NET-2, TEST-NET-3)
+    (a === 192 && b === 0 && parts[2] === 2) ||
+    (a === 198 && b === 51 && parts[2] === 100) ||
+    (a === 203 && b === 0 && parts[2] === 113)
+  );
+}
+
+export function isPrivateIPv6(address: string): boolean {
+  const normalized = address.toLowerCase().split("%")[0];
+  if (normalized === "::" || normalized === "::1") {
+    return true;
+  }
+
+  if (normalized.startsWith("::ffff:")) {
+    const mappedAddress = normalized.slice("::ffff:".length);
+    return nodeNet.isIP(mappedAddress) === 4 && isPrivateIPv4(mappedAddress);
+  }
+
+  // Expand :: into the correct number of zero groups to get all 8 hextets
+  const halves = normalized.split("::");
+  let segments: string[];
+  if (halves.length === 2) {
+    const left = halves[0] ? halves[0].split(":") : [];
+    const right = halves[1] ? halves[1].split(":") : [];
+    const missing = 8 - left.length - right.length;
+    segments = [...left, ...Array(missing).fill("0"), ...right];
+  } else {
+    segments = normalized.split(":");
+  }
+
+  if (segments.length < 2) {
+    return false;
+  }
+
+  const firstHextet = Number.parseInt(segments[0], 16);
+  if (Number.isNaN(firstHextet)) {
+    return false;
+  }
+  const secondHextet = Number.parseInt(segments[1], 16) || 0;
+
+  return (
+    // ULA (Unique Local Address)
+    (firstHextet & 0xfe00) === 0xfc00 ||
+    // Link-local
+    (firstHextet & 0xffc0) === 0xfe80 ||
+    // 6to4 relay
+    firstHextet === 0x2002 ||
+    // Teredo tunneling
+    (firstHextet === 0x2001 && secondHextet === 0x0000) ||
+    // Documentation
+    (firstHextet === 0x2001 && secondHextet === 0x0db8) ||
+    // Discard prefix
+    firstHextet === 0x0100 ||
+    // NAT64
+    (firstHextet === 0x0064 && secondHextet === 0xff9b)
+  );
+}
+
+export function isPrivateAddress(address: string): boolean {
+  const family = nodeNet.isIP(address);
+  if (family === 4) {
+    return isPrivateIPv4(address);
+  }
+  if (family === 6) {
+    return isPrivateIPv6(address);
+  }
+  return false;
+}
+
+function expandIPv6Segments(address: string): string[] | null {
+  const normalized = address.toLowerCase().split("%")[0];
+  if (nodeNet.isIP(normalized) !== 6) {
+    return null;
+  }
+
+  const halves = normalized.split("::");
+  let segments: string[];
+  if (halves.length === 2) {
+    const left = halves[0] ? halves[0].split(":") : [];
+    const right = halves[1] ? halves[1].split(":") : [];
+    const missing = 8 - left.length - right.length;
+    segments = [...left, ...Array(missing).fill("0"), ...right];
+  } else {
+    segments = normalized.split(":");
+  }
+
+  if (segments.length !== 8) {
+    return null;
+  }
+
+  return segments.map((segment) => segment.padStart(4, "0"));
+}
+
+function decodeTrustedCompatibilityIPv6(address: string): string | null {
+  const segments = expandIPv6Segments(address);
+  if (!segments) {
+    return null;
+  }
+
+  const standardMappedPrefix = ["0000", "0000", "0000", "0000", "0000", "ffff"];
+  const translatedPrefix = ["0000", "0000", "0000", "0000", "ffff", "0000"];
+  const prefix = segments.slice(0, 6);
+  const hasSupportedPrefix =
+    prefix.every((segment, index) => segment === standardMappedPrefix[index]) ||
+    prefix.every((segment, index) => segment === translatedPrefix[index]);
+  if (!hasSupportedPrefix) {
+    return null;
+  }
+
+  const high = Number.parseInt(segments[6], 16);
+  const low = Number.parseInt(segments[7], 16);
+  if (Number.isNaN(high) || Number.isNaN(low)) {
+    return null;
+  }
+
+  return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+}
+
+function isProxyCompatibilityAddress(address: string): boolean {
+  if (address.startsWith("198.18.") || address.startsWith("198.19.")) {
+    return true;
+  }
+
+  const decodedIPv4 = decodeTrustedCompatibilityIPv6(address);
+  return decodedIPv4 !== null && isProxyCompatibilityAddress(decodedIPv4);
+}
+
+export async function resolvePublicAddress(
+  hostname: string,
+  options: ResolvePublicAddressOptions = {},
+): Promise<ResolvedAddress> {
+  if (isBlockedHostname(hostname)) {
+    throw new Error("Access to local network addresses is not allowed");
+  }
+
+  if (nodeNet.isIP(hostname)) {
+    if (isPrivateAddress(hostname)) {
+      if (options.allowPrivateNetwork) {
+        return { address: hostname, family: nodeNet.isIP(hostname) as 4 | 6 };
+      }
+      if (
+        isProxyCompatibilityAddress(hostname) &&
+        options.allowProxyCompatibilityAddress
+      ) {
+        return { address: hostname, family: nodeNet.isIP(hostname) as 4 | 6 };
+      }
+      throw new Error("Access to internal network addresses is not allowed");
+    }
+    return { address: hostname, family: nodeNet.isIP(hostname) as 4 | 6 };
+  }
+
+  const addresses = await dns.lookup(hostname, { all: true, verbatim: true });
+  if (addresses.length === 0) {
+    throw new Error("Failed to resolve remote host");
+  }
+
+  const trustedCompatibilityAddresses = addresses.filter((entry) =>
+    isProxyCompatibilityAddress(entry.address),
+  );
+  if (
+    trustedCompatibilityAddresses.length > 0 &&
+    trustedCompatibilityAddresses.length === addresses.length &&
+    options.allowProxyCompatibilityAddress
+  ) {
+    const firstTrustedAddress = trustedCompatibilityAddresses[0];
+    return {
+      address: firstTrustedAddress.address,
+      family: firstTrustedAddress.family === 6 ? 6 : 4,
+    };
+  }
+
+  if (
+    !options.allowPrivateNetwork &&
+    addresses.some((entry) => isPrivateAddress(entry.address))
+  ) {
+    throw new Error("Access to internal network addresses is not allowed");
+  }
+
+  const firstAddress = addresses[0];
+  return {
+    address: firstAddress.address,
+    family: firstAddress.family === 6 ? 6 : 4,
+  };
+}

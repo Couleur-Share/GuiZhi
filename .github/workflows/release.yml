@@ -1,0 +1,290 @@
+name: Desktop Build and Release
+
+# 打 v* tag 触发构建并创建 Draft Release；验证通过后维护者手动执行
+#   gh release edit <tag> --draft=false --latest
+# 正式对外发布。
+#
+# 当前发布平台：Windows (x64 / arm64) + Linux (AppImage / deb)。
+# macOS 需要签名与公证证书，待证书就绪后再恢复 mac 矩阵
+# （resources/icon.icns 与 tray 模板图案也需要一并替换为归知图标）。
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          # 版本读取 package.json 的 packageManager 字段，避免双处声明冲突
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.arch }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Clean previous build artifacts
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          rm -rf dist || true
+
+      - name: Build for ${{ matrix.platform }} ${{ matrix.arch }}
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            pnpm vite build && pnpm electron-builder --config electron-builder.config.cjs --win --${{ matrix.arch }} --publish never
+          else
+            pnpm vite build && pnpm electron-builder --config electron-builder.config.cjs --linux --x64 --publish never
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Normalize Windows update metadata
+        if: matrix.platform == 'win'
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          # 为每个架构生成对应的 electron-updater 清单文件
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            if [ -f "dist/latest.yml" ]; then
+              node scripts/fix-latest-yml.js --file dist/latest.yml --arch arm64
+              mv dist/latest.yml dist/latest-arm64.yml
+              echo "Renamed latest.yml to latest-arm64.yml for ARM64"
+            fi
+          else
+            if [ -f "dist/latest.yml" ]; then
+              node scripts/fix-latest-yml.js --file dist/latest.yml --arch x64
+              cp dist/latest.yml dist/latest-x64.yml
+              echo "Created latest-x64.yml alias"
+            fi
+          fi
+          # 删除不带架构后缀的重复 blockmap，避免上传冲突
+          shopt -s nullglob
+          for file in dist/*.exe.blockmap; do
+            case "$file" in
+              *-x64.exe.blockmap|*-arm64.exe.blockmap) ;;
+              *) rm -f "$file" ;;
+            esac
+          done
+
+      - name: Remove debug files
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          find dist -name "builder-debug.yml" -delete || true
+
+      - name: Prepare upload bundle
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          mkdir -p upload_dist
+
+          copy_if_exists() {
+            local file="$1"
+            if [ -f "$file" ]; then
+              cp "$file" upload_dist/
+            else
+              echo "Expected build output not found: $file"
+              exit 1
+            fi
+          }
+
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            copy_if_exists "dist/GuiZhi-Setup-${VERSION}-${{ matrix.arch }}.exe"
+
+            if [ "${{ matrix.arch }}" = "arm64" ]; then
+              copy_if_exists "dist/latest-arm64.yml"
+            else
+              copy_if_exists "dist/latest.yml"
+              copy_if_exists "dist/latest-x64.yml"
+            fi
+          else
+            copy_if_exists "dist/GuiZhi-${VERSION}-x64.AppImage"
+            copy_if_exists "dist/GuiZhi-${VERSION}-amd64.deb"
+            copy_if_exists "dist/latest-linux.yml"
+          fi
+
+          echo "Prepared upload bundle:"
+          ls -1 upload_dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-build
+          path: apps/desktop/upload_dist/*
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Set release version
+        shell: bash
+        run: |
+          echo "VERSION=$(node -p "require('./apps/desktop/package.json').version")" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "IS_PRERELEASE=true" >> "$GITHUB_ENV"
+            echo "DOWNLOAD_BASE_URL=https://github.com/Couleur-Share/GuiZhi/releases/download/${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          else
+            echo "IS_PRERELEASE=false" >> "$GITHUB_ENV"
+            echo "DOWNLOAD_BASE_URL=https://github.com/Couleur-Share/GuiZhi/releases/latest/download" >> "$GITHUB_ENV"
+          fi
+
+      - name: Create Release with gh CLI
+        shell: bash
+        run: |
+          # 1. 组装 Release Notes
+          cat > release_notes.md <<EOF
+          ## 📦 下载安装
+
+          | 平台 | 下载 |
+          |------|------|
+          | Windows | [![Windows x64](https://img.shields.io/badge/Windows_x64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-x64.exe) [![Windows arm64](https://img.shields.io/badge/Windows_arm64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-arm64.exe) |
+          | Linux | [![Linux AppImage](https://img.shields.io/badge/Linux_AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-x64.AppImage) [![Linux deb](https://img.shields.io/badge/Linux_deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-amd64.deb) |
+
+          > macOS 版本待签名证书就绪后提供。
+
+          ---
+
+          ## 🔄 本次更新
+
+          详细更新日志见 [CHANGELOG](https://github.com/Couleur-Share/GuiZhi/blob/main/CHANGELOG.md)
+          EOF
+
+          # 2. 确定性收集产物（多产物目录不盲目覆盖，防清单与二进制错配）
+          echo "Collecting release assets..."
+          mkdir -p release_assets
+
+          copy_unique() {
+            local pattern="$1"
+            local matches=()
+
+            while IFS= read -r line; do
+              matches+=("$line")
+            done < <(find artifacts -type f -name "$pattern" | sort)
+
+            if [ "${#matches[@]}" -eq 0 ]; then
+              echo "Missing release asset: $pattern"
+              exit 1
+            fi
+
+            if [ "${#matches[@]}" -gt 1 ]; then
+              echo "Ambiguous release asset for pattern $pattern:"
+              printf '  %s\n' "${matches[@]}"
+              exit 1
+            fi
+
+            cp "${matches[0]}" "release_assets/$(basename "${matches[0]}")"
+          }
+
+          copy_unique "GuiZhi-Setup-${VERSION}-x64.exe"
+          copy_unique "GuiZhi-Setup-${VERSION}-arm64.exe"
+          copy_unique "GuiZhi-${VERSION}-x64.AppImage"
+          copy_unique "GuiZhi-${VERSION}-amd64.deb"
+          copy_unique "latest.yml"
+          copy_unique "latest-x64.yml"
+          copy_unique "latest-arm64.yml"
+          copy_unique "latest-linux.yml"
+
+          echo "Files to upload (deduplicated):"
+          ls -1 release_assets/
+
+          # 3. 校正并校验更新清单哈希（错配即中止，防坏自动更新）
+          node apps/desktop/scripts/fix-manifest-hashes.js \
+            release_assets/latest.yml \
+            release_assets/latest-arm64.yml \
+            release_assets/latest-x64.yml
+
+          node apps/desktop/scripts/verify-update-manifest.js \
+            release_assets/latest.yml \
+            release_assets/latest-arm64.yml \
+            release_assets/latest-x64.yml
+
+          # 4. 创建 / 更新 Draft Release（验证后手动 promote）
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists. Updating assets in place..."
+            IS_DRAFT=$(gh release view "${GITHUB_REF_NAME}" --json isDraft -q .isDraft)
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "归知 GuiZhi ${VERSION}" \
+              --notes-file release_notes.md \
+              --draft=${IS_DRAFT} \
+              --prerelease=${IS_PRERELEASE}
+
+            gh release upload "${GITHUB_REF_NAME}" \
+              release_assets/* \
+              --clobber
+          else
+            echo "Creating DRAFT release..."
+            gh release create "${GITHUB_REF_NAME}" \
+              release_assets/* \
+              --title "归知 GuiZhi ${VERSION}" \
+              --notes-file release_notes.md \
+              --draft=true \
+              --prerelease=${IS_PRERELEASE}
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

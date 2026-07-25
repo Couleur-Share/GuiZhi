@@ -1,0 +1,468 @@
+/**
+ * 在线视频采集：平台链接检测 → yt-dlp 元数据 / 音频下载 → 可选远程转写。
+ *
+ * yt-dlp 是外部工具：优先用设置里配置的路径，否则查 PATH；
+ * 未安装时降级保存链接并附安装指引（任务可在安装后重试）。
+ * 命令执行以接口注入，便于单测用假实现驱动。
+ */
+import { randomUUID } from "crypto";
+import { spawn } from "child_process";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import {
+  detectVideoPlatform,
+  type VideoPlatform,
+} from "@guizhi/shared/utils/video-platforms";
+import type { ExtractedContent } from "./connectors";
+import { prepareAudioForTranscription } from "../media/audio-preprocess";
+import { resolveFfmpegExecutable } from "../media/ffmpeg-manager";
+import { ensureLocalTranscriptionService } from "../media/funasr-service";
+import {
+  resolveTranscriptionConfig,
+  transcribeMediaFile,
+  type TranscriptionModelConfig,
+} from "../media/transcribe";
+import {
+  formatTranscript,
+  resolveTranscriptFormatterConfig,
+} from "../media/transcript-format";
+import {
+  generateMediaSummary,
+  resolveMediaSummaryConfig,
+} from "../media/media-summary";
+import { resolveYtDlpExecutable } from "../media/ytdlp-manager";
+import {
+  appendOriginalTitleNote,
+  mediaSummaryHeading,
+  upsertMediaSummarySection,
+} from "@guizhi/shared/utils/media-summary";
+import type { AIClientConfig } from "@guizhi/core";
+
+// 平台识别移至 @guizhi/shared（渲染进程转写卡片共用），此处透传给既有调用方
+export { detectVideoPlatform, type VideoPlatform };
+
+const METADATA_TIMEOUT_MS = 90 * 1000;
+const AUDIO_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+const AUDIO_MAX_FILESIZE = "300m";
+/** 简介压缩为元数据引用块单行展示，取前 300 字足够辨识 */
+const DESCRIPTION_MAX_LENGTH = 300;
+const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
+
+const PLATFORM_LABELS: Record<VideoPlatform, string> = {
+  bilibili: "哔哩哔哩",
+  youtube: "YouTube",
+  douyin: "抖音",
+  xiaohongshu: "小红书",
+};
+
+export class YtDlpNotFoundError extends Error {
+  constructor() {
+    super("YT_DLP_NOT_FOUND");
+    this.name = "YtDlpNotFoundError";
+  }
+}
+
+export interface RunCommandResult {
+  stdout: string;
+}
+
+export type RunCommand = (
+  executable: string,
+  args: string[],
+  options: { timeoutMs: number; signal?: AbortSignal },
+) => Promise<RunCommandResult>;
+
+/** 默认命令执行器：spawn + 超时/取消 kill；找不到可执行文件抛 YtDlpNotFoundError */
+export const runCommand: RunCommand = (executable, args, options) => {
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, args, { windowsHide: true });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+
+    const finish = (action: () => void) => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        action();
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish(() => reject(new Error("yt-dlp 执行超时")));
+    }, options.timeoutMs);
+
+    const abort = () => {
+      child.kill();
+      finish(() => reject(new Error("已取消")));
+    };
+    options.signal?.addEventListener("abort", abort, { once: true });
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      options.signal?.removeEventListener("abort", abort);
+    };
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      if (stdout.length < OUTPUT_MAX_BYTES) {
+        stdout += chunk.toString("utf8");
+      }
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      if (stderr.length < OUTPUT_MAX_BYTES) {
+        stderr += chunk.toString("utf8");
+      }
+    });
+
+    child.on("error", (error: NodeJS.ErrnoException) => {
+      finish(() =>
+        reject(
+          error.code === "ENOENT" ? new YtDlpNotFoundError() : error,
+        ),
+      );
+    });
+
+    child.on("close", (code) => {
+      finish(() => {
+        if (code === 0) {
+          resolve({ stdout });
+        } else {
+          const detail = stderr.trim().split(/\r?\n/).slice(-3).join(" ");
+          reject(new Error(`yt-dlp 退出码 ${code}: ${detail.slice(0, 300)}`));
+        }
+      });
+    });
+  });
+};
+
+export interface YtDlpMetadata {
+  title: string;
+  uploader: string;
+  durationSeconds: number | null;
+  description: string;
+  webpageUrl: string;
+}
+
+/** 解析 --dump-json 输出（单行 JSON；容忍前后噪声行） */
+export function parseYtDlpMetadata(stdout: string): YtDlpMetadata {
+  const lines = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("{"));
+  const jsonLine = lines[lines.length - 1];
+  if (!jsonLine) {
+    throw new Error("yt-dlp 未返回视频元数据");
+  }
+  const parsed = JSON.parse(jsonLine) as Record<string, unknown>;
+  return {
+    title: typeof parsed.title === "string" ? parsed.title : "",
+    uploader:
+      typeof parsed.uploader === "string"
+        ? parsed.uploader
+        : typeof parsed.channel === "string"
+          ? parsed.channel
+          : "",
+    durationSeconds:
+      typeof parsed.duration === "number" && Number.isFinite(parsed.duration)
+        ? Math.round(parsed.duration)
+        : null,
+    description:
+      typeof parsed.description === "string" ? parsed.description : "",
+    webpageUrl:
+      typeof parsed.webpage_url === "string" && parsed.webpage_url
+        ? parsed.webpage_url
+        : "",
+  };
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return hours > 0
+    ? `${hours}:${pad(minutes)}:${pad(seconds)}`
+    : `${minutes}:${pad(seconds)}`;
+}
+
+export interface VideoUrlDeps {
+  /** 设置里配置的 yt-dlp 路径（空表示查 PATH） */
+  getYtDlpPath: () => string | null;
+  /** 设置里配置的 ffmpeg 路径（空表示托管版 / PATH），用于转写前音频转码 */
+  getFfmpegPath?: () => string | null;
+  run?: RunCommand;
+  /** 测试注入：转写配置解析（默认读 ai-config.json 的 audioText 路由） */
+  getTranscriptionConfig?: () => TranscriptionModelConfig | null;
+  /** 测试注入：转写执行 */
+  transcribe?: (
+    filePath: string,
+    config: TranscriptionModelConfig,
+    signal?: AbortSignal,
+  ) => Promise<string>;
+  /** 测试注入：音频预处理（默认 ffmpeg 转码 16kHz 单声道 mp3） */
+  prepareAudio?: typeof prepareAudioForTranscription;
+  /** 测试注入：排版模型解析（默认读 ai-config.json 的 fastText 路由） */
+  getFormatterConfig?: () => AIClientConfig | null;
+  /** 测试注入：文字稿 AI 排版 */
+  formatTranscript?: typeof formatTranscript;
+  /** 测试注入：总结模型解析（默认读 ai-config.json 的 mainText 路由） */
+  getSummaryConfig?: () => AIClientConfig | null;
+  /** 测试注入：视频总结生成 */
+  summarize?: typeof generateMediaSummary;
+}
+
+/**
+ * 组装视频条目正文：只写元数据引用块（平台/作者/时长/简介）与可选的转写注记。
+ * 简介压缩为引用块内的单行（MediaMetaCard 展示，正文视图不再出现）；
+ * 来源链接不写入正文——sourceUri 字段是数据载体，元数据卡片提供跳转。
+ */
+export function buildVideoContent(
+  metadata: YtDlpMetadata,
+  platform: VideoPlatform,
+  transcriptionNote?: string,
+): string {
+  const metaLine = [
+    `平台：${PLATFORM_LABELS[platform]}`,
+    metadata.uploader ? `作者：${metadata.uploader}` : "",
+    metadata.durationSeconds != null
+      ? `时长：${formatDuration(metadata.durationSeconds)}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const quoteLines = [`> ${metaLine}`];
+  const description = metadata.description.trim().replace(/\s+/g, " ");
+  if (description) {
+    const clipped =
+      description.length > DESCRIPTION_MAX_LENGTH
+        ? `${description.slice(0, DESCRIPTION_MAX_LENGTH)}…`
+        : description;
+    quoteLines.push(`> 简介：${clipped}`);
+  }
+
+  const parts: string[] = [quoteLines.join("\n")];
+  if (transcriptionNote) {
+    parts.push(`> ${transcriptionNote}`);
+  }
+  return parts.join("\n\n");
+}
+
+/** 转写状态注记的段落前缀（buildVideoContent 写入正文的两种模板） */
+const TRANSCRIPTION_NOTE_PREFIXES = [
+  "> 文字稿生成失败",
+  "> 未配置「语音转写」模型",
+];
+
+/** 重新生成文字稿成功后，从正文中移除历史转写状态注记 */
+export function stripTranscriptionNote(content: string): string {
+  return content
+    .split("\n\n")
+    .filter(
+      (paragraph) =>
+        !TRANSCRIPTION_NOTE_PREFIXES.some((prefix) =>
+          paragraph.startsWith(prefix),
+        ),
+    )
+    .join("\n\n");
+}
+
+function buildNotInstalledContent(url: string, platform: VideoPlatform): string {
+  return [
+    `> 检测到${PLATFORM_LABELS[platform]}视频链接，但尚未安装 yt-dlp，无法解析视频信息。`,
+    "打开「设置 → 应用设置 → 采集」点击**一键安装**（应用会自动下载并托管 yt-dlp），",
+    "完成后回到导入任务列表点击「重试」即可解析。",
+    `原始链接：<${url}>`,
+  ].join("\n\n");
+}
+
+/** 下载最佳音轨到临时目录（不依赖 ffmpeg），返回音频文件路径 */
+export async function downloadBestAudio(
+  executable: string,
+  url: string,
+  run: RunCommand,
+  signal?: AbortSignal,
+): Promise<{ dir: string; filePath: string }> {
+  const dir = path.join(os.tmpdir(), `guizhi-video-${randomUUID().slice(0, 8)}`);
+  fs.mkdirSync(dir, { recursive: true });
+  await run(
+    executable,
+    [
+      "--no-warnings",
+      "--no-playlist",
+      "--max-filesize",
+      AUDIO_MAX_FILESIZE,
+      "-f",
+      "bestaudio/best",
+      "-o",
+      path.join(dir, "audio.%(ext)s"),
+      url,
+    ],
+    { timeoutMs: AUDIO_DOWNLOAD_TIMEOUT_MS, signal },
+  );
+  const files = fs.readdirSync(dir);
+  if (files.length === 0) {
+    throw new Error("音频下载失败（可能超过大小限制）");
+  }
+  return { dir, filePath: path.join(dir, files[0]) };
+}
+
+export async function extractVideoUrl(
+  url: string,
+  platform: VideoPlatform,
+  deps: VideoUrlDeps,
+  signal?: AbortSignal,
+): Promise<ExtractedContent> {
+  const run = deps.run ?? runCommand;
+  const executable = resolveYtDlpExecutable(deps.getYtDlpPath());
+
+  let metadata: YtDlpMetadata;
+  try {
+    const result = await run(
+      executable,
+      ["--dump-json", "--no-download", "--no-warnings", "--no-playlist", url],
+      { timeoutMs: METADATA_TIMEOUT_MS, signal },
+    );
+    metadata = parseYtDlpMetadata(result.stdout);
+  } catch (error) {
+    if (error instanceof Error && error.message === "已取消") {
+      throw error;
+    }
+    if (error instanceof YtDlpNotFoundError) {
+      return {
+        title: url,
+        content: buildNotInstalledContent(url, platform),
+        itemType: "video",
+        sourceUri: url,
+        degraded: true,
+      };
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      title: url,
+      content: `> 视频信息解析失败：${message}\n\n原始链接：<${url}>`,
+      itemType: "video",
+      sourceUri: url,
+      degraded: true,
+    };
+  }
+
+  // 配置了转写模型才下载音频（元数据条目本身不依赖下载）
+  let transcript: string | null = null;
+  let transcriptionNote: string | undefined;
+  const transcriptionConfig = (
+    deps.getTranscriptionConfig ?? resolveTranscriptionConfig
+  )();
+  if (transcriptionConfig) {
+    const transcribe = deps.transcribe ?? transcribeMediaFile;
+    const prepareAudio = deps.prepareAudio ?? prepareAudioForTranscription;
+    let tempDir: string | null = null;
+    let prepared: { filePath: string; cleanup: () => void } | null = null;
+    try {
+      // 目标是托管本地引擎时先确保服务已启动
+      await ensureLocalTranscriptionService(transcriptionConfig.apiUrl);
+      const audio = await downloadBestAudio(executable, url, run, signal);
+      tempDir = audio.dir;
+      prepared = await prepareAudio(
+        audio.filePath,
+        resolveFfmpegExecutable(deps.getFfmpegPath?.() ?? null),
+        signal,
+      );
+      transcript = await transcribe(
+        prepared.filePath,
+        transcriptionConfig,
+        signal,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message === "已取消") {
+        throw error;
+      }
+      transcriptionNote = `文字稿生成失败：${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      prepared?.cleanup();
+      if (tempDir) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+
+    // 转写成功后顺带 AI 排版（补标点/分段）；失败保留原始转写，不阻断导入
+    if (transcript) {
+      const formatterConfig = (
+        deps.getFormatterConfig ?? resolveTranscriptFormatterConfig
+      )();
+      if (formatterConfig) {
+        try {
+          transcript = await (deps.formatTranscript ?? formatTranscript)(
+            transcript,
+            formatterConfig,
+            { signal },
+          );
+        } catch (error) {
+          if (signal?.aborted) {
+            throw new Error("已取消");
+          }
+          console.warn("[import] 文字稿 AI 排版失败，保留原始转写:", error);
+        }
+      }
+    }
+  } else {
+    transcriptionNote =
+      "未配置「语音转写」模型，本次仅保存视频信息；配置后可在任务列表重试生成文字稿。";
+  }
+
+  // 有文字稿则生成结构化视频总结与 AI 标题；失败只保留文字稿，不阻断导入
+  let summary: string | null = null;
+  let aiTitle: string | null = null;
+  if (transcript) {
+    const summaryConfig = (
+      deps.getSummaryConfig ?? resolveMediaSummaryConfig
+    )();
+    if (summaryConfig) {
+      try {
+        const result = await (deps.summarize ?? generateMediaSummary)(
+          {
+            title: metadata.title || url,
+            context: metadata.description,
+            transcript,
+          },
+          summaryConfig,
+          { signal },
+        );
+        summary = result.summary;
+        aiTitle = result.title;
+      } catch (error) {
+        if (signal?.aborted) {
+          throw new Error("已取消");
+        }
+        console.warn("[import] 视频总结生成失败，保留文字稿:", error);
+      }
+    }
+  }
+
+  let title = metadata.title || url;
+  let content = buildVideoContent(metadata, platform, transcriptionNote);
+  if (summary) {
+    content = upsertMediaSummarySection(
+      content,
+      mediaSummaryHeading("video"),
+      summary,
+    );
+  }
+  // AI 标题替换平台原标题，原标题记入元数据引用块（仍可检索）
+  if (aiTitle && aiTitle !== title) {
+    if (metadata.title) {
+      content = appendOriginalTitleNote(content, metadata.title);
+    }
+    title = aiTitle;
+  }
+
+  return {
+    title,
+    content,
+    itemType: "video",
+    sourceUri: metadata.webpageUrl || url,
+    transcript,
+  };
+}

@@ -1,0 +1,201 @@
+import {
+  AudioLinesIcon,
+  BrainIcon,
+  DatabaseIcon,
+  EyeIcon,
+  ZapIcon,
+} from "lucide-react";
+
+import type {
+  ModelFormState,
+  ProviderOption,
+  ScenarioDefinition,
+} from "./types";
+
+export const PROVIDER_OPTIONS: ProviderOption[] = [
+  {
+    id: "custom",
+    name: "自定义",
+    defaultUrl: "",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: true,
+    iconCategory: "Custom",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    defaultUrl: "https://api.openai.com",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "GPT",
+  },
+  {
+    id: "openai-responses",
+    name: "OpenAI-Response",
+    defaultUrl: "https://api.openai.com",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "GPT",
+  },
+  {
+    id: "google",
+    name: "Gemini",
+    defaultUrl: "https://generativelanguage.googleapis.com",
+    recommendedProtocol: "gemini",
+    allowsCustomProtocol: false,
+    iconCategory: "Gemini",
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    defaultUrl: "https://api.anthropic.com",
+    recommendedProtocol: "anthropic",
+    allowsCustomProtocol: false,
+    iconCategory: "Claude",
+  },
+  {
+    id: "azure-openai",
+    name: "Azure OpenAI",
+    defaultUrl: "",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: true,
+    iconCategory: "Azure OpenAI",
+  },
+  {
+    id: "new-api",
+    name: "New API",
+    defaultUrl: "",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: true,
+    iconCategory: "New API",
+  },
+  {
+    id: "ollama",
+    name: "Ollama",
+    defaultUrl: "http://localhost:11434/v1",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "Llama",
+  },
+  {
+    id: "xai",
+    name: "xAI",
+    defaultUrl: "https://api.x.ai",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "Grok",
+  },
+  {
+    id: "deepseek",
+    name: "DeepSeek",
+    defaultUrl: "https://api.deepseek.com",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "DeepSeek",
+  },
+  {
+    id: "moonshot",
+    name: "Moonshot",
+    defaultUrl: "https://api.moonshot.cn",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "Moonshot",
+  },
+  {
+    id: "zhipu",
+    name: "智谱 AI",
+    defaultUrl: "https://open.bigmodel.cn/api/paas",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "GLM",
+  },
+  {
+    id: "qwen",
+    name: "通义千问",
+    defaultUrl: "https://dashscope.aliyuncs.com/compatible-mode",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "Qwen",
+  },
+  {
+    id: "doubao",
+    name: "豆包",
+    defaultUrl: "https://ark.cn-beijing.volces.com/api",
+    recommendedProtocol: "openai",
+    allowsCustomProtocol: false,
+    iconCategory: "Doubao",
+  },
+];
+
+export const MODEL_ROUTE_DEFINITIONS: ScenarioDefinition[] = [
+  {
+    key: "mainText",
+    labelKey: "settings.aiWorkbenchRouteMainText",
+    descKey: "settings.aiWorkbenchRouteMainTextDesc",
+    badgeKey: "settings.aiWorkbenchBadgeMainText",
+    icon: BrainIcon,
+  },
+  {
+    key: "fastText",
+    labelKey: "settings.aiWorkbenchRouteFastText",
+    descKey: "settings.aiWorkbenchRouteFastTextDesc",
+    badgeKey: "settings.aiWorkbenchBadgeFastText",
+    icon: ZapIcon,
+  },
+  {
+    key: "visionText",
+    labelKey: "settings.aiWorkbenchRouteVisionText",
+    descKey: "settings.aiWorkbenchRouteVisionTextDesc",
+    badgeKey: "settings.aiWorkbenchBadgeVisionText",
+    icon: EyeIcon,
+  },
+  {
+    key: "embedding",
+    labelKey: "settings.aiWorkbenchRouteEmbedding",
+    descKey: "settings.aiWorkbenchRouteEmbeddingDesc",
+    badgeKey: "settings.aiWorkbenchBadgeEmbedding",
+    icon: DatabaseIcon,
+  },
+  {
+    key: "audioText",
+    labelKey: "settings.aiWorkbenchRouteAudioText",
+    descKey: "settings.aiWorkbenchRouteAudioTextDesc",
+    badgeKey: "settings.aiWorkbenchBadgeAudioText",
+    icon: AudioLinesIcon,
+  },
+];
+
+export const DEFAULT_CHAT_PARAMS: ModelFormState["chatParams"] = {
+  temperature: 0.7,
+  maxTokens: 2048,
+  topP: 1,
+  topK: "",
+  frequencyPenalty: 0,
+  presencePenalty: 0,
+  stream: false,
+  enableThinking: false,
+  customParamsText: "",
+};
+
+export const DEFAULT_MODEL_CAPABILITIES: ModelFormState["capabilities"] = {
+  chat: true,
+  vision: false,
+  reasoning: false,
+  toolUse: false,
+  webSearch: false,
+  embedding: false,
+  rerank: false,
+  audioTranscription: false,
+};
+
+export const EMPTY_FORM: ModelFormState = {
+  name: "",
+  providerId: undefined,
+  provider: "openai",
+  apiProtocol: "openai",
+  apiKey: "",
+  apiUrl: "https://api.openai.com",
+  model: "",
+  capabilities: DEFAULT_MODEL_CAPABILITIES,
+  chatParams: DEFAULT_CHAT_PARAMS,
+};

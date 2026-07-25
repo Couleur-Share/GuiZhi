@@ -1,0 +1,129 @@
+# ========================
+# Monorepo root .gitignore
+# ========================
+
+# Re-include common source file extensions (overrides parent-level ignores)
+!*.json
+!*.yaml
+!*.yml
+!*.ts
+!*.tsx
+!*.js
+!*.jsx
+!*.css
+!*.svg
+
+# ========================
+# Dependencies
+# ========================
+node_modules/
+.pnpm-store/
+
+# ========================
+# Build output
+# ========================
+out/
+dist/
+build/
+dist-electron/
+release/
+*.tgz
+
+# ========================
+# Lock files (pnpm only)
+# ========================
+package-lock.json
+yarn.lock
+
+# ========================
+# IDE / Editor
+# ========================
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+.windsurfrules
+.claude/
+.agent/
+.sisyphus/
+文档/
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+
+# ========================
+# Logs
+# ========================
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ========================
+# Environment
+# ========================
+.env
+.env.local
+.env.*.local
+.dev.vars
+apps/web-cloudflare/.dev.vars
+apps/web-cloudflare/.wrangler/
+apps/web-cloudflare/scripts/*.local.txt
+
+# Signing credentials
+*.p8
+*.p12
+*.pfx
+AuthKey_*.p8
+DeveloperID*.p12
+DeveloperID*.pfx
+
+# ========================
+# Test / Coverage
+# ========================
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+.playwright-cli/
+output/playwright/
+
+# ========================
+# Cache
+# ========================
+.cache/
+.codegraph/
+.parcel-cache/
+.eslintcache
+
+# ========================
+# Bundle analysis output
+# ========================
+apps/desktop/dist-stats/
+
+# ========================
+# Database (local dev databases)
+# ========================
+*.db
+*.db.lock
+*.sqlite
+*.sqlite3
+apps/web/data/
+apps/web/data-first-run-*/
+packages/db/src/index.js
+packages/db/src/index.js.map
+packages/shared/types/index.js
+packages/shared/types/index.js.map
+
+# ========================
+# Temporary files
+# ========================
+*.tmp
+*.temp
+*.tsbuildinfo
+.omx/
+# 调试脚本与截图产物（.tmp-shots/、.tmp-ui-check.mjs 等）
+.tmp-*

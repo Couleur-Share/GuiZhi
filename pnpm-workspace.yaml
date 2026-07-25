@@ -1,0 +1,11 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# 依赖构建脚本白名单：core-js 的 postinstall 只打印赞助信息，明确禁止
+allowBuilds:
+  core-js: false
+  electron: true
+  esbuild: true
+
+shamefullyHoist: true
