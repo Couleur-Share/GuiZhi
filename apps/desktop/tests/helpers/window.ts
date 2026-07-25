@@ -118,23 +118,6 @@ export function createWindowElectronMock(overrides?: DeepPartial<MockRecord>) {
       listImages: vi.fn().mockResolvedValue([]),
       imageExists: vi.fn().mockResolvedValue(false),
       clearImages: vi.fn().mockResolvedValue(true),
-      webdav: {
-        testConnection: vi
-          .fn()
-          .mockResolvedValue({ success: false, message: "mocked" }),
-        ensureDirectory: vi.fn().mockResolvedValue({ success: true }),
-        upload: vi.fn().mockResolvedValue({ success: true }),
-        download: vi.fn().mockResolvedValue({ success: false, notFound: true }),
-        stat: vi.fn().mockResolvedValue({ success: false, notFound: true }),
-      },
-      s3: {
-        testConnection: vi
-          .fn()
-          .mockResolvedValue({ success: false, message: "mocked" }),
-        upload: vi.fn().mockResolvedValue({ success: true }),
-        download: vi.fn().mockResolvedValue({ success: false, notFound: true }),
-        stat: vi.fn().mockResolvedValue({ success: false, notFound: true }),
-      },
     },
     overrides,
   );

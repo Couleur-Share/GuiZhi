@@ -76,10 +76,13 @@ v0.4.0（2026-07，首个公开发布）在此之上重构了知识库界面：�
 
 待办：平台登录采集（cookies）延后；macOS 平台暂不考虑。
 
-已知的技术债：WebDAV / S3 同步是 fork 遗留的未接线代码（IPC 与 settings state
-都在，但没有任何 UI 或服务引用），要么接通要么删除；OCR / embedding / 转写
-按 OpenAI 请求响应格式硬编码，Gemini 与 Anthropic 只在对话补全上完整可用；
-语义检索是全量余弦扫描，没有 ANN 索引。
+已知的技术债：OCR / embedding / 转写按 OpenAI 请求响应格式硬编码，
+Gemini 与 Anthropic 只在对话补全上完整可用；语义检索是全量余弦扫描，
+没有 ANN 索引；列表视图分页在客户端进行，单次最多加载 200 条。
+
+fork 遗留的 WebDAV / S3 同步通道已在 v0.4.1 整体删除（主进程 transport、
+preload 白名单、settings 的 36 个字段与 69 条 i18n 文案）。归知目前不提供
+多设备同步，跨设备走备份文件或 Markdown 导出。
 
 v0.4.0 发布时重置了 git 历史（孤儿提交），PromptHub 的原始提交与
 `prompthub-v0.5.9-base` tag 不再在本仓库中，需要时从上游

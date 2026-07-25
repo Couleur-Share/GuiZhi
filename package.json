@@ -1,6 +1,6 @@
 {
   "name": "guizhi-monorepo",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "GuiZhi monorepo - local-first AI personal knowledge base",
   "license": "AGPL-3.0",

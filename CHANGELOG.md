@@ -1,5 +1,36 @@
 # 更新日志 / Changelog
 
+## v0.4.1
+
+### 修复：更新弹窗显示整份 CHANGELOG
+
+版本标题的解析正则只认 `## [0.4.0]` 这种方括号写法，而本项目的 CHANGELOG
+用的是 `## v0.4.0`，两条解析路径都匹配不到，最终落进「一个版本都没找到就返回
+全文」的兜底分支。现在解析下沉到 `src/utils/changelog.ts`，同时兼容
+`## v0.4.0`、`## 0.4.0` 与 `## [0.4.0]`，并补了单测。
+
+打包时也不再把整份 CHANGELOG 写进 `latest.yml`——更新清单只带当前版本一节，
+从 9.3 KB 降到 2.5 KB，且不会随版本数无限增长。
+
+### 移除：WebDAV / S3 同步通道
+
+fork 自 PromptHub 的同步管线一直是未接线的死代码——IPC handler、preload 白名单、
+settings 里 36 个字段和 69 条 i18n 文案都在，但没有任何界面或服务引用它们，
+也不存在把知识数据序列化上传的实现。整体删除：
+
+- 主进程 `webdav.ts` / `s3.ts` 与注册调用、自动同步日志 handler
+- preload 的 `window.electron.webdav` / `.s3` 及类型声明
+- shared 的 `SyncSettings` / `SyncProviderKind` 等类型与 S3 IPC 频道常量
+- 渲染进程 `settings-sync-actions.ts` 与相关归一化、持久化逻辑
+- `@aws-sdk/client-s3`、`@smithy/node-http-handler` 依赖
+- 设置页导航「数据同步」改名为「数据备份」
+
+归知目前不提供多设备同步，跨设备请用备份文件或 Markdown 导出中转。
+
+### 文档
+
+- README 补上知识库卡片视图与列表视图的实际截图
+
 ## v0.4.0
 
 首个公开发布版本。在 v0.3.0-alpha.1（内部预发布）的基础上补齐了数据安全、

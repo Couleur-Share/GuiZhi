@@ -28,6 +28,10 @@ SQLite，交给 AI 做摘要、打标签、编织成互相链接的 Wiki 页面�
 
 不需要账号，不上传云端。只有你主动配置的模型调用会走网络，其余一切留在本地。
 
+<p align="center">
+  <img src="docs/images/library-card.png" alt="归知知识库：卡片视图与常驻详情面板" width="900" />
+</p>
+
 ## 下载安装
 
 前往 [Releases](https://github.com/Couleur-Share/GuiZhi/releases/latest) 下载对应安装包：
@@ -70,6 +74,10 @@ macOS 版本待签名证书就绪后提供。
 - **编辑**：CodeMirror 6 Markdown 编辑与预览双模式，「正文 / 文字稿」双 Tab，
   防抖自动保存（可关掉改用 `Ctrl+S`）
 - **检索**：SQLite FTS5 中文按字分词 + 英文前缀匹配，BM25 加权排序（标题 > 标签 > 正文）
+
+<p align="center">
+  <img src="docs/images/library-list.png" alt="归知知识库：列表视图与列配置" width="900" />
+</p>
 
 ### AI · 五条模型路由，各司其职
 
@@ -238,6 +246,3 @@ GuiZhi/
 Electron 多进程结构、Liquid Glass 主题系统、设置框架、AI Provider 工作台与构建发布链。
 业务域（知识采集、检索、AI、Wiki）为归知自研。详见 [NOTICE](./NOTICE)。
 感谢 legeling 与 PromptHub 的所有贡献者。
-
-.NET 10 / Avalonia 时代（v0.1–v0.2）的代码保留在
-[GuiZhi-Avalonia](https://github.com/Couleur-Share/GuiZhi-Avalonia) 归档仓库。

@@ -10,7 +10,6 @@ process.env.BROWSERSLIST_IGNORE_OLD_DATA = "1";
 const mainExternalModules = new Set([
   "node-sqlite3-wasm",
   "electron",
-  "@aws-sdk/client-s3",
   "http-proxy-agent",
   "https-proxy-agent",
   "socks-proxy-agent",

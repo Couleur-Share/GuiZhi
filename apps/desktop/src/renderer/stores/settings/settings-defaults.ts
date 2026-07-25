@@ -41,61 +41,10 @@ function createDefaultAppearanceValues() {
   } satisfies Partial<SettingsValues>;
 }
 
-function createDefaultWebdavValues() {
-  return {
-    webdavEnabled: false,
-    webdavUrl: "",
-    webdavUsername: "",
-    webdavPassword: "",
-    webdavAutoSync: false,
-    webdavSyncOnStartup: true,
-    webdavSyncOnStartupDelay: 10,
-    webdavAutoSyncInterval: 0,
-    webdavSyncOnSave: false,
-    webdavIncludeImages: true,
-    webdavIncrementalSync: true,
-    webdavEncryptionEnabled: false,
-    webdavEncryptionPassword: "",
-  } satisfies Partial<SettingsValues>;
-}
-
-function createDefaultSelfHostedSyncValues() {
-  return {
-    selfHostedSyncEnabled: false,
-    selfHostedSyncUrl: "",
-    selfHostedSyncUsername: "",
-    selfHostedSyncPassword: "",
-    selfHostedSyncOnStartup: false,
-    selfHostedSyncOnStartupDelay: 10,
-    selfHostedAutoSyncInterval: 0,
-  } satisfies Partial<SettingsValues>;
-}
-
-function createDefaultS3Values() {
-  return {
-    s3StorageEnabled: false,
-    s3Endpoint: "",
-    s3Region: "",
-    s3Bucket: "",
-    s3AccessKeyId: "",
-    s3SecretAccessKey: "",
-    s3BackupPrefix: "",
-    s3SyncOnStartup: false,
-    s3SyncOnStartupDelay: 10,
-    s3AutoSyncInterval: 0,
-    s3SyncOnSave: false,
-    s3IncludeImages: true,
-    s3IncrementalSync: true,
-    s3EncryptionEnabled: false,
-    s3EncryptionPassword: "",
-  } satisfies Partial<SettingsValues>;
-}
-
 function createDefaultWorkspaceValues() {
   return {
     language: normalizeLanguage(i18n.language),
     dataPath: "",
-    syncProvider: "manual",
     autoCheckUpdate: true,
     useUpdateMirror: false,
     updateChannel: "stable",
@@ -126,9 +75,6 @@ function createDefaultAiValues() {
 export function createDefaultSettingsValues(): SettingsValues {
   return {
     ...createDefaultAppearanceValues(),
-    ...createDefaultWebdavValues(),
-    ...createDefaultSelfHostedSyncValues(),
-    ...createDefaultS3Values(),
     ...createDefaultWorkspaceValues(),
     ...createDefaultAiValues(),
   } satisfies Omit<SettingsValues, keyof SettingsActions>;

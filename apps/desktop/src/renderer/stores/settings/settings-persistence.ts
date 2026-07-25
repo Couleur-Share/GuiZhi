@@ -1,6 +1,5 @@
 import type { Settings } from "@guizhi/shared/types";
 import { normalizeNetworkProxySettings } from "@guizhi/shared/utils/network-proxy";
-import type { StoreApi } from "zustand";
 import {
   applyBackgroundImageVars,
   clampBackgroundImageBlur,
@@ -17,13 +16,9 @@ import {
   normalizePersistedAIProviders,
 } from "./settings-ai";
 import {
-  buildMainProcessSyncSettings,
-  clampSyncProvider,
   normalizeCloseAction,
   normalizeLanguage,
   normalizeShortcutModes,
-  normalizeSyncProvider,
-  normalizeSyncTimingSettings,
 } from "./settings-normalizers";
 import type { SettingsState } from "./settings-types";
 
@@ -71,22 +66,9 @@ function normalizeMergedPresentationSettings(next: SettingsState): void {
   }
 }
 
-function normalizeSyncProviderState(next: SettingsState): void {
-  normalizeSyncTimingSettings(next);
-  next.syncProvider = clampSyncProvider(
-    normalizeSyncProvider(next.syncProvider),
-    {
-      webdavEnabled: next.webdavEnabled === true,
-      selfHostedSyncEnabled: next.selfHostedSyncEnabled === true,
-      s3StorageEnabled: next.s3StorageEnabled === true,
-    },
-  );
-}
-
 function normalizeMergedState(next: SettingsState): SettingsState {
   normalizeSharedSettingsState(next);
   normalizeMergedPresentationSettings(next);
-  normalizeSyncProviderState(next);
   return next;
 }
 
@@ -112,18 +94,8 @@ export function migrateSettingsState(
 
 export function rehydrateSettingsState(
   state: SettingsState | undefined,
-  setState: StoreApi<SettingsState>["setState"],
   syncSettingsToMain: (settings: Partial<Settings>) => Promise<void>,
 ): void {
-  const syncProvider = clampSyncProvider(
-    normalizeSyncProvider(state?.syncProvider),
-    {
-      webdavEnabled: state?.webdavEnabled === true,
-      selfHostedSyncEnabled: state?.selfHostedSyncEnabled === true,
-      s3StorageEnabled: state?.s3StorageEnabled === true,
-    },
-  );
-  if (state && state.syncProvider !== syncProvider) setState({ syncProvider });
   applyBackgroundImageVars({
     backgroundImageFileName: state?.backgroundImageFileName,
     backgroundImageOpacity: state?.backgroundImageOpacity,
@@ -131,7 +103,6 @@ export function rehydrateSettingsState(
   });
   const mainProcessSettings: Partial<Settings> = {
     networkProxy: normalizeNetworkProxySettings(state?.networkProxy),
-    sync: buildMainProcessSyncSettings(syncProvider),
   };
   if (state?.language) {
     mainProcessSettings.language = state.language;

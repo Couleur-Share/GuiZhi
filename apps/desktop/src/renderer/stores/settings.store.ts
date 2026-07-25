@@ -15,17 +15,11 @@ import {
 import { createDefaultSettingsValues } from "./settings/settings-defaults";
 import { createGeneralSettingsActions } from "./settings/settings-general-actions";
 import {
-  buildMainProcessSyncSettings,
-  clampSyncProvider,
-  normalizeSyncProvider,
-} from "./settings/settings-normalizers";
-import {
   mergeSettingsState,
   migrateSettingsState,
   rehydrateSettingsState,
   stripEphemeralSettings,
 } from "./settings/settings-persistence";
-import { createSyncSettingsActions } from "./settings/settings-sync-actions";
 import { applyBackgroundImageVars } from "./settings/settings-appearance";
 import type {
   AIModelConfig,
@@ -85,7 +79,6 @@ export const useSettingsStore = create<SettingsState>()(
       return {
         ...createDefaultSettingsValues(),
         ...createGeneralSettingsActions(context),
-        ...createSyncSettingsActions(context),
         ...createAISettingsActions(context),
       };
     },
@@ -101,11 +94,7 @@ export const useSettingsStore = create<SettingsState>()(
           return;
         }
         queueMicrotask(() => {
-          rehydrateSettingsState(
-            state,
-            useSettingsStore.setState,
-            syncSettingsToMain,
-          );
+          rehydrateSettingsState(state, syncSettingsToMain);
         });
       },
     },
@@ -138,10 +127,6 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
     typeof settings.minimizeOnLaunch === "boolean"
       ? settings.minimizeOnLaunch
       : state.minimizeOnLaunch;
-  const syncProvider = clampSyncProvider(
-    normalizeSyncProvider(settings.sync?.provider),
-    state,
-  );
   const aiProviders = Array.isArray(aiSettings.aiProviders)
     ? normalizePersistedAIProviders(aiSettings.aiProviders)
     : state.aiProviders;
@@ -166,7 +151,6 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
   useSettingsStore.setState({
     launchAtStartup,
     minimizeOnLaunch,
-    syncProvider,
     backupAutoEnabled:
       typeof settings.backupAutoEnabled === "boolean"
         ? settings.backupAutoEnabled
@@ -214,9 +198,5 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
     void syncSettingsToMain({ launchAtStartup });
   if (typeof settings.minimizeOnLaunch !== "boolean")
     void syncSettingsToMain({ minimizeOnLaunch });
-  if (settings.sync?.provider !== syncProvider)
-    void syncSettingsToMain({
-      sync: buildMainProcessSyncSettings(syncProvider),
-    });
   if (!settings.networkProxy) void syncSettingsToMain({ networkProxy });
 }

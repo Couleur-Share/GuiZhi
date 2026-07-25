@@ -1,3 +1,30 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
+// 与 src/utils/changelog.ts 的 VERSION_HEADING_SOURCE 保持一致
+const VERSION_HEADING = /^## \[?v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\]?/gm;
+
+/**
+ * 只取 CHANGELOG 最新一节写进更新清单。整份塞进去会让 latest.yml
+ * 随版本无限增长，用户每次检查更新都要下载全部历史。
+ */
+function readLatestChangelogSection() {
+  const content = fs.readFileSync(
+    path.join(__dirname, "../../CHANGELOG.md"),
+    "utf8",
+  );
+  const headings = [...content.matchAll(VERSION_HEADING)];
+
+  if (headings.length === 0) {
+    return "";
+  }
+
+  return content
+    .slice(headings[0].index, headings[1]?.index ?? content.length)
+    .replace(/^---\s*$/gm, "")
+    .trim();
+}
+
 const enableMacReleaseSigning =
   process.env.GUIZHI_MAC_RELEASE_SIGN === "true";
 
@@ -113,6 +140,6 @@ module.exports = {
     releaseType: "release",
   },
   releaseInfo: {
-    releaseNotesFile: "../../CHANGELOG.md",
+    releaseNotes: readLatestChangelogSection(),
   },
 };

@@ -1,6 +1,5 @@
 export * from "./settings";
 export * from "./ai";
-export * from "./sync";
 export * from "./app-command";
 export * from "./knowledge";
 export * from "./import";

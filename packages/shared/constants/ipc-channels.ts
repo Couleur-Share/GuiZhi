@@ -121,7 +121,6 @@ export const IPC_CHANNELS = {
   APP_GET_CACHE_SIZE: "app:getCacheSize",
   APP_CLEAR_CACHE: "app:clearCache",
   APP_GET_RUNTIME_PATHS: "app:getRuntimePaths",
-  APP_APPEND_AUTO_SYNC_LOG: "app:appendAutoSyncLog",
   APP_COMMAND: "app:command",
 
   // AI HTTP proxy (bypass CORS via main process)
@@ -130,12 +129,6 @@ export const IPC_CHANNELS = {
   AI_HTTP_STREAM_CHUNK: "ai:httpStreamChunk",
   AI_HTTP_STREAM_ERROR: "ai:httpStreamError",
   AI_HTTP_STREAM_CANCEL: "ai:httpStreamCancel",
-
-  // S3 sync transport
-  S3_TEST_CONNECTION: "s3:testConnection",
-  S3_UPLOAD: "s3:upload",
-  S3_DOWNLOAD: "s3:download",
-  S3_STAT: "s3:stat",
 
   // Dialogs
   DIALOG_SELECT_IMAGE: "dialog:selectImage",

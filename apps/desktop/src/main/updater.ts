@@ -7,6 +7,11 @@ import https from "https";
 import { getHttpRequestAgent } from "./services/network-proxy";
 import { createBackupSafe } from "./services/backup";
 import { compareVersions, isPrereleaseVersion } from "../utils/version";
+import {
+  extractChangelogRange,
+  extractLatestChangelogSection,
+  parseChangelogVersions,
+} from "../utils/changelog";
 
 // Simplified update info type (for IPC transmission)
 // 简化的更新信息类型（用于 IPC 传输）
@@ -302,56 +307,31 @@ export function getChangelogForVersionRange(
 
     console.log("[Updater] Reading CHANGELOG from:", changelogPath);
 
-    const content = fs.readFileSync(changelogPath, "utf-8");
-
-    // Parse CHANGELOG, extract all updates within version range
-    // Format: ## [0.2.9] - 2025-12-18
-    // 解析 CHANGELOG，提取版本区间内的所有更新
-    // 格式: ## [0.2.9] - 2025-12-18
-    const versionRegex = /^## \[(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)\]/gm;
-    const versions: { version: string; startIndex: number }[] = [];
-
-    let match;
-    while ((match = versionRegex.exec(content)) !== null) {
-      versions.push({
-        version: match[1],
-        startIndex: match.index,
-      });
-    }
-
-    // Find versions to include (greater than currentVersion and less than or equal to newVersion)
-    // 找到需要包含的版本（大于 currentVersion 且小于等于 newVersion）
-    const relevantSections: string[] = [];
-
-    for (let i = 0; i < versions.length; i++) {
-      const ver = versions[i].version;
-      // Version is in (currentVersion, newVersion] range
-      // 版本在 (currentVersion, newVersion] 区间内
-      if (
-        compareVersions(ver, currentVersion) > 0 &&
-        compareVersions(ver, newVersion) <= 0
-      ) {
-        const startIndex = versions[i].startIndex;
-        const endIndex = versions[i + 1]?.startIndex || content.length;
-        let section = content.slice(startIndex, endIndex).trim();
-
-        // Remove separator lines
-        // 移除分隔线
-        section = section.replace(/^---\s*$/gm, "").trim();
-
-        relevantSections.push(section);
-      }
-    }
-
-    if (relevantSections.length === 0) {
-      return "";
-    }
-
-    return relevantSections.join("\n\n---\n\n");
+    return extractChangelogRange(
+      fs.readFileSync(changelogPath, "utf-8"),
+      newVersion,
+      currentVersion,
+    );
   } catch (error) {
     console.error("Failed to read CHANGELOG.md:", error);
     return "";
   }
+}
+
+// 更新清单里的 releaseNotes 可能是字符串，也可能是 { note } 数组
+function readManifestNotes(info: ElectronUpdateInfo): string {
+  if (typeof info.releaseNotes === "string") {
+    return info.releaseNotes;
+  }
+
+  if (Array.isArray(info.releaseNotes)) {
+    return info.releaseNotes
+      .map((entry) => entry.note ?? "")
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  return "";
 }
 
 // Convert from electron-updater's UpdateInfo to simplified format
@@ -359,41 +339,17 @@ export function getChangelogForVersionRange(
 function toSimpleInfo(info: ElectronUpdateInfo): SimpleUpdateInfo {
   const currentVersion = app.getVersion();
 
-  // Prefer reading version range changelog from CHANGELOG.md
-  // 优先从 CHANGELOG.md 读取版本区间的更新日志
+  // 优先从随包分发的 CHANGELOG.md 取版本区间，跨版本升级能看到中间版本
   let releaseNotes = getChangelogForVersionRange(info.version, currentVersion);
 
-  // If CHANGELOG has no content, fallback to GitHub Release notes
-  // 如果 CHANGELOG 没有内容，回退到 GitHub Release 的说明
+  // 读不到时回退到更新清单里的说明；若那里恰好是多版本文档，同样只取区间
   if (!releaseNotes) {
-    let githubNotes = "";
-    if (typeof info.releaseNotes === "string") {
-      githubNotes = info.releaseNotes;
-    } else if (Array.isArray(info.releaseNotes)) {
-      githubNotes = info.releaseNotes
-        .map((n) => (n.note ? n.note : ""))
-        .filter(Boolean)
-        .join("\n\n");
-    }
-
-    // Check if GitHub notes is the full CHANGELOG (contains multiple version headers)
-    // 检查 GitHub notes 是否是完整的 CHANGELOG（包含多个版本标题）
-    const versionHeaders = githubNotes.match(/^## \[\d+\.\d+\.\d+/gm) || [];
-
-    if (versionHeaders.length > 3) {
-      // Likely full CHANGELOG, try to extract version range
-      // 可能是完整的 CHANGELOG，尝试提取版本区间
-      console.log(
-        "[Updater] GitHub notes appears to be full CHANGELOG, extracting version range...",
-      );
-      releaseNotes = extractVersionRange(
-        githubNotes,
-        info.version,
-        currentVersion,
-      );
-    } else {
-      releaseNotes = githubNotes;
-    }
+    const manifestNotes = readManifestNotes(info);
+    releaseNotes =
+      parseChangelogVersions(manifestNotes).length > 1
+        ? extractChangelogRange(manifestNotes, info.version, currentVersion) ||
+          extractLatestChangelogSection(manifestNotes)
+        : manifestNotes;
   }
 
   return {
@@ -401,58 +357,6 @@ function toSimpleInfo(info: ElectronUpdateInfo): SimpleUpdateInfo {
     releaseNotes,
     releaseDate: info.releaseDate,
   };
-}
-
-// Extract version range from CHANGELOG content (for fallback)
-// 从 CHANGELOG 内容中提取版本区间（用于 fallback）
-function extractVersionRange(
-  content: string,
-  newVersion: string,
-  currentVersion: string,
-): string {
-  const versionRegex = /^## \[(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)\]/gm;
-  const versions: { version: string; startIndex: number }[] = [];
-
-  let match;
-  while ((match = versionRegex.exec(content)) !== null) {
-    versions.push({
-      version: match[1],
-      startIndex: match.index,
-    });
-  }
-
-  const relevantSections: string[] = [];
-
-  for (let i = 0; i < versions.length; i++) {
-    const ver = versions[i].version;
-    if (
-      compareVersions(ver, currentVersion) > 0 &&
-      compareVersions(ver, newVersion) <= 0
-    ) {
-      const startIndex = versions[i].startIndex;
-      const endIndex = versions[i + 1]?.startIndex || content.length;
-      let section = content.slice(startIndex, endIndex).trim();
-      section = section.replace(/^---\s*$/gm, "").trim();
-      relevantSections.push(section);
-    }
-  }
-
-  if (relevantSections.length === 0) {
-    // If no relevant sections, just return the first version's content
-    // 如果没有相关版本，返回第一个版本的内容
-    if (versions.length > 0) {
-      const startIndex = versions[0].startIndex;
-      const endIndex = versions[1]?.startIndex || content.length;
-      return content
-        .slice(startIndex, endIndex)
-        .trim()
-        .replace(/^---\s*$/gm, "")
-        .trim();
-    }
-    return content;
-  }
-
-  return relevantSections.join("\n\n---\n\n");
 }
 
 let mainWindow: BrowserWindow | null = null;
