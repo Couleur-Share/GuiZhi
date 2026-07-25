@@ -6,6 +6,12 @@ import { resolveScenarioAIConfig } from "../ai-defaults";
 import { useSettingsStore } from "../../stores/settings.store";
 import type { AIUsageScenario } from "../../stores/settings.store";
 
+/**
+ * 知识域的模型调用都是「长提示词 + 整段生成」，主进程 30s 的兜底超时
+ * （`ai.ipc.ts`）是按连通性探测定的，套到这里会在生成中途被掐断。
+ */
+const SCENARIO_CHAT_TIMEOUT_MS = 120_000;
+
 /** AI 未配置（区别于调用失败，UI 引导去设置页）。 */
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -46,6 +52,8 @@ export async function runScenarioChat(
     maxTokens?: number;
     /** 传下去才能真正中断在途请求，否则「停止」只是标记状态 */
     signal?: AbortSignal;
+    /** 素材特别长的场景（如 Wiki 编译）可再放宽 */
+    timeoutMs?: number;
   },
 ): Promise<ScenarioChatResult> {
   const config = resolveConfig(scenario);
@@ -58,6 +66,7 @@ export async function runScenarioChat(
     stream: false,
     enableThinking: false,
     signal: options?.signal,
+    timeoutMs: options?.timeoutMs ?? SCENARIO_CHAT_TIMEOUT_MS,
   });
 
   // 知识域的每一次模型调用都经过这里，是唯一的计量点。

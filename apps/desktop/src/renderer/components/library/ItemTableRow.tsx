@@ -14,15 +14,14 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { Checkbox } from "../ui/Checkbox";
 import type { LibraryColumn } from "./item-table-config";
-import { ITEM_TYPE_META, TAG_COLOR_CLASSES, formatItemTime } from "./type-meta";
+import {
+  TAG_COLOR_CLASSES,
+  formatItemTime,
+  getItemStatusMeta,
+  getItemTypeMeta,
+} from "./type-meta";
 
 const CELL = "px-4 py-2.5 align-middle";
-
-const STATUS_META = {
-  inbox: { labelKey: "library.statusInbox", fallback: "收件箱" },
-  ready: { labelKey: "library.statusReady", fallback: "知识库" },
-  archived: { labelKey: "library.statusArchived", fallback: "归档" },
-} as const;
 
 function RowAction({
   onClick,
@@ -96,9 +95,9 @@ export function ItemTableRow({
       )?.name,
   );
 
-  const typeMeta = ITEM_TYPE_META[entry.itemType];
+  const typeMeta = getItemTypeMeta(entry.itemType);
   const typeLabel = t(typeMeta.labelKey, typeMeta.fallback);
-  const statusMeta = STATUS_META[entry.status];
+  const statusMeta = getItemStatusMeta(entry.status);
   const title = entry.title || t("library.untitled", "无标题");
 
   const renderCell = (column: LibraryColumn) => {

@@ -10,7 +10,7 @@ import { ItemBulkBar } from "./ItemBulkBar";
 import { ItemConfirmDialog, useItemMenus } from "./item-menus";
 import { ItemListToolbar } from "./ItemListToolbar";
 import { ItemPagination } from "./ItemPagination";
-import { ITEM_TYPE_META } from "./type-meta";
+import { getItemTypeMeta } from "./type-meta";
 
 /** 卡片预估高度（含行间距）：标题最多两行 */
 const ROW_HEIGHT = 64;
@@ -29,7 +29,7 @@ function ItemRow({
   onContextMenu: (event: React.MouseEvent) => void;
 }) {
   const { t } = useTranslation();
-  const typeMeta = ITEM_TYPE_META[entry.itemType];
+  const typeMeta = getItemTypeMeta(entry.itemType);
   const typeLabel = t(typeMeta.labelKey, typeMeta.fallback);
   // 选中卡片为实心主色，内部图标改走反色梯度
   const surface = isSelected

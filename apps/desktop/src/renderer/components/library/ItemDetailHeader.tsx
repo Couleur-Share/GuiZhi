@@ -23,7 +23,7 @@ import { ContextMenu } from "../ui/ContextMenu";
 import { TagEditor } from "./TagEditor";
 import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
-import { ITEM_TYPE_META, formatItemTime } from "./type-meta";
+import { formatItemTime, getItemTypeMeta } from "./type-meta";
 
 /** 标题最多撑到三行（text-xl / leading-snug 约 28px 一行），再长就内部滚动 */
 const TITLE_MAX_HEIGHT_PX = 84;
@@ -195,7 +195,7 @@ export function ItemDetailHeader({
       node.scrollHeight > TITLE_MAX_HEIGHT_PX ? "auto" : "hidden";
   }, [item.title]);
 
-  const typeMeta = ITEM_TYPE_META[item.itemType];
+  const typeMeta = getItemTypeMeta(item.itemType);
   // 保存失败与 autoSave 无关：改动已退回待保存队列，此时必须提示未落盘
   const isDirty = hasUnsavedChanges && (!autoSave || saveError !== null);
   const wordCount = item.content.trim().length;

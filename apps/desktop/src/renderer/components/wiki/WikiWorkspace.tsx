@@ -9,6 +9,7 @@ import {
   RotateCcwIcon,
   SearchIcon,
   SparklesIcon,
+  SquareIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { WikiCatalogEntry, WikiPageKind } from "@guizhi/shared/types";
@@ -275,8 +276,48 @@ function PageDetail() {
 }
 
 /**
+ * 自动编译开关：工具栏里唯一的持久设置项。
+ * 做成药丸开关而非复选框——原生 checkbox 在深色玻璃工具栏里是个突兀的白方块，
+ * 且与左右两侧的分段控件、动作按钮不在同一视觉语言上。
+ */
+function AutoCompileToggle() {
+  const { t } = useTranslation();
+  const enabled = useSettingsStore((state) => state.wikiCompileEnabled);
+  const setEnabled = useSettingsStore((state) => state.setWikiCompileEnabled);
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      onClick={() => setEnabled(!enabled)}
+      title={t("wiki.autoCompileHint", "开启后每 5 分钟自动把新条目编译进 Wiki")}
+      className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-lg border px-2.5 text-xs transition-colors ${
+        enabled
+          ? "border-primary/40 bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors duration-base ${
+          enabled ? "bg-primary" : "bg-muted-foreground/25"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-2.5 w-2.5 rounded-full transition-all duration-base ${
+            enabled ? "left-3 bg-white" : "left-0.5 bg-muted-foreground/70"
+          }`}
+        />
+      </span>
+      {t("wiki.autoCompile", "自动编译")}
+    </button>
+  );
+}
+
+/**
  * Wiki 模块（ADR 0023）：AI 从知识条目编译出的互链知识页网络。
- * 头部提供编译控制（自动开关 / 立即编译 / 全量重建）与状态。
+ * 头部提供编译控制（自动开关 / 立即编译 / 停止 / 全量重建）与状态。
  */
 export function WikiWorkspace() {
   const { t } = useTranslation();
@@ -289,13 +330,8 @@ export function WikiWorkspace() {
   const dismissNotice = useWikiStore((state) => state.dismissNotice);
   const refresh = useWikiStore((state) => state.refresh);
   const compileNow = useWikiStore((state) => state.compileNow);
+  const cancelCompile = useWikiStore((state) => state.cancelCompile);
   const rebuildAll = useWikiStore((state) => state.rebuildAll);
-  const wikiCompileEnabled = useSettingsStore(
-    (state) => state.wikiCompileEnabled,
-  );
-  const setWikiCompileEnabled = useSettingsStore(
-    (state) => state.setWikiCompileEnabled,
-  );
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
@@ -320,6 +356,15 @@ export function WikiWorkspace() {
             })
           : t("wiki.compileNothing", "没有需要编译的条目"),
         "success",
+      );
+    } else if (compileNotice.kind === "cancelled") {
+      showToast(
+        compileNotice.message
+          ? t("wiki.compileStoppedPartial", "已停止编译（已完成 {{result}}）", {
+              result: compileNotice.message,
+            })
+          : t("wiki.compileStopped", "已停止编译"),
+        "info",
       );
     } else if (compileNotice.kind === "not-configured") {
       showToast(t("ask.notConfigured", "尚未配置 AI 服务"), "error");
@@ -384,27 +429,39 @@ export function WikiWorkspace() {
           </button>
         </div>
 
-        <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={wikiCompileEnabled}
-            onChange={(event) => setWikiCompileEnabled(event.target.checked)}
-            className="h-3.5 w-3.5 accent-[var(--color-primary)]"
-          />
-          {t("wiki.autoCompile", "自动编译")}
-        </label>
+        {/* 视图控件与编译控件分属两类，用竖线分组 */}
+        <div className="h-4 w-px shrink-0 bg-border" aria-hidden="true" />
+
+        <AutoCompileToggle />
 
         {isCompiling ? (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary">
-            <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            {compileProgress
-              ? t("wiki.compiling", "编译中（{{current}}/{{total}}）：{{title}}", {
-                  current: compileProgress.current,
-                  total: compileProgress.total,
-                  title: compileProgress.currentTitle,
-                })
-              : t("wiki.compilingShort", "编译中…")}
-          </span>
+          <>
+            <span className="inline-flex h-8 max-w-80 items-center gap-1.5 rounded-lg bg-primary/10 px-3 text-xs text-primary">
+              <Loader2Icon
+                className="h-3.5 w-3.5 shrink-0 animate-spin"
+                aria-hidden="true"
+              />
+              {/* 条目标题长度不可控，不截断会把整条工具栏挤变形 */}
+              <span className="truncate">
+                {compileProgress
+                  ? t("wiki.compiling", "编译中（{{current}}/{{total}}）：{{title}}", {
+                      current: compileProgress.current,
+                      total: compileProgress.total,
+                      title: compileProgress.currentTitle,
+                    })
+                  : t("wiki.compilingShort", "编译中…")}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={cancelCompile}
+              title={t("wiki.stopCompile", "停止编译")}
+              aria-label={t("wiki.stopCompile", "停止编译")}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <SquareIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </>
         ) : (
           <>
             <button

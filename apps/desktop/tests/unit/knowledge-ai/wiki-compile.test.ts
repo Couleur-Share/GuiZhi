@@ -1,14 +1,22 @@
-import { describe, expect, it } from "vitest";
-import type { WikiCatalogEntry } from "@guizhi/shared/types";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { WikiCatalogEntry, WikiCompilableItem } from "@guizhi/shared/types";
 import {
   buildLinkResolver,
   cleanWikiLinks,
+  compilePendingItems,
   normalizeWikiTitle,
   parseWikiResponse,
   rankCandidates,
   sanitizePages,
 } from "../../../src/renderer/services/knowledge-ai/wiki-compile";
 import { preprocessWikiLinks } from "../../../src/renderer/components/wiki/WikiMarkdown";
+import { installWindowMocks } from "../../helpers/window";
+
+const { runScenarioChat } = vi.hoisted(() => ({ runScenarioChat: vi.fn() }));
+vi.mock("../../../src/renderer/services/knowledge-ai/ai-invoke", () => ({
+  runScenarioChat,
+  AiNotConfiguredError: class AiNotConfiguredError extends Error {},
+}));
 
 function catalogEntry(
   overrides: Partial<WikiCatalogEntry> & { title: string },
@@ -133,6 +141,64 @@ describe("rankCandidates", () => {
     expect(ranked[1].entry.title).toBe("打包工具");
     expect(ranked[1].score).toBe(5);
     expect(ranked[2].score).toBe(0);
+  });
+});
+
+describe("compilePendingItems", () => {
+  function compilableItem(id: string): WikiCompilableItem {
+    return { id, title: `条目${id}`, content: `正文${id}` };
+  }
+
+  function installWikiApi(items: WikiCompilableItem[]) {
+    installWindowMocks({
+      api: {
+        wiki: {
+          listCompilable: vi.fn().mockResolvedValue(items),
+          listIngestions: vi.fn().mockResolvedValue([]),
+          catalog: vi.fn().mockResolvedValue([]),
+          getPage: vi.fn().mockResolvedValue(null),
+          applyCompilation: vi.fn().mockResolvedValue(undefined),
+          recordCompilationFailure: vi.fn().mockResolvedValue(undefined),
+        },
+      },
+    });
+  }
+
+  const onePage = {
+    content: '{"pages":[{"title":"页面一","kind":"topic","summary":"s","body":"正文"}]}',
+    model: "test-model",
+  };
+
+  beforeEach(() => {
+    runScenarioChat.mockReset();
+  });
+
+  it("放宽单请求超时并把取消信号交给模型调用", async () => {
+    // 主进程 30s 兜底会把这条最重的生成掐断在半路（v0.7 实测踩到）
+    installWikiApi([compilableItem("a")]);
+    runScenarioChat.mockResolvedValue(onePage);
+    const controller = new AbortController();
+
+    const result = await compilePendingItems(undefined, controller.signal);
+
+    expect(result).toEqual({ compiled: 1, pending: 1, skipped: 0 });
+    const options = runScenarioChat.mock.calls[0][2];
+    expect(options.timeoutMs).toBeGreaterThan(30_000);
+    expect(options.signal).toBe(controller.signal);
+  });
+
+  it("中途取消 → 停在当前条目，已编译的保留，剩余留到下轮", async () => {
+    installWikiApi([compilableItem("a"), compilableItem("b")]);
+    const controller = new AbortController();
+    runScenarioChat.mockImplementation(async () => {
+      controller.abort();
+      return onePage;
+    });
+
+    const result = await compilePendingItems(undefined, controller.signal);
+
+    expect(runScenarioChat).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ compiled: 1, pending: 2, skipped: 0 });
   });
 });
 

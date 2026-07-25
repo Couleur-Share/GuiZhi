@@ -31,8 +31,11 @@ interface WikiState {
   isLoading: boolean;
   isCompiling: boolean;
   compileProgress: WikiCompileProgress | null;
-  /** 编译结果提示（完成/失败后一次性展示） */
-  compileNotice: { kind: "done" | "error" | "not-configured"; message: string } | null;
+  /** 编译结果提示（完成/停止/失败后一次性展示） */
+  compileNotice: {
+    kind: "done" | "cancelled" | "error" | "not-configured";
+    message: string;
+  } | null;
   /** 目录视图 / 关系图谱 */
   viewMode: WikiViewMode;
   graph: WikiGraph | null;
@@ -44,6 +47,8 @@ interface WikiState {
   /** 按 [[链接]] 目标跳转：标题精确匹配优先，其次别名 */
   openByLinkTarget: (target: string) => Promise<boolean>;
   compileNow: () => Promise<void>;
+  /** 中断在途编译：已落库的条目保留，本轮剩余条目下轮续跑 */
+  cancelCompile: () => void;
   rebuildAll: () => Promise<void>;
   dismissNotice: () => void;
   setViewMode: (mode: WikiViewMode) => void;
@@ -167,14 +172,16 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       return;
     }
     set({ isCompiling: true, compileProgress: null, compileNotice: null });
-    compileAbort = new AbortController();
+    const controller = new AbortController();
+    compileAbort = controller;
     try {
       const result = await compilePendingItems((currentTitle, current, total) => {
         set({ compileProgress: { currentTitle, current, total } });
-      }, compileAbort.signal);
+      }, controller.signal);
       set({
-        compileNotice:
-          result.pending === 0
+        compileNotice: controller.signal.aborted
+          ? { kind: "cancelled", message: `${result.compiled}/${result.pending}` }
+          : result.pending === 0
             ? { kind: "done", message: "" }
             : {
                 kind: "done",
@@ -182,7 +189,10 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
               },
       });
     } catch (error) {
-      if (error instanceof AiNotConfiguredError) {
+      if (controller.signal.aborted) {
+        // 中断落在在途请求上时抛的是 AbortError，不是失败
+        set({ compileNotice: { kind: "cancelled", message: "" } });
+      } else if (error instanceof AiNotConfiguredError) {
         set({ compileNotice: { kind: "not-configured", message: "" } });
       } else {
         set({
@@ -197,6 +207,10 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       set({ isCompiling: false, compileProgress: null });
       await get().refresh();
     }
+  },
+
+  cancelCompile: () => {
+    compileAbort?.abort();
   },
 
   rebuildAll: async () => {

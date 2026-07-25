@@ -31,6 +31,11 @@ const BODY_MAX_LENGTH = 8000;
 const WIKI_LINK_REGEX = /\[\[([^[\]]+)\]\]/g;
 /** 连续失败到这个次数后不再自动重试，等素材变化或手动全量重建 */
 const WIKI_COMPILE_MAX_FAILURES = 3;
+/**
+ * 单条目编译的请求超时。全应用最重的一次调用：条目正文 3000 字 + 目录 30 行 +
+ * 最多 5 个上下文页（每页正文上限 8000 字），还要生成 2048 token 的 JSON。
+ */
+const WIKI_COMPILE_TIMEOUT_MS = 180_000;
 /** 首次重试的退避时长，之后每次 ×4（30 分钟 → 2 小时 → 8 小时） */
 const WIKI_COMPILE_RETRY_BASE_MS = 30 * 60 * 1000;
 
@@ -333,7 +338,7 @@ export async function compilePendingItems(
       break;
     }
     onProgress?.(item.title, compiled + skipped + 1, pending.length);
-    const success = await compileSingleItem(item, hash);
+    const success = await compileSingleItem(item, hash, signal);
     if (success) {
       compiled++;
     } else {
@@ -364,6 +369,7 @@ async function recordFailure(
 async function compileSingleItem(
   item: WikiCompilableItem,
   materialHash: string,
+  signal?: AbortSignal,
 ): Promise<boolean> {
   // 每条目重取目录：同轮前序条目新建的页面要参与本条目的候选与链接解析
   const catalog = await window.api.wiki.catalog();
@@ -412,7 +418,12 @@ async function compileSingleItem(
         { role: "system", content: WIKI_COMPILE_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
-      { temperature: 0.2, maxTokens: 2048 },
+      {
+        temperature: 0.2,
+        maxTokens: 2048,
+        signal,
+        timeoutMs: WIKI_COMPILE_TIMEOUT_MS,
+      },
     );
     model = generation.model;
     pages = parseWikiResponse(generation.content);
