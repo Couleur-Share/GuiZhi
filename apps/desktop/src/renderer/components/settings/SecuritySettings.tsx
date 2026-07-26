@@ -34,7 +34,10 @@ export function SecuritySettings() {
   // Initialize security status
   // 初始化安全状态
   useEffect(() => {
-    refreshSecurityStatus();
+    void refreshSecurityStatus();
+    // 只在挂载时拉一次状态；refreshSecurityStatus 每次渲染都是新引用，
+    // 进依赖数组会变成每帧一次 IPC
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSetMasterPassword = async () => {

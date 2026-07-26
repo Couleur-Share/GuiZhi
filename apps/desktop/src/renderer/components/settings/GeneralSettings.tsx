@@ -85,6 +85,22 @@ export function GeneralSettings() {
 
       <CaptureSection />
 
+      <SettingSection title={t("settings.wikiSection", "Wiki")}>
+        <SettingItem
+          label={t("settings.wikiAutoCompile", "自动编译")}
+          description={t(
+            "settings.wikiAutoCompileDesc",
+            "每 5 分钟把新条目增量编译进 Wiki。后台静默运行，会持续消耗 AI 调用额度。",
+          )}
+        >
+          <ToggleSwitch
+            ariaLabel={t("settings.wikiAutoCompile", "自动编译")}
+            checked={settings.wikiCompileEnabled}
+            onChange={settings.setWikiCompileEnabled}
+          />
+        </SettingItem>
+      </SettingSection>
+
       <SettingSection title={t("settings.languageAndRegion", "语言与地区")}>
         <SettingItem
           label={t("settings.language")}

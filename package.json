@@ -23,7 +23,6 @@
     "format": "pnpm --filter @guizhi/desktop format",
     "test": "pnpm --filter @guizhi/desktop test",
     "test:unit": "pnpm --filter @guizhi/desktop test:unit",
-    "test:integration": "pnpm --filter @guizhi/desktop test:integration",
     "test:run": "pnpm --filter @guizhi/desktop test:run",
     "test:e2e": "pnpm --filter @guizhi/desktop test:e2e",
     "test:e2e:smoke": "pnpm --filter @guizhi/desktop test:e2e:smoke",

@@ -943,6 +943,9 @@
     },
     "desktopModuleMcpDesc": "MCP servers, market templates and agent targets",
     "captureSection": "Capture",
+    "wikiSection": "Wiki",
+    "wikiAutoCompile": "Auto compile",
+    "wikiAutoCompileDesc": "Compiles new items into the wiki every 5 minutes. Runs silently in the background and keeps consuming AI calls.",
     "captureStateProbing": "Checking",
     "captureStateReady": "Ready",
     "captureStateMissing": "Not installed",
@@ -1042,7 +1045,9 @@
     "aiWorkbenchBadgeEmbedding": "Embedding route",
     "aiWorkbenchRouteAudioText": "Transcription",
     "aiWorkbenchRouteAudioTextDesc": "Speech-to-text model for audio/video (e.g. whisper-1, via /audio/transcriptions).",
-    "aiWorkbenchBadgeAudioText": "Transcription route"
+    "aiWorkbenchBadgeAudioText": "Transcription route",
+    "autoBackupRunning": "Auto backup in progress; the app may briefly stop responding…",
+    "autoBackupFailed": "Auto backup failed; see the log for details"
   },
   "common": {
     "install": "Install",
@@ -1118,7 +1123,14 @@
     "disabled": "Disabled",
     "enable": "Enable",
     "disable": "Disable",
-    "continueEditing": "Continue editing"
+    "continueEditing": "Continue editing",
+    "imagePosition": "Image {{current}} of {{total}}",
+    "previousImage": "Previous image",
+    "nextImage": "Next image",
+    "unsavedChanges": "Unsaved changes",
+    "unsavedChangesMessage": "You have unsaved changes. Save them?",
+    "discardChanges": "Don't save",
+    "undo": "Undo"
   },
   "error": {
     "sha512Desc": "SHA512 checksum mismatch.\nThis is usually caused by CDN cache inconsistencies or network issues.\nThe file may have been downloaded successfully. You can try to install it manually."
@@ -1284,6 +1296,8 @@
     "aiSummaryRegenerate": "Regenerate",
     "aiSummaryGenerating": "Generating summary…",
     "aiSummaryEmpty": "Content is empty, nothing to summarize",
+    "aiSummaryDone": "AI summary generated",
+    "aiSummaryTruncated": "AI summary generated, but the model hit its output length limit — it may be incomplete",
     "aiSummaryFailed": "Summary failed: {{message}}",
     "ocrGenerate": "Extract text from image",
     "ocrRegenerate": "Re-extract text from image",
@@ -1347,7 +1361,11 @@
       "purple": "Purple",
       "pink": "Pink",
       "gray": "Gray"
-    }
+    },
+    "movedToTrash": "Moved {{count}} item(s) to trash",
+    "bulkAddTag": "Add tag to selection",
+    "bulkAddTagHint": "Add a tag to the {{count}} selected item(s)",
+    "bulkFavorite": "Favorite selection"
   },
   "migration": {
     "title": "Legacy GuiZhi data found",
@@ -1389,7 +1407,7 @@
     "viewGraph": "Relationship graph",
     "graphEmpty": "No page relationships yet — they appear after compiling the wiki",
     "autoCompile": "Auto compile",
-    "autoCompileHint": "Compiles new items into the wiki every 5 minutes",
+    "autoCompileOnHint": "Auto compile is on: new items are compiled into the wiki every 5 minutes. Click to change it in Settings.",
     "compileNow": "Compile now",
     "stopCompile": "Stop compiling",
     "compiling": "Compiling ({{current}}/{{total}}): {{title}}",
@@ -1402,7 +1420,22 @@
     "rebuild": "Rebuild all",
     "rebuildConfirm": "This clears all wiki pages and recompiles every item (the only way to purge knowledge from deleted items). It consumes many AI calls. Continue?",
     "empty": "The wiki is empty",
-    "emptyHint": "AI compiles your knowledge items into interlinked wiki pages. Click \"Compile now\" to start, or enable \"Auto compile\" to keep it updated in the background."
+    "emptyHint": "AI compiles your knowledge items into interlinked wiki pages. Click \"Compile now\" to start, or turn on auto compile under Settings → General → Wiki to keep it updated in the background.",
+    "graphTruncated": "Showing {{shown}} of {{total}} pages by connectivity",
+    "manualEditedAt": "Manually edited at {{time}}",
+    "manualEdited": "Manually edited",
+    "manualEditedHint": "This page was edited by hand; future compilations will not overwrite its body",
+    "editPage": "Edit",
+    "editPageHint": "Saving marks this page as manually edited so later compilations leave its body alone. [[Links]] still work.",
+    "pageSaved": "Saved; later compilations will not overwrite this page",
+    "pageSaveFailed": "Save failed",
+    "releaseToAuto": "Hand back to AI",
+    "releaseToAutoHint": "Clear the manual flag so compilation takes this page over again",
+    "releasedToAuto": "Handed back to automatic compilation",
+    "deletePage": "Delete page",
+    "deletePageConfirm": "Delete \"{{title}}\"? Links pointing at it will break, and the next compilation may recreate it.",
+    "pageDeleted": "Page deleted",
+    "pageDeleteFailed": "Delete failed"
   },
   "ask": {
     "title": "AI Q&A",
@@ -1424,7 +1457,8 @@
     "stepsLabel": "Retrieval steps ({{count}})",
     "notConfigured": "AI service is not configured yet",
     "goToSettings": "Open Settings",
-    "noSource": "No related material found in your knowledge base. Capture some content first, or rephrase the question."
+    "noSource": "No related material found in your knowledge base. Capture some content first, or rephrase the question.",
+    "answerTruncated": "The answer hit the model's output length limit and may be incomplete."
   },
   "capture": {
     "title": "Quick Capture",
@@ -1437,7 +1471,8 @@
     "chooseFiles": "Choose files",
     "blankNote": "Blank note",
     "submit": "Import",
-    "enqueued": "Added to import queue ({{count}} items)"
+    "enqueued": "Added to import queue ({{count}} items)",
+    "tagsPlaceholder": "Tags (press Enter)"
   },
   "imports": {
     "title": "Import Tasks",
@@ -1470,6 +1505,7 @@
     "stageSummarizing": "Summarizing",
     "stageImageDownload": "Downloading images",
     "stageImageOcr": "Extracting text from images",
-    "stageForumReplies": "Collecting replies"
+    "stageForumReplies": "Collecting replies",
+    "removeTask": "Remove from list"
   }
 }

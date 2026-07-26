@@ -75,7 +75,7 @@ vi.mock('@tanstack/react-virtual', async () => {
         '@tanstack/react-virtual',
     );
 
-    interface MinimalVirtualizerOptions<TItem> {
+    interface MinimalVirtualizerOptions {
         count: number;
         estimateSize: (index: number) => number;
         getItemKey?: (index: number) => string | number;
@@ -96,8 +96,8 @@ vi.mock('@tanstack/react-virtual', async () => {
         lane: number;
     }
 
-    function buildVirtualItems<TItem>(
-        options: MinimalVirtualizerOptions<TItem>,
+    function buildVirtualItems(
+        options: MinimalVirtualizerOptions,
     ): VirtualItem[] {
         const items: VirtualItem[] = [];
         let offset = 0;
@@ -119,7 +119,7 @@ vi.mock('@tanstack/react-virtual', async () => {
 
     return {
         ...actual,
-        useVirtualizer: <TItem,>(options: MinimalVirtualizerOptions<TItem>) => {
+        useVirtualizer: (options: MinimalVirtualizerOptions) => {
             const items = buildVirtualItems(options);
             const totalSize = items.reduce((sum, item) => sum + item.size, 0);
             return {

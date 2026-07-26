@@ -113,9 +113,9 @@ export function UpdateDialog({ isOpen, onClose, initialStatus }: UpdateDialogPro
   useEffect(() => {
     // Get current version and platform
     // 获取当前版本和平台
-    window.electron?.updater?.getVersion().then(setCurrentVersion);
-    window.electron?.updater?.getPlatform?.().then(setPlatform);
-    window.electron?.updater?.getInstallSource?.().then((source: MacInstallSource) => {
+    void window.electron?.updater?.getVersion().then(setCurrentVersion);
+    void window.electron?.updater?.getPlatform?.().then(setPlatform);
+    void window.electron?.updater?.getInstallSource?.().then((source: MacInstallSource) => {
       setInstallSource(source);
     });
 
@@ -157,6 +157,8 @@ export function UpdateDialog({ isOpen, onClose, initialStatus }: UpdateDialogPro
         preserveVisibleStatus: isStableUpgradeState(updateStatusRef.current),
       });
     }
+    // handleCheckUpdate 每次渲染都是新引用，进依赖数组会让弹窗一直重复检查
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, updateChannel, useUpdateMirror]);
 
   const handleCheckUpdate = async (

@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
   KNOWLEDGE_GET: "knowledge:get",
   KNOWLEDGE_CREATE: "knowledge:create",
   KNOWLEDGE_UPDATE: "knowledge:update",
+  KNOWLEDGE_BULK_UPDATE: "knowledge:bulkUpdate",
   KNOWLEDGE_SET_STATUS: "knowledge:setStatus",
   KNOWLEDGE_MOVE_TO_TRASH: "knowledge:moveToTrash",
   KNOWLEDGE_RESTORE: "knowledge:restore",
@@ -35,12 +36,18 @@ export const IPC_CHANNELS = {
   IMPORT_LIST: "import:list",
   IMPORT_CANCEL: "import:cancel",
   IMPORT_RETRY: "import:retry",
+  /** 主进程 → 渲染进程：自动备份开始 / 结束（这段主线程是冻住的） */
+  BACKUP_AUTO_STATUS: "backup:autoStatus",
+  IMPORT_REMOVE: "import:remove",
   IMPORT_CLEAR_FINISHED: "import:clearFinished",
   /** 主进程 → 渲染进程：任务状态变更事件 */
   IMPORT_CHANGED: "import:changed",
 
   // Wiki (ADR 0023)
   WIKI_CATALOG: "wiki:catalog",
+  WIKI_SEARCH: "wiki:search",
+  WIKI_UPDATE_PAGE: "wiki:updatePage",
+  WIKI_DELETE_PAGE: "wiki:deletePage",
   WIKI_GET_PAGE: "wiki:getPage",
   WIKI_APPLY_COMPILATION: "wiki:applyCompilation",
   WIKI_LIST_COMPILABLE: "wiki:listCompilable",

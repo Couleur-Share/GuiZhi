@@ -38,7 +38,7 @@ export function AboutSettings() {
   const lastCheckVersion = useUpdaterStore((state) => state.lastCheckVersion);
 
   useEffect(() => {
-    window.electron?.updater?.getVersion().then((v) => setAppVersion(v || ""));
+    void window.electron?.updater?.getVersion().then((v) => setAppVersion(v || ""));
   }, []);
 
   useEffect(() => {

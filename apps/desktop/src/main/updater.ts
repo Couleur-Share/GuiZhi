@@ -919,7 +919,7 @@ export function registerUpdaterIPC() {
   // Open GitHub Releases page
   // 打开 GitHub Releases 页面
   ipcMain.handle("updater:openReleases", () => {
-    shell.openExternal("https://github.com/Couleur-Share/GuiZhi/releases");
+    void shell.openExternal("https://github.com/Couleur-Share/GuiZhi/releases");
   });
 
   ipcMain.handle("updater:openDownloadedUpdate", async () => {

@@ -943,6 +943,9 @@
     },
     "desktopModuleMcpDesc": "MCP 服务、市场模板和 Agent 分发目标",
     "captureSection": "采集",
+    "wikiSection": "Wiki",
+    "wikiAutoCompile": "自动编译",
+    "wikiAutoCompileDesc": "每 5 分钟把新条目增量编译进 Wiki。后台静默运行，会持续消耗 AI 调用额度。",
     "captureStateProbing": "检测中",
     "captureStateReady": "已就绪",
     "captureStateMissing": "未安装",
@@ -1042,7 +1045,9 @@
     "aiWorkbenchBadgeEmbedding": "嵌入路由",
     "aiWorkbenchRouteAudioText": "语音转写",
     "aiWorkbenchRouteAudioTextDesc": "音视频转文字使用的转写模型（如 whisper-1，走 /audio/transcriptions 接口）。",
-    "aiWorkbenchBadgeAudioText": "转写路由"
+    "aiWorkbenchBadgeAudioText": "转写路由",
+    "autoBackupRunning": "正在自动备份，界面可能短暂无响应…",
+    "autoBackupFailed": "自动备份失败，详见日志"
   },
   "common": {
     "install": "安装",
@@ -1118,7 +1123,14 @@
     "disabled": "已停用",
     "enable": "启用",
     "disable": "停用",
-    "continueEditing": "继续编辑"
+    "continueEditing": "继续编辑",
+    "imagePosition": "第 {{current}} / {{total}} 张",
+    "previousImage": "上一张",
+    "nextImage": "下一张",
+    "unsavedChanges": "未保存的更改",
+    "unsavedChangesMessage": "您有未保存的更改，是否要保存？",
+    "discardChanges": "不保存",
+    "undo": "撤销"
   },
   "error": {
     "sha512Desc": "SHA512 校验失败。\n这通常是由于 CDN 缓存不一致或网络劫持导致的。\n文件可能已下载完成，您可以尝试手动安装。"
@@ -1284,6 +1296,8 @@
     "aiSummaryRegenerate": "重新生成",
     "aiSummaryGenerating": "正在生成摘要…",
     "aiSummaryEmpty": "内容为空，无法生成摘要",
+    "aiSummaryDone": "AI 摘要已生成",
+    "aiSummaryTruncated": "AI 摘要已生成，但模型输出达到长度上限，内容可能不完整",
     "aiSummaryFailed": "摘要生成失败：{{message}}",
     "ocrGenerate": "识别图中文字",
     "ocrRegenerate": "重新识别图中文字",
@@ -1347,7 +1361,11 @@
       "purple": "紫",
       "pink": "粉",
       "gray": "灰"
-    }
+    },
+    "movedToTrash": "已移到回收站（{{count}} 项）",
+    "bulkAddTag": "批量打标签",
+    "bulkAddTagHint": "为选中的 {{count}} 项添加标签",
+    "bulkFavorite": "批量收藏"
   },
   "migration": {
     "title": "发现旧版归知数据",
@@ -1389,7 +1407,7 @@
     "viewGraph": "关系图谱",
     "graphEmpty": "还没有页面关系，编译 Wiki 后自动生成",
     "autoCompile": "自动编译",
-    "autoCompileHint": "开启后每 5 分钟自动把新条目编译进 Wiki",
+    "autoCompileOnHint": "自动编译已开启：每 5 分钟把新条目编译进 Wiki。点击前往设置修改。",
     "compileNow": "立即编译",
     "stopCompile": "停止编译",
     "compiling": "编译中（{{current}}/{{total}}）：{{title}}",
@@ -1402,7 +1420,22 @@
     "rebuild": "全量重建",
     "rebuildConfirm": "将清空现有全部 Wiki 页面并重新编译所有条目（清理已删除条目残留知识的唯一方式）。编译会消耗较多 AI 调用，确定继续？",
     "empty": "Wiki 还是空的",
-    "emptyHint": "AI 会把知识条目编译成互相链接的 Wiki 页面。点击「立即编译」开始，或打开「自动编译」让它在后台持续更新。"
+    "emptyHint": "AI 会把知识条目编译成互相链接的 Wiki 页面。点击「立即编译」开始，或在「设置 → 通用 → Wiki」里打开自动编译，让它在后台持续更新。",
+    "graphTruncated": "按连接度显示 {{shown}} / {{total}} 个页面",
+    "manualEditedAt": "手动编辑于 {{time}}",
+    "manualEdited": "手动编辑",
+    "manualEditedHint": "这一页已被手动改过，后续编译不会覆盖它的正文",
+    "editPage": "编辑",
+    "editPageHint": "保存后这一页会被标记为手动编辑，后续编译不再覆盖它的正文。[[链接]] 仍然有效。",
+    "pageSaved": "已保存，后续编译不会覆盖这一页",
+    "pageSaveFailed": "保存失败",
+    "releaseToAuto": "交回自动编译",
+    "releaseToAutoHint": "清除手动标记，让后续编译重新接管这一页",
+    "releasedToAuto": "已交回自动编译",
+    "deletePage": "删除页面",
+    "deletePageConfirm": "删除「{{title}}」？指向它的链接会变成断链，下一轮编译可能重新生成这一页。",
+    "pageDeleted": "页面已删除",
+    "pageDeleteFailed": "删除失败"
   },
   "ask": {
     "title": "AI 问答",
@@ -1424,7 +1457,8 @@
     "stepsLabel": "检索过程（{{count}} 步）",
     "notConfigured": "尚未配置 AI 服务",
     "goToSettings": "前往设置",
-    "noSource": "知识库中没有找到与问题相关的资料。先采集一些内容，或换个问法试试。"
+    "noSource": "知识库中没有找到与问题相关的资料。先采集一些内容，或换个问法试试。",
+    "answerTruncated": "回答达到模型输出长度上限，内容可能不完整。"
   },
   "capture": {
     "title": "快速采集",
@@ -1437,7 +1471,8 @@
     "chooseFiles": "选择文件",
     "blankNote": "空白笔记",
     "submit": "导入",
-    "enqueued": "已加入导入队列（{{count}} 项）"
+    "enqueued": "已加入导入队列（{{count}} 项）",
+    "tagsPlaceholder": "打标签（回车添加）"
   },
   "imports": {
     "title": "导入任务",
@@ -1470,6 +1505,7 @@
     "stageSummarizing": "生成总结",
     "stageImageDownload": "下载配图",
     "stageImageOcr": "识别图中文字",
-    "stageForumReplies": "整理讨论区"
+    "stageForumReplies": "整理讨论区",
+    "removeTask": "从列表中删除"
   }
 }

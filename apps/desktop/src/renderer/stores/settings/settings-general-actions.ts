@@ -110,7 +110,7 @@ function createThemeModeActions(context: SettingsActionContext) {
 }
 
 function createCustomThemeActions(context: SettingsActionContext) {
-  const { get, setTouched } = context;
+  const { setTouched } = context;
   return {
     setCustomThemeHex: (hex) => {
       const color = hexToHs(hex);

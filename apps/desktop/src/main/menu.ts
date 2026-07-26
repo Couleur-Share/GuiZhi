@@ -117,13 +117,13 @@ export function createMenu(): void {
         {
           label: '文档',
           click: () => {
-            shell.openExternal(GUIZHI_REPOSITORY_URL);
+            void shell.openExternal(GUIZHI_REPOSITORY_URL);
           },
         },
         {
           label: '报告问题',
           click: () => {
-            shell.openExternal(GUIZHI_ISSUES_URL);
+            void shell.openExternal(GUIZHI_ISSUES_URL);
           },
         },
       ],

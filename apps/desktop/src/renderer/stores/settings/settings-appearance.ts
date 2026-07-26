@@ -117,7 +117,7 @@ export function applyBackgroundImageVars(options: {
 
   root.style.setProperty(
     "--app-background-image",
-    resolvedSrc ? `url(\"${resolvedSrc.replace(/\"/g, '\\\"')}\")` : "none",
+    resolvedSrc ? `url("${resolvedSrc.replace(/"/g, '\\"')}")` : "none",
   );
   root.style.setProperty(
     "--app-background-opacity",

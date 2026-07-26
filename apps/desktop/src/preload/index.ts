@@ -84,6 +84,7 @@ const api = {
       "window:fullscreen-changed",
       "window:visibility-changed",
       "import:changed",
+      "backup:autoStatus",
       "menu:import",
       "menu:export",
       "ytdlp:downloadProgress",
