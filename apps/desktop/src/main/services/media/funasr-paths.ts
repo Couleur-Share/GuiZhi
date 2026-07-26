@@ -22,8 +22,10 @@ export interface FunasrPaths {
   pythonExe: string;
   venvDir: string;
   venvPython: string;
-  /** funasr-server 控制台入口 */
-  serverExe: string;
+  /** 自带的服务脚本（由 funasr-server-script.ts 落盘） */
+  serverScript: string;
+  /** funasr 包安装位置，用作「依赖装好了」的判据 */
+  funasrPackage: string;
   /** MODELSCOPE_CACHE：模型缓存目录 */
   modelsDir: string;
   stateFile: string;
@@ -39,14 +41,27 @@ export function getFunasrPaths(root = getFunasrRoot()): FunasrPaths {
     pythonExe: path.join(root, "python", "python.exe"),
     venvDir: path.join(root, "env"),
     venvPython: path.join(root, "env", "Scripts", "python.exe"),
-    serverExe: path.join(root, "env", "Scripts", "funasr-server.exe"),
+    serverScript: path.join(root, "server.py"),
+    funasrPackage: path.join(
+      root,
+      "env",
+      "Lib",
+      "site-packages",
+      "funasr",
+      "__init__.py",
+    ),
     modelsDir: path.join(root, "models"),
     stateFile: path.join(root, "state.json"),
   };
 }
 
+/**
+ * 判据是「venv 里的 python 与 funasr 包都在」。
+ * 服务脚本不计入：它由应用在每次启动前落盘，缺失可自愈，
+ * 拿它当安装标记会让首次启动陷入先有鸡还是先有蛋。
+ */
 export function isFunasrInstalled(paths = getFunasrPaths()): boolean {
-  return fs.existsSync(paths.serverExe) && fs.existsSync(paths.venvPython);
+  return fs.existsSync(paths.funasrPackage) && fs.existsSync(paths.venvPython);
 }
 
 export interface FunasrInstallState {

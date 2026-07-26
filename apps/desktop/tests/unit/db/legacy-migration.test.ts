@@ -138,10 +138,12 @@ describe("枚举与时间映射", () => {
   it("枚举映射", () => {
     expect(mapLegacyItemType(1)).toBe("webpage");
     expect(mapLegacyItemType(99)).toBe("note");
-    expect(mapLegacyStatus(2)).toBe("ready");
-    expect(mapLegacyStatus(1)).toBe("inbox");
-    expect(mapLegacyStatus(4)).toBe("inbox");
     expect(mapLegacyStatus(3)).toBe("archived");
+    // 旧版那几种「没处理完」的状态在两态模型里都是活跃
+    expect(mapLegacyStatus(2)).toBe("active");
+    expect(mapLegacyStatus(1)).toBe("active");
+    expect(mapLegacyStatus(4)).toBe("active");
+    expect(mapLegacyStatus(0)).toBe("active");
     expect(mapLegacyTagColor(1)).toBe("blue");
     expect(mapLegacyTagColor(9)).toBe("gray");
     expect(mapLegacySourceType(3)).toBe("url");
@@ -176,16 +178,16 @@ describe("migrateLegacyDatabase", () => {
     const items = new KnowledgeItemDB(target);
     const item1 = items.get("ITEM-1")!;
     expect(item1.itemType).toBe("webpage");
-    expect(item1.status).toBe("ready");
+    expect(item1.status).toBe("active");
     expect(item1.summary).toBe("- 要点摘要");
     expect(item1.isFavorite).toBe(true);
     expect(item1.collectionId).toBe("COL-1");
     expect(item1.tags.map((tag) => tag.name).sort()).toEqual(["前端", "性能"]);
     expect(item1.createdAt).toBe(Date.parse("2026-07-19T16:35:19.718Z"));
 
-    // Processing → inbox；已删集合引用置空；转写稿保留
+    // Processing → active；已删集合引用置空；转写稿保留
     const item2 = items.get("ITEM-2")!;
-    expect(item2.status).toBe("inbox");
+    expect(item2.status).toBe("active");
     expect(item2.collectionId).toBeNull();
     expect(item2.transcript).toBe("转写稿");
 

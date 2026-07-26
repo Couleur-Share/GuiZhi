@@ -299,7 +299,6 @@ export function DataSettings() {
                   type="button"
                   onClick={() => setConfirmState({ kind: "restore", backup })}
                   disabled={busy !== null}
-                  title={t("settings.backupRestore", "恢复")}
                   className="inline-flex h-8 items-center gap-1 rounded-lg border border-border px-2.5 text-xs text-foreground transition-colors hover:bg-muted/60 disabled:opacity-50"
                 >
                   <ArchiveRestoreIcon className="h-3.5 w-3.5" aria-hidden="true" />

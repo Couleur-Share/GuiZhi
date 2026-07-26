@@ -197,10 +197,11 @@ describe("0003-item-type-forum 重建表迁移", () => {
       "SELECT title, item_type, status FROM knowledge_items WHERE id = ?",
       "item-1",
     );
+    // status 是 'active' 而非入库时的 'ready'：0008 在 0003 之后把三态折叠成两态
     expect(item).toEqual({
       title: "已有条目",
       item_type: "webpage",
-      status: "ready",
+      status: "active",
     });
     expect(countRows(db, "knowledge_item_tags")).toBe(1);
     expect(countRows(db, "source_records")).toBe(1);
@@ -242,6 +243,67 @@ describe("0003-item-type-forum 重建表迁移", () => {
   it("对已经放行 forum 的库保持幂等", () => {
     const db = createDb();
     expect(getTableDefinition(db, "knowledge_items")).toContain("'forum'");
+    expect(() => runMigrations(db)).not.toThrow();
+    expect(runMigrations(db)).toEqual([]);
+    db.close();
+  });
+});
+
+describe("0008-item-status-two-state 重建表迁移", () => {
+  function statusOf(db: DatabaseAdapter.Database, id: string): string {
+    return (
+      db.get("SELECT status FROM knowledge_items WHERE id = ?", id) as {
+        status: string;
+      }
+    ).status;
+  }
+
+  it("inbox 与 ready 一并折叠成 active，archived 原样保留", () => {
+    const db = createLegacyDbWithData();
+    for (const [id, status] of [
+      ["item-inbox", "inbox"],
+      ["item-archived", "archived"],
+    ]) {
+      db.run(
+        "INSERT INTO knowledge_items (id, title, status, created_at, updated_at) VALUES (?, ?, ?, 1, 1)",
+        id,
+        id,
+        status,
+      );
+    }
+
+    runMigrations(db);
+
+    // item-1 建库时是 ready
+    expect(statusOf(db, "item-1")).toBe("active");
+    expect(statusOf(db, "item-inbox")).toBe("active");
+    expect(statusOf(db, "item-archived")).toBe("archived");
+    db.close();
+  });
+
+  it("新 CHECK 拒绝旧状态值，且级联子表数据不丢", () => {
+    const db = createLegacyDbWithData();
+    runMigrations(db);
+
+    expect(getTableDefinition(db, "knowledge_items")).toContain("'active'");
+    expect(() =>
+      db.run(
+        "INSERT INTO knowledge_items (id, status, created_at, updated_at) VALUES ('x', 'inbox', 1, 1)",
+      ),
+    ).toThrow();
+
+    // 0008 同样是「建新表→拷数据→删旧表」，外键没关就会连带清空这些子表
+    expect(countRows(db, "knowledge_item_tags")).toBe(1);
+    expect(countRows(db, "source_records")).toBe(1);
+    expect(countRows(db, "wiki_page_sources")).toBe(1);
+    expect(countRows(db, "wiki_ingestions")).toBe(1);
+    expect(countRows(db, "knowledge_embeddings")).toBe(1);
+    db.close();
+  });
+
+  it("对已经是两态的库保持幂等", () => {
+    const db = createDb();
+    expect(getTableDefinition(db, "knowledge_items")).toContain("'active'");
     expect(() => runMigrations(db)).not.toThrow();
     expect(runMigrations(db)).toEqual([]);
     db.close();

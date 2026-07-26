@@ -1,4 +1,4 @@
-import { cloneElement, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   SunIcon,
@@ -20,6 +20,7 @@ import {
 import { SettingSection } from "./shared";
 import { isWebRuntime } from "../../runtime";
 import { BackgroundImageBackdrop } from "../ui/BackgroundImageBackdrop";
+import { ColorPicker } from "../ui/ColorPicker";
 import { useToast } from "../ui/Toast";
 
 interface BackgroundPreviewStageProps {
@@ -181,58 +182,43 @@ export function AppearanceSettings() {
     {
       id: "light",
       labelKey: "settings.light",
-      icon: <SunIcon aria-hidden="true" className="w-5 h-5" />,
+      icon: <SunIcon aria-hidden="true" className="w-4 h-4" />,
     },
     {
       id: "dark",
       labelKey: "settings.dark",
-      icon: <MoonIcon aria-hidden="true" className="w-5 h-5" />,
+      icon: <MoonIcon aria-hidden="true" className="w-4 h-4" />,
     },
     {
       id: "system",
       labelKey: "settings.system",
-      icon: <MonitorIcon aria-hidden="true" className="w-5 h-5" />,
+      icon: <MonitorIcon aria-hidden="true" className="w-4 h-4" />,
     },
   ];
 
   return (
     <div className="space-y-6">
       <SettingSection title={t("settings.themeMode")}>
-        {/* Segmented control */}
-        <div className="p-4">
-          <div className="flex items-center gap-1.5 p-1.5 rounded-2xl app-settings-subtle">
-            {themeModes.map((mode) => {
-              const selected = settings.themeMode === mode.id;
-              return (
-                <button
-                  key={mode.id}
-                  type="button"
-                  onClick={() => settings.setThemeMode(mode.id)}
-                  aria-pressed={selected}
-                  className={`relative flex-1 h-10 rounded-xl text-[13px] font-medium transition-all duration-base ${
-                    selected
-                      ? "app-settings-segment-active"
-                      : "app-settings-segment"
-                  }`}
-                >
-                  <span className="inline-flex items-center justify-center gap-2">
-                    <span
-                      className={`transition-transform duration-base ${selected ? "scale-105" : ""}`}
-                    >
-                      {cloneElement(mode.icon as any, {
-                        className: "w-4 h-4",
-                        "aria-hidden": "true",
-                      })}
-                    </span>
-                    {t(mode.labelKey)}
-                  </span>
-                  {selected && (
-                    <span className="absolute inset-0 rounded-lg ring-1 ring-primary/25" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        <div className="grid grid-cols-3 gap-3 p-4">
+          {themeModes.map((mode) => {
+            const selected = settings.themeMode === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => settings.setThemeMode(mode.id)}
+                aria-pressed={selected}
+                className={`inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-[13px] font-medium transition-all duration-base ${
+                  selected
+                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                    : "app-settings-subtle text-foreground hover:shadow"
+                } hover:-translate-y-0.5 active:translate-y-0`}
+              >
+                {mode.icon}
+                {t(mode.labelKey)}
+              </button>
+            );
+          })}
         </div>
       </SettingSection>
 
@@ -327,12 +313,10 @@ export function AppearanceSettings() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="color"
+                  <ColorPicker
                     value={settings.customThemeHex}
-                    onChange={(e) => settings.setCustomThemeHex(e.target.value)}
-                    className="h-9 w-10 rounded-lg border border-border bg-transparent p-1"
-                    aria-label={t("settings.customColor", "Custom Theme Color")}
+                    onChange={(hex) => settings.setCustomThemeHex(hex)}
+                    ariaLabel={t("settings.customColor", "Custom Theme Color")}
                   />
                   <input
                     type="text"
@@ -372,7 +356,7 @@ export function AppearanceSettings() {
                 onClick={() => settings.setFontSize(size.id)}
                 aria-pressed={settings.fontSize === size.id}
                 aria-label={`${t(sizeNameKey)}, ${size.value}px`}
-                className={`py-2.5 px-4 rounded-xl text-[13px] font-medium transition-all duration-base ${
+                className={`py-2.5 px-4 rounded-2xl text-[13px] font-medium transition-all duration-base ${
                   settings.fontSize === size.id
                     ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                     : "app-settings-subtle text-foreground hover:shadow"
@@ -411,7 +395,7 @@ export function AppearanceSettings() {
                   type="button"
                   onClick={() => settings.setMotionPreference(option.id)}
                   aria-pressed={selected}
-                  className={`py-2.5 px-4 rounded-xl text-[13px] font-medium transition-all duration-base ${
+                  className={`py-2.5 px-4 rounded-2xl text-[13px] font-medium transition-all duration-base ${
                     selected
                       ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                       : "app-settings-subtle text-foreground hover:shadow"
@@ -522,7 +506,7 @@ export function AppearanceSettings() {
                         Number(event.target.value) / 100,
                       )
                     }
-                    className="w-full accent-primary"
+                    className="w-full"
                   />
                 </div>
 
@@ -547,7 +531,7 @@ export function AppearanceSettings() {
                     onChange={(event) =>
                       settings.setBackgroundImageBlur(Number(event.target.value))
                     }
-                    className="w-full accent-primary"
+                    className="w-full"
                   />
                 </div>
               </div>

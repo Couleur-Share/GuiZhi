@@ -54,7 +54,6 @@ function createPersistence(db: Database.Database): ImportPersistence {
           content: extracted.content,
           transcript: extracted.transcript ?? null,
           itemType: extracted.itemType,
-          status: "inbox",
           collectionId,
           tagNames: tagNames.length > 0 ? tagNames : undefined,
         });

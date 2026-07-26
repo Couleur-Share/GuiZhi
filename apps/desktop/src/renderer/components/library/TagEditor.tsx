@@ -59,7 +59,8 @@ export function TagEditor({
           const rect = event.currentTarget.getBoundingClientRect();
           setAnchor({ x: rect.left, y: rect.bottom + 6 });
         }}
-        title={addTagLabel}
+        // 没有标签时按钮自带文案，只有缩成纯图标时才需要气泡
+        title={tags.length === 0 ? undefined : addTagLabel}
         aria-label={addTagLabel}
         aria-haspopup="dialog"
         aria-expanded={anchor !== null}

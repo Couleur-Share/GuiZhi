@@ -58,6 +58,14 @@ export default defineConfig(async () => ({
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
+    // 设置页整棵子树是懒加载的，dev 下首次点进去才现场编译几十个模块，
+    // 期间内容区一片空白。预热把这份编译挪到 dev server 启动时做掉。
+    warmup: {
+      clientFiles: [
+        "./src/renderer/components/settings/SettingsPage.tsx",
+        "./src/renderer/components/settings/GeneralSettings.tsx",
+      ],
+    },
   },
   plugins: [
     react(),

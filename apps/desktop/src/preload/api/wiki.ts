@@ -2,6 +2,7 @@ import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type {
   WikiApplyCompilationInput,
+  WikiBacklinkCounts,
   WikiCatalogEntry,
   WikiCompilableItem,
   WikiCompilationStatus,
@@ -15,6 +16,8 @@ import type {
 export const wikiApi = {
   catalog: (): Promise<WikiCatalogEntry[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_CATALOG),
+  backlinkCounts: (): Promise<WikiBacklinkCounts> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_BACKLINK_COUNTS),
   search: (query: string, limit: number): Promise<WikiSearchHit[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_SEARCH, query, limit),
   updatePage: (input: {

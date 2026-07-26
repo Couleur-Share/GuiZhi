@@ -1,68 +1,165 @@
 import {
+  BanIcon,
   CheckCircle2Icon,
   CopyIcon,
-  EraserIcon,
+  FolderOpenIcon,
+  InboxIcon,
   Loader2Icon,
   PlusIcon,
   XCircleIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useImportStore } from "../../stores/import.store";
+import {
+  countByFilter,
+  useImportStore,
+  type ImportFilter,
+} from "../../stores/import.store";
+import { useToast } from "../ui/Toast";
 
-function CountRow({
+function FilterRow({
   icon,
   label,
   count,
+  active,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   count: number;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 text-sm text-sidebar-foreground/70">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors duration-smooth ${
+        active
+          ? "bg-primary/15 text-primary"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+      }`}
+    >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
         {icon}
       </span>
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sidebar-accent/80 text-sidebar-foreground/50 border border-white/5">
+      <span
+        className={`min-w-0 flex-1 truncate text-left ${active ? "font-medium" : ""}`}
+      >
+        {label}
+      </span>
+      <span
+        className={`rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums ${
+          active
+            ? "border-primary/20 bg-primary/10 text-primary/80"
+            : "border-white/5 bg-sidebar-accent/80 text-sidebar-foreground/50"
+        }`}
+      >
         {count}
       </span>
-    </div>
+    </button>
   );
 }
 
 /**
- * 导入模块侧栏：快速采集入口 + 任务状态摘要 + 清理已完成。
+ * 导入模块侧栏：采集入口 + 状态筛选。
+ * 这几行原本只是计数展示，长得像导航却点不动；现在它们就是列表的筛选器。
  */
 export function SidebarImportsPanel() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const tasks = useImportStore((state) => state.tasks);
-  const clearFinished = useImportStore((state) => state.clearFinished);
+  const filter = useImportStore((state) => state.filter);
+  const setFilter = useImportStore((state) => state.setFilter);
+  const enqueue = useImportStore((state) => state.enqueue);
 
-  const activeCount = tasks.filter(
-    (task) => task.status === "pending" || task.status === "processing",
-  ).length;
-  const failedCount = tasks.filter((task) => task.status === "failed").length;
-  const duplicateCount = tasks.filter(
-    (task) => task.status === "duplicate",
-  ).length;
-  const completedCount = tasks.filter(
-    (task) => task.status === "completed",
-  ).length;
-  const finishedCount = tasks.length - activeCount;
+  const counts = countByFilter(tasks);
+
+  const importFiles = async () => {
+    const files = await window.api.import.selectFiles();
+    if (files.length === 0) {
+      return;
+    }
+    await enqueue(
+      files.map((input) => ({ kind: "file" as const, input, collectionId: null })),
+    );
+    showToast(
+      t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+        count: files.length,
+      }),
+      "success",
+    );
+  };
+
+  const rows: {
+    id: ImportFilter;
+    icon: React.ReactNode;
+    label: string;
+  }[] = [
+    {
+      id: "all",
+      icon: <InboxIcon className="h-4 w-4" aria-hidden="true" />,
+      label: t("imports.panelAll", "全部任务"),
+    },
+    {
+      id: "active",
+      icon: (
+        <Loader2Icon
+          className={`h-4 w-4 ${counts.active > 0 ? "animate-spin text-primary" : ""}`}
+          aria-hidden="true"
+        />
+      ),
+      label: t("imports.panelActive", "进行中"),
+    },
+    {
+      id: "completed",
+      icon: (
+        <CheckCircle2Icon
+          className="h-4 w-4 text-emerald-500"
+          aria-hidden="true"
+        />
+      ),
+      label: t("imports.panelCompleted", "已完成"),
+    },
+    {
+      id: "duplicate",
+      icon: <CopyIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />,
+      label: t("imports.panelDuplicate", "重复"),
+    },
+    {
+      id: "failed",
+      icon: (
+        <XCircleIcon className="h-4 w-4 text-destructive" aria-hidden="true" />
+      ),
+      label: t("imports.panelFailed", "失败"),
+    },
+    {
+      id: "canceled",
+      icon: <BanIcon className="h-4 w-4" aria-hidden="true" />,
+      label: t("imports.panelCanceled", "已取消"),
+    },
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-3">
-      <div className="pt-3">
+      <div className="space-y-1.5 pt-3">
         <button
           type="button"
           onClick={() =>
             window.dispatchEvent(new CustomEvent("shortcut:newItem"))
           }
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-sidebar-border px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:border-primary/50 hover:text-sidebar-foreground"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <PlusIcon className="h-4 w-4" aria-hidden="true" />
           {t("imports.panelCapture", "快速采集")}
+        </button>
+        <button
+          type="button"
+          onClick={() => void importFiles()}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-sidebar-border px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:border-primary/50 hover:text-sidebar-foreground"
+        >
+          <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
+          {t("header.newImportFiles", "导入文件")}
         </button>
       </div>
 
@@ -73,42 +170,17 @@ export function SidebarImportsPanel() {
         <div className="h-px flex-1 bg-sidebar-border/60" />
       </div>
 
-      <CountRow
-        icon={
-          <Loader2Icon
-            className={`h-4 w-4 ${activeCount > 0 ? "animate-spin text-primary" : ""}`}
-            aria-hidden="true"
+      <div className="space-y-0.5">
+        {rows.map((row) => (
+          <FilterRow
+            key={row.id}
+            icon={row.icon}
+            label={row.label}
+            count={counts[row.id]}
+            active={filter === row.id}
+            onClick={() => setFilter(row.id)}
           />
-        }
-        label={t("imports.panelActive", "进行中")}
-        count={activeCount}
-      />
-      <CountRow
-        icon={<CheckCircle2Icon className="h-4 w-4 text-emerald-500" aria-hidden="true" />}
-        label={t("imports.panelCompleted", "已完成")}
-        count={completedCount}
-      />
-      <CountRow
-        icon={<CopyIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />}
-        label={t("imports.panelDuplicate", "重复")}
-        count={duplicateCount}
-      />
-      <CountRow
-        icon={<XCircleIcon className="h-4 w-4 text-destructive" aria-hidden="true" />}
-        label={t("imports.panelFailed", "失败")}
-        count={failedCount}
-      />
-
-      <div className="mt-auto pt-4">
-        <button
-          type="button"
-          onClick={() => void clearFinished()}
-          disabled={finishedCount === 0}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-sidebar-border px-3 py-1.5 text-xs text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground disabled:opacity-40"
-        >
-          <EraserIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          {t("imports.clearFinished", "清理已完成")}
-        </button>
+        ))}
       </div>
     </div>
   );

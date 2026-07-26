@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronDownIcon, CheckIcon } from 'lucide-react';
 
+/** 面板与触发器的间距 */
+const MENU_GAP = 4;
+/** 面板与视口边缘的最小留白 */
+const VIEWPORT_MARGIN = 12;
+/** 低于这个高度就认为「放不下」，翻到另一侧展开 */
+const MIN_MENU_HEIGHT = 160;
+const MAX_MENU_HEIGHT = 280;
+
 export interface SelectOption {
   value: string;
   label: React.ReactNode;
@@ -19,6 +27,10 @@ export interface SelectProps {
   ariaLabel?: string;
   triggerClassName?: string;
   disabled?: boolean;
+  /** 下拉面板最小宽度（px）。窄触发器（如分页每页条数）需要调小 */
+  menuMinWidth?: number;
+  /** 下拉面板与触发器的对齐边。贴右侧边缘的控件用 end 才不会越界 */
+  align?: 'start' | 'end';
 }
 
 export function Select({
@@ -30,12 +42,15 @@ export function Select({
   ariaLabel,
   triggerClassName,
   disabled = false,
+  menuMinWidth = 180,
+  align = 'start',
 }: SelectProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const listboxId = useId();
   const [dropdownStyle, setDropdownStyle] = useState<{
-    top: number;
+    top?: number;
+    bottom?: number;
     left: number;
     width: number;
     maxHeight: number;
@@ -56,18 +71,28 @@ export function Select({
       }
 
       const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - rect.bottom - 12;
-      const spaceAbove = rect.top - 12;
-      const dropdownHeight = Math.min(280, Math.max(spaceBelow, spaceAbove, 160));
-      const shouldOpenUpwards = spaceBelow < 160 && spaceAbove > spaceBelow;
+      const spaceBelow = viewportHeight - rect.bottom - MENU_GAP - VIEWPORT_MARGIN;
+      const spaceAbove = rect.top - MENU_GAP - VIEWPORT_MARGIN;
+      const openUpwards = spaceBelow < MIN_MENU_HEIGHT && spaceAbove > spaceBelow;
+
+      // 面板可以比触发器宽，所以定位后还要夹回视口内，否则贴右边缘的窄触发器
+      // （分页条那种）会把面板推到窗口外面
+      const dropdownWidth = Math.max(rect.width, menuMinWidth);
+      const preferredLeft = align === 'end' ? rect.right - dropdownWidth : rect.left;
+      const maxLeft = Math.max(VIEWPORT_MARGIN, window.innerWidth - dropdownWidth - VIEWPORT_MARGIN);
 
       setDropdownStyle({
-        top: shouldOpenUpwards
-          ? Math.max(12, rect.top - dropdownHeight - 4)
-          : Math.min(viewportHeight - dropdownHeight - 12, rect.bottom + 4),
-        left: rect.left,
-        width: rect.width,
-        maxHeight: dropdownHeight,
+        // 向上展开时锚定底边。面板实际高度由选项条数决定，如果用
+        // 「触发器顶边 − maxHeight」反推 top，选项少于上限时面板就会悬在
+        // 半空，差多少全看没用掉的那部分 maxHeight。
+        top: openUpwards ? undefined : rect.bottom + MENU_GAP,
+        bottom: openUpwards ? viewportHeight - rect.top + MENU_GAP : undefined,
+        left: Math.min(Math.max(VIEWPORT_MARGIN, preferredLeft), maxLeft),
+        width: dropdownWidth,
+        maxHeight: Math.min(
+          MAX_MENU_HEIGHT,
+          Math.max(openUpwards ? spaceAbove : spaceBelow, MIN_MENU_HEIGHT),
+        ),
       });
     };
 
@@ -80,7 +105,7 @@ export function Select({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [isOpen]);
+  }, [isOpen, align, menuMinWidth]);
 
   // Close when clicking outside
   // 点击外部关闭
@@ -177,12 +202,13 @@ export function Select({
               role="listbox"
               aria-label={ariaLabel}
               className="
-                fixed min-w-[180px]
+                fixed
                 bg-popover border border-border rounded-lg shadow-lg
                 overflow-hidden animate-in fade-in-0 zoom-in-95 duration-quick ease-enter
               "
               style={{
                 top: dropdownStyle.top,
+                bottom: dropdownStyle.bottom,
                 left: dropdownStyle.left,
                 width: dropdownStyle.width,
                 maxHeight: dropdownStyle.maxHeight,

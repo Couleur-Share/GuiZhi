@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
+import { slugifyHeading } from "@guizhi/shared/utils/wiki-body";
 
 const WIKI_HREF_PREFIX = "#wiki=";
 
@@ -23,6 +24,55 @@ export function preprocessWikiLinks(body: string): string {
     const safeDisplay = display.replace(/([[\]])/g, "\\$1");
     return `[${safeDisplay}](${WIKI_HREF_PREFIX}${encodeURIComponent(target)})`;
   });
+}
+
+interface HastNode {
+  type?: string;
+  tagName?: string;
+  value?: string;
+  properties?: Record<string, unknown>;
+  children?: HastNode[];
+}
+
+function nodeText(node: HastNode): string {
+  if (node.type === "text") {
+    return node.value ?? "";
+  }
+  return (node.children ?? []).map(nodeText).join("");
+}
+
+/**
+ * 给二、三级标题挂锚点 id，供页内目录跳转。
+ *
+ * 必须以 rehype 插件的形式跑在树上，而不是在自定义标题组件里边渲染边计数：
+ * 同名标题要靠出现序号区分，而组件里的计数器跨渲染不会复位，第二次渲染
+ * 就会把所有 id 顺移一位，目录全部跳错。
+ *
+ * 也必须排在 rehypeSanitize 之后——sanitize 默认给 id 加 `user-content-`
+ * 前缀防 DOM clobbering，排在前面写的 id 会被改名。
+ */
+function rehypeWikiHeadingIds() {
+  return (tree: HastNode) => {
+    const used = new Map<string, number>();
+    const walk = (node: HastNode) => {
+      if (
+        node.type === "element" &&
+        (node.tagName === "h2" || node.tagName === "h3")
+      ) {
+        const base = slugifyHeading(nodeText(node));
+        const occurrence = used.get(base) ?? 0;
+        used.set(base, occurrence + 1);
+        node.properties = {
+          ...node.properties,
+          id: slugifyHeading(nodeText(node), occurrence),
+        };
+      }
+      for (const child of node.children ?? []) {
+        walk(child);
+      }
+    };
+    walk(tree);
+  };
 }
 
 /** Wiki 页面正文渲染：[[链接]] 可点击跳页，外链经系统浏览器打开。 */
@@ -70,7 +120,7 @@ export function WikiMarkdown({
     <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-code:text-primary prose-a:text-primary">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeSanitize]}
+        rehypePlugins={[rehypeSanitize, rehypeWikiHeadingIds]}
         components={components}
       >
         {preprocessWikiLinks(body)}

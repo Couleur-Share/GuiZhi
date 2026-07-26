@@ -50,17 +50,16 @@ export function mapLegacyItemType(value: unknown): string {
   return ITEM_TYPES[index] ?? "note";
 }
 
-/** 旧版 Status：0=Inbox 1=Processing 2=Ready 3=Archived 4=Failed → 新版三态。 */
+/**
+ * 旧版 Status：0=Inbox 1=Processing 2=Ready 3=Archived 4=Failed → 新版两态。
+ *
+ * 只有 Archived 需要区分：旧版那几种「没处理完」的状态在新模型里不存在了，
+ * 待整理与否改看条目有没有归入知识库（迁移会把旧集合一并带过来）。
+ */
 export function mapLegacyStatus(value: unknown): string {
-  switch (typeof value === "number" ? value : Number(value)) {
-    case 2:
-      return "ready";
-    case 3:
-      return "archived";
-    default:
-      // Inbox / Processing（中断的后台处理）/ Failed 都回到收件箱
-      return "inbox";
-  }
+  return (typeof value === "number" ? value : Number(value)) === 3
+    ? "archived"
+    : "active";
 }
 
 const TAG_COLORS = ["teal", "blue", "purple", "pink", "amber", "green"] as const;

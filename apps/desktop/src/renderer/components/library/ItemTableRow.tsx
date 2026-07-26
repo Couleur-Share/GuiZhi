@@ -144,7 +144,6 @@ export function ItemTableRow({
                   event.stopPropagation();
                   onOpen();
                 }}
-                title={title}
                 className="min-w-0 truncate text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
               >
                 {title}
@@ -162,10 +161,7 @@ export function ItemTableRow({
       case "snippet":
         return (
           <td key={column.id} className={CELL} style={style}>
-            <span
-              className="block truncate text-xs text-muted-foreground"
-              title={entry.snippet || undefined}
-            >
+            <span className="block truncate text-xs text-muted-foreground">
               {entry.snippet || (
                 <span className="text-muted-foreground/40">-</span>
               )}
@@ -183,7 +179,6 @@ export function ItemTableRow({
                 entry.tags.slice(0, 2).map((tag) => (
                   <span
                     key={tag.id}
-                    title={tag.name}
                     className={`max-w-[5rem] truncate rounded px-1.5 py-0.5 text-[10px] leading-none ${TAG_COLOR_CLASSES[tag.colorKey]}`}
                   >
                     {tag.name}
@@ -309,7 +304,7 @@ export function ItemTableRow({
                   </RowAction>
                   {entry.status === "archived" ? (
                     <RowAction
-                      onClick={() => void setStatus([entry.id], "ready")}
+                      onClick={() => void setStatus([entry.id], "active")}
                       label={t("library.unarchive", "取消归档")}
                     >
                       <ArchiveRestoreIcon

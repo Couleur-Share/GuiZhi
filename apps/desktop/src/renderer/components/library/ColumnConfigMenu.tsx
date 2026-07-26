@@ -77,7 +77,6 @@ export function ColumnConfigMenu({
         }}
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
-        title={label}
         className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
           anchor
             ? "border-primary/30 bg-primary/10 text-primary"

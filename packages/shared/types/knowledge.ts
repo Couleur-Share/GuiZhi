@@ -16,7 +16,15 @@ export const KNOWLEDGE_ITEM_TYPES = [
 
 export type KnowledgeItemType = (typeof KNOWLEDGE_ITEM_TYPES)[number];
 
-export const KNOWLEDGE_ITEM_STATUSES = ["inbox", "ready", "archived"] as const;
+/**
+ * 条目状态只有「活跃」与「归档」两态。
+ *
+ * v0.6 之前还有一个 inbox 态，本意是「待整理」，但它不 gate 任何消费路径
+ * （问答检索、Wiki 编译、语义索引一律无视 status），也没有任何自动化会推进它，
+ * 于是永远停在 inbox——「收件箱」和「全部」显示的是同一批条目。
+ * 待整理的真实信号是「还没归到任何知识库」，见 scope 的 uncategorized。
+ */
+export const KNOWLEDGE_ITEM_STATUSES = ["active", "archived"] as const;
 
 export type KnowledgeItemStatus = (typeof KNOWLEDGE_ITEM_STATUSES)[number];
 
@@ -93,9 +101,9 @@ export interface KnowledgeItemListEntry {
   tags: Tag[];
 }
 
-/** 侧栏导航范围 */
+/** 侧栏导航范围。uncategorized = 未归入任何知识库，即待整理队列 */
 export const KNOWLEDGE_SCOPES = [
-  "inbox",
+  "uncategorized",
   "all",
   "favorites",
   "archived",
@@ -182,9 +190,9 @@ export interface UpdateKnowledgeItemInput {
   tagNames?: string[];
 }
 
-/** 侧栏计数（未删除条目） */
+/** 侧栏计数（未删除条目；除 trash 外都排除归档，与点进去看到的列表同口径） */
 export interface KnowledgeCounts {
-  inbox: number;
+  uncategorized: number;
   all: number;
   favorites: number;
   archived: number;

@@ -14,7 +14,6 @@ function SidebarRailItems({ controller }: SidebarRailProps) {
           key={item.key}
           onClick={item.onClick}
           aria-label={item.label}
-          title={item.label}
           className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-[11px] font-medium transition-colors titlebar-no-drag ${item.active ? "bg-primary text-white shadow-sm" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
         >
           <span className="relative">
@@ -64,7 +63,7 @@ function SidebarRailSettings({ controller }: SidebarRailProps) {
 export function SidebarRail({ controller }: SidebarRailProps) {
   return (
     <div
-      className={`flex ${controller.railWidthClass} shrink-0 flex-col bg-sidebar-accent/25 ${controller.layout === "combined" && !controller.isCollapsed ? "border-r border-sidebar-border/60" : ""}`}
+      className={`flex ${controller.railWidthClass} shrink-0 select-none flex-col bg-sidebar-accent/25 ${controller.layout === "combined" && !controller.isCollapsed ? "border-r border-sidebar-border/60" : ""}`}
     >
       {!controller.webRuntime &&
       controller.isMac &&

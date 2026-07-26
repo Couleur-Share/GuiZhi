@@ -78,14 +78,25 @@ function countEligibleItems(db: Database.Database): number {
   return row?.c ?? 0;
 }
 
-/** 待索引条目：无索引 / 内容哈希变化 / 模型切换 */
-export function listPendingSemanticItems(
+/**
+ * 待索引条目：无索引 / 内容哈希变化 / 模型切换。
+ *
+ * SQL 预筛只看得到时间戳，哈希才是权威判定。被预筛捞出来、哈希一比却发现
+ * 没变的条目（收藏、打标签、写 AI 摘要都会推高 updated_at，却都不影响
+ * 参与嵌入的文本），顺手把它们的索引行时间戳抬到当前，让它们退出候选集合。
+ *
+ * 不这么做的后果实测过：这类条目会永远留在候选里，侧栏一直显示
+ * 「索引 N 条新内容」，点下去 pending 是空的，界面上就是「点了没反应」。
+ */
+function resolvePendingItems(
   db: Database.Database,
   model: string,
-  limit: number,
+  limit?: number,
 ): PendingSemanticItem[] {
-  const states = new SemanticIndexDB(db).listItemStates();
+  const index = new SemanticIndexDB(db);
+  const states = index.listItemStates();
   const pending: PendingSemanticItem[] = [];
+  const upToDate: string[] = [];
 
   for (const id of listCandidateItemIds(db, model)) {
     const row = db.get(
@@ -100,6 +111,7 @@ export function listPendingSemanticItems(
     );
     const state = states.get(row.id);
     if (state && state.contentHash === contentHash && state.model === model) {
+      upToDate.push(row.id);
       continue;
     }
     pending.push({
@@ -109,29 +121,43 @@ export function listPendingSemanticItems(
       transcript: row.transcript,
       contentHash,
     });
-    if (pending.length >= limit) {
+    if (limit !== undefined && pending.length >= limit) {
       break;
     }
   }
+
+  index.touchIndexedAt(upToDate);
   return pending;
+}
+
+export function listPendingSemanticItems(
+  db: Database.Database,
+  model: string,
+  limit: number,
+): PendingSemanticItem[] {
+  return resolvePendingItems(db, model, limit);
 }
 
 /**
  * 索引进度。
  *
- * 「已索引」按候选判定取反算，不再逐条读正文重算哈希——这个查询在侧栏
- * 每次挂载都会打一次，而它此前的代价与整个知识库的正文总量成正比。
- * 代价是同一毫秒内写入的条目会短暂被算作未索引，下一轮就会归位。
+ * 「待索引」必须与真正要跑的那批条目同一个口径，否则按钮上的数字点不动：
+ * 早先这里数的是 SQL 预筛出来的候选数，而候选里混着一批哈希其实没变的
+ * 条目，它们进不了 pending，数字却一直挂在那儿。
+ *
+ * 走 resolvePendingItems 意味着要为候选条目读一次正文算哈希，但候选集合
+ * 只包含「时间戳动过」的条目，稳态下很小；而且每算一次就会把确认没变的
+ * 那些踢出候选，下一次更便宜。
  */
 export function getSemanticStatus(
   db: Database.Database,
   model: string,
 ): SemanticIndexStatus {
   const eligibleItems = countEligibleItems(db);
-  const candidates = listCandidateItemIds(db, model).length;
+  const pending = resolvePendingItems(db, model).length;
 
   return {
-    indexedItems: Math.max(0, eligibleItems - candidates),
+    indexedItems: Math.max(0, eligibleItems - pending),
     eligibleItems,
     totalChunks: new SemanticIndexDB(db).stats().totalChunks,
   };

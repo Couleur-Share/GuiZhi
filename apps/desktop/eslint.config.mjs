@@ -3,6 +3,7 @@ import tsParser from "@typescript-eslint/parser";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
+import { noRedundantTitle } from "./eslint-rules/no-redundant-title.mjs";
 
 const commonGlobals = {
   window: "readonly",
@@ -68,6 +69,7 @@ export default [
       "@typescript-eslint": tsPlugin,
       react: reactPlugin,
       "react-hooks": reactHooksPlugin,
+      guizhi: { rules: { "no-redundant-title": noRedundantTitle } },
     },
     settings: {
       react: {
@@ -106,6 +108,31 @@ export default [
       // 清洗文件名与路径本来就要按控制字符成段匹配（\u0000-\u001f），
       // 这条规则在本仓库全是误报
       "no-control-regex": "off",
+
+      // 原生弹窗由 Chromium/系统绘制，标题栏写的是应用名，配色与应用无关；
+      // 用 components/ui/ConfirmDialog 代替
+      "no-alert": "error",
+
+      // 悬浮气泡把元素自己已经写着的字再念一遍，等于没有信息
+      "guizhi/no-redundant-title": "error",
+
+      // 会拉起操作系统窗口、CSS 完全够不着的元素。globals.css 里能收敛的
+      // （range / number / search）已经收敛，剩下这些只能换自绘组件。
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "JSXOpeningElement[name.name=/^(select|option|optgroup|datalist)$/]",
+          message:
+            "原生 <select> 的下拉列表是系统弹窗，无法套用主题令牌。请改用 components/ui/Select。",
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='color']",
+          message:
+            "<input type=\"color\"> 会拉起系统取色对话框。请改用 components/ui/ColorPicker。",
+        },
+      ],
     },
   },
   {

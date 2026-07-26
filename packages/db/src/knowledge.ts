@@ -138,8 +138,14 @@ export class KnowledgeItemDB {
     const params: unknown[] = [];
 
     switch (query.scope) {
-      case "inbox":
-        conditions.push("i.deleted_at IS NULL", "i.status = 'inbox'");
+      case "uncategorized":
+        // 待整理队列：还没归入任何知识库的条目。归档的不算——归档本身就是
+        // 「处理完了，别再来烦我」，再塞回待整理队列只会让它永远清不空
+        conditions.push(
+          "i.deleted_at IS NULL",
+          "i.collection_id IS NULL",
+          "i.status != 'archived'",
+        );
         break;
       case "favorites":
         conditions.push("i.deleted_at IS NULL", "i.is_favorite = 1");
@@ -256,7 +262,7 @@ export class KnowledgeItemDB {
   counts(): KnowledgeCounts {
     const scopeRow = this.db.get(
       `SELECT
-         SUM(CASE WHEN deleted_at IS NULL AND status = 'inbox' THEN 1 ELSE 0 END) AS inbox,
+         SUM(CASE WHEN deleted_at IS NULL AND collection_id IS NULL AND status != 'archived' THEN 1 ELSE 0 END) AS uncategorized,
          SUM(CASE WHEN deleted_at IS NULL AND status != 'archived' THEN 1 ELSE 0 END) AS all_count,
          SUM(CASE WHEN deleted_at IS NULL AND is_favorite = 1 THEN 1 ELSE 0 END) AS favorites,
          SUM(CASE WHEN deleted_at IS NULL AND status = 'archived' THEN 1 ELSE 0 END) AS archived,
@@ -264,7 +270,7 @@ export class KnowledgeItemDB {
        FROM knowledge_items`,
     ) as
       | {
-          inbox: number | null;
+          uncategorized: number | null;
           all_count: number | null;
           favorites: number | null;
           archived: number | null;
@@ -272,9 +278,11 @@ export class KnowledgeItemDB {
         }
       | undefined;
 
+    // 集合与标签的计数必须排除归档：点进侧栏某个集合时 scope 被复位成 all，
+    // 而 all 是不含归档的。少了这个条件，侧栏显示 10、点进去只有 7
     const byCollectionRows = this.db.all(
       `SELECT collection_id, COUNT(*) AS count FROM knowledge_items
-       WHERE deleted_at IS NULL AND collection_id IS NOT NULL
+       WHERE deleted_at IS NULL AND status != 'archived' AND collection_id IS NOT NULL
        GROUP BY collection_id`,
     ) as Array<{ collection_id: string; count: number }>;
 
@@ -282,12 +290,12 @@ export class KnowledgeItemDB {
       `SELECT kit.tag_id AS tag_id, COUNT(*) AS count
        FROM knowledge_item_tags kit
        JOIN knowledge_items i ON i.id = kit.item_id
-       WHERE i.deleted_at IS NULL
+       WHERE i.deleted_at IS NULL AND i.status != 'archived'
        GROUP BY kit.tag_id`,
     ) as Array<{ tag_id: string; count: number }>;
 
     return {
-      inbox: scopeRow?.inbox ?? 0,
+      uncategorized: scopeRow?.uncategorized ?? 0,
       all: scopeRow?.all_count ?? 0,
       favorites: scopeRow?.favorites ?? 0,
       archived: scopeRow?.archived ?? 0,
@@ -318,7 +326,7 @@ export class KnowledgeItemDB {
         input.content ?? "",
         input.transcript ?? null,
         input.itemType ?? "note",
-        input.status ?? "inbox",
+        input.status ?? "active",
         input.collectionId ?? null,
         now,
         now,

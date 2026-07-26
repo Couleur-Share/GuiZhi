@@ -11,6 +11,7 @@ import type {
   WikiCompilableItem,
   WikiPageKind,
 } from "@guizhi/shared/types";
+import { stripDuplicateTitleHeading } from "@guizhi/shared/utils/wiki-body";
 import {
   WIKI_COMPILE_CATALOG_LIMIT,
   WIKI_COMPILE_CONTEXT_PAGES_LIMIT,
@@ -132,9 +133,14 @@ export function sanitizePages(pages: RawPageDto[]): WikiPageDraft[] {
     }
     seen.add(normalized);
 
-    const body = truncatePlain(
-      typeof dto.body === "string" ? dto.body.trim() : "",
-      BODY_MAX_LENGTH,
+    // 详情页头部已经渲染了 title，模型还常在正文首行放一个同名一级标题，
+    // 落库前剥掉；渲染侧另有一层兜底，负责已经入库的老页面
+    const body = stripDuplicateTitleHeading(
+      truncatePlain(
+        typeof dto.body === "string" ? dto.body.trim() : "",
+        BODY_MAX_LENGTH,
+      ),
+      title,
     );
     if (!body) {
       continue;

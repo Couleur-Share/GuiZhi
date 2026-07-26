@@ -366,10 +366,6 @@ export function EndpointsSection({
 
   const endpointStatus = getEndpointStatus(selectedGroup);
   const providerMetaLabel = getProtocolLabel(selectedGroup.apiProtocol);
-  const endpointHost = getEndpointHost(
-    selectedGroup.apiUrl,
-    t("settings.aiWorkbenchEndpointAddressMissing"),
-  );
   const firstModel = selectedGroup.models[0];
 
   return (
@@ -625,7 +621,6 @@ export function EndpointsSection({
                               "settings.aiWorkbenchEndpointApiUrl",
                               "Endpoint API URL",
                             )}
-                            title={endpointHost}
                             className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/15"
                           />
                         </label>

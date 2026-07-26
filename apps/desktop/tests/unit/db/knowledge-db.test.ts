@@ -30,7 +30,7 @@ describe("KnowledgeItemDB", () => {
     });
 
     expect(created.id).toBeTruthy();
-    expect(created.status).toBe("inbox");
+    expect(created.status).toBe("active");
     expect(created.itemType).toBe("note");
     expect(created.tags.map((tag) => tag.name).sort()).toEqual([
       "测试",
@@ -70,13 +70,16 @@ describe("KnowledgeItemDB", () => {
   });
 
   it("scope 过滤与排序（置顶在前）", () => {
-    const a = items.create({ title: "A", status: "ready" });
-    items.create({ title: "B", status: "inbox" });
-    const c = items.create({ title: "C", status: "ready" });
+    const collection = new CollectionDB(db).create({ name: "集合" });
+    const a = items.create({ title: "A", collectionId: collection.id });
+    items.create({ title: "B" });
+    const c = items.create({ title: "C", collectionId: collection.id });
     items.update(c.id, { status: "archived" });
     items.update(a.id, { isPinned: true });
 
-    expect(items.list({ scope: "inbox" }).total).toBe(1);
+    // 未分类 = 没归入任何集合且未归档；B 是唯一一条
+    expect(items.list({ scope: "uncategorized" }).total).toBe(1);
+    expect(items.list({ scope: "uncategorized" }).entries[0].title).toBe("B");
     expect(items.list({ scope: "archived" }).total).toBe(1);
     const all = items.list({ scope: "all" });
     expect(all.total).toBe(2);
@@ -86,10 +89,20 @@ describe("KnowledgeItemDB", () => {
     expect(items.list({ scope: "favorites" }).total).toBe(1);
   });
 
+  it("未分类不含归档条目：归档过的无集合条目不再回到待整理队列", () => {
+    const kept = items.create({ title: "还没归档" });
+    const archived = items.create({ title: "归档了" });
+    items.update(archived.id, { status: "archived" });
+
+    const result = items.list({ scope: "uncategorized" });
+    expect(result.total).toBe(1);
+    expect(result.entries[0].id).toBe(kept.id);
+  });
+
   it("排序参数生效，置顶始终在最前", () => {
-    const first = items.create({ title: "Banana", status: "ready" });
-    const second = items.create({ title: "apple", status: "ready" });
-    const third = items.create({ title: "Cherry", status: "ready" });
+    const first = items.create({ title: "Banana" });
+    const second = items.create({ title: "apple" });
+    const third = items.create({ title: "Cherry" });
 
     // 同毫秒创建会让时间排序不确定，这里手工拉开时间戳
     for (const [index, id] of [first.id, second.id, third.id].entries()) {
@@ -252,16 +265,17 @@ describe("KnowledgeItemDB", () => {
   it("counts 汇总正确", () => {
     const collections = new CollectionDB(db);
     const col = collections.create({ name: "集合" });
-    const a = items.create({ title: "a", status: "inbox", collectionId: col.id });
-    items.create({ title: "b", status: "ready", tagNames: ["t1"] });
-    const c = items.create({ title: "c", status: "ready" });
+    const a = items.create({ title: "a", collectionId: col.id });
+    items.create({ title: "b", tagNames: ["t1"] });
+    const c = items.create({ title: "c" });
     items.update(a.id, { isFavorite: true });
     items.update(c.id, { status: "archived" });
     const d = items.create({ title: "d" });
     items.moveToTrash([d.id]);
 
     const counts = items.counts();
-    expect(counts.inbox).toBe(1);
+    // a 有集合、c 已归档、d 在回收站，只剩 b 是待整理
+    expect(counts.uncategorized).toBe(1);
     expect(counts.all).toBe(2);
     expect(counts.favorites).toBe(1);
     expect(counts.archived).toBe(1);
@@ -269,6 +283,24 @@ describe("KnowledgeItemDB", () => {
     expect(counts.byCollection[col.id]).toBe(1);
     const tag = new TagDB(db).findByName("t1");
     expect(counts.byTag[tag!.id]).toBe(1);
+  });
+
+  it("集合与标签计数排除归档，与点进去看到的列表同口径", () => {
+    const col = new CollectionDB(db).create({ name: "集合" });
+    items.create({ title: "留着", collectionId: col.id, tagNames: ["t1"] });
+    const archived = items.create({
+      title: "归档掉",
+      collectionId: col.id,
+      tagNames: ["t1"],
+    });
+    items.update(archived.id, { status: "archived" });
+
+    const counts = items.counts();
+    const tag = new TagDB(db).findByName("t1");
+    expect(counts.byCollection[col.id]).toBe(1);
+    expect(counts.byTag[tag!.id]).toBe(1);
+    expect(items.list({ scope: "all", collectionId: col.id }).total).toBe(1);
+    expect(items.list({ scope: "all", tagId: tag!.id }).total).toBe(1);
   });
 });
 
@@ -507,7 +539,7 @@ describe("列表查询的执行计划", () => {
       items.create({
         title: `条目 ${index}`,
         content: "正文".repeat(50),
-        status: index % 10 === 0 ? "archived" : "ready",
+        status: index % 10 === 0 ? "archived" : "active",
       });
     }
     db.exec("ANALYZE");

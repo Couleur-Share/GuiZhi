@@ -178,5 +178,20 @@ pnpm electron:build:win  # Windows 打包
   `config/file-line-limit-baseline.json`（`pnpm lint:file-size`）。
 - 生成的代码注释与日志用中文（可中英双语），标识符用英文。
 - 渲染进程不得直接访问 Node API；一切系统能力经 preload 白名单。
+- 界面里不出现原生控件。`<select>` 的下拉列表、`<input type="color">`、
+  `alert/confirm/prompt` 都由操作系统绘制，CSS 完全够不着，一律换成
+  `components/ui` 下的 `Select` / `ColorPicker` / `ConfirmDialog`；eslint 的
+  `no-alert` 与 `no-restricted-syntax` 会挡住回潮。滑块、数字步进箭头、搜索框
+  清除叉这些浏览器自绘的默认外观在 `globals.css` 统一收敛。`title` 提示由
+  `ui/TooltipLayer` 全局接管（悬停时摘走 `title` 自绘、移开再装回），
+  所以写 `title` 无需改动即可获得主题化气泡。
+- `title` 必须给出元素自己没写出来的信息。纯图标控件该写（气泡是它唯一的名字）；
+  气泡内容与可见文字不同的该写（绝对时间对相对时间、URL 对显示名、置灰原因、
+  快捷键）。而 `title={x}` 配 `{x}` 这种把同一句话再念一遍的一律不写——即便
+  文字被 `truncate` 截断也不写，完整内容靠点开条目/加宽列去看，不靠悬停。
+  同一控件在不同形态下结论不同时写成条件式（`collapsed ? label : undefined`），
+  不要图省事一律挂上。点击会打开菜单或弹窗的按钮尤其别挂无谓的 `title`。
+  eslint 的 `guizhi/no-redundant-title`（`apps/desktop/eslint-rules/`）会挡住
+  原生标签上的回潮；组件（`ui/Input` 这类透传 title 的）它查不到，仍需人工把关。
 - 远程抓取必须走 `main/services/net-safety.ts` 的 SSRF 防护。
 - 机密（API Key）不写入 localStorage 之外的明文位置；导出功能不得携带机密。

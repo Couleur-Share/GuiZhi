@@ -30,6 +30,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const runtimeCapabilities = getRuntimeCapabilities();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [focusRequested, setFocusRequested] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 搜索只作用于知识库。在问答/Wiki/导入页显示这个框，用户打了字却什么都不发生，
@@ -40,11 +41,21 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
     const focusSearch = () => {
       // 在别的模块按搜索快捷键，先切回知识库再聚焦，否则光标进了一个不起作用的框
       setAppModule("library");
-      searchInputRef.current?.focus();
+      setFocusRequested(true);
     };
     window.addEventListener("shortcut:search", focusSearch);
     return () => window.removeEventListener("shortcut:search", focusSearch);
   }, [setAppModule]);
+
+  // 聚焦要等切换真正提交到 DOM：visibility: hidden 的元素不可聚焦，
+  // 在事件回调里紧接着 setAppModule 调 focus() 只会静默失败。
+  useEffect(() => {
+    if (!focusRequested || !isSearchable) {
+      return;
+    }
+    setFocusRequested(false);
+    searchInputRef.current?.focus();
+  }, [focusRequested, isSearchable]);
 
   // 防抖下发到知识库全文检索
   useEffect(() => {
@@ -103,6 +114,10 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
         >
           <div className="app-wallpaper-search absolute inset-0 rounded-lg border pointer-events-none" />
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
+          {/* 只过渡 box-shadow（焦点环）。transition-all 会把继承自外层的
+              visibility 一并纳入过渡：切到问答/Wiki 时外层已 invisible，
+              图标与玻璃底框立刻消失，输入框却要等过渡跑完才隐藏，
+              占位文字「搜索知识…」于是孤零零地多留一帧多。 */}
           <input
             ref={searchInputRef}
             type="text"
@@ -111,7 +126,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
             value={searchQuery}
             tabIndex={isSearchable ? 0 : -1}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="relative z-10 w-full h-9 pl-9 pr-10 rounded-lg border border-transparent bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            className="relative z-10 w-full h-9 pl-9 pr-10 rounded-lg border border-transparent bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow duration-quick"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           />
           {searchQuery && (
@@ -148,7 +163,6 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
                 className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
                 style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
                 aria-label={t("settings.updateAvailable")}
-                title={t("settings.updateAvailable")}
               >
                 <DownloadIcon aria-hidden="true" className="w-4 h-4" />
                 <span className="hidden sm:inline">{updateButtonLabel}</span>

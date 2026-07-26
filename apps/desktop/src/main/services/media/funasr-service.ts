@@ -13,6 +13,7 @@ import {
   getFunasrPaths,
   isFunasrInstalled,
 } from "./funasr-paths";
+import { ensureFunasrServerScript } from "./funasr-server-script";
 
 const DEFAULT_BOOT_TIMEOUT_MS = 2 * 60 * 1000;
 const HEALTH_POLL_INTERVAL_MS = 2000;
@@ -58,11 +59,14 @@ export function isManagedFunasrUrl(apiUrl: string): boolean {
 
 async function startAndWait(bootTimeoutMs: number): Promise<void> {
   const paths = getFunasrPaths();
+  // 脚本内容随应用版本走：升级后无需重装引擎，这里覆盖到最新
+  ensureFunasrServerScript(paths.serverScript);
   logTail = "";
   childExited = false;
   child = spawn(
-    paths.serverExe,
+    paths.venvPython,
     [
+      paths.serverScript,
       "--device",
       "cpu",
       "--model",

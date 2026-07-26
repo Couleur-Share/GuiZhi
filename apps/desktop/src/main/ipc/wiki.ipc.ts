@@ -12,6 +12,9 @@ export function registerWikiIPC(db: Database.Database): void {
   const wiki = new WikiDB(db);
 
   ipcMain.handle(IPC_CHANNELS.WIKI_CATALOG, () => wiki.getCatalog());
+  ipcMain.handle(IPC_CHANNELS.WIKI_BACKLINK_COUNTS, () =>
+    wiki.getBacklinkCounts(),
+  );
   ipcMain.handle(
     IPC_CHANNELS.WIKI_SEARCH,
     (_event, query: string, limit: number) =>

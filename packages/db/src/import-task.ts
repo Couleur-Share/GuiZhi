@@ -9,6 +9,7 @@ import type {
   ImportStage,
   ImportTask,
   ImportTaskStatus,
+  KnowledgeItemType,
 } from "@guizhi/shared/types";
 
 interface TaskRow {
@@ -19,6 +20,7 @@ interface TaskRow {
   status: ImportTaskStatus;
   stage: ImportStage | null;
   error: string | null;
+  item_type: KnowledgeItemType | null;
   result_item_id: string | null;
   duplicate_item_id: string | null;
   collection_id: string | null;
@@ -64,6 +66,7 @@ function mapRow(row: TaskRow): ImportTask {
     status: row.status,
     stage: row.stage,
     error: row.error,
+    itemType: row.item_type,
     resultItemId: row.result_item_id,
     duplicateItemId: row.duplicate_item_id,
     collectionId: row.collection_id,
@@ -156,6 +159,9 @@ export class ImportTaskDB {
       status: ImportTaskStatus;
       stage: ImportStage | null;
       error: string | null;
+      /** 抽取拿到真实标题后回写，替换建任务时的原始 URL / 首行 */
+      displayName: string;
+      itemType: KnowledgeItemType | null;
       resultItemId: string | null;
       duplicateItemId: string | null;
       forceDuplicate: boolean;
@@ -170,11 +176,14 @@ export class ImportTaskDB {
     }
     this.db.run(
       `UPDATE import_tasks SET
-         status = ?, stage = ?, error = ?, result_item_id = ?, duplicate_item_id = ?, force_duplicate = ?, updated_at = ?
+         status = ?, stage = ?, error = ?, display_name = ?, item_type = ?,
+         result_item_id = ?, duplicate_item_id = ?, force_duplicate = ?, updated_at = ?
        WHERE id = ?`,
       patch.status ?? existing.status,
       patch.stage !== undefined ? patch.stage : existing.stage,
       patch.error !== undefined ? patch.error : existing.error,
+      patch.displayName?.trim() || existing.display_name,
+      patch.itemType !== undefined ? patch.itemType : existing.item_type,
       patch.resultItemId !== undefined
         ? patch.resultItemId
         : existing.result_item_id,

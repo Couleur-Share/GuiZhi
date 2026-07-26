@@ -115,21 +115,59 @@ async function requestTranscription(
   return payload.text;
 }
 
+/**
+ * CJK 文字与全角标点。两者相邻处出现的空格是转写按 VAD 切段再拼接留下的
+ * 噪音（实测「所谓的高手 都是」「持っ ていけない」），不是分词。
+ */
+const CJK_RANGES =
+  "\\u3000-\\u303f\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uac00-\\ud7af\\uff00-\\uffef";
+const CJK_ADJACENT_SPACE = new RegExp(
+  `([${CJK_RANGES}])[ \\t]+(?=[${CJK_RANGES}])`,
+  "g",
+);
+const PUNCTUATION_RUN = /[，、；：。！？]{2,}/g;
+const SENTENCE_END = "。！？";
+
+/**
+ * 转写文本清洗。
+ *
+ * 开了 use_itn 的 SenseVoice 会在 VAD 段边界处叠出「高手，。」这类
+ * 双标点——前一段收尾的逗号撞上后一段起头的句号。折叠时句末标点优先，
+ * 因为叠加位置本身就是一次停顿。
+ *
+ * 对已经排版规整的云端转写结果是幂等的，不会改动 ASCII 文本的空格。
+ */
+export function cleanTranscriptText(raw: string): string {
+  return raw
+    .replace(CJK_ADJACENT_SPACE, "$1")
+    .replace(PUNCTUATION_RUN, (run) => {
+      for (const char of run) {
+        if (SENTENCE_END.includes(char)) {
+          return char;
+        }
+      }
+      return run[0];
+    })
+    .trim();
+}
+
 export async function transcribeMediaFile(
   filePath: string,
   config: TranscriptionModelConfig,
   signal?: AbortSignal,
 ): Promise<string> {
   const timeoutSignal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
-  const text = await requestTranscription(
-    filePath,
-    config,
-    signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+  const text = cleanTranscriptText(
+    await requestTranscription(
+      filePath,
+      config,
+      signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+    ),
   );
-  if (!text.trim()) {
+  if (!text) {
     throw new Error("转写接口未返回有效文本");
   }
-  return text.trim();
+  return text;
 }
 
 /** 生成指定时长的 16kHz 单声道 16bit 静音 WAV（连通性测试样本） */

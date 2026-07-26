@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type SettingsSectionId } from "../../stores/ui.store";
-import { Spinner } from "../ui";
+// 直接指向文件而不走 ui 的桶文件：桶文件会把 ModelIcons 连同二十来个
+// provider SVG 一起拖进设置页的首屏依赖，dev 下每个都是一次单独请求
+import { Spinner } from "../ui/Spinner";
 
 interface SettingsPageProps {
   onBack: () => void;

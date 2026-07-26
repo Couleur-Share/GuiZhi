@@ -1,100 +1,184 @@
-import { useEffect } from "react";
-import { Loader2Icon, SparklesIcon } from "lucide-react";
+import {
+  BoxIcon,
+  LayersIcon,
+  LightbulbIcon,
+  ListIcon,
+  PencilIcon,
+  UnlinkIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useWikiStore } from "../../stores/wiki.store";
+import {
+  countCatalogByFilter,
+  useWikiStore,
+  type WikiCatalogFilter,
+} from "../../stores/wiki.store";
+
+function FilterRow({
+  icon,
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors duration-smooth ${
+        active
+          ? "bg-primary/15 text-primary"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+      }`}
+    >
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+        {icon}
+      </span>
+      <span
+        className={`min-w-0 flex-1 truncate text-left ${active ? "font-medium" : ""}`}
+      >
+        {label}
+      </span>
+      <span
+        className={`rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums ${
+          active
+            ? "border-primary/20 bg-primary/10 text-primary/80"
+            : "border-white/5 bg-sidebar-accent/80 text-sidebar-foreground/50"
+        }`}
+      >
+        {count}
+      </span>
+    </button>
+  );
+}
 
 /**
- * Wiki 模块侧栏：编译状态摘要 + 立即编译 + 最近更新页面。
+ * Wiki 模块侧栏：目录的筛选轴。
+ *
+ * 这里原本放的是「最近更新」——`catalog.slice(0, 15)`，和中间目录列
+ * 同源同序，页面标题在屏幕上被列了两遍。侧栏该给的是「看哪一批」，
+ * 不是再抄一遍列表。编译入口与状态统一收在工作区顶栏，也不再两处各一份。
  */
 export function SidebarWikiPanel() {
   const { t } = useTranslation();
   const catalog = useWikiStore((state) => state.catalog);
-  const status = useWikiStore((state) => state.status);
-  const selectedPageId = useWikiStore((state) => state.selectedPageId);
-  const isCompiling = useWikiStore((state) => state.isCompiling);
-  const compileProgress = useWikiStore((state) => state.compileProgress);
-  const refresh = useWikiStore((state) => state.refresh);
-  const selectPage = useWikiStore((state) => state.selectPage);
-  const compileNow = useWikiStore((state) => state.compileNow);
+  const backlinkCounts = useWikiStore((state) => state.backlinkCounts);
+  const filter = useWikiStore((state) => state.catalogFilter);
+  const setFilter = useWikiStore((state) => state.setCatalogFilter);
+  const viewMode = useWikiStore((state) => state.viewMode);
+  const setViewMode = useWikiStore((state) => state.setViewMode);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const counts = countCatalogByFilter(catalog, backlinkCounts);
 
-  const pendingCount = status
-    ? Math.max(0, status.eligibleItemCount - status.compiledItemCount)
-    : 0;
-  const recentPages = catalog.slice(0, 15);
+  const groups: {
+    titleKey: string;
+    titleFallback: string;
+    rows: { id: WikiCatalogFilter; icon: React.ReactNode; label: string }[];
+  }[] = [
+    {
+      titleKey: "wiki.panelBrowse",
+      titleFallback: "浏览",
+      rows: [
+        {
+          id: "all",
+          icon: <LayersIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.panelAll", "全部页面"),
+        },
+      ],
+    },
+    {
+      titleKey: "wiki.panelByKind",
+      titleFallback: "按类型",
+      rows: [
+        {
+          id: "topic",
+          icon: <ListIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.kindTopic", "主题"),
+        },
+        {
+          id: "entity",
+          icon: <BoxIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.kindEntity", "实体"),
+        },
+        {
+          id: "concept",
+          icon: <LightbulbIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.kindConcept", "概念"),
+        },
+      ],
+    },
+    {
+      titleKey: "wiki.panelNeedsAttention",
+      titleFallback: "需要留意",
+      rows: [
+        {
+          id: "orphan",
+          icon: <UnlinkIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.panelOrphan", "孤立页"),
+        },
+        {
+          id: "manual",
+          icon: <PencilIcon className="h-4 w-4" aria-hidden="true" />,
+          label: t("wiki.panelManual", "手动编辑过"),
+        },
+      ],
+    },
+  ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-3">
-      <div className="pt-3">
-        <div className="rounded-lg border border-sidebar-border/70 px-3 py-2.5">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-3 pt-3">
+      {viewMode === "graph" ? (
+        <div className="rounded-lg border border-dashed border-sidebar-border px-3 py-3 text-center">
           <p className="text-xs text-sidebar-foreground/60">
-            {t("wiki.panelStatus", "{{pages}} 个页面 · {{compiled}}/{{eligible}} 条已编译", {
-              pages: status?.pageCount ?? 0,
-              compiled: status?.compiledItemCount ?? 0,
-              eligible: status?.eligibleItemCount ?? 0,
-            })}
+            {t("wiki.panelGraphHint", "图谱视图下按节点浏览")}
           </p>
           <button
             type="button"
-            onClick={() => void compileNow()}
-            disabled={isCompiling}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+            onClick={() => setViewMode("catalog")}
+            className="mt-2 text-xs text-primary transition-colors hover:underline"
           >
-            {isCompiling ? (
-              <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-            ) : (
-              <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
-            )}
-            {isCompiling
-              ? compileProgress
-                ? t("wiki.panelCompiling", "编译中 {{current}}/{{total}}", {
-                    current: compileProgress.current,
-                    total: compileProgress.total,
-                  })
-                : t("wiki.panelCompilingSimple", "编译中…")
-              : pendingCount > 0
-                ? t("wiki.panelCompilePending", "编译 {{count}} 条新内容", {
-                    count: pendingCount,
-                  })
-                : t("wiki.panelCompileNow", "立即编译")}
+            {t("wiki.viewCatalog", "目录视图")}
           </button>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 px-3 pb-1 pt-4">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/50">
-          {t("wiki.panelRecent", "最近更新")}
-        </span>
-        <div className="h-px flex-1 bg-sidebar-border/60" />
-      </div>
-
-      {recentPages.length === 0 ? (
-        <p className="px-3 py-1 text-xs text-sidebar-foreground/40">
-          {t("wiki.panelEmpty", "还没有 Wiki 页面，编译后自动生成")}
-        </p>
       ) : (
-        recentPages.map((page) => (
-          <div key={page.id} className="w-full py-0.5">
-            <button
-              type="button"
-              onClick={() => void selectPage(page.id)}
-              title={page.title}
-              className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left transition-all duration-smooth ${
-                selectedPageId === page.id
-                  ? "bg-primary text-white shadow-sm"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-              }`}
-            >
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {page.title}
+        groups.map((group) => (
+          <div key={group.titleKey}>
+            <div className="flex items-center gap-2 px-3 pb-1 pt-3 first:pt-0">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/50">
+                {t(group.titleKey, group.titleFallback)}
               </span>
-            </button>
+              <div className="h-px flex-1 bg-sidebar-border/60" />
+            </div>
+            <div className="space-y-0.5">
+              {group.rows.map((row) => (
+                <FilterRow
+                  key={row.id}
+                  icon={row.icon}
+                  label={row.label}
+                  count={counts[row.id]}
+                  active={filter === row.id}
+                  onClick={() => setFilter(row.id)}
+                />
+              ))}
+            </div>
           </div>
         ))
       )}
+
+      {viewMode === "catalog" && counts.orphan > 0 ? (
+        <p className="mt-auto px-3 pt-4 text-[11px] leading-relaxed text-sidebar-foreground/40">
+          {t(
+            "wiki.panelOrphanHint",
+            "孤立页没有被任何页面引用，通常是知识网络还没连上的边角。",
+          )}
+        </p>
+      ) : null}
     </div>
   );
 }

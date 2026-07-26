@@ -4,6 +4,7 @@ interface CardStatusBadgeProps {
   className?: string;
   label: string;
   testId?: string;
+  /** 只给补充说明用；与 label 相同的话别传，气泡念一遍原文没有意义 */
   title?: string;
   tone?: "info" | "danger";
 }
@@ -24,7 +25,7 @@ export function CardStatusBadge({
     <span
       data-testid={testId}
       className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm ${toneClassName} ${className}`}
-      title={title ?? label}
+      title={title}
     >
       <BellDotIcon
         aria-hidden="true"

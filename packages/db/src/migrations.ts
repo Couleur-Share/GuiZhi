@@ -197,6 +197,62 @@ export const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, "wiki_pages", "manual_edited_at", "INTEGER");
     },
   },
+  {
+    // 导入列表按条目类型显示图标：抽取成功后回写，老库缺这一列
+    name: "0007-import-task-item-type",
+    up: (db) => {
+      addColumnIfMissing(db, "import_tasks", "item_type", "TEXT");
+    },
+  },
+  {
+    // 条目状态三态压成两态：inbox / ready 一并并入 active。
+    //
+    // inbox 从来没有 gate 过任何东西（问答检索、Wiki 编译、语义索引都不看
+    // status），也没有任何自动化会把它推进到 ready，所以它只是一个需要人
+    // 手动维护、维护了也不产生任何效果的状态。待整理的信号改用
+    // 「collection_id IS NULL」表达，见 KnowledgeItemDB.list 的 uncategorized 分支。
+    name: "0008-item-status-two-state",
+    foreignKeysOff: true,
+    up: (db) => {
+      const definition = getTableDefinition(db, "knowledge_items");
+      // 表不存在（单测建了半个库）或已是两态则跳过，保持幂等
+      if (!definition || definition.includes("'active'")) {
+        return;
+      }
+
+      const columns = KNOWLEDGE_ITEMS_COLUMNS.join(", ");
+      // 旧 CHECK 不放行 'active'，没法先 UPDATE 再重建，只能在拷贝时就地折叠
+      const selected = KNOWLEDGE_ITEMS_COLUMNS.map((column) =>
+        column === "status"
+          ? "CASE WHEN status = 'archived' THEN 'archived' ELSE 'active' END"
+          : column,
+      ).join(", ");
+      db.exec(`
+        CREATE TABLE knowledge_items_migrate (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL DEFAULT '',
+          content TEXT NOT NULL DEFAULT '',
+          summary TEXT,
+          transcript TEXT,
+          item_type TEXT NOT NULL DEFAULT 'note'
+            CHECK(item_type IN ('note','webpage','video','image','audio','document','snippet','forum')),
+          status TEXT NOT NULL DEFAULT 'active'
+            CHECK(status IN ('active','archived')),
+          collection_id TEXT REFERENCES collections(id) ON DELETE SET NULL,
+          is_favorite INTEGER NOT NULL DEFAULT 0,
+          is_pinned INTEGER NOT NULL DEFAULT 0,
+          deleted_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        INSERT INTO knowledge_items_migrate (${columns})
+          SELECT ${selected} FROM knowledge_items;
+        DROP TABLE knowledge_items;
+        ALTER TABLE knowledge_items_migrate RENAME TO knowledge_items;
+        ${KNOWLEDGE_ITEMS_INDEXES.join(";\n        ")};
+      `);
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

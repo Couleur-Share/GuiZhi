@@ -16,7 +16,7 @@ function makeEntry(id: string): KnowledgeItemListEntry {
     title: id,
     snippet: "",
     itemType: "note",
-    status: "inbox",
+    status: "active",
     collectionId: null,
     isFavorite: false,
     isPinned: false,

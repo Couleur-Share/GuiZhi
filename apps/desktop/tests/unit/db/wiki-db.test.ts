@@ -83,6 +83,29 @@ describe("WikiDB", () => {
     expect(ingestions[0]).toMatchObject({ itemId, contentHash: "hash-1" });
   });
 
+  it("getBacklinkCounts 只列有入链的页面，孤立页靠缺省判定", () => {
+    wiki.applyCompilation(compilationInput(itemId));
+    const kmId = wiki.findPageIdByNormalizedTitle("知识管理")!;
+    const electronId = wiki.findPageIdByNormalizedTitle("ELECTRON")!;
+
+    const counts = wiki.getBacklinkCounts();
+    expect(counts[electronId]).toBe(1);
+    // 知识管理页没有入链——界面据此把它归进「孤立页」
+    expect(counts[kmId]).toBeUndefined();
+  });
+
+  it("目录带上手动编辑标记（侧栏据此筛选）", () => {
+    wiki.applyCompilation(compilationInput(itemId));
+    const kmId = wiki.findPageIdByNormalizedTitle("知识管理")!;
+    expect(
+      wiki.getCatalog().every((entry) => entry.manualEditedAt === null),
+    ).toBe(true);
+
+    wiki.updatePageBody({ pageId: kmId, body: "手写正文", linkTargets: [] });
+    const edited = wiki.getCatalog().find((entry) => entry.id === kmId)!;
+    expect(edited.manualEditedAt).toBeTruthy();
+  });
+
   it("再次编译按 normalized_title 更新既有页（id 不变）", () => {
     wiki.applyCompilation(compilationInput(itemId));
     const before = wiki.getCatalog();

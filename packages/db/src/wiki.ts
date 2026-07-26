@@ -7,6 +7,7 @@ import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
 import type {
   WikiApplyCompilationInput,
+  WikiBacklinkCounts,
   WikiCatalogEntry,
   WikiCompilableItem,
   WikiCompilationStatus,
@@ -44,6 +45,7 @@ interface CatalogRow {
   kind: WikiPageKind;
   summary: string;
   aliases_json: string | null;
+  manual_edited_at: number | null;
   updated_at: number;
 }
 
@@ -105,12 +107,13 @@ function mapCatalog(row: CatalogRow): WikiCatalogEntry {
     kind: row.kind,
     summary: row.summary,
     aliasesJson: row.aliases_json,
+    manualEditedAt: row.manual_edited_at,
     updatedAt: row.updated_at,
   };
 }
 
 const CATALOG_COLUMNS =
-  "id, title, normalized_title, kind, summary, aliases_json, updated_at";
+  "id, title, normalized_title, kind, summary, aliases_json, manual_edited_at, updated_at";
 
 export class WikiDB {
   constructor(private readonly db: Database.Database) {}
@@ -120,6 +123,25 @@ export class WikiDB {
       `SELECT ${CATALOG_COLUMNS} FROM wiki_pages ORDER BY updated_at DESC`,
     ) as CatalogRow[];
     return rows.map(mapCatalog);
+  }
+
+  /**
+   * 各页面的入链数。界面用它排「被引用最多」并挑出孤立页
+   * （没有任何页面链向它 = 游离在知识网络之外）。
+   *
+   * 单独一条查询而不是并进 getCatalog：后者在编译时每条目都要打一次。
+   * 没有入链的页面不会出现在结果里，调用方按缺省 0 处理。
+   */
+  getBacklinkCounts(): WikiBacklinkCounts {
+    const rows = this.db.all(
+      `SELECT to_page_id AS page_id, COUNT(*) AS n
+       FROM wiki_page_links GROUP BY to_page_id`,
+    ) as { page_id: string; n: number }[];
+    const counts: WikiBacklinkCounts = {};
+    for (const row of rows) {
+      counts[row.page_id] = row.n;
+    }
+    return counts;
   }
 
   getPage(id: string): WikiPageDetail | null {
@@ -218,7 +240,7 @@ export class WikiDB {
     return row?.id ?? null;
   }
 
-  /** 可编译条目：未删除且正文非空（含收件箱与归档） */
+  /** 可编译条目：未删除且正文非空（含归档——归档 ≠ 移出知识） */
   listCompilableItems(): WikiCompilableItem[] {
     const rows = this.db.all(
       "SELECT id, title, content FROM knowledge_items WHERE deleted_at IS NULL AND content != ''",

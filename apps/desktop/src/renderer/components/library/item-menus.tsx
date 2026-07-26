@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
-  InboxIcon,
   PinIcon,
   RotateCcwIcon,
   StarIcon,
@@ -168,18 +167,11 @@ export function useItemMenus({
       });
     }
 
-    if (entry.status === "inbox") {
-      items.push({
-        label: t("library.markReady", "移入知识库"),
-        icon: <InboxIcon className="h-4 w-4" aria-hidden="true" />,
-        onClick: () => void setStatus([entry.id], "ready"),
-      });
-    }
     if (entry.status === "archived") {
       items.push({
         label: t("library.unarchive", "取消归档"),
         icon: <ArchiveRestoreIcon className="h-4 w-4" aria-hidden="true" />,
-        onClick: () => void setStatus([entry.id], "ready"),
+        onClick: () => void setStatus([entry.id], "active"),
       });
     } else {
       items.push({

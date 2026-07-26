@@ -71,8 +71,7 @@ export const ITEM_TYPE_META: Record<KnowledgeItemType, ItemTypeMeta> = {
 };
 
 export const ITEM_STATUS_META: Record<KnowledgeItemStatus, ItemStatusMeta> = {
-  inbox: { labelKey: "library.statusInbox", fallback: "收件箱" },
-  ready: { labelKey: "library.statusReady", fallback: "知识库" },
+  active: { labelKey: "library.statusActive", fallback: "活跃" },
   archived: { labelKey: "library.statusArchived", fallback: "归档" },
 };
 

@@ -239,9 +239,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
                   className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                   aria-hidden="true"
                 />
-                <span className="min-w-0 flex-1 truncate" title={filePath}>
-                  {filePath}
-                </span>
+                <span className="min-w-0 flex-1 truncate">{filePath}</span>
                 <button
                   type="button"
                   onClick={() =>

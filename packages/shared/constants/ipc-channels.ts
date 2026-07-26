@@ -45,6 +45,8 @@ export const IPC_CHANNELS = {
 
   // Wiki (ADR 0023)
   WIKI_CATALOG: "wiki:catalog",
+  /** 各页面入链数：目录列的「被引用最多」排序与孤立页筛选 */
+  WIKI_BACKLINK_COUNTS: "wiki:backlinkCounts",
   WIKI_SEARCH: "wiki:search",
   WIKI_UPDATE_PAGE: "wiki:updatePage",
   WIKI_DELETE_PAGE: "wiki:deletePage",

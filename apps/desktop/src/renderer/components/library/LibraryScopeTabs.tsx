@@ -24,7 +24,7 @@ function CountBadge({ value, active }: { value: number; active: boolean }) {
 }
 
 /**
- * 知识库范围分段控件：收件箱 / 全部 / 收藏 / 归档。
+ * 知识库范围分段控件：未分类 / 全部 / 收藏 / 归档。
  * 选中集合或标签时四个磁贴都不高亮（此时列表已被更窄的条件接管）。
  */
 export function LibraryScopeTabs() {
@@ -37,10 +37,10 @@ export function LibraryScopeTabs() {
 
   const tabs: ScopeTab[] = [
     {
-      scope: "inbox",
-      label: t("library.scopeInbox", "收件箱"),
+      scope: "uncategorized",
+      label: t("library.scopeUncategorized", "未分类"),
       icon: <InboxIcon className="mb-1 h-4 w-4" aria-hidden="true" />,
-      count: counts?.inbox ?? 0,
+      count: counts?.uncategorized ?? 0,
     },
     {
       scope: "all",
@@ -72,7 +72,6 @@ export function LibraryScopeTabs() {
             type="button"
             onClick={() => setScope(tab.scope)}
             aria-pressed={active}
-            title={tab.label}
             className={`relative flex flex-col items-center justify-center rounded-md py-2 transition-all duration-base ${
               active
                 ? "bg-primary/15 text-primary shadow-sm"

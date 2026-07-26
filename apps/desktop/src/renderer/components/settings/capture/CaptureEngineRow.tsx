@@ -250,10 +250,7 @@ export function CaptureEngineRow({
               <span className="w-20 shrink-0 text-xs text-muted-foreground">
                 {t("settings.captureActivePath", "生效路径")}
               </span>
-              <code
-                className="min-w-0 flex-1 truncate rounded-lg bg-muted/60 px-3 py-2 text-xs"
-                title={activePath}
-              >
+              <code className="min-w-0 flex-1 truncate rounded-lg bg-muted/60 px-3 py-2 text-xs">
                 {activePath}
               </code>
             </div>
@@ -271,7 +268,6 @@ export function CaptureEngineRow({
                     <Input
                       value={customPath.value}
                       readOnly
-                      title={customPath.value}
                       placeholder={customPath.placeholder}
                       aria-label={t("settings.captureCustomPath", "自定义路径")}
                     />

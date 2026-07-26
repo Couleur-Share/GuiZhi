@@ -22,10 +22,15 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 /** fetchList 的请求序号：只有最后一次发出的请求可以写回结果 */
 let listRequestSeq = 0;
 
-/** 可本地编辑并防抖持久化的字段 */
+/**
+ * 可本地编辑并防抖持久化的字段。
+ *
+ * 分类不在其中：改分类是一次命令，不是正文编辑，走 bulkMoveToCollection
+ * 立即落盘并重取列表与计数（详情页 chip 与列表右键菜单共用这一条路）。
+ */
 type EditablePatch = Pick<
   UpdateKnowledgeItemInput,
-  "title" | "content" | "collectionId" | "tagNames"
+  "title" | "content" | "tagNames"
 >;
 
 /**
@@ -264,6 +269,11 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
               }
             : updated,
         }));
+      }
+      // 标签增删会改侧栏的按标签计数；标题与正文不会，
+      // 不必让每次防抖落盘都多打一次计数查询
+      if (patch.tagNames) {
+        await get().refreshCounts();
       }
     } catch (error) {
       // 退回本条目自己的桶；await 期间对同一条目的新输入优先
@@ -521,10 +531,6 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         ...current,
         title: patch.title !== undefined ? patch.title : current.title,
         content: patch.content !== undefined ? patch.content : current.content,
-        collectionId:
-          patch.collectionId !== undefined
-            ? patch.collectionId
-            : current.collectionId,
         tags:
           patch.tagNames !== undefined
             ? reconcileOptimisticTags(current.tags, patch.tagNames)
@@ -581,8 +587,9 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (get().selectedId === id) {
         set({ selectedItem: updated });
       }
-      // 可能新建了标签，侧栏标签列表要跟上
+      // 可能新建了标签，侧栏的标签列表与计数都要跟上
       await useTagStore.getState().fetchTags();
+      await get().refreshCounts();
     },
 
     setStatus: async (ids, status) => {

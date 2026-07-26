@@ -5,21 +5,62 @@ import type { AskSessionMeta } from "@guizhi/shared/types";
 import { useAskStore } from "../../stores/ask.store";
 import { useSemanticStore } from "../../stores/semantic.store";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { useToast } from "../ui/Toast";
 import { formatItemTime } from "../library/type-meta";
 
 /** 语义索引状态卡：仅在 embedding 模型配置后出现 */
 function SemanticIndexCard() {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const status = useSemanticStore((state) => state.status);
   const isConfigured = useSemanticStore((state) => state.isConfigured);
   const isIndexing = useSemanticStore((state) => state.isIndexing);
   const indexedThisRun = useSemanticStore((state) => state.indexedThisRun);
+  const notice = useSemanticStore((state) => state.notice);
+  const consumeNotice = useSemanticStore((state) => state.consumeNotice);
   const refreshStatus = useSemanticStore((state) => state.refreshStatus);
   const runIndexing = useSemanticStore((state) => state.runIndexing);
 
   useEffect(() => {
     void refreshStatus();
   }, [refreshStatus]);
+
+  // 手动触发的那一轮必须有回执：失败、一条没跑成，此前都只进 console
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+    // 取走后 store 里就没有了：StrictMode 下 effect 会带着同一份闭包再跑一次，
+    // 若在这里重读 notice 就会把同一条回执弹两遍
+    const pending = consumeNotice();
+    if (!pending) {
+      return;
+    }
+    if (pending.kind === "done") {
+      showToast(
+        t("ask.semanticDone", "已索引 {{count}} 条", { count: pending.indexed }),
+        "success",
+      );
+    } else if (pending.kind === "partial") {
+      showToast(
+        t("ask.semanticPartial", "索引 {{indexed}} 条，{{failed}} 条失败：{{message}}", {
+          indexed: pending.indexed,
+          failed: pending.failed,
+          message: pending.message ?? "",
+        }),
+        "error",
+      );
+    } else if (pending.kind === "failed") {
+      showToast(
+        t("ask.semanticFailed", "索引失败：{{message}}", {
+          message: pending.message ?? t("common.unknownError", "未知错误"),
+        }),
+        "error",
+      );
+    } else {
+      showToast(t("ask.semanticNothing", "没有需要索引的内容"), "info");
+    }
+  }, [notice, consumeNotice, showToast, t]);
 
   if (!isConfigured || !status) {
     return null;
@@ -88,7 +129,7 @@ export function SidebarAskPanel() {
         <button
           type="button"
           onClick={newSession}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-sidebar-border px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:border-primary/50 hover:text-sidebar-foreground"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <MessageSquarePlusIcon className="h-4 w-4" aria-hidden="true" />
           {t("ask.newSession", "新对话")}
@@ -115,7 +156,6 @@ export function SidebarAskPanel() {
               <button
                 type="button"
                 onClick={() => void switchSession(session.id)}
-                title={session.title}
                 className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-all duration-smooth ${
                   isActive
                     ? "bg-primary text-white shadow-sm"

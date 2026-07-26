@@ -117,13 +117,6 @@
     --app-settings-subtle-border: hsl(var(--border) / 0.68);
     --app-settings-input-bg: hsl(var(--background) / 0.92);
     --app-settings-input-border: hsl(var(--input));
-    --app-settings-segment-color: hsl(var(--foreground) / 0.74);
-    --app-settings-segment-hover-bg: hsl(var(--accent) / 0.72);
-    --app-settings-segment-hover-color: hsl(var(--foreground));
-    --app-settings-segment-active-bg: hsl(var(--card));
-    --app-settings-segment-active-color: hsl(var(--foreground));
-    --app-settings-segment-active-border: hsl(var(--border) / 0.85);
-    --app-settings-segment-active-shadow: var(--shadow-sm);
 
     --app-library-list-pane-bg: hsl(var(--card) / 0.5);
     --app-library-list-pane-border: hsl(var(--border));
@@ -222,6 +215,76 @@
   @apply bg-muted-foreground/40;
 }
 
+/* ============================================================
+ * Native form control normalization
+ * 原生控件外观收敛
+ *
+ * 滑块轨道、数字步进箭头、搜索框清除叉都由浏览器自绘，配色与几何和
+ * 语义令牌无关，在深色/玻璃拟态下一眼就是「网页默认控件」。这里统一
+ * 关掉默认外观再接回令牌。
+ *
+ * 会拉起系统窗口的那几个（<select> 的下拉列表、<input type="color">、
+ * alert/confirm/prompt）CSS 一点办法都没有，只能换成 components/ui 下的
+ * 自绘组件；eslint 的 no-restricted-syntax 负责挡住回潮。
+ * ============================================================ */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-top: -0.25rem;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
+  background: hsl(var(--primary));
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.25);
+  transition: transform var(--motion-duration-quick)
+    var(--motion-easing-standard);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+input[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 步进箭头无法上色，隐藏之；键盘上下键仍可按 step 步进 */
+input[type="number"] {
+  appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* macOS-style title bar drag region */
 /* macOS 风格标题栏拖拽区域 */
 .titlebar-drag {
@@ -313,6 +376,28 @@ html[data-motion="reduced"] {
   --motion-duration-base: 110ms;
   --motion-duration-smooth: 170ms;
   --motion-duration-slow: 250ms;
+}
+
+/* Loading indicators that only show up when loading is actually slow.
+ *
+ * 加载指示器延迟登场。本地 SQLite 走一趟 IPC 通常几十毫秒就回来，
+ * 立刻画一个转圈再立刻抹掉，这一下"闪现"本身就是用户看到的闪烁。
+ * backwards 让延迟期间停在 opacity 0：快路径全程无痕，只有真的慢下来
+ * 才淡入。250ms 是这里唯一的常量——低于它人眼基本注意不到等待，
+ * 高于它就该给反馈了。延迟不属于装饰，data-motion="off" 只压缩
+ * animation-duration，不会把它一并抹掉。 */
+@keyframes delayed-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.delayed-fade-in {
+  animation: delayed-fade-in var(--motion-duration-base)
+    var(--motion-easing-enter) 250ms backwards;
 }
 
 /* Selected text color */
@@ -495,27 +580,6 @@ body {
   color: hsl(var(--muted-foreground) / 0.72);
 }
 
-.app-settings-segment {
-  color: var(--app-settings-segment-color);
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease;
-}
-
-.app-settings-segment:hover {
-  background: var(--app-settings-segment-hover-bg);
-  color: var(--app-settings-segment-hover-color);
-}
-
-.app-settings-segment-active {
-  background: var(--app-settings-segment-active-bg);
-  color: var(--app-settings-segment-active-color);
-  border: 1px solid var(--app-settings-segment-active-border);
-  box-shadow: var(--app-settings-segment-active-shadow);
-}
-
 .data-settings-shell .app-settings-card {
   border-radius: 1.25rem;
   box-shadow: none;
@@ -641,14 +705,6 @@ body {
   --app-settings-input-bg: hsl(0 0% 100% / 0.24);
   --app-settings-input-border: var(--app-glass-stroke-soft);
   
-  --app-settings-segment-color: hsl(220 22% 18%);
-  --app-settings-segment-hover-bg: hsl(0 0% 100% / 0.3);
-  --app-settings-segment-hover-color: hsl(220 26% 10%);
-  --app-settings-segment-active-bg: hsl(0 0% 100% / 0.42);
-  --app-settings-segment-active-color: hsl(220 26% 10%);
-  --app-settings-segment-active-border: var(--app-glass-stroke-soft);
-  --app-settings-segment-active-shadow: var(--app-glass-shadow-soft);
-
   --app-library-list-pane-bg: hsl(0 0% 100% / 0.32);
   --app-library-list-pane-border: var(--app-glass-stroke-soft);
   --app-library-list-pane-backdrop: none;
@@ -746,14 +802,6 @@ body {
   --app-settings-input-bg: hsl(220 30% 15% / 0.22);
   --app-settings-input-border: var(--app-glass-stroke-soft);
   
-  --app-settings-segment-color: hsl(220 16% 84%);
-  --app-settings-segment-hover-bg: hsl(220 30% 25% / 0.2);
-  --app-settings-segment-hover-color: hsl(220 18% 97%);
-  --app-settings-segment-active-bg: hsl(220 30% 30% / 0.3);
-  --app-settings-segment-active-color: hsl(220 18% 97%);
-  --app-settings-segment-active-border: var(--app-glass-stroke-soft);
-  --app-settings-segment-active-shadow: var(--app-glass-shadow-soft);
-
   --app-library-list-pane-bg: hsl(220 30% 10% / 0.32);
   --app-library-list-pane-border: var(--app-glass-stroke-soft);
   --app-library-list-pane-backdrop: none;

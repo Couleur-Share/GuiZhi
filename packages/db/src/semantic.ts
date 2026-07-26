@@ -124,6 +124,38 @@ export class SemanticIndexDB {
   }
 
   /**
+   * 把索引行的时间戳抬到当前，用于「哈希校验后确认没变」的条目。
+   *
+   * pending 的 SQL 预筛只能比时间戳（`i.updated_at >= e.updated_at`），
+   * 而收藏、打标签、写 AI 摘要这类改动同样会推高条目的 updated_at，
+   * 却完全不影响参与嵌入的文本。不把索引行的时间戳抬上来，这些条目会
+   * 永远留在候选集合里：状态栏一直显示有待索引，点下去却因为哈希没变
+   * 而无事可做。
+   */
+  touchIndexedAt(itemIds: string[]): number {
+    if (itemIds.length === 0) {
+      return 0;
+    }
+    const placeholders = itemIds.map(() => "?").join(", ");
+    // 取「当前时刻」与「条目时间戳 +1」的较大值：预筛条件是 >=（有意为之，
+    // 免得漏掉同毫秒完成的索引），只写 Date.now() 的话，同一毫秒内发生的
+    // 元数据改动 + 本次抬升会打平，条目要等到下一毫秒才退出候选。
+    return this.db.run(
+      `UPDATE knowledge_embeddings SET updated_at = MAX(
+         ?,
+         COALESCE(
+           (SELECT i.updated_at + 1 FROM knowledge_items i
+             WHERE i.id = knowledge_embeddings.item_id),
+           0
+         )
+       )
+       WHERE item_id IN (${placeholders})`,
+      Date.now(),
+      ...itemIds,
+    ).changes;
+  }
+
+  /**
    * 加载指定模型的分块向量（排除回收站条目）。
    *
    * 支持分页：全量取回会把整份索引一次性搬过 wasm 边界（万级条目约几百 MB），

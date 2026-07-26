@@ -85,7 +85,7 @@ function seed(db: DatabaseAdapter.Database, count: number): void {
       `INSERT INTO knowledge_items
          (id, title, content, item_type, status, is_favorite, is_pinned,
           created_at, updated_at)
-       VALUES (?, ?, ?, 'note', 'ready', 0, ?, ?, ?)`,
+       VALUES (?, ?, ?, 'note', 'active', 0, ?, ?, ?)`,
       id,
       `条目标题 ${index} 架构检索`,
       makeBody(index + 1),

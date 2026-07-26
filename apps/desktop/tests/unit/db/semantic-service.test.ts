@@ -112,6 +112,42 @@ describe("语义索引 pending 判定与状态", () => {
     expect(listPendingSemanticItems(db, MODEL, 10)).toHaveLength(0);
   });
 
+  it("元数据改动后，状态里的待索引数与真正要跑的批次一致", () => {
+    const item = items.create({ title: "笔记", content: "内容" });
+    const [pending] = listPendingSemanticItems(db, MODEL, 10);
+    applyPending(item.id, pending.contentHash);
+
+    // 收藏、打标签、写 AI 摘要都会推高 updated_at，却都不进嵌入文本。
+    // 状态曾经数的是 SQL 预筛出的候选数，于是侧栏显示「索引 1 条新内容」，
+    // 点下去 pending 是空的——界面上就是「点了没反应」。
+    items.update(item.id, { isFavorite: true, summary: "AI 生成的摘要" });
+
+    const status = getSemanticStatus(db, MODEL);
+    expect(listPendingSemanticItems(db, MODEL, 10)).toHaveLength(0);
+    expect(status.eligibleItems - status.indexedItems).toBe(0);
+  });
+
+  it("确认没变的条目会退出候选集合，下次判定不再回表读正文", () => {
+    const item = items.create({ title: "笔记", content: "内容" });
+    const [pending] = listPendingSemanticItems(db, MODEL, 10);
+    applyPending(item.id, pending.contentHash);
+    items.update(item.id, { isFavorite: true });
+
+    // 第一次判定要读正文算哈希，同时把索引行的时间戳抬过条目
+    listPendingSemanticItems(db, MODEL, 10);
+
+    const reads: string[] = [];
+    const originalGet = db.get.bind(db);
+    db.get = ((sql: string, ...params: unknown[]) => {
+      reads.push(sql);
+      return originalGet(sql, ...params);
+    }) as typeof db.get;
+    listPendingSemanticItems(db, MODEL, 10);
+    db.get = originalGet;
+
+    expect(reads.some((sql) => sql.includes("content"))).toBe(false);
+  });
+
   it("buildSemanticSourceText 拼接标题/正文/转写", () => {
     expect(buildSemanticSourceText("标题", "正文", "转写")).toBe(
       "标题\n正文\n转写",

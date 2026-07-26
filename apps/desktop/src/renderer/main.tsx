@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
 import { ToastProvider } from "./components/ui/Toast";
+import { TooltipLayer } from "./components/ui/TooltipLayer";
 import "./styles/globals.css";
 import { i18nReady } from "./i18n";
 
@@ -28,6 +29,7 @@ void i18nReady
             >
               <App />
             </React.Suspense>
+            <TooltipLayer />
           </ToastProvider>
         </ErrorBoundary>
       </React.StrictMode>,

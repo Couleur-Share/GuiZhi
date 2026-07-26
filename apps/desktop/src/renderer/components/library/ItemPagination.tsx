@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   PAGE_SIZE_OPTIONS,
   useKnowledgeStore,
 } from "../../stores/knowledge.store";
+import { Select } from "../ui/Select";
 
 /** 页码按钮最多显示几个 */
 const PAGE_WINDOW = 5;
@@ -31,6 +33,14 @@ export function ItemPagination() {
   const pageSize = useKnowledgeStore((state) => state.pageSize);
   const setPage = useKnowledgeStore((state) => state.setPage);
   const setPageSize = useKnowledgeStore((state) => state.setPageSize);
+  const pageSizeOptions = useMemo(
+    () =>
+      PAGE_SIZE_OPTIONS.map((size) => ({
+        value: String(size),
+        label: String(size),
+      })),
+    [],
+  );
 
   if (total === 0) {
     return null;
@@ -46,20 +56,18 @@ export function ItemPagination() {
       <span>{t("library.itemCount", "共 {{count}} 个", { count: total })}</span>
 
       <div className="flex items-center gap-4">
-        <label className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span>{t("library.pageSize", "每页")}</span>
-          <select
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-            className="rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            value={String(pageSize)}
+            onChange={(value) => setPageSize(Number(value))}
+            options={pageSizeOptions}
+            ariaLabel={t("library.pageSize", "每页")}
+            align="end"
+            menuMinWidth={88}
+            triggerClassName="flex h-7 min-w-[56px] cursor-pointer items-center justify-between gap-1 rounded-md border border-border bg-muted px-2 text-xs text-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          />
+        </div>
 
         {totalPages > 1 ? (
           <div className="flex items-center gap-1">

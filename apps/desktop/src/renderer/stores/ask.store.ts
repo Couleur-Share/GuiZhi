@@ -32,12 +32,23 @@ interface AskState {
   activeSessionId: string | null;
   messages: AskMessage[];
   isRunning: boolean;
+  /**
+   * 首次加载是否已结束（无论成败）。
+   *
+   * 界面不能拿 `messages.length === 0` 直接判空态：读会话是异步的，
+   * 有历史会话的用户会先看到一整屏空态引导，再被消息列表整块换掉。
+   */
+  hasLoaded: boolean;
   /** 加载会话列表并恢复上次活跃会话（AskWorkspace / 侧栏挂载时调用） */
   initialize: () => Promise<void>;
   newSession: () => void;
   switchSession: (id: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   ask: (question: string) => Promise<void>;
+  /** 重新回答某一轮：丢弃它及其之后的消息，用同一个问题重跑 */
+  retry: (messageId: string) => Promise<void>;
+  /** 删除单轮问答（问错了、答歪了，不必清空整个会话） */
+  removeMessage: (messageId: string) => void;
   stop: () => void;
 }
 
@@ -146,9 +157,15 @@ export const useAskStore = create<AskState>()((set, get) => {
     activeSessionId: null,
     messages: [],
     isRunning: false,
+    hasLoaded: false,
 
     initialize: async () => {
-      if (initialized || !window.api?.askSession) {
+      if (initialized) {
+        return;
+      }
+      if (!window.api?.askSession) {
+        // 没有持久化能力（web 运行时），没有什么可等的，直接放行空态
+        set({ hasLoaded: true });
         return;
       }
       initialized = true;
@@ -173,6 +190,9 @@ export const useAskStore = create<AskState>()((set, get) => {
       } catch (error) {
         initialized = false;
         console.error("加载问答会话失败:", error);
+      } finally {
+        // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
+        set({ hasLoaded: true });
       }
     },
 
@@ -312,6 +332,46 @@ export const useAskStore = create<AskState>()((set, get) => {
         set({ isRunning: false });
         void persistActiveSession();
       }
+    },
+
+    retry: async (messageId) => {
+      if (get().isRunning) {
+        return;
+      }
+      const index = get().messages.findIndex(
+        (message) => message.id === messageId,
+      );
+      if (index < 0) {
+        return;
+      }
+      const { question } = get().messages[index];
+      // 连同其后的轮次一并丢弃：它们是基于这一轮的回答问出来的，
+      // 留着会让多轮上下文对不上
+      set((state) => ({ messages: state.messages.slice(0, index) }));
+      await get().ask(question);
+    },
+
+    removeMessage: (messageId) => {
+      const remaining = get().messages.filter(
+        (message) => message.id !== messageId,
+      );
+      set({ messages: remaining });
+      if (remaining.length > 0) {
+        void persistActiveSession();
+        return;
+      }
+      // 删空了就把会话记录一并清掉：persistActiveSession 对空会话直接跳过，
+      // 只 set 状态的话数据库里会留着删除前的那份内容
+      const sessionId = get().activeSessionId;
+      if (!sessionId) {
+        return;
+      }
+      set((state) => ({
+        sessions: state.sessions.filter((session) => session.id !== sessionId),
+      }));
+      void window.api?.askSession
+        ?.delete(sessionId)
+        .catch((error: unknown) => console.error("删除问答会话失败:", error));
     },
 
     stop: () => {

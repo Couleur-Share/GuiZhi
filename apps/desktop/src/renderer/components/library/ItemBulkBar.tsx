@@ -35,7 +35,8 @@ function BulkAction({
     <button
       type="button"
       onClick={onClick}
-      title={label}
+      // 宽版把文案摆在按钮里了，再挂 title 只是把同一句话又弹一遍
+      title={wide ? undefined : label}
       aria-label={label}
       className={`inline-flex h-7 shrink-0 items-center justify-center gap-1.5 rounded-md transition-colors ${tone} ${
         wide ? "px-2.5 text-xs" : "w-7"

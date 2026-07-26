@@ -25,6 +25,8 @@ export interface ImportTaskStore {
       status: ImportTask["status"];
       stage: ImportStage | null;
       error: string | null;
+      displayName: string;
+      itemType: ImportTask["itemType"];
       resultItemId: string | null;
       duplicateItemId: string | null;
       forceDuplicate: boolean;
@@ -212,7 +214,13 @@ export class ImportQueue {
       );
 
       this.throwIfAborted(controller);
-      this.updateAndNotify(id, { stage: "extracting" });
+      // 标题与类型在这里回写：建任务时只有原始 URL，一列长得一样的链接
+      // 没法辨认采的是什么。写在去重判定之前，重复任务同样拿得到标题。
+      this.updateAndNotify(id, {
+        stage: "extracting",
+        displayName: extracted.title,
+        itemType: extracted.itemType,
+      });
 
       // 降级结果按失败处理：不入库，也不登记来源，
       // 否则空壳条目会占住该链接的 normalized_uri，重试永远判重为重复

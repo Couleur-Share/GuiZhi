@@ -16,6 +16,9 @@ interface LibrarySidebarRowProps {
 /**
  * 知识库侧栏的通用行（集合 / 标签 / 回收站）。
  * 计数与「更多」按钮共用同一个槽位，悬停时交叉淡入淡出，避免行内元素位移。
+ * 行本身不挂 title——名称就在旁边显示着，划过侧栏一路弹气泡纯属干扰。
+ * 「更多」按钮同理只留 aria-label：省略号的含义不必解释，而它一点就开菜单，
+ * 气泡除了和菜单挤在一起没有别的作用。
  */
 export function LibrarySidebarRow({
   icon,
@@ -40,7 +43,6 @@ export function LibrarySidebarRow({
         type="button"
         onClick={onClick}
         aria-pressed={active}
-        title={label}
         className="flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1.5 pl-3 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
       >
         <span
@@ -70,7 +72,6 @@ export function LibrarySidebarRow({
           <button
             type="button"
             onClick={onMore}
-            title={moreLabel}
             aria-label={moreLabel}
             className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-opacity duration-quick hover:bg-foreground/10 focus-visible:opacity-100 group-hover/row:opacity-100"
           >

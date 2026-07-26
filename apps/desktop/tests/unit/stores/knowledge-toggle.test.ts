@@ -16,7 +16,7 @@ function makeEntry(
     title: id,
     snippet: "",
     itemType: "note",
-    status: "inbox",
+    status: "active",
     collectionId: null,
     isFavorite: false,
     isPinned: false,
@@ -36,7 +36,7 @@ function makeItem(id: string, patch: UpdateKnowledgeItemInput): KnowledgeItem {
     summary: null,
     transcript: null,
     itemType: "note",
-    status: "inbox",
+    status: "active",
     collectionId: null,
     isFavorite: patch.isFavorite ?? false,
     isPinned: patch.isPinned ?? false,
@@ -66,7 +66,7 @@ describe("knowledge.store 收藏 / 置顶", () => {
         return { entries: [], total: 0 };
       },
       counts: async () => ({
-        inbox: 0,
+        uncategorized: 0,
         all: 0,
         favorites: 0,
         archived: 0,

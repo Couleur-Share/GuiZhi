@@ -91,7 +91,7 @@ export function NewItemButton() {
         onClick={openCapture}
         data-testid="topbar-new"
         className="inline-flex h-8 items-center gap-1.5 rounded-l-lg bg-primary pl-2.5 pr-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        title={t("header.new", "新建")}
+        aria-label={t("header.new", "新建")}
       >
         <PlusIcon className="h-4 w-4" aria-hidden="true" />
         <span className="hidden sm:inline">{t("header.new", "新建")}</span>

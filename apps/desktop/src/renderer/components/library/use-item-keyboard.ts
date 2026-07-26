@@ -2,7 +2,7 @@
  * 条目列表的键盘导航（卡片视图与列表视图共用）。
  *
  * 之前整个 library 目录里只有三处 onKeyDown（两个输入框加一个拖拽手柄），
- * 收件箱里几十条待整理只能一路点鼠标。
+ * 几十条待整理条目只能一路点鼠标。
  */
 import { useEffect } from "react";
 import { useKnowledgeStore } from "../../stores/knowledge.store";

@@ -11,6 +11,8 @@ export { ImagePreviewModal } from './ImagePreviewModal';
 export { CloseDialog } from './CloseDialog';
 export { getCategoryIcon } from './ModelIcons';
 export { Checkbox } from './Checkbox';
+export { ColorPicker } from './ColorPicker';
+export { TooltipLayer } from './TooltipLayer';
 export { CardStatusBadge } from './CardStatusBadge';
 export { LocalImage } from './LocalImage';
 export { Spinner } from './Spinner';

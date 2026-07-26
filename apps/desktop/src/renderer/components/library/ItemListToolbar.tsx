@@ -160,11 +160,7 @@ export function ItemListToolbar({
         }}
         aria-haspopup="menu"
         aria-expanded={menuAnchor !== null}
-        title={
-          isSearching
-            ? t("library.sortLockedBySearch", "搜索时按相关度排序")
-            : `${t("library.sortBy", "排序")}: ${sortLabel}`
-        }
+        aria-label={`${t("library.sortBy", "排序")}: ${sortLabel}`}
         className="inline-flex shrink-0 items-center gap-0.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
       >
         <span className="max-w-[7rem] truncate">{sortLabel}</span>

@@ -208,8 +208,9 @@ function App() {
     }
     const SEMANTIC_INDEX_INTERVAL_MS = 5 * 60 * 1000;
     const runBackgroundIndexing = () => {
+      // 静默：这一轮由定时器发起，用户没点过任何东西，不该收到回执 toast
       void import("./stores/semantic.store").then(({ useSemanticStore }) =>
-        useSemanticStore.getState().runIndexing(),
+        useSemanticStore.getState().runIndexing(true),
       );
     };
     const initialTimer = setTimeout(runBackgroundIndexing, 60 * 1000);

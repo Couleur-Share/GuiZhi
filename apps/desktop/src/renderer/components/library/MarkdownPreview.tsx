@@ -49,8 +49,22 @@ function transformUrl(url: string): string {
   return isLocalAsset(url) ? url : defaultUrlTransform(url);
 }
 
-/** 无滚动容器的 Markdown 正文（对话流等内嵌场景复用） */
-export function MarkdownBody({ content }: { content: string }) {
+/** 问答回答里的 `[n]` 引用锚点（由 ask/qa-citations 改写生成） */
+const CITATION_HREF_PREFIX = "#qa-cite=";
+
+/**
+ * 无滚动容器的 Markdown 正文（对话流等内嵌场景复用）。
+ *
+ * `onCitationClick` 只有问答用得上：回答正文里的 `[1]` 原本是纯文本，
+ * 与底部那排来源 chip 各说各的，点不动。
+ */
+export function MarkdownBody({
+  content,
+  onCitationClick,
+}: {
+  content: string;
+  onCitationClick?: (ordinal: number) => void;
+}) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   // 正文里的本地图片按出现顺序编号，查看器据此支持左右切换
@@ -71,6 +85,20 @@ export function MarkdownBody({ content }: { content: string }) {
         node: _node,
         ...props
       }: ComponentProps<"a"> & { children?: ReactNode; node?: unknown }) => {
+        if (onCitationClick && href?.startsWith(CITATION_HREF_PREFIX)) {
+          const ordinal = Number(href.slice(CITATION_HREF_PREFIX.length));
+          if (Number.isFinite(ordinal)) {
+            return (
+              <button
+                type="button"
+                onClick={() => onCitationClick(ordinal)}
+                className="mx-0.5 inline rounded bg-primary/10 px-1 align-baseline text-[0.85em] font-medium text-primary no-underline transition-colors hover:bg-primary/20"
+              >
+                {children}
+              </button>
+            );
+          }
+        }
         const safeHref = resolveSafeHref(href);
         if (!safeHref) {
           return <span {...props}>{children}</span>;
@@ -104,7 +132,7 @@ export function MarkdownBody({ content }: { content: string }) {
         );
       },
     }),
-    [localImages],
+    [localImages, onCitationClick],
   );
 
   return (

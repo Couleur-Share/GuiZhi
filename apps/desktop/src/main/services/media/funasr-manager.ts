@@ -372,8 +372,8 @@ export async function installFunasr(
         },
       },
     );
-    if (!fs.existsSync(paths.serverExe)) {
-      throw new Error("依赖安装完成但未找到 funasr-server，请重试");
+    if (!fs.existsSync(paths.funasrPackage)) {
+      throw new Error("依赖安装完成但未找到 funasr 包，请重试");
     }
     const pipShow = await runTool(paths.venvPython, [
       "-m",

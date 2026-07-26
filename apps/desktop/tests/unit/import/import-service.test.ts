@@ -24,7 +24,7 @@ describe("ImportService（真实 DB 集成）", () => {
     service = createImportService(db, (task) => events.push(task));
   });
 
-  it("文本导入端到端：入库为收件箱条目并写来源记录", async () => {
+  it("文本导入端到端：入库为活跃条目并写来源记录", async () => {
     service.queue.enqueue([
       { kind: "text", input: "会议纪要\n下周一发布 v0.3" },
     ]);
@@ -37,7 +37,7 @@ describe("ImportService（真实 DB 集成）", () => {
     const items = new KnowledgeItemDB(db);
     const item = items.get(task.resultItemId!);
     expect(item?.title).toBe("会议纪要");
-    expect(item?.status).toBe("inbox");
+    expect(item?.status).toBe("active");
     expect(item?.itemType).toBe("note");
 
     const source = db.get(

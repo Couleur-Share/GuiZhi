@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 /**
  * 归知的顶层功能模块（对应侧栏 rail）：
- * - library：知识库（条目/集合/标签/收件箱/回收站）
+ * - library：知识库（条目/集合/标签/回收站）
  * - ask：AI 问答
  * - wiki：知识 Wiki
  * - imports：导入任务队列
@@ -42,6 +42,13 @@ export const ITEM_LIST_PANE_WIDTH_DEFAULT = 320;
 export const ITEM_LIST_PANE_WIDTH_MIN = 240;
 export const ITEM_LIST_PANE_WIDTH_MAX = 720;
 
+/**
+ * Wiki 目录列宽度。原本写死 288px，窄列里摘要一行就被 truncate 成半句话。
+ */
+export const WIKI_CATALOG_PANE_WIDTH_DEFAULT = 300;
+export const WIKI_CATALOG_PANE_WIDTH_MIN = 220;
+export const WIKI_CATALOG_PANE_WIDTH_MAX = 560;
+
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) {
     return min;
@@ -68,8 +75,10 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   sidebarPanelWidth: number;
   itemListPaneWidth: number;
+  wikiCatalogPaneWidth: number;
   setSidebarPanelWidth: (width: number) => void;
   setItemListPaneWidth: (width: number) => void;
+  setWikiCatalogPaneWidth: (width: number) => void;
   resetColumnWidths: () => void;
   libraryViewMode: LibraryViewMode;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
@@ -90,6 +99,7 @@ export const useUIStore = create<UIState>()(
         set({ isSidebarCollapsed: collapsed }),
       sidebarPanelWidth: SIDEBAR_PANEL_WIDTH_DEFAULT,
       itemListPaneWidth: ITEM_LIST_PANE_WIDTH_DEFAULT,
+      wikiCatalogPaneWidth: WIKI_CATALOG_PANE_WIDTH_DEFAULT,
       setSidebarPanelWidth: (width) =>
         set({
           sidebarPanelWidth: clamp(
@@ -106,10 +116,19 @@ export const useUIStore = create<UIState>()(
             ITEM_LIST_PANE_WIDTH_MAX,
           ),
         }),
+      setWikiCatalogPaneWidth: (width) =>
+        set({
+          wikiCatalogPaneWidth: clamp(
+            width,
+            WIKI_CATALOG_PANE_WIDTH_MIN,
+            WIKI_CATALOG_PANE_WIDTH_MAX,
+          ),
+        }),
       resetColumnWidths: () =>
         set({
           sidebarPanelWidth: SIDEBAR_PANEL_WIDTH_DEFAULT,
           itemListPaneWidth: ITEM_LIST_PANE_WIDTH_DEFAULT,
+          wikiCatalogPaneWidth: WIKI_CATALOG_PANE_WIDTH_DEFAULT,
         }),
       libraryViewMode: "card",
       setLibraryViewMode: (mode) =>
@@ -130,6 +149,7 @@ export const useUIStore = create<UIState>()(
         isSidebarCollapsed: state.isSidebarCollapsed,
         sidebarPanelWidth: state.sidebarPanelWidth,
         itemListPaneWidth: state.itemListPaneWidth,
+        wikiCatalogPaneWidth: state.wikiCatalogPaneWidth,
         libraryViewMode: state.libraryViewMode,
       }),
       merge: (persisted, current) => {
@@ -149,6 +169,11 @@ export const useUIStore = create<UIState>()(
             merged.itemListPaneWidth ?? ITEM_LIST_PANE_WIDTH_DEFAULT,
             ITEM_LIST_PANE_WIDTH_MIN,
             ITEM_LIST_PANE_WIDTH_MAX,
+          ),
+          wikiCatalogPaneWidth: clamp(
+            merged.wikiCatalogPaneWidth ?? WIKI_CATALOG_PANE_WIDTH_DEFAULT,
+            WIKI_CATALOG_PANE_WIDTH_MIN,
+            WIKI_CATALOG_PANE_WIDTH_MAX,
           ),
           libraryViewMode: normalizeLibraryViewMode(
             saved.libraryViewMode ?? saved.libraryListDensity,

@@ -6,7 +6,6 @@ import {
   ClockIcon,
   FolderIcon,
   HashIcon,
-  InboxIcon,
   PinIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -82,7 +81,13 @@ function ActionButton({
   );
 }
 
-/** 所属知识库 chip：点击弹出集合列表 */
+/**
+ * 所属知识库 chip：点击弹出集合列表。
+ *
+ * 走 bulkMoveToCollection 而不是防抖保存队列——分类是过滤条件，
+ * 改完侧栏的「未分类」与各知识库计数、以及当前列表都要立刻跟上；
+ * 混进正文的 800ms 防抖里只会让侧栏读数停留在旧值。
+ */
 function CollectionChip({
   item,
   disabled,
@@ -92,7 +97,9 @@ function CollectionChip({
 }) {
   const { t } = useTranslation();
   const collections = useCollectionStore((state) => state.collections);
-  const updateSelected = useKnowledgeStore((state) => state.updateSelected);
+  const bulkMoveToCollection = useKnowledgeStore(
+    (state) => state.bulkMoveToCollection,
+  );
   const chipRef = useRef<HTMLButtonElement>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
 
@@ -117,7 +124,6 @@ function CollectionChip({
         }}
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
-        title={t("library.collection", "知识库")}
         className={`${CHIP_BASE} border-border/70 text-muted-foreground transition-colors hover:border-border hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-60`}
       >
         <span aria-hidden="true" className="leading-none">
@@ -137,11 +143,12 @@ function CollectionChip({
           items={[
             {
               label: t("library.noCollection", "未分类"),
-              onClick: () => updateSelected({ collectionId: null }),
+              onClick: () => void bulkMoveToCollection([item.id], null),
             },
             ...collections.map((collection) => ({
               label: collection.name,
-              onClick: () => updateSelected({ collectionId: collection.id }),
+              onClick: () =>
+                void bulkMoveToCollection([item.id], collection.id),
             })),
           ]}
         />
@@ -230,7 +237,6 @@ export function ItemDetailHeader({
             }
           }}
           readOnly={isTrashed}
-          title={item.title}
           placeholder={t("library.titlePlaceholder", "标题")}
           className="min-w-0 flex-1 resize-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
@@ -271,17 +277,9 @@ export function ItemDetailHeader({
               >
                 <PinIcon className="h-4 w-4" aria-hidden="true" />
               </ActionButton>
-              {item.status === "inbox" ? (
-                <ActionButton
-                  onClick={() => void setStatus([item.id], "ready")}
-                  title={t("library.markReady", "移入知识库")}
-                >
-                  <InboxIcon className="h-4 w-4" aria-hidden="true" />
-                </ActionButton>
-              ) : null}
               {item.status === "archived" ? (
                 <ActionButton
-                  onClick={() => void setStatus([item.id], "ready")}
+                  onClick={() => void setStatus([item.id], "active")}
                   title={t("library.unarchive", "取消归档")}
                 >
                   <ArchiveRestoreIcon className="h-4 w-4" aria-hidden="true" />

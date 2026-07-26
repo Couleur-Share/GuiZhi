@@ -41,7 +41,7 @@ export function NetworkSettings() {
           label={t("settings.networkProxyMode", "代理模式")}
           description={t(
             "settings.networkProxyModeDesc",
-            "用于 Skill、MCP、Plugin、AI 请求和同步等需要访问网络的功能",
+            "用于 AI 请求、网页与视频采集、模型服务连接和检查更新等需要访问网络的功能",
           )}
         >
           <Select

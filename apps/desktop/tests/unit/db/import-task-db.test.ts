@@ -48,6 +48,30 @@ describe("ImportTaskDB", () => {
     expect(updated.duplicateItemId).toBe("item-1");
   });
 
+  it("回写真实标题与条目类型", () => {
+    const task = tasks.create({
+      kind: "url",
+      input: "https://www.v2ex.com/t/1223399#reply147",
+    });
+    expect(task.displayName).toBe("https://www.v2ex.com/t/1223399#reply147");
+    expect(task.itemType).toBeNull();
+
+    const updated = tasks.update(task.id, {
+      displayName: "为什么 SQLite 不适合做队列",
+      itemType: "forum",
+      status: "completed",
+    })!;
+    expect(updated.displayName).toBe("为什么 SQLite 不适合做队列");
+    expect(updated.itemType).toBe("forum");
+  });
+
+  it("空标题不覆盖既有显示名", () => {
+    const task = tasks.create({ kind: "url", input: "https://example.com" });
+    // 抽取降级时 title 可能是空串，覆盖过去列表上就只剩一行空白
+    tasks.update(task.id, { displayName: "   " });
+    expect(tasks.get(task.id)!.displayName).toBe("https://example.com");
+  });
+
   it("forceDuplicate 标志读写", () => {
     const task = tasks.create({
       kind: "text",

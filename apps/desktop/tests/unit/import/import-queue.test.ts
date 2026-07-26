@@ -28,6 +28,7 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
         status: "pending",
         stage: null,
         error: null,
+        itemType: null,
         resultItemId: null,
         duplicateItemId: null,
         collectionId: input.collectionId ?? null,
@@ -67,6 +68,9 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
       if (patch.status !== undefined) row.status = patch.status;
       if (patch.stage !== undefined) row.stage = patch.stage;
       if (patch.error !== undefined) row.error = patch.error;
+      // 与 ImportTaskDB.update 一致：空标题不覆盖既有显示名
+      if (patch.displayName?.trim()) row.displayName = patch.displayName.trim();
+      if (patch.itemType !== undefined) row.itemType = patch.itemType;
       if (patch.resultItemId !== undefined) row.resultItemId = patch.resultItemId;
       if (patch.duplicateItemId !== undefined)
         row.duplicateItemId = patch.duplicateItemId;
@@ -171,6 +175,67 @@ describe("ImportQueue", () => {
 
     expect(peak).toBe(2);
     expect(harness.savedItems).toHaveLength(5);
+  });
+
+  it("抽取成功后回写真实标题与条目类型", async () => {
+    const harness = createHarness({
+      extract: async () => ({
+        title: "为什么 SQLite 不适合做队列",
+        content: "正文",
+        itemType: "forum",
+        sourceUri: "https://www.v2ex.com/t/1223399",
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://www.v2ex.com/t/1223399#reply147" },
+    ]);
+    // 建任务时显示名只能是原始链接，一列长得一样的 URL 分不清采的是什么
+    expect(task.displayName).toContain("v2ex.com");
+    await harness.queue.drain();
+
+    const finished = harness.store.get(task.id)!;
+    expect(finished.displayName).toBe("为什么 SQLite 不适合做队列");
+    expect(finished.itemType).toBe("forum");
+  });
+
+  it("重复任务同样拿得到标题：回写发生在去重判定之前", async () => {
+    const harness = createHarness({
+      findDuplicate: () => "existing-item",
+      extract: async () => ({
+        title: "已经采过的那篇",
+        content: "正文",
+        itemType: "webpage",
+        sourceUri: "https://example.com/a",
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://example.com/a" },
+    ]);
+    await harness.queue.drain();
+
+    const finished = harness.store.get(task.id)!;
+    expect(finished.status).toBe("duplicate");
+    expect(finished.displayName).toBe("已经采过的那篇");
+    expect(finished.itemType).toBe("webpage");
+  });
+
+  it("抽取没给标题时保留原始显示名，不写成空", async () => {
+    const harness = createHarness({
+      extract: async () => ({
+        title: "   ",
+        content: "正文",
+        itemType: "note",
+        sourceUri: null,
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://example.com/b" },
+    ]);
+    await harness.queue.drain();
+
+    expect(harness.store.get(task.id)!.displayName).toBe(
+      "https://example.com/b",
+    );
   });
 
   it("去重命中：标记 duplicate 并携带已有条目 id，不入库", async () => {

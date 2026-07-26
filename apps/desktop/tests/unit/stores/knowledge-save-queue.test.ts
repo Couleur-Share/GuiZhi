@@ -15,7 +15,7 @@ function makeItem(id: string, content = ""): KnowledgeItem {
     summary: null,
     transcript: null,
     itemType: "note",
-    status: "inbox",
+    status: "active",
     collectionId: null,
     isFavorite: false,
     isPinned: false,
@@ -32,10 +32,27 @@ interface UpdateCall {
   patch: UpdateKnowledgeItemInput;
 }
 
+let countsCalls = 0;
+
 function stubUpdate(
   impl: (id: string, patch: UpdateKnowledgeItemInput) => Promise<KnowledgeItem | null>,
 ): void {
-  window.api.knowledge = { ...(window.api.knowledge ?? {}), update: impl };
+  window.api.knowledge = {
+    ...(window.api.knowledge ?? {}),
+    update: impl,
+    counts: async () => {
+      countsCalls += 1;
+      return {
+        uncategorized: 0,
+        all: 0,
+        favorites: 0,
+        archived: 0,
+        trash: 0,
+        byCollection: {},
+        byTag: {},
+      };
+    },
+  };
 }
 
 function selectItem(item: KnowledgeItem): void {
@@ -45,6 +62,7 @@ function selectItem(item: KnowledgeItem): void {
 describe("knowledge.store 待保存队列", () => {
   beforeEach(() => {
     __resetPendingSaves();
+    countsCalls = 0;
     // 关掉 autoSave：由用例显式驱动落盘，等价于 Ctrl+S / 切换条目的路径
     useSettingsStore.setState({ autoSave: false });
     useKnowledgeStore.setState({
@@ -172,5 +190,19 @@ describe("knowledge.store 待保存队列", () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0].patch.tagNames).toEqual(["读书", "笔记"]);
+  });
+
+  it("标签落盘后重取侧栏计数，正文落盘不重取", async () => {
+    stubUpdate(async (id, patch) => makeItem(id, String(patch.content ?? "")));
+
+    selectItem(makeItem("A"));
+    useKnowledgeStore.getState().updateSelected({ tagNames: ["读书"] });
+    await useKnowledgeStore.getState().flushPendingSave();
+    expect(countsCalls).toBe(1);
+
+    // 标题与正文不改变任何侧栏读数，不该让每次防抖落盘都多打一次计数查询
+    useKnowledgeStore.getState().updateSelected({ content: "接着写" });
+    await useKnowledgeStore.getState().flushPendingSave();
+    expect(countsCalls).toBe(1);
   });
 });

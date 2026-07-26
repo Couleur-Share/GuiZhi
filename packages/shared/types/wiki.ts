@@ -44,8 +44,18 @@ export interface WikiCatalogEntry {
   kind: WikiPageKind;
   summary: string;
   aliasesJson: string | null;
+  /** 手动改过正文的时刻；非空表示后续编译不再覆盖它 */
+  manualEditedAt: number | null;
   updatedAt: number;
 }
+
+/**
+ * 各页面被引用次数（page id → 入链数）。
+ *
+ * 有意不并进 getCatalog：那个查询在编译时每条目都要打一次，
+ * 多挂一个分组 JOIN 是给热路径加常数开销；界面单独取一次就够了。
+ */
+export type WikiBacklinkCounts = Record<string, number>;
 
 /** 页面全文检索命中（问答检索用；按 bm25 排序，标题权重最高） */
 export interface WikiSearchHit {

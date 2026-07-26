@@ -24,6 +24,7 @@ import {
   type AIModelConfig,
   type AIModelRoute,
 } from "../../stores/settings.store";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useToast } from "../ui/Toast";
 import { Spinner } from "../ui/Spinner";
 import { AdvancedSection } from "./ai-workbench/AdvancedSection";
@@ -280,6 +281,8 @@ export function AISettingsPrototype() {
     null,
   );
   const [savingModel, setSavingModel] = useState(false);
+  const [pendingDeleteModel, setPendingDeleteModel] =
+    useState<AIModelConfig | null>(null);
   const [modelEndpointLocked, setModelEndpointLocked] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -657,10 +660,12 @@ export function AISettingsPrototype() {
     closeModelFetch();
   };
 
-  const handleDeleteModel = (model: AIModelConfig) => {
-    if (!confirm(t("settings.confirmDelete"))) {
+  const confirmDeleteModel = () => {
+    const model = pendingDeleteModel;
+    if (!model) {
       return;
     }
+    setPendingDeleteModel(null);
 
     const group = endpointGroups.find((item) =>
       item.models.some((groupModel) => groupModel.id === model.id),
@@ -1033,7 +1038,18 @@ export function AISettingsPrototype() {
         onSetDefaultModel={(modelId) => settings.setDefaultAiModel(modelId)}
         onTestModel={(model) => void handleTestModel(model)}
         onEditModel={openEditModel}
-        onDeleteModel={handleDeleteModel}
+        onDeleteModel={(model) => setPendingDeleteModel(model)}
+      />
+
+      <ConfirmDialog
+        isOpen={pendingDeleteModel !== null}
+        onClose={() => setPendingDeleteModel(null)}
+        onConfirm={confirmDeleteModel}
+        title={t("common.delete")}
+        message={t("settings.confirmDelete")}
+        confirmText={t("common.delete")}
+        cancelText={t("common.cancel")}
+        variant="destructive"
       />
 
       {showModelForm ? (

@@ -1,64 +1,35 @@
-import { lazy, Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useUIStore } from "../../stores/ui.store";
 import { Spinner } from "../ui/Spinner";
-
-const LibraryWorkspace = lazy(() =>
-  import("../library/LibraryWorkspace").then((module) => ({
-    default: module.LibraryWorkspace,
-  })),
-);
-const ImportsWorkspace = lazy(() =>
-  import("../imports/ImportsWorkspace").then((module) => ({
-    default: module.ImportsWorkspace,
-  })),
-);
-const AskWorkspace = lazy(() =>
-  import("../ask/AskWorkspace").then((module) => ({
-    default: module.AskWorkspace,
-  })),
-);
-const WikiWorkspace = lazy(() =>
-  import("../wiki/WikiWorkspace").then((module) => ({
-    default: module.WikiWorkspace,
-  })),
-);
+import { MODULE_WORKSPACES, prefetchAppModules } from "./module-chunks";
 
 const loadingFallback = (
-  <div className="flex flex-1 items-center justify-center">
+  <div className="delayed-fade-in flex flex-1 items-center justify-center">
     <Spinner />
   </div>
 );
 
 export function MainContent() {
   const appModule = useUIStore((state) => state.appModule);
+  const Workspace = MODULE_WORKSPACES[appModule];
 
-  if (appModule === "library") {
-    return (
-      <Suspense fallback={loadingFallback}>
-        <LibraryWorkspace />
-      </Suspense>
-    );
-  }
-
-  if (appModule === "imports") {
-    return (
-      <Suspense fallback={loadingFallback}>
-        <ImportsWorkspace />
-      </Suspense>
-    );
-  }
-
-  if (appModule === "ask") {
-    return (
-      <Suspense fallback={loadingFallback}>
-        <AskWorkspace />
-      </Suspense>
-    );
-  }
+  // 其余模块的 chunk 在空闲时段先拉好。等用户点了导航再加载，切换那一瞬间
+  // Suspense 的转圈就会闪一下——这是「首次进入某个模块才卡一下」的来源。
+  useEffect(() => {
+    if (typeof window.requestIdleCallback !== "function") {
+      prefetchAppModules();
+      return;
+    }
+    // 一直没有空闲时段就 2 秒后强制执行，别让预取无限期推迟
+    const handle = window.requestIdleCallback(prefetchAppModules, {
+      timeout: 2000,
+    });
+    return () => window.cancelIdleCallback(handle);
+  }, []);
 
   return (
     <Suspense fallback={loadingFallback}>
-      <WikiWorkspace />
+      <Workspace />
     </Suspense>
   );
 }

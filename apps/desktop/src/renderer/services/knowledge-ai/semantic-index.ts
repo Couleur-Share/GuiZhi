@@ -14,6 +14,13 @@ export interface SemanticIndexRunResult {
   skipped: boolean;
   indexed: number;
   failed: number;
+  /**
+   * 最后一次失败的原因。
+   *
+   * 每条目的失败原先只进 console，界面拿不到任何可说的话——嵌入接口
+   * 报 401 也好、模型不支持 embeddings 也好，用户看到的都是「点了没反应」。
+   */
+  lastError?: string;
 }
 
 export async function runSemanticIndexing(
@@ -28,6 +35,7 @@ export async function runSemanticIndexing(
   let indexed = 0;
   let failed = 0;
   let consecutiveFailures = 0;
+  let lastError: string | undefined;
   const attempted = new Set<string>();
 
   while (true) {
@@ -75,20 +83,19 @@ export async function runSemanticIndexing(
           onProgress?.(indexed);
         } else {
           failed++;
+          lastError = "向量落库失败（条目可能已被删除）";
         }
       } catch (error) {
         failed++;
         consecutiveFailures++;
-        console.warn(
-          `[semantic] 条目嵌入失败（${item.id}）:`,
-          error instanceof Error ? error.message : error,
-        );
+        lastError = error instanceof Error ? error.message : String(error);
+        console.warn(`[semantic] 条目嵌入失败（${item.id}）:`, lastError);
         if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          return { skipped: false, indexed, failed };
+          return { skipped: false, indexed, failed, lastError };
         }
       }
     }
   }
 
-  return { skipped: false, indexed, failed };
+  return { skipped: false, indexed, failed, lastError };
 }

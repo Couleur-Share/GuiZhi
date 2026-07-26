@@ -1,6 +1,7 @@
 /**
  * 采集 / 导入管线类型。
  */
+import type { KnowledgeItemType } from "./knowledge";
 
 export const IMPORT_SOURCE_KINDS = ["text", "file", "url"] as const;
 
@@ -54,6 +55,13 @@ export interface ImportTask {
   status: ImportTaskStatus;
   stage?: ImportStage | null;
   error?: string | null;
+  /**
+   * 抽取出的条目类型（视频 / 论坛 / 图片…），抽取成功后回写。
+   *
+   * 列表靠它给出与知识库一致的类型图标；抽取完成前为 null，
+   * 此时只能按 sourceKind 显示地球 / 文件图标。
+   */
+  itemType?: KnowledgeItemType | null;
   /** 成功入库的条目 id */
   resultItemId?: string | null;
   /** 去重命中的已有条目 id */

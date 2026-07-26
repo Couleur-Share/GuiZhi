@@ -55,10 +55,12 @@ import {
 import { prepareAudioForTranscription } from "../services/media/audio-preprocess";
 import { rememberPickedBinaryPath } from "../services/picked-binary-paths";
 import { createStatusCache } from "../services/media/engine-status-cache";
+import { withCachedVersion } from "../services/media/engine-version-store";
 import {
   checkFfmpegUpdate,
   getFfmpegStatus,
   installFfmpeg,
+  probeFfmpegVersion,
   removeManagedFfmpeg,
   resolveFfmpegExecutable,
 } from "../services/media/ffmpeg-manager";
@@ -90,6 +92,7 @@ import {
   checkYtDlpUpdate,
   getYtDlpStatus,
   installYtDlp,
+  probeYtDlpVersion,
   removeManagedYtDlp,
   resolveYtDlpExecutable,
 } from "../services/media/ytdlp-manager";
@@ -550,7 +553,10 @@ export function registerMediaIPC(db: Database.Database): void {
       const configuredPath = readYtDlpPathSetting(db);
       return ytDlpStatusCache.read(
         configuredPath ?? "",
-        () => getYtDlpStatus(configuredPath),
+        () =>
+          getYtDlpStatus(configuredPath, {
+            probe: withCachedVersion(probeYtDlpVersion, force === true),
+          }),
         force === true,
       );
     },
@@ -561,7 +567,9 @@ export function registerMediaIPC(db: Database.Database): void {
     async (): Promise<ToolUpdateCheck> => {
       // 只有当前就跑在内置版上才谈得上「更新」：来源是 PATH / 自定义路径时
       // 用户面对的动作是「安装内置版」，不存在版本比较。
-      const current = await getYtDlpStatus(readYtDlpPathSetting(db));
+      const current = await getYtDlpStatus(readYtDlpPathSetting(db), {
+        probe: withCachedVersion(probeYtDlpVersion),
+      });
       return checkYtDlpUpdate(
         current.source === "managed" ? current.version ?? null : null,
       );
@@ -606,7 +614,10 @@ export function registerMediaIPC(db: Database.Database): void {
       const configuredPath = readFfmpegPathSetting(db);
       return ffmpegStatusCache.read(
         configuredPath ?? "",
-        () => getFfmpegStatus(configuredPath),
+        () =>
+          getFfmpegStatus(configuredPath, {
+            probe: withCachedVersion(probeFfmpegVersion, force === true),
+          }),
         force === true,
       );
     },
@@ -615,7 +626,9 @@ export function registerMediaIPC(db: Database.Database): void {
   ipcMain.handle(
     IPC_CHANNELS.FFMPEG_CHECK_UPDATE,
     async (): Promise<ToolUpdateCheck> => {
-      const current = await getFfmpegStatus(readFfmpegPathSetting(db));
+      const current = await getFfmpegStatus(readFfmpegPathSetting(db), {
+        probe: withCachedVersion(probeFfmpegVersion),
+      });
       return checkFfmpegUpdate(
         current.source === "managed" ? current.version ?? null : null,
       );

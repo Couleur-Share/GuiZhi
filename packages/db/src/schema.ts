@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS knowledge_items (
   transcript TEXT,
   item_type TEXT NOT NULL DEFAULT 'note'
     CHECK(item_type IN ('note','webpage','video','image','audio','document','snippet','forum')),
-  status TEXT NOT NULL DEFAULT 'inbox'
-    CHECK(status IN ('inbox','ready','archived')),
+  status TEXT NOT NULL DEFAULT 'active'
+    CHECK(status IN ('active','archived')),
   collection_id TEXT REFERENCES collections(id) ON DELETE SET NULL,
   is_favorite INTEGER NOT NULL DEFAULT 0,
   is_pinned INTEGER NOT NULL DEFAULT 0,
@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
     CHECK(status IN ('pending','processing','completed','failed','canceled','duplicate')),
   stage TEXT,
   error TEXT,
+  -- 抽取出的条目类型，用于列表图标；不加 CHECK，避免新增类型时又要重建表
+  item_type TEXT,
   result_item_id TEXT,
   duplicate_item_id TEXT,
   collection_id TEXT,
