@@ -61,15 +61,78 @@ function hasSearchableToken(value: string): boolean {
 }
 
 /**
+ * 匹配模式。
+ *
+ * - `phrase`：片段之间 AND，中文整段按字相邻。用户在搜索框里敲什么就找什么。
+ * - `recall`：先按虚词/疑问词切开长句，片段之间 OR，交给 bm25 排序。
+ *   自然语言问句走 phrase 必然零命中——中文没有空格，整句会被编译成
+ *   一个要求逐字连续出现的长 phrase。问答检索用这一档。
+ */
+export type FtsMatchMode = "phrase" | "recall";
+
+/**
+ * 中文虚词与疑问词：召回模式下在这些位置切开。
+ * 「归知的语义检索是怎么实现的」→ 归知 / 语义检索 / 实现
+ *
+ * 按长度倒序排列，扫描时优先吃掉长词（「为什么」不该被「什么」先切掉一半）。
+ */
+const CJK_STOPWORDS = [
+  "为什么", "是不是", "怎么样", "怎么办",
+  "怎么", "怎样", "如何", "什么", "哪些", "哪个", "多少",
+  "可以", "能否", "需要", "应该", "我们", "你们", "他们",
+  "这个", "那个", "这些", "那些", "一下", "一个", "没有",
+  "以及", "还是", "或者", "并且", "但是", "因为", "所以",
+  "的", "了", "着", "是", "在", "和", "与", "及", "或",
+  "吗", "呢", "吧", "啊", "有", "会", "要", "对", "把",
+  "被", "从", "到", "给", "让", "用", "跟", "向", "并",
+  "都", "也", "又", "很", "太", "就", "才", "再", "还",
+].sort((left, right) => right.length - left.length);
+
+/** OR 子句上限：再多只会把 bm25 的信噪比拖低 */
+const MAX_RECALL_CLAUSES = 8;
+
+/** 按虚词切开一段连续中文，返回实词片段 */
+function splitCjkRunForRecall(run: string): string[] {
+  const chars = [...run];
+  const segments: string[] = [];
+  let buffer: string[] = [];
+
+  const flush = () => {
+    if (buffer.length > 0) {
+      segments.push(buffer.join(""));
+      buffer = [];
+    }
+  };
+
+  let index = 0;
+  while (index < chars.length) {
+    const rest = chars.slice(index).join("");
+    const stopword = CJK_STOPWORDS.find((word) => rest.startsWith(word));
+    if (stopword) {
+      flush();
+      index += [...stopword].length;
+      continue;
+    }
+    buffer.push(chars[index]);
+    index += 1;
+  }
+  flush();
+  return segments;
+}
+
+/**
  * 把用户搜索串构造成 FTS5 MATCH 查询。
  *
  * - 连续 CJK 片段 → 按字 phrase（"归 知"），保证字序相邻
  * - 非 CJK 词 → 前缀匹配（word*）
- * - 多个片段之间为 AND 关系
+ * - 片段之间的连接词由 mode 决定（见 FtsMatchMode）
  *
  * 返回 null 表示查询串没有可检索内容。
  */
-export function buildFtsMatchQuery(search: string): string | null {
+export function buildFtsMatchQuery(
+  search: string,
+  mode: FtsMatchMode = "phrase",
+): string | null {
   const trimmed = (search ?? "").trim();
   if (!trimmed) {
     return null;
@@ -79,10 +142,31 @@ export function buildFtsMatchQuery(search: string): string | null {
   let cjkRun: string[] = [];
   let asciiBuffer = "";
 
+  const pushCjkPhrase = (run: string) => {
+    clauses.push(quoteFtsString([...run].join(" ")));
+  };
   const flushCjk = () => {
-    if (cjkRun.length > 0) {
-      clauses.push(quoteFtsString(cjkRun.join(" ")));
-      cjkRun = [];
+    if (cjkRun.length === 0) {
+      return;
+    }
+    const run = cjkRun.join("");
+    cjkRun = [];
+    if (mode === "phrase") {
+      pushCjkPhrase(run);
+      return;
+    }
+    const segments = splitCjkRunForRecall(run);
+    // 单字片段（「的」剥完剩下的边角）几乎匹配全库，有实词时一律丢掉。
+    // 整句都是虚词时退回原串——查得少好过返回 null 让上层当成「没搜索」
+    const meaningful = segments.filter((segment) => [...segment].length > 1);
+    const kept =
+      meaningful.length > 0
+        ? meaningful
+        : segments.length > 0
+          ? segments
+          : [run];
+    for (const segment of kept) {
+      pushCjkPhrase(segment);
     }
   };
   const flushAscii = () => {
@@ -109,5 +193,10 @@ export function buildFtsMatchQuery(search: string): string | null {
   flushAscii();
   flushCjk();
 
-  return clauses.length > 0 ? clauses.join(" AND ") : null;
+  if (clauses.length === 0) {
+    return null;
+  }
+  return mode === "phrase"
+    ? clauses.join(" AND ")
+    : clauses.slice(0, MAX_RECALL_CLAUSES).join(" OR ");
 }

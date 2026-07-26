@@ -46,14 +46,20 @@ export function hasColumn(
   return rows.some((row) => row.name === column);
 }
 
-/** 缺列才加；已存在时静默跳过 */
+/**
+ * 缺列才加；已存在时静默跳过。
+ *
+ * 表本身不存在也跳过：迁移在 SCHEMA_TABLES 之后执行，正常库里表一定在；
+ * 只建了半个库的单测不该因此炸掉整条迁移链。
+ */
 export function addColumnIfMissing(
   db: Database.Database,
   table: string,
   column: string,
   definition: string,
 ): void {
-  if (hasColumn(db, table, column)) {
+  const rows = db.all(`PRAGMA table_info(${table})`) as ColumnRow[];
+  if (rows.length === 0 || rows.some((row) => row.name === column)) {
     return;
   }
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
@@ -163,6 +169,32 @@ export const MIGRATIONS: Migration[] = [
         ALTER TABLE knowledge_items_migrate RENAME TO knowledge_items;
         ${KNOWLEDGE_ITEMS_INDEXES.join(";\n        ")};
       `);
+    },
+  },
+  {
+    // 采集时选定的标签要随任务持久化，重启恢复后仍能打到条目上
+    name: "0004-import-task-tags",
+    up: (db) => {
+      addColumnIfMissing(db, "import_tasks", "tag_names", "TEXT");
+    },
+  },
+  {
+    // 失败调用也计入用量：超时与限流同样产生费用
+    name: "0005-ai-usage-failed-calls",
+    up: (db) => {
+      addColumnIfMissing(
+        db,
+        "ai_usage_daily",
+        "failed_calls",
+        "INTEGER NOT NULL DEFAULT 0",
+      );
+    },
+  },
+  {
+    // Wiki 页面可手动编辑：标记过的页面下一轮编译不再覆盖正文
+    name: "0006-wiki-manual-edit",
+    up: (db) => {
+      addColumnIfMissing(db, "wiki_pages", "manual_edited_at", "INTEGER");
     },
   },
 ];

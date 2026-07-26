@@ -10,6 +10,7 @@ import {
   getDatabase,
   closeDatabase,
   KnowledgeItemDB,
+  WikiDB,
 } from "@guizhi/db";
 import type { InitDatabaseHooks } from "@guizhi/db";
 import { getDatabasePath } from "../runtime-paths";
@@ -36,6 +37,12 @@ export function initDatabase(): DatabaseAdapter.Database {
   const backfilled = new KnowledgeItemDB(db).backfillMissingFtsRows();
   if (backfilled > 0) {
     console.log(`[db] 补齐 ${backfilled} 条缺失的全文索引`);
+  }
+
+  // wiki_fts 是后加的表，老库里已有的页面一条索引都没有
+  const wikiBackfilled = new WikiDB(db).backfillMissingFtsRows();
+  if (wikiBackfilled > 0) {
+    console.log(`[db] 补齐 ${wikiBackfilled} 个 Wiki 页面的全文索引`);
   }
 
   return db;

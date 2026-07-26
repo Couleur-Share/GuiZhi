@@ -16,6 +16,23 @@ export interface SemanticChunkRecord {
   vector: Float32Array;
 }
 
+/** 打分阶段够用的最小投影：不带正文与标题 */
+export interface SemanticVectorRecord {
+  itemId: string;
+  chunkIndex: number;
+  vector: Float32Array;
+  /** 游标翻页用：调用方把最后一条的 rowid 传回来取下一批 */
+  rowid: number;
+}
+
+/** 命中分块的展示信息（只为最终 top-k 取） */
+export interface SemanticChunkSnippet {
+  itemId: string;
+  chunkIndex: number;
+  chunkText: string;
+  title: string;
+}
+
 export interface SemanticItemState {
   itemId: string;
   contentHash: string;
@@ -138,6 +155,67 @@ export class SemanticIndexDB {
       chunkText: row.chunk_text,
       title: row.title,
       vector: blobToVector(row.vector, row.dims),
+    }));
+  }
+
+  /**
+   * 打分用的向量流。
+   *
+   * 与 loadChunksForSearch 的区别是不取 chunk_text 与 title——它们只在最终
+   * top-k 上用得着，却要为每一个分块跨一次 wasm 边界、在 JS 侧建一个字符串。
+   * 万级分块下这是白搬几十 MB 和一轮无谓的 GC 压力。
+   */
+  loadVectorsForSearch(
+    model: string,
+    limit?: number,
+    afterRowid = 0,
+  ): SemanticVectorRecord[] {
+    // 按 rowid 游标翻页，不用 LIMIT/OFFSET：OFFSET 要求 SQLite 先扫过
+    // 并丢弃前 N 行连接结果，分批遍历全表就成了平方级。实测 6 万分块下
+    // 偏移翻页 15.1s，游标翻页 1.1s。
+    const params: unknown[] = [model, afterRowid];
+    let pageClause = "";
+    if (limit !== undefined) {
+      pageClause = " LIMIT ?";
+      params.push(limit);
+    }
+    const rows = this.db.all(
+      `SELECT e.rowid AS rowid, e.item_id, e.chunk_index, e.dims, e.vector
+       FROM knowledge_embeddings e
+       JOIN knowledge_items i ON i.id = e.item_id AND i.deleted_at IS NULL
+       WHERE e.model = ? AND e.rowid > ?
+       ORDER BY e.rowid${pageClause}`,
+      ...params,
+    ) as Array<Omit<ChunkRow, "chunk_text" | "title"> & { rowid: number }>;
+    return rows.map((row) => ({
+      itemId: row.item_id,
+      chunkIndex: row.chunk_index,
+      vector: blobToVector(row.vector, row.dims),
+      rowid: row.rowid,
+    }));
+  }
+
+  /** 取指定分块的展示文本（检索完成后只对 top-k 调用） */
+  loadChunkSnippets(
+    keys: Array<{ itemId: string; chunkIndex: number }>,
+  ): SemanticChunkSnippet[] {
+    if (keys.length === 0) {
+      return [];
+    }
+    const placeholders = keys.map(() => "(?, ?)").join(", ");
+    const params = keys.flatMap((key) => [key.itemId, key.chunkIndex]);
+    const rows = this.db.all(
+      `SELECT e.item_id, e.chunk_index, e.chunk_text, i.title AS title
+       FROM knowledge_embeddings e
+       JOIN knowledge_items i ON i.id = e.item_id
+       WHERE (e.item_id, e.chunk_index) IN (VALUES ${placeholders})`,
+      ...params,
+    ) as Array<Pick<ChunkRow, "item_id" | "chunk_index" | "chunk_text" | "title">>;
+    return rows.map((row) => ({
+      itemId: row.item_id,
+      chunkIndex: row.chunk_index,
+      chunkText: row.chunk_text,
+      title: row.title,
     }));
   }
 

@@ -59,3 +59,45 @@ describe("buildFtsMatchQuery", () => {
     expect(buildFtsMatchQuery("——")).toBeNull();
   });
 });
+
+describe("buildFtsMatchQuery 召回模式", () => {
+  it("按虚词切开长句并以 OR 连接", () => {
+    // phrase 模式下整句会变成一个逐字相邻的长 phrase，必然零命中
+    expect(buildFtsMatchQuery("归知的语义检索是怎么实现的")).toBe(
+      '"归 知 的 语 义 检 索 是 怎 么 实 现 的"',
+    );
+    expect(buildFtsMatchQuery("归知的语义检索是怎么实现的", "recall")).toBe(
+      '"归 知" OR "语 义 检 索" OR "实 现"',
+    );
+  });
+
+  it("疑问词整体剥离，不被短虚词切碎", () => {
+    expect(buildFtsMatchQuery("为什么采集会失败", "recall")).toBe(
+      '"采 集" OR "失 败"',
+    );
+  });
+
+  it("中英混排：英文仍走前缀匹配", () => {
+    expect(buildFtsMatchQuery("Electron 的窗口安全", "recall")).toBe(
+      '"Electron"* OR "窗 口 安 全"',
+    );
+  });
+
+  it("整句都是虚词时退回原串，不返回 null", () => {
+    // 返回 null 会被调用方当成「没有搜索」进而列出全库
+    expect(buildFtsMatchQuery("这个是什么", "recall")).toBe(
+      '"这 个 是 什 么"',
+    );
+  });
+
+  it("子句数量有上限", () => {
+    const long = "采集 转写 摘要 标签 问答 图谱 备份 导出 索引 迁移";
+    const clauses = buildFtsMatchQuery(long, "recall")!.split(" OR ");
+    expect(clauses.length).toBeLessThanOrEqual(8);
+  });
+
+  it("空查询两种模式都返回 null", () => {
+    expect(buildFtsMatchQuery("   ", "recall")).toBeNull();
+    expect(buildFtsMatchQuery("——", "recall")).toBeNull();
+  });
+});

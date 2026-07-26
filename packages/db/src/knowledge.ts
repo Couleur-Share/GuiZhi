@@ -12,6 +12,7 @@ import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
 import { extractAllLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
 import type {
+  BulkUpdateKnowledgeItemsInput,
   CreateKnowledgeItemInput,
   KnowledgeCounts,
   KnowledgeItem,
@@ -53,6 +54,14 @@ interface TagRow {
 
 const LIST_DEFAULT_LIMIT = 200;
 const SNIPPET_MAX_LENGTH = 160;
+/**
+ * 列表只取正文前这么多字用来生成摘要。
+ *
+ * 原来是 `SELECT i.*`：一页 20 条长转写（每条几万字）就要从磁盘读出并跨进程
+ * 序列化上百万字符，最终只用掉 3200 个。留足余量是因为 makeSnippet 会先剥掉
+ * 代码块与 Markdown 语法，开头若全是元数据引用块，剥完可能不剩几个字。
+ */
+const SNIPPET_SOURCE_LENGTH = 2000;
 
 /** 排序字段白名单：调用方传入的键只能命中这里的固定 SQL 片段 */
 const SORT_COLUMNS: Record<KnowledgeSortField, string> = {
@@ -161,9 +170,17 @@ export class KnowledgeItemDB {
       params.push(query.tagId);
     }
 
-    const matchQuery = query.search
-      ? buildFtsMatchQuery(query.search)
+    const searchTerm = query.search?.trim() || "";
+    const matchQuery = searchTerm
+      ? buildFtsMatchQuery(searchTerm, query.searchMode ?? "phrase")
       : null;
+
+    // 搜索串编译不出任何可检索内容（例如全是标点）：这是「没有命中」，
+    // 不是「没有搜索」。把 null 当成后者会静默列出全库，
+    // 而界面此时还显示着「按相关度排序」，用户以为这就是搜索结果。
+    if (searchTerm && !matchQuery) {
+      return { entries: [], total: 0 };
+    }
 
     let joinClause = "";
     let orderClause = buildOrderClause(query.sortBy, query.sortOrder);
@@ -191,7 +208,10 @@ export class KnowledgeItemDB {
     const total = totalRow?.count ?? 0;
 
     const rows = this.db.all(
-      `SELECT i.* FROM knowledge_items i ${joinClause} ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
+      `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
+              i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at,
+              substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content
+       FROM knowledge_items i ${joinClause} ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
       ...params,
       limit,
       offset,
@@ -383,6 +403,80 @@ export class KnowledgeItemDB {
     return this.get(id);
   }
 
+  /**
+   * 一个事务里改一批条目，返回实际改动的条数。
+   *
+   * 渲染层原来是 for 循环逐条打 IPC：100 条就是 100 次往返、100 个独立事务，
+   * 每次还要重写一遍 FTS 行；中途失败没有回滚也没有提示。
+   */
+  bulkUpdate(ids: string[], input: BulkUpdateKnowledgeItemsInput): number {
+    if (ids.length === 0) {
+      return 0;
+    }
+    const addNames = normalizeTagNames(input.addTagNames);
+    const removeNames = new Set(
+      normalizeTagNames(input.removeTagNames).map((name) => name.toLowerCase()),
+    );
+    const touchesTags = addNames.length > 0 || removeNames.size > 0;
+
+    const now = Date.now();
+    let changed = 0;
+    const run = this.db.transaction(() => {
+      for (const id of ids) {
+        const existing = this.db.get(
+          "SELECT * FROM knowledge_items WHERE id = ?",
+          id,
+        ) as ItemRow | undefined;
+        if (!existing) {
+          continue;
+        }
+
+        const next = {
+          collectionId:
+            input.collectionId !== undefined
+              ? input.collectionId
+              : existing.collection_id,
+          status: input.status ?? existing.status,
+          isFavorite:
+            input.isFavorite !== undefined
+              ? input.isFavorite
+              : existing.is_favorite === 1,
+          isPinned:
+            input.isPinned !== undefined
+              ? input.isPinned
+              : existing.is_pinned === 1,
+        };
+
+        this.db.run(
+          `UPDATE knowledge_items SET
+             collection_id = ?, status = ?, is_favorite = ?, is_pinned = ?, updated_at = ?
+           WHERE id = ?`,
+          next.collectionId,
+          next.status,
+          next.isFavorite ? 1 : 0,
+          next.isPinned ? 1 : 0,
+          now,
+          id,
+        );
+
+        if (touchesTags) {
+          const current = (this.loadTagsFor([id]).get(id) ?? []).map(
+            (tag) => tag.name,
+          );
+          const kept = current.filter(
+            (name) => !removeNames.has(name.toLowerCase()),
+          );
+          const merged = normalizeTagNames([...kept, ...addNames]);
+          const tags = this.replaceTags(id, merged, now);
+          this.writeFts(id, existing.title, existing.content, tags);
+        }
+        changed += 1;
+      }
+    });
+    run();
+    return changed;
+  }
+
   setStatus(ids: string[], status: KnowledgeItemStatus): number {
     if (ids.length === 0) {
       return 0;
@@ -449,7 +543,7 @@ export class KnowledgeItemDB {
     let changed = 0;
     const run = this.db.transaction(() => {
       for (const id of ids) {
-        this.db.run("DELETE FROM knowledge_fts WHERE item_id = ?", id);
+        this.deleteFtsRow(id);
         changed += this.db.run(
           "DELETE FROM knowledge_items WHERE id = ?",
           id,
@@ -493,12 +587,28 @@ export class KnowledgeItemDB {
 
   /** 是否还有条目引用该资产（决定删除条目后能否清理磁盘文件） */
   isAssetReferenced(fileName: string): boolean {
-    // 适配器无结果时返回 null（不是 undefined），这里只能用宽松判空
-    const row = this.db.get(
-      "SELECT 1 AS hit FROM knowledge_items WHERE content LIKE ? LIMIT 1",
-      `%${fileName}%`,
-    ) as { hit: number } | null;
-    return row != null;
+    return this.listReferencedAssets().has(fileName);
+  }
+
+  /**
+   * 全库仍在引用的资产文件名。
+   *
+   * 逐个资产打一次 `content LIKE '%name%'` 会做 N 次全表扫描——删一条带 9 张
+   * 配图的图文条目就是 9 次。这里换成一次带前缀条件的扫描：任何引用都必然
+   * 含有协议前缀，SQL 只筛出这批正文，具体文件名交给已有的解析函数在内存里比。
+   */
+  listReferencedAssets(): Set<string> {
+    const rows = this.db.all(
+      `SELECT content FROM knowledge_items
+       WHERE content LIKE '%local-image://%' OR content LIKE '%local-video://%'`,
+    ) as Array<{ content: string }>;
+    const referenced = new Set<string>();
+    for (const row of rows) {
+      for (const ref of extractAllLocalAssetRefs(row.content)) {
+        referenced.add(ref);
+      }
+    }
+    return referenced;
   }
 
   /**
@@ -508,6 +618,14 @@ export class KnowledgeItemDB {
    * 回收站范围内搜不到。全量重建对大库太贵，这里只补缺失的。
    */
   backfillMissingFtsRows(): number {
+    // 先把 rowid 映射补齐：映射表是后加的，老库里已有的索引行一条都没登记，
+    // 不补的话写路径会一直走「按 item_id 全表扫」那条退路
+    this.db.run(
+      `INSERT OR IGNORE INTO knowledge_fts_map (item_id, fts_rowid)
+       SELECT item_id, rowid FROM knowledge_fts`,
+    );
+
+    // 缺失以索引本身为准而不是映射表：映射可能指向一条已经不在的索引行
     const rows = this.db.all(
       `SELECT * FROM knowledge_items i
        WHERE NOT EXISTS (SELECT 1 FROM knowledge_fts WHERE item_id = i.id)`,
@@ -536,6 +654,7 @@ export class KnowledgeItemDB {
     const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
     const run = this.db.transaction(() => {
       this.db.run("DELETE FROM knowledge_fts");
+      this.db.run("DELETE FROM knowledge_fts_map");
       for (const row of rows) {
         this.writeFts(
           row.id,
@@ -625,19 +744,43 @@ export class KnowledgeItemDB {
     return tags;
   }
 
+  /**
+   * 按 rowid 删掉某条目的索引行。
+   *
+   * fts5 对 UNINDEXED 列的等值条件只能线性扫全表，而这是每次写入的必经步骤；
+   * 映射表里没有记录时（老库尚未回填）退回按 item_id 删，保证正确性。
+   */
+  private deleteFtsRow(itemId: string): void {
+    const mapped = this.db.get(
+      "SELECT fts_rowid FROM knowledge_fts_map WHERE item_id = ?",
+      itemId,
+    ) as { fts_rowid: number } | undefined | null;
+    if (mapped) {
+      this.db.run("DELETE FROM knowledge_fts WHERE rowid = ?", mapped.fts_rowid);
+      this.db.run("DELETE FROM knowledge_fts_map WHERE item_id = ?", itemId);
+      return;
+    }
+    this.db.run("DELETE FROM knowledge_fts WHERE item_id = ?", itemId);
+  }
+
   private writeFts(
     itemId: string,
     title: string,
     content: string,
     tags: Tag[],
   ): void {
-    this.db.run("DELETE FROM knowledge_fts WHERE item_id = ?", itemId);
-    this.db.run(
+    this.deleteFtsRow(itemId);
+    const inserted = this.db.run(
       "INSERT INTO knowledge_fts (item_id, title, content, tags) VALUES (?, ?, ?, ?)",
       itemId,
       segmentTextForFts(title),
       segmentTextForFts(content),
       segmentTextForFts(tags.map((tag) => tag.name).join(" ")),
+    );
+    this.db.run(
+      "INSERT OR REPLACE INTO knowledge_fts_map (item_id, fts_rowid) VALUES (?, ?)",
+      itemId,
+      Number(inserted.lastInsertRowid),
     );
   }
 }

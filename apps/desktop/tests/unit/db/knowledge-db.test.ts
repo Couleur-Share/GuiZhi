@@ -310,3 +310,227 @@ describe("CollectionDB / TagDB", () => {
     expect(() => tags.update(first.id, { name: "other" })).toThrow();
   });
 });
+
+describe("FTS rowid 映射", () => {
+  let db: DatabaseAdapter.Database;
+  let items: KnowledgeItemDB;
+
+  const mapRows = () =>
+    db.all("SELECT item_id, fts_rowid FROM knowledge_fts_map") as Array<{
+      item_id: string;
+      fts_rowid: number;
+    }>;
+  const ftsCount = () =>
+    (db.get("SELECT COUNT(*) AS c FROM knowledge_fts") as { c: number }).c;
+
+  beforeEach(() => {
+    db = createTestDb();
+    items = new KnowledgeItemDB(db);
+  });
+
+  it("写入登记映射，反复更新不会留下多余索引行", () => {
+    const item = items.create({ title: "初稿", content: "第一版内容" });
+    expect(mapRows()).toHaveLength(1);
+    expect(ftsCount()).toBe(1);
+
+    for (let round = 0; round < 5; round++) {
+      items.update(item.id, { content: `第 ${round} 版内容` });
+    }
+    expect(mapRows()).toHaveLength(1);
+    expect(ftsCount()).toBe(1);
+    // 旧内容不该还能搜到
+    expect(items.list({ scope: "all", search: "第一版" }).total).toBe(0);
+    expect(items.list({ scope: "all", search: "第 4 版" }).total).toBe(1);
+  });
+
+  it("彻底删除后索引与映射一起清掉", () => {
+    const item = items.create({ title: "待删", content: "内容" });
+    items.moveToTrash([item.id]);
+    items.deleteForever([item.id]);
+
+    expect(mapRows()).toHaveLength(0);
+    expect(ftsCount()).toBe(0);
+  });
+
+  it("老库没有映射时按 item_id 兜底，backfill 后补齐", () => {
+    const item = items.create({ title: "老条目", content: "老内容" });
+    // 模拟映射表加入之前建的库
+    db.run("DELETE FROM knowledge_fts_map");
+
+    // 兜底路径要能正确替换索引行，不能留下两条
+    items.update(item.id, { content: "新内容" });
+    expect(ftsCount()).toBe(1);
+    expect(items.list({ scope: "all", search: "老内容" }).total).toBe(0);
+
+    db.run("DELETE FROM knowledge_fts_map");
+    items.backfillMissingFtsRows();
+    expect(mapRows()).toHaveLength(1);
+  });
+
+  it("rebuildFtsIndex 重建后映射与索引数量一致", () => {
+    items.create({ title: "甲", content: "一" });
+    items.create({ title: "乙", content: "二" });
+
+    expect(items.rebuildFtsIndex()).toBe(2);
+    expect(ftsCount()).toBe(2);
+    expect(mapRows()).toHaveLength(2);
+    expect(items.list({ scope: "all", search: "甲" }).total).toBe(1);
+  });
+});
+
+describe("KnowledgeItemDB.list 只取摘要所需的正文前缀", () => {
+  it("列表不返回完整正文，详情仍然完整", () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const tail = "结尾标记";
+    const created = items.create({
+      title: "长文",
+      content: `${"填充。".repeat(3000)}${tail}`,
+    });
+
+    const entry = items.list({ scope: "all" }).entries[0];
+    expect(entry.snippet.length).toBeLessThanOrEqual(161);
+    expect(entry.snippet).not.toContain(tail);
+
+    // get() 走的是另一条路径，必须拿到全文
+    expect(items.get(created.id)!.content).toContain(tail);
+  });
+});
+
+describe("KnowledgeItemDB.bulkUpdate", () => {
+  let db: DatabaseAdapter.Database;
+  let items: KnowledgeItemDB;
+  let ids: string[];
+
+  beforeEach(() => {
+    db = createTestDb();
+    items = new KnowledgeItemDB(db);
+    ids = [
+      items.create({ title: "甲", content: "x", tagNames: ["读书"] }).id,
+      items.create({ title: "乙", content: "y", tagNames: ["播客"] }).id,
+    ];
+  });
+
+  it("追加标签时保留各自原有的标签", () => {
+    // 整体替换的语义会把两条各自的原标签一起抹掉
+    expect(items.bulkUpdate(ids, { addTagNames: ["待读"] })).toBe(2);
+
+    const names = (id: string) =>
+      new Set(items.get(id)!.tags.map((tag) => tag.name));
+    expect(names(ids[0])).toEqual(new Set(["读书", "待读"]));
+    expect(names(ids[1])).toEqual(new Set(["播客", "待读"]));
+  });
+
+  it("移除标签只动指定的那个", () => {
+    items.bulkUpdate(ids, { addTagNames: ["待读"] });
+    items.bulkUpdate(ids, { removeTagNames: ["待读"] });
+
+    expect(items.get(ids[0])!.tags.map((tag) => tag.name)).toEqual(["读书"]);
+    expect(items.get(ids[1])!.tags.map((tag) => tag.name)).toEqual(["播客"]);
+  });
+
+  it("一次改多个字段，未传的字段不动", () => {
+    items.bulkUpdate(ids, { isFavorite: true, status: "archived" });
+
+    for (const id of ids) {
+      const item = items.get(id)!;
+      expect(item.isFavorite).toBe(true);
+      expect(item.status).toBe("archived");
+      expect(item.isPinned).toBe(false);
+    }
+    // 标签没传就不该被清掉
+    expect(items.get(ids[0])!.tags).toHaveLength(1);
+  });
+
+  it("标签变更同步进 FTS", () => {
+    items.bulkUpdate(ids, { addTagNames: ["机器学习"] });
+    const hit = items.list({ scope: "all", search: "机器学习" });
+    expect(hit.total).toBe(2);
+  });
+
+  it("不存在的 id 跳过，不影响其余", () => {
+    expect(items.bulkUpdate([...ids, "missing"], { isPinned: true })).toBe(2);
+    expect(items.bulkUpdate([], { isPinned: true })).toBe(0);
+  });
+});
+
+describe("KnowledgeItemDB.list 搜索模式", () => {
+  let db: DatabaseAdapter.Database;
+  let items: KnowledgeItemDB;
+
+  beforeEach(() => {
+    db = createTestDb();
+    items = new KnowledgeItemDB(db);
+    items.create({
+      title: "语义检索的实现",
+      content: "归知用 embedding 做语义检索，主进程算余弦相似度。",
+    });
+    items.create({ title: "无关条目", content: "今天天气不错" });
+  });
+
+  it("自然语言问句：phrase 模式零命中，recall 模式命中", () => {
+    const question = "归知的语义检索是怎么实现的";
+    expect(items.list({ scope: "all", search: question }).total).toBe(0);
+
+    const recalled = items.list({
+      scope: "all",
+      search: question,
+      searchMode: "recall",
+    });
+    expect(recalled.total).toBe(1);
+    expect(recalled.entries[0].title).toBe("语义检索的实现");
+  });
+
+  it("搜索串编译不出内容时返回空，而不是列出全库", () => {
+    // 旧行为把 null 当成「没有搜索」，界面显示「按相关度排序」却列出了所有条目
+    expect(items.list({ scope: "all", search: "???" }).total).toBe(0);
+    expect(items.list({ scope: "all", search: "——" }).entries).toEqual([]);
+    // 空搜索仍然是「不过滤」
+    expect(items.list({ scope: "all", search: "  " }).total).toBe(2);
+  });
+});
+
+describe("列表查询的执行计划", () => {
+  let db: DatabaseAdapter.Database;
+
+  function planOf(sql: string): string {
+    return (db.all(`EXPLAIN QUERY PLAN ${sql}`) as Array<{ detail: string }>)
+      .map((row) => row.detail)
+      .join(" | ");
+  }
+
+  beforeEach(() => {
+    db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    // 少量数据也能定计划形态；ANALYZE 是 initDatabase 会做的事
+    for (let index = 0; index < 200; index++) {
+      items.create({
+        title: `条目 ${index}`,
+        content: "正文".repeat(50),
+        status: index % 10 === 0 ? "archived" : "ready",
+      });
+    }
+    db.exec("ANALYZE");
+  });
+
+  it("总数走覆盖索引，不回表读 status", () => {
+    // 条目表每行带正文，回表 = 按整页读；两万条时实测 180ms → 2.5ms
+    const plan = planOf(
+      `SELECT COUNT(*) AS c FROM knowledge_items i
+       WHERE i.deleted_at IS NULL AND i.status != 'archived'`,
+    );
+    expect(plan).toContain("COVERING INDEX idx_items_deleted_status");
+  });
+
+  it("取页顺着排序索引走，不做临时排序", () => {
+    // 缺统计信息时规划器会挑 idx_items_deleted（把 IS NULL 当等值、估成
+    // 高选择度），然后对全部匹配行建临时 B 树——两万条时实测 128ms
+    const plan = planOf(
+      `SELECT i.id FROM knowledge_items i
+       WHERE i.deleted_at IS NULL AND i.status != 'archived'
+       ORDER BY i.is_pinned DESC, i.updated_at DESC LIMIT 50`,
+    );
+    expect(plan).toContain("idx_items_pinned_updated");
+    expect(plan).not.toContain("TEMP B-TREE");
+  });
+});

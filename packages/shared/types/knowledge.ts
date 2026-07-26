@@ -121,6 +121,12 @@ export interface KnowledgeItemQuery {
   tagId?: string;
   /** 全文搜索关键词；非空时结果按相关性排序 */
   search?: string;
+  /**
+   * 搜索串的编译方式，默认 phrase（片段 AND、中文整段相邻）。
+   * 自然语言问句要用 recall，否则中文长句会被编译成一个
+   * 要求逐字连续出现的 phrase，必然零命中。
+   */
+  searchMode?: "phrase" | "recall";
   /** scope=all 时把归档条目一并纳入（AI 问答检索：归档 ≠ 移出知识） */
   includeArchived?: boolean;
   /** 默认 updatedAt；search 非空时被相关度排序覆盖 */
@@ -129,6 +135,21 @@ export interface KnowledgeItemQuery {
   sortOrder?: KnowledgeSortOrder;
   limit?: number;
   offset?: number;
+}
+
+/**
+ * 批量修改多个条目。
+ *
+ * 标签用「追加 / 移除」而不是整体替换：批量打标签时各条目原有的标签不一样，
+ * 替换语义会把它们一起抹掉。
+ */
+export interface BulkUpdateKnowledgeItemsInput {
+  collectionId?: string | null;
+  isFavorite?: boolean;
+  isPinned?: boolean;
+  status?: KnowledgeItemStatus;
+  addTagNames?: string[];
+  removeTagNames?: string[];
 }
 
 export interface KnowledgeItemListResult {

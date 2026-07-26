@@ -35,17 +35,47 @@ export function buildSemanticSourceText(
   return parts.filter(Boolean).join("\n");
 }
 
-/** 未删除且有实际内容的条目（空白笔记无可嵌入文本，不算 eligible） */
-function listEligibleItems(db: Database.Database): EligibleItemRow[] {
+/** 有实际可嵌入文本的条件（空白笔记不算 eligible） */
+const ELIGIBLE_CONDITION = `
+  i.deleted_at IS NULL
+  AND (
+    TRIM(i.title) != ''
+    OR TRIM(i.content) != ''
+    OR TRIM(COALESCE(i.transcript, '')) != ''
+  )`;
+
+/**
+ * 可能需要重新索引的条目 id（只查 id，不读正文）。
+ *
+ * 原来的做法是把全库正文读进内存、逐条算 SHA 再比对，而这个判定每 5 分钟
+ * 跑一轮、索引循环每批 10 条还要再跑一次——索引 N 条要做 N/10 次全库扫描。
+ * 这里先用「没有索引行 / 换过模型 / 条目比索引新」在 SQL 里筛掉绝大多数，
+ * 哈希仍是最终authority，只是不必为没动过的条目付出读正文的代价。
+ *
+ * updated_at 用 >= 比较：索引行写在读取条目之后，正常情况下严格更大；
+ * 取等是为了不漏掉同一毫秒内完成的那种极端情形，代价只是多算一次哈希。
+ */
+function listCandidateItemIds(db: Database.Database, model: string): string[] {
   const rows = db.all(
-    `SELECT id, title, content, transcript
-     FROM knowledge_items
-     WHERE deleted_at IS NULL
-     ORDER BY updated_at DESC`,
-  ) as EligibleItemRow[];
-  return rows.filter(
-    (row) => buildSemanticSourceText(row.title, row.content, row.transcript).length > 0,
-  );
+    `SELECT i.id
+     FROM knowledge_items i
+     LEFT JOIN (
+       SELECT item_id, MIN(model) AS model, MAX(updated_at) AS updated_at
+       FROM knowledge_embeddings GROUP BY item_id
+     ) e ON e.item_id = i.id
+     WHERE ${ELIGIBLE_CONDITION}
+       AND (e.item_id IS NULL OR e.model != ? OR i.updated_at >= e.updated_at)
+     ORDER BY i.updated_at DESC`,
+    model,
+  ) as Array<{ id: string }>;
+  return rows.map((row) => row.id);
+}
+
+function countEligibleItems(db: Database.Database): number {
+  const row = db.get(
+    `SELECT COUNT(*) AS c FROM knowledge_items i WHERE ${ELIGIBLE_CONDITION}`,
+  ) as { c: number } | undefined;
+  return row?.c ?? 0;
 }
 
 /** 待索引条目：无索引 / 内容哈希变化 / 模型切换 */
@@ -56,7 +86,15 @@ export function listPendingSemanticItems(
 ): PendingSemanticItem[] {
   const states = new SemanticIndexDB(db).listItemStates();
   const pending: PendingSemanticItem[] = [];
-  for (const row of listEligibleItems(db)) {
+
+  for (const id of listCandidateItemIds(db, model)) {
+    const row = db.get(
+      "SELECT id, title, content, transcript FROM knowledge_items WHERE id = ?",
+      id,
+    ) as EligibleItemRow | undefined | null;
+    if (!row) {
+      continue;
+    }
     const contentHash = computeContentHash(
       buildSemanticSourceText(row.title, row.content, row.transcript),
     );
@@ -78,32 +116,24 @@ export function listPendingSemanticItems(
   return pending;
 }
 
+/**
+ * 索引进度。
+ *
+ * 「已索引」按候选判定取反算，不再逐条读正文重算哈希——这个查询在侧栏
+ * 每次挂载都会打一次，而它此前的代价与整个知识库的正文总量成正比。
+ * 代价是同一毫秒内写入的条目会短暂被算作未索引，下一轮就会归位。
+ */
 export function getSemanticStatus(
   db: Database.Database,
   model: string,
 ): SemanticIndexStatus {
-  const semantic = new SemanticIndexDB(db);
-  const states = semantic.listItemStates();
-  const eligible = listEligibleItems(db);
-
-  let indexedItems = 0;
-  for (const row of eligible) {
-    const state = states.get(row.id);
-    if (!state || state.model !== model) {
-      continue;
-    }
-    const contentHash = computeContentHash(
-      buildSemanticSourceText(row.title, row.content, row.transcript),
-    );
-    if (state.contentHash === contentHash) {
-      indexedItems++;
-    }
-  }
+  const eligibleItems = countEligibleItems(db);
+  const candidates = listCandidateItemIds(db, model).length;
 
   return {
-    indexedItems,
-    eligibleItems: eligible.length,
-    totalChunks: semantic.stats().totalChunks,
+    indexedItems: Math.max(0, eligibleItems - candidates),
+    eligibleItems,
+    totalChunks: new SemanticIndexDB(db).stats().totalChunks,
   };
 }
 
@@ -129,14 +159,20 @@ export async function searchSemanticByVector(
   limit: number,
 ): Promise<SemanticSearchHit[]> {
   const index = new SemanticIndexDB(db);
-  const bestByItem = new Map<string, SemanticSearchHit>();
+  // 打分只需要「哪个条目的哪一块、多少分」，正文留到最后再取
+  const bestByItem = new Map<
+    string,
+    { chunkIndex: number; score: number }
+  >();
   const dims = queryVector.length;
 
-  for (let offset = 0; ; offset += SEARCH_BATCH_SIZE) {
-    const batch = index.loadChunksForSearch(model, SEARCH_BATCH_SIZE, offset);
+  let cursor = 0;
+  for (;;) {
+    const batch = index.loadVectorsForSearch(model, SEARCH_BATCH_SIZE, cursor);
     if (batch.length === 0) {
       break;
     }
+    cursor = batch[batch.length - 1].rowid;
 
     for (const chunk of batch) {
       // 维度不一致说明这批向量出自别的模型，跳过
@@ -149,14 +185,8 @@ export async function searchSemanticByVector(
       }
       const existing = bestByItem.get(chunk.itemId);
       if (!existing || dot > existing.score) {
-        const snippet = chunk.chunkText.replace(/\s+/g, " ").trim();
         bestByItem.set(chunk.itemId, {
-          itemId: chunk.itemId,
-          title: chunk.title,
-          snippet:
-            snippet.length > SNIPPET_MAX_LENGTH
-              ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
-              : snippet,
+          chunkIndex: chunk.chunkIndex,
           score: dot,
         });
       }
@@ -168,7 +198,29 @@ export async function searchSemanticByVector(
     await yieldToEventLoop();
   }
 
-  return [...bestByItem.values()]
-    .sort((left, right) => right.score - left.score)
+  const top = [...bestByItem.entries()]
+    .sort((left, right) => right[1].score - left[1].score)
     .slice(0, Math.max(1, limit));
+
+  const snippets = new Map(
+    index
+      .loadChunkSnippets(
+        top.map(([itemId, best]) => ({ itemId, chunkIndex: best.chunkIndex })),
+      )
+      .map((row) => [`${row.itemId}:${row.chunkIndex}`, row]),
+  );
+
+  return top.map(([itemId, best]) => {
+    const row = snippets.get(`${itemId}:${best.chunkIndex}`);
+    const snippet = (row?.chunkText ?? "").replace(/\s+/g, " ").trim();
+    return {
+      itemId,
+      title: row?.title ?? "",
+      snippet:
+        snippet.length > SNIPPET_MAX_LENGTH
+          ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
+          : snippet,
+      score: best.score,
+    };
+  });
 }

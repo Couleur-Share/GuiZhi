@@ -157,9 +157,75 @@ function repairIndexIntegrity(dbPath: string, diagnostics: string[]): void {
   );
 }
 
+/** 干净关闭标记：存在且够新就说明上次是正常退出 */
+function getCleanShutdownMarkerPath(dbPath: string): string {
+  return `${dbPath}.clean`;
+}
+
+/** 兜底全量校验的间隔：正常退出也每周查一次，防的是外部原因的坏块 */
+const INTEGRITY_RECHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * 上次正常退出时记下的「最近一次真正校验」时刻；读完即删。
+ *
+ * 崩溃或断电时没人写标记，下次启动自然读不到，于是照常全量校验。
+ */
+function consumeCleanShutdownMarker(dbPath: string): number | null {
+  const markerPath = getCleanShutdownMarkerPath(dbPath);
+  let raw: string;
+  try {
+    raw = fs.readFileSync(markerPath, "utf8");
+  } catch {
+    return null;
+  } finally {
+    fs.rmSync(markerPath, { force: true });
+  }
+  const checkedAt = Number.parseInt(raw, 10);
+  return Number.isFinite(checkedAt) ? checkedAt : null;
+}
+
+function writeCleanShutdownMarker(dbPath: string, checkedAt: number): void {
+  try {
+    fs.writeFileSync(getCleanShutdownMarkerPath(dbPath), String(checkedAt));
+  } catch (error) {
+    // 写不进去只是下次多校验一遍，不该拦住退出
+    console.warn("[DB] 未能写入干净关闭标记:", error);
+  }
+}
+
+/**
+ * 启动完整性检查。
+ *
+ * 这一步在窗口创建之前同步执行，`quick_check` 的耗时与库体积成正比——
+ * 实测 2 万条（364MB）要 920ms，用户看到的是「点了图标半天没反应」。
+ *
+ * 所以只在上次没能正常退出时才查：正常退出会在 closeDatabase 里留下标记，
+ * SQLite 的事务保证此时文件必然自洽，再查一遍纯属白等。标记超过一周
+ * 仍会强制查一次——磁盘坏块不挑应用退没退干净。
+ */
 function ensureDatabaseIntegrity(dbPath: string): void {
-  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) return;
+  const previousCheckAt = consumeCleanShutdownMarker(dbPath);
+  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) {
+    return;
+  }
+  if (
+    previousCheckAt !== null &&
+    Date.now() - previousCheckAt < INTEGRITY_RECHECK_INTERVAL_MS
+  ) {
+    // 上次正常退出，且距上次校验不到一周：SQLite 的事务保证文件自洽
+    lastIntegrityCheckAt = previousCheckAt;
+    return;
+  }
+
+  const startedAt = Date.now();
   const diagnostics = inspectDatabaseIntegrity(dbPath);
+  lastIntegrityCheckAt = startedAt;
+  const elapsed = Date.now() - startedAt;
+  if (elapsed > 1000) {
+    console.warn(
+      `[DB] 启动完整性检查耗时 ${elapsed}ms（此期间主进程无响应）`,
+    );
+  }
   if (isHealthyQuickCheck(diagnostics)) return;
   if (isFreelistOnlyMismatch(diagnostics)) {
     repairFreelistIntegrity(dbPath, diagnostics);
@@ -172,6 +238,47 @@ function ensureDatabaseIntegrity(dbPath: string): void {
   throw new Error(
     `Database integrity check failed: ${diagnostics.join("; ").slice(0, 500)}`,
   );
+}
+
+/** 统计信息过期到这个倍数就重新 ANALYZE */
+const STATS_DRIFT_FACTOR = 3;
+
+/**
+ * 让查询规划器拿到真实的选择度。
+ *
+ * 没有 sqlite_stat1 时 SQLite 只能按「等值约束 = 高选择度」的经验值估算，
+ * 于是列表查询会挑中 idx_items_deleted——deleted_at IS NULL 被当成等值，
+ * 而它其实匹配几乎所有行，接着还要对全部匹配行做一次临时 B 树排序。
+ * 有了统计信息，规划器改走 idx_items_pinned_updated 顺序扫描并在 LIMIT
+ * 处提前收工。实测 2 万条列表首屏 272ms → 16ms。
+ *
+ * ANALYZE 本身在 2 万条上约 40ms，只在没跑过或行数漂移过大时执行。
+ */
+function ensureQueryPlannerStats(database: Database.Database): void {
+  const hasStatsTable = database.get(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_stat1'",
+  );
+  if (hasStatsTable) {
+    const recorded = database.get(
+      "SELECT stat FROM sqlite_stat1 WHERE tbl = 'knowledge_items' LIMIT 1",
+    ) as { stat: string } | undefined;
+    // 每条 stat 的首个数字都是 ANALYZE 当时的表行数
+    const analyzedRows = Number.parseInt(recorded?.stat ?? "", 10);
+    if (Number.isFinite(analyzedRows)) {
+      const actual = (
+        database.get("SELECT COUNT(*) AS count FROM knowledge_items") as {
+          count: number;
+        }
+      ).count;
+      const drifted =
+        actual > Math.max(1, analyzedRows) * STATS_DRIFT_FACTOR ||
+        actual * STATS_DRIFT_FACTOR < analyzedRows;
+      if (!drifted) return;
+    }
+  }
+  const startedAt = Date.now();
+  database.exec("ANALYZE");
+  console.log(`[DB] 已刷新查询规划统计信息（${Date.now() - startedAt}ms）`);
 }
 
 /**
@@ -188,6 +295,9 @@ export interface InitDatabaseHooks {
 
 let db: Database.Database | null = null;
 let dbClientLease: DatabaseClientLease | null = null;
+/** 最近一次真正跑过 quick_check 的时刻，正常退出时写进标记文件 */
+let lastIntegrityCheckAt = 0;
+let openDatabasePath: string | null = null;
 
 function resetFailedDatabaseInitialization(): void {
   const failedDatabase = db;
@@ -214,6 +324,7 @@ export function initDatabase(
 ): Database.Database {
   if (db) return db;
 
+  const initStartedAt = Date.now();
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   dbClientLease = acquireDatabaseClientLease(dbPath, {
     recoverUnregisteredLock: hooks?.recoverUnregisteredLock,
@@ -227,6 +338,11 @@ export function initDatabase(
 
     // Enable foreign key constraints
     db.pragma("foreign_keys = ON");
+
+    // 这里不设 journal_mode = WAL。node-sqlite3-wasm 的 Emscripten 构建没有
+    // WAL 需要的共享内存 VFS，实测（2026-07）执行该 PRAGMA 既不报错也不生效，
+    // 返回值仍是 delete。所以库跑在 rollback journal 下：写事务期间读被阻塞。
+    // 谁要再加这一行，先确认 `PRAGMA journal_mode` 的返回值真的变了。
 
     // Create tables only (indexes come after migrations)
     db.exec(SCHEMA_TABLES);
@@ -245,13 +361,17 @@ export function initDatabase(
     if (SCHEMA_INDEXES.trim().length > 0) {
       db.exec(SCHEMA_INDEXES);
     }
+    ensureQueryPlannerStats(db);
   } catch (error) {
     console.error("Database migration failed:", error);
     resetFailedDatabaseInitialization();
     throw error;
   }
 
-  console.log(`Database initialized at: ${dbPath}`);
+  openDatabasePath = dbPath;
+  console.log(
+    `Database initialized at: ${dbPath} (${Date.now() - initStartedAt}ms)`,
+  );
   return db;
 }
 
@@ -270,9 +390,15 @@ export function getDatabase(): Database.Database {
  */
 export function closeDatabase(): void {
   const databaseToClose = db;
+  const dbPath = openDatabasePath;
   db = null;
+  openDatabasePath = null;
   try {
     databaseToClose?.close();
+    // 关闭成功才留标记：close 抛错说明状态不明，下次照常全量校验
+    if (dbPath) {
+      writeCleanShutdownMarker(dbPath, lastIntegrityCheckAt);
+    }
   } finally {
     dbClientLease?.release();
     dbClientLease = null;
