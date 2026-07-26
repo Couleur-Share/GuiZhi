@@ -1,4 +1,4 @@
-import { useState, useEffect, useId, useRef } from 'react';
+import { useState, useCallback, useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { XIcon, MinusIcon, LogOutIcon } from 'lucide-react';
@@ -37,11 +37,11 @@ export function CloseDialog({ isOpen, onClose }: CloseDialogProps) {
         ? document.activeElement
         : null;
 
-    dialogRef.current?.focus({ preventScroll: true });
+    const dialog = dialogRef.current;
+    dialog?.focus({ preventScroll: true });
 
     return () => {
       const previousFocus = previousFocusRef.current;
-      const dialog = dialogRef.current;
       const activeElement = document.activeElement;
       const focusIsInsideDialog =
         activeElement instanceof Node && dialog?.contains(activeElement);
@@ -57,14 +57,14 @@ export function CloseDialog({ isOpen, onClose }: CloseDialogProps) {
     };
   }, [isOpen]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     // Important: User only closed the dialog (didn't choose minimize/exit)
     // Need to notify main process to reset pendingCloseAction, otherwise next close click won't show dialog again
     // 重要：用户只是关闭了弹窗（没有选择最小化/退出）
     // 需要通知主进程重置 pendingCloseAction，否则下次点关闭将不会再次弹窗
     window.electron?.sendCloseDialogCancel?.();
     onClose();
-  };
+  }, [onClose]);
 
   // ESC to close
   // ESC 关闭
@@ -85,7 +85,7 @@ export function CloseDialog({ isOpen, onClose }: CloseDialogProps) {
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, handleCancel]);
 
   const handleMinimize = () => {
     if (rememberChoice) {
@@ -174,6 +174,7 @@ export function CloseDialog({ isOpen, onClose }: CloseDialogProps) {
             <button
               type="button"
               onClick={handleExit}
+              data-testid="close-dialog-exit"
               className="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:bg-accent hover:border-destructive/50 transition-all group"
             >
               <div className="p-2 rounded-lg bg-destructive/10 text-destructive group-hover:bg-destructive group-hover:text-destructive-foreground transition-colors">

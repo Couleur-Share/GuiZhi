@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  BulkUpdateKnowledgeItemsInput,
   CreateKnowledgeItemInput,
   KnowledgeCounts,
   KnowledgeItem,
@@ -8,6 +9,7 @@ import type {
   KnowledgeScope,
   KnowledgeSortField,
   KnowledgeSortOrder,
+  Tag,
   UpdateKnowledgeItemInput,
 } from "@guizhi/shared/types";
 import { useSettingsStore } from "./settings.store";
@@ -26,9 +28,47 @@ type EditablePatch = Pick<
   "title" | "content" | "collectionId" | "tagNames"
 >;
 
+/**
+ * 待落盘的编辑，按条目 id 分桶。
+ *
+ * 用单个 pendingPatch 变量存不住并发：A 的保存请求在途时切到 B 继续输入，
+ * A 失败回退会把 B 的正文并进 A 的 patch，下一次落盘就把 B 的内容写进了 A。
+ */
+const pendingPatches = new Map<string, EditablePatch>();
+/** 每个条目最近一次落盘的 Promise，切条目前要等它真正结束 */
+const inflightSaves = new Map<string, Promise<void>>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let pendingPatch: EditablePatch = {};
-let pendingItemId: string | null = null;
+
+/** 仅用于测试：清空跨用例残留的待保存队列 */
+export function __resetPendingSaves(): void {
+  pendingPatches.clear();
+  inflightSaves.clear();
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+}
+
+/**
+ * 本地即时回显的标签列表：已存在的标签沿用原对象，新名字生成临时占位。
+ *
+ * 不回显的话，标签浮层下一次 onChange 仍然基于旧的 item.tags 做全量覆盖，
+ * 防抖窗口内连加两个标签，第一个会被第二个的 patch 覆盖掉。
+ */
+function reconcileOptimisticTags(existing: Tag[], tagNames: string[]): Tag[] {
+  const byName = new Map(existing.map((tag) => [tag.name.toLowerCase(), tag]));
+  const now = Date.now();
+  return tagNames.map(
+    (name) =>
+      byName.get(name.toLowerCase()) ?? {
+        id: `pending:${name.toLowerCase()}`,
+        name,
+        colorKey: "gray",
+        createdAt: now,
+        updatedAt: now,
+      },
+  );
+}
 
 interface KnowledgeState {
   // ── 导航 ──
@@ -74,6 +114,11 @@ interface KnowledgeState {
   /** 覆盖式设置选中集合（表格视图的「全选本页」） */
   setSelection: (ids: string[]) => void;
   clearSelection: () => void;
+  /** 一次 IPC 改一批条目（移动 / 收藏 / 置顶 / 加减标签） */
+  bulkUpdate: (
+    ids: string[],
+    patch: BulkUpdateKnowledgeItemsInput,
+  ) => Promise<void>;
   bulkMoveToCollection: (
     ids: string[],
     collectionId: string | null,
@@ -119,14 +164,13 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     };
   };
 
-  const scheduleSave = (itemId: string) => {
-    pendingItemId = itemId;
+  const scheduleSave = () => {
     set({ hasUnsavedChanges: true });
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
     }
-    // autoSave 关闭时不排定时器；改动保留在 pendingPatch，
+    // autoSave 关闭时不排定时器；改动保留在 pendingPatches，
     // 由 Ctrl+S / 保存按钮 / 切换条目时的 flushPendingSave 落盘
     if (!useSettingsStore.getState().autoSave) {
       return;
@@ -153,6 +197,84 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
           : entry,
       ),
     }));
+  };
+
+  /**
+   * 翻转收藏 / 置顶。
+   *
+   * 两者原本一个只改本地行、一个整表重取：在「收藏」范围里取消收藏，
+   * 条目会留在列表里不走；而置顶会让整个列表重排、滚动位置丢失。
+   * 现在统一——本地先回显，再重取列表与计数（两者都会改变过滤与排序结果）。
+   * 翻转值以在途请求为准，连点两次不会都发同一个值。
+   */
+  const pendingFlags = new Map<string, boolean>();
+  const toggleFlag = async (
+    id: string,
+    field: "isFavorite" | "isPinned",
+  ): Promise<void> => {
+    const key = `${field}:${id}`;
+    const state = get();
+    const entry = state.entries.find((candidate) => candidate.id === id);
+    const selected = state.selectedItem;
+    const known =
+      selected?.id === id ? selected[field] : (entry?.[field] ?? false);
+    const nextValue = !(pendingFlags.get(key) ?? known);
+    pendingFlags.set(key, nextValue);
+
+    try {
+      const updated = await window.api.knowledge.update(id, {
+        [field]: nextValue,
+      });
+      if (updated) {
+        applyItemToList(updated);
+        if (get().selectedId === id) {
+          set({ selectedItem: updated });
+        }
+      }
+      await get().refreshAll();
+    } finally {
+      if (pendingFlags.get(key) === nextValue) {
+        pendingFlags.delete(key);
+      }
+    }
+  };
+
+  /** 落盘单个条目的待存改动；失败只退回它自己那一桶。 */
+  const persistPatch = async (itemId: string): Promise<void> => {
+    const patch = pendingPatches.get(itemId);
+    pendingPatches.delete(itemId);
+    if (!patch || Object.keys(patch).length === 0) {
+      return;
+    }
+    set({ isSaving: true, saveError: null });
+    try {
+      const updated = await window.api.knowledge.update(itemId, patch);
+      if (!updated) {
+        throw new Error("条目不存在或已被删除");
+      }
+      applyItemToList(updated);
+      if (get().selectedId === updated.id) {
+        // 保留用户可能仍在输入的本地内容，仅同步服务器权威字段
+        set((state) => ({
+          selectedItem: state.selectedItem
+            ? {
+                ...state.selectedItem,
+                updatedAt: updated.updatedAt,
+                tags: updated.tags,
+              }
+            : updated,
+        }));
+      }
+    } catch (error) {
+      // 退回本条目自己的桶；await 期间对同一条目的新输入优先
+      pendingPatches.set(itemId, { ...patch, ...pendingPatches.get(itemId) });
+      set({
+        saveError: error instanceof Error ? error.message : String(error),
+      });
+      console.error("保存条目失败:", error);
+    } finally {
+      set({ isSaving: false, hasUnsavedChanges: pendingPatches.size > 0 });
+    }
   };
 
   return {
@@ -291,11 +413,24 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       set({ selectionIds: [], selectionAnchorId: null });
     },
 
-    bulkMoveToCollection: async (ids, collectionId) => {
-      for (const id of ids) {
-        await window.api.knowledge.update(id, { collectionId });
+    bulkUpdate: async (ids, patch) => {
+      if (ids.length === 0) {
+        return;
       }
+      await window.api.knowledge.bulkUpdate(ids, patch);
       await get().refreshAll();
+      // 可能建了新标签，侧栏标签列表要跟上
+      if (patch.addTagNames?.length) {
+        await useTagStore.getState().fetchTags();
+      }
+      const { selectedId } = get();
+      if (selectedId && ids.includes(selectedId)) {
+        await get().selectItem(selectedId);
+      }
+    },
+
+    bulkMoveToCollection: async (ids, collectionId) => {
+      await get().bulkUpdate(ids, { collectionId });
     },
 
     fetchList: async () => {
@@ -390,10 +525,17 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
           patch.collectionId !== undefined
             ? patch.collectionId
             : current.collectionId,
+        tags:
+          patch.tagNames !== undefined
+            ? reconcileOptimisticTags(current.tags, patch.tagNames)
+            : current.tags,
       };
       set({ selectedItem: next });
-      pendingPatch = { ...pendingPatch, ...patch };
-      scheduleSave(current.id);
+      pendingPatches.set(current.id, {
+        ...pendingPatches.get(current.id),
+        ...patch,
+      });
+      scheduleSave();
     },
 
     flushPendingSave: async () => {
@@ -401,47 +543,26 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         clearTimeout(saveTimer);
         saveTimer = null;
       }
-      const itemId = pendingItemId;
-      const patch = pendingPatch;
-      pendingItemId = null;
-      pendingPatch = {};
-      set({ hasUnsavedChanges: false });
-      if (!itemId || Object.keys(patch).length === 0) {
+      // 先等在途落盘收尾：它可能失败并把改动退回桶里，那一份也要一起处理
+      await Promise.allSettled([...inflightSaves.values()]);
+
+      const itemIds = [...pendingPatches.keys()];
+      if (itemIds.length === 0) {
+        set({ hasUnsavedChanges: false });
         return;
       }
-      set({ isSaving: true, saveError: null });
-      try {
-        const updated = await window.api.knowledge.update(itemId, patch);
-        if (!updated) {
-          throw new Error("条目不存在或已被删除");
-        }
-        applyItemToList(updated);
-        if (get().selectedId === updated.id) {
-          // 保留用户可能仍在输入的本地内容，仅同步服务器权威字段
-          set((state) => ({
-            selectedItem: state.selectedItem
-              ? {
-                  ...state.selectedItem,
-                  updatedAt: updated.updatedAt,
-                  tags: updated.tags,
-                }
-              : updated,
-          }));
-        }
-      } catch (error) {
-        // 改动退回待保存队列——patch 在 await 之前就被取走了，
-        // 这里不放回去，用户这段编辑就随异常一起消失了。
-        // await 期间可能又有新输入，新值优先。
-        pendingItemId = itemId;
-        pendingPatch = { ...patch, ...pendingPatch };
-        set({
-          hasUnsavedChanges: true,
-          saveError: error instanceof Error ? error.message : String(error),
+
+      const runs = itemIds.map((itemId) => {
+        const run = persistPatch(itemId);
+        inflightSaves.set(itemId, run);
+        void run.finally(() => {
+          if (inflightSaves.get(itemId) === run) {
+            inflightSaves.delete(itemId);
+          }
         });
-        console.error("保存条目失败:", error);
-      } finally {
-        set({ isSaving: false });
-      }
+        return run;
+      });
+      await Promise.allSettled(runs);
     },
 
     applyServerItem: (item) => {
@@ -474,36 +595,11 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     toggleFavorite: async (id) => {
-      const entry = get().entries.find((candidate) => candidate.id === id);
-      const selected = get().selectedItem;
-      const currentValue =
-        selected?.id === id ? selected.isFavorite : entry?.isFavorite ?? false;
-      const updated = await window.api.knowledge.update(id, {
-        isFavorite: !currentValue,
-      });
-      if (updated) {
-        applyItemToList(updated);
-        if (get().selectedId === id) {
-          set({ selectedItem: updated });
-        }
-      }
-      await get().refreshCounts();
+      await toggleFlag(id, "isFavorite");
     },
 
     togglePinned: async (id) => {
-      const entry = get().entries.find((candidate) => candidate.id === id);
-      const selected = get().selectedItem;
-      const currentValue =
-        selected?.id === id ? selected.isPinned : entry?.isPinned ?? false;
-      const updated = await window.api.knowledge.update(id, {
-        isPinned: !currentValue,
-      });
-      if (updated) {
-        if (get().selectedId === id) {
-          set({ selectedItem: updated });
-        }
-        await get().fetchList();
-      }
+      await toggleFlag(id, "isPinned");
     },
 
     moveToTrash: async (ids) => {

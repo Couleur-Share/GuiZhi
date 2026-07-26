@@ -55,7 +55,10 @@ import {
   applyWebContentsSecurity,
 } from "./window-security";
 import { applyNetworkProxySettings } from "./services/network-proxy";
-import { startBackupScheduler } from "./services/backup";
+import {
+  setAutoBackupNotifier,
+  startBackupScheduler,
+} from "./services/backup";
 import { createTrayController } from "./tray-controller";
 import { dispatchTrayAppCommand } from "./tray-command-dispatcher";
 
@@ -200,6 +203,13 @@ const trayController = createTrayController({
     }),
   onQuit: () => {
     isQuitting = true;
+    // 走窗口关闭路径而不是直接 app.quit()：渲染进程的 beforeunload 要在
+    // before-quit 关掉数据库之前把未保存的编辑落盘。窗口销毁后
+    // window-all-closed 会接着退出应用。
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.close();
+      return;
+    }
     app.quit();
   },
   onToggleWindow: () => {
@@ -285,7 +295,7 @@ async function createWindow() {
   mainWindow.once("ready-to-show", () => {
     const launchArgs = Array.isArray(process.argv) ? process.argv : [];
     const hasHiddenArg = launchArgs.includes("--hidden");
-    let openedAsHiddenByOs = false;
+    let openedAsHiddenByOs: boolean;
     try {
       openedAsHiddenByOs =
         app.getLoginItemSettings().wasOpenedAsHidden === true;
@@ -510,8 +520,12 @@ ipcMain.on("app:setDebugMode", (_event, enabled: boolean) => {
 });
 
 // Toggle DevTools
-// 切换开发者工具
+// 切换开发者工具。与 F12 快捷键同样受调试模式约束：这条通道任何渲染进程代码
+// 都能调用，不设门槛等于给注入脚本留了一个绕过快捷键限制的后门。
 ipcMain.on("window:toggleDevTools", () => {
+  if (!isDebugMode && !isDev) {
+    return;
+  }
   mainWindow?.webContents.toggleDevTools();
 });
 
@@ -895,7 +909,7 @@ app.on("web-contents-created", (_event, contents) => {
 
 // App startup
 // 应用启动
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
   try {
     // A second packaged instance on Windows may still reach whenReady() before quit
     // if we only call app.quit() after failing the single-instance lock.
@@ -1015,6 +1029,9 @@ app.whenReady().then(async () => {
 
     // 启动本地自动备份调度（E2E 环境不做后台备份，避免干扰断言）
     if (!isE2E) {
+      setAutoBackupNotifier((phase) =>
+        sendToMainWindow(IPC_CHANNELS.BACKUP_AUTO_STATUS, phase),
+      );
       startBackupScheduler(db);
     }
 
