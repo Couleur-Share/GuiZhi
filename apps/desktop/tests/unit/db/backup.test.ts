@@ -13,6 +13,7 @@ import {
   maybeRunAutoBackup,
   performRestoreSwap,
   pruneAutoBackups,
+  pruneBackupsOfKind,
   validateBackupFile,
 } from "../../../src/main/services/backup";
 
@@ -109,6 +110,45 @@ describe("pruneAutoBackups", () => {
     expect(remaining.filter((b) => b.kind === "manual")).toHaveLength(1);
     db.close();
   });
+
+  it("快照类备份同样受保留数约束（每次更新都留一份整库副本）", () => {
+    const db = createFileDb("knowledge.db");
+    for (let i = 0; i < 5; i++) {
+      createBackup(db, "pre-update", backupsDir);
+    }
+    createBackup(db, "manual", backupsDir);
+
+    expect(pruneBackupsOfKind("pre-update", 3, backupsDir)).toBe(2);
+    const remaining = listBackups(backupsDir);
+    expect(remaining.filter((b) => b.kind === "pre-update")).toHaveLength(3);
+    expect(remaining.filter((b) => b.kind === "manual")).toHaveLength(1);
+    db.close();
+  });
+
+  it("清理顺序按文件名时间戳，不受 mtime 干扰", () => {
+    const db = createFileDb("knowledge.db");
+    fs.mkdirSync(backupsDir, { recursive: true });
+    db.close();
+
+    // 手工造三份不同时间的备份，再把 mtime 打乱成与时间戳相反的顺序
+    // （整体复制/同步备份目录后就是这个状态）
+    const names = [
+      "knowledge-auto-20260101-000000.db",
+      "knowledge-auto-20260102-000000.db",
+      "knowledge-auto-20260103-000000.db",
+    ];
+    names.forEach((name, index) => {
+      const fullPath = path.join(backupsDir, name);
+      fs.writeFileSync(fullPath, "x");
+      const mtime = new Date(2020, 0, names.length - index);
+      fs.utimesSync(fullPath, mtime, mtime);
+    });
+
+    expect(pruneAutoBackups(1, backupsDir)).toBe(2);
+    expect(fs.readdirSync(backupsDir)).toEqual([
+      "knowledge-auto-20260103-000000.db",
+    ]);
+  });
 });
 
 describe("validateBackupFile", () => {
@@ -170,6 +210,34 @@ describe("performRestoreSwap", () => {
     ) as { title: string };
     expect(snapshotRow.title).toBe("条目 A");
     snapshot.close();
+  });
+
+  it("换库失败时主库回滚到快照，不会留下半个文件", () => {
+    const current = createFileDb("knowledge.db");
+    new KnowledgeItemDB(current).create({ title: "条目 A", content: "" });
+    current.close();
+
+    const databasePath = path.join(workDir, "knowledge.db");
+    const originalSize = fs.statSync(databasePath).size;
+
+    // 备份文件不存在 → copyFileSync 抛错，模拟拷贝中途失败
+    expect(() =>
+      performRestoreSwap({
+        databasePath,
+        backupFilePath: path.join(workDir, "missing-backup.db"),
+        backupsDir,
+      }),
+    ).toThrow();
+
+    // 主库仍然可打开且内容完好，中间文件不残留
+    expect(fs.existsSync(`${databasePath}.incoming`)).toBe(false);
+    expect(fs.statSync(databasePath).size).toBe(originalSize);
+    const reopened = new DatabaseAdapter(databasePath);
+    const row = reopened.get("SELECT title FROM knowledge_items") as {
+      title: string;
+    };
+    expect(row.title).toBe("条目 A");
+    reopened.close();
   });
 });
 

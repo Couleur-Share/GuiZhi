@@ -47,11 +47,13 @@ export function cleanupOrphanAssets(
     return 0;
   }
   const directories = [getImagesDir(), getVideosDir()];
+  // 引用集合一次取全：逐个资产查一遍等于 N 次全表扫描
+  const referenced = items.listReferencedAssets();
   let removed = 0;
 
   for (const fileName of candidates) {
     // 同一份资产可能被复制粘贴到别的条目，仍被引用就不能删
-    if (items.isAssetReferenced(fileName)) {
+    if (referenced.has(fileName)) {
       continue;
     }
     const filePath = resolveAssetPath(fileName, directories);

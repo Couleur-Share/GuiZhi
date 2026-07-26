@@ -107,14 +107,17 @@ export function registerBackupIPC(db: Database.Database): void {
           backupsDir,
         });
       } catch (error) {
-        // 数据库已关闭，无论交换是否完成都必须重启恢复运行状态；
-        // 换库前已存 pre-restore 快照，数据不会丢失。
+        // 数据库已关闭，无论交换是否完成都必须重启恢复运行状态。
+        // performRestoreSwap 失败时会用 pre-restore 快照回滚主库，
+        // 这里把快照位置一并告诉用户——万一自动回滚也失败了，
+        // 「去哪找那份快照」不该只写在源码注释里。
         console.error("[backup] 恢复过程中出错，应用将重启:", error);
         scheduleRelaunch(RESTORE_RELAUNCH_DELAY_MS * 3);
+        const reason = error instanceof Error ? error.message : String(error);
         return {
           success: false,
           relaunching: true,
-          error: `恢复失败: ${error instanceof Error ? error.message : String(error)}`,
+          error: `恢复失败：${reason}。已尝试用换库前的 pre-restore 快照回滚，快照保存在 ${backupsDir}`,
         };
       }
 
@@ -149,7 +152,7 @@ export function registerBackupIPC(db: Database.Database): void {
         fs.mkdirSync(exportDir, { recursive: true });
         const stats = exportKnowledgeToMarkdown(db, exportDir);
         console.log(
-          `[export] Markdown 导出完成: ${stats.count} 条 → ${exportDir}`,
+          `[export] Markdown 导出完成: ${stats.count} 条 + ${stats.assetCount} 个资产 → ${exportDir}`,
         );
         return { success: true, count: stats.count, dir: exportDir };
       } catch (error) {

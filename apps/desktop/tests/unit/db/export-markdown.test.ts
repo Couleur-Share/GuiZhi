@@ -7,11 +7,17 @@ import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
 import { KnowledgeItemDB } from "@guizhi/db/knowledge";
 import { CollectionDB } from "@guizhi/db/collection";
 import {
+  configureRuntimePaths,
+  getImagesDir,
+  resetRuntimePaths,
+} from "../../../src/main/runtime-paths";
+import {
   exportKnowledgeToMarkdown,
   sanitizeFileName,
 } from "../../../src/main/services/export-markdown";
 
 let exportDir: string;
+let dataRoot: string;
 
 function createTestDb(): DatabaseAdapter.Database {
   const db = new DatabaseAdapter(":memory:");
@@ -36,10 +42,14 @@ function listFilesRecursive(dir: string): string[] {
 
 beforeEach(() => {
   exportDir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-export-test-"));
+  dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-export-data-"));
+  configureRuntimePaths({ userDataPath: dataRoot });
 });
 
 afterEach(() => {
   fs.rmSync(exportDir, { recursive: true, force: true });
+  fs.rmSync(dataRoot, { recursive: true, force: true });
+  resetRuntimePaths();
 });
 
 describe("sanitizeFileName", () => {
@@ -115,6 +125,83 @@ describe("exportKnowledgeToMarkdown", () => {
     expect(path.basename(files[0])).toBe(
       `untitled-${created.id.slice(0, 8)}.md`,
     );
+    db.close();
+  });
+
+  it("引用的图片一并拷进 assets/，正文改写成相对路径", () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const collections = new CollectionDB(db);
+
+    const imagesDir = getImagesDir();
+    fs.mkdirSync(imagesDir, { recursive: true });
+    fs.writeFileSync(path.join(imagesDir, "import-abc123.png"), "PNG");
+
+    items.create({
+      title: "根目录条目",
+      content: "![配图](local-image://import-abc123.png)",
+    });
+    const collection = collections.create({ name: "工作" });
+    items.create({
+      title: "集合内条目",
+      content: "![同一张](local-image://import-abc123.png)",
+      collectionId: collection.id,
+    });
+
+    const stats = exportKnowledgeToMarkdown(db, exportDir);
+    expect(stats.assetCount).toBe(1);
+
+    // 资产实际落盘，不是只改了链接
+    expect(
+      fs.existsSync(path.join(exportDir, "assets", "import-abc123.png")),
+    ).toBe(true);
+
+    const rootDoc = fs.readFileSync(
+      listFilesRecursive(exportDir).find((file) =>
+        file.endsWith(".md") && fs.readFileSync(file, "utf8").includes("根目录条目"),
+      )!,
+      "utf8",
+    );
+    expect(rootDoc).toContain("![配图](./assets/import-abc123.png)");
+    expect(rootDoc).not.toContain("local-image://");
+
+    // 集合子目录里的条目要多退一级
+    const nestedDoc = fs.readFileSync(
+      path.join(
+        exportDir,
+        "工作",
+        fs.readdirSync(path.join(exportDir, "工作"))[0],
+      ),
+      "utf8",
+    );
+    expect(nestedDoc).toContain("![同一张](../assets/import-abc123.png)");
+    db.close();
+  });
+
+  it("资产文件已不在磁盘上时保持原引用，不建空 assets 目录", () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    items.create({
+      title: "断链条目",
+      content: "![丢失](local-image://import-gone.png)",
+    });
+
+    const stats = exportKnowledgeToMarkdown(db, exportDir);
+    expect(stats.assetCount).toBe(0);
+    expect(fs.existsSync(path.join(exportDir, "assets"))).toBe(false);
+    db.close();
+  });
+
+  it("集合目录名躲开 Windows 保留设备名", () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const collections = new CollectionDB(db);
+    // CON 建目录会抛 EINVAL，把整次导出中断在半路
+    const collection = collections.create({ name: "CON" });
+    items.create({ title: "条目", content: "正文", collectionId: collection.id });
+
+    exportKnowledgeToMarkdown(db, exportDir);
+    expect(fs.existsSync(path.join(exportDir, "CON-dir"))).toBe(true);
     db.close();
   });
 });
