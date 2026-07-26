@@ -664,7 +664,7 @@ export class WikiDB {
     }));
   }
 
-  /** 补齐缺失的 FTS 行（本表是 v0.7.2 新加的，老库里一条都没有） */
+  /** 补齐缺失的 FTS 行（本表是 v0.8.0 新加的，老库里一条都没有） */
   backfillMissingFtsRows(): number {
     const rows = this.db.all(
       `SELECT id, title, summary, body FROM wiki_pages p
