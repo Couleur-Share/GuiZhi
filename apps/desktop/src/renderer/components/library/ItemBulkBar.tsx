@@ -3,6 +3,8 @@ import {
   ArchiveIcon,
   FolderInputIcon,
   RotateCcwIcon,
+  StarIcon,
+  TagIcon,
   Trash2Icon,
   XCircleIcon,
   XIcon,
@@ -10,6 +12,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
+import { useToast } from "../ui/Toast";
+import { BulkTagPopover } from "./BulkTagPopover";
 
 function BulkAction({
   onClick,
@@ -57,15 +61,31 @@ export function ItemBulkBar({
   onRequestDeleteForever: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
+  const { showUndoToast } = useToast();
   const scope = useKnowledgeStore((state) => state.scope);
   const selectionIds = useKnowledgeStore((state) => state.selectionIds);
   const clearSelection = useKnowledgeStore((state) => state.clearSelection);
   const setStatus = useKnowledgeStore((state) => state.setStatus);
   const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
+  const bulkUpdate = useKnowledgeStore((state) => state.bulkUpdate);
   const [moveAnchor, setMoveAnchor] = useState<{ x: number; y: number } | null>(
     null,
   );
+  const [tagAnchor, setTagAnchor] = useState<{ x: number; y: number } | null>(
+    null,
+  );
+
+  const trashSelected = async () => {
+    const ids = [...selectionIds];
+    await moveToTrash(ids);
+    showUndoToast(
+      t("library.movedToTrash", "已移到回收站（{{count}} 项）", {
+        count: ids.length,
+      }),
+      () => void restoreItems(ids),
+    );
+  };
 
   // 本条只在有选中项时挂载，Escape 直接退出多选
   useEffect(() => {
@@ -130,6 +150,24 @@ export function ItemBulkBar({
           </BulkAction>
           <BulkAction
             wide={wide}
+            onClick={(event) =>
+              setTagAnchor({ x: event.clientX, y: event.clientY })
+            }
+            label={t("library.bulkAddTag", "批量打标签")}
+          >
+            <TagIcon className="h-4 w-4" aria-hidden="true" />
+          </BulkAction>
+          <BulkAction
+            wide={wide}
+            onClick={() =>
+              void bulkUpdate(selectionIds, { isFavorite: true })
+            }
+            label={t("library.bulkFavorite", "批量收藏")}
+          >
+            <StarIcon className="h-4 w-4" aria-hidden="true" />
+          </BulkAction>
+          <BulkAction
+            wide={wide}
             onClick={() => void setStatus(selectionIds, "archived")}
             label={t("library.archive", "归档")}
           >
@@ -138,7 +176,7 @@ export function ItemBulkBar({
           <BulkAction
             wide={wide}
             destructive
-            onClick={() => void moveToTrash(selectionIds)}
+            onClick={() => void trashSelected()}
             label={t("library.moveToTrash", "移到回收站")}
           >
             <Trash2Icon className="h-4 w-4" aria-hidden="true" />
@@ -152,6 +190,17 @@ export function ItemBulkBar({
           y={moveAnchor.y}
           items={moveMenuItems}
           onClose={() => setMoveAnchor(null)}
+        />
+      ) : null}
+
+      {tagAnchor ? (
+        <BulkTagPopover
+          count={selectionIds.length}
+          anchor={tagAnchor}
+          onAdd={(tagName) =>
+            void bulkUpdate(selectionIds, { addTagNames: [tagName] })
+          }
+          onClose={() => setTagAnchor(null)}
         />
       ) : null}
     </div>

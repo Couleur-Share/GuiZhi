@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { EditorView, keymap, lineNumbers, placeholder } from "@codemirror/view";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState, Compartment, Transaction } from "@codemirror/state";
 import { markdown } from "@codemirror/lang-markdown";
 import {
   defaultKeymap,
@@ -97,6 +97,7 @@ export function MarkdownEditor({
       viewRef.current = null;
     };
     // 仅在挂载时创建；外部内容同步与配置变化由下面的 effect 处理
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 外部内容同步：切换条目或外部写回（AI 总结/转写等 applyServerItem）时重建文档。
@@ -110,6 +111,10 @@ export function MarkdownEditor({
     if (current !== value) {
       view.dispatch({
         changes: { from: 0, to: current.length, insert: value },
+        // 这次替换不能进撤销栈：编辑器跨条目常驻（关闭「Markdown 渲染」时），
+        // 切到条目 B 后按 Ctrl+Z 会把文档回滚成 A 的正文，
+        // updateListener 随即把 A 的内容当作用户输入保存进 B。
+        annotations: Transaction.addToHistory.of(false),
       });
     }
   }, [docId, value]);

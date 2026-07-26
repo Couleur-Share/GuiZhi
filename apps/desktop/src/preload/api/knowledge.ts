@@ -1,6 +1,7 @@
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type {
+  BulkUpdateKnowledgeItemsInput,
   Collection,
   CreateCollectionInput,
   CreateKnowledgeItemInput,
@@ -28,6 +29,11 @@ export const knowledgeApi = {
     input: UpdateKnowledgeItemInput,
   ): Promise<KnowledgeItem | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_UPDATE, id, input),
+  bulkUpdate: (
+    ids: string[],
+    input: BulkUpdateKnowledgeItemsInput,
+  ): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_BULK_UPDATE, ids, input),
   setStatus: (ids: string[], status: KnowledgeItemStatus): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_SET_STATUS, ids, status),
   moveToTrash: (ids: string[]): Promise<number> =>

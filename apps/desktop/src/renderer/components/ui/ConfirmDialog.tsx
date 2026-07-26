@@ -42,6 +42,7 @@ export function ConfirmDialog({
 
     // Focus on cancel button to prevent accidental operations
     // 聚焦到取消按钮，防止误操作
+    const dialog = dialogRef.current;
     const timer = setTimeout(() => {
       cancelButtonRef.current?.focus();
     }, 50);
@@ -50,7 +51,6 @@ export function ConfirmDialog({
       clearTimeout(timer);
 
       const previousFocus = previousFocusRef.current;
-      const dialog = dialogRef.current;
       const activeElement = document.activeElement;
       const focusIsInsideDialog =
         activeElement instanceof Node && dialog?.contains(activeElement);

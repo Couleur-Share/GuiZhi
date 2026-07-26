@@ -345,6 +345,7 @@ export function ItemTableRow({
 
   return (
     <tr
+      data-item-row={entry.id}
       onClick={onRowClick}
       onContextMenu={onContextMenu}
       className={`group cursor-pointer border-b border-border/50 transition-colors last:border-b-0 hover:bg-accent/50 ${

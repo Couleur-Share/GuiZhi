@@ -31,6 +31,7 @@ export function UnsavedChangesDialog({
         ? document.activeElement
         : null;
 
+    const dialog = dialogRef.current;
     const timer = setTimeout(() => {
       saveButtonRef.current?.focus();
     }, 50);
@@ -39,7 +40,6 @@ export function UnsavedChangesDialog({
       clearTimeout(timer);
 
       const previousFocus = previousFocusRef.current;
-      const dialog = dialogRef.current;
       const activeElement = document.activeElement;
       const focusIsInsideDialog =
         activeElement instanceof Node && dialog?.contains(activeElement);
@@ -104,13 +104,13 @@ export function UnsavedChangesDialog({
         {/* Title */}
         {/* 标题 */}
         <h3 id={titleId} className="text-lg font-semibold text-center mb-2">
-          {t("prompt.unsavedChanges", "未保存的更改")}
+          {t("common.unsavedChanges", "未保存的更改")}
         </h3>
 
         {/* Message */}
         {/* 消息 */}
         <div id={messageId} className="text-sm text-muted-foreground text-center mb-6">
-          {t("prompt.unsavedChangesMessage", "您有未保存的更改，是否要保存？")}
+          {t("common.unsavedChangesMessage", "您有未保存的更改，是否要保存？")}
         </div>
 
         {/* Buttons */}
@@ -128,7 +128,7 @@ export function UnsavedChangesDialog({
             onClick={onDiscard}
             className="flex-1 h-10 px-4 rounded-lg border border-border app-wallpaper-surface hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium"
           >
-            {t("prompt.discardChanges", "不保存")}
+            {t("common.discardChanges", "不保存")}
           </button>
           <button
             type="button"

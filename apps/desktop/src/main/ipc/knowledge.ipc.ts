@@ -4,6 +4,7 @@ import { CollectionDB, KnowledgeItemDB, TagDB } from "@guizhi/db";
 import type Database from "../database/sqlite";
 import { cleanupOrphanAssets } from "../services/asset-cleanup";
 import type {
+  BulkUpdateKnowledgeItemsInput,
   CreateCollectionInput,
   CreateKnowledgeItemInput,
   CreateTagInput,
@@ -47,6 +48,11 @@ export function registerKnowledgeIPC(db: Database.Database): void {
     IPC_CHANNELS.KNOWLEDGE_UPDATE,
     (_event, id: string, input: UpdateKnowledgeItemInput) =>
       items.update(id, input ?? {}),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.KNOWLEDGE_BULK_UPDATE,
+    (_event, ids: unknown, input: BulkUpdateKnowledgeItemsInput) =>
+      items.bulkUpdate(normalizeIds(ids), input ?? {}),
   );
   ipcMain.handle(
     IPC_CHANNELS.KNOWLEDGE_SET_STATUS,

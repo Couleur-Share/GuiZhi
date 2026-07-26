@@ -171,7 +171,7 @@ function PreviewContent({
     <img
       key={activeSrc}
       src={resolveLocalImageSrc(activeSrc)}
-      alt={t("prompt.preview")}
+      alt={t("common.preview", "预览")}
       className="max-h-[calc(100vh-7rem)] max-w-full rounded-lg object-contain shadow-2xl"
       onError={onError}
     />
@@ -216,20 +216,20 @@ export function ImagePreviewModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={t("prompt.preview")}
+      aria-label={t("common.preview", "预览")}
       className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/90 px-16 py-14 backdrop-blur-sm animate-in fade-in duration-base sm:px-24"
     >
       <ClosePreviewButton onClose={onClose} />
       {gallery.sources.length > 1 ? (
         <GalleryControls
           activeIndex={gallery.activeIndex}
-          positionLabel={t("prompt.imagePosition", {
+          positionLabel={t("common.imagePosition", {
             current: gallery.activeIndex + 1,
             total: gallery.sources.length,
-            defaultValue: "Image {{current}} of {{total}}",
+            defaultValue: "第 {{current}} / {{total}} 张",
           })}
-          previousLabel={t("prompt.previousImage", "Previous image")}
-          nextLabel={t("prompt.nextImage", "Next image")}
+          previousLabel={t("common.previousImage", "上一张")}
+          nextLabel={t("common.nextImage", "下一张")}
           selectIndex={gallery.selectIndex}
           total={gallery.sources.length}
         />

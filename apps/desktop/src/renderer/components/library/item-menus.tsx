@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -16,6 +16,7 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import type { ContextMenuItem } from "../ui/ContextMenu";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { useToast } from "../ui/Toast";
 
 /** 需要二次确认的不可逆动作 */
 export type ItemConfirmState =
@@ -45,7 +46,25 @@ export function useItemMenus({
     (state) => state.bulkMoveToCollection,
   );
   const collections = useCollectionStore((state) => state.collections);
+  const { showUndoToast } = useToast();
   const [confirmState, setConfirmState] = useState<ItemConfirmState>(null);
+
+  /** 删除不弹确认框（打断太重），改成事后给一个撤销窗口 */
+  const trashWithUndo = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        return;
+      }
+      await moveToTrash(ids);
+      showUndoToast(
+        t("library.movedToTrash", "已移到回收站（{{count}} 项）", {
+          count: ids.length,
+        }),
+        () => void restoreItems(ids),
+      );
+    },
+    [moveToTrash, restoreItems, showUndoToast, t],
+  );
 
   const selectionCount = selectionIds.length;
 
@@ -84,7 +103,7 @@ export function useItemMenus({
         }),
         icon: <Trash2Icon className="h-4 w-4" aria-hidden="true" />,
         variant: "destructive",
-        onClick: () => void moveToTrash(selectionIds),
+        onClick: () => void trashWithUndo([...selectionIds]),
       },
     ];
   };
@@ -174,7 +193,7 @@ export function useItemMenus({
       label: t("library.moveToTrash", "移到回收站"),
       icon: <Trash2Icon className="h-4 w-4" aria-hidden="true" />,
       variant: "destructive",
-      onClick: () => void moveToTrash([entry.id]),
+      onClick: () => void trashWithUndo([entry.id]),
     });
 
     return items;
@@ -184,6 +203,7 @@ export function useItemMenus({
     buildEntryMenu,
     buildBulkMenu,
     buildMoveMenu,
+    trashWithUndo,
     confirmState,
     setConfirmState,
   };

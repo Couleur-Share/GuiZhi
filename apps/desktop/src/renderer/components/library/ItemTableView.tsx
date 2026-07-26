@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItemListEntry } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
@@ -15,6 +15,7 @@ import { ItemTableHeaderCell } from "./ItemTableHeaderCell";
 import { ItemTableRow } from "./ItemTableRow";
 import { TagPickerPopover } from "./TagPickerPopover";
 import { useItemTableConfig } from "./item-table-config";
+import { useItemListKeyboard } from "./use-item-keyboard";
 
 /**
  * 列表视图：占满内容区的表格，对齐 PromptHub v0.5.9 的列表视图。
@@ -52,6 +53,7 @@ export function ItemTableView() {
   const {
     buildEntryMenu,
     buildMoveMenu,
+    trashWithUndo,
     confirmState,
     setConfirmState,
   } = useItemMenus({
@@ -105,6 +107,40 @@ export function ItemTableView() {
     }
     openDetail(entry.id);
   };
+
+  const handleKeyboardOpen = useCallback((id: string) => {
+    void useKnowledgeStore.getState().selectItem(id);
+    setDetailOpen(true);
+  }, []);
+
+  // 回收站里 Delete 的语义是彻底删除，走确认弹窗；其余范围直接删并给撤销
+  const handleKeyboardDelete = useCallback(
+    (ids: string[]) => {
+      if (scope === "trash") {
+        setConfirmState({ kind: "delete-forever", ids });
+        return;
+      }
+      void trashWithUndo(ids);
+    },
+    [scope, setConfirmState, trashWithUndo],
+  );
+
+  // 详情浮层打开时方向键属于浮层内部，不该继续移动列表选中行
+  useItemListKeyboard({
+    enabled: !isDetailOpen,
+    onOpen: handleKeyboardOpen,
+    onDelete: handleKeyboardDelete,
+  });
+
+  // 键盘移动选中行后滚动跟随
+  useEffect(() => {
+    if (!selectedId || isDetailOpen) {
+      return;
+    }
+    document
+      .querySelector(`[data-item-row="${selectedId}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selectedId, isDetailOpen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { PinIcon, StarIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import { ItemConfirmDialog, useItemMenus } from "./item-menus";
 import { ItemListToolbar } from "./ItemListToolbar";
 import { ItemPagination } from "./ItemPagination";
 import { getItemTypeMeta } from "./type-meta";
+import { useItemListKeyboard } from "./use-item-keyboard";
 
 /** 卡片预估高度（含行间距）：标题最多两行 */
 const ROW_HEIGHT = 64;
@@ -102,9 +103,24 @@ export function ItemList() {
   const {
     buildEntryMenu,
     buildMoveMenu,
+    trashWithUndo,
     confirmState,
     setConfirmState,
   } = useItemMenus();
+
+  // 回收站里 Delete 的语义是彻底删除，走确认弹窗；其余范围直接删并给撤销
+  const handleKeyboardDelete = useCallback(
+    (ids: string[]) => {
+      if (scope === "trash") {
+        setConfirmState({ kind: "delete-forever", ids });
+        return;
+      }
+      void trashWithUndo(ids);
+    },
+    [scope, setConfirmState, trashWithUndo],
+  );
+
+  useItemListKeyboard({ onDelete: handleKeyboardDelete });
 
   const handleRowClick = (
     entry: KnowledgeItemListEntry,
@@ -131,6 +147,17 @@ export function ItemList() {
     overscan: 8,
     getItemKey: (index) => entries[index]?.id ?? index,
   });
+
+  // 键盘选中的行可能在视口之外；列表是虚拟化的，只能让虚拟器滚过去
+  useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+    const index = entries.findIndex((entry) => entry.id === selectedId);
+    if (index >= 0) {
+      virtualizer.scrollToIndex(index, { align: "auto" });
+    }
+  }, [selectedId, entries, virtualizer]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

@@ -22,6 +22,8 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const { t } = useTranslation();
   const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
   const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
+  const appModule = useUIStore((state) => state.appModule);
+  const setAppModule = useUIStore((state) => state.setAppModule);
   const setKnowledgeSearch = useKnowledgeStore(
     (state) => state.setSearchQuery,
   );
@@ -30,19 +32,30 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // 搜索只作用于知识库。在问答/Wiki/导入页显示这个框，用户打了字却什么都不发生，
+  // 而知识库的过滤条件已被悄悄改掉——切回去看到的是一个被过滤过的列表。
+  const isSearchable = appModule === "library";
+
   useEffect(() => {
-    const focusSearch = () => searchInputRef.current?.focus();
+    const focusSearch = () => {
+      // 在别的模块按搜索快捷键，先切回知识库再聚焦，否则光标进了一个不起作用的框
+      setAppModule("library");
+      searchInputRef.current?.focus();
+    };
     window.addEventListener("shortcut:search", focusSearch);
     return () => window.removeEventListener("shortcut:search", focusSearch);
-  }, []);
+  }, [setAppModule]);
 
   // 防抖下发到知识库全文检索
   useEffect(() => {
+    if (!isSearchable) {
+      return;
+    }
     const timer = setTimeout(() => {
       setKnowledgeSearch(searchQuery);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [searchQuery, setKnowledgeSearch]);
+  }, [isSearchable, searchQuery, setKnowledgeSearch]);
 
   const updateVersion =
     updateAvailable?.status === "available"
@@ -80,9 +93,14 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
         </button>
       </div>
 
-      {/* 搜索框 - 居中 */}
+      {/* 搜索框 - 居中；只在知识库模块出现 */}
       <div className="flex-1 flex justify-center px-3">
-        <div className="w-full max-w-lg relative flex items-center">
+        <div
+          className={`w-full max-w-lg relative flex items-center ${
+            isSearchable ? "" : "invisible"
+          }`}
+          aria-hidden={!isSearchable}
+        >
           <div className="app-wallpaper-search absolute inset-0 rounded-lg border pointer-events-none" />
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
           <input
@@ -91,6 +109,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
             data-testid="topbar-search"
             placeholder={t("header.search")}
             value={searchQuery}
+            tabIndex={isSearchable ? 0 : -1}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="relative z-10 w-full h-9 pl-9 pr-10 rounded-lg border border-transparent bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}

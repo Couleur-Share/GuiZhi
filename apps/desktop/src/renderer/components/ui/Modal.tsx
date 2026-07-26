@@ -122,9 +122,10 @@ export function Modal({
         ? document.activeElement
         : null;
 
+    const modal = modalRef.current;
+
     return () => {
       const previousFocus = previousFocusRef.current;
-      const modal = modalRef.current;
       const activeElement = document.activeElement;
       const focusIsInsideModal =
         activeElement instanceof Node && modal?.contains(activeElement);

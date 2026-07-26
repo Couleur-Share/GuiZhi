@@ -9,10 +9,19 @@ import { MOTION_DURATION } from '../../styles/motion-tokens';
 // Toast 类型
 type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface Toast {
   id: string;
   message: string;
   type: ToastType;
+  /** 行内动作按钮（撤销等）；点击后 toast 立即收起 */
+  action?: ToastAction;
+  /** 覆盖默认的自动消失时长 */
+  dismissAfterMs?: number;
   /**
    * When true, the toast is in its exit animation. The DOM node remains
    * mounted for one duration-quick window so the fade-out / slide-out
@@ -25,9 +34,47 @@ interface Toast {
 
 interface ToastContextType {
   showToast: (message: string, type?: ToastType, sendSystemNotification?: boolean) => void;
+  /**
+   * 带「撤销」按钮的提示。
+   *
+   * 删除这类动作不该先弹确认框打断操作，但也不能删完毫无反应——
+   * 事后给一个撤销窗口，误删 200 条不必再去回收站逐条勾选恢复。
+   */
+  showUndoToast: (message: string, onUndo: () => void) => void;
 }
 
 const ToastContext = createContext<ToastContextType | null>(null);
+
+// Success / info toasts fade out on their own; errors and warnings stay until
+// the user closes them. A failure that disappears after three seconds is a
+// failure the user never sees — they just retry the same action.
+// 成功/提示类自动淡出；错误与警告留到用户手动关闭。几秒就消失的报错等于没报，
+// 用户只会把同一个操作再做一遍。
+const AUTO_DISMISS_MS = 3000;
+/** 撤销窗口：3 秒不够读完一句话再决定要不要点 */
+const UNDO_DISMISS_MS = 8000;
+// Persistent toasts must not be able to fill the screen; keep the newest few.
+// 不自动消失就得有上限，否则堆满屏幕；只保留最新的几条。
+const MAX_VISIBLE_TOASTS = 5;
+
+function isPersistent(type: ToastType): boolean {
+  return type === 'error' || type === 'warning';
+}
+
+/**
+ * 超出上限时优先挤掉最老的「会自己消失」的那条。
+ *
+ * 一律砍最老的话，批量导入 10 个文件全失败时，前 5 条错误会在用户读到之前
+ * 就被后来的挤没——而它们恰恰是不该消失的那类。
+ */
+function trimToasts(list: Toast[]): Toast[] {
+  if (list.length <= MAX_VISIBLE_TOASTS) {
+    return list;
+  }
+  const transientIndex = list.findIndex((toast) => !isPersistent(toast.type));
+  const dropIndex = transientIndex === -1 ? 0 : transientIndex;
+  return list.filter((_, index) => index !== dropIndex);
+}
 
 // Toast Provider
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -71,7 +118,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const showToast = useCallback((message: string, type: ToastType = 'success', sendSystemNotification = false) => {
     idCounter.current += 1;
     const id = `${Date.now()}-${idCounter.current}`;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => trimToasts([...prev, { id, message, type }]));
 
     // Send system notification (if enabled and requested)
     // 发送系统通知（如果启用且请求）
@@ -84,17 +131,45 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             : type === 'warning'
               ? t('common.warning', 'Warning')
               : t('common.info', 'Info');
-      window.electron.showNotification(`GuiZhi - ${title}`, message);
+      void window.electron.showNotification(`GuiZhi - ${title}`, message);
     }
 
-    // Auto-dismiss after 3 seconds via the same exit-animation pipeline.
-    // 3 秒后自动通过同一个退场动画管线消失。
+    if (isPersistent(type)) {
+      return;
+    }
+
+    // Auto-dismiss via the same exit-animation pipeline.
+    // 通过同一个退场动画管线自动消失。
     const dismiss = setTimeout(() => {
       autoDismissTimers.current.delete(id);
       removeToast(id);
-    }, 3000);
+    }, AUTO_DISMISS_MS);
     autoDismissTimers.current.set(id, dismiss);
   }, [enableNotifications, removeToast, t]);
+
+  const showUndoToast = useCallback((message: string, onUndo: () => void) => {
+    idCounter.current += 1;
+    const id = `${Date.now()}-${idCounter.current}`;
+    setToasts((prev) =>
+      trimToasts([
+        ...prev,
+        {
+          id,
+          message,
+          type: 'info',
+          action: {
+            label: t('common.undo', '撤销'),
+            onClick: onUndo,
+          },
+        },
+      ]),
+    );
+    const dismiss = setTimeout(() => {
+      autoDismissTimers.current.delete(id);
+      removeToast(id);
+    }, UNDO_DISMISS_MS);
+    autoDismissTimers.current.set(id, dismiss);
+  }, [removeToast, t]);
 
   // Clean up timers on unmount.
   useEffect(() => {
@@ -137,7 +212,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={{ showToast, showUndoToast }}>
       {children}
 
       {/* Toast container - z-index needs to be the highest to stay above everything */}
@@ -148,7 +223,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={toast.id}
               className={`
-                flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-2xl pointer-events-auto
+                flex items-start gap-3 px-5 py-3.5 rounded-2xl border shadow-2xl pointer-events-auto
+                max-w-[26rem]
                 ${
                   toast.leaving
                     ? 'animate-out slide-out-to-right-10 fade-out duration-quick ease-exit'
@@ -158,12 +234,27 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 ${getBgColor(toast.type)}
               `}
             >
-              {getIcon(toast.type)}
-              <span className="text-sm font-semibold text-foreground">{toast.message}</span>
+              <span className="shrink-0">{getIcon(toast.type)}</span>
+              <span className="min-w-0 flex-1 text-sm font-semibold leading-relaxed text-foreground break-words">
+                {toast.message}
+              </span>
+              {toast.action ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.action?.onClick();
+                    removeToast(toast.id);
+                  }}
+                  data-testid="toast-action"
+                  className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+                >
+                  {toast.action.label}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => removeToast(toast.id)}
-                className="ml-2 p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors"
+                className="shrink-0 -mr-2 p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors"
                 aria-label={t('common.close', 'Close')}
                 title={t('common.close') || 'Close'}
               >

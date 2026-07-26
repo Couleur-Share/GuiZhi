@@ -5,6 +5,8 @@ import {
   FileUpIcon,
   GlobeIcon,
   StickyNoteIcon,
+  TagIcon,
+  XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { EnqueueImportInput } from "@guizhi/shared/types";
@@ -41,6 +43,8 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
   const [draft, setDraft] = useState("");
   const [filePaths, setFilePaths] = useState<string[]>([]);
   const [collectionId, setCollectionId] = useState("");
+  const [tagNames, setTagNames] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
@@ -49,9 +53,24 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     } else {
       setDraft("");
       setFilePaths([]);
+      setTagNames([]);
+      setTagDraft("");
       setIsDragOver(false);
     }
   }, [isOpen, fetchCollections]);
+
+  const addTag = (name: string) => {
+    const trimmed = name.trim();
+    if (
+      !trimmed ||
+      tagNames.some((existing) => existing.toLowerCase() === trimmed.toLowerCase())
+    ) {
+      setTagDraft("");
+      return;
+    }
+    setTagNames((current) => [...current, trimmed]);
+    setTagDraft("");
+  };
 
   const parsedDraft = useMemo(() => parseCaptureDraft(draft), [draft]);
   const canSubmit = parsedDraft.kind !== "empty" || filePaths.length > 0;
@@ -59,6 +78,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
   const submit = async () => {
     const inputs: EnqueueImportInput[] = [];
     const targetCollection = collectionId || null;
+    const targetTags = tagNames.length > 0 ? tagNames : undefined;
 
     if (parsedDraft.kind === "urls") {
       for (const url of parsedDraft.urls) {
@@ -66,6 +86,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
           kind: "url",
           input: url,
           collectionId: targetCollection,
+          tagNames: targetTags,
         });
       }
     } else if (parsedDraft.kind === "text") {
@@ -73,10 +94,16 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
         kind: "text",
         input: parsedDraft.text,
         collectionId: targetCollection,
+        tagNames: targetTags,
       });
     }
     for (const filePath of filePaths) {
-      inputs.push({ kind: "file", input: filePath, collectionId: targetCollection });
+      inputs.push({
+        kind: "file",
+        input: filePath,
+        collectionId: targetCollection,
+        tagNames: targetTags,
+      });
     }
     if (inputs.length === 0) {
       return;
@@ -159,7 +186,17 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
         >
           <textarea
             value={draft}
+            data-testid="capture-draft"
             onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              // 快速采集由全局快捷键唤起，提交也不该被迫回到鼠标
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                if (canSubmit) {
+                  void submit();
+                }
+              }
+            }}
             autoFocus
             rows={6}
             placeholder={t(
@@ -221,6 +258,50 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
           </div>
         ) : null}
 
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border px-3 py-2">
+          <TagIcon
+            className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+          {tagNames.map((name) => (
+            <span
+              key={name}
+              className="inline-flex h-6 items-center gap-1 rounded-full bg-muted px-2.5 text-xs text-foreground"
+            >
+              {name}
+              <button
+                type="button"
+                onClick={() =>
+                  setTagNames((current) =>
+                    current.filter((candidate) => candidate !== name),
+                  )
+                }
+                aria-label={t("library.removeTag", "移除标签 {{name}}", { name })}
+                className="rounded-full opacity-60 transition-opacity hover:opacity-100"
+              >
+                <XIcon className="h-3 w-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+          <input
+            type="text"
+            value={tagDraft}
+            data-testid="capture-tags-input"
+            onChange={(event) => setTagDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addTag(tagDraft);
+              }
+              if (event.key === "Backspace" && !tagDraft) {
+                setTagNames((current) => current.slice(0, -1));
+              }
+            }}
+            placeholder={t("capture.tagsPlaceholder", "打标签（回车添加）")}
+            className="h-6 min-w-32 flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -257,6 +338,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             type="button"
             onClick={() => void submit()}
             disabled={!canSubmit}
+            data-testid="capture-submit"
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             <FilePlusIcon className="h-4 w-4" aria-hidden="true" />
