@@ -16,6 +16,7 @@ interface UsageRow {
   scenario: string;
   model: string;
   calls: number;
+  failed_calls: number;
   prompt_tokens: number;
   completion_tokens: number;
 }
@@ -31,26 +32,36 @@ export function toLocalDay(timestamp: number): string {
 export class AIUsageDB {
   constructor(private readonly db: Database.Database) {}
 
+  /**
+   * 记一次模型调用。
+   *
+   * 失败的调用也要记：401 不花钱，但超时、限流重试、思考 token 烧光后返回
+   * 空正文这些都已经产生了费用，只统计成功调用会让面板显著低估实际消耗。
+   */
   record(entry: {
     scenario: string;
     model: string;
     promptTokens: number;
     completionTokens: number;
+    failed?: boolean;
   }): void {
     const now = Date.now();
     const day = toLocalDay(now);
+    const failed = entry.failed ? 1 : 0;
     this.db.run(
       `INSERT INTO ai_usage_daily
-         (day, scenario, model, calls, prompt_tokens, completion_tokens, updated_at)
-       VALUES (?, ?, ?, 1, ?, ?, ?)
+         (day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at)
+       VALUES (?, ?, ?, 1, ?, ?, ?, ?)
        ON CONFLICT(day, scenario, model) DO UPDATE SET
          calls = calls + 1,
+         failed_calls = failed_calls + excluded.failed_calls,
          prompt_tokens = prompt_tokens + excluded.prompt_tokens,
          completion_tokens = completion_tokens + excluded.completion_tokens,
          updated_at = excluded.updated_at`,
       day,
       entry.scenario,
       entry.model,
+      failed,
       Math.max(0, Math.trunc(entry.promptTokens)),
       Math.max(0, Math.trunc(entry.completionTokens)),
       now,
@@ -66,28 +77,32 @@ export class AIUsageDB {
       Date.now() - Math.max(0, days - 1) * 24 * 60 * 60 * 1000,
     );
     const rows = this.db.all(
-      `SELECT day, scenario, model, calls, prompt_tokens, completion_tokens
+      `SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens
        FROM ai_usage_daily WHERE day >= ? ORDER BY day DESC`,
       since,
     ) as UsageRow[];
 
     const byScenario = new Map<string, AIUsageDailyRow>();
     let calls = 0;
+    let failedCalls = 0;
     let promptTokens = 0;
     let completionTokens = 0;
     for (const row of rows) {
       calls += row.calls;
+      failedCalls += row.failed_calls ?? 0;
       promptTokens += row.prompt_tokens;
       completionTokens += row.completion_tokens;
       const existing = byScenario.get(row.scenario);
       if (existing) {
         existing.calls += row.calls;
+        existing.failedCalls += row.failed_calls ?? 0;
         existing.promptTokens += row.prompt_tokens;
         existing.completionTokens += row.completion_tokens;
       } else {
         byScenario.set(row.scenario, {
           scenario: row.scenario,
           calls: row.calls,
+          failedCalls: row.failed_calls ?? 0,
           promptTokens: row.prompt_tokens,
           completionTokens: row.completion_tokens,
         });
@@ -97,6 +112,7 @@ export class AIUsageDB {
     return {
       days,
       calls,
+      failedCalls,
       promptTokens,
       completionTokens,
       byScenario: [...byScenario.values()].sort(

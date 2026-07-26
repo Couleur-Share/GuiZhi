@@ -39,10 +39,25 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
     setIsGenerating(true);
     const itemId = item.id;
     try {
-      const summary = await generateSummary(item.title, item.content);
+      const { text: summary, truncated } = await generateSummary(
+        item.title,
+        item.content,
+      );
       const updated = await window.api.knowledge.update(itemId, { summary });
       if (updated) {
         applyServerItem(updated);
+      }
+      // 截断的摘要照常写入（半篇也比没有强），但不能装作它是完整的
+      if (truncated) {
+        showToast(
+          t(
+            "library.aiSummaryTruncated",
+            "AI 摘要已生成，但模型输出达到长度上限，内容可能不完整",
+          ),
+          "warning",
+        );
+      } else {
+        showToast(t("library.aiSummaryDone", "AI 摘要已生成"), "success");
       }
     } catch (error) {
       if (error instanceof AiNotConfiguredError) {

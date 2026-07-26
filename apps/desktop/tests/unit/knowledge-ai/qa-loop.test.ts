@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { WikiCatalogEntry, WikiPageDetail } from "@guizhi/shared/types";
 import {
   askKnowledgeBase,
+  extractReadWindow,
+  locateNormalized,
   matchWikiPages,
   QaNoSourceError,
   type QaDeps,
@@ -286,5 +288,139 @@ describe("matchWikiPages", () => {
 
   it("无命中返回空", () => {
     expect(matchWikiPages(catalog, "完全无关的词汇")).toEqual([]);
+  });
+});
+
+describe("流式回答", () => {
+  /** 把脚本里的输出按块吐给 onDelta，模拟 SSE */
+  function createStreamingDeps(script: string[], chunkSize = 7): QaDeps {
+    let index = 0;
+    return {
+      chat: async (_messages, options) => {
+        const content = script[Math.min(index, script.length - 1)];
+        index++;
+        if (options.onDelta) {
+          for (let at = 0; at < content.length; at += chunkSize) {
+            options.onDelta(content.slice(at, at + chunkSize));
+          }
+        }
+        return { content, model: "test-model" };
+      },
+      searchItems: async () => HITS,
+      readItem: async (id) => ITEMS[id] ?? null,
+    };
+  }
+
+  it("回答逐字到达，检索轮的动作 JSON 不漏到界面", async () => {
+    const deps = createStreamingDeps([
+      '{"action":"search","query":"架构"}',
+      '{"action":"read","target":1}',
+      '{"action":"answer","text":"归知基于 Electron 构建 [1]。"}',
+    ]);
+    const streamed: string[] = [];
+    const answer = await askKnowledgeBase(
+      "归知用什么技术栈？",
+      undefined,
+      deps,
+      undefined,
+      undefined,
+      (text) => streamed.push(text),
+    );
+
+    expect(answer.text).toBe("归知基于 Electron 构建 [1]。");
+    // 至少分多次到达，且每一次都是「到目前为止的全量文本」
+    expect(streamed.length).toBeGreaterThan(1);
+    expect(streamed.at(-1)).toBe("归知基于 Electron 构建 [1]。");
+    for (const [position, text] of streamed.entries()) {
+      expect(answer.text.startsWith(text)).toBe(true);
+      if (position > 0) {
+        expect(text.length).toBeGreaterThanOrEqual(streamed[position - 1].length);
+      }
+    }
+    // search / read 两轮不该吐出任何内容
+    expect(streamed.some((text) => text.includes("action"))).toBe(false);
+  });
+
+  it("被判违规的回答轮不会在界面上留下半截内容", async () => {
+    // 第一轮直接 answer 但没读过任何资料 → 违规，第二轮才是真回答
+    const deps = createStreamingDeps([
+      '{"action":"answer","text":"我瞎编的回答"}',
+      '{"action":"search","query":"架构"}',
+      '{"action":"read","target":1}',
+      '{"action":"answer","text":"基于资料的回答 [1]。"}',
+    ]);
+    const streamed: string[] = [];
+    const answer = await askKnowledgeBase(
+      "问题",
+      undefined,
+      deps,
+      undefined,
+      undefined,
+      (text) => streamed.push(text),
+    );
+
+    expect(answer.text).toBe("基于资料的回答 [1]。");
+    // 每轮换一份新 state，最终文本会把上一轮的半截盖掉
+    expect(streamed.at(-1)).toBe("基于资料的回答 [1]。");
+  });
+
+  it("不传回调时不启用流式", async () => {
+    const seen: (((chunk: string) => void) | undefined)[] = [];
+    const deps: QaDeps = {
+      chat: async (_messages, options) => {
+        seen.push(options.onDelta);
+        return {
+          content: '{"action":"answer","text":"直接回答"}',
+          model: "m",
+        };
+      },
+      searchItems: async () => HITS,
+      readItem: async (id) => ITEMS[id] ?? null,
+    };
+    // 没读过资料会被判违规，这里只关心 onDelta 是否为 undefined
+    await askKnowledgeBase("问题", undefined, deps).catch(() => undefined);
+    expect(seen.every((callback) => callback === undefined)).toBe(true);
+  });
+});
+
+describe("locateNormalized / extractReadWindow", () => {
+  it("空白被压过的片段也能在原文里定位", () => {
+    const haystack = "前言。\n\n  关键结论   在这里。\n后记。";
+    expect(locateNormalized(haystack, "关键结论 在这里。")).toBe(
+      haystack.indexOf("关键结论"),
+    );
+  });
+
+  it("找不到时返回 -1，过短的片段不参与定位", () => {
+    expect(locateNormalized("一段正文", "不存在")).toBe(-1);
+    expect(locateNormalized("一段正文", "正文")).toBe(-1);
+  });
+
+  it("短于上限的正文原样返回", () => {
+    expect(extractReadWindow("很短的一段", 100, "任意")).toBe("很短的一段");
+  });
+
+  it("有命中线索时取包含命中的窗口，而不是文档开头", () => {
+    const body = `${"开头填充。".repeat(400)}这里是真正的答案段落。${"结尾填充。".repeat(400)}`;
+    const window = extractReadWindow(body, 300, "这里是真正的答案段落。");
+
+    expect(window).toContain("这里是真正的答案段落。");
+    expect(window.startsWith("…（前文略）")).toBe(true);
+    expect(window).toContain("…（后文略）");
+  });
+
+  it("没有线索或定位失败时退回开头截断", () => {
+    const body = "起始标记" + "填充。".repeat(500);
+    expect(extractReadWindow(body, 200).startsWith("起始标记")).toBe(true);
+    expect(
+      extractReadWindow(body, 200, "库里根本没有这句话啊").startsWith("起始标记"),
+    ).toBe(true);
+  });
+
+  it("命中在文档末尾时窗口不越界", () => {
+    const body = `${"填充。".repeat(500)}末尾的关键结论。`;
+    const window = extractReadWindow(body, 200, "末尾的关键结论。");
+    expect(window).toContain("末尾的关键结论。");
+    expect(window).not.toContain("…（后文略）");
   });
 });

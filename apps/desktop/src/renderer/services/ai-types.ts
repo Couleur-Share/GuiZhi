@@ -112,6 +112,8 @@ export interface ChatCompletionUsage {
 export interface ChatCompletionResult {
   content: string;
   thinkingContent?: string;
+  /** openai 系 finish_reason；anthropic 的 max_tokens 归一化为 "length" */
+  finishReason?: string;
   /** provider 回报的 token 用量；流式与部分中转站不返回，此时为 undefined */
   usage?: ChatCompletionUsage;
 }
@@ -138,6 +140,11 @@ export interface ChatCompletionOptions {
   timeoutMs?: number;
   /** 中断在途请求；桌面端经 requestId 转达到主进程 */
   signal?: AbortSignal;
+  /**
+   * 允许模型返回空正文。只有连通性测试用得上——几个 token 的探针本来就不足以
+   * 让思考类模型产出正文，但连接确实是通的。业务调用一律按失败处理。
+   */
+  allowEmptyContent?: boolean;
 }
 
 export interface AITestResult {

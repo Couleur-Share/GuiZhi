@@ -142,6 +142,27 @@ function SourceList({ sources }: { sources: QaSourceRef[] }) {
   );
 }
 
+/**
+ * 截断标注：撞上 max_tokens 的回答是「200 成功但没写完」，
+ * 不标出来用户会当成完整答案来用。
+ */
+function TruncatedNotice() {
+  const { t } = useTranslation();
+
+  return (
+    <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
+      <TriangleAlertIcon
+        className="mt-0.5 h-3.5 w-3.5 shrink-0"
+        aria-hidden="true"
+      />
+      {t(
+        "ask.answerTruncated",
+        "回答达到模型输出长度上限，内容可能不完整。",
+      )}
+    </p>
+  );
+}
+
 function MessageError({ message }: { message: AskMessage }) {
   const { t } = useTranslation();
   const requestSettingsSection = useUIStore(
@@ -207,7 +228,10 @@ function MessageCard({ message }: { message: AskMessage }) {
         {message.status === "error" ? (
           <MessageError message={message} />
         ) : message.answer ? (
-          <MarkdownBody content={message.answer} />
+          <>
+            <MarkdownBody content={message.answer} />
+            {message.truncated ? <TruncatedNotice /> : null}
+          </>
         ) : message.status === "running" && message.steps.length === 0 ? (
           <Loader2Icon
             className="h-4 w-4 animate-spin text-muted-foreground"

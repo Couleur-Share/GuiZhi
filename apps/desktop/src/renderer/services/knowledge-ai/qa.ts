@@ -6,7 +6,11 @@
  * 依赖以接口注入，便于单测用假实现驱动循环逻辑。
  * Wiki 页面检索随 M4 加入（当前 search 仅覆盖知识条目）。
  */
-import type { WikiCatalogEntry, WikiPageDetail } from "@guizhi/shared/types";
+import type {
+  WikiCatalogEntry,
+  WikiPageDetail,
+  WikiSearchHit,
+} from "@guizhi/shared/types";
 import {
   QA_AGENT_SYSTEM_PROMPT,
   QA_SYSTEM_PROMPT,
@@ -20,6 +24,7 @@ import {
   parseAliases,
   wikiKindLabel,
 } from "./wiki-compile";
+import { createAnswerStreamState, pushAnswerChunk } from "./answer-stream";
 
 export type { QaTurn };
 
@@ -40,12 +45,21 @@ export interface QaAnswer {
   model: string;
   /** 走了兜底管线（Agent 协议失败） */
   usedFallback: boolean;
+  /** 回答撞上 max_tokens 被截断，话没说完 */
+  truncated: boolean;
 }
 
 export interface QaSearchHit {
   id: string;
   title: string;
   snippet: string;
+  /**
+   * 语义检索实际命中的那段分块正文。
+   *
+   * 有它才知道该读文档的哪一段——否则检索辛苦定位到第 12000 字的段落，
+   * 阅读时照样从头截 1500 字，命中的内容根本进不了上下文。
+   */
+  matchText?: string;
 }
 
 export interface QaItemContent {
@@ -63,14 +77,23 @@ export interface QaDeps {
       maxTokens: number;
       /** 必须透传到底层请求，否则「停止」只能等这一轮自然返回 */
       signal?: AbortSignal;
+      /** 传了就走流式，逐块回调模型的原始输出 */
+      onDelta?: (chunk: string) => void;
     },
-  ) => Promise<{ content: string; model: string }>;
+  ) => Promise<{ content: string; model: string; finishReason?: string }>;
   /** 知识库全文检索（含归档，排除回收站） */
   searchItems: (query: string, limit: number) => Promise<QaSearchHit[]>;
   /** 读取条目全文 */
   readItem: (id: string) => Promise<QaItemContent | null>;
-  /** Wiki 目录（Agent 循环的页面匹配与出链解析；未提供时循环退化为纯条目检索） */
+  /** Wiki 目录（出链解析用；未提供时循环退化为纯条目检索） */
   getWikiCatalog?: () => Promise<WikiCatalogEntry[]>;
+  /**
+   * Wiki 页面全文检索。
+   *
+   * 没有它就只能退回内存子串计分，而那套对中文基本失效：
+   * 中文查询切不出 token，只有「问句里逐字包含页面标题」才加得上分。
+   */
+  searchWikiPages?: (query: string, limit: number) => Promise<WikiSearchHit[]>;
   /** 读取 Wiki 页面详情（含来源条目） */
   readWikiPage?: (id: string) => Promise<WikiPageDetail | null>;
 }
@@ -95,7 +118,8 @@ const HISTORY_TURN_LIMIT = 3;
 const HISTORY_ANSWER_LIMIT = 400;
 
 const QA_TEMPERATURE = 0.2;
-const QA_MAX_TOKENS = 1200;
+/** 回答本身 300~500 token 足够，余量留给思考类模型的推理消耗（推理计入 max_tokens） */
+const QA_MAX_TOKENS = 4096;
 
 /** 知识库没有相关资料（区别于调用失败，UI 显示引导文案）。 */
 export class QaNoSourceError extends Error {
@@ -184,6 +208,8 @@ interface AgentResource {
   refId: string;
   title: string;
   read: boolean;
+  /** 检索命中的片段，read 时据此定位该读文档的哪一段 */
+  matchText?: string;
 }
 
 function getOrAddResource(
@@ -191,11 +217,16 @@ function getOrAddResource(
   kind: QaSourceKind,
   refId: string,
   title: string,
+  matchText?: string,
 ): AgentResource {
   const existing = resources.find(
     (candidate) => candidate.kind === kind && candidate.refId === refId,
   );
   if (existing) {
+    // 后一轮检索可能命中同一文档的另一段，用最新的定位线索
+    if (matchText) {
+      existing.matchText = matchText;
+    }
     return existing;
   }
   const resource: AgentResource = {
@@ -204,9 +235,73 @@ function getOrAddResource(
     refId,
     title,
     read: false,
+    matchText,
   };
   resources.push(resource);
   return resource;
+}
+
+/**
+ * 空白归一后在原文里定位片段，返回它在原文中的起始下标；找不到返回 -1。
+ *
+ * 检索返回的片段是压过空白的，直接 indexOf 原文匹配不上。
+ */
+export function locateNormalized(haystack: string, needle: string): number {
+  const trimmedNeedle = needle.replace(/\s+/g, " ").trim();
+  if (!haystack || trimmedNeedle.length < 4) {
+    return -1;
+  }
+
+  const normalized: string[] = [];
+  const offsets: number[] = [];
+  let inWhitespace = false;
+  for (let index = 0; index < haystack.length; index++) {
+    const char = haystack[index];
+    if (/\s/.test(char)) {
+      if (!inWhitespace && normalized.length > 0) {
+        normalized.push(" ");
+        offsets.push(index);
+      }
+      inWhitespace = true;
+      continue;
+    }
+    inWhitespace = false;
+    normalized.push(char);
+    offsets.push(index);
+  }
+
+  const found = normalized.join("").indexOf(trimmedNeedle);
+  return found === -1 ? -1 : offsets[found];
+}
+
+/**
+ * 取文档中包含命中片段的一段窗口；没有线索或定位失败时退回开头。
+ *
+ * 窗口不是以命中点居中，而是留三成前文——上文往往是这段的铺垫，
+ * 全砍掉会让模型看不懂命中的这几句在讲什么。
+ */
+export function extractReadWindow(
+  text: string,
+  limit: number,
+  hint?: string,
+): string {
+  if (text.length <= limit) {
+    return text;
+  }
+  const hitIndex = hint ? locateNormalized(text, hint) : -1;
+  if (hitIndex < 0) {
+    return truncateText(text, limit);
+  }
+
+  const lead = Math.floor(limit * 0.3);
+  const start = Math.max(0, Math.min(hitIndex - lead, text.length - limit));
+  const end = Math.min(text.length, start + limit);
+  const body = text.slice(start, end);
+  return [
+    start > 0 ? "…（前文略）\n" : "",
+    body,
+    end < text.length ? "\n…（后文略）" : "",
+  ].join("");
 }
 
 /** Wiki 页面匹配：标题 / 别名 / 摘要与检索词双向包含计分（个人库规模内存匹配足够）。 */
@@ -314,6 +409,8 @@ export async function askKnowledgeBase(
   deps: QaDeps,
   onStep?: (description: string) => void,
   signal?: AbortSignal,
+  /** 回答逐字到达时的回调；不传则整段返回 */
+  onAnswerText?: (chunk: string) => void,
 ): Promise<QaAnswer> {
   const trimmedQuestion = question.trim();
   if (!trimmedQuestion) {
@@ -334,13 +431,20 @@ export async function askKnowledgeBase(
     deps,
     onStep,
     signal,
+    onAnswerText,
   );
   if (agentAnswer) {
     return agentAnswer;
   }
 
   onStep?.("智能检索未成功，改用单次检索…");
-  return askSingleShot(trimmedQuestion, trimmedHistory, deps, signal);
+  return askSingleShot(
+    trimmedQuestion,
+    trimmedHistory,
+    deps,
+    signal,
+    onAnswerText,
+  );
 }
 
 /** Agent 工具循环。返回 null 表示应回退单发管线（协议失败）。 */
@@ -350,6 +454,7 @@ async function askByAgentLoop(
   deps: QaDeps,
   onStep?: (description: string) => void,
   signal?: AbortSignal,
+  onAnswerText?: (chunk: string) => void,
 ): Promise<QaAnswer | null> {
   // Wiki 目录取一次：编译知识参与检索与出链遍历（Wiki 为空时自然退化为条目检索）
   const catalog = deps.getWikiCatalog ? await deps.getWikiCatalog() : [];
@@ -375,6 +480,11 @@ async function askByAgentLoop(
       );
     }
 
+    // 每一轮都流式。哪一轮是回答轮事先不知道（模型多半在预算用尽前就
+    // 自己给出 answer），而提取器只在动作确实是 answer 时才吐字，
+    // 检索轮的动作 JSON 不会漏到界面上。
+    const answerStream = createAnswerStreamState();
+
     const generation = await deps.chat(
       [
         { role: "system", content: QA_AGENT_SYSTEM_PROMPT },
@@ -383,7 +493,19 @@ async function askByAgentLoop(
           content: buildQaAgentPrompt(question, history, transcript),
         },
       ],
-      { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS, signal },
+      {
+        temperature: QA_TEMPERATURE,
+        maxTokens: QA_MAX_TOKENS,
+        signal,
+        onDelta: onAnswerText
+          ? (chunk) => {
+              const text = pushAnswerChunk(answerStream, chunk);
+              if (text) {
+                onAnswerText(text);
+              }
+            }
+          : undefined,
+      },
     );
     throwIfAborted(signal);
 
@@ -440,6 +562,7 @@ async function askByAgentLoop(
           })),
           model: generation.model,
           usedFallback: false,
+          truncated: generation.finishReason === "length",
         };
       }
 
@@ -448,11 +571,12 @@ async function askByAgentLoop(
         onStep?.(`检索：${action.query}`);
         const lines: string[] = [];
 
-        // Wiki 页面匹配在前（编译知识优先），条目融合检索在后
-        for (const entry of matchWikiPages(catalog, action.query).slice(
-          0,
-          SEARCH_WIKI_LIMIT,
-        )) {
+        // Wiki 页面检索在前（编译知识优先），条目融合检索在后。
+        // 有 FTS 就走 FTS，没有才退回内存子串计分
+        const wikiHits = deps.searchWikiPages
+          ? await deps.searchWikiPages(action.query, SEARCH_WIKI_LIMIT)
+          : matchWikiPages(catalog, action.query).slice(0, SEARCH_WIKI_LIMIT);
+        for (const entry of wikiHits) {
           const resource = getOrAddResource(
             resources,
             "wiki",
@@ -471,6 +595,7 @@ async function askByAgentLoop(
             "item",
             hit.id,
             hit.title,
+            hit.matchText,
           );
           const excerpt = truncateText(hit.snippet.replace(/\r?\n/g, " "), 80);
           lines.push(
@@ -531,7 +656,12 @@ async function readItemResource(
     return `[工具] [${resource.ordinal}]《${resource.title}》不存在或内容为空。`;
   }
   resource.read = true;
-  return `[工具] [${resource.ordinal}]《${item.title}》内容：\n${truncateText(buildItemText(item), ITEM_READ_LIMIT)}`;
+  const body = extractReadWindow(
+    buildItemText(item),
+    ITEM_READ_LIMIT,
+    resource.matchText,
+  );
+  return `[工具] [${resource.ordinal}]《${item.title}》内容：\n${body}`;
 }
 
 /**
@@ -593,6 +723,7 @@ async function askSingleShot(
   history: QaTurn[] | undefined,
   deps: QaDeps,
   signal?: AbortSignal,
+  onAnswerText?: (text: string) => void,
 ): Promise<QaAnswer> {
   const hits = await deps.searchItems(
     buildRetrievalText(question, history),
@@ -616,9 +747,10 @@ async function askSingleShot(
     if (!item || !item.content.trim()) {
       continue;
     }
-    const content = truncateText(
+    const content = extractReadWindow(
       buildItemText(item),
       Math.min(PER_SOURCE_CONTENT_LIMIT, budgetRemaining),
+      hit.matchText,
     );
     budgetRemaining -= content.length;
     contextBlocks.push(`[${ordinal}] 《${item.title}》\n${content}`);
@@ -631,6 +763,8 @@ async function askSingleShot(
     throw new QaNoSourceError();
   }
 
+  // 兜底管线输出的是纯 Markdown，不用过 JSON 提取器
+  let streamed = "";
   const generation = await deps.chat(
     [
       { role: "system", content: QA_SYSTEM_PROMPT },
@@ -639,7 +773,17 @@ async function askSingleShot(
         content: buildQaUserPrompt(question, contextBlocks, history),
       },
     ],
-    { temperature: QA_TEMPERATURE, maxTokens: QA_MAX_TOKENS, signal },
+    {
+      temperature: QA_TEMPERATURE,
+      maxTokens: QA_MAX_TOKENS,
+      signal,
+      onDelta: onAnswerText
+        ? (chunk) => {
+            streamed += chunk;
+            onAnswerText(streamed);
+          }
+        : undefined,
+    },
   );
 
   // 引用对齐：来源列表只保留回答实际标注引用的条目；未标注时退回完整列表保底可回溯
@@ -655,6 +799,7 @@ async function askSingleShot(
     sources: citedSources,
     model: generation.model,
     usedFallback: true,
+    truncated: generation.finishReason === "length",
   };
 }
 
@@ -681,6 +826,7 @@ export function createQaDeps(): QaDeps {
       };
     },
     getWikiCatalog: () => window.api.wiki.catalog(),
+    searchWikiPages: (query, limit) => window.api.wiki.search(query, limit),
     readWikiPage: (id) => window.api.wiki.getPage(id),
   };
 }

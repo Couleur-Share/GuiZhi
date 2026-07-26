@@ -15,6 +15,7 @@ import {
   toAIConfig,
 } from "../ai-defaults";
 import type { AIConfig } from "../ai";
+import { recordAiUsage } from "./ai-invoke";
 
 const EMBEDDINGS_TIMEOUT_MS = 60_000;
 
@@ -106,17 +107,42 @@ export async function embedTexts(
     throw new Error(`当前协议不支持 embeddings 接口: ${protocol}`);
   }
 
-  const response = await window.api.ai.request({
-    method: "POST",
-    url: endpoint,
-    headers: buildHeadersForProtocol(protocol, config.apiKey),
-    body: JSON.stringify({ model: config.model, input: texts }),
-    timeoutMs: EMBEDDINGS_TIMEOUT_MS,
-  });
+  let response;
+  try {
+    response = await window.api.ai.request({
+      method: "POST",
+      url: endpoint,
+      headers: buildHeadersForProtocol(protocol, config.apiKey),
+      body: JSON.stringify({ model: config.model, input: texts }),
+      timeoutMs: EMBEDDINGS_TIMEOUT_MS,
+    });
+  } catch (error) {
+    recordAiUsage({ scenario: "embedding", model: config.model, failed: true });
+    throw error;
+  }
   if (!response.ok) {
+    recordAiUsage({ scenario: "embedding", model: config.model, failed: true });
     const detail = (response.error || response.body || "").slice(0, 300);
     throw new Error(`Embeddings 请求失败 (HTTP ${response.status}): ${detail}`);
   }
 
+  // 一次全库索引会打成百上千次 embeddings，此前这些消耗在用量面板上是 0
+  recordAiUsage({
+    scenario: "embedding",
+    model: config.model,
+    promptTokens: readPromptTokens(response.body),
+  });
+
   return parseEmbeddingsResponse(response.body, texts.length).map(l2Normalize);
+}
+
+/** embeddings 响应里的 usage.prompt_tokens；provider 不回报时按 0 计 */
+function readPromptTokens(body: string): number {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    const usage = (parsed as { usage?: { prompt_tokens?: unknown } })?.usage;
+    return Math.max(0, Math.trunc(Number(usage?.prompt_tokens) || 0));
+  } catch {
+    return 0;
+  }
 }

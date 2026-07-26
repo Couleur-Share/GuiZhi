@@ -6,6 +6,7 @@
  */
 import type {
   ChatCompletionResult,
+  ChatCompletionUsage,
   StreamCallbacks,
 } from "./ai-types";
 
@@ -17,6 +18,14 @@ export interface StreamState {
   thinkingContent: string;
   buffer: string;
   chunkCount: number;
+  /**
+   * 流里带回来的 finish_reason 与 usage。
+   *
+   * 不收这两样，启用流式后「回答被截断」的标注会永远不亮、
+   * 用量统计恒为 0 token——两个只在流式路径上出现的静默失真。
+   */
+  finishReason?: string;
+  usage?: ChatCompletionUsage;
 }
 
 export function createStreamState(): StreamState {
@@ -61,8 +70,21 @@ export async function processStreamTextChunk(
 
     try {
       const json = JSON.parse(trimmed.slice(6));
-      const delta = json.choices?.[0]?.delta;
 
+      // finish_reason 与 usage 各自独立到达：前者挂在最后一个 choice 上，
+      // 后者通常是一个 choices 为空的收尾事件
+      const finishReason = json.choices?.[0]?.finish_reason;
+      if (typeof finishReason === "string" && finishReason) {
+        state.finishReason = finishReason;
+      }
+      if (json.usage) {
+        state.usage = {
+          promptTokens: Number(json.usage.prompt_tokens) || 0,
+          completionTokens: Number(json.usage.completion_tokens) || 0,
+        };
+      }
+
+      const delta = json.choices?.[0]?.delta;
       if (!delta) {
         continue;
       }
@@ -107,6 +129,8 @@ export function finalizeStreamState(
   return {
     content: state.fullContent,
     thinkingContent: state.thinkingContent || undefined,
+    finishReason: state.finishReason,
+    usage: state.usage,
   };
 }
 

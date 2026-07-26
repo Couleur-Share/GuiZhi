@@ -23,6 +23,8 @@ export interface AskMessage {
   errorKind?: AskErrorKind;
   model?: string;
   usedFallback?: boolean;
+  /** 回答被 max_tokens 截断（界面标注「可能不完整」） */
+  truncated?: boolean;
 }
 
 interface AskState {
@@ -100,6 +102,7 @@ function parseStoredMessages(messagesJson: string): AskMessage[] {
           }),
       model: message.model,
       usedFallback: message.usedFallback,
+      truncated: message.truncated,
     });
   }
   return messages;
@@ -279,6 +282,8 @@ export const useAskStore = create<AskState>()((set, get) => {
             }));
           },
           abortController.signal,
+          // 回调给的是到目前为止的全量文本，直接覆盖即可
+          (text) => patchMessage({ answer: text }),
         );
         patchMessage({
           status: "done",
@@ -286,6 +291,7 @@ export const useAskStore = create<AskState>()((set, get) => {
           sources: answer.sources,
           model: answer.model,
           usedFallback: answer.usedFallback,
+          truncated: answer.truncated,
         });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {

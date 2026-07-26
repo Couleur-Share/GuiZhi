@@ -1,8 +1,6 @@
-import type { AIProtocol, AITransportResponse } from "@guizhi/shared/types";
 import {
   buildChatEndpointFromBase,
   buildHeadersForProtocol,
-  buildModelsEndpointFromBase,
   resolveAIProtocol,
   resolveProtocolBase,
 } from "@guizhi/shared/utils/ai-protocol";
@@ -16,8 +14,6 @@ import type {
   ChatMessage,
   ChatMessageContent,
   ChatMessageContentPart,
-  FetchModelsResult,
-  ModelInfo,
   ResponseLike,
   StreamCallbacks,
 } from "./ai-types";
@@ -32,7 +28,6 @@ import {
   createFetchResponseLike,
   createResponseLike,
   getAITransport,
-  requestAIEndpoint,
   withCancellation,
 } from "./ai-transport";
 
@@ -72,6 +67,10 @@ function normalizeAssistantContent(content: ChatMessageContent): string {
   if (typeof content === "string") {
     return content;
   }
+  // provider 在没有正文时回 content: null 很常见，按空串处理，别让它撞成 TypeError
+  if (!Array.isArray(content)) {
+    return "";
+  }
 
   return content
     .filter(
@@ -80,6 +79,41 @@ function normalizeAssistantContent(content: ChatMessageContent): string {
     )
     .map((part) => part.text)
     .join("");
+}
+
+/**
+ * 空正文一律按失败处理。
+ *
+ * 思考类模型会把 max_tokens 预算整个花在推理上：HTTP 200、choices 齐全，
+ * 但 `finish_reason` 是 length、`content` 是空字符串，正文全在
+ * `reasoning_content` 里且被截断。沿用「有 choices 就算成功」的判断，
+ * 上层会把空结果当成有效输出静默落库（摘要就被写成空串），
+ * 界面上既看不到结果也看不到报错。
+ */
+function assertNonEmptyContent(
+  content: string,
+  context: {
+    finishReason?: string;
+    hasThinking: boolean;
+    maxTokens: number;
+    allowEmpty?: boolean;
+  },
+): void {
+  if (context.allowEmpty || content.trim()) {
+    return;
+  }
+
+  if (context.finishReason === "length") {
+    throw new Error(
+      context.hasThinking
+        ? `模型把 ${context.maxTokens} token 的输出预算全用在思考过程上（finish_reason=length），没有产出正文。请为该场景改用非思考模型。`
+        : `模型输出在 ${context.maxTokens} token 上限处被截断，没有产出正文。`,
+    );
+  }
+
+  throw new Error(
+    `模型返回了空正文（finish_reason=${context.finishReason ?? "unknown"}）`,
+  );
 }
 
 function toAnthropicMessageContent(
@@ -177,7 +211,7 @@ export async function chatCompletion(
   // Detect if it's a new model that requires max_completion_tokens
   // Updated for Issue #21: Support automatic fallback/retry for token parameters
   const modelLower = model.toLowerCase();
-  let useMaxCompletionTokens =
+  const useMaxCompletionTokens =
     modelLower.includes("o1") ||
     modelLower.includes("o3") ||
     modelLower.includes("gpt-4o") ||
@@ -239,18 +273,25 @@ export async function chatCompletion(
 
     const data = await response.json<{
       content?: Array<{ type?: string; text?: string }>;
+      stop_reason?: string;
     }>();
     const content = (data.content || [])
       .filter((item) => item?.type === "text" && typeof item.text === "string")
       .map((item) => item.text)
       .join("");
+    const finishReason =
+      data.stop_reason === "max_tokens" ? "length" : data.stop_reason;
 
-    if (!content) {
-      throw new Error("AI returned an unexpected response format");
-    }
+    assertNonEmptyContent(content, {
+      finishReason,
+      hasThinking: false,
+      maxTokens: mergedParams.maxTokens,
+      allowEmpty: options?.allowEmptyContent,
+    });
 
     return {
       content,
+      finishReason,
     };
   }
 
@@ -486,6 +527,12 @@ export async function chatCompletion(
     }
 
     if (requestResult.streamResult) {
+      // 流式没有 finish_reason 可读，只能凭「有没有攒到正文」判断
+      assertNonEmptyContent(requestResult.streamResult.content, {
+        hasThinking: Boolean(requestResult.streamResult.thinkingContent),
+        maxTokens: mergedParams.maxTokens,
+        allowEmpty: options?.allowEmptyContent,
+      });
       return requestResult.streamResult;
     }
 
@@ -501,10 +548,21 @@ export async function chatCompletion(
       // AI returned empty result
     }
 
-    const message = data.choices[0].message;
+    const choice = data.choices[0];
+    const message = choice.message;
+    const content = normalizeAssistantContent(message.content);
+
+    assertNonEmptyContent(content, {
+      finishReason: choice.finish_reason,
+      hasThinking: Boolean(message.reasoning_content),
+      maxTokens: mergedParams.maxTokens,
+      allowEmpty: options?.allowEmptyContent,
+    });
+
     return {
-      content: normalizeAssistantContent(message.content),
+      content,
       thinkingContent: message.reasoning_content,
+      finishReason: choice.finish_reason,
       usage: data.usage
         ? {
             promptTokens: data.usage.prompt_tokens ?? 0,
@@ -516,7 +574,7 @@ export async function chatCompletion(
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("网络请求失败，请检查网络连接");
+    throw new Error("网络请求失败，请检查网络连接", { cause: error });
     // Network request failed, please check network connection
   }
 }
@@ -547,6 +605,8 @@ export async function testAIConnection(
         enableThinking: false,
         streamCallbacks,
         timeoutMs: AI_CONNECTION_TEST_TIMEOUT_MS,
+        // 探针只有几个 token，思考类模型必然答不出正文；这里验的是连通性
+        allowEmptyContent: true,
       },
     );
 

@@ -16,7 +16,7 @@ import {
 import { useSettingsStore } from "../../stores/settings.store";
 import { resolveScenarioAIConfig } from "../ai-defaults";
 import type { AIConfig } from "../ai";
-import { AiNotConfiguredError } from "./ai-invoke";
+import { AiNotConfiguredError, recordAiUsage } from "./ai-invoke";
 
 const OCR_TIMEOUT_MS = 120_000;
 
@@ -58,21 +58,30 @@ export async function recognizeImageText(
   const endpoint = buildChatEndpointFromBase(
     resolveProtocolBase(config.apiUrl, protocol),
   );
-  const response = await window.api.ai.request({
-    method: "POST",
-    url: endpoint,
-    headers: buildHeadersForProtocol(protocol, config.apiKey),
-    body: buildOcrRequestBody(
-      config.model,
-      `data:${mime};base64,${base64}`,
-      protocol,
-    ),
-    timeoutMs: OCR_TIMEOUT_MS,
-  });
+  let response;
+  try {
+    response = await window.api.ai.request({
+      method: "POST",
+      url: endpoint,
+      headers: buildHeadersForProtocol(protocol, config.apiKey),
+      body: buildOcrRequestBody(
+        config.model,
+        `data:${mime};base64,${base64}`,
+        protocol,
+      ),
+      timeoutMs: OCR_TIMEOUT_MS,
+    });
+  } catch (error) {
+    recordAiUsage({ scenario: "ocr", model: config.model, failed: true });
+    throw error;
+  }
   if (!response.ok) {
+    recordAiUsage({ scenario: "ocr", model: config.model, failed: true });
     const detail = (response.error || response.body || "").slice(0, 300);
     throw new Error(`OCR 请求失败 (HTTP ${response.status}): ${detail}`);
   }
+  // 图文采集逐张调视觉模型，9 张图就是 9 次，不记等于漏掉一整类消耗
+  recordAiUsage({ scenario: "ocr", model: config.model });
   const text = parseOcrResponse(response.body, protocol);
   if (!text) {
     throw new Error("OCR 未识别到内容");

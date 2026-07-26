@@ -6,6 +6,8 @@ import { runScenarioChat } from "./ai-invoke";
 
 const TAG_MAX_LENGTH = 12;
 const TAG_MAX_COUNT = 5;
+/** 标签本身只要几十 token，余量留给思考类模型的推理消耗（推理计入 max_tokens） */
+const TAG_MAX_TOKENS = 2048;
 
 /** 解析模型输出的标签列表：容忍编号、井号、多种分隔符与引号污染。 */
 export function parseTagResponse(response: string): string[] {
@@ -47,7 +49,7 @@ export async function suggestTags(
         content: buildUserPrompt(title.trim() || "无标题", text),
       },
     ],
-    { temperature: 0.3, maxTokens: 100 },
+    { temperature: 0.3, maxTokens: TAG_MAX_TOKENS },
   );
 
   const tags = parseTagResponse(result.content);
