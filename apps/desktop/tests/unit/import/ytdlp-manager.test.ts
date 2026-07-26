@@ -21,6 +21,9 @@ vi.mock("../../../src/main/services/media/tool-download", () => ({
   downloadToFile: vi.fn(async () => {
     throw new Error("单测禁用真实下载");
   }),
+  // 校验和取不到时安装会照常继续（只是跳过校验），这里模拟离线
+  fetchExpectedSha256: vi.fn(async () => null),
+  sha256File: vi.fn(async () => "0".repeat(64)),
 }));
 
 import {

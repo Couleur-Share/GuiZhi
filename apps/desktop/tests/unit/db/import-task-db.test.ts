@@ -73,6 +73,31 @@ describe("ImportTaskDB", () => {
     expect(tasks.get(done.id)!.status).toBe("completed");
   });
 
+  it("采集时选定的标签随任务持久化", () => {
+    const task = tasks.create({
+      kind: "url",
+      input: "https://example.com",
+      tagNames: ["读书", "待读"],
+    });
+    // 重启恢复后要还能读出来，所以走一次 get 而不是直接看返回值
+    expect(tasks.get(task.id)!.tagNames).toEqual(["读书", "待读"]);
+    expect(tasks.create({ kind: "text", input: "无标签" }).tagNames).toEqual([]);
+  });
+
+  it("remove 删得掉失败任务，删不掉进行中的", () => {
+    const failed = tasks.create({ kind: "text", input: "失败" });
+    const running = tasks.create({ kind: "text", input: "进行中" });
+    tasks.update(failed.id, { status: "failed" });
+    tasks.update(running.id, { status: "processing" });
+
+    // failed 有意不进「清理已完成」，所以必须有单独的删除出口
+    expect(tasks.remove(failed.id)).toBe(true);
+    expect(tasks.get(failed.id)).toBeNull();
+    // 正在跑的任务删掉会让队列失去落点
+    expect(tasks.remove(running.id)).toBe(false);
+    expect(tasks.get(running.id)).not.toBeNull();
+  });
+
   it("clearFinished 清掉终态任务，保留进行中的与失败的", () => {
     const pending = tasks.create({ kind: "text", input: "待处理" });
     const failed = tasks.create({ kind: "text", input: "失败" });

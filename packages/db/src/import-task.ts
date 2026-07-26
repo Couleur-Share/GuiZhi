@@ -22,9 +22,25 @@ interface TaskRow {
   result_item_id: string | null;
   duplicate_item_id: string | null;
   collection_id: string | null;
+  tag_names: string | null;
   force_duplicate: number;
   created_at: number;
   updated_at: number;
+}
+
+/** tag_names 存的是 JSON 数组；老行为 NULL，坏数据当成没有标签 */
+function parseTagNames(raw: string | null): string[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((name): name is string => typeof name === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -51,6 +67,7 @@ function mapRow(row: TaskRow): ImportTask {
     resultItemId: row.result_item_id,
     duplicateItemId: row.duplicate_item_id,
     collectionId: row.collection_id,
+    tagNames: parseTagNames(row.tag_names),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -77,13 +94,14 @@ export class ImportTaskDB {
     const id = randomUUID();
     this.db.run(
       `INSERT INTO import_tasks
-         (id, source_kind, source_input, display_name, status, collection_id, force_duplicate, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+         (id, source_kind, source_input, display_name, status, collection_id, tag_names, force_duplicate, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
       id,
       input.kind,
       input.input,
       makeDisplayName(input),
       input.collectionId ?? null,
+      input.tagNames?.length ? JSON.stringify(input.tagNames) : null,
       input.forceDuplicate ? 1 : 0,
       now,
       now,
@@ -188,5 +206,21 @@ export class ImportTaskDB {
       `DELETE FROM import_tasks WHERE status IN (${placeholders})`,
       ...CLEARABLE_STATUSES,
     ).changes;
+  }
+
+  /**
+   * 删除一条已结束的任务。
+   *
+   * failed 有意不进「清理已完成」（它是重试入口），但也得有单独的出口——
+   * 否则失败任务永久堆积，超过 list 的 200 条窗口后连看都看不到，
+   * 却仍然占着位置把更早的任务挤出去。
+   */
+  remove(id: string): boolean {
+    return (
+      this.db.run(
+        "DELETE FROM import_tasks WHERE id = ? AND status NOT IN ('pending', 'processing')",
+        id,
+      ).changes > 0
+    );
   }
 }

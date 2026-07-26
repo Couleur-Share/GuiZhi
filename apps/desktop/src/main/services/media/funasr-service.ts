@@ -115,6 +115,8 @@ export async function ensureFunasrService(
   if (await probeFunasrHealth()) {
     return;
   }
+  // 判的是「有没有在途的启动」，不是 await 这个 Promise
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   if (startingPromise) {
     return startingPromise;
   }

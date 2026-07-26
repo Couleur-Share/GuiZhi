@@ -82,6 +82,36 @@ describe("ImportService（真实 DB 集成）", () => {
     expect(second.resultItemId).not.toBe(first.resultItemId);
   });
 
+  it("采集时选的标签直接落到入库条目上", async () => {
+    service.queue.enqueue([
+      { kind: "text", input: "带标签的内容", tagNames: ["读书", "待读"] },
+    ]);
+    await service.queue.drain();
+
+    const [task] = service.taskDb.list();
+    expect(task.status).toBe("completed");
+
+    // 标签要穿过「任务持久化 → 队列调度 → saveItem」整条链路
+    const items = new KnowledgeItemDB(db);
+    const names = items.get(task.resultItemId!)!.tags.map((tag) => tag.name);
+    expect(new Set(names)).toEqual(new Set(["读书", "待读"]));
+  });
+
+  it("重启恢复后仍能打上采集时选的标签", async () => {
+    // 任务入队但不跑完，模拟「下载途中退出应用」
+    const [pending] = service.queue.enqueue([
+      { kind: "text", input: "重启前入队", tagNames: ["稍后读"] },
+    ]);
+    await service.queue.drain();
+
+    // 标签存在任务行里，而不只是活在渲染进程的内存里
+    expect(service.taskDb.get(pending.id)!.tagNames).toEqual(["稍后读"]);
+
+    const items = new KnowledgeItemDB(db);
+    const itemId = service.taskDb.get(pending.id)!.resultItemId!;
+    expect(items.get(itemId)!.tags.map((tag) => tag.name)).toEqual(["稍后读"]);
+  });
+
   it("指定知识库：条目归入目标 collection", async () => {
     db.run(
       "INSERT INTO collections (id, name, sort_order, created_at, updated_at) VALUES ('c1', '技术', 0, 1, 1)",

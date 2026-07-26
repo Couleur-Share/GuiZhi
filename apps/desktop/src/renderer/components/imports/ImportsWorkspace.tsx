@@ -12,6 +12,7 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
   CopyIcon,
+  XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportStage, ImportTask } from "@guizhi/shared/types";
@@ -127,6 +128,7 @@ export function ImportsWorkspace() {
   const fetchTasks = useImportStore((state) => state.fetchTasks);
   const cancelTask = useImportStore((state) => state.cancelTask);
   const retryTask = useImportStore((state) => state.retryTask);
+  const removeTask = useImportStore((state) => state.removeTask);
   const clearFinished = useImportStore((state) => state.clearFinished);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
   const setScope = useKnowledgeStore((state) => state.setScope);
@@ -279,6 +281,17 @@ export function ImportsWorkspace() {
                         {t("imports.createCopy", "仍要创建副本")}
                       </button>
                     </>
+                  ) : null}
+                  {task.status !== "pending" && task.status !== "processing" ? (
+                    <button
+                      type="button"
+                      onClick={() => void removeTask(task.id)}
+                      className={actionButtonClass}
+                      title={t("imports.removeTask", "从列表中删除")}
+                    >
+                      <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t("imports.removeTask", "从列表中删除")}
+                    </button>
                   ) : null}
                 </div>
               </div>

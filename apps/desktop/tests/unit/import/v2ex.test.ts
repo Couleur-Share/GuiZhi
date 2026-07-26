@@ -14,6 +14,7 @@ import { fetchV2exThread, type ForumThread } from "../../../src/main/services/im
 import { extractForumPost } from "../../../src/main/services/import/forum-post";
 import {
   generateForumSummary,
+  needsAiTitle,
   sanitizeForumSummary,
   splitReplyChunks,
 } from "../../../src/main/services/import/forum-summary";
@@ -142,18 +143,95 @@ describe("fetchV2exThread", () => {
   });
 
   it("限流的 HTTP 403 翻译成用户能理解的说法", async () => {
+    const fetchJson = vi.fn(async () => {
+      throw new Error("HTTP 403");
+    });
+
+    await expect(
+      fetchV2exThread("1227616", { fetchJson: fetchJson as never }),
+    ).rejects.toThrow(/访问受限/);
+    // 4xx 重试只会更快撞上限，必须一次就放弃
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it("Cloudflare 522 这类瞬时故障退避重试，成功后照常返回", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let topicCalls = 0;
+    const thread = await fetchV2exThread("1227616", {
+      retryDelaysMs: [0, 0],
+      fetchJson: async <T,>(url: string): Promise<T> => {
+        if (url.includes("/topics/show.json")) {
+          topicCalls += 1;
+          if (topicCalls < 3) {
+            throw new Error("HTTP 522");
+          }
+          return topicPayload() as T;
+        }
+        return repliesPayload() as T;
+      },
+    });
+
+    expect(topicCalls).toBe(3);
+    expect(thread.title).toBe("外面访问家里局域网最优雅的方式是？");
+    expect(thread.replies).toHaveLength(2);
+    warn.mockRestore();
+  });
+
+  it("重试耗尽后说清是对方故障，而不是甩一个 HTTP 522", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchJson = vi.fn(async () => {
+      throw new Error("HTTP 522");
+    });
+
     await expect(
       fetchV2exThread("1227616", {
-        fetchJson: async () => {
-          throw new Error("HTTP 403");
-        },
+        retryDelaysMs: [0, 0],
+        fetchJson: fetchJson as never,
       }),
-    ).rejects.toThrow(/访问受限/);
+    ).rejects.toThrow("V2EX 服务器暂时无响应（HTTP 522），已自动重试仍未成功，稍后再试");
+    expect(fetchJson).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+
+  it("连接超时同样重试，并给出可读说法", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchJson = vi.fn(async () => {
+      throw new Error("请求超时");
+    });
+
+    await expect(
+      fetchV2exThread("1227616", {
+        retryDelaysMs: [0],
+        fetchJson: fetchJson as never,
+      }),
+    ).rejects.toThrow(/连接 V2EX 超时/);
+    expect(fetchJson).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it("取消要立刻生效，不等退避走完", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const controller = new AbortController();
+    const fetchJson = vi.fn(async () => {
+      controller.abort();
+      throw new Error("HTTP 522");
+    });
+
+    await expect(
+      fetchV2exThread(
+        "1227616",
+        { retryDelaysMs: [60_000], fetchJson: fetchJson as never },
+        controller.signal,
+      ),
+    ).rejects.toThrow("已取消");
+    expect(fetchJson).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it("回复抓取失败时保留主楼，不让整条采集失败", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const thread = await fetchV2exThread("1227616", {
+      retryDelaysMs: [],
       fetchJson: fakeFetchJson(topicPayload(), new Error("HTTP 500")),
     });
 
@@ -200,7 +278,10 @@ describe("extractForumPost", () => {
     const entry = await extractForumPost(TARGET, {
       fetchThread: async () => buildThread(),
       getSummaryConfig: () => CONFIG,
-      summarize: async () => "**ZeroTier**\n- 多人推荐",
+      summarize: async () => ({
+        summary: "**ZeroTier**\n- 多人推荐",
+        title: null,
+      }),
     });
 
     expect(entry.itemType).toBe("forum");
@@ -226,7 +307,10 @@ describe("extractForumPost", () => {
     const entry = await extractForumPost(TARGET, {
       fetchThread: async () => buildThread(),
       getSummaryConfig: () => CONFIG,
-      summarize: async () => "**ZeroTier**\n- 多人推荐",
+      summarize: async () => ({
+        summary: "**ZeroTier**\n- 多人推荐",
+        title: null,
+      }),
     });
 
     // 中间夹空行会让「发布」这行漏进正文，必须紧邻
@@ -242,6 +326,27 @@ describe("extractForumPost", () => {
     expect(sections.body).toBe("家里的设备有群辉 nas。");
     expect(sections.summary).toBe("**ZeroTier**\n- 多人推荐");
     expect(sections.replies).toContain("**1 楼 · wowo243**");
+  });
+
+  it("模型重拟标题时替换原标题，原标题记进元数据引用块", async () => {
+    const entry = await extractForumPost(TARGET, {
+      fetchThread: async () => buildThread({ title: "求推荐" }),
+      getSummaryConfig: () => CONFIG,
+      summarize: async () => ({
+        summary: "### ZeroTier\n- 多人推荐",
+        title: "内网穿透方案选型与实测对比",
+      }),
+    });
+
+    expect(entry.title).toBe("内网穿透方案选型与实测对比");
+    // 原标题仍在元数据块里：来源 chip 显示得出，全文检索也找得到
+    const meta = parseVideoMetaBlock(entry.content);
+    expect(meta?.originalTitle).toBe("求推荐");
+    expect(meta?.platform).toBe("V2EX");
+    expect(meta?.body).not.toContain("原标题：");
+    expect(splitForumNoteSections(entry.content).summary).toBe(
+      "### ZeroTier\n- 多人推荐",
+    );
   });
 
   it("未配置文本模型时如实注明，讨论照常入库", async () => {
@@ -315,7 +420,7 @@ describe("extractForumPost", () => {
     await extractForumPost(TARGET, {
       fetchThread: async () => buildThread(),
       getSummaryConfig: () => CONFIG,
-      summarize: async () => "总结",
+      summarize: async () => ({ summary: "总结", title: null }),
       onStage: (stage) => stages.push(stage),
     });
 
@@ -370,7 +475,7 @@ describe("generateForumSummary", () => {
     );
 
     // 独占一行的加粗小标题在清洗阶段升为 ###
-    expect(summary).toBe("### ZeroTier\n- 多人推荐");
+    expect(summary?.summary).toBe("### ZeroTier\n- 多人推荐");
     expect(chat).toHaveBeenCalledTimes(1);
     const userMessage = chat.mock.calls[0][1][1].content;
     expect(userMessage).toContain("家里有群辉 nas。");
@@ -407,7 +512,7 @@ describe("generateForumSummary", () => {
       { chat: chat as never },
     );
 
-    expect(summary).toBe("### 方案\n- 要点");
+    expect(summary?.summary).toBe("### 方案\n- 要点");
     // 至少一轮 map 加一次 reduce
     expect(chat.mock.calls.length).toBeGreaterThan(1);
     const lastUserMessage =
@@ -427,9 +532,92 @@ describe("generateForumSummary", () => {
       { chat: chat as never },
     );
 
-    expect(summary).toContain("### 方案一");
-    expect(summary).not.toMatch(/^#{1,2}\s/m);
-    expect(summary).not.toMatch(/^-{3,}$/m);
+    expect(summary?.summary).toContain("### 方案一");
+    expect(summary?.summary).not.toMatch(/^#{1,2}\s/m);
+    expect(summary?.summary).not.toMatch(/^-{3,}$/m);
+  });
+
+  it("原标题说得清内容时不要拟题指令，也不动标题", async () => {
+    const chat = vi.fn(async () => ({
+      content: "**方案**\n- 要点",
+      finishReason: "stop" as const,
+    }));
+
+    const summary = await generateForumSummary(
+      {
+        title: "外面访问家里局域网最优雅的方式是？",
+        content: "主楼",
+        replies: buildThread().replies,
+      },
+      CONFIG,
+      { chat: chat as never },
+    );
+
+    expect(summary?.title).toBeNull();
+    expect(chat.mock.calls[0][1][0].content).not.toContain("「标题：」");
+  });
+
+  it("弱标题时在同一次请求里拟题，不额外发一次调用", async () => {
+    const chat = vi.fn(async () => ({
+      content: "标题：内网穿透方案选型与实测对比\n\n**方案**\n- 要点",
+      finishReason: "stop" as const,
+    }));
+
+    const summary = await generateForumSummary(
+      { title: "求推荐", content: "主楼", replies: buildThread().replies },
+      CONFIG,
+      { chat: chat as never },
+    );
+
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(chat.mock.calls[0][1][0].content).toContain("「标题：」");
+    expect(summary?.title).toBe("内网穿透方案选型与实测对比");
+    // 标题行不能漏进总结正文
+    expect(summary?.summary).toBe("### 方案\n- 要点");
+  });
+
+  it("要了标题但模型没按协议输出时，整段仍当总结正文", async () => {
+    const chat = vi.fn(async () => ({
+      content: "**方案**\n- 要点",
+      finishReason: "stop" as const,
+    }));
+
+    const summary = await generateForumSummary(
+      { title: "求推荐", content: "主楼", replies: buildThread().replies },
+      CONFIG,
+      { chat: chat as never },
+    );
+
+    expect(summary?.title).toBeNull();
+    expect(summary?.summary).toBe("### 方案\n- 要点");
+  });
+});
+
+describe("needsAiTitle", () => {
+  it("说得清内容的标题一律不动", () => {
+    for (const title of [
+      "外面访问家里局域网最优雅的方式是？",
+      "如果有家族遗传脱发应尽早使用非那雄胺",
+      "求推荐一个适合小团队的项目管理工具",
+      "有人用过 Obsidian 的同步服务吗",
+      "大家都用什么记笔记？",
+    ]) {
+      expect(needsAiTitle(title)).toBe(false);
+    }
+  });
+
+  it("只剩套话、过短或抓取兜底的标题才重拟", () => {
+    for (const title of [
+      "求推荐",
+      "问个问题",
+      "急！在线等",
+      "有人遇到过吗",
+      "",
+      "   ",
+      "V2EX 帖子 1227616",
+    ]) {
+      expect(needsAiTitle(title)).toBe(true);
+    }
   });
 });
 

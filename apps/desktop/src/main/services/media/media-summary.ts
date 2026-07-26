@@ -141,8 +141,11 @@ function normalizeAiTitle(raw: string): string | null {
     : title;
 }
 
-/** 按输出协议拆出首行「标题：xxx」；未匹配则整段视为总结正文 */
-function splitTitleFromSummary(raw: string): {
+/**
+ * 按输出协议拆出首行「标题：xxx」；未匹配则整段视为总结正文。
+ * 论坛讨论总结（import/forum-summary.ts）用的是同一套输出协议。
+ */
+export function splitTitleFromSummary(raw: string): {
   title: string | null;
   body: string;
 } {

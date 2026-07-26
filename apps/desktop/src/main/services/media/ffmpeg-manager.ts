@@ -36,6 +36,11 @@ export function getManagedFfmpegPath(
 /**
  * Windows 静态构建 zip（yt-dlp 官方维护的 FFmpeg-Builds），
  * 镜像加速源与 yt-dlp 管理器同一组。其余平台不提供应用内安装。
+ *
+ * 这里没有哈希校验，不是漏了：FFmpeg-Builds 的 release 既不发 SHA2-256SUMS
+ * 也没有 .sha256 旁车（2026-07 实测均 404），而 tag 恒为 latest、构建每天变，
+ * 仓库里钉一个常量也会隔天失效。yt-dlp 与 FunASR 的 Python 运行时都有官方
+ * 校验和，各自的 manager 里已按它校验；这一条只能靠「解出来能跑」兜着。
  */
 export function getFfmpegDownloadUrls(
   platform: NodeJS.Platform = process.platform,

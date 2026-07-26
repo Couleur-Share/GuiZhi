@@ -14,7 +14,11 @@ import type {
 } from "@guizhi/shared/types";
 import { getToolsDir } from "../../runtime-paths";
 import { fetchWithNetworkProxy } from "../network-proxy";
-import { downloadToFile } from "./tool-download";
+import {
+  downloadToFile,
+  fetchExpectedSha256,
+  sha256File,
+} from "./tool-download";
 
 const VERSION_PROBE_TIMEOUT_MS = 10_000;
 const LATEST_VERSION_TIMEOUT_MS = 6_000;
@@ -35,13 +39,35 @@ export function getManagedYtDlpPath(
 export function getYtDlpDownloadUrls(
   platform: NodeJS.Platform = process.platform,
 ): string[] {
-  const asset =
-    platform === "win32"
-      ? "yt-dlp.exe"
-      : platform === "darwin"
-        ? "yt-dlp_macos"
-        : "yt-dlp_linux";
-  const official = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${asset}`;
+  const official = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${getYtDlpAssetName(platform)}`;
+  return [
+    official,
+    `https://ghfast.top/${official}`,
+    `https://gh-proxy.com/${official}`,
+    `https://hub.gitmirror.com/${official}`,
+  ];
+}
+
+/** 下载的资产文件名（校验清单按它匹配行） */
+export function getYtDlpAssetName(
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return platform === "win32"
+    ? "yt-dlp.exe"
+    : platform === "darwin"
+      ? "yt-dlp_macos"
+      : "yt-dlp_linux";
+}
+
+/**
+ * 官方发布的 SHA2-256SUMS。
+ *
+ * 二进制可能来自第三方 GitHub 代理，校验和优先走官方源：只要两者不同源，
+ * 代理替换掉的文件就对不上。官方不可达时才退到镜像（聊胜于无）。
+ */
+export function getYtDlpChecksumUrls(): string[] {
+  const official =
+    "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS";
   return [
     official,
     `https://ghfast.top/${official}`,
@@ -243,11 +269,29 @@ export async function installYtDlp(
       process.platform === "win32" ? "yt-dlp.partial.exe" : "yt-dlp.partial",
     );
 
+    // 校验和先取：拿不到也要继续（正需要镜像的网络里官方多半也不通），
+    // 但拿到了就必须对上——「跑起来能打印版本号」拦不住被替换的可执行文件
+    const expectedSha256 = await fetchExpectedSha256(
+      getYtDlpChecksumUrls(),
+      getYtDlpAssetName(),
+    );
+    if (!expectedSha256) {
+      console.warn("[ytdlp] 未能获取官方校验和，本次安装跳过哈希校验");
+    }
+
     const failures: string[] = [];
     for (const url of getYtDlpDownloadUrls()) {
       try {
         console.log(`[ytdlp] 开始下载: ${url}`);
         await downloadToFile(url, tempPath, onProgress);
+        if (expectedSha256) {
+          const actual = await sha256File(tempPath);
+          if (actual !== expectedSha256) {
+            throw new Error(
+              `校验和不匹配（期望 ${expectedSha256.slice(0, 12)}…，实际 ${actual.slice(0, 12)}…）`,
+            );
+          }
+        }
         if (process.platform !== "win32") {
           fs.chmodSync(tempPath, 0o755);
         }

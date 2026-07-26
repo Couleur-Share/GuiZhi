@@ -147,7 +147,7 @@ async function recognizeImages(
       outcome.texts.push(await recognize(image.assetPath, config, signal));
     } catch (error) {
       if (signal?.aborted) {
-        throw new Error("已取消");
+        throw new Error("已取消", { cause: error });
       }
       console.warn(`[import] 第 ${index + 1} 张图 OCR 失败:`, error);
       outcome.failed += 1;
@@ -287,7 +287,7 @@ async function resolveTitle(
     return (await generate(source, config, { signal })) || aweme.title;
   } catch (error) {
     if (signal?.aborted) {
-      throw new Error("已取消");
+      throw new Error("已取消", { cause: error });
     }
     console.warn("[import] 图文 AI 拟题失败，保留文案首行:", error);
     return aweme.title;

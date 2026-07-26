@@ -8,12 +8,15 @@
  *
  * 模型走 mainText 路由（与视频总结同一解析函数，回退 fastText → 默认
  * chat 模型）。未配置模型时调用方静默跳过，只入库原始讨论。
+ *
+ * 顺带在同一次请求里拟标题，但只在原标题说不清内容时（见 needsAiTitle）。
  */
 import {
   chatCompletion,
   type AIChatMessage,
   type AIClientConfig,
 } from "@guizhi/core";
+import { splitTitleFromSummary } from "../media/media-summary";
 
 /**
  * 总结只用得上这三个字段。刚抓下来的 ForumReply 与从已入库正文解析回来的
@@ -53,6 +56,20 @@ const SYSTEM_PROMPT =
   "8. 输出简体中文 Markdown；小标题一律用 ###，不要用 # 或 ##，" +
   "不要 --- 分隔线、表格或代码块；不要输出「讨论总结」这类总标题，" +
   "也不要任何前言或结尾说明。";
+
+/**
+ * 弱标题才追加的拟题协议，编号接着上面的 8 条往下排。
+ * 与视频总结一样塞进同一次请求，不为了一个标题多发一次模型调用。
+ */
+const TITLE_RULE =
+  "9. 这个帖子的标题没说清它在讲什么，请顺便替它拟一个：在上述总结正文之前，" +
+  "第一行以「标题：」开头单独成行，15~30 字，用讨论真正要解决的问题或得出的结论" +
+  "来概括，书面语、不加书名号或引号，之后空一行再开始总结正文。这一行不算前言。";
+
+/** 拟题只加在单发与 reduce 这两处终稿请求上，map 阶段的片段笔记不需要 */
+function buildSystemPrompt(withTitle: boolean): string {
+  return withTitle ? `${SYSTEM_PROMPT}\n${TITLE_RULE}` : SYSTEM_PROMPT;
+}
 
 const MAP_SYSTEM_PROMPT =
   "你是论坛讨论总结助手。下面是某个论坛帖子回复的一个片段，" +
@@ -129,11 +146,53 @@ export function sanitizeForumSummary(raw: string): string {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/** 去掉空白后短于此长度：这么点字描述不了一整帖讨论 */
+const MIN_TITLE_LENGTH = 8;
+/** 剥掉求助套话后仍要剩下的实义长度 */
+const MIN_SUBSTANTIVE_LENGTH = 6;
+/** 接口没返回标题时 v2ex.ts 兜的占位标题 */
+const PLACEHOLDER_TITLE = /^v2ex\s*(?:帖子|主题)\s*\d+$/i;
+/** 求助套话：本身不携带任何信息，剥掉之后剩的才是标题真正说了什么 */
+const FILLER_WORDS =
+  /求助|求推荐|求方案|求教|求指点|求解答|求个|跪求|请教|请问|想问|问一下|问个问题|问问|咨询|有没有人|有人|大家|各位|在线等|万分感谢|谢谢|急|吗|呢|吧/g;
+/** 标点与空白不算实义内容 */
+const NON_SUBSTANTIVE = /[\s\p{P}]/gu;
+
+/**
+ * 判断是否需要让模型重拟标题。
+ *
+ * 论坛标题是人写的，多数情况下就是问题本身，改写只会丢掉可辨识度——所以默认
+ * 沿用原标题，只在标题压根没描述任何东西时才重拟：「求推荐」「问个问题，急」
+ * 这类进了知识库根本认不出是什么，以及抓取兜底的「V2EX 帖子 123456」。
+ *
+ * 判据刻意保守：宁可漏掉几个平淡标题，也不要把「求推荐一个适合小团队的项目
+ * 管理工具」这种本来就说得清的标题改掉。
+ */
+export function needsAiTitle(title: string): boolean {
+  const normalized = title.replace(/\s+/g, " ").trim();
+  if (!normalized || PLACEHOLDER_TITLE.test(normalized)) {
+    return true;
+  }
+  if ([...normalized.replace(/\s+/g, "")].length < MIN_TITLE_LENGTH) {
+    return true;
+  }
+  const substantive = normalized
+    .replace(FILLER_WORDS, "")
+    .replace(NON_SUBSTANTIVE, "");
+  return [...substantive].length < MIN_SUBSTANTIVE_LENGTH;
+}
+
 export interface ForumSummaryInput {
   title: string;
   /** 主楼正文 */
   content: string;
   replies: ForumSummaryReply[];
+}
+
+export interface ForumSummaryResult {
+  summary: string;
+  /** 重拟的标题；原标题够用、或模型没按协议输出时为 null，调用方保留原标题 */
+  title: string | null;
 }
 
 export interface ForumSummaryOptions {
@@ -206,6 +265,15 @@ async function runChat(
   return content;
 }
 
+/** 按是否请求了拟题拆出标题，再清洗总结正文；正文清洗后为空视为没生成 */
+function finalize(raw: string, withTitle: boolean): ForumSummaryResult | null {
+  const { title, body } = withTitle
+    ? splitTitleFromSummary(stripWrappingCodeFence(raw.trim()))
+    : { title: null, body: raw };
+  const summary = sanitizeForumSummary(body);
+  return summary ? { summary, title } : null;
+}
+
 /**
  * 生成讨论总结。没有回复时返回 null——只有主楼的帖子等同于一篇短文，
  * 让「讨论总结」小节空着比硬凑一段废话好。
@@ -214,11 +282,12 @@ export async function generateForumSummary(
   input: ForumSummaryInput,
   config: AIClientConfig,
   options?: ForumSummaryOptions,
-): Promise<string | null> {
+): Promise<ForumSummaryResult | null> {
   if (input.replies.length === 0) {
     return null;
   }
 
+  const withTitle = needsAiTitle(input.title);
   const header = buildHeader(input);
   const replyText = input.replies.map(formatReply).join("\n");
 
@@ -226,7 +295,7 @@ export async function generateForumSummary(
     const content = await runChat(
       config,
       [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: buildSystemPrompt(withTitle) },
         {
           role: "user",
           content: `${header}\n\n以下是全部 ${input.replies.length} 条回复：\n${replyText}`,
@@ -235,7 +304,7 @@ export async function generateForumSummary(
       options,
       "",
     );
-    return sanitizeForumSummary(content) || null;
+    return finalize(content, withTitle);
   }
 
   // map：按回复边界分块提取要点
@@ -275,7 +344,7 @@ export async function generateForumSummary(
   const reduced = await runChat(
     config,
     [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: buildSystemPrompt(withTitle) },
       {
         role: "user",
         content:
@@ -287,5 +356,5 @@ export async function generateForumSummary(
     options,
     "（综合）",
   );
-  return sanitizeForumSummary(reduced) || null;
+  return finalize(reduced, withTitle);
 }

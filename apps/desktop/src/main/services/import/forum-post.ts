@@ -14,9 +14,14 @@ import {
   FORUM_REPLIES_HEADING,
   FORUM_SUMMARY_HEADING,
 } from "@guizhi/shared/utils/forum-note";
+import { appendOriginalTitleNote } from "@guizhi/shared/utils/media-summary";
 import type { AIClientConfig } from "@guizhi/core";
 import type { ExtractedContent } from "./connectors";
-import { generateForumSummary, type ForumSummaryInput } from "./forum-summary";
+import {
+  generateForumSummary,
+  type ForumSummaryInput,
+  type ForumSummaryResult,
+} from "./forum-summary";
 import { fetchV2exThread, type ForumReply, type ForumThread } from "./v2ex";
 import { resolveMediaSummaryConfig } from "../media/media-summary";
 
@@ -40,7 +45,7 @@ export interface ForumPostDeps {
     input: ForumSummaryInput,
     config: AIClientConfig,
     options?: { signal?: AbortSignal },
-  ) => Promise<string | null>;
+  ) => Promise<ForumSummaryResult | null>;
   onStage?: (stage: ImportStage) => void;
 }
 
@@ -104,6 +109,13 @@ function buildRepliesSection(replies: ForumReply[]): string[] {
   return parts;
 }
 
+interface SummarySection {
+  /** 写进正文的段落；总结没生成时是状态注记，或者空 */
+  parts: string[];
+  /** 模型重拟的标题（仅原标题说不清内容时才有），否则 null */
+  title: string | null;
+}
+
 /**
  * 生成讨论总结；未配置模型或生成失败都不阻断采集，
  * 改为在正文里如实交代，原始讨论照常入库。
@@ -112,20 +124,23 @@ async function buildSummarySection(
   thread: ForumThread,
   deps: ForumPostDeps,
   signal?: AbortSignal,
-): Promise<string[]> {
+): Promise<SummarySection> {
   if (thread.replies.length === 0) {
-    return [];
+    return { parts: [], title: null };
   }
 
   const config = (deps.getSummaryConfig ?? resolveMediaSummaryConfig)();
   if (!config) {
-    return ["> 未配置文本模型，讨论总结未生成；原始讨论已完整入库。"];
+    return {
+      parts: ["> 未配置文本模型，讨论总结未生成；原始讨论已完整入库。"],
+      title: null,
+    };
   }
 
   deps.onStage?.("summarizing");
   try {
     const summarize = deps.summarize ?? generateForumSummary;
-    const summary = await summarize(
+    const result = await summarize(
       {
         title: thread.title,
         content: thread.content,
@@ -134,16 +149,22 @@ async function buildSummarySection(
       config,
       { signal },
     );
-    return summary ? [FORUM_SUMMARY_HEADING, summary] : [];
+    return {
+      parts: result ? [FORUM_SUMMARY_HEADING, result.summary] : [],
+      title: result?.title ?? null,
+    };
   } catch (error) {
     if (signal?.aborted) {
-      throw new Error("已取消");
+      throw new Error("已取消", { cause: error });
     }
     console.warn("[import] 论坛讨论总结失败:", error);
     const reason = (
       error instanceof Error ? error.message : String(error)
     ).slice(0, SUMMARY_ERROR_MAX_LENGTH);
-    return [`> 讨论总结生成失败：${reason}。原始讨论已完整入库。`];
+    return {
+      parts: [`> 讨论总结生成失败：${reason}。原始讨论已完整入库。`],
+      title: null,
+    };
   }
 }
 
@@ -178,17 +199,25 @@ export async function extractForumPost(
     };
   }
 
-  const parts = [buildForumMetaBlock(thread)];
-  parts.push(...(await buildSummarySection(thread, deps, signal)));
+  const summarySection = await buildSummarySection(thread, deps, signal);
+  const parts = [buildForumMetaBlock(thread), ...summarySection.parts];
 
   if (thread.content) {
     parts.push(FORUM_BODY_HEADING, thread.content);
   }
   parts.push(...buildRepliesSection(thread.replies));
 
+  let title = thread.title;
+  let content = parts.join("\n\n");
+  // 原标题说不清内容时才换成 AI 拟的，原标题记进元数据引用块（来源 chip 可见，也仍能检索到）
+  if (summarySection.title && summarySection.title !== title) {
+    content = appendOriginalTitleNote(content, title);
+    title = summarySection.title;
+  }
+
   return {
-    title: thread.title,
-    content: parts.join("\n\n"),
+    title,
+    content,
     itemType: "forum",
     sourceUri: thread.webpageUrl,
   };

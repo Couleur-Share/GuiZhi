@@ -8,11 +8,16 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import * as http from "http";
 import * as https from "https";
+import * as nodeNet from "net";
 import os from "os";
 import path from "path";
-import { getHttpRequestAgent } from "../network-proxy";
+import {
+  getHttpRequestAgent,
+  hasAnyProxyConfigured,
+} from "../network-proxy";
 import {
   isBlockedHostname,
+  isPrivateAddress,
   resolvePublicAddress,
   type ResolvedAddress,
 } from "../net-safety";
@@ -46,10 +51,12 @@ export interface FetchHtmlResult {
 /**
  * 校验目标并返回要钉扎的 IP。
  *
- * 走代理时返回 null：目标域名由代理解析，本地解析结果与实际连接无关，
- * 钉扎反而会绕过代理按域名分流的规则。
+ * 走代理时不做 DNS 解析也不钉扎：目标域名由代理解析，本地解析结果与实际
+ * 连接无关，钉扎反而会绕过代理按域名分流的规则。但「不解析域名」不等于
+ * 「什么都不查」——URL 里直接写的字面 IP 与 DNS 无关，必须照常拦下，
+ * 否则配了手动代理之后 http://192.168.1.1/ 和云元数据地址会被原样转发。
  */
-async function assertSafeTarget(
+export async function assertSafeTarget(
   parsed: URL,
   viaProxy: boolean,
 ): Promise<ResolvedAddress | null> {
@@ -60,14 +67,39 @@ async function assertSafeTarget(
   if (isBlockedHostname(host)) {
     throw new Error("不允许访问本地网络地址");
   }
+
+  // 方括号写法的 IPv6 字面量在 URL.hostname 里带着括号
+  const literalHost = host.startsWith("[") && host.endsWith("]")
+    ? host.slice(1, -1)
+    : host;
+  const isLiteralIp = nodeNet.isIP(literalHost) !== 0;
+
   if (viaProxy) {
+    if (isLiteralIp && isPrivateAddress(literalHost)) {
+      throw new Error("不允许访问内网地址");
+    }
     return null;
   }
-  // Clash / Surge 的 fake-ip 池就在 198.18/15，国内用户开着系统代理时
-  // 本地 DNS 拿到的全是这个段；一律拒绝会让网页导入完全不可用。
-  return await resolvePublicAddress(host, {
-    allowProxyCompatibilityAddress: true,
-  });
+
+  // Clash / Surge 的 fake-ip 池就在 198.18/15，本地 DNS 在系统代理下拿到的
+  // 全是这个段；一律拒绝会让网页导入不可用。但这只在确实存在代理配置时
+  // 才该放行——没有代理却解析到 198.18，那就是一个真实的内网地址。
+  try {
+    return await resolvePublicAddress(literalHost, {
+      allowProxyCompatibilityAddress: hasAnyProxyConfigured(),
+    });
+  } catch (error) {
+    // resolvePublicAddress 的消息是英文的，而这里抛出的错误会原样进
+    // 导入任务列表；翻成用户能据此行动的说法
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("internal network") || message.includes("local network")) {
+      throw new Error("不允许访问内网地址", { cause: error });
+    }
+    if (message.includes("resolve")) {
+      throw new Error(`无法解析域名：${literalHost}`, { cause: error });
+    }
+    throw error;
+  }
 }
 
 /**

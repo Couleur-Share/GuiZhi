@@ -32,6 +32,9 @@ export function registerImportIPC(
     (_event, id: string, options?: { forceDuplicate?: boolean }) =>
       service!.queue.retry(id, options),
   );
+  ipcMain.handle(IPC_CHANNELS.IMPORT_REMOVE, (_event, id: string) =>
+    service!.taskDb.remove(id),
+  );
   ipcMain.handle(IPC_CHANNELS.IMPORT_CLEAR_FINISHED, () =>
     service!.taskDb.clearFinished(),
   );

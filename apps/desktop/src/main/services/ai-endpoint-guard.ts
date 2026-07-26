@@ -83,7 +83,7 @@ export function evaluateEndpointAccess(params: {
     return { allowed: false, reason: "无效的接口地址", host: null, isKnown: false };
   }
 
-  let hostname = "";
+  let hostname: string;
   try {
     hostname = new URL(params.url).hostname;
   } catch {

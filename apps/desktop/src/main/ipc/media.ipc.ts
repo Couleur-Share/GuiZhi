@@ -182,7 +182,7 @@ async function regenerateForumSummary(
   }
 
   try {
-    const summary = await generateForumSummary(
+    const result = await generateForumSummary(
       {
         title: item.title,
         // 只喂主楼，别把上一版总结和回复原文重复塞进提示词
@@ -191,14 +191,19 @@ async function regenerateForumSummary(
       },
       config,
     );
-    if (!summary) {
+    if (!result) {
       return { success: false, error: "模型未返回有效的讨论总结" };
     }
-    const updated = items.update(item.id, {
-      content: upsertForumSummarySection(item.content, summary),
-    });
+    const content = upsertForumSummarySection(item.content, result.summary);
+    const patch: { content: string; title?: string } = { content };
+    // 标题仍是那个说不清内容的原标题时，顺手换成模型拟的
+    if (result.title && result.title !== item.title) {
+      patch.content = appendOriginalTitleNote(content, item.title);
+      patch.title = result.title;
+    }
+    const updated = items.update(item.id, patch);
     console.log(
-      `[import] 讨论总结重新生成完成（item=${item.id}，${summary.length} 字）`,
+      `[import] 讨论总结重新生成完成（item=${item.id}，${result.summary.length} 字）`,
     );
     return { success: true, item: updated ?? undefined };
   } catch (error) {

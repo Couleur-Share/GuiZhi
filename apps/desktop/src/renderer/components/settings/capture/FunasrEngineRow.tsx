@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { DownloadIcon, RefreshCwIcon } from "lucide-react";
+import { DownloadIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import type { FunasrInstallProgress, FunasrStatus } from "@guizhi/shared/types";

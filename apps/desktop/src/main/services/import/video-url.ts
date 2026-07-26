@@ -497,7 +497,7 @@ export async function extractVideoUrl(
           );
         } catch (error) {
           if (signal?.aborted) {
-            throw new Error("已取消");
+            throw new Error("已取消", { cause: error });
           }
           console.warn("[import] 文字稿 AI 排版失败，保留原始转写:", error);
         }
@@ -531,7 +531,7 @@ export async function extractVideoUrl(
         aiTitle = result.title;
       } catch (error) {
         if (signal?.aborted) {
-          throw new Error("已取消");
+          throw new Error("已取消", { cause: error });
         }
         console.warn("[import] 视频总结生成失败，保留文字稿:", error);
       }

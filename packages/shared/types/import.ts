@@ -59,6 +59,8 @@ export interface ImportTask {
   /** 去重命中的已有条目 id */
   duplicateItemId?: string | null;
   collectionId?: string | null;
+  /** 入库时要打上的标签（采集弹窗里选的） */
+  tagNames?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -68,6 +70,13 @@ export interface EnqueueImportInput {
   /** 文本内容 / 文件绝对路径 / URL */
   input: string;
   collectionId?: string | null;
+  /**
+   * 入库时直接打上的标签。
+   *
+   * 采集完再回列表里找出来逐条补标签，是整理流程里最费手的一步；
+   * 采集当下就知道这批内容属于什么，让它在这里落地。
+   */
+  tagNames?: string[];
   /** 跳过去重强制创建副本（「仍要创建副本」） */
   forceDuplicate?: boolean;
 }

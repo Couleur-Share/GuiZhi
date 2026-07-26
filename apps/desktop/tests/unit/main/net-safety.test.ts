@@ -49,13 +49,23 @@ describe("isPrivateIPv6", () => {
     "64:ff9b::1",
     "::ffff:127.0.0.1",
     "::ffff:192.168.0.1",
+    // 十六进制写法的内嵌 IPv4：首个 hextet 是 0，所有掩码都不命中，
+    // 不单独解码就会被当成公网地址放行
+    "::7f00:1", // 127.0.0.1（IPv4-compatible，已废弃但栈仍然认）
+    "::c0a8:1", // 192.168.0.1
+    "::a9fe:a9fe", // 169.254.169.254 云元数据
+    "::ffff:0:7f00:1", // 127.0.0.1（IPv4-translated）
+    "::ffff:7f00:1", // 127.0.0.1（映射地址的十六进制写法）
   ])("拦截 %s", (address) => {
     expect(isPrivateIPv6(address)).toBe(true);
   });
 
-  it.each(["2400:cb00::1", "2606:4700::1111"])("放行 %s", (address) => {
-    expect(isPrivateIPv6(address)).toBe(false);
-  });
+  it.each(["2400:cb00::1", "2606:4700::1111", "::0808:0808"])(
+    "放行 %s",
+    (address) => {
+      expect(isPrivateIPv6(address)).toBe(false);
+    },
+  );
 });
 
 describe("isBlockedHostname", () => {
@@ -87,6 +97,9 @@ describe("isForbiddenAIEndpointAddress", () => {
     "fe80::1",
     "ff02::1",
     "::ffff:169.254.169.254",
+    // 兼容写法同样要解开，否则元数据服务可以用它绕过去
+    "::a9fe:a9fe",
+    "::ffff:0:a9fe:a9fe",
   ])("拦截 %s", (address) => {
     expect(isForbiddenAIEndpointAddress(address)).toBe(true);
   });

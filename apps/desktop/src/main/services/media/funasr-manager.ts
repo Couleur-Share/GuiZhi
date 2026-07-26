@@ -15,7 +15,11 @@ import {
   type CoreAIProviderConfig,
 } from "@guizhi/core";
 import type { FunasrInstallProgress, FunasrStatus } from "@guizhi/shared/types";
-import { downloadToFile } from "./tool-download";
+import {
+  downloadToFile,
+  fetchExpectedSha256,
+  sha256File,
+} from "./tool-download";
 import {
   FUNASR_BASE_URL,
   FUNASR_MODEL_ID,
@@ -34,8 +38,12 @@ import {
 } from "./funasr-service";
 
 // python-build-standalone 固定版本（install_only 含 pip，解压即用）
-const PYTHON_DOWNLOAD_OFFICIAL =
-  "https://github.com/astral-sh/python-build-standalone/releases/download/20260610/cpython-3.12.13%2B20260610-x86_64-pc-windows-msvc-install_only.tar.gz";
+const PYTHON_RELEASE_TAG = "20260610";
+/** SHA256SUMS 里的行名用的是 `+` 而不是 URL 里的 %2B */
+const PYTHON_ASSET_NAME =
+  "cpython-3.12.13+20260610-x86_64-pc-windows-msvc-install_only.tar.gz";
+const PYTHON_DOWNLOAD_OFFICIAL = `https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_RELEASE_TAG}/${PYTHON_ASSET_NAME.replace("+", "%2B")}`;
+const PYTHON_CHECKSUM_OFFICIAL = `https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_RELEASE_TAG}/SHA256SUMS`;
 const PIP_INDEX_URL = "https://pypi.tuna.tsinghua.edu.cn/simple";
 const PIP_PACKAGES = [
   "funasr",
@@ -66,6 +74,20 @@ export function getPythonDownloadUrls(
     `https://gh-proxy.com/${PYTHON_DOWNLOAD_OFFICIAL}`,
     `https://hub.gitmirror.com/${PYTHON_DOWNLOAD_OFFICIAL}`,
   ];
+}
+
+/** 官方发布的 SHA256SUMS；优先官方源，镜像只作兜底 */
+export function getPythonChecksumUrls(): string[] {
+  return [
+    PYTHON_CHECKSUM_OFFICIAL,
+    `https://ghfast.top/${PYTHON_CHECKSUM_OFFICIAL}`,
+    `https://gh-proxy.com/${PYTHON_CHECKSUM_OFFICIAL}`,
+    `https://hub.gitmirror.com/${PYTHON_CHECKSUM_OFFICIAL}`,
+  ];
+}
+
+export function getPythonAssetName(): string {
+  return PYTHON_ASSET_NAME;
 }
 
 /** 通用外部命令执行：收集输出、超时终止、失败附错误尾部 */
@@ -253,6 +275,15 @@ export async function installFunasr(
 
     // ── 阶段 1：Python 运行时 ────────────────────────────────────────────
     const tarPath = path.join(paths.root, "python.download.tar.gz");
+    // 运行时来自第三方 GitHub 代理，而解压出来的是要执行的 python.exe；
+    // 校验和从官方源单独取，拿不到才降级（正需要镜像的网络里官方也常不通）
+    const expectedSha256 = await fetchExpectedSha256(
+      getPythonChecksumUrls(),
+      getPythonAssetName(),
+    );
+    if (!expectedSha256) {
+      console.warn("[funasr] 未能获取官方校验和，本次安装跳过哈希校验");
+    }
     const failures: string[] = [];
     let runtimeReady = false;
     for (const url of getPythonDownloadUrls()) {
@@ -270,6 +301,14 @@ export async function installFunasr(
             detail: `${(progress.transferred / (1024 * 1024)).toFixed(1)} MB`,
           });
         });
+        if (expectedSha256) {
+          const actual = await sha256File(tarPath);
+          if (actual !== expectedSha256) {
+            throw new Error(
+              `校验和不匹配（期望 ${expectedSha256.slice(0, 12)}…，实际 ${actual.slice(0, 12)}…）`,
+            );
+          }
+        }
         await runTool("tar", ["-xzf", tarPath, "-C", paths.root], {
           timeoutMs: EXTRACT_TIMEOUT_MS,
         });

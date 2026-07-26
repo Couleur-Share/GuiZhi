@@ -11,6 +11,8 @@ interface ImportState {
   enqueue: (inputs: EnqueueImportInput[]) => Promise<ImportTask[]>;
   cancelTask: (id: string) => Promise<void>;
   retryTask: (id: string, forceDuplicate?: boolean) => Promise<void>;
+  /** 删除单条已结束的任务（失败任务不进「清理已完成」，需要单独的出口） */
+  removeTask: (id: string) => Promise<void>;
   clearFinished: () => Promise<void>;
   /** 订阅主进程任务变更（App 挂载时调用一次） */
   subscribeChanges: () => () => void;
@@ -55,6 +57,11 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       id,
       forceDuplicate !== undefined ? { forceDuplicate } : undefined,
     );
+    await get().fetchTasks();
+  },
+
+  removeTask: async (id) => {
+    await window.api.import.remove(id);
     await get().fetchTasks();
   },
 

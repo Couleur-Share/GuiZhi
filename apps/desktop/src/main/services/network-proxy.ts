@@ -481,3 +481,13 @@ export async function applyNetworkProxySettings(
 export function getActiveNetworkProxySettings(): NetworkProxySettings {
   return activeNetworkProxy;
 }
+
+/**
+ * 是否存在任何形式的代理配置（手动或跟随系统）。
+ *
+ * fake-ip 段（198.18/15）的放行以此为前提：没有代理却解析到这个段，
+ * 那就是一个真实的内网地址，不该当成代理的合成应答放过去。
+ */
+export function hasAnyProxyConfigured(): boolean {
+  return activeNetworkProxy.mode !== "direct";
+}

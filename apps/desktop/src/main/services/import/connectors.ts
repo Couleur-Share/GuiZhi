@@ -176,8 +176,7 @@ async function extractWebpage(
   const { document } = parseHTML(fetched.html);
   const pageTitle = document.querySelector("title")?.textContent?.trim() ?? "";
 
-  let article: { title?: string | null; content?: string | null } | null =
-    null;
+  let article: { title?: string | null; content?: string | null } | null;
   try {
     article = new Readability(document as unknown as Document, {
       charThreshold: 100,

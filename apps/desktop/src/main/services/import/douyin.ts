@@ -277,7 +277,7 @@ export async function downloadDouyinMedia(
 
 /** 从图片地址取扩展名；资产入库要靠它决定文件后缀 */
 export function imageExtensionFromUrl(url: string): string {
-  let extension = "";
+  let extension: string;
   try {
     extension = path.extname(new URL(url).pathname).toLowerCase();
   } catch {

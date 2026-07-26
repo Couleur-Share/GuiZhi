@@ -14,6 +14,8 @@ export const importApi = {
     options?: { forceDuplicate?: boolean },
   ): Promise<ImportTask | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.IMPORT_RETRY, id, options),
+  remove: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMPORT_REMOVE, id),
   clearFinished: (): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.IMPORT_CLEAR_FINISHED),
   selectFiles: (): Promise<string[]> =>

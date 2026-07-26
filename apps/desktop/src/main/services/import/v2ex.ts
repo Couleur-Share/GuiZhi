@@ -56,9 +56,20 @@ export interface ForumThread {
   webpageUrl: string;
 }
 
+/**
+ * 瞬时故障的退避重试间隔（毫秒），长度即额外尝试次数。
+ *
+ * 实际遇到过 Cloudflare 的 522：边缘节点收下了请求，但 V2EX 源站在超时窗口内
+ * 没应答，帖子本身好好的，隔几秒再打就是 200。这类抖动不该让整条采集任务失败，
+ * 更不该让用户自己去点重试。
+ */
+const RETRY_DELAYS_MS = [1_500, 4_000];
+
 export interface V2exDeps {
   /** 测试注入：JSON 抓取 */
   fetchJson?: <T>(url: string, signal?: AbortSignal) => Promise<T>;
+  /** 测试注入：重试退避间隔，传空数组即关闭重试 */
+  retryDelaysMs?: number[];
 }
 
 /** 秒级时间戳转毫秒；缺失或非法时回退到当前时间 */
@@ -74,8 +85,22 @@ function normalizeText(value: string | undefined): string {
 }
 
 /**
+ * 是否值得重来一次。
+ *
+ * 5xx 与连接层故障是对方或链路抖了一下，退避后往往就成了；4xx 不然——
+ * 帖子不存在、限额用尽、被风控拦下，立刻重试只会更快撞上限。
+ */
+function isTransientFailure(message: string): boolean {
+  return (
+    /HTTP 5\d\d/.test(message) ||
+    message === "请求超时" ||
+    message === "连接被中断"
+  );
+}
+
+/**
  * 把接口错误翻译成用户能据此行动的说法。
- * 采集失败的原因最终会显示在导入列表里，「HTTP 403」对用户没有意义。
+ * 采集失败的原因最终会显示在导入列表里，「HTTP 522」对用户没有意义。
  */
 function describeFetchError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -88,24 +113,71 @@ function describeFetchError(error: unknown): string {
   if (message.includes("HTTP 404")) {
     return "帖子不存在或已被删除";
   }
+  const serverError = /HTTP (5\d\d)/.exec(message);
+  if (serverError) {
+    return `V2EX 服务器暂时无响应（HTTP ${serverError[1]}），已自动重试仍未成功，稍后再试`;
+  }
+  if (message === "请求超时") {
+    return "连接 V2EX 超时，已自动重试仍未成功，稍后再试";
+  }
+  if (message === "连接被中断") {
+    return "与 V2EX 的连接被中断，已自动重试仍未成功，稍后再试";
+  }
   return message;
 }
 
+/** 可被取消打断的等待 */
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error("已取消"));
+      return;
+    }
+    let timer: NodeJS.Timeout | undefined;
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error("已取消"));
+    };
+    timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** 发起请求，瞬时故障退避重试；错误一律翻译后再抛给上层 */
 async function request<T>(
   url: string,
   deps: V2exDeps,
   signal?: AbortSignal,
 ): Promise<T> {
   const get = deps.fetchJson ?? fetchJson;
-  try {
-    return await get<T>(url, signal);
-  } catch (error) {
-    const described = describeFetchError(error);
-    if (described === "已取消") {
-      throw error;
+  const delays = deps.retryDelaysMs ?? RETRY_DELAYS_MS;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (attempt > 0) {
+      await wait(delays[attempt - 1], signal);
     }
-    throw new Error(described);
+    try {
+      return await get<T>(url, signal);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === "已取消") {
+        throw error;
+      }
+      if (!isTransientFailure(message)) {
+        throw new Error(describeFetchError(error), { cause: error });
+      }
+      lastError = error;
+      console.warn(
+        `[import] V2EX 接口第 ${attempt + 1} 次请求失败（${message}）`,
+      );
+    }
   }
+
+  throw new Error(describeFetchError(lastError));
 }
 
 /**

@@ -39,7 +39,14 @@ function createPersistence(db: Database.Database): ImportPersistence {
       return byHash?.item_id ?? null;
     },
 
-    saveItem({ extracted, collectionId, sourceKind, normalizedUri, contentHash }) {
+    saveItem({
+      extracted,
+      collectionId,
+      tagNames,
+      sourceKind,
+      normalizedUri,
+      contentHash,
+    }) {
       let itemId = "";
       const run = db.transaction(() => {
         const created = items.create({
@@ -49,6 +56,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
           itemType: extracted.itemType,
           status: "inbox",
           collectionId,
+          tagNames: tagNames.length > 0 ? tagNames : undefined,
         });
         itemId = created.id;
         db.run(

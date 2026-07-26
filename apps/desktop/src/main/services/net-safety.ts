@@ -66,9 +66,20 @@ export function isPrivateIPv6(address: string): boolean {
     return true;
   }
 
+  // 点分写法的映射地址（::ffff:127.0.0.1）。不是合法 IPv4 时不能直接返回
+  // false——Node 会把它规范化成十六进制的 ::ffff:7f00:1，那种形态交给下面处理
   if (normalized.startsWith("::ffff:")) {
     const mappedAddress = normalized.slice("::ffff:".length);
-    return nodeNet.isIP(mappedAddress) === 4 && isPrivateIPv4(mappedAddress);
+    if (nodeNet.isIP(mappedAddress) === 4) {
+      return isPrivateIPv4(mappedAddress);
+    }
+  }
+
+  // 十六进制写法的内嵌 IPv4：`::7f00:1` 展开就是 127.0.0.1，
+  // 而它的首个 hextet 是 0，下面所有掩码都不命中，会被当成公网地址放行
+  const decodedIPv4 = decodeEmbeddedIPv4(normalized, ALL_EMBEDDED_PREFIXES);
+  if (decodedIPv4) {
+    return isPrivateIPv4(decodedIPv4);
   }
 
   // Expand :: into the correct number of zero groups to get all 8 hextets
@@ -135,11 +146,12 @@ export function isForbiddenAIEndpointAddress(address: string): boolean {
     const normalized = address.toLowerCase().split("%")[0];
     if (normalized.startsWith("::ffff:")) {
       const mapped = normalized.slice("::ffff:".length);
-      return (
-        nodeNet.isIP(mapped) === 4 && isForbiddenAIEndpointAddress(mapped)
-      );
+      if (nodeNet.isIP(mapped) === 4) {
+        return isForbiddenAIEndpointAddress(mapped);
+      }
     }
-    const decoded = decodeTrustedCompatibilityIPv6(normalized);
+    // 兼容写法也要解：`::a9fe:a9fe` 展开就是 169.254.169.254（云元数据服务）
+    const decoded = decodeEmbeddedIPv4(normalized, ALL_EMBEDDED_PREFIXES);
     if (decoded) {
       return isForbiddenAIEndpointAddress(decoded);
     }
@@ -192,19 +204,35 @@ function expandIPv6Segments(address: string): string[] | null {
   return segments.map((segment) => segment.padStart(4, "0"));
 }
 
-function decodeTrustedCompatibilityIPv6(address: string): string | null {
+/** ::ffff:a.b.c.d —— IPv4 映射地址 */
+const MAPPED_PREFIX = ["0000", "0000", "0000", "0000", "0000", "ffff"];
+/** ::ffff:0:a.b.c.d —— IPv4 翻译地址（RFC 2765） */
+const TRANSLATED_PREFIX = ["0000", "0000", "0000", "0000", "ffff", "0000"];
+/** ::a.b.c.d —— IPv4 兼容地址，已废弃但栈仍然认，攻击面照旧 */
+const COMPATIBLE_PREFIX = ["0000", "0000", "0000", "0000", "0000", "0000"];
+
+const TRUSTED_COMPATIBILITY_PREFIXES = [MAPPED_PREFIX, TRANSLATED_PREFIX];
+const ALL_EMBEDDED_PREFIXES = [
+  MAPPED_PREFIX,
+  TRANSLATED_PREFIX,
+  COMPATIBLE_PREFIX,
+];
+
+/** 解出 IPv6 里内嵌的 IPv4；前缀不在给定集合内时返回 null */
+function decodeEmbeddedIPv4(
+  address: string,
+  prefixes: string[][],
+): string | null {
   const segments = expandIPv6Segments(address);
   if (!segments) {
     return null;
   }
 
-  const standardMappedPrefix = ["0000", "0000", "0000", "0000", "0000", "ffff"];
-  const translatedPrefix = ["0000", "0000", "0000", "0000", "ffff", "0000"];
   const prefix = segments.slice(0, 6);
-  const hasSupportedPrefix =
-    prefix.every((segment, index) => segment === standardMappedPrefix[index]) ||
-    prefix.every((segment, index) => segment === translatedPrefix[index]);
-  if (!hasSupportedPrefix) {
+  const matched = prefixes.find((candidate) =>
+    prefix.every((segment, index) => segment === candidate[index]),
+  );
+  if (!matched) {
     return null;
   }
 
@@ -214,7 +242,19 @@ function decodeTrustedCompatibilityIPv6(address: string): string | null {
     return null;
   }
 
+  // `::` 与 `::1` 是未指定地址和回环，不是「内嵌 0.0.0.0 / 0.0.0.1 的 IPv4」。
+  // 不排除的话回环会被解成 0.0.0.1，而那个地址在 AI 端点判定里是禁止的——
+  // 本地 Ollama 就连不上了。全零前缀下 high 为 0 的一律不算内嵌 IPv4。
+  if (matched === COMPATIBLE_PREFIX && high === 0) {
+    return null;
+  }
+
   return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+}
+
+/** 代理 fake-ip 的判定只认映射/翻译两种写法（真代理不会回废弃的兼容形式） */
+function decodeTrustedCompatibilityIPv6(address: string): string | null {
+  return decodeEmbeddedIPv4(address, TRUSTED_COMPATIBILITY_PREFIXES);
 }
 
 function isProxyCompatibilityAddress(address: string): boolean {

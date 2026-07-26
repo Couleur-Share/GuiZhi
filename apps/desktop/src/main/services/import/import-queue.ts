@@ -43,6 +43,7 @@ export interface ImportPersistence {
   saveItem(params: {
     extracted: ExtractedContent;
     collectionId: string | null;
+    tagNames: string[];
     sourceKind: ImportTask["sourceKind"];
     normalizedUri: string | null;
     contentHash: string;
@@ -253,6 +254,7 @@ export class ImportQueue {
       const resultItemId = this.persistence.saveItem({
         extracted,
         collectionId: task.collectionId ?? null,
+        tagNames: task.tagNames ?? [],
         sourceKind: task.sourceKind,
         normalizedUri,
         contentHash,
