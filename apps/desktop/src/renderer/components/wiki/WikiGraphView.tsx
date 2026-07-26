@@ -67,8 +67,13 @@ export function WikiGraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
+  // setViewMode("graph") 已经拉过一次，挂载时不必再拉
   useEffect(() => {
-    void loadGraph();
+    if (!graph) {
+      void loadGraph();
+    }
+    // 只在挂载时判断一次，graph 变化不该重新触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadGraph]);
 
   useEffect(() => {
@@ -120,6 +125,15 @@ export function WikiGraphView() {
 
   return (
     <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
+      {graph.totalNodes > graph.nodes.length ? (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg border border-border/70 bg-background/85 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur">
+          {t(
+            "wiki.graphTruncated",
+            "按连接度显示 {{shown}} / {{total}} 个页面",
+            { shown: graph.nodes.length, total: graph.totalNodes },
+          )}
+        </div>
+      ) : null}
       {size.width > 0 && size.height > 0 ? (
         <Suspense
           fallback={

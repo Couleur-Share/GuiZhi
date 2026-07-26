@@ -32,8 +32,14 @@ const WIKI_LINK_REGEX = /\[\[([^[\]]+)\]\]/g;
 /** 连续失败到这个次数后不再自动重试，等素材变化或手动全量重建 */
 const WIKI_COMPILE_MAX_FAILURES = 3;
 /**
+ * 输出上限。一次最多 4 个页面、每页正文上限 1200 字（约 1200 token），
+ * 光正文就能顶到 5000 token，思考类模型还要另算推理消耗——预算给小了，
+ * JSON 会在中途被截断，解析不出页面，整轮编译白跑。
+ */
+const WIKI_COMPILE_MAX_TOKENS = 8192;
+/**
  * 单条目编译的请求超时。全应用最重的一次调用：条目正文 3000 字 + 目录 30 行 +
- * 最多 5 个上下文页（每页正文上限 8000 字），还要生成 2048 token 的 JSON。
+ * 最多 5 个上下文页（每页正文上限 8000 字），还要生成整份 JSON。
  */
 const WIKI_COMPILE_TIMEOUT_MS = 180_000;
 /** 首次重试的退避时长，之后每次 ×4（30 分钟 → 2 小时 → 8 小时） */
@@ -407,11 +413,19 @@ async function compileSingleItem(
   // LLM 生成 + 一次纠错重试（AiNotConfiguredError 等 Provider 级错误向上抛，中止本轮）
   let pages: RawPageDto[] | null = null;
   let model = "";
+  let truncated = false;
   for (let attempt = 0; attempt <= 1; attempt++) {
+    // 截断和格式错误是两种失败，纠错话术不能混：上一次是被 max_tokens 切断的，
+    // 再喊一遍「只输出 JSON」毫无作用。半截 JSON 也不能拼接续写——模型不会
+    // 逐 token 接上，只会重写并漂移，把截断问题变成脏数据问题。
+    // 两个杠杆一起上：抬上限（provider 顶不住会自己 clamp），同时压需求
+    // （少要几个页面是确定生效的那个）。
     const prompt =
       attempt === 0
         ? basePrompt
-        : `${basePrompt}\n\n注意：你上一次的输出无法解析。请严格只输出要求格式的 JSON 对象，不要包含任何其他文字或代码块标记。`;
+        : truncated
+          ? `${basePrompt}\n\n注意：你上一次的输出太长，被截断在半途，JSON 不完整。这次请只输出 1~2 个页面，正文写得更精简，务必让 JSON 完整闭合。`
+          : `${basePrompt}\n\n注意：你上一次的输出无法解析。请严格只输出要求格式的 JSON 对象，不要包含任何其他文字或代码块标记。`;
     const generation = await runScenarioChat(
       "wiki",
       [
@@ -420,12 +434,15 @@ async function compileSingleItem(
       ],
       {
         temperature: 0.2,
-        maxTokens: 2048,
+        maxTokens: truncated
+          ? WIKI_COMPILE_MAX_TOKENS * 2
+          : WIKI_COMPILE_MAX_TOKENS,
         signal,
         timeoutMs: WIKI_COMPILE_TIMEOUT_MS,
       },
     );
     model = generation.model;
+    truncated = generation.finishReason === "length";
     pages = parseWikiResponse(generation.content);
     if (pages && pages.length > 0) {
       break;

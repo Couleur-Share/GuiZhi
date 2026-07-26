@@ -9,11 +9,23 @@ import type {
   WikiIngestion,
   WikiPageDetail,
   WikiPageRevision,
+  WikiSearchHit,
 } from "@guizhi/shared/types";
 
 export const wikiApi = {
   catalog: (): Promise<WikiCatalogEntry[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_CATALOG),
+  search: (query: string, limit: number): Promise<WikiSearchHit[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_SEARCH, query, limit),
+  updatePage: (input: {
+    pageId: string;
+    body: string;
+    linkTargets: string[];
+    releaseToAuto?: boolean;
+  }): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_UPDATE_PAGE, input),
+  deletePage: (pageId: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.WIKI_DELETE_PAGE, pageId),
   getPage: (id: string): Promise<WikiPageDetail | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_GET_PAGE, id),
   applyCompilation: (input: WikiApplyCompilationInput): Promise<void> =>

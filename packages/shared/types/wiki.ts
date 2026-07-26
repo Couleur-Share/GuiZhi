@@ -25,6 +25,13 @@ export interface WikiPage {
   model: string;
   promptVersion: string;
   generatedAt: number;
+  /**
+   * 用户手动改过正文的时刻；非空时编译不再覆盖 body。
+   *
+   * 派生数据纪律的例外：AI 编出来的页面允许人工修正，但修正必须挡得住
+   * 下一轮编译，否则改完等于白改。清空该标记即交回自动编译。
+   */
+  manualEditedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -38,6 +45,14 @@ export interface WikiCatalogEntry {
   summary: string;
   aliasesJson: string | null;
   updatedAt: number;
+}
+
+/** 页面全文检索命中（问答检索用；按 bm25 排序，标题权重最高） */
+export interface WikiSearchHit {
+  id: string;
+  title: string;
+  kind: WikiPageKind;
+  summary: string;
 }
 
 /** 页面来源条目引用（页面 → 原文跳转） */
@@ -111,6 +126,8 @@ export interface WikiGraphLink {
 export interface WikiGraph {
   nodes: WikiGraphNode[];
   links: WikiGraphLink[];
+  /** 库中页面总数；大于 nodes.length 时说明图被截断了 */
+  totalNodes: number;
 }
 
 /** 单条目编译结果落库输入（main 侧单事务写四表） */

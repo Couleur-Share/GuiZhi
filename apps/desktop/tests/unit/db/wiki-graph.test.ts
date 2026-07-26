@@ -75,6 +75,6 @@ describe("WikiDB.getGraph", () => {
   });
 
   it("空库返回空图", () => {
-    expect(wiki.getGraph()).toEqual({ nodes: [], links: [] });
+    expect(wiki.getGraph()).toEqual({ nodes: [], links: [], totalNodes: 0 });
   });
 });

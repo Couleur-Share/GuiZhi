@@ -7,6 +7,8 @@ import type {
   WikiPageRevision,
 } from "@guizhi/shared/types";
 import {
+  buildLinkResolver,
+  cleanWikiLinks,
   compilePendingItems,
   normalizeWikiTitle,
   parseAliases,
@@ -44,6 +46,10 @@ interface WikiState {
   selectPage: (id: string | null) => Promise<void>;
   /** 把当前页回滚到最近一次被覆盖前的内容 */
   restorePreviousRevision: () => Promise<boolean>;
+  /** 手动改写当前页正文；落标记后下一轮编译不再覆盖 */
+  savePageBody: (body: string, releaseToAuto?: boolean) => Promise<boolean>;
+  /** 删除单个页面（清理残留知识不必再清空全库重编） */
+  deletePage: (pageId: string) => Promise<boolean>;
   /** 按 [[链接]] 目标跳转：标题精确匹配优先，其次别名 */
   openByLinkTarget: (target: string) => Promise<boolean>;
   compileNow: () => Promise<void>;
@@ -144,6 +150,38 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       await get().refresh();
     }
     return restored;
+  },
+
+  savePageBody: async (body, releaseToAuto) => {
+    const pageId = get().selectedPageId;
+    if (!pageId) {
+      return false;
+    }
+    // 出链按新正文重建，否则图谱与反向链接停留在改动之前
+    const resolver = buildLinkResolver(get().catalog, []);
+    const { targets } = cleanWikiLinks(body, resolver);
+    const saved = await window.api.wiki.updatePage({
+      pageId,
+      body,
+      linkTargets: targets,
+      releaseToAuto,
+    });
+    if (saved) {
+      await get().selectPage(pageId);
+      await get().refresh();
+    }
+    return saved;
+  },
+
+  deletePage: async (pageId) => {
+    const removed = await window.api.wiki.deletePage(pageId);
+    if (removed) {
+      if (get().selectedPageId === pageId) {
+        set({ selectedPageId: null, pageDetail: null, pageRevisions: [] });
+      }
+      await get().refresh();
+    }
+    return removed;
   },
 
   openByLinkTarget: async (target) => {

@@ -187,6 +187,52 @@ describe("compilePendingItems", () => {
     expect(options.signal).toBe(controller.signal);
   });
 
+  it("上一次被 max_tokens 截断 → 重试抬上限并要求更少页面，而不是再喊一遍格式", async () => {
+    // 半截 JSON 不能拼接续写（模型会重写并漂移），只能丢弃重来；
+    // 而重来时喊「只输出 JSON」对长度问题毫无作用
+    installWikiApi([compilableItem("a")]);
+    runScenarioChat
+      .mockResolvedValueOnce({
+        content: '{"pages":[{"title":"页面一","kind":"topic","summary":"s","body":"正文被切断',
+        model: "test-model",
+        finishReason: "length",
+      })
+      .mockResolvedValueOnce(onePage);
+
+    const result = await compilePendingItems();
+
+    expect(runScenarioChat).toHaveBeenCalledTimes(2);
+    const retryPrompt = runScenarioChat.mock.calls[1][1][1].content;
+    expect(retryPrompt).toContain("被截断");
+    expect(retryPrompt).toContain("1~2 个页面");
+    expect(retryPrompt).not.toContain("无法解析");
+    expect(runScenarioChat.mock.calls[1][2].maxTokens).toBeGreaterThan(
+      runScenarioChat.mock.calls[0][2].maxTokens,
+    );
+    expect(result.compiled).toBe(1);
+  });
+
+  it("输出完整但解析失败 → 重试仍用格式纠错话术", async () => {
+    installWikiApi([compilableItem("a")]);
+    runScenarioChat
+      .mockResolvedValueOnce({
+        content: "抱歉，我不能这样输出。",
+        model: "test-model",
+        finishReason: "stop",
+      })
+      .mockResolvedValueOnce(onePage);
+
+    await compilePendingItems();
+
+    const retryPrompt = runScenarioChat.mock.calls[1][1][1].content;
+    expect(retryPrompt).toContain("无法解析");
+    expect(retryPrompt).not.toContain("被截断");
+    // 输出没到上限，抬预算解决不了问题，不该改动
+    expect(runScenarioChat.mock.calls[1][2].maxTokens).toBe(
+      runScenarioChat.mock.calls[0][2].maxTokens,
+    );
+  });
+
   it("中途取消 → 停在当前条目，已编译的保留，剩余留到下轮", async () => {
     installWikiApi([compilableItem("a"), compilableItem("b")]);
     const controller = new AbortController();
