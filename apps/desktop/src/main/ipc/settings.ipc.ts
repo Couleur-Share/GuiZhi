@@ -97,6 +97,7 @@ const PERSISTED_SETTINGS_KEYS = new Set<string>([
   "backupKeepCount",
   "ytDlpPath",
   "ffmpegPath",
+  "transcribeDiarize",
 ]);
 
 export function isPersistedSettingKey(key: string): boolean {

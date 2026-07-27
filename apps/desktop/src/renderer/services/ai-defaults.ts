@@ -21,7 +21,8 @@ export function hasModelCapability(
   if (
     capability === "embedding" ||
     capability === "rerank" ||
-    capability === "audioTranscription"
+    capability === "audioTranscription" ||
+    capability === "imageGeneration"
   ) {
     return model.capabilities?.[capability] === true;
   }
@@ -42,7 +43,7 @@ export function getModelsByCapability(
 
 /**
  * 路由候选模型：
- * - embedding / visionText 严格按能力过滤；
+ * - embedding / visionText / imageGen 严格按能力过滤；
  * - audioText 转写模型优先，对话模型兜底（中转站模型名无法可靠判定）；
  * - 其余路由为对话模型。
  */
@@ -55,6 +56,9 @@ export function getRouteCandidateModels(
   }
   if (route === "visionText") {
     return getModelsByCapability(aiModels, "vision");
+  }
+  if (route === "imageGen") {
+    return getModelsByCapability(aiModels, "imageGeneration");
   }
   if (route === "audioText") {
     const transcriptionModels = getModelsByCapability(
@@ -83,8 +87,9 @@ function pickRouteModel(
     }
   }
 
-  // audioText 主进程只认显式路由设置，这里不回退，避免 UI 与实际转写行为不一致
-  if (route === "audioText") {
+  // audioText / imageGen 主进程只认显式路由设置，这里同样不回退，
+  // 否则 UI 会显示一个「已配置」而实际调用直接报未配置
+  if (route === "audioText" || route === "imageGen") {
     return null;
   }
 

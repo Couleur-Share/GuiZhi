@@ -46,7 +46,7 @@ import {
   getVideosDir,
 } from "./runtime-paths";
 import { registerAppRuntimeIPC } from "./ipc/app-runtime.ipc";
-import { logStartupEvent, scrubPath } from "./startup-log";
+import { logStartupEvent, scrubPath } from "./diagnostic-log";
 import { openDirectoryPath } from "./shell-open-path";
 import { shouldOpenStartupDevTools } from "./devtools-policy";
 import { resolveLocalMediaProtocolPath } from "./local-media-protocol";
@@ -1029,8 +1029,8 @@ void app.whenReady().then(async () => {
 
     // 启动本地自动备份调度（E2E 环境不做后台备份，避免干扰断言）
     if (!isE2E) {
-      setAutoBackupNotifier((phase) =>
-        sendToMainWindow(IPC_CHANNELS.BACKUP_AUTO_STATUS, phase),
+      setAutoBackupNotifier((phase, message) =>
+        sendToMainWindow(IPC_CHANNELS.BACKUP_AUTO_STATUS, phase, message),
       );
       startBackupScheduler(db);
     }

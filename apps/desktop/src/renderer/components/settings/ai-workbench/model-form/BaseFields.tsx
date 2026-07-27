@@ -11,6 +11,7 @@ import {
   CheckIcon,
   DatabaseIcon,
   EyeIcon,
+  ImageIcon,
   Loader2Icon,
   SparklesIcon,
 } from "lucide-react";
@@ -116,6 +117,7 @@ export function BaseFields({
     embedding: false,
     rerank: false,
     audioTranscription: false,
+    imageGeneration: false,
   };
   const trimmedApiUrl = modelForm.apiUrl.trim();
   const normalizedInput = useMemo(
@@ -397,6 +399,7 @@ export function BaseFields({
                     vision: checked,
                     embedding: false,
                     audioTranscription: false,
+                    imageGeneration: false,
                   },
                 }));
             }}
@@ -419,6 +422,7 @@ export function BaseFields({
                     reasoning: checked,
                     embedding: false,
                     audioTranscription: false,
+                    imageGeneration: false,
                   },
                 }));
             }}
@@ -443,6 +447,7 @@ export function BaseFields({
                     reasoning: checked ? false : prev.capabilities.reasoning,
                     embedding: checked,
                     audioTranscription: false,
+                    imageGeneration: false,
                   },
                 }));
             }}
@@ -467,6 +472,32 @@ export function BaseFields({
                     reasoning: checked ? false : prev.capabilities.reasoning,
                     embedding: false,
                     audioTranscription: checked,
+                    imageGeneration: false,
+                  },
+                }));
+            }}
+          />
+
+          <CapabilityCard
+            checked={capabilities.imageGeneration === true}
+            ariaLabel={t("settings.aiWorkbenchImageGenCapability")}
+            icon={
+              <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            }
+            title={t("settings.aiWorkbenchImageGenCapability")}
+            description={t("settings.aiWorkbenchImageGenCapabilityDesc")}
+            onChange={(checked) => {
+                // 文生图是专用模型：勾选后退出对话能力
+                setModelForm((prev) => ({
+                  ...prev,
+                  capabilities: {
+                    ...prev.capabilities,
+                    chat: !checked,
+                    vision: false,
+                    reasoning: checked ? false : prev.capabilities.reasoning,
+                    embedding: false,
+                    audioTranscription: false,
+                    imageGeneration: checked,
                   },
                 }));
             }}

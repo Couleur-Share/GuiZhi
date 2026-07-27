@@ -48,6 +48,8 @@ export interface ImportConnectorContext {
   getYtDlpPath?: () => string | null;
   /** 设置里配置的 ffmpeg 路径（空表示托管版 / PATH） */
   getFfmpegPath?: () => string | null;
+  /** 导入时是否区分说话人（默认关；仅内置本地引擎支持） */
+  getDiarize?: () => boolean;
   /** 上报当前子阶段：视频链路可跑几十分钟，只报「抓取中」等于没有进度 */
   onStage?: (stage: ImportStage) => void;
 }
@@ -233,6 +235,7 @@ export async function extractContent(
           {
             getYtDlpPath: context?.getYtDlpPath ?? (() => null),
             getFfmpegPath: context?.getFfmpegPath,
+            getDiarize: context?.getDiarize,
             onStage: context?.onStage,
           },
           signal,

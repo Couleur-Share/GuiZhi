@@ -26,6 +26,7 @@ import argparse
 import os
 import re
 import tempfile
+import time
 
 import soundfile as sf
 import uvicorn
@@ -35,6 +36,7 @@ from funasr import AutoModel
 
 CHECKPOINT = "iic/SenseVoiceSmall"
 VAD_CHECKPOINT = "fsmn-vad"
+SPK_CHECKPOINT = "cam++"
 # VAD 单段时长上限（毫秒），与 funasr-server 的取值保持一致
 VAD_MAX_SEGMENT_MS = 30000
 
@@ -54,23 +56,93 @@ def detect_language(raw_text):
     return "unknown"
 
 
-def build_segments(result):
+def sentence_text(sentence):
+    """开了说话人分离时字段名是 sentence，没开时是 text。"""
+    return strip_tags(sentence.get("sentence") or sentence.get("text") or "")
+
+
+def speaker_label(spk):
+    """聚类编号从 0 起，展示给人看的从 1 起。"""
+    try:
+        return "说话人 %d" % (int(spk) + 1)
+    except (TypeError, ValueError):
+        return "说话人 1"
+
+
+def build_segments(result, diarize):
     """把 sentence_info 转成 OpenAI 的 segments（毫秒转秒）。"""
     segments = []
     for index, sentence in enumerate(result.get("sentence_info") or []):
-        text = strip_tags(sentence.get("text", ""))
+        text = sentence_text(sentence)
         if not text:
             continue
-        segments.append(
-            {
-                "id": index,
-                "start": round(sentence.get("start", 0) / 1000, 3),
-                "end": round(sentence.get("end", 0) / 1000, 3),
-                "text": text,
-                "words": [],
-            }
-        )
+        segment = {
+            "id": index,
+            "start": round(sentence.get("start", 0) / 1000, 3),
+            "end": round(sentence.get("end", 0) / 1000, 3),
+            "text": text,
+            "words": [],
+        }
+        if diarize and sentence.get("spk") is not None:
+            segment["speaker"] = speaker_label(sentence.get("spk"))
+        segments.append(segment)
     return segments
+
+
+def build_diarized_text(result):
+    """按说话人把相邻分段并成对话体。
+
+    VAD 是按停顿切的，一段独白本来就会切成十几条；不按说话人合并的话，
+    正文会碎成几十行「说话人 1：半句话」。
+    """
+    lines = []
+    current = None
+    buffer = []
+    for sentence in result.get("sentence_info") or []:
+        text = sentence_text(sentence)
+        if not text:
+            continue
+        spk = sentence.get("spk")
+        if buffer and spk != current:
+            lines.append("%s：%s" % (speaker_label(current), "".join(buffer)))
+            buffer = []
+        current = spk
+        buffer.append(text)
+    if buffer:
+        lines.append("%s：%s" % (speaker_label(current), "".join(buffer)))
+    return "\\n\\n".join(lines)
+
+
+def resolve_ncpu():
+    """torch 线程数。
+
+    funasr 默认 4，而 CPU 上它把批处理整个关掉了（auto_model.py 里
+    device == "cpu" 时直接把 batch_size 置 0），每个 VAD 段单独前向，
+    只能靠线程数要速度。实测 301 秒音频：4 线程 14.6s、12 线程 12.6s、16 线程 10.8s，
+    带说话人分离时 4 线程 30.3s、12 线程 26.1s。
+    收益有限（延迟受限，不是吞吐受限），所以不把机器占满——留出余量，
+    转写跑几分钟期间整台机器不该卡。
+    """
+    total = os.cpu_count() or 8
+    return min(max(total // 2, 4), 12)
+
+
+def make_progress_reporter():
+    """每处理完一段就往 stdout 打一次心跳，托管进程据此判断服务是否还在动。
+
+    funasr 的 progress_callback 在 VAD 路径下 total 恒为 1（每段单独成批），
+    给不出分母，所以这里只做心跳不做百分比——写死的分母只会骗人。
+    节流到最多每秒一条：一小时的音频有几百段，全打会把日志尾巴冲掉。
+    """
+    last = [0.0]
+
+    def report(current, total):
+        now = time.time()
+        if now - last[0] >= 1.0:
+            last[0] = now
+            print("[guizhi-asr] tick", flush=True)
+
+    return report
 
 
 def probe_duration(audio_path):
@@ -83,18 +155,39 @@ def probe_duration(audio_path):
 def create_app(model_name, device):
     app = FastAPI(title="GuiZhi Transcription Server")
 
+    # 说话人模型不能常驻：AutoModel 只要带了 spk_model，每次推理都会对每个
+    # VAD 子段跑一遍声纹提取（funasr 只判模型在不在，return_spk_res 只管
+    # 最后输不输出标签），实测 28 秒音频多花约 2.6 秒且随时长线性增长。
+    # 所以按请求切换，模式变了就重建（模型文件已在本地缓存，重载约 6.5 秒）。
+    state = {"model": None, "diarize": None}
+
+    def ensure_model(diarize):
+        # 端点是 async 且 generate() 是阻塞调用，请求实际被事件循环串行化，
+        # 这里不会有并发重建的竞争
+        if state["model"] is None or state["diarize"] != diarize:
+            print(
+                "[guizhi-asr] loading %s on %s (diarize=%s)"
+                % (CHECKPOINT, device, diarize),
+                flush=True,
+            )
+            kwargs = {
+                "model": CHECKPOINT,
+                "vad_model": VAD_CHECKPOINT,
+                "vad_kwargs": {"max_single_segment_time": VAD_MAX_SEGMENT_MS},
+                "device": device,
+                "ncpu": resolve_ncpu(),
+                "disable_update": True,
+            }
+            if diarize:
+                kwargs["spk_model"] = SPK_CHECKPOINT
+            state["model"] = AutoModel(**kwargs)
+            state["diarize"] = diarize
+            print("[guizhi-asr] model ready", flush=True)
+        return state["model"]
+
     # 在 uvicorn 起监听之前把模型加载完：调用方以 /v1/models 可达作为
     # 「服务就绪」的判据，端口先开会让首次转写撞上模型加载。
-    print("[guizhi-asr] loading %s on %s" % (CHECKPOINT, device), flush=True)
-    # 不叫 model：转写端点的表单字段按 OpenAI 协议就叫 model，同名会遮蔽它
-    asr_model = AutoModel(
-        model=CHECKPOINT,
-        vad_model=VAD_CHECKPOINT,
-        vad_kwargs={"max_single_segment_time": VAD_MAX_SEGMENT_MS},
-        device=device,
-        disable_update=True,
-    )
-    print("[guizhi-asr] model ready", flush=True)
+    ensure_model(False)
 
     @app.get("/v1/models")
     async def list_models():
@@ -108,11 +201,14 @@ def create_app(model_name, device):
         model: str = Form(default=""),
         language: str = Form(default=""),
         response_format: str = Form(default="json"),
+        diarize: str = Form(default=""),
     ):
         if model and model != model_name:
             raise HTTPException(
                 400, "Unknown model '%s', expected '%s'" % (model, model_name)
             )
+        want_diarize = diarize.strip().lower() in ("1", "true", "yes")
+        asr_model = ensure_model(want_diarize)
 
         suffix = os.path.splitext(file.filename or "")[1] or ".wav"
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -127,7 +223,9 @@ def create_app(model_name, device):
             }
             if language:
                 kwargs["language"] = language
-            results = asr_model.generate(**kwargs)
+            results = asr_model.generate(
+                progress_callback=make_progress_reporter(), **kwargs
+            )
             duration = probe_duration(tmp_path)
         finally:
             os.unlink(tmp_path)
@@ -135,7 +233,8 @@ def create_app(model_name, device):
         # 静音样本（连通性测试用）会走到这里：results 为空或 text 为空串
         result = results[0] if results else {}
         raw_text = result.get("text", "")
-        text = strip_tags(raw_text)
+        # 分离模式下正文改成对话体，三种 response_format 保持一致
+        text = build_diarized_text(result) if want_diarize else strip_tags(raw_text)
 
         if response_format == "text":
             return PlainTextResponse(text)
@@ -146,7 +245,7 @@ def create_app(model_name, device):
                     "language": detect_language(raw_text),
                     "duration": duration,
                     "text": text,
-                    "segments": build_segments(result),
+                    "segments": build_segments(result, want_diarize),
                 }
             )
         return JSONResponse({"text": text})

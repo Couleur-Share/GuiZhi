@@ -54,6 +54,7 @@ function createDefaultWorkspaceValues() {
     backupKeepCount: 10,
     ytDlpPath: "",
     ffmpegPath: "",
+    transcribeDiarize: false,
     networkProxy: { ...DEFAULT_NETWORK_PROXY_SETTINGS },
   } satisfies Partial<SettingsValues>;
 }

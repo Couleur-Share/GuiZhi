@@ -181,7 +181,12 @@ describe("compilePendingItems", () => {
 
     const result = await compilePendingItems(undefined, controller.signal);
 
-    expect(result).toEqual({ compiled: 1, pending: 1, skipped: 0 });
+    expect(result).toEqual({
+      compiled: 1,
+      pending: 1,
+      skipped: 0,
+      failures: [],
+    });
     const options = runScenarioChat.mock.calls[0][2];
     expect(options.timeoutMs).toBeGreaterThan(30_000);
     expect(options.signal).toBe(controller.signal);
@@ -244,7 +249,48 @@ describe("compilePendingItems", () => {
     const result = await compilePendingItems(undefined, controller.signal);
 
     expect(runScenarioChat).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ compiled: 1, pending: 2, skipped: 0 });
+    expect(result).toEqual({
+      compiled: 1,
+      pending: 2,
+      skipped: 0,
+      failures: [],
+    });
+  });
+
+  /**
+   * 只回一个 skipped 计数的话，界面上就是「编译完成（1/2）」，
+   * 用户得自己做减法，而且完全不知道那一条为什么没编出来。
+   */
+  it("条目级失败带回原因：格式错与被截断要分得开", async () => {
+    installWikiApi([compilableItem("a")]);
+    runScenarioChat.mockResolvedValue({
+      content: "抱歉，我不能这样输出。",
+      model: "test-model",
+      finishReason: "stop",
+    });
+
+    const result = await compilePendingItems();
+
+    expect(result.compiled).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(result.failures).toEqual([
+      { title: "条目a", reason: "模型输出不是可解析的 JSON" },
+    ]);
+  });
+
+  it("被 max_tokens 截断的失败原因指向长度而不是格式", async () => {
+    installWikiApi([compilableItem("a")]);
+    runScenarioChat.mockResolvedValue({
+      content: '{"pages":[{"title":"页面一","kind":"topic","summary":"s","body":"被切断',
+      model: "test-model",
+      finishReason: "length",
+    });
+
+    const result = await compilePendingItems();
+
+    expect(result.failures).toEqual([
+      { title: "条目a", reason: "模型输出被 max_tokens 截断，JSON 不完整" },
+    ]);
   });
 });
 

@@ -60,6 +60,7 @@ export function normalizeAIModelCapabilities(
       embedding: false,
       rerank: false,
       audioTranscription: false,
+      imageGeneration: false,
     };
   }
 
@@ -76,6 +77,7 @@ export function normalizeAIModelCapabilities(
     embedding: capabilities.embedding === true,
     rerank: capabilities.rerank === true,
     audioTranscription: capabilities.audioTranscription === true,
+    imageGeneration: capabilities.imageGeneration === true,
   };
 }
 
@@ -168,7 +170,8 @@ function normalizeModelRoute(value: unknown): AIModelRoute | null {
     value === "fastText" ||
     value === "visionText" ||
     value === "embedding" ||
-    value === "audioText"
+    value === "audioText" ||
+    value === "imageGen"
     ? value
     : null;
 }

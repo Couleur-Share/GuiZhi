@@ -12,6 +12,8 @@ import type {
   Tag,
   UpdateKnowledgeItemInput,
 } from "@guizhi/shared/types";
+import { runGuardedMutation } from "./operation-error.store";
+import { describeLoadError } from "./load-error";
 import { useSettingsStore } from "./settings.store";
 import { useTagStore } from "./tag.store";
 
@@ -90,6 +92,8 @@ interface KnowledgeState {
   page: number;
   pageSize: number;
   isLoading: boolean;
+  /** 列表读取失败的原因；为空表示读取正常（列表真的是空的） */
+  loadError: string | null;
   // ── 计数 ──
   counts: KnowledgeCounts | null;
   // ── 详情 ──
@@ -148,7 +152,8 @@ interface KnowledgeState {
   setStatus: (ids: string[], status: KnowledgeItemStatus) => Promise<void>;
   toggleFavorite: (id: string) => Promise<void>;
   togglePinned: (id: string) => Promise<void>;
-  moveToTrash: (ids: string[]) => Promise<void>;
+  /** 返回是否移动成功；调用方据此决定要不要弹撤销提示 */
+  moveToTrash: (ids: string[]) => Promise<boolean>;
   restoreItems: (ids: string[]) => Promise<void>;
   deleteForever: (ids: string[]) => Promise<void>;
   emptyTrash: () => Promise<void>;
@@ -299,6 +304,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
     isLoading: false,
+    loadError: null,
     counts: null,
     selectedId: null,
     selectedItem: null,
@@ -427,16 +433,22 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (ids.length === 0) {
         return;
       }
-      await window.api.knowledge.bulkUpdate(ids, patch);
-      await get().refreshAll();
-      // 可能建了新标签，侧栏标签列表要跟上
-      if (patch.addTagNames?.length) {
-        await useTagStore.getState().fetchTags();
-      }
-      const { selectedId } = get();
-      if (selectedId && ids.includes(selectedId)) {
-        await get().selectItem(selectedId);
-      }
+      await runGuardedMutation(
+        "library.actionBulkUpdate",
+        "批量更新",
+        async () => {
+          await window.api.knowledge.bulkUpdate(ids, patch);
+          await get().refreshAll();
+          // 可能建了新标签，侧栏标签列表要跟上
+          if (patch.addTagNames?.length) {
+            await useTagStore.getState().fetchTags();
+          }
+          const { selectedId } = get();
+          if (selectedId && ids.includes(selectedId)) {
+            await get().selectItem(selectedId);
+          }
+        },
+      );
     },
 
     bulkMoveToCollection: async (ids, collectionId) => {
@@ -445,7 +457,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
 
     fetchList: async () => {
       const requestId = ++listRequestSeq;
-      set({ isLoading: true });
+      set({ isLoading: true, loadError: null });
       try {
         const result = await window.api.knowledge.list(buildQuery());
         // 快速切换范围时，先发出的慢请求可能后到；只认最后一次
@@ -475,6 +487,10 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         }));
       } catch (error) {
         console.error("加载知识条目列表失败:", error);
+        // 不记下来的话，读失败会被渲染成「暂无条目」，用户以为条目真没了
+        if (requestId === listRequestSeq) {
+          set({ loadError: describeLoadError(error) });
+        }
       } finally {
         // 只有最后一次请求负责收起加载态，避免先返回的请求提前关掉 Spinner
         if (requestId === listRequestSeq) {
@@ -579,64 +595,101 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     setItemTags: async (id, tagNames) => {
-      const updated = await window.api.knowledge.update(id, { tagNames });
-      if (!updated) {
-        return;
-      }
-      applyItemToList(updated);
-      if (get().selectedId === id) {
-        set({ selectedItem: updated });
-      }
-      // 可能新建了标签，侧栏的标签列表与计数都要跟上
-      await useTagStore.getState().fetchTags();
-      await get().refreshCounts();
+      await runGuardedMutation(
+        "library.actionSetTags",
+        "更新标签",
+        async () => {
+          const updated = await window.api.knowledge.update(id, { tagNames });
+          if (!updated) {
+            return;
+          }
+          applyItemToList(updated);
+          if (get().selectedId === id) {
+            set({ selectedItem: updated });
+          }
+          // 可能新建了标签，侧栏的标签列表与计数都要跟上
+          await useTagStore.getState().fetchTags();
+          await get().refreshCounts();
+        },
+      );
     },
 
     setStatus: async (ids, status) => {
-      await window.api.knowledge.setStatus(ids, status);
-      const { selectedId } = get();
-      await get().refreshAll();
-      if (selectedId && ids.includes(selectedId)) {
-        await get().selectItem(selectedId);
-      }
+      await runGuardedMutation(
+        "library.actionSetStatus",
+        "更新状态",
+        async () => {
+          await window.api.knowledge.setStatus(ids, status);
+          const { selectedId } = get();
+          await get().refreshAll();
+          if (selectedId && ids.includes(selectedId)) {
+            await get().selectItem(selectedId);
+          }
+        },
+      );
     },
 
     toggleFavorite: async (id) => {
-      await toggleFlag(id, "isFavorite");
+      await runGuardedMutation("library.actionSetFlag", "更新标记", () =>
+        toggleFlag(id, "isFavorite"),
+      );
     },
 
     togglePinned: async (id) => {
-      await toggleFlag(id, "isPinned");
+      await runGuardedMutation("library.actionSetFlag", "更新标记", () =>
+        toggleFlag(id, "isPinned"),
+      );
     },
 
-    moveToTrash: async (ids) => {
-      await window.api.knowledge.moveToTrash(ids);
-      if (ids.includes(get().selectedId ?? "")) {
-        set({ selectedId: null, selectedItem: null });
-      }
-      await get().refreshAll();
-    },
+    // 返回是否真的移动成功：调用方据此决定要不要弹「已移到回收站」的撤销提示，
+    // 否则删失败了还会弹一句成功文案，用户以为删掉了
+    moveToTrash: async (ids) =>
+      runGuardedMutation(
+        "library.actionMoveToTrash",
+        "移到回收站",
+        async () => {
+          await window.api.knowledge.moveToTrash(ids);
+          if (ids.includes(get().selectedId ?? "")) {
+            set({ selectedId: null, selectedItem: null });
+          }
+          await get().refreshAll();
+        },
+      ),
 
     restoreItems: async (ids) => {
-      await window.api.knowledge.restore(ids);
-      if (ids.includes(get().selectedId ?? "")) {
-        set({ selectedId: null, selectedItem: null });
-      }
-      await get().refreshAll();
+      await runGuardedMutation("library.actionRestore", "恢复条目", async () => {
+        await window.api.knowledge.restore(ids);
+        if (ids.includes(get().selectedId ?? "")) {
+          set({ selectedId: null, selectedItem: null });
+        }
+        await get().refreshAll();
+      });
     },
 
     deleteForever: async (ids) => {
-      await window.api.knowledge.deleteForever(ids);
-      if (ids.includes(get().selectedId ?? "")) {
-        set({ selectedId: null, selectedItem: null });
-      }
-      await get().refreshAll();
+      await runGuardedMutation(
+        "library.actionDeleteForever",
+        "彻底删除",
+        async () => {
+          await window.api.knowledge.deleteForever(ids);
+          if (ids.includes(get().selectedId ?? "")) {
+            set({ selectedId: null, selectedItem: null });
+          }
+          await get().refreshAll();
+        },
+      );
     },
 
     emptyTrash: async () => {
-      await window.api.knowledge.emptyTrash();
-      set({ selectedId: null, selectedItem: null });
-      await get().refreshAll();
+      await runGuardedMutation(
+        "library.actionEmptyTrash",
+        "清空回收站",
+        async () => {
+          await window.api.knowledge.emptyTrash();
+          set({ selectedId: null, selectedItem: null });
+          await get().refreshAll();
+        },
+      );
     },
   };
 });

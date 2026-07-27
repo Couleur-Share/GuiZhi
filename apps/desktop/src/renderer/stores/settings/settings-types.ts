@@ -22,7 +22,8 @@ export type AIModelRoute =
   | "fastText"
   | "visionText"
   | "embedding"
-  | "audioText";
+  | "audioText"
+  | "imageGen";
 export type ModelRouteDefaults = Partial<Record<AIModelRoute, string>>;
 
 export interface AIModelCapabilities {
@@ -34,6 +35,7 @@ export interface AIModelCapabilities {
   embedding?: boolean;
   rerank?: boolean;
   audioTranscription?: boolean;
+  imageGeneration?: boolean;
 }
 
 export interface ChatModelParams {
@@ -114,6 +116,8 @@ export interface SettingsState {
   ytDlpPath: string;
   /** ffmpeg 可执行文件路径（空 = 托管版 / 系统 PATH） */
   ffmpegPath: string;
+  /** 导入在线视频时区分说话人（仅内置本地引擎支持，会让转写慢一倍） */
+  transcribeDiarize: boolean;
   aiProvider: string;
   aiApiProtocol: AIProtocol;
   aiApiKey: string;
@@ -158,6 +162,7 @@ export interface SettingsState {
   setBackupKeepCount: (count: number) => void;
   setYtDlpPath: (path: string) => void;
   setFfmpegPath: (path: string) => void;
+  setTranscribeDiarize: (enabled: boolean) => void;
   setAiProvider: (provider: string) => void;
   setAiApiProtocol: (protocol: AIProtocol) => void;
   setAiApiKey: (key: string) => void;

@@ -1,6 +1,46 @@
 import { create } from "zustand";
 import type { EnqueueImportInput, ImportTask } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "./knowledge.store";
+import {
+  reportOperationError,
+  runGuardedMutation,
+} from "./operation-error.store";
+import { describeLoadError } from "./load-error";
+
+/**
+ * 批量操作逐条独立执行。
+ *
+ * 此前是一个裸 for 循环：选中 20 条点「重试失败」，第 3 条抛异常，
+ * 后 17 条一声不响地不执行，用户还以为都重试了。改成失败只记账、不中断，
+ * 结束后一次性把逐条原因报出来。
+ */
+async function runTaskBatch(
+  get: () => ImportState,
+  ids: string[],
+  actionKey: string,
+  actionFallback: string,
+  run: (id: string) => Promise<unknown>,
+): Promise<void> {
+  const failures: string[] = [];
+  for (const id of ids) {
+    try {
+      await run(id);
+    } catch (error) {
+      const name =
+        get().tasks.find((task) => task.id === id)?.displayName ?? id;
+      failures.push(
+        `${name}：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  if (failures.length > 0) {
+    reportOperationError(
+      actionKey,
+      actionFallback,
+      new Error(failures.join("\n")),
+    );
+  }
+}
 
 /** 侧栏筛选组的取值；active 合并 pending 与 processing */
 export type ImportFilter =
@@ -22,6 +62,8 @@ interface ImportState {
    * 区分这两者：否则空队列时会先铺一整屏引导页，再被列表换掉。
    */
   hasLoaded: boolean;
+  /** 队列读取失败的原因；为空表示读取正常（队列真的是空的） */
+  loadError: string | null;
   /** 进行中任务数（rail 角标） */
   activeCount: number;
   filter: ImportFilter;
@@ -121,6 +163,7 @@ export function filterTasks(
 export const useImportStore = create<ImportState>()((set, get) => ({
   tasks: [],
   hasLoaded: false,
+  loadError: null,
   activeCount: 0,
   filter: "all",
   query: "",
@@ -161,6 +204,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   clearSelection: () => set({ selectionIds: [] }),
 
   fetchTasks: async () => {
+    set({ loadError: null });
     try {
       const tasks = await window.api.import.list();
       const alive = new Set(tasks.map((task) => task.id));
@@ -172,6 +216,8 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       }));
     } catch (error) {
       console.error("加载导入任务失败:", error);
+      // 不记下来就会铺出「还没有导入任务」的新手引导页，掩盖了读取失败
+      set({ loadError: describeLoadError(error) });
     } finally {
       // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
       set({ hasLoaded: true });
@@ -185,50 +231,62 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   cancelTask: async (id) => {
-    await window.api.import.cancel(id);
-    await get().fetchTasks();
+    await runGuardedMutation("imports.actionCancel", "取消任务", async () => {
+      await window.api.import.cancel(id);
+      await get().fetchTasks();
+    });
   },
 
   retryTask: async (id, forceDuplicate) => {
-    await window.api.import.retry(
-      id,
-      forceDuplicate !== undefined ? { forceDuplicate } : undefined,
-    );
-    await get().fetchTasks();
+    await runGuardedMutation("imports.actionRetry", "重试任务", async () => {
+      await window.api.import.retry(
+        id,
+        forceDuplicate !== undefined ? { forceDuplicate } : undefined,
+      );
+      await get().fetchTasks();
+    });
   },
 
   removeTask: async (id) => {
-    await window.api.import.remove(id);
-    await get().fetchTasks();
+    await runGuardedMutation("imports.actionRemove", "移除任务", async () => {
+      await window.api.import.remove(id);
+      await get().fetchTasks();
+    });
   },
 
   cancelTasks: async (ids) => {
-    for (const id of ids) {
-      await window.api.import.cancel(id);
-    }
+    await runTaskBatch(get, ids, "imports.actionCancel", "取消任务", (id) =>
+      window.api.import.cancel(id),
+    );
     set({ selectionIds: [] });
     await get().fetchTasks();
   },
 
   retryTasks: async (ids) => {
-    for (const id of ids) {
-      await window.api.import.retry(id);
-    }
+    await runTaskBatch(get, ids, "imports.actionRetry", "重试任务", (id) =>
+      window.api.import.retry(id),
+    );
     set({ selectionIds: [] });
     await get().fetchTasks();
   },
 
   removeTasks: async (ids) => {
-    for (const id of ids) {
-      await window.api.import.remove(id);
-    }
+    await runTaskBatch(get, ids, "imports.actionRemove", "移除任务", (id) =>
+      window.api.import.remove(id),
+    );
     set({ selectionIds: [] });
     await get().fetchTasks();
   },
 
   clearFinished: async () => {
-    await window.api.import.clearFinished();
-    await get().fetchTasks();
+    await runGuardedMutation(
+      "imports.actionClearFinished",
+      "清理已完成任务",
+      async () => {
+        await window.api.import.clearFinished();
+        await get().fetchTasks();
+      },
+    );
   },
 
   subscribeChanges: () => {

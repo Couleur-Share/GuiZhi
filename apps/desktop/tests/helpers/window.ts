@@ -63,6 +63,10 @@ export function createWindowApiMock(overrides?: DeepPartial<MockRecord>) {
         httpStream: vi.fn(),
         cancelHttpStream: vi.fn(),
       },
+      media: {
+        // 详情页挂载时就会问一次能力，缺了它组件测试会直接炸
+        capabilities: vi.fn().mockResolvedValue({ diarization: false }),
+      },
       on: vi.fn(),
       off: vi.fn(),
     },

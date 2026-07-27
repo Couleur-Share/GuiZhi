@@ -8,14 +8,21 @@ import {
   ScanTextIcon,
   ScrollTextIcon,
   SparklesIcon,
+  UsersIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeItem } from "@guizhi/shared/types";
+import type { TFunction } from "i18next";
+import type {
+  KnowledgeItem,
+  TranscribeProgress,
+  TranscribeStage,
+} from "@guizhi/shared/types";
 import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
 import { splitImageNoteSections } from "@guizhi/shared/utils/image-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ImageGallery } from "./ImageGallery";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
@@ -262,7 +269,18 @@ export function ContentPanel({
               {transcriptActions.transcript ? (
                 <ToolButton
                   onClick={() => void transcriptActions.format()}
-                  label={t("library.transcriptFormat", "AI 排版")}
+                  label={
+                    transcriptActions.formatProgress
+                      ? t(
+                          "library.transcriptFormatProgress",
+                          "正在排版…已完成 {{current}}/{{total}} 块",
+                          {
+                            current: transcriptActions.formatProgress.current,
+                            total: transcriptActions.formatProgress.total,
+                          },
+                        )
+                      : t("library.transcriptFormat", "AI 排版")
+                  }
                   busy={transcriptActions.isFormatting}
                   disabled={transcriptActions.isRunning}
                 >
@@ -271,13 +289,33 @@ export function ContentPanel({
               ) : null}
               {transcriptActions.canTranscribe &&
               transcriptActions.transcript ? (
-                <ToolButton
-                  onClick={() => void transcriptActions.transcribe()}
-                  label={t("library.transcribeRegenerate", "重新生成文字稿")}
-                  busy={transcriptActions.isRunning}
-                >
-                  <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                </ToolButton>
+                <>
+                  {transcriptActions.canDiarize ? (
+                    <ToolButton
+                      onClick={() =>
+                        void transcriptActions.transcribe({ diarize: true })
+                      }
+                      label={t(
+                        "library.transcribeDiarize",
+                        "重新生成并区分说话人",
+                      )}
+                      // 只有被点的那个转圈，其余置灰——两个都转会让人以为
+                      // 整个界面都在忙
+                      busy={transcriptActions.runningAction === "diarize"}
+                      disabled={transcriptActions.isRunning}
+                    >
+                      <UsersIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    </ToolButton>
+                  ) : null}
+                  <ToolButton
+                    onClick={() => void transcriptActions.transcribe()}
+                    label={t("library.transcribeRegenerate", "重新生成文字稿")}
+                    busy={transcriptActions.runningAction === "transcribe"}
+                    disabled={transcriptActions.isRunning}
+                  >
+                    <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  </ToolButton>
+                </>
               ) : null}
             </>
           )}
@@ -313,8 +351,61 @@ export function ContentPanel({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={transcriptActions.pendingLongFormat !== null}
+        onClose={transcriptActions.cancelLongFormat}
+        onConfirm={() => void transcriptActions.confirmLongFormat()}
+        title={t("library.transcriptFormat", "AI 排版")}
+        message={t(
+          "library.transcriptFormatLongConfirm",
+          "这份文字稿约 {{chars}} 字，排版会拆成 {{chunks}} 次请求串行发给模型，可能需要几分钟并产生相应用量。继续？",
+          transcriptActions.pendingLongFormat ?? { chars: 0, chunks: 0 },
+        )}
+        confirmText={t("common.confirm", "确认")}
+        cancelText={t("common.cancel", "取消")}
+      />
     </div>
   );
+}
+
+const STAGE_LABELS: Record<TranscribeStage, { key: string; text: string }> = {
+  transcribing: { key: "library.stageTranscribing", text: "正在转写" },
+  formatting: { key: "library.stageFormatting", text: "正在排版文字稿" },
+  summarizing: { key: "library.stageSummarizing", text: "正在生成总结" },
+};
+
+/**
+ * 只报当前阶段与已用时长，不报百分比——funasr 给不出可用的分母。
+ * 阶段是必须的：三步都以分钟计，光说「正在转写」会让后两步看起来像卡住。
+ */
+function transcribeStatusText(
+  t: TFunction,
+  progress: TranscribeProgress | null,
+): string {
+  if (!progress) {
+    return t("library.transcribeRunning", "正在转写（可能需要几分钟）…");
+  }
+  const label = STAGE_LABELS[progress.stage] ?? STAGE_LABELS.transcribing;
+  const stage = t(label.key, label.text);
+  const elapsed = formatClock(progress.elapsedMs);
+  // 心跳停了一分钟以上才值得说，正常间隔本来就是秒级
+  if (progress.stalledMs !== undefined && progress.stalledMs >= 60_000) {
+    return t(
+      "library.transcribeStalled",
+      "{{stage}}…已用 {{elapsed}}，但已有 {{stalled}} 没有进展",
+      { stage, elapsed, stalled: formatClock(progress.stalledMs) },
+    );
+  }
+  return t("library.transcribeElapsed", "{{stage}}…已用 {{elapsed}}", {
+    stage,
+    elapsed,
+  });
+}
+
+function formatClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptActions> }) {
@@ -341,7 +432,7 @@ function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptA
             <AudioLinesIcon className="h-3.5 w-3.5" aria-hidden="true" />
           )}
           {actions.isRunning
-            ? t("library.transcribeRunning", "正在转写（可能需要几分钟）…")
+            ? transcribeStatusText(t, actions.transcribeProgress)
             : actions.isOnlineVideo
               ? t("library.transcribeRegenerateOnline", "重新生成文字稿")
               : t("library.transcribeGenerate", "生成文字稿")}
@@ -352,6 +443,27 @@ function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptA
 
   return (
     <div className="h-full overflow-y-auto px-6 py-4">
+      {actions.isRunning ? (
+        <p className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-accent/50 px-2.5 py-1 text-xs text-muted-foreground">
+          <Loader2Icon className="h-3 w-3 animate-spin" aria-hidden="true" />
+          {transcribeStatusText(t, actions.transcribeProgress)}
+        </p>
+      ) : null}
+      {actions.isFormatting ? (
+        <p className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-accent/50 px-2.5 py-1 text-xs text-muted-foreground">
+          <Loader2Icon className="h-3 w-3 animate-spin" aria-hidden="true" />
+          {actions.formatProgress
+            ? t(
+                "library.transcriptFormatProgress",
+                "正在排版…已完成 {{current}}/{{total}} 块",
+                {
+                  current: actions.formatProgress.current,
+                  total: actions.formatProgress.total,
+                },
+              )
+            : t("library.transcriptFormatting", "正在排版…")}
+        </p>
+      ) : null}
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
         {actions.transcript}
       </p>

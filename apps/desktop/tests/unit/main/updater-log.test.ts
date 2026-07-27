@@ -54,7 +54,7 @@ vi.mock("../../../src/main/services/network-proxy", () => ({
   getHttpRequestAgent: () => undefined,
 }));
 
-vi.mock("../../../src/main/startup-log", () => ({ logStartupEvent }));
+vi.mock("../../../src/main/diagnostic-log", () => ({ logStartupEvent }));
 
 import { registerUpdaterIPC } from "../../../src/main/updater";
 

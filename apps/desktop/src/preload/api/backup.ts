@@ -7,12 +7,17 @@ import type {
   ExportMarkdownResult,
 } from "@guizhi/shared/types";
 
+export interface BackupDeleteResult {
+  success: boolean;
+  error?: string;
+}
+
 export const backupApi = {
   create: (): Promise<BackupCreateResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_CREATE),
   list: (): Promise<BackupFileInfo[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_LIST),
-  delete: (fileName: string): Promise<boolean> =>
+  delete: (fileName: string): Promise<BackupDeleteResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_DELETE, fileName),
   restore: (fileName: string): Promise<BackupRestoreResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_RESTORE, fileName),

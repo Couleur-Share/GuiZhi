@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { KnowledgeItem } from "@guizhi/shared/types";
+import {
+  IPC_CHANNELS,
+  TRANSCRIPT_FORMAT_CHUNK_CHARS,
+  TRANSCRIPT_FORMAT_LONG_CHARS,
+} from "@guizhi/shared/constants";
+import type {
+  KnowledgeItem,
+  TranscribeProgress,
+  TranscriptFormatProgress,
+} from "@guizhi/shared/types";
 import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
 import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
 import { hasMediaSummarySection } from "@guizhi/shared/utils/media-summary";
@@ -16,8 +25,23 @@ export interface TranscriptActions {
   transcript: string;
   isRunning: boolean;
   isFormatting: boolean;
-  transcribe: () => Promise<void>;
+  /** 当前「语音转写」路由是否支持区分说话人（仅内置本地引擎） */
+  canDiarize: boolean;
+  /**
+   * 正在跑的是哪一个转写动作。
+   * 两个按钮共用 isRunning 的话会一起转圈，看起来像整个界面都在忙。
+   */
+  runningAction: "transcribe" | "diarize" | null;
+  /** 转写进行中的已用/停滞时长；未在转写时为 null */
+  transcribeProgress: TranscribeProgress | null;
+  /** 排版进行中的逐块进度；未在排版或尚未收到首个事件时为 null */
+  formatProgress: TranscriptFormatProgress | null;
+  /** 非空表示正等用户确认长稿排版的代价 */
+  pendingLongFormat: { chars: number; chunks: number } | null;
+  transcribe: (options?: { diarize?: boolean }) => Promise<void>;
   format: () => Promise<void>;
+  confirmLongFormat: () => Promise<void>;
+  cancelLongFormat: () => void;
 }
 
 /**
@@ -34,13 +58,75 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
-  const [isRunning, setIsRunning] = useState(false);
+  const [runningAction, setRunningAction] = useState<
+    "transcribe" | "diarize" | null
+  >(null);
+  const isRunning = runningAction !== null;
   const [isFormatting, setIsFormatting] = useState(false);
+  const [formatProgress, setFormatProgress] =
+    useState<TranscriptFormatProgress | null>(null);
+  const [pendingLongFormat, setPendingLongFormat] = useState<{
+    chars: number;
+    chunks: number;
+  } | null>(null);
+  const [canDiarize, setCanDiarize] = useState(false);
+  const [transcribeProgress, setTranscribeProgress] =
+    useState<TranscribeProgress | null>(null);
+
+  // 只有内置本地引擎支持分离；不支持时不摆入口，而不是摆一个点了必然报错的按钮
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.media
+      .capabilities()
+      .then((capabilities) => {
+        if (!cancelled) {
+          setCanDiarize(capabilities.diarization);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCanDiarize(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const itemId = item.id;
   useEffect(() => {
-    setIsRunning(false);
+    setRunningAction(null);
     setIsFormatting(false);
+    setFormatProgress(null);
+    setPendingLongFormat(null);
+    setTranscribeProgress(null);
+  }, [itemId]);
+
+  // 排版按块串行请求，长稿可达数十块；不上报进度的话按钮会静默转好几分钟
+  useEffect(() => {
+    const handleProgress = (payload: TranscriptFormatProgress) => {
+      if (payload.itemId === itemId) {
+        setFormatProgress(payload);
+      }
+    };
+    window.api.on?.(IPC_CHANNELS.MEDIA_FORMAT_PROGRESS, handleProgress);
+    return () => {
+      window.api.off?.(IPC_CHANNELS.MEDIA_FORMAT_PROGRESS, handleProgress);
+    };
+  }, [itemId]);
+
+  // 转写是个不返回中间结果的长请求，20 分钟的访谈要跑好几分钟；
+  // 不报已用时长的话，按钮转圈和卡死在界面上长得一模一样
+  useEffect(() => {
+    const handleProgress = (payload: TranscribeProgress) => {
+      if (payload.itemId === itemId) {
+        setTranscribeProgress(payload);
+      }
+    };
+    window.api.on?.(IPC_CHANNELS.MEDIA_TRANSCRIBE_PROGRESS, handleProgress);
+    return () => {
+      window.api.off?.(IPC_CHANNELS.MEDIA_TRANSCRIBE_PROGRESS, handleProgress);
+    };
   }, [itemId]);
 
   const hasLocalAsset =
@@ -51,18 +137,29 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
     !hasLocalAsset &&
     detectVideoPlatform(item.sourceUri?.trim() ?? "") !== null;
 
-  const transcribe = useCallback(async () => {
+  const transcribe = useCallback(
+    async (options?: { diarize?: boolean }) => {
     if (isRunning) {
       return;
     }
-    setIsRunning(true);
+    setRunningAction(options?.diarize === true ? "diarize" : "transcribe");
+    setTranscribeProgress(null);
     try {
       // 主进程基于库中正文写回（清注记/总结/标题），先落盘本地编辑
       await flushPendingSave();
-      const result = await window.api.media.transcribe(itemId);
+      const result = await window.api.media.transcribe(itemId, options);
       if (result.success && result.item) {
         applyServerItem(result.item);
-        showToast(t("library.transcribeDone", "文字稿已生成"), "success");
+        // 要了分离却只出来一个说话人时不报「已生成」了事
+        if (result.warning) {
+          showToast(
+            t("library.transcribeOneSpeaker", "文字稿已生成，但只识别出一个说话人"),
+            "warning",
+            { detail: result.warning },
+          );
+        } else {
+          showToast(t("library.transcribeDone", "文字稿已生成"), "success");
+        }
       } else if (result.notConfigured) {
         showToast(
           t(
@@ -81,67 +178,110 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
         );
       }
     } finally {
-      setIsRunning(false);
+      setRunningAction(null);
+      setTranscribeProgress(null);
     }
-  }, [
-    isRunning,
-    itemId,
-    flushPendingSave,
-    applyServerItem,
-    showToast,
-    requestSettingsSection,
-    t,
-  ]);
+    },
+    [
+      isRunning,
+      itemId,
+      flushPendingSave,
+      applyServerItem,
+      showToast,
+      requestSettingsSection,
+      t,
+    ],
+  );
 
-  // 已有文字稿的 AI 排版：补标点/分段，不重新转写
+  const transcript = item.transcript?.trim() ?? "";
+
+  const runFormat = useCallback(
+    async (allowLong: boolean) => {
+      setIsFormatting(true);
+      setFormatProgress(null);
+      try {
+        const result = await window.api.media.formatTranscript(itemId, {
+          allowLong,
+        });
+        if (result.success && result.item) {
+          applyServerItem(result.item);
+          // 只排了一部分也算成功（结果已落库），但不能弹绿色的「完成」
+          if (result.warning) {
+            showToast(
+              t("library.transcriptFormatPartial", "文字稿只排版了一部分"),
+              "warning",
+              { detail: result.warning },
+            );
+          } else {
+            showToast(
+              t("library.transcriptFormatDone", "文字稿排版完成"),
+              "success",
+            );
+          }
+        } else if (result.notConfigured) {
+          showToast(
+            t("library.transcriptFormatNotConfigured", "尚未配置可用的文本模型"),
+            "error",
+          );
+          requestSettingsSection("ai");
+        } else {
+          showToast(
+            t("library.transcriptFormatFailed", "排版失败"),
+            "error",
+            { detail: result.error },
+          );
+        }
+      } finally {
+        setIsFormatting(false);
+        setFormatProgress(null);
+      }
+    },
+    [itemId, applyServerItem, showToast, requestSettingsSection, t],
+  );
+
+  /**
+   * 已有文字稿的 AI 排版：补标点/分段，不重新转写。
+   * 长稿先弹确认——几万字要拆成几十次串行请求，耗时数分钟且真实计费，
+   * 不该在用户点一下图标按钮后就默默花掉。
+   */
   const format = useCallback(async () => {
     if (isRunning || isFormatting) {
       return;
     }
-    setIsFormatting(true);
-    try {
-      const result = await window.api.media.formatTranscript(itemId);
-      if (result.success && result.item) {
-        applyServerItem(result.item);
-        showToast(
-          t("library.transcriptFormatDone", "文字稿排版完成"),
-          "success",
-        );
-      } else if (result.notConfigured) {
-        showToast(
-          t("library.transcriptFormatNotConfigured", "尚未配置可用的文本模型"),
-          "error",
-        );
-        requestSettingsSection("ai");
-      } else {
-        showToast(
-          t("library.transcriptFormatFailed", "排版失败：{{message}}", {
-            message: result.error ?? "",
-          }),
-          "error",
-        );
-      }
-    } finally {
-      setIsFormatting(false);
+    if (transcript.length > TRANSCRIPT_FORMAT_LONG_CHARS) {
+      setPendingLongFormat({
+        chars: transcript.length,
+        chunks: Math.ceil(transcript.length / TRANSCRIPT_FORMAT_CHUNK_CHARS),
+      });
+      return;
     }
-  }, [
-    isRunning,
-    isFormatting,
-    itemId,
-    applyServerItem,
-    showToast,
-    requestSettingsSection,
-    t,
-  ]);
+    await runFormat(false);
+  }, [isRunning, isFormatting, transcript, runFormat]);
+
+  const confirmLongFormat = useCallback(async () => {
+    setPendingLongFormat(null);
+    await runFormat(true);
+  }, [runFormat]);
+
+  const cancelLongFormat = useCallback(() => {
+    setPendingLongFormat(null);
+  }, []);
 
   return {
     canTranscribe: hasLocalAsset || isOnlineVideo,
     isOnlineVideo,
-    transcript: item.transcript?.trim() ?? "",
+    transcript,
     isRunning,
     isFormatting,
+    canDiarize,
+    runningAction,
+    transcribeProgress,
+    formatProgress,
+    pendingLongFormat,
     transcribe,
     format,
+    confirmLongFormat,
+    cancelLongFormat,
   };
 }
 

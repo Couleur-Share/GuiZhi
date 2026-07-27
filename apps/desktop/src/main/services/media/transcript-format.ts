@@ -5,9 +5,10 @@
  * 模型解析走 ai-config.json 的 fastText 路由（回退 mainText → 默认 chat 模型），
  * 与转写一样由主进程直读配置；未配置文本模型或排版失败时，调用方保留原始文字稿。
  *
- * 每块输出做验收（标点密度 / 长度比 / 截断），不合格自动重试一次，
- * 仍不合格则整体抛错——思考类模型偶发"复读式敷衍"（原样返回不加标点），
- * 宁可明确失败，不把未排版结果当成功写库。
+ * 每块输出做验收（标点密度 / 长度比 / 截断），不合格自动重试一次——
+ * 思考类模型偶发"复读式敷衍"（原样返回不加标点），不能把未排版结果当成功写库。
+ * 重试后仍不合格：**第一块**就失败直接抛错（多半是模型配错），
+ * 中途失败则收下已排好的部分、其余接回原文，并回一个 `partialReason`。
  */
 import {
   chatCompletion,
@@ -16,19 +17,127 @@ import {
   type AIChatResult,
   type AIClientConfig,
 } from "@guizhi/core";
+import {
+  TRANSCRIPT_FORMAT_CHUNK_CHARS,
+  TRANSCRIPT_FORMAT_LONG_CHARS,
+} from "@guizhi/shared/constants";
+import { countSpeakerPrefixes } from "@guizhi/shared/utils/speaker-note";
 
 /** 单块上限：兼顾输出 token 限制与单请求耗时 */
-const CHUNK_MAX_CHARS = 1600;
-/** 超过该长度跳过排版，避免超长转写带来意外的 token 开销 */
-const FORMAT_MAX_TOTAL_CHARS = 50_000;
-/** 排版块要完整复述原文，思考类模型还会先烧推理 token，放宽单请求超时 */
-const CHUNK_TIMEOUT_MS = 120_000;
+const CHUNK_MAX_CHARS = TRANSCRIPT_FORMAT_CHUNK_CHARS;
+/**
+ * 单块请求超时。
+ *
+ * 原本是 120 秒，实测偏紧：同一条短提示词在中转站的思考类模型上
+ * 耗时 75 / 117 / 130 秒都出现过——120 秒正好卡在正常区间的上沿，
+ * 于是「本来会成功」的请求被自己的超时掐掉，重试一次再掐，整块作废。
+ * 取 240 秒与生图那边的单次上限同口径。
+ */
+const CHUNK_TIMEOUT_MS = 240_000;
+/**
+ * 整篇排版的时间预算，按块数缩放。
+ *
+ * 单块超时 240 秒 × 每块 2 次尝试，32 块理论上能拖两个多小时。固定预算
+ * 对 32 块和 63 块又都不合适（后者是用户确认过代价的超长稿），
+ * 所以按块摊：正常每块 30~60 秒，90 秒/块留足余量，卡死的上游会很快耗光它。
+ */
+const BUDGET_PER_CHUNK_MS = 90_000;
+/** 预算下限：只有一两块时也得给够一次重试的时间 */
+const MIN_TIME_BUDGET_MS = 300_000;
 /** 完整复述 1600 字 ≈ 1100 token，思考类模型另耗 2000+ 推理 token，需留足余量 */
 const CHUNK_MAX_TOKENS = 6144;
 /** 每块最多尝试次数（1 次重试）：思考类模型的敷衍输出有随机性，重试通常可恢复 */
 const MAX_ATTEMPTS_PER_CHUNK = 2;
+/**
+ * 并发块数。
+ *
+ * 块之间互不依赖（各排各的、按下标归位），而中转站单次要几十秒——实测同一条
+ * 提示词在思考类模型上 75~130 秒都出现过。串行的话 4400 字的稿子要发 3 次、
+ * 拖上好几分钟，是整条链路里仅次于转写的一段。3 路够把常见长度压到一次请求的
+ * 时间，又不至于撞上限流。
+ */
+const FORMAT_CONCURRENCY = 3;
 
 const SYSTEM_PROMPT = "你是文字稿排版助手，负责为语音转写文本补标点、分段。";
+
+/** 术语表上限：够覆盖一条内容的专名，又不至于把提示词撑大 */
+const GLOSSARY_MAX_TERMS = 40;
+/** 简介只取前若干字符：长简介后半段多是推广话术与链接，提不出有效术语 */
+const GLOSSARY_SOURCE_MAX_CHARS = 500;
+/** 单条术语的最短长度：单个字母（「C 语言」的 C）噪音大于价值 */
+const GLOSSARY_MIN_TERM_CHARS = 2;
+
+/**
+ * 连续的拉丁词串。相邻两词以单个空格相连时并成一条——
+ * 「GitHub Actions」是一个专名而不是两个，拆开就对不上转写里的错误形式。
+ */
+const LATIN_RUN = /[A-Za-z][A-Za-z0-9.+#_-]*(?: [A-Za-z][A-Za-z0-9.+#_-]*)*/g;
+
+/**
+ * 从标题与简介里提取拉丁字母专名，作为排版时的术语表。
+ *
+ * 只收拉丁串是有实测依据的：本地引擎（SenseVoiceSmall）纯中文逐字正确，
+ * 中英混杂时错误全部落在拉丁词上——Docker 听成 dacker、useState 听成
+ * us state、TypeScript 听成 typepescript。而被毁掉的恰好是专有名词，
+ * 也就是全文检索与语义召回最依赖的那批词。
+ *
+ * SenseVoice 不支持热词（funasr 里只有 paraformer 系支持），这层等于
+ * 在文本侧补上同一件事，不额外发起任何模型调用。
+ */
+export function extractGlossaryTerms(
+  ...sources: (string | null | undefined)[]
+): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const source of sources) {
+    const text = source?.trim().slice(0, GLOSSARY_SOURCE_MAX_CHARS);
+    if (!text) {
+      continue;
+    }
+    for (const match of text.match(LATIN_RUN) ?? []) {
+      // 句末标点会被贴进词尾（Node.js. / Docker-），统一剥掉
+      const term = match.replace(/[.+#_-]+$/, "");
+      const key = term.toLowerCase();
+      if (term.length < GLOSSARY_MIN_TERM_CHARS || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      terms.push(term);
+      if (terms.length >= GLOSSARY_MAX_TERMS) {
+        return terms;
+      }
+    }
+  }
+  return terms;
+}
+
+/**
+ * 说话人对话体的排版约束。
+ *
+ * 分离后的正文每段以「说话人 N：」开头，而排版这一步是要重写正文的——
+ * 不明确要求保留，模型会把前缀当成口播里的赘语删掉，或者把相邻段落合并，
+ * 分离就白做了。提示词管不住排版，所以 `rejectFormattedChunk` 还会数一遍。
+ */
+const SPEAKER_INSTRUCTION = [
+  "",
+  "本段文字稿已区分说话人，每个自然段以「说话人 N：」开头。整理时必须原样保留每个",
+  "「说话人 N：」前缀（包括编号），不得删除、改写或增补；不同说话人的段落不得合并，",
+  "段落顺序也不得调整。",
+].join("\n");
+
+/**
+ * 术语表指令。措辞刻意收紧到「把文中已有的错误形式改成表中写法」：
+ * 放开成自由改写就是拿幻觉换错字，比留着错字更糟。
+ */
+function buildGlossaryInstruction(glossary: string[]): string {
+  return [
+    "",
+    `本条内容的专有名词表（取自标题与简介）：${glossary.join("、")}`,
+    "语音转写常把这类名词听错（如 dacker → Docker、us state → useState）。" +
+      "文中出现表内名词的错误形式时，改成表中写法——这是第 4 条的唯一放宽之处。" +
+      "表以外的词不要改动；表中没有在文里出现的词，也不要添加进去。",
+  ].join("\n");
+}
 
 /**
  * 排版指令并入 user 消息（部分中转站会丢弃或弱化 system 消息），
@@ -45,12 +154,23 @@ const FORMAT_INSTRUCTIONS = [
   "7. 直接输出整理后的正文，不要输出任何说明、标题或 Markdown 标记。",
 ].join("\n");
 
-function buildChunkMessages(chunk: string): AIChatMessage[] {
+function buildChunkMessages(
+  chunk: string,
+  glossary: string[],
+): AIChatMessage[] {
+  const parts = [FORMAT_INSTRUCTIONS];
+  if (glossary.length > 0) {
+    parts.push(buildGlossaryInstruction(glossary));
+  }
+  if (countSpeakerPrefixes(chunk) > 0) {
+    parts.push(SPEAKER_INSTRUCTION);
+  }
+  const instructions = parts.join("\n");
   return [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `${FORMAT_INSTRUCTIONS}\n\n【待整理文字稿开始】\n${chunk}\n【待整理文字稿结束】`,
+      content: `${instructions}\n\n【待整理文字稿开始】\n${chunk}\n【待整理文字稿结束】`,
     },
   ];
 }
@@ -152,70 +272,123 @@ export function rejectFormattedChunk(
   if (punctuation < required) {
     return `输出仍缺少标点分段（仅 ${punctuation} 处）`;
   }
+  // 说话人前缀必须一条不少一条不多：少了是把标记当赘语删了或把段落合并了，
+  // 多了是模型自己编的。两种都会让分离结果失真，而提示词拦不住
+  const expectedSpeakers = countSpeakerPrefixes(rawChunk);
+  if (expectedSpeakers > 0) {
+    const actual = countSpeakerPrefixes(cleaned);
+    if (actual !== expectedSpeakers) {
+      return `说话人前缀数量不符（原文 ${expectedSpeakers} 处，输出 ${actual} 处）`;
+    }
+  }
   return null;
 }
 
 export interface FormatTranscriptOptions {
   signal?: AbortSignal;
+  /**
+   * 超过该长度直接跳过排版。默认是自动链路的上限；
+   * 用户在详情页确认代价后可放开（传一个足够大的值）。
+   */
+  maxTotalChars?: number;
+  /** 已完成块数（并发下不保证按顺序完成，报的是计数不是序号） */
+  onProgress?: (completed: number, total: number) => void;
+  /** 专有名词表（`extractGlossaryTerms` 从标题与简介提取），用于纠正听错的专名 */
+  glossary?: string[];
+  /** 整篇时间预算，默认按块数缩放；测试注入用 */
+  timeBudgetMs?: number;
   /** 测试注入：底层 chat 调用 */
   chat?: typeof chatCompletion;
 }
 
+export interface FormatTranscriptResult {
+  /** 排版后的文字稿；跳过时原样返回入参 */
+  text: string;
+  /** 非空表示本次没有排版（超长跳过），调用方据此留痕或告知用户 */
+  skippedReason?: string;
+  /**
+   * 非空表示只排完了前面若干块，其余按原文拼回（内容不丢，只是没排版）。
+   * 排到一半的成果不该因为后面某块失败就整篇作废——这些请求的钱已经花了，
+   * 而半篇排好的稿子严格优于一篇没排的。
+   */
+  partialReason?: string;
+}
+
 /**
- * 分块排版整个文字稿并按空行拼接。
- * 任一块验收不通过（重试后）或请求失败即抛错，由调用方决定保留原始文字稿。
+ * 分块排版整个文字稿并按空行拼接，块之间并发（见 `FORMAT_CONCURRENCY`）。
+ *
+ * 返回对象而非裸字符串：跳过与排版完成都给得出原文，
+ * 只回字符串的话调用方分不清「排好了」和「太长没排」。
  */
 export async function formatTranscript(
   raw: string,
   config: AIClientConfig,
   options?: FormatTranscriptOptions,
-): Promise<string> {
+): Promise<FormatTranscriptResult> {
   const text = raw.trim();
   if (!text) {
-    return text;
+    return { text };
   }
-  if (text.length > FORMAT_MAX_TOTAL_CHARS) {
-    console.warn(`[media] 文字稿过长（${text.length} 字），跳过 AI 排版`);
-    return text;
+  const maxTotalChars = options?.maxTotalChars ?? TRANSCRIPT_FORMAT_LONG_CHARS;
+  if (text.length > maxTotalChars) {
+    return {
+      text,
+      skippedReason: `文字稿 ${text.length} 字，超过自动排版上限 ${maxTotalChars} 字`,
+    };
   }
 
   const chat = options?.chat ?? chatCompletion;
+  const glossary = options?.glossary ?? [];
   const chunks = splitTranscriptChunks(text);
+  const deadline =
+    Date.now() +
+    (options?.timeBudgetMs ??
+      Math.max(MIN_TIME_BUDGET_MS, chunks.length * BUDGET_PER_CHUNK_MS));
   console.log(
-    `[media] 文字稿排版开始（model=${config.model}，共 ${chunks.length} 块）`,
+    `[media] 文字稿排版开始（model=${config.model}，共 ${chunks.length} 块，术语 ${glossary.length} 条）`,
   );
 
-  const formatted: string[] = [];
-  for (let index = 0; index < chunks.length; index++) {
-    const chunk = chunks[index];
-    let accepted: string | null = null;
+  // 每块在原文里的起始下标：中断时用它切出未排版的尾巴。
+  // 拿 chunks 反拼会丢掉切分点上的空白（ASCII 会把两个词黏起来）
+  const offsets = chunkOffsets(text, chunks);
+  const done: (string | null)[] = new Array(chunks.length).fill(null);
+  const reasons: string[] = new Array(chunks.length).fill("");
+  let completed = 0;
+  let nextIndex = 0;
+
+  /** 排一块：验收不合格或请求失败都重试一次，仍不行就交回原因 */
+  const runChunk = async (
+    chunk: string,
+    index: number,
+  ): Promise<{ text: string | null; reason: string }> => {
     let lastReason = "";
     for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_CHUNK; attempt++) {
       options?.signal?.throwIfAborted();
       let result: AIChatResult;
       try {
-        result = await chat(config, buildChunkMessages(chunk), {
+        result = await chat(config, buildChunkMessages(chunk, glossary), {
           temperature: 0.1,
           maxTokens: CHUNK_MAX_TOKENS,
           signal: options?.signal,
           timeoutMs: CHUNK_TIMEOUT_MS,
         });
       } catch (error) {
-        // 请求本身失败（超时/限流等瞬时故障）同样给重试机会；外部取消直接透传
-        if (options?.signal?.aborted || attempt >= MAX_ATTEMPTS_PER_CHUNK) {
+        // 用户点的取消不该留下半成品，直接透传
+        if (options?.signal?.aborted) {
           throw error;
         }
+        const message = error instanceof Error ? error.message : String(error);
+        if (attempt >= MAX_ATTEMPTS_PER_CHUNK) {
+          return { text: null, reason: message };
+        }
         console.warn(
-          `[media] 第 ${index + 1}/${chunks.length} 块排版请求失败（${
-            error instanceof Error ? error.message : String(error)
-          }），重试一次`,
+          `[media] 第 ${index + 1}/${chunks.length} 块排版请求失败（${message}），重试一次`,
         );
         continue;
       }
       const reason = rejectFormattedChunk(chunk, result);
       if (!reason) {
-        accepted = result.content.trim();
-        break;
+        return { text: result.content.trim(), reason: "" };
       }
       lastReason = reason;
       console.warn(
@@ -224,12 +397,67 @@ export async function formatTranscript(
         }`,
       );
     }
-    if (accepted === null) {
-      throw new Error(
-        `模型未按排版要求输出（第 ${index + 1}/${chunks.length} 块：${lastReason}）`,
-      );
+    return { text: null, reason: `模型未按排版要求输出（${lastReason}）` };
+  };
+
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      options?.signal?.throwIfAborted();
+      const index = nextIndex++;
+      if (index >= chunks.length) {
+        return;
+      }
+      // 预算耗尽就不再发新请求；但第一块无论如何要试一次，
+      // 否则一个过小的预算会让整篇直接失败而不是「没排版」
+      if (index > 0 && Date.now() >= deadline) {
+        return;
+      }
+      const outcome = await runChunk(chunks[index], index);
+      done[index] = outcome.text;
+      reasons[index] = outcome.reason;
+      completed += 1;
+      options?.onProgress?.(completed, chunks.length);
     }
-    formatted.push(accepted);
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(FORMAT_CONCURRENCY, chunks.length) }, () =>
+      worker(),
+    ),
+  );
+
+  // 并发下「成功了几块」不再等于「排到第几块」：能留下的是**第一个没完成的块之前**
+  // 那一段，它后面即便有块排好了也不能用——中间缺一块就接不上原文
+  const firstIncomplete = done.findIndex((entry) => entry === null);
+  if (firstIncomplete === -1) {
+    return { text: done.join("\n\n") };
   }
-  return formatted.join("\n\n");
+  const reason = reasons[firstIncomplete] || "整篇排版超出时间预算";
+  if (firstIncomplete === 0) {
+    // 一块都没成，多半是模型名/鉴权这类硬故障，不能粉饰成「部分成功」
+    throw new Error(reason);
+  }
+  console.warn(
+    `[media] 文字稿排版中止于第 ${firstIncomplete + 1}/${chunks.length} 块：${reason}`,
+  );
+  const tail = text.slice(offsets[firstIncomplete]).trim();
+  return {
+    text: [done.slice(0, firstIncomplete).join("\n\n"), tail]
+      .filter(Boolean)
+      .join("\n\n"),
+    partialReason: `已排版 ${firstIncomplete}/${chunks.length} 块，其余保留原始转写：${reason}`,
+  };
+}
+
+/** 每块在原文中的起始下标（chunks 是 text 的连续切片，trim 过） */
+function chunkOffsets(text: string, chunks: string[]): number[] {
+  const offsets: number[] = [];
+  let cursor = 0;
+  for (const chunk of chunks) {
+    const at = text.indexOf(chunk, cursor);
+    const start = at >= 0 ? at : cursor;
+    offsets.push(start);
+    cursor = start + chunk.length;
+  }
+  return offsets;
 }

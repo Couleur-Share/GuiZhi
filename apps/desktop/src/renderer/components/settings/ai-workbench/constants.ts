@@ -3,6 +3,7 @@ import {
   BrainIcon,
   DatabaseIcon,
   EyeIcon,
+  ImageIcon,
   ZapIcon,
 } from "lucide-react";
 
@@ -163,6 +164,13 @@ export const MODEL_ROUTE_DEFINITIONS: ScenarioDefinition[] = [
     badgeKey: "settings.aiWorkbenchBadgeAudioText",
     icon: AudioLinesIcon,
   },
+  {
+    key: "imageGen",
+    labelKey: "settings.aiWorkbenchRouteImageGen",
+    descKey: "settings.aiWorkbenchRouteImageGenDesc",
+    badgeKey: "settings.aiWorkbenchBadgeImageGen",
+    icon: ImageIcon,
+  },
 ];
 
 export const DEFAULT_CHAT_PARAMS: ModelFormState["chatParams"] = {
@@ -186,6 +194,7 @@ export const DEFAULT_MODEL_CAPABILITIES: ModelFormState["capabilities"] = {
   embedding: false,
   rerank: false,
   audioTranscription: false,
+  imageGeneration: false,
 };
 
 export const EMPTY_FORM: ModelFormState = {

@@ -42,6 +42,8 @@ export interface Settings {
   ytDlpPath?: string;
   // 转写前音频转码：ffmpeg 可执行文件路径（空 = 托管版 / 系统 PATH）
   ffmpegPath?: string;
+  // 导入时区分说话人（仅内置本地引擎支持，会让转写慢一倍）
+  transcribeDiarize?: boolean;
 }
 
 export type Theme = "light" | "dark" | "system";

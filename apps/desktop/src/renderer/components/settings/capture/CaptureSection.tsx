@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { useSettingsStore } from "../../../stores/settings.store";
-import { SettingSection } from "../shared";
+import { SettingItem, SettingSection, ToggleSwitch } from "../shared";
 import { BinaryEngineRow } from "./BinaryEngineRow";
 import { formatEngineVersion } from "./engine-version";
 import { FunasrEngineRow } from "./FunasrEngineRow";
@@ -16,6 +16,12 @@ export function CaptureSection() {
   const setYtDlpPath = useSettingsStore((state) => state.setYtDlpPath);
   const ffmpegPath = useSettingsStore((state) => state.ffmpegPath);
   const setFfmpegPath = useSettingsStore((state) => state.setFfmpegPath);
+  const transcribeDiarize = useSettingsStore(
+    (state) => state.transcribeDiarize,
+  );
+  const setTranscribeDiarize = useSettingsStore(
+    (state) => state.setTranscribeDiarize,
+  );
 
   const customPathHint = t(
     "settings.captureCustomPathHint",
@@ -90,6 +96,20 @@ export function CaptureSection() {
       />
 
       <FunasrEngineRow />
+
+      <SettingItem
+        label={t("settings.transcribeDiarize", "导入时区分说话人")}
+        description={t(
+          "settings.transcribeDiarizeDesc",
+          "访谈、会议这类多人内容才有意义：转写会慢一倍，且只有内置本地引擎支持。单人内容开着没有收益。",
+        )}
+      >
+        <ToggleSwitch
+          ariaLabel={t("settings.transcribeDiarize", "导入时区分说话人")}
+          checked={transcribeDiarize}
+          onChange={setTranscribeDiarize}
+        />
+      </SettingItem>
     </SettingSection>
   );
 }

@@ -4,6 +4,7 @@ import { PinIcon, StarIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItemListEntry } from "@guizhi/shared/types";
 import { ContextMenu } from "../ui/ContextMenu";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ItemBulkBar } from "./ItemBulkBar";
@@ -85,6 +86,8 @@ export function ItemList() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const entries = useKnowledgeStore((state) => state.entries);
   const isLoading = useKnowledgeStore((state) => state.isLoading);
+  const loadError = useKnowledgeStore((state) => state.loadError);
+  const fetchList = useKnowledgeStore((state) => state.fetchList);
   const scope = useKnowledgeStore((state) => state.scope);
   const selectedId = useKnowledgeStore((state) => state.selectedId);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
@@ -187,6 +190,8 @@ export function ItemList() {
           <div className="flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />
           </div>
+        ) : loadError && entries.length === 0 ? (
+          <LoadErrorState message={loadError} onRetry={() => void fetchList()} />
         ) : entries.length === 0 ? (
           <div className="flex h-32 items-center justify-center px-6 text-center text-sm text-muted-foreground">
             {scope === "trash"

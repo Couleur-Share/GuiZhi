@@ -1,9 +1,18 @@
 import { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { CheckCircleIcon, XCircleIcon, InfoIcon, AlertTriangleIcon, XIcon } from 'lucide-react';
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  InfoIcon,
+  AlertTriangleIcon,
+  ChevronRightIcon,
+  CopyIcon,
+  XIcon,
+} from 'lucide-react';
 import { useSettingsStore } from '../../stores/settings.store';
 import { MOTION_DURATION } from '../../styles/motion-tokens';
+import { copyTextToClipboard } from '../../utils/clipboard';
 
 // Toast type
 // Toast 类型
@@ -14,10 +23,23 @@ interface ToastAction {
   onClick: () => void;
 }
 
+export interface ShowToastOptions {
+  /**
+   * 完整报错原文，折叠在「查看详情」后面。
+   *
+   * 提示语要短才读得进去，但「失败」两个字对排查毫无用处——原因收在这里，
+   * 展开能读、能复制去搜。批量操作把逐条失败明细放这儿最合适。
+   */
+  detail?: string;
+  /** 同时发一条系统通知（需在设置里开启通知） */
+  systemNotification?: boolean;
+}
+
 interface Toast {
   id: string;
   message: string;
   type: ToastType;
+  detail?: string;
   /** 行内动作按钮（撤销等）；点击后 toast 立即收起 */
   action?: ToastAction;
   /** 覆盖默认的自动消失时长 */
@@ -33,7 +55,11 @@ interface Toast {
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType, sendSystemNotification?: boolean) => void;
+  showToast: (
+    message: string,
+    type?: ToastType,
+    options?: ShowToastOptions,
+  ) => void;
   /**
    * 带「撤销」按钮的提示。
    *
@@ -76,6 +102,70 @@ function trimToasts(list: Toast[]): Toast[] {
   return list.filter((_, index) => index !== dropIndex);
 }
 
+/**
+ * 折叠起来的报错原文。
+ *
+ * 展开而不是直接铺开：提示语要短才有人读，但原因不能因此丢掉。
+ * 「复制」是这一块的重点——用户拿到原文才谈得上去搜或者提 issue。
+ */
+function ToastDetail({ detail }: { detail: string }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) {
+        clearTimeout(copiedTimer.current);
+      }
+    },
+    [],
+  );
+
+  const copy = async () => {
+    try {
+      await copyTextToClipboard(detail);
+      setCopied(true);
+      copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 复制不了也没关系：原文就摊在上面，用户照样读得到
+    }
+  };
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        aria-expanded={expanded}
+        className="inline-flex items-center gap-0.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronRightIcon
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+        />
+        {expanded ? t('common.collapse', '收起') : t('common.viewDetail', '查看详情')}
+      </button>
+      {expanded ? (
+        <div className="mt-1.5 rounded-lg bg-black/5 p-2 dark:bg-white/5">
+          <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] font-normal leading-relaxed text-muted-foreground">
+            {detail}
+          </pre>
+          <button
+            type="button"
+            onClick={() => void copy()}
+            className="mt-1.5 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+          >
+            <CopyIcon aria-hidden="true" className="h-3 w-3" />
+            {copied ? t('toast.copied', '已复制') : t('common.copy', '复制')}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // Toast Provider
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -115,14 +205,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     exitTimers.current.set(id, timer);
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'success', sendSystemNotification = false) => {
+  const showToast = useCallback((message: string, type: ToastType = 'success', options?: ShowToastOptions) => {
     idCounter.current += 1;
     const id = `${Date.now()}-${idCounter.current}`;
-    setToasts((prev) => trimToasts([...prev, { id, message, type }]));
+    setToasts((prev) =>
+      trimToasts([...prev, { id, message, type, detail: options?.detail }]),
+    );
 
     // Send system notification (if enabled and requested)
     // 发送系统通知（如果启用且请求）
-    if (sendSystemNotification && enableNotifications && window.electron?.showNotification) {
+    if (options?.systemNotification && enableNotifications && window.electron?.showNotification) {
       const title =
         type === 'success'
           ? t('common.success', 'Success')
@@ -235,9 +327,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               `}
             >
               <span className="shrink-0">{getIcon(toast.type)}</span>
-              <span className="min-w-0 flex-1 text-sm font-semibold leading-relaxed text-foreground break-words">
-                {toast.message}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold leading-relaxed text-foreground break-words">
+                  {toast.message}
+                </p>
+                {toast.detail ? <ToastDetail detail={toast.detail} /> : null}
+              </div>
               {toast.action ? (
                 <button
                   type="button"

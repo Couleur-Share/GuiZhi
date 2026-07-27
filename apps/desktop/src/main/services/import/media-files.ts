@@ -59,8 +59,18 @@ export function classifyMediaFile(extension: string): MediaFileKind | null {
   return null;
 }
 
-export function buildAssetFileName(extension: string): string {
-  return `import-${randomUUID().replace(/-/g, "").slice(0, 16)}${extension.toLowerCase()}`;
+/**
+ * 资产文件名。
+ *
+ * prefix 用来区分资产来源：采集导入是 `import-`，AI 生成的正文配图是 `gen-`
+ * （见 shared/utils/illustration-note.ts 的 ILLUSTRATION_ASSET_PREFIX）——
+ * 详情页据此把配图和原文里的图分开管理。
+ */
+export function buildAssetFileName(
+  extension: string,
+  prefix = "import-",
+): string {
+  return `${prefix}${randomUUID().replace(/-/g, "").slice(0, 16)}${extension.toLowerCase()}`;
 }
 
 /** 媒体资产的自定义协议 URL（音频走 local-video 协议：同为文件流服务） */

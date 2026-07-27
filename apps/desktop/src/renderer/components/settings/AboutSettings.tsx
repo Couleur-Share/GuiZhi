@@ -36,6 +36,7 @@ export function AboutSettings() {
   const lastCheckAt = useUpdaterStore((state) => state.lastCheckAt);
   const lastCheckOutcome = useUpdaterStore((state) => state.lastCheckOutcome);
   const lastCheckVersion = useUpdaterStore((state) => state.lastCheckVersion);
+  const lastCheckError = useUpdaterStore((state) => state.lastCheckError);
 
   useEffect(() => {
     void window.electron?.updater?.getVersion().then((v) => setAppVersion(v || ""));
@@ -69,9 +70,11 @@ export function AboutSettings() {
         latest !== webVersion &&
         latest.localeCompare(webVersion, undefined, { numeric: true }) > 0;
       setUpdateState(isNewer ? "available" : "latest");
-    } catch {
+    } catch (error) {
       setUpdateState("idle");
-      showToast(t("settings.updateCheckFailed"), "error");
+      showToast(t("settings.updateCheckFailed"), "error", {
+        detail: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -110,7 +113,10 @@ export function AboutSettings() {
       });
     }
     if (lastCheckOutcome === "error") {
-      return t("settings.lastCheckFailed", { time });
+      // 原因一直存在 store 里却从没显示过，用户在这行只看得到「失败」两个字
+      const reason = lastCheckError?.trim();
+      const label = t("settings.lastCheckFailed", { time });
+      return reason ? `${label}（${reason.slice(0, 120)}）` : label;
     }
     return t("settings.lastCheckLatest", { time });
   };

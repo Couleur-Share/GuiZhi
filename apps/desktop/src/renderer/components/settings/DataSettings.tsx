@@ -5,6 +5,7 @@ import {
   FileDownIcon,
   FolderOpenIcon,
   Loader2Icon,
+  ScrollTextIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -88,6 +89,7 @@ export function DataSettings() {
   const [busy, setBusy] = useState<BusyAction>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [backupsDir, setBackupsDir] = useState<string | null>(null);
+  const [logsDir, setLogsDir] = useState<string | null>(null);
 
   const reloadBackups = useCallback(async () => {
     setIsLoadingBackups(true);
@@ -95,17 +97,25 @@ export function DataSettings() {
       const list = await window.api.backup.list();
       setBackups(list);
     } catch (error) {
-      console.error("加载备份列表失败:", error);
+      // 读不出来会被渲染成「还没有备份」，用户可能因此以为定时备份没在跑
+      showToast(
+        t("settings.backupListFailed", "读取备份列表失败"),
+        "error",
+        { detail: error instanceof Error ? error.message : String(error) },
+      );
     } finally {
       setIsLoadingBackups(false);
     }
-  }, []);
+  }, [showToast, t]);
 
   useEffect(() => {
     void reloadBackups();
     void window.electron
       ?.getRuntimePaths?.()
-      .then((paths) => setBackupsDir(paths.backupsDir))
+      .then((paths) => {
+        setBackupsDir(paths.backupsDir);
+        setLogsDir(paths.logsDir);
+      })
       .catch(() => {});
   }, [reloadBackups]);
 
@@ -151,9 +161,13 @@ export function DataSettings() {
   };
 
   const handleDelete = async (backup: BackupFileInfo) => {
-    const removed = await window.api.backup.delete(backup.fileName);
-    if (!removed) {
-      showToast(t("settings.backupDeleteFailed", "删除失败"), "error");
+    const result = await window.api.backup.delete(backup.fileName);
+    if (!result.success) {
+      showToast(
+        t("settings.backupDeleteFailed", "删除失败"),
+        "error",
+        result.error ? { detail: result.error } : undefined,
+      );
     }
     await reloadBackups();
   };
@@ -268,6 +282,21 @@ export function DataSettings() {
           >
             <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
             {t("settings.openBackupsDir", "打开备份目录")}
+          </button>
+          {/* 后台任务（定时备份、后台 Wiki 编译）失败时不弹窗，只记进 error.log；
+              这个按钮是它们唯一的出口 */}
+          <button
+            type="button"
+            onClick={() => logsDir && void window.electron?.openPath?.(logsDir)}
+            disabled={!logsDir}
+            title={t(
+              "settings.openLogsHint",
+              "后台任务失败会记在这里的 error.log",
+            )}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60 disabled:opacity-50"
+          >
+            <ScrollTextIcon className="h-4 w-4" aria-hidden="true" />
+            {t("settings.openLogs", "打开日志")}
           </button>
         </div>
 

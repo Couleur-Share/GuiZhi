@@ -133,6 +133,8 @@ export function BinaryEngineRow({
       showToast(
         t("settings.captureCheckFailed", "检查更新失败，请稍后重试"),
         "error",
+        // 这里几乎总是网络或代理问题，说清楚用户才知道该去配代理
+        { detail: cause instanceof Error ? cause.message : String(cause) },
       );
     }
   };

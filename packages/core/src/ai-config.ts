@@ -10,7 +10,8 @@ export type CoreAIModelRoute =
   | "fastText"
   | "visionText"
   | "embedding"
-  | "audioText";
+  | "audioText"
+  | "imageGen";
 
 export interface CoreAIModelCapabilities {
   chat?: boolean;
@@ -21,6 +22,7 @@ export interface CoreAIModelCapabilities {
   embedding?: boolean;
   rerank?: boolean;
   audioTranscription?: boolean;
+  imageGeneration?: boolean;
 }
 
 export interface CoreAIProviderConfig {
@@ -92,6 +94,7 @@ const MODEL_ROUTES: CoreAIModelRoute[] = [
   "visionText",
   "embedding",
   "audioText",
+  "imageGen",
 ];
 
 function nowIso(): string {
@@ -456,6 +459,17 @@ export class CoreAIConfigService {
 
     if (route === "audioText") {
       // 转写走 /audio/transcriptions，中转站模型名难以从能力位判定，不做强校验
+      return;
+    }
+
+    if (route === "imageGen") {
+      // 文生图走 /images/generations 或 Gemini 的 generateContent，与 chat 无关
+      if (model.capabilities?.imageGeneration !== true) {
+        throw new AIConfigError(
+          "ROUTE_CAPABILITY_MISMATCH",
+          "imageGen 路由需要启用文生图能力的模型",
+        );
+      }
       return;
     }
 

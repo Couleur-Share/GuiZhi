@@ -82,14 +82,28 @@ describe("listBackups / deleteBackup", () => {
     db.close();
   });
 
-  it("deleteBackup 拒绝路径穿越与非规范文件名", () => {
+  it("deleteBackup 拒绝路径穿越与非规范文件名，并说明拒绝的原因", () => {
     const db = createFileDb("knowledge.db");
     const backup = createBackup(db, "manual", backupsDir);
 
-    expect(deleteBackup("../knowledge.db", backupsDir)).toBe(false);
-    expect(deleteBackup("random.txt", backupsDir)).toBe(false);
-    expect(deleteBackup(backup.fileName, backupsDir)).toBe(true);
+    // 只回一个 false 的话，界面上就只剩「删除失败」三个字
+    expect(deleteBackup("../knowledge.db", backupsDir)).toEqual({
+      success: false,
+      error: "备份文件名不合法",
+    });
+    expect(deleteBackup("random.txt", backupsDir)).toEqual({
+      success: false,
+      error: "备份文件名不合法",
+    });
+    expect(deleteBackup(backup.fileName, backupsDir)).toEqual({
+      success: true,
+    });
     expect(fs.existsSync(backup.path)).toBe(false);
+    // 同一个文件删第二次：文件已经不在了
+    expect(deleteBackup(backup.fileName, backupsDir)).toEqual({
+      success: false,
+      error: "备份文件已不存在",
+    });
     db.close();
   });
 });

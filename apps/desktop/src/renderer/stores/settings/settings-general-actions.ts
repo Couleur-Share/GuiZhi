@@ -57,6 +57,7 @@ type GeneralActionKey =
   | "setBackupKeepCount"
   | "setYtDlpPath"
   | "setFfmpegPath"
+  | "setTranscribeDiarize"
   | "setNetworkProxy"
   | "applyTheme";
 
@@ -356,12 +357,17 @@ function createBackupActions(context: SettingsActionContext) {
       setTouched({ ffmpegPath });
       void syncSettingsToMain({ ffmpegPath });
     },
+    setTranscribeDiarize: (transcribeDiarize) => {
+      setTouched({ transcribeDiarize });
+      void syncSettingsToMain({ transcribeDiarize });
+    },
   } satisfies SettingsActionGroup<
     | "setBackupAutoEnabled"
     | "setBackupIntervalHours"
     | "setBackupKeepCount"
     | "setYtDlpPath"
     | "setFfmpegPath"
+    | "setTranscribeDiarize"
   >;
 }
 

@@ -196,13 +196,24 @@ export function WikiPageDetail() {
     await selectItem(itemId);
   };
 
-  const restorePrevious = async () => {
-    const ok = await restorePreviousRevision();
+  /** 写操作的统一回执：失败原因（若有）折进 toast 的「查看详情」 */
+  const notifyMutation = (
+    result: { ok: boolean; error?: string },
+    successMessage: string,
+    failureMessage: string,
+  ) => {
     showToast(
-      ok
-        ? t("wiki.revisionRestored", "已恢复上一版内容")
-        : t("wiki.revisionRestoreFailed", "恢复失败"),
-      ok ? "success" : "error",
+      result.ok ? successMessage : failureMessage,
+      result.ok ? "success" : "error",
+      result.error ? { detail: result.error } : undefined,
+    );
+  };
+
+  const restorePrevious = async () => {
+    notifyMutation(
+      await restorePreviousRevision(),
+      t("wiki.revisionRestored", "已恢复上一版内容"),
+      t("wiki.revisionRestoreFailed", "恢复失败"),
     );
   };
 
@@ -210,36 +221,31 @@ export function WikiPageDetail() {
     if (draft === null) {
       return;
     }
-    const ok = await savePageBody(draft);
-    if (ok) {
+    const result = await savePageBody(draft);
+    if (result.ok) {
       setDraft(null);
     }
-    showToast(
-      ok
-        ? t("wiki.pageSaved", "已保存，后续编译不会覆盖这一页")
-        : t("wiki.pageSaveFailed", "保存失败"),
-      ok ? "success" : "error",
+    notifyMutation(
+      result,
+      t("wiki.pageSaved", "已保存，后续编译不会覆盖这一页"),
+      t("wiki.pageSaveFailed", "保存失败"),
     );
   };
 
   const releaseToAuto = async () => {
-    const ok = await savePageBody(page.body, true);
-    showToast(
-      ok
-        ? t("wiki.releasedToAuto", "已交回自动编译")
-        : t("wiki.pageSaveFailed", "保存失败"),
-      ok ? "success" : "error",
+    notifyMutation(
+      await savePageBody(page.body, true),
+      t("wiki.releasedToAuto", "已交回自动编译"),
+      t("wiki.pageSaveFailed", "保存失败"),
     );
   };
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false);
-    const ok = await deletePage(page.id);
-    showToast(
-      ok
-        ? t("wiki.pageDeleted", "页面已删除")
-        : t("wiki.pageDeleteFailed", "删除失败"),
-      ok ? "success" : "error",
+    notifyMutation(
+      await deletePage(page.id),
+      t("wiki.pageDeleted", "页面已删除"),
+      t("wiki.pageDeleteFailed", "删除失败"),
     );
   };
 

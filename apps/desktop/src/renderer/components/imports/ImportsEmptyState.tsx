@@ -66,15 +66,29 @@ export function ImportsEmptyState() {
     if (files.length === 0) {
       return;
     }
-    await enqueue(
-      files.map((input) => ({ kind: "file" as const, input, collectionId: null })),
-    );
-    showToast(
-      t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
-        count: files.length,
-      }),
-      "success",
-    );
+    try {
+      await enqueue(
+        files.map((input) => ({
+          kind: "file" as const,
+          input,
+          collectionId: null,
+        })),
+      );
+      showToast(
+        t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+          count: files.length,
+        }),
+        "success",
+      );
+    } catch (error) {
+      showToast(
+        t("capture.enqueueFailed", "加入导入队列失败：{{message}}", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+        "error",
+        { detail: error instanceof Error ? error.message : String(error) },
+      );
+    }
   };
 
   return (

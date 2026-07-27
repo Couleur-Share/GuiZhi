@@ -13,6 +13,7 @@ import path from "path";
 import Database from "../database/sqlite";
 import { getDatabase } from "../database";
 import { getBackupsDir, getDatabasePath } from "../runtime-paths";
+import { logAppError } from "../diagnostic-log";
 import { getSchemaVersion, SCHEMA_VERSION } from "@guizhi/db";
 import type {
   BackupCreateResult,
@@ -166,20 +167,37 @@ export function listBackups(backupsDir = getBackupsDir()): BackupFileInfo[] {
   return backups;
 }
 
-/** 仅允许删除备份目录内、命名符合规范的文件（防路径穿越） */
+export interface BackupDeleteResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * 仅允许删除备份目录内、命名符合规范的文件（防路径穿越）。
+ *
+ * rmSync 必须包起来：Windows 上备份文件被杀毒软件或同步盘占用会抛 EPERM/EBUSY，
+ * 此前它一路穿到渲染进程变成无人处理的 rejection，界面上连「删除失败」都不弹。
+ */
 export function deleteBackup(
   fileName: string,
   backupsDir = getBackupsDir(),
-): boolean {
+): BackupDeleteResult {
   if (path.basename(fileName) !== fileName || !parseBackupKind(fileName)) {
-    return false;
+    return { success: false, error: "备份文件名不合法" };
   }
   const fullPath = path.join(backupsDir, fileName);
   if (!fs.existsSync(fullPath)) {
-    return false;
+    return { success: false, error: "备份文件已不存在" };
   }
-  fs.rmSync(fullPath);
-  return true;
+  try {
+    fs.rmSync(fullPath);
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 /** 按类别保留最近 keepCount 份，其余删除；返回删除数量 */
@@ -379,7 +397,11 @@ function writeLastAutoBackupAt(db: Database.Database, timestamp: number): void {
  * 独立线程是另一码事（node-sqlite3-wasm 是同步 WASM），在那之前至少让这段
  * 停顿有个解释。
  */
-export type AutoBackupNotifier = (phase: "start" | "done" | "failed") => void;
+export type AutoBackupNotifier = (
+  phase: "start" | "done" | "failed",
+  /** 失败原因；此前只发一个光杆 "failed"，界面上只能说「详见日志」 */
+  message?: string,
+) => void;
 
 let autoBackupNotifier: AutoBackupNotifier | null = null;
 
@@ -418,8 +440,11 @@ export function maybeRunAutoBackup(
     autoBackupNotifier?.("done");
     return true;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.warn("[backup] 自动备份失败:", error);
-    autoBackupNotifier?.("failed");
+    // 备份失败是数据安全事件：磁盘满还是路径没权限，用户必须知道
+    logAppError({ scope: "backup", action: "自动备份", message });
+    autoBackupNotifier?.("failed", message);
     return false;
   }
 }

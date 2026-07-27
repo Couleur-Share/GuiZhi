@@ -4,6 +4,7 @@ import type { KnowledgeItemListEntry } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ContextMenu } from "../ui/ContextMenu";
 import { Checkbox } from "../ui/Checkbox";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { ColumnConfigMenu } from "./ColumnConfigMenu";
 import { ItemBulkBar } from "./ItemBulkBar";
@@ -27,6 +28,8 @@ export function ItemTableView() {
   const { t } = useTranslation();
   const entries = useKnowledgeStore((state) => state.entries);
   const isLoading = useKnowledgeStore((state) => state.isLoading);
+  const loadError = useKnowledgeStore((state) => state.loadError);
+  const fetchList = useKnowledgeStore((state) => state.fetchList);
   const scope = useKnowledgeStore((state) => state.scope);
   const selectedId = useKnowledgeStore((state) => state.selectedId);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
@@ -177,6 +180,13 @@ export function ItemTableView() {
         {isLoading && entries.length === 0 ? (
           <div className="flex h-40 items-center justify-center">
             <Spinner size="sm" tone="muted" />
+          </div>
+        ) : loadError && entries.length === 0 ? (
+          <div className="app-wallpaper-surface rounded-xl border border-border">
+            <LoadErrorState
+              message={loadError}
+              onRetry={() => void fetchList()}
+            />
           </div>
         ) : entries.length === 0 ? (
           <div className="app-wallpaper-surface flex h-40 items-center justify-center rounded-xl border border-border px-6 text-center text-sm text-muted-foreground">

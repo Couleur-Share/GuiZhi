@@ -7,6 +7,7 @@ import type {
   FunasrOperationResult,
   FunasrStatus,
   KnowledgeItem,
+  MediaCapabilities,
   ToolUpdateCheck,
   YtDlpInstallResult,
   YtDlpStatus,
@@ -16,6 +17,8 @@ export interface MediaTranscribeResult {
   success: boolean;
   notConfigured?: boolean;
   error?: string;
+  /** 成功但打了折扣（如只排版了一部分） */
+  warning?: string;
   item?: KnowledgeItem;
 }
 
@@ -26,14 +29,27 @@ export interface TranscriptionTestResult {
 }
 
 export const mediaApi = {
-  transcribe: (itemId: string): Promise<MediaTranscribeResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_TRANSCRIBE, itemId),
-  /** 已有文字稿的 AI 排版（补标点/分段，不重新转写） */
-  formatTranscript: (itemId: string): Promise<MediaTranscribeResult> =>
-    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_FORMAT_TRANSCRIPT, itemId),
+  /** diarize 区分说话人，仅内置本地转写引擎支持 */
+  transcribe: (
+    itemId: string,
+    options?: { diarize?: boolean },
+  ): Promise<MediaTranscribeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_TRANSCRIBE, itemId, options),
+  /**
+   * 已有文字稿的 AI 排版（补标点/分段，不重新转写）。
+   * allowLong 越过自动排版的长度上限，由调用方先向用户确认代价。
+   */
+  formatTranscript: (
+    itemId: string,
+    options?: { allowLong?: boolean },
+  ): Promise<MediaTranscribeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_FORMAT_TRANSCRIPT, itemId, options),
   /** 基于文字稿生成结构化「视频/音频总结」并写入正文 */
   summarize: (itemId: string): Promise<MediaTranscribeResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SUMMARIZE, itemId),
+  /** 当前「语音转写」路由支持哪些可选能力（界面据此决定摆不摆入口） */
+  capabilities: (): Promise<MediaCapabilities> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_CAPABILITIES),
   /** 转写模型连通性测试：主进程用静音样本发起真实转写请求 */
   testTranscription: (config: {
     apiUrl: string;

@@ -20,6 +20,7 @@ import {
 import { useToast } from "../ui/Toast";
 import { ColumnResizer } from "../ui/ColumnResizer";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { WikiCatalogList } from "./WikiCatalogList";
 import { WikiGraphView } from "./WikiGraphView";
@@ -105,6 +106,7 @@ export function WikiWorkspace() {
   const status = useWikiStore((state) => state.status);
   const catalog = useWikiStore((state) => state.catalog);
   const hasLoaded = useWikiStore((state) => state.hasLoaded);
+  const loadError = useWikiStore((state) => state.loadError);
   const isCompiling = useWikiStore((state) => state.isCompiling);
   const compileProgress = useWikiStore((state) => state.compileProgress);
   const compileNotice = useWikiStore((state) => state.compileNotice);
@@ -132,6 +134,9 @@ export function WikiWorkspace() {
     if (!compileNotice) {
       return;
     }
+    const detail = compileNotice.detail
+      ? { detail: compileNotice.detail }
+      : undefined;
     if (compileNotice.kind === "done") {
       showToast(
         compileNotice.message
@@ -141,6 +146,16 @@ export function WikiWorkspace() {
           : t("wiki.compileNothing", "没有需要编译的条目"),
         "success",
       );
+    } else if (compileNotice.kind === "partial") {
+      // 有条目没编出来就不能报绿色，原因逐条挂在详情里
+      showToast(
+        t("wiki.compilePartial", "编译完成 {{result}}，{{failed}} 条未能生成", {
+          result: compileNotice.message,
+          failed: compileNotice.detail?.split("\n").length ?? 0,
+        }),
+        "warning",
+        detail,
+      );
     } else if (compileNotice.kind === "cancelled") {
       showToast(
         compileNotice.message
@@ -149,6 +164,7 @@ export function WikiWorkspace() {
             })
           : t("wiki.compileStopped", "已停止编译"),
         "info",
+        detail,
       );
     } else if (compileNotice.kind === "not-configured") {
       showToast(t("ask.notConfigured", "尚未配置 AI 服务"), "error");
@@ -266,6 +282,10 @@ export function WikiWorkspace() {
         // 再被两栏布局整块顶掉
         <div className="delayed-fade-in flex flex-1 items-center justify-center">
           <Spinner tone="muted" />
+        </div>
+      ) : loadError && catalog.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <LoadErrorState message={loadError} onRetry={() => void refresh()} />
         </div>
       ) : catalog.length === 0 && !isCompiling ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">

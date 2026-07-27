@@ -16,6 +16,7 @@ import type {
 } from "@guizhi/shared/types";
 import Database from "../database/sqlite";
 import { closeDatabase } from "../database";
+import type { BackupDeleteResult } from "../services/backup";
 import {
   countActiveImportTasks,
   createBackup,
@@ -66,7 +67,7 @@ export function registerBackupIPC(db: Database.Database): void {
 
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_DELETE,
-    (_event, fileName: string): boolean => {
+    (_event, fileName: string): BackupDeleteResult => {
       return deleteBackup(fileName);
     },
   );

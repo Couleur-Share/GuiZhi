@@ -14,6 +14,11 @@ const MAX_MENU_HEIGHT = 280;
 export interface SelectOption {
   value: string;
   label: React.ReactNode;
+  /**
+   * 触发器上的显示内容，缺省时用 label。
+   * 选项里带说明文字的多行 label 直接塞进触发器会把它撑成两行。
+   */
+  triggerLabel?: React.ReactNode;
   labelText?: string; // Searchable/Accessibility text
   group?: string;
 }
@@ -144,7 +149,11 @@ export function Select({
   // Get current selected label
   // 获取当前选中项的标签
   const selectedOption = options.find((opt) => opt.value === value);
-  const displayLabel = selectedOption?.label || placeholder || t('common.select');
+  const displayLabel =
+    selectedOption?.triggerLabel ??
+    selectedOption?.label ??
+    placeholder ??
+    t('common.select');
 
   // Group options
   // 按分组整理选项
@@ -291,7 +300,7 @@ function OptionItem({
         }
       `}
     >
-      <span className="truncate">{option.label}</span>
+      <span className="min-w-0 flex-1 truncate">{option.label}</span>
       {isSelected && <CheckIcon aria-hidden="true" className="w-4 h-4 flex-shrink-0" />}
     </button>
   );

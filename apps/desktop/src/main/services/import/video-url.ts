@@ -17,6 +17,7 @@ import {
   type VideoPlatform,
 } from "@guizhi/shared/utils/video-platforms";
 import type { ImportStage } from "@guizhi/shared/types";
+import { logAppError } from "../../diagnostic-log";
 import type { ExtractedContent } from "./connectors";
 import {
   downloadDouyinMedia,
@@ -33,6 +34,7 @@ import {
   type TranscriptionModelConfig,
 } from "../media/transcribe";
 import {
+  extractGlossaryTerms,
   formatTranscript,
   resolveTranscriptFormatterConfig,
 } from "../media/transcript-format";
@@ -216,11 +218,14 @@ export interface VideoUrlDeps {
   douyinNote?: Omit<DouyinNoteDeps, "onStage">;
   /** 测试注入：转写配置解析（默认读 ai-config.json 的 audioText 路由） */
   getTranscriptionConfig?: () => TranscriptionModelConfig | null;
+  /** 导入时是否区分说话人（读设置，默认关） */
+  getDiarize?: () => boolean;
   /** 测试注入：转写执行 */
   transcribe?: (
     filePath: string,
     config: TranscriptionModelConfig,
     signal?: AbortSignal,
+    options?: { diarize?: boolean },
   ) => Promise<string>;
   /** 测试注入：音频预处理（默认 ffmpeg 转码 16kHz 单声道 mp3） */
   prepareAudio?: typeof prepareAudioForTranscription;
@@ -469,6 +474,8 @@ export async function extractVideoUrl(
         prepared.filePath,
         transcriptionConfig,
         signal,
+        // 目标不是内置引擎时 transcribe 内部会忽略这个字段，不必在这里判
+        { diarize: deps.getDiarize?.() === true },
       );
     } catch (error) {
       if (error instanceof Error && error.message === "已取消") {
@@ -490,16 +497,47 @@ export async function extractVideoUrl(
       if (formatterConfig) {
         deps.onStage?.("formatting");
         try {
-          transcript = await (deps.formatTranscript ?? formatTranscript)(
+          const result = await (deps.formatTranscript ?? formatTranscript)(
             transcript,
             formatterConfig,
-            { signal },
+            {
+              signal,
+              glossary: extractGlossaryTerms(
+                metadata.title,
+                metadata.description,
+              ),
+            },
           );
+          transcript = result.text;
+          // 导入是后台流程，不弹提示；但跳过/半途而废要留痕，
+          // 否则用户只看到一坨没分段的文字，报上来时双方都拿不出数
+          const note = result.skippedReason
+            ? `跳过排版：${result.skippedReason}`
+            : result.partialReason
+              ? `部分排版：${result.partialReason}`
+              : null;
+          if (note) {
+            console.warn(`[import] ${note}`);
+            logAppError({
+              scope: "import",
+              action: "文字稿排版",
+              message: note,
+              url,
+            });
+          }
         } catch (error) {
           if (signal?.aborted) {
             throw new Error("已取消", { cause: error });
           }
           console.warn("[import] 文字稿 AI 排版失败，保留原始转写:", error);
+          logAppError({
+            scope: "import",
+            action: "文字稿排版",
+            message: `排版失败，保留原始转写：${
+              error instanceof Error ? error.message : String(error)
+            }`,
+            url,
+          });
         }
       }
     }

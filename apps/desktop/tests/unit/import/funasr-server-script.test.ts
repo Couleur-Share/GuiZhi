@@ -37,7 +37,7 @@ describe("FUNASR_SERVER_SCRIPT", () => {
   it("模型实例不与 model 表单字段同名", () => {
     // 端点按 OpenAI 协议必须收一个叫 model 的表单字段，闭包里的 AutoModel
     // 若也叫 model 会被它遮蔽，运行时报 'str' object has no attribute 'generate'
-    expect(FUNASR_SERVER_SCRIPT).toContain("asr_model.generate(**kwargs)");
+    expect(FUNASR_SERVER_SCRIPT).toContain("asr_model.generate(");
     expect(FUNASR_SERVER_SCRIPT).not.toContain("    model = AutoModel(");
   });
 
@@ -46,6 +46,34 @@ describe("FUNASR_SERVER_SCRIPT", () => {
     expect(FUNASR_SERVER_SCRIPT).toContain('@app.get("/v1/models")');
     expect(FUNASR_SERVER_SCRIPT).toContain(
       '@app.post("/v1/audio/transcriptions")',
+    );
+  });
+
+  it("说话人模型按请求加载，不常驻", () => {
+    // 带了 spk_model 的 AutoModel 每次推理都会跑声纹提取（funasr 只判模型
+    // 在不在），常驻会让所有转写都慢一倍——必须按模式重建
+    expect(FUNASR_SERVER_SCRIPT).toContain("def ensure_model(diarize):");
+    expect(FUNASR_SERVER_SCRIPT).toContain('kwargs["spk_model"] = SPK_CHECKPOINT');
+    expect(FUNASR_SERVER_SCRIPT).toContain("ensure_model(want_diarize)");
+  });
+
+  it("按机器核数给 torch 线程，不吃 funasr 默认的 4", () => {
+    // CPU 上 funasr 关掉了批处理，只能靠线程数要速度；但也不占满机器
+    expect(FUNASR_SERVER_SCRIPT).toContain("def resolve_ncpu():");
+    expect(FUNASR_SERVER_SCRIPT).toContain('"ncpu": resolve_ncpu()');
+  });
+
+  it("分离不动 VAD 的收尾静音阈值", () => {
+    // 曾经降到 400ms 想切得更细，实测在真实音频上会在切点丢字
+    //（「花了很多很多年」丢成「了很多很多年」），而 800ms 默认值同样分得出
+    // 两个说话人——降阈值是净损失，别再加回来
+    expect(FUNASR_SERVER_SCRIPT).not.toContain("max_end_silence_time");
+  });
+
+  it("兼容 sentence_info 的两种文本字段名", () => {
+    // 开了 spk 是 sentence，没开是 text；只读一种会得到空白分段
+    expect(FUNASR_SERVER_SCRIPT).toContain(
+      'sentence.get("sentence") or sentence.get("text")',
     );
   });
 

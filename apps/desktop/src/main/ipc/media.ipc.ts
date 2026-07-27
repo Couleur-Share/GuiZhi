@@ -19,7 +19,11 @@ import type {
   FunasrOperationResult,
   FunasrStatus,
   KnowledgeItem,
+  MediaCapabilities,
   ToolUpdateCheck,
+  TranscribeProgress,
+  TranscribeStage,
+  TranscriptFormatProgress,
   YtDlpInstallResult,
   YtDlpStatus,
 } from "@guizhi/shared/types";
@@ -34,9 +38,12 @@ import {
   mediaSummaryHeading,
   upsertMediaSummarySection,
 } from "@guizhi/shared/utils/media-summary";
+import { listSpeakers } from "@guizhi/shared/utils/speaker-note";
+import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
 import { KnowledgeItemDB } from "@guizhi/db";
 import Database from "../database/sqlite";
+import { logAppError } from "../diagnostic-log";
 import { getVideosDir } from "../runtime-paths";
 import {
   readFfmpegPathSetting,
@@ -71,10 +78,12 @@ import {
 } from "../services/media/funasr-manager";
 import {
   ensureLocalTranscriptionService,
+  getTranscriptionActivityAt,
   stopFunasrService,
 } from "../services/media/funasr-service";
 import {
   resolveTranscriptionConfig,
+  supportsDiarization,
   testTranscriptionConfig,
   transcribeMediaFile,
   type TranscriptionModelConfig,
@@ -85,6 +94,7 @@ import {
 } from "../services/media/media-summary";
 import { generateForumSummary } from "../services/import/forum-summary";
 import {
+  extractGlossaryTerms,
   formatTranscript,
   resolveTranscriptFormatterConfig,
 } from "../services/media/transcript-format";
@@ -102,6 +112,8 @@ export interface MediaTranscribeResult {
   /** 未配置 audioText 转写模型（UI 引导去设置） */
   notConfigured?: boolean;
   error?: string;
+  /** 成功但打了折扣（如只排版了一部分），UI 用 warning 提示而非绿色的「完成」 */
+  warning?: string;
   item?: KnowledgeItem;
 }
 
@@ -111,16 +123,60 @@ export interface TranscriptionTestResult {
   error?: string;
 }
 
-/** 转写成功后顺带 AI 排版（补标点/分段）；失败或未配置文本模型时保留原始转写 */
-async function formatTranscriptSafely(raw: string): Promise<string> {
+/** 条目侧的专名表：标题 + 元数据引用块里的平台简介 */
+function resolveItemGlossary(item: KnowledgeItem): string[] {
+  return extractGlossaryTerms(
+    item.title,
+    parseVideoMetaBlock(item.content)?.description,
+  );
+}
+
+/**
+ * 转写成功后顺带 AI 排版（补标点/分段）；失败或未配置文本模型时保留原始转写。
+ *
+ * 这是后台自动执行的一步，不弹提示，但失败与超长跳过都要写进 error.log：
+ * 不然用户看到的只是一坨没分段的文字，报「排版怎么没生效」时双方都拿不出数。
+ * 未配置文本模型是常态而非故障，不记。
+ */
+async function formatTranscriptSafely(
+  raw: string,
+  item: KnowledgeItem,
+): Promise<string> {
+  const itemId = item.id;
   const formatterConfig = resolveTranscriptFormatterConfig();
   if (!formatterConfig) {
     return raw;
   }
   try {
-    return await formatTranscript(raw, formatterConfig);
+    const { text, skippedReason, partialReason } = await formatTranscript(
+      raw,
+      formatterConfig,
+      { glossary: resolveItemGlossary(item) },
+    );
+    const note = skippedReason
+      ? `跳过排版：${skippedReason}`
+      : partialReason
+        ? `部分排版：${partialReason}`
+        : null;
+    if (note) {
+      console.warn(`[media] ${note}`);
+      logAppError({
+        scope: "media",
+        action: "文字稿排版",
+        message: note,
+        itemId,
+      });
+    }
+    return text;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.warn("[media] 文字稿 AI 排版失败，保留原始转写:", error);
+    logAppError({
+      scope: "media",
+      action: "文字稿排版",
+      message: `排版失败，保留原始转写：${message}`,
+      itemId,
+    });
     return raw;
   }
 }
@@ -222,20 +278,71 @@ async function regenerateForumSummary(
  * 文字稿存 transcript 字段；总结写入正文总结小节并应用 AI 标题，
  * 历史转写状态注记一并清除。
  */
+/**
+ * 按秒上报当前阶段与已用时长。
+ *
+ * 覆盖整条链路（转写 → 排版 → 总结）而不只是转写：这三步都以分钟计，
+ * 只给转写计时的话，后两步期间界面会停在最后一次上报的数字上、文案还写着
+ * 「正在转写」——看起来就像卡死了。没有百分比是有意的，见
+ * `TranscribeProgress` 的注释。
+ */
+function startTranscribeProgress(
+  itemId: string,
+  report?: (payload: TranscribeProgress) => void,
+): { setStage: (stage: TranscribeStage) => void; stop: () => void } {
+  if (!report) {
+    return { setStage: () => {}, stop: () => {} };
+  }
+  const startedAt = Date.now();
+  let stage: TranscribeStage = "transcribing";
+  const emit = () => {
+    const activityAt = getTranscriptionActivityAt();
+    report({
+      itemId,
+      stage,
+      elapsedMs: Date.now() - startedAt,
+      // 心跳来自本地 ASR 服务，只有转写阶段有；云端转写也没有，
+      // 报出来会变成「一直卡着」
+      stalledMs:
+        stage === "transcribing" && activityAt > startedAt
+          ? Date.now() - activityAt
+          : undefined,
+    });
+  };
+  const timer = setInterval(emit, 1000);
+  return {
+    setStage: (next) => {
+      stage = next;
+      emit();
+    },
+    stop: () => clearInterval(timer),
+  };
+}
+
 async function transcribeAndSave(
   items: KnowledgeItemDB,
   item: KnowledgeItem,
   sourceFilePath: string,
   ffmpegExecutable: string,
   config: TranscriptionModelConfig,
+  diarize = false,
+  report?: (payload: TranscribeProgress) => void,
 ): Promise<MediaTranscribeResult> {
   const prepared = await prepareAudioForTranscription(
     sourceFilePath,
     ffmpegExecutable,
   );
+  const progress = startTranscribeProgress(item.id, report);
   try {
-    const rawText = await transcribeMediaFile(prepared.filePath, config);
-    const text = await formatTranscriptSafely(rawText);
+    const rawText = await transcribeMediaFile(
+      prepared.filePath,
+      config,
+      undefined,
+      { diarize },
+    );
+    progress.setStage("formatting");
+    const text = await formatTranscriptSafely(rawText, item);
+    progress.setStage("summarizing");
     const summarized = await applyMediaSummarySafely(
       item,
       stripTranscriptionNote(item.content),
@@ -252,8 +359,19 @@ async function transcribeAndSave(
     }
     const updated = items.update(item.id, patch);
     console.log(`[media] 转写完成（item=${item.id}，${text.length} 字）`);
-    return { success: true, item: updated ?? undefined };
+    // 要求了分离却只出来一个说话人：聚类判定「只有一个人」。实测短音频
+    // （15 秒 3 轮）会塌成单说话人，而用户会以为功能没生效
+    const speakers = diarize ? listSpeakers(text).length : 0;
+    return {
+      success: true,
+      item: updated ?? undefined,
+      warning:
+        diarize && speakers <= 1
+          ? "只识别出一个说话人。音频较短或换人间隔太小时分不出来，全程单人说话时这也是正确结果。"
+          : undefined,
+    };
   } finally {
+    progress.stop();
     prepared.cleanup();
   }
 }
@@ -279,6 +397,8 @@ async function retranscribeOnlineVideo(
   item: KnowledgeItem,
   ffmpegExecutable: string,
   config: TranscriptionModelConfig,
+  diarize = false,
+  report?: (payload: TranscribeProgress) => void,
 ): Promise<MediaTranscribeResult> {
   const sourceUrl = item.sourceUri?.trim() ?? "";
   const platform = detectVideoPlatform(sourceUrl);
@@ -306,6 +426,8 @@ async function retranscribeOnlineVideo(
       audio.filePath,
       ffmpegExecutable,
       config,
+      diarize,
+      report,
     );
   } catch (error) {
     if (error instanceof YtDlpNotFoundError) {
@@ -359,7 +481,14 @@ const FUNASR_STATUS_CACHE_KEY = "funasr";
 export function registerMediaIPC(db: Database.Database): void {
   ipcMain.handle(
     IPC_CHANNELS.MEDIA_TRANSCRIBE,
-    async (_event, itemId: string): Promise<MediaTranscribeResult> => {
+    async (
+      event,
+      itemId: string,
+      options?: { diarize?: boolean },
+    ): Promise<MediaTranscribeResult> => {
+      const report = (payload: TranscribeProgress) => {
+        event.sender.send(IPC_CHANNELS.MEDIA_TRANSCRIBE_PROGRESS, payload);
+      };
       const items = new KnowledgeItemDB(db);
       const item = items.get(itemId);
       if (!item) {
@@ -375,6 +504,15 @@ export function registerMediaIPC(db: Database.Database): void {
           success: false,
           notConfigured: true,
           error: "未配置语音转写模型",
+        };
+      }
+      const diarize = options?.diarize === true;
+      // 说话人分离是内置引擎的扩展能力，云端转写接口给不出来——
+      // 静默忽略的话用户会以为分了、结果里却一个说话人都没有
+      if (diarize && !supportsDiarization(config.apiUrl)) {
+        return {
+          success: false,
+          error: "区分说话人只有内置本地转写引擎支持，当前「语音转写」路由指向的是外部接口",
         };
       }
 
@@ -395,6 +533,8 @@ export function registerMediaIPC(db: Database.Database): void {
             item,
             ffmpegExecutable,
             config,
+            diarize,
+            report,
           );
         }
 
@@ -408,6 +548,8 @@ export function registerMediaIPC(db: Database.Database): void {
           filePath,
           ffmpegExecutable,
           config,
+          diarize,
+          report,
         );
       } catch (error) {
         return {
@@ -418,10 +560,25 @@ export function registerMediaIPC(db: Database.Database): void {
     },
   );
 
+  // 「语音转写」路由支持哪些可选能力：界面据此决定要不要摆出入口
+  ipcMain.handle(
+    IPC_CHANNELS.MEDIA_CAPABILITIES,
+    async (): Promise<MediaCapabilities> => {
+      const config = resolveTranscriptionConfig();
+      return {
+        diarization: config ? supportsDiarization(config.apiUrl) : false,
+      };
+    },
+  );
+
   // 已有文字稿的 AI 排版：不重新转写，直接整理 transcript 字段
   ipcMain.handle(
     IPC_CHANNELS.MEDIA_FORMAT_TRANSCRIPT,
-    async (_event, itemId: string): Promise<MediaTranscribeResult> => {
+    async (
+      event,
+      itemId: string,
+      options?: { allowLong?: boolean },
+    ): Promise<MediaTranscribeResult> => {
       const items = new KnowledgeItemDB(db);
       const item = items.get(itemId);
       if (!item) {
@@ -442,12 +599,41 @@ export function registerMediaIPC(db: Database.Database): void {
       }
 
       try {
-        const formatted = await formatTranscript(transcript, config);
-        const updated = items.update(item.id, { transcript: formatted });
-        console.log(
-          `[media] 文字稿排版完成（item=${item.id}，${formatted.length} 字）`,
+        const { text, skippedReason, partialReason } = await formatTranscript(
+          transcript,
+          config,
+          {
+            glossary: resolveItemGlossary(item),
+            // 用户已在确认框里看过字数与预估请求次数，这里不再拦
+            maxTotalChars: options?.allowLong
+              ? Number.MAX_SAFE_INTEGER
+              : undefined,
+            onProgress: (current, total) => {
+              const payload: TranscriptFormatProgress = {
+                itemId,
+                current,
+                total,
+              };
+              event.sender.send(IPC_CHANNELS.MEDIA_FORMAT_PROGRESS, payload);
+            },
+          },
         );
-        return { success: true, item: updated ?? undefined };
+        // 手动点的操作不能静默返回成功——没排版就得说清为什么
+        if (skippedReason) {
+          return { success: false, error: skippedReason };
+        }
+        const updated = items.update(item.id, { transcript: text });
+        console.log(
+          `[media] 文字稿排版完成（item=${item.id}，${text.length} 字${
+            partialReason ? "，部分排版" : ""
+          }）`,
+        );
+        // 排到一半照样落库（这些请求的钱已经花了），但不能报成完整成功
+        return {
+          success: true,
+          item: updated ?? undefined,
+          warning: partialReason,
+        };
       } catch (error) {
         return {
           success: false,

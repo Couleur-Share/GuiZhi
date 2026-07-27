@@ -72,7 +72,8 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
     try {
       // 图文条目会有多张配图，逐张识别；单张失败不影响其余
       const texts: (string | null)[] = [];
-      for (const assetFileName of assetFileNames) {
+      const failures: string[] = [];
+      for (const [index, assetFileName] of assetFileNames.entries()) {
         try {
           texts.push(await recognizeImageText(assetFileName));
         } catch (error) {
@@ -81,11 +82,30 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
           }
           console.warn(`[ocr] ${assetFileName} 识别失败:`, error);
           texts.push(null);
+          failures.push(
+            `${t("library.imageIndex", "图 {{index}}", { index: index + 1 })}：${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
         }
       }
+      // 逐张的原因此前只进 console：9 张里 8 张失败，用户看到的还是绿色的「完成」
+      const failureDetail =
+        failures.length > 0 ? { detail: failures.join("\n") } : undefined;
+
       const body = buildOcrSectionBody(texts);
       if (!body) {
-        throw new Error("所有图片都未识别出文字");
+        showToast(
+          t("library.ocrFailed", "文字识别失败：{{message}}", {
+            message: t(
+              "library.ocrNoTextRecognized",
+              "所有图片都未识别出文字",
+            ),
+          }),
+          "error",
+          failureDetail,
+        );
+        return;
       }
       const updated = await window.api.knowledge.update(itemId, {
         content: applyOcrTextToContent(item.content, body),
@@ -93,7 +113,15 @@ export function AiOcrCard({ item }: { item: KnowledgeItem }) {
       if (updated) {
         applyServerItem(updated);
       }
-      showToast(t("library.ocrDone", "文字识别完成"), "success");
+      showToast(
+        failures.length > 0
+          ? t("library.ocrPartial", "文字识别完成，{{failed}} 张失败", {
+              failed: failures.length,
+            })
+          : t("library.ocrDone", "文字识别完成"),
+        failures.length > 0 ? "warning" : "success",
+        failureDetail,
+      );
     } catch (error) {
       if (error instanceof AiNotConfiguredError) {
         showToast(

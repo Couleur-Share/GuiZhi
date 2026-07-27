@@ -5,6 +5,7 @@ import type { ImportTask } from "@guizhi/shared/types";
 import { filterTasks, useImportStore } from "../../stores/import.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { ImportsBulkBar } from "./ImportsBulkBar";
 import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
@@ -22,6 +23,7 @@ export function ImportsWorkspace() {
   const { t } = useTranslation();
   const tasks = useImportStore((state) => state.tasks);
   const hasLoaded = useImportStore((state) => state.hasLoaded);
+  const loadError = useImportStore((state) => state.loadError);
   const filter = useImportStore((state) => state.filter);
   const setFilter = useImportStore((state) => state.setFilter);
   const query = useImportStore((state) => state.query);
@@ -159,6 +161,8 @@ export function ImportsWorkspace() {
           <div className="delayed-fade-in flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />
           </div>
+        ) : loadError && tasks.length === 0 ? (
+          <LoadErrorState message={loadError} onRetry={() => void fetchTasks()} />
         ) : tasks.length === 0 ? (
           <ImportsEmptyState />
         ) : visible.length === 0 ? (

@@ -10,6 +10,8 @@ import { backupApi } from "./api/backup";
 import { askSessionApi } from "./api/ask";
 import { semanticApi } from "./api/semantic";
 import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
+import { illustrationApi } from "./api/illustration";
+import { logApi } from "./api/log";
 import { createBufferedSubscription } from "./app-command-subscription";
 import type { AppCommand } from "@guizhi/shared/types";
 
@@ -69,6 +71,8 @@ const api = {
   askSession: askSessionApi,
   semantic: semanticApi,
   media: mediaApi,
+  illustration: illustrationApi,
+  log: logApi,
   ytdlp: ytDlpApi,
   ffmpeg: ffmpegApi,
   funasr: funasrApi,
@@ -90,6 +94,8 @@ const api = {
       "ytdlp:downloadProgress",
       "ffmpeg:downloadProgress",
       "funasr:installProgress",
+      "media:formatProgress",
+      "media:transcribeProgress",
     ];
 
     if (!ALLOWED_LISTEN_CHANNELS.includes(channel)) {

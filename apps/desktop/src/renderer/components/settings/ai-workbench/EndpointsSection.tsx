@@ -9,6 +9,7 @@ import {
   DatabaseIcon,
   EyeIcon,
   EyeOffIcon,
+  ImageIcon,
   KeyRoundIcon,
   LinkIcon,
   ListPlusIcon,
@@ -735,7 +736,7 @@ export function EndpointsSection({
 
                 <div className="divide-y divide-border">
                   {selectedGroup.models.map((model) => {
-                    // 类型徽章：嵌入 / 转写为专用模型，其余按对话模型展示
+                    // 类型徽章：嵌入 / 转写 / 文生图为专用模型，其余按对话模型展示
                     const typeBadge: ModelBadge =
                       model.capabilities?.embedding === true
                         ? {
@@ -749,11 +750,17 @@ export function EndpointsSection({
                               icon: AudioLinesIcon,
                               primary: false,
                             }
-                          : {
-                              label: t("settings.chatModel"),
-                              icon: TypeIcon,
-                              primary: false,
-                            };
+                          : model.capabilities?.imageGeneration === true
+                            ? {
+                                label: t("settings.imageGenModel"),
+                                icon: ImageIcon,
+                                primary: false,
+                              }
+                            : {
+                                label: t("settings.chatModel"),
+                                icon: TypeIcon,
+                                primary: false,
+                              };
                     const capabilityBadges: ModelBadge[] = [
                       typeBadge,
                       ...(model.isDefault

@@ -110,6 +110,21 @@ export function readFfmpegPathSetting(db: Database.Database): string | null {
   return readToolPathSetting(db, "ffmpegPath");
 }
 
+/** 导入时是否区分说话人（默认关：它让转写慢一倍，且只对多人内容有意义） */
+export function readTranscribeDiarizeSetting(db: Database.Database): boolean {
+  const row = db.get("SELECT value FROM settings WHERE key = ?", [
+    "transcribeDiarize",
+  ]) as { value: string } | undefined;
+  if (!row) {
+    return false;
+  }
+  try {
+    return JSON.parse(row.value) === true;
+  } catch {
+    return false;
+  }
+}
+
 export function createImportService(
   db: Database.Database,
   broadcast: (task: ImportTask) => void,
@@ -122,6 +137,7 @@ export function createImportService(
       extractContent(kind, input, signal, {
         getYtDlpPath: () => readYtDlpPathSetting(db),
         getFfmpegPath: () => readFfmpegPathSetting(db),
+        getDiarize: () => readTranscribeDiarizeSetting(db),
         onStage,
       }),
     onTaskChanged: broadcast,

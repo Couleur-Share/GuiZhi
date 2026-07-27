@@ -197,11 +197,91 @@ describe("extractVideoUrl", () => {
       }),
       formatTranscript: async (raw) => {
         expect(raw).toBe("原始 转写 无标点");
-        return "原始转写，已排版。";
+        return { text: "原始转写，已排版。" };
       },
       getSummaryConfig: () => null,
     });
     expect(extracted.transcript).toBe("原始转写，已排版。");
+  });
+
+  it("排版带上取自标题与简介的专名表：本地引擎听错的正是这批词", async () => {
+    // 元数据里出现的拉丁专名要进术语表，中文部分不进
+    const run: RunCommand = async (_exe, args) => {
+      const outputIndex = args.indexOf("-o");
+      if (outputIndex >= 0) {
+        const filePath = args[outputIndex + 1].replace(".%(ext)s", ".m4a");
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, "fake-audio");
+        return { stdout: "" };
+      }
+      return {
+        stdout: JSON.stringify({
+          ...SAMPLE_METADATA,
+          title: "React 的 useEffect 到底怎么用",
+          description: "顺带聊聊 Docker 与 GitHub Actions。",
+        }),
+      };
+    };
+    let received: string[] | undefined;
+    await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run,
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: passthroughPrepareAudio,
+      transcribe: async () => "原始 转写 无标点",
+      getFormatterConfig: () => ({
+        provider: "openai",
+        apiProtocol: "openai",
+        apiKey: "sk-test",
+        apiUrl: "https://api.openai.com",
+        model: "fast-model",
+      }),
+      formatTranscript: async (raw, _config, options) => {
+        received = options?.glossary;
+        return { text: raw };
+      },
+      getSummaryConfig: () => null,
+    });
+    expect(received).toEqual([
+      "React",
+      "useEffect",
+      "Docker",
+      "GitHub Actions",
+    ]);
+  });
+
+  it("导入时按设置决定要不要区分说话人，默认不分", async () => {
+    const seen: (boolean | undefined)[] = [];
+    const deps = {
+      getYtDlpPath: () => null,
+      run: buildAudioAwareRun(),
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: passthroughPrepareAudio,
+      transcribe: async (
+        _path: string,
+        _config: unknown,
+        _signal?: AbortSignal,
+        options?: { diarize?: boolean },
+      ) => {
+        seen.push(options?.diarize);
+        return "文字稿";
+      },
+      getFormatterConfig: () => null,
+      getSummaryConfig: () => null,
+    };
+
+    await extractVideoUrl(url, "bilibili", deps);
+    await extractVideoUrl(url, "bilibili", { ...deps, getDiarize: () => true });
+
+    expect(seen).toEqual([false, true]);
   });
 
   it("AI 排版失败 → 保留原始转写，不影响导入", async () => {
@@ -226,6 +306,35 @@ describe("extractVideoUrl", () => {
       formatTranscript: async () => {
         throw new Error("HTTP 429");
       },
+      getSummaryConfig: () => null,
+    });
+    expect(extracted.transcript).toBe("原始 转写 无标点");
+    expect(extracted.content).not.toContain("文字稿生成失败");
+  });
+
+  it("超长文字稿跳过排版 → 保留原始转写，导入照常完成", async () => {
+    const run = buildAudioAwareRun();
+    const extracted = await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run,
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: passthroughPrepareAudio,
+      transcribe: async () => "原始 转写 无标点",
+      getFormatterConfig: () => ({
+        provider: "openai",
+        apiProtocol: "openai",
+        apiKey: "sk-test",
+        apiUrl: "https://api.openai.com",
+        model: "fast-model",
+      }),
+      formatTranscript: async (raw) => ({
+        text: raw,
+        skippedReason: "文字稿 60000 字，超过自动排版上限 50000 字",
+      }),
       getSummaryConfig: () => null,
     });
     expect(extracted.transcript).toBe("原始 转写 无标点");
@@ -350,7 +459,7 @@ describe("extractVideoUrl", () => {
         model: "fast-model",
         apiProtocol: "openai",
       }),
-      formatTranscript: async (text) => text,
+      formatTranscript: async (text) => ({ text }),
       getSummaryConfig: () => ({
         apiUrl: "https://api.openai.com",
         apiKey: "sk-test",

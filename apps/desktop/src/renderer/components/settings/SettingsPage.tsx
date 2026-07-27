@@ -6,6 +6,7 @@ import {
   InfoIcon,
   ArrowLeftIcon,
   BrainIcon,
+  ImageIcon,
   KeyIcon,
   KeyboardIcon,
   WifiIcon,
@@ -28,6 +29,7 @@ const SETTINGS_MENU = [
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
+  { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
   { id: "shortcuts", labelKey: "settings.shortcuts", icon: KeyboardIcon },
   { id: "security", labelKey: "settings.security", icon: KeyIcon },
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
@@ -78,6 +80,11 @@ const AISettingsPrototype = lazy(() =>
     default: module.AISettingsPrototype,
   })),
 );
+const IllustrationSettings = lazy(() =>
+  import("./IllustrationSettings").then((module) => ({
+    default: module.IllustrationSettings,
+  })),
+);
 
 function SettingsContentFallback({ label }: { label: string }) {
   return (
@@ -126,6 +133,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <NetworkSettings />;
       case "ai":
         return <AISettingsPrototype />;
+      case "illustration":
+        return <IllustrationSettings />;
       case "language":
         return <LanguageSettings />;
       case "shortcuts":

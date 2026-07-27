@@ -17,6 +17,7 @@ import {
 } from "@guizhi/shared/utils/ai-protocol";
 import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
+import { isManagedFunasrUrl } from "./funasr-service";
 
 const TRANSCRIBE_TIMEOUT_MS = 10 * 60 * 1000;
 const TEST_TIMEOUT_MS = 60 * 1000;
@@ -78,11 +79,17 @@ export function buildTranscriptionsEndpoint(
   );
 }
 
+/** 说话人分离是内置引擎的扩展字段，云端 OpenAI 兼容接口没有也未必宽容 */
+export function supportsDiarization(apiUrl: string): boolean {
+  return isManagedFunasrUrl(apiUrl);
+}
+
 /** 发起转写请求并返回原始文本（可能为空串——测试静音样本时属正常） */
 async function requestTranscription(
   filePath: string,
   config: TranscriptionModelConfig,
   signal: AbortSignal,
+  diarize = false,
 ): Promise<string> {
   const endpoint = buildTranscriptionsEndpoint(config);
   if (!endpoint) {
@@ -95,6 +102,9 @@ async function requestTranscription(
   form.append("file", await openAsBlob(filePath), path.basename(filePath));
   form.append("model", config.model);
   form.append("response_format", "json");
+  if (diarize && supportsDiarization(config.apiUrl)) {
+    form.append("diarize", "true");
+  }
 
   const response = await fetchWithNetworkProxy(endpoint, {
     method: "POST",
@@ -155,6 +165,7 @@ export async function transcribeMediaFile(
   filePath: string,
   config: TranscriptionModelConfig,
   signal?: AbortSignal,
+  options?: { diarize?: boolean },
 ): Promise<string> {
   const timeoutSignal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
   const text = cleanTranscriptText(
@@ -162,6 +173,7 @@ export async function transcribeMediaFile(
       filePath,
       config,
       signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+      options?.diarize === true,
     ),
   );
   if (!text) {

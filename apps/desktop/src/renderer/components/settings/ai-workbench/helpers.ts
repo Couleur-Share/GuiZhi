@@ -375,6 +375,27 @@ export function inferModelAttributes(
     };
   }
 
+  const isImageGenModel = [
+    "gpt-image",
+    "dall-e",
+    "stable-diffusion",
+    "flux",
+    "-image",
+    "seedream",
+    "wanx",
+    "kolors",
+  ].some((keyword) => normalized.includes(keyword));
+
+  if (isImageGenModel) {
+    return {
+      capabilities: {
+        ...cloneDefaultCapabilities(),
+        chat: false,
+        imageGeneration: true,
+      },
+    };
+  }
+
   const isRerankModel = [
     "rerank",
     "reranker",
@@ -466,6 +487,7 @@ export function createFormFromModel(model: AIModelConfig): ModelFormState {
       embedding: model.capabilities?.embedding === true,
       rerank: model.capabilities?.rerank === true,
       audioTranscription: model.capabilities?.audioTranscription === true,
+      imageGeneration: model.capabilities?.imageGeneration === true,
     },
     chatParams: {
       temperature: chatParams?.temperature ?? DEFAULT_CHAT_PARAMS.temperature,

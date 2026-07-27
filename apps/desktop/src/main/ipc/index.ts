@@ -13,6 +13,7 @@ import { registerBackupIPC } from "./backup.ipc";
 import { registerAskIPC } from "./ask.ipc";
 import { registerSemanticIPC } from "./semantic.ipc";
 import { registerMediaIPC } from "./media.ipc";
+import { registerIllustrationIPC } from "./illustration.ipc";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 
 const REBINDABLE_DB_CHANNELS = [
@@ -73,6 +74,16 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.MEDIA_TRANSCRIBE,
   IPC_CHANNELS.MEDIA_SUMMARIZE,
   IPC_CHANNELS.MEDIA_TEST_TRANSCRIPTION,
+  IPC_CHANNELS.ILLUSTRATION_STYLES,
+  IPC_CHANNELS.ILLUSTRATION_SAVE_STYLES,
+  IPC_CHANNELS.ILLUSTRATION_BUILT_IN_STYLES,
+  IPC_CHANNELS.ILLUSTRATION_REVEAL_STYLES_FILE,
+  IPC_CHANNELS.ILLUSTRATION_TEST,
+  IPC_CHANNELS.ILLUSTRATION_PLAN,
+  IPC_CHANNELS.ILLUSTRATION_GENERATE,
+  IPC_CHANNELS.ILLUSTRATION_REGENERATE,
+  IPC_CHANNELS.ILLUSTRATION_REMOVE,
+  IPC_CHANNELS.ILLUSTRATION_CLEAR,
   IPC_CHANNELS.YTDLP_STATUS,
   IPC_CHANNELS.YTDLP_INSTALL,
   IPC_CHANNELS.YTDLP_REMOVE,
@@ -133,6 +144,7 @@ export function registerAllIPC(
   registerIpcGroup("ask", () => registerAskIPC(db));
   registerIpcGroup("semantic", () => registerSemanticIPC(db));
   registerIpcGroup("media", () => registerMediaIPC(db));
+  registerIpcGroup("illustration", () => registerIllustrationIPC(db));
   registerIpcGroup("settings", () => registerSettingsIPC(db));
   registerIpcGroup("security", () => registerSecurityIPC(db));
   registerIpcGroup("image", () => registerImageIPC());

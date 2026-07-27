@@ -24,6 +24,7 @@ export type SettingsSectionId =
   | "data"
   | "network"
   | "ai"
+  | "illustration"
   | "language"
   | "shortcuts"
   | "about";

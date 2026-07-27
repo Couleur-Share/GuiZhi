@@ -15,11 +15,37 @@ import {
   parseAliases,
 } from "../services/knowledge-ai/wiki-compile";
 import { AiNotConfiguredError } from "../services/knowledge-ai/ai-invoke";
+import { describeLoadError } from "./load-error";
 
 export interface WikiCompileProgress {
   currentTitle: string;
   current: number;
   total: number;
+}
+
+/**
+ * 页面写操作的结果。
+ *
+ * 原来只返回 boolean：DB 抛异常时整条链路没人 catch，界面上连「保存失败」
+ * 都不弹，用户手写的正文就那么没了着落。现在异常收进 error 一并交给调用方。
+ * error 为空的 false 表示目标不存在这类无异常的失败。
+ */
+export interface WikiMutationResult {
+  ok: boolean;
+  error?: string;
+}
+
+function describeMutationError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** 逐条编译失败，一行一条挂进 toast 的「查看详情」 */
+function formatCompileFailures(
+  failures: { title: string; reason: string }[],
+): string | undefined {
+  return failures.length > 0
+    ? failures.map((entry) => `${entry.title}：${entry.reason}`).join("\n")
+    : undefined;
 }
 
 export type WikiViewMode = "catalog" | "graph";
@@ -152,12 +178,18 @@ interface WikiState {
    * 布局整块顶掉，顶栏的状态行与重建按钮也跟着横向弹一下。
    */
   hasLoaded: boolean;
+  /** 目录读取失败的原因；为空表示读取正常（Wiki 真的是空的） */
+  loadError: string | null;
+  /** 搜索失败的原因；不区分的话失败会显示成「无结果」，最容易误导 */
+  searchError: string | null;
   isCompiling: boolean;
   compileProgress: WikiCompileProgress | null;
-  /** 编译结果提示（完成/停止/失败后一次性展示） */
+  /** 编译结果提示（完成/部分失败/停止/失败后一次性展示） */
   compileNotice: {
-    kind: "done" | "cancelled" | "error" | "not-configured";
+    kind: "done" | "partial" | "cancelled" | "error" | "not-configured";
     message: string;
+    /** 逐条失败原因，进 toast 的「查看详情」 */
+    detail?: string;
   } | null;
   /** 目录视图 / 关系图谱 */
   viewMode: WikiViewMode;
@@ -170,11 +202,14 @@ interface WikiState {
   refresh: () => Promise<void>;
   selectPage: (id: string | null) => Promise<void>;
   /** 把当前页回滚到最近一次被覆盖前的内容 */
-  restorePreviousRevision: () => Promise<boolean>;
+  restorePreviousRevision: () => Promise<WikiMutationResult>;
   /** 手动改写当前页正文；落标记后下一轮编译不再覆盖 */
-  savePageBody: (body: string, releaseToAuto?: boolean) => Promise<boolean>;
+  savePageBody: (
+    body: string,
+    releaseToAuto?: boolean,
+  ) => Promise<WikiMutationResult>;
   /** 删除单个页面（清理残留知识不必再清空全库重编） */
-  deletePage: (pageId: string) => Promise<boolean>;
+  deletePage: (pageId: string) => Promise<WikiMutationResult>;
   /** 按 [[链接]] 目标跳转：标题精确匹配优先，其次别名 */
   openByLinkTarget: (target: string) => Promise<boolean>;
   compileNow: () => Promise<void>;
@@ -201,6 +236,8 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   pageDetail: null,
   pageRevisions: [],
   hasLoaded: false,
+  loadError: null,
+  searchError: null,
   isCompiling: false,
   compileProgress: null,
   compileNotice: null,
@@ -214,10 +251,10 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
     const trimmed = query.trim();
     set({ searchQuery: query });
     if (!trimmed) {
-      set({ searchHitIds: null, isSearching: false });
+      set({ searchHitIds: null, isSearching: false, searchError: null });
       return;
     }
-    set({ isSearching: true });
+    set({ isSearching: true, searchError: null });
     try {
       const hits = await window.api.wiki.search(trimmed, CATALOG_SEARCH_LIMIT);
       // 输入很快时前一次请求可能后到，只认最后一次输入对应的结果
@@ -226,7 +263,10 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       }
     } catch (error) {
       console.error("Wiki 搜索失败:", error);
-      set({ searchHitIds: [] });
+      // 只清空命中集合的话，搜索失败会被画成「无结果」——这是最误导的一种
+      if (get().searchQuery.trim() === trimmed) {
+        set({ searchHitIds: [], searchError: describeLoadError(error) });
+      }
     } finally {
       if (get().searchQuery.trim() === trimmed) {
         set({ isSearching: false });
@@ -251,6 +291,7 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   },
 
   refresh: async () => {
+    set({ loadError: null });
     try {
       const [catalog, status, backlinkCounts] = await Promise.all([
         window.api.wiki.catalog(),
@@ -274,6 +315,8 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       }
     } catch (error) {
       console.error("加载 Wiki 目录失败:", error);
+      // 不记下来就会渲染成「Wiki 还是空的」，用户以为页面被清空了
+      set({ loadError: describeLoadError(error) });
     } finally {
       // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
       set({ hasLoaded: true });
@@ -300,47 +343,59 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
     const pageId = get().selectedPageId;
     const latest = get().pageRevisions[0];
     if (!pageId || !latest) {
-      return false;
+      return { ok: false };
     }
-    const restored = await window.api.wiki.restoreRevision(latest.id);
-    if (restored) {
-      // 回滚本身也会存一份快照，重新拉详情与版本列表
-      await get().selectPage(pageId);
-      await get().refresh();
+    try {
+      const restored = await window.api.wiki.restoreRevision(latest.id);
+      if (restored) {
+        // 回滚本身也会存一份快照，重新拉详情与版本列表
+        await get().selectPage(pageId);
+        await get().refresh();
+      }
+      return { ok: restored };
+    } catch (error) {
+      return { ok: false, error: describeMutationError(error) };
     }
-    return restored;
   },
 
   savePageBody: async (body, releaseToAuto) => {
     const pageId = get().selectedPageId;
     if (!pageId) {
-      return false;
+      return { ok: false };
     }
     // 出链按新正文重建，否则图谱与反向链接停留在改动之前
     const resolver = buildLinkResolver(get().catalog, []);
     const { targets } = cleanWikiLinks(body, resolver);
-    const saved = await window.api.wiki.updatePage({
-      pageId,
-      body,
-      linkTargets: targets,
-      releaseToAuto,
-    });
-    if (saved) {
-      await get().selectPage(pageId);
-      await get().refresh();
+    try {
+      const saved = await window.api.wiki.updatePage({
+        pageId,
+        body,
+        linkTargets: targets,
+        releaseToAuto,
+      });
+      if (saved) {
+        await get().selectPage(pageId);
+        await get().refresh();
+      }
+      return { ok: saved };
+    } catch (error) {
+      return { ok: false, error: describeMutationError(error) };
     }
-    return saved;
   },
 
   deletePage: async (pageId) => {
-    const removed = await window.api.wiki.deletePage(pageId);
-    if (removed) {
-      if (get().selectedPageId === pageId) {
-        set({ selectedPageId: null, pageDetail: null, pageRevisions: [] });
+    try {
+      const removed = await window.api.wiki.deletePage(pageId);
+      if (removed) {
+        if (get().selectedPageId === pageId) {
+          set({ selectedPageId: null, pageDetail: null, pageRevisions: [] });
+        }
+        await get().refresh();
       }
-      await get().refresh();
+      return { ok: removed };
+    } catch (error) {
+      return { ok: false, error: describeMutationError(error) };
     }
-    return removed;
   },
 
   openByLinkTarget: async (target) => {
@@ -375,14 +430,19 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
       const result = await compilePendingItems((currentTitle, current, total) => {
         set({ compileProgress: { currentTitle, current, total } });
       }, controller.signal);
+      const progress = `${result.compiled}/${result.pending}`;
+      const detail = formatCompileFailures(result.failures);
       set({
         compileNotice: controller.signal.aborted
-          ? { kind: "cancelled", message: `${result.compiled}/${result.pending}` }
+          ? { kind: "cancelled", message: progress, detail }
           : result.pending === 0
             ? { kind: "done", message: "" }
-            : {
-                kind: "done",
-                message: `${result.compiled}/${result.pending}`,
+            : // 10 条只编出 3 条此前照样报绿色的「编译完成（3/10）」，
+              // 得自己做减法才知道有 7 条失败，而且没有任何原因
+              {
+                kind: result.skipped > 0 ? "partial" : "done",
+                message: progress,
+                detail,
               },
       });
     } catch (error) {
@@ -430,9 +490,23 @@ export async function runBackgroundWikiCompile(): Promise<void> {
   }
   useWikiStore.setState({ isCompiling: true });
   try {
-    await compilePendingItems();
-  } catch {
-    // 后台任务纪律：失败静默，等下轮（AI 未配置 / 网络抖动都不打扰用户）
+    const result = await compilePendingItems();
+    // 后台轮次不弹提示，但逐条失败要留痕，否则「为什么这条一直没进 Wiki」无从查起
+    for (const failure of result.failures) {
+      window.api?.log?.appError({
+        scope: "wiki-compile",
+        action: "后台 Wiki 编译",
+        message: `${failure.title}：${failure.reason}`,
+      });
+    }
+  } catch (error) {
+    // 后台任务纪律：失败静默，等下轮（AI 未配置 / 网络抖动都不打扰用户），
+    // 但同样记进日志
+    window.api?.log?.appError({
+      scope: "wiki-compile",
+      action: "后台 Wiki 编译",
+      message: error instanceof Error ? error.message : String(error),
+    });
   } finally {
     useWikiStore.setState({ isCompiling: false });
     // 仅当用户正停留在 Wiki 模块时刷新视图

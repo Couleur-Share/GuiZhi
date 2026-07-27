@@ -16,6 +16,7 @@ import { isWebRuntime } from "./runtime";
 import { waitForPersistHydration } from "./utils/persist-hydration";
 import { DesktopAppCommandBridge } from "./components/app/DesktopAppCommandBridge";
 import { useToast } from "./components/ui/Toast";
+import { useOperationErrorToast } from "./hooks/useOperationErrorToast";
 import { useUpdaterStore } from "./stores/updater.store";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MS,
@@ -54,6 +55,8 @@ const CloseDialog = lazy(() =>
 type PageType = "home" | "settings";
 
 function App() {
+  // store 里变更操作的失败统一在这里提示，调用点无需逐个 try/catch
+  useOperationErrorToast();
   const applyTheme = useSettingsStore((state) => state.applyTheme);
   const inferUpdateChannel = useSettingsStore(
     (state) => state.inferUpdateChannel,
@@ -152,11 +155,18 @@ function App() {
     if (isWebRuntime()) {
       return;
     }
-    const handleAutoBackup = (phase: "start" | "done" | "failed") => {
+    const handleAutoBackup = (
+      phase: "start" | "done" | "failed",
+      message?: string,
+    ) => {
       if (phase === "start") {
         showToastRef.current(i18n.t("settings.autoBackupRunning"), "info");
       } else if (phase === "failed") {
-        showToastRef.current(i18n.t("settings.autoBackupFailed"), "error");
+        showToastRef.current(
+          i18n.t("settings.autoBackupFailed"),
+          "error",
+          message ? { detail: message } : undefined,
+        );
       }
     };
     window.api?.on?.("backup:autoStatus", handleAutoBackup);
@@ -403,6 +413,7 @@ function App() {
             showToastRef.current(
               i18n.t("settings.autoUpdateCheckFailed"),
               "error",
+              { detail: error },
             );
           }
         })

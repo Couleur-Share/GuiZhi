@@ -247,6 +247,21 @@ async function runModelConnectionTest(
     }
   }
 
+  // 文生图模型走 /images/generations，拿 chat completions 去测只会撞
+  // model_not_supported
+  if (capabilities?.imageGeneration === true) {
+    const result = await window.api.illustration.testModel({
+      apiUrl: config.apiUrl,
+      apiKey: config.apiKey,
+      model: config.model,
+      apiProtocol: config.apiProtocol,
+      provider: config.provider,
+    });
+    return result.success
+      ? { status: "success", latency: result.latency ?? 0 }
+      : { status: "failed", message: result.error || "" };
+  }
+
   const result = await testAIConnection(config);
   return result.success
     ? { status: "success", latency: result.latency ?? 0 }

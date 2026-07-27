@@ -82,10 +82,42 @@ export const IPC_CHANNELS = {
   MEDIA_TRANSCRIBE: "media:transcribe",
   /** 已有文字稿的 AI 排版（补标点/分段，不重新转写） */
   MEDIA_FORMAT_TRANSCRIPT: "media:formatTranscript",
+  /** 主进程 → 渲染进程：文字稿排版逐块进度 */
+  MEDIA_FORMAT_PROGRESS: "media:formatProgress",
   /** 基于文字稿生成结构化「视频/音频总结」并写入正文 */
   MEDIA_SUMMARIZE: "media:summarize",
   /** 转写模型连通性测试（静音样本真实请求） */
   MEDIA_TEST_TRANSCRIPTION: "media:testTranscription",
+  /** 当前「语音转写」路由支持哪些可选能力（如区分说话人） */
+  MEDIA_CAPABILITIES: "media:capabilities",
+  /** 主进程 → 渲染进程：转写进行中的已用时长与停滞时长 */
+  MEDIA_TRANSCRIBE_PROGRESS: "media:transcribeProgress",
+
+  // 正文配图（AI 文生图）
+  /** 可用的插画风格预设 */
+  ILLUSTRATION_STYLES: "illustration:styles",
+  /** 应用内编辑器回写风格预设文件 */
+  ILLUSTRATION_SAVE_STYLES: "illustration:saveStyles",
+  /** 内置风格预设（编辑器的「恢复内置预设」用，不落盘） */
+  ILLUSTRATION_BUILT_IN_STYLES: "illustration:builtInStyles",
+  /** 在文件管理器里定位风格预设文件（不用默认程序打开，免得撞上应用选择框） */
+  ILLUSTRATION_REVEAL_STYLES_FILE: "illustration:revealStylesFile",
+  /** 读正文出配图规格（shot list），不生成图片 */
+  ILLUSTRATION_PLAN: "illustration:plan",
+  /** 按 shot list 逐张生成并写入正文 */
+  ILLUSTRATION_GENERATE: "illustration:generate",
+  /** 重新生成正文里已有的某一张（原位替换） */
+  ILLUSTRATION_REGENERATE: "illustration:regenerate",
+  /** 从正文移除某一张（磁盘资产随之回收） */
+  ILLUSTRATION_REMOVE: "illustration:remove",
+  /** 一次移除正文里的全部配图 */
+  ILLUSTRATION_CLEAR: "illustration:clear",
+  /** 文生图模型连通性测试（真实生成一张最小尺寸的图） */
+  ILLUSTRATION_TEST: "illustration:testModel",
+  /** 中断在途的配图生成 */
+  ILLUSTRATION_CANCEL: "illustration:cancel",
+  /** 主进程 → 渲染进程：逐张生成进度 */
+  ILLUSTRATION_PROGRESS: "illustration:progress",
 
   // yt-dlp 工具管理（在线视频解析引擎）
   YTDLP_STATUS: "ytdlp:status",
@@ -138,6 +170,8 @@ export const IPC_CHANNELS = {
   APP_CLEAR_CACHE: "app:clearCache",
   APP_GET_RUNTIME_PATHS: "app:getRuntimePaths",
   APP_COMMAND: "app:command",
+  /** 渲染进程 → 主进程：把业务失败记进 logs/error.log */
+  LOG_APP_ERROR: "log:appError",
 
   // AI HTTP proxy (bypass CORS via main process)
   AI_HTTP_REQUEST: "ai:httpRequest",

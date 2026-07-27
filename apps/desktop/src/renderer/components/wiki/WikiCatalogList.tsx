@@ -7,6 +7,7 @@ import {
   useWikiStore,
   type WikiCatalogSort,
 } from "../../stores/wiki.store";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 
 const KIND_LABEL_KEYS: Record<WikiPageKind, [string, string]> = {
@@ -48,6 +49,7 @@ export function WikiCatalogList() {
   const searchQuery = useWikiStore((state) => state.searchQuery);
   const searchHitIds = useWikiStore((state) => state.searchHitIds);
   const isSearching = useWikiStore((state) => state.isSearching);
+  const searchError = useWikiStore((state) => state.searchError);
   const runSearch = useWikiStore((state) => state.runSearch);
   const selectedPageId = useWikiStore((state) => state.selectedPageId);
   const selectPage = useWikiStore((state) => state.selectPage);
@@ -136,7 +138,13 @@ export function WikiCatalogList() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {visible.length === 0 ? (
+        {searchError ? (
+          // 搜索失败此前只是清空命中集合，画出来和「没有匹配的页面」一模一样
+          <LoadErrorState
+            message={searchError}
+            onRetry={() => void runSearch(searchQuery)}
+          />
+        ) : visible.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground/70">
             {catalog.length === 0
               ? t("wiki.catalogEmpty", "还没有 Wiki 页面")

@@ -125,6 +125,46 @@ export function buildEmbeddingsEndpointFromBase(
 }
 
 /**
+ * 文生图端点：OpenAI 兼容协议走 /v1/images/generations。
+ *
+ * Gemini 的图像生成在 `models/{model}:generateContent` 上（模型名要进路径，
+ * 见 buildGeminiImageEndpoint），Anthropic 压根没有文生图 API；
+ * 两者都返回空串，由调用方给出可读提示而不是让用户撞一个 404。
+ */
+export function buildImagesEndpointFromBase(
+  resolved: ResolvedAIProtocolBase,
+): string {
+  const baseUrl = resolved.baseUrl.replace(/\/$/, "");
+  if (!baseUrl) return "";
+  if (resolved.explicit) return baseUrl;
+  if (resolved.protocol !== "openai") return "";
+  return baseUrl.match(/\/v\d+$/)
+    ? `${baseUrl}/images/generations`
+    : `${baseUrl}/v1/images/generations`;
+}
+
+/**
+ * Gemini 生图端点。
+ *
+ * 走原生 generateContent 而不是 OpenAI 兼容层：只有原生请求体里的
+ * `generationConfig.imageConfig.aspectRatio` 能拿到真正的 16:9，
+ * 兼容层没有对应参数，出来的是方图。
+ */
+export function buildGeminiImageEndpoint(
+  resolved: ResolvedAIProtocolBase,
+  model: string,
+): string {
+  const baseUrl = resolved.baseUrl.replace(/\/$/, "");
+  if (!baseUrl) return "";
+  if (resolved.explicit) return baseUrl;
+  const nativeBase = baseUrl.replace(/\/openai$/, "");
+  const versioned = nativeBase.match(/\/v\d+(?:beta)?$/)
+    ? nativeBase
+    : `${nativeBase}/v1beta`;
+  return `${versioned}/models/${encodeURIComponent(model)}:generateContent`;
+}
+
+/**
  * 转写端点：只有 OpenAI 兼容协议提供 multipart 的 /audio/transcriptions。
  *
  * Anthropic 没有转写 API；Gemini 的音频要走 generateContent 内联，

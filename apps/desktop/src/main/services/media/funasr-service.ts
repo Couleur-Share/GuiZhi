@@ -23,13 +23,30 @@ let child: ChildProcess | null = null;
 let childExited = false;
 let logTail = "";
 let startingPromise: Promise<void> | null = null;
+/**
+ * 服务最后一次报告「还在处理」的时刻。
+ *
+ * 转写是一个不返回中间结果的长请求，界面上只能干等；服务脚本每处理完一段
+ * 就往 stdout 打一条心跳，这里记下时间。有心跳说明它在动，长时间没有才是卡住——
+ * funasr 给不出可用的分母（VAD 路径下 total 恒为 1），所以不做百分比。
+ */
+let lastActivityAt = 0;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function appendLogTail(chunk: Buffer): void {
-  logTail = (logTail + chunk.toString("utf8")).slice(-LOG_TAIL_MAX);
+  const text = chunk.toString("utf8");
+  if (text.includes("[guizhi-asr] tick")) {
+    lastActivityAt = Date.now();
+  }
+  logTail = (logTail + text).slice(-LOG_TAIL_MAX);
+}
+
+/** 托管服务最后一次心跳的时刻（0 表示本次进程还没报过） */
+export function getTranscriptionActivityAt(): number {
+  return lastActivityAt;
 }
 
 /** 服务健康探测：/v1/models 应答即视为可用 */

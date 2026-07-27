@@ -34,9 +34,11 @@ export function ShortcutsSettings() {
         if (mountedRef.current && savedShortcuts) {
           setShortcuts(savedShortcuts);
         }
-      } catch {
+      } catch (error) {
         if (mountedRef.current) {
-          showToast(t("settings.shortcutLoadFailed"), "error");
+          showToast(t("settings.shortcutLoadFailed"), "error", {
+            detail: error instanceof Error ? error.message : String(error),
+          });
         }
       }
     }
@@ -55,16 +57,31 @@ export function ShortcutsSettings() {
     const previousShortcuts = shortcuts;
     setShortcuts(newShortcuts);
 
+    const rollback = (detail?: string) => {
+      if (!mountedRef.current) {
+        return;
+      }
+      setShortcuts(previousShortcuts);
+      showToast(
+        t("settings.shortcutSaveFailed"),
+        "error",
+        detail ? { detail } : undefined,
+      );
+    };
+
     try {
-      await window.electron?.setShortcuts?.(newShortcuts);
+      // 主进程注册失败时返回 false 而不是抛错；不看返回值就会在没保存成功的
+      // 情况下弹一句绿色的「已保存」，用户以为设好了，实际按键毫无反应
+      const saved = await window.electron?.setShortcuts?.(newShortcuts);
+      if (saved === false) {
+        rollback(t("settings.shortcutRegisterFailed", "系统拒绝注册该快捷键，可能已被其他程序占用"));
+        return;
+      }
       if (mountedRef.current) {
         showToast(successMessage, "success");
       }
-    } catch {
-      if (mountedRef.current) {
-        setShortcuts(previousShortcuts);
-        showToast(t("settings.shortcutSaveFailed"), "error");
-      }
+    } catch (error) {
+      rollback(error instanceof Error ? error.message : String(error));
     }
   };
 

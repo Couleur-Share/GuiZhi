@@ -6,7 +6,7 @@ import path from "path";
 import https from "https";
 import { getHttpRequestAgent } from "./services/network-proxy";
 import { createBackupSafe } from "./services/backup";
-import { logStartupEvent } from "./startup-log";
+import { logStartupEvent } from "./diagnostic-log";
 import { compareVersions, isPrereleaseVersion } from "../utils/version";
 import {
   extractChangelogRange,

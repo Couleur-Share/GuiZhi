@@ -288,11 +288,31 @@ export function wikiKindLabel(kind: WikiPageKind): string {
   return KIND_LABELS[kind];
 }
 
+/** 单条目编译失败的记录：只有条目名和「为什么没编出来」才是可据以行动的 */
+export interface WikiCompileFailure {
+  title: string;
+  reason: string;
+}
+
 export interface WikiCompileRoundResult {
   compiled: number;
   pending: number;
   /** 条目级解析失败被跳过的数量（下轮重试） */
   skipped: number;
+  /** 逐条失败原因；此前只有 skipped 计数，原因从来没被收集过 */
+  failures: WikiCompileFailure[];
+}
+
+/**
+ * 单条目编译的结果：失败必须带原因，不能只回一个 false。
+ *
+ * 用可选字段而不是判别式联合——本仓库 `strict: false`，布尔判别式narrowing
+ * 不生效，其余结果类型（MediaTranscribeResult 等）也都是这个形状。
+ */
+interface CompileOutcome {
+  ok: boolean;
+  /** ok 为 true 时为空 */
+  reason?: string;
 }
 
 /**
@@ -340,25 +360,33 @@ export async function compilePendingItems(
   }
 
   if (pending.length === 0) {
-    return { compiled: 0, pending: 0, skipped: 0 };
+    return { compiled: 0, pending: 0, skipped: 0, failures: [] };
   }
 
   let compiled = 0;
-  let skipped = 0;
+  const failures: WikiCompileFailure[] = [];
   for (const { item, hash } of pending) {
     if (signal?.aborted) {
       break;
     }
-    onProgress?.(item.title, compiled + skipped + 1, pending.length);
-    const success = await compileSingleItem(item, hash, signal);
-    if (success) {
+    onProgress?.(item.title, compiled + failures.length + 1, pending.length);
+    const outcome = await compileSingleItem(item, hash, signal);
+    if (outcome.ok) {
       compiled++;
     } else {
-      skipped++;
+      failures.push({
+        title: item.title,
+        reason: outcome.reason ?? "未知原因",
+      });
       await recordFailure(item.id, hash, ingestionByItem.get(item.id));
     }
   }
-  return { compiled, pending: pending.length, skipped };
+  return {
+    compiled,
+    pending: pending.length,
+    skipped: failures.length,
+    failures,
+  };
 }
 
 /** 失败落库并排下次重试：退避按失败次数指数增长，到上限后不再自动重试 */
@@ -377,12 +405,16 @@ async function recordFailure(
   await window.api.wiki.recordCompilationFailure(itemId, hash, nextAttemptAt);
 }
 
-/** 单条目编译：候选检索 → LLM 生成（1 次纠错重试）→ 净化 → 链接清洗 → 落库。失败返回 false（跳过）。 */
+/**
+ * 单条目编译：候选检索 → LLM 生成（1 次纠错重试）→ 净化 → 链接清洗 → 落库。
+ * 失败返回原因而不是裸 false——「10 条编译了 3 条」剩下 7 条为什么没成，
+ * 是被 max_tokens 截断还是输出压根不是 JSON，处置完全不同。
+ */
 async function compileSingleItem(
   item: WikiCompilableItem,
   materialHash: string,
   signal?: AbortSignal,
-): Promise<boolean> {
+): Promise<CompileOutcome> {
   // 每条目重取目录：同轮前序条目新建的页面要参与本条目的候选与链接解析
   const catalog = await window.api.wiki.catalog();
   const material = buildMaterial(item);
@@ -455,12 +487,17 @@ async function compileSingleItem(
     }
   }
   if (!pages || pages.length === 0) {
-    return false;
+    return {
+      ok: false,
+      reason: truncated
+        ? "模型输出被 max_tokens 截断，JSON 不完整"
+        : "模型输出不是可解析的 JSON",
+    };
   }
 
   const batch = sanitizePages(pages);
   if (batch.length === 0) {
-    return false;
+    return { ok: false, reason: "模型返回的页面都没通过校验（标题或正文为空）" };
   }
 
   const resolver = buildLinkResolver(catalog, batch);
@@ -488,5 +525,5 @@ async function compileSingleItem(
     contextPageIds,
     pages: compiledPages,
   });
-  return true;
+  return { ok: true };
 }

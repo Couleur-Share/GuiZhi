@@ -34,6 +34,14 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("界面渲染失败：", error, info.componentStack);
+    // 用户多半会直接点「重新加载」，页面上的堆栈随即消失；留一份到 error.log
+    window.api?.log?.appError({
+      scope: "renderer",
+      action: "界面渲染",
+      message: [error.stack ?? `${error.name}: ${error.message}`, info.componentStack]
+        .filter(Boolean)
+        .join("\n"),
+    });
     this.setState({ componentStack: info.componentStack ?? null });
   }
 

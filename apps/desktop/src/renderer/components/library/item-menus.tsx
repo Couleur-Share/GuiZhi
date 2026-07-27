@@ -54,7 +54,10 @@ export function useItemMenus({
       if (ids.length === 0) {
         return;
       }
-      await moveToTrash(ids);
+      // 删失败时错误提示由 store 统一发出，这里不能再补一句「已移到回收站」
+      if (!(await moveToTrash(ids))) {
+        return;
+      }
       showUndoToast(
         t("library.movedToTrash", "已移到回收站（{{count}} 项）", {
           count: ids.length,
