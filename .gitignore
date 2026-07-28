@@ -127,3 +127,7 @@ packages/shared/types/index.js.map
 .omx/
 # 调试脚本与截图产物（.tmp-shots/、.tmp-ui-check.mjs 等）
 .tmp-*
+# 同上，但历史上有一批没带点前缀的（scripts/tmp-vad-ab.py、tmp-shots/）
+tmp-*
+# 抓下来对比发布 feed 的一次性产物
+/atom.txt
