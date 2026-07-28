@@ -147,16 +147,41 @@ function createAiProviderUpdateAction(context: SettingsActionContext) {
   } satisfies SettingsActionGroup<"updateAiProvider">;
 }
 
+/**
+ * 供应商与旗下模型一起删。
+ *
+ * 只删 provider 记录、把模型的 providerId 解绑是不行的：设置页对没有
+ * providerId 的模型会按 model.id 各自合成一个分组，那一行非但不消失，
+ * 还会炸成 N 行。合成分组本来就没有 provider 记录，此时 providerId 为空、
+ * 只删模型。一次提交而不是逐条删，否则要写 N 次 localStorage、同步 N 次主进程。
+ */
 function createAiProviderDeleteAction(context: SettingsActionContext) {
   const { get, commitAISettings } = context;
   return {
-    deleteAiProvider: (id) =>
-      commitAISettings({
-        aiProviders: get().aiProviders.filter((provider) => provider.id !== id),
-        aiModels: get().aiModels.map((model) =>
-          model.providerId === id ? { ...model, providerId: undefined } : model,
+    deleteAiProvider: ({ providerId, modelIds }) => {
+      const state = get();
+      const removedIds = new Set(modelIds);
+      const aiModels = state.aiModels.filter(
+        (model) => !removedIds.has(model.id),
+      );
+      const droppedDefault = state.aiModels.some(
+        (model) => removedIds.has(model.id) && model.isDefault,
+      );
+      if (droppedDefault && aiModels.length > 0) {
+        aiModels[0] = { ...aiModels[0], isDefault: true };
+      }
+      const partial: Partial<SettingsState> = {
+        aiProviders: state.aiProviders.filter(
+          (provider) => provider.id !== providerId,
         ),
-      }),
+        aiModels,
+        ...removeModelDefaults(state, removedIds),
+      };
+      if (droppedDefault && aiModels.length > 0) {
+        applyChatModelToLegacyDefaults(partial, aiModels[0]);
+      }
+      commitAISettings(partial);
+    },
   } satisfies SettingsActionGroup<"deleteAiProvider">;
 }
 
@@ -248,16 +273,17 @@ function createAiModelUpdateAction(context: SettingsActionContext) {
 
 function removeModelDefaults(
   state: SettingsState,
-  id: string,
+  removedIds: Set<string>,
 ): Pick<SettingsState, "scenarioModelDefaults" | "modelRouteDefaults"> {
   const scenarioModelDefaults = { ...state.scenarioModelDefaults };
   const modelRouteDefaults = { ...state.modelRouteDefaults };
   for (const [scenario, modelId] of Object.entries(scenarioModelDefaults)) {
-    if (modelId === id)
+    if (removedIds.has(modelId))
       delete scenarioModelDefaults[scenario as AIUsageScenario];
   }
   for (const [route, modelId] of Object.entries(modelRouteDefaults)) {
-    if (modelId === id) delete modelRouteDefaults[route as AIModelRoute];
+    if (removedIds.has(modelId))
+      delete modelRouteDefaults[route as AIModelRoute];
   }
   return { scenarioModelDefaults, modelRouteDefaults };
 }
@@ -274,7 +300,7 @@ function createAiModelDeleteAction(context: SettingsActionContext) {
       }
       const partial: Partial<SettingsState> = {
         aiModels,
-        ...removeModelDefaults(state, id),
+        ...removeModelDefaults(state, new Set([id])),
       };
       if (deleted?.isDefault && aiModels.length > 0) {
         applyChatModelToLegacyDefaults(partial, aiModels[0]);

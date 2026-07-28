@@ -40,6 +40,14 @@ export interface ExtractedContent {
    * 任务改标 failed，用户可以在导入列表里看到原因并重试。
    */
   degradedReason?: string;
+  /**
+   * 入库了、但内容有缺失的用户可读原因（转写失败 / 未配置转写模型…）。
+   *
+   * 与 degradedReason 的分界是「条目值不值得留」：抓不到正文的空壳留着有害，
+   * 而拿到了元数据只是缺文字稿的视频仍然有用，所以照常入库、任务照常 completed。
+   * 但那一行注记此前只在正文里，列表上是一枚绿色的「已完成」——降级得说出来。
+   */
+  warningReason?: string;
 }
 
 /** 连接器运行环境（由 import-service 注入，避免连接器直接依赖 DB） */

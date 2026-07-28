@@ -10,6 +10,7 @@ import {
   normalizeBackgroundImageFileName,
 } from "./settings-appearance";
 import {
+  dropProviderNameAliases,
   normalizeAIModelDefaults,
   normalizeAIProtocol,
   normalizePersistedAIModels,
@@ -66,7 +67,10 @@ function normalizeSharedSettingsState(next: SettingsState): void {
     next.aiApiUrl,
   );
   next.aiProviders = normalizePersistedAIProviders(next.aiProviders);
-  next.aiModels = normalizePersistedAIModels(next.aiModels);
+  next.aiModels = dropProviderNameAliases(
+    next.aiProviders,
+    normalizePersistedAIModels(next.aiModels),
+  );
   normalizeAIModelDefaults(next);
   next.shortcutModes = normalizeShortcutModes(next.shortcutModes);
   next.networkProxy = normalizeNetworkProxySettings(next.networkProxy);

@@ -424,4 +424,51 @@ describe("addColumnIfMissing", () => {
     expect(hasColumn(db, "wiki_ingestions", "next_attempt_at")).toBe(true);
     db.close();
   });
+
+  it("0010：老库的 import_tasks 补出 warning 列，既有任务不受影响", () => {
+    const db = new DatabaseAdapter(":memory:");
+    // v0.11.0 之前的 import_tasks：只有 error，没有 warning
+    db.exec(`
+      CREATE TABLE import_tasks (
+        id TEXT PRIMARY KEY,
+        source_kind TEXT NOT NULL,
+        source_input TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        stage TEXT,
+        error TEXT,
+        item_type TEXT,
+        result_item_id TEXT,
+        duplicate_item_id TEXT,
+        collection_id TEXT,
+        tag_names TEXT,
+        force_duplicate INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+    db.run(
+      "INSERT INTO import_tasks (id, source_kind, source_input, display_name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "task-1",
+      "url",
+      "https://v.douyin.com/abc/",
+      "老任务",
+      "completed",
+      1,
+      1,
+    );
+    expect(hasColumn(db, "import_tasks", "warning")).toBe(false);
+
+    runMigrations(db);
+
+    expect(hasColumn(db, "import_tasks", "warning")).toBe(true);
+    // 补列不改既有行：历史任务当时没记降级原因，只能是 NULL
+    const row = db.get(
+      "SELECT status, warning FROM import_tasks WHERE id = ?",
+      "task-1",
+    ) as { status: string; warning: string | null };
+    expect(row.status).toBe("completed");
+    expect(row.warning).toBeNull();
+    db.close();
+  });
 });

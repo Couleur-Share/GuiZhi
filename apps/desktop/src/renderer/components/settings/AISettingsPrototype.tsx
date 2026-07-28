@@ -298,6 +298,8 @@ export function AISettingsPrototype() {
   const [savingModel, setSavingModel] = useState(false);
   const [pendingDeleteModel, setPendingDeleteModel] =
     useState<AIModelConfig | null>(null);
+  const [pendingDeleteEndpoint, setPendingDeleteEndpoint] =
+    useState<EndpointGroup | null>(null);
   const [modelEndpointLocked, setModelEndpointLocked] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -700,6 +702,19 @@ export function AISettingsPrototype() {
     showToast(t("settings.aiWorkbenchModelDeleted"), "success");
   };
 
+  const confirmDeleteEndpoint = () => {
+    const group = pendingDeleteEndpoint;
+    if (!group) {
+      return;
+    }
+    setPendingDeleteEndpoint(null);
+    settings.deleteAiProvider({
+      providerId: group.providerConfigId,
+      modelIds: group.models.map((model) => model.id),
+    });
+    showToast(t("settings.aiWorkbenchProviderDeleted"), "success");
+  };
+
   const handleTestModel = async (model: AIModelConfig) => {
     if (!isConfiguredModel(model)) {
       showToast(t("settings.aiWorkbenchIncompleteModel"), "error");
@@ -821,10 +836,17 @@ export function AISettingsPrototype() {
       settings.updateAiProvider(targetGroup.providerConfigId, providerConfig);
     }
 
+    // 只把端点字段落到旗下模型上。整份 spread 会把供应商的 name 一路灌进
+    // model.name，模型路由的下拉里每一项都变成供应商名，一个模型都分不出来。
     for (const model of targetGroup.models) {
       settings.updateAiModel(model.id, {
         providerId: targetGroup.providerConfigId,
-        ...providerConfig,
+        provider: providerConfig.provider,
+        apiProtocol: providerConfig.apiProtocol,
+        apiKey: providerConfig.apiKey,
+        apiUrl: providerConfig.apiUrl,
+        // 凭据变了，上一次的验证结果不再作数，这个 undefined 要写进去
+        lastVerifiedAt: providerConfig.lastVerifiedAt,
       });
     }
 
@@ -1012,6 +1034,19 @@ export function AISettingsPrototype() {
     />
   );
 
+  // 旗下模型会一并删除，确认框必须把这个数字说出来
+  const deleteEndpointMessage = pendingDeleteEndpoint
+    ? t(
+        pendingDeleteEndpoint.models.length > 0
+          ? "settings.aiWorkbenchConfirmDeleteProviderModels"
+          : "settings.aiWorkbenchConfirmDeleteProvider",
+        {
+          name: getEndpointDisplayName(pendingDeleteEndpoint),
+          count: pendingDeleteEndpoint.models.length,
+        },
+      )
+    : "";
+
   return (
     <div className="h-full min-h-0 min-w-0">
       {hasLegacyOnlyConfig ? (
@@ -1046,6 +1081,7 @@ export function AISettingsPrototype() {
         modelScenarioBadges={modelScenarioBadges}
         onTestEndpoint={(group) => void handleTestEndpoint(group)}
         onEditEndpoint={openEditEndpoint}
+        onDeleteEndpoint={(group) => setPendingDeleteEndpoint(group)}
         onUpdateEndpointCredentials={handleUpdateEndpointCredentials}
         onAddProvider={openAddEndpoint}
         onAddModel={openAddModel}
@@ -1062,6 +1098,17 @@ export function AISettingsPrototype() {
         onConfirm={confirmDeleteModel}
         title={t("common.delete")}
         message={t("settings.confirmDelete")}
+        confirmText={t("common.delete")}
+        cancelText={t("common.cancel")}
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        isOpen={pendingDeleteEndpoint !== null}
+        onClose={() => setPendingDeleteEndpoint(null)}
+        onConfirm={confirmDeleteEndpoint}
+        title={t("settings.aiWorkbenchDeleteProvider")}
+        message={deleteEndpointMessage}
         confirmText={t("common.delete")}
         cancelText={t("common.cancel")}
         variant="destructive"

@@ -19,10 +19,15 @@ import type {
   IllustrationStyle,
 } from "@guizhi/shared/types";
 import {
+  MCP_SCOPE_FILE_NAME,
+  type McpScope,
+} from "@guizhi/shared/utils/mcp-scope";
+import {
   getCurrentShortcuts,
   getShortcutModes,
   persistImportedShortcuts,
 } from "../../shortcuts";
+import { readMcpScope, writeMcpScope } from "../mcp-scope";
 import { reconcileImportedAiConfig } from "./ai-reconcile";
 import type { TransferModelConfig } from "./ai-reconcile";
 
@@ -36,6 +41,7 @@ const CONFIG_FILE_NAMES = [
   "illustration-styles.json",
   "shortcuts.json",
   "shortcut-mode.json",
+  MCP_SCOPE_FILE_NAME,
 ];
 const SNAPSHOT_DIR_PREFIX = "pre-import-";
 const SNAPSHOT_KEEP_COUNT = 3;
@@ -97,6 +103,7 @@ export function snapshotConfigDir(): string | null {
 export interface MainConfigParts {
   illustrationStyles: IllustrationStyle[];
   shortcuts: ConfigTransferShortcuts;
+  mcpScope: McpScope;
 }
 
 /** 采集只有主进程读得到的那部分设置 */
@@ -114,6 +121,8 @@ export function collectMainConfigParts(): MainConfigParts {
       accelerators: { ...getCurrentShortcuts() },
       modes: { ...getShortcutModes() },
     },
+    // 没有 mcp.json 时回默认的「全部可见」，那正是本机此刻的真实状态
+    mcpScope: readMcpScope(),
   };
 }
 
@@ -168,6 +177,24 @@ export function applyMainConfigParts(
     } catch (error) {
       warnings.push(
         `快捷键未能导入：${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // 只在文件真带了范围时才写：旧版本导出的文件没有这个字段，本机现有范围保持原样
+  if (file.mcpScope) {
+    try {
+      writeMcpScope(file.mcpScope);
+      if (file.mcpScope.mode === "selected") {
+        // 范围存的是知识库 id，这台机器若还没恢复备份，勾中的库可能一个都不存在，
+        // 表现是 MCP 什么都搜不到——不说出来没人会想到去设置页核对
+        warnings.push(
+          `MCP 可访问范围已收紧到 ${file.mcpScope.allowedCollectionIds.length} 个知识库，请在「设置 → MCP 接入」确认这些知识库在本机存在`,
+        );
+      }
+    } catch (error) {
+      warnings.push(
+        `MCP 可访问范围未能导入：${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }

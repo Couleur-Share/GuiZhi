@@ -28,6 +28,7 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
         status: "pending",
         stage: null,
         error: null,
+        warning: null,
         itemType: null,
         resultItemId: null,
         duplicateItemId: null,
@@ -68,6 +69,7 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
       if (patch.status !== undefined) row.status = patch.status;
       if (patch.stage !== undefined) row.stage = patch.stage;
       if (patch.error !== undefined) row.error = patch.error;
+      if (patch.warning !== undefined) row.warning = patch.warning;
       // 与 ImportTaskDB.update 一致：空标题不覆盖既有显示名
       if (patch.displayName?.trim()) row.displayName = patch.displayName.trim();
       if (patch.itemType !== undefined) row.itemType = patch.itemType;
@@ -217,6 +219,53 @@ describe("ImportQueue", () => {
     expect(finished.status).toBe("duplicate");
     expect(finished.displayName).toBe("已经采过的那篇");
     expect(finished.itemType).toBe("webpage");
+  });
+
+  it("入库但内容有缺失：任务仍标 completed，降级原因写在 warning 上", async () => {
+    const harness = createHarness({
+      extract: async () => ({
+        title: "某条抖音视频",
+        content: "> 平台：抖音\n\n> 文字稿生成失败：本地转写服务启动失败",
+        itemType: "video",
+        sourceUri: "https://v.douyin.com/abc/",
+        warningReason: "文字稿生成失败：本地转写服务启动失败",
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://v.douyin.com/abc/" },
+    ]);
+    await harness.queue.drain();
+
+    const finished = harness.store.get(task.id)!;
+    // 条目本身有价值（元数据齐全），不该按失败处理丢掉
+    expect(finished.status).toBe("completed");
+    expect(finished.resultItemId).toBe("item-1");
+    // 但「已完成」三个字必须带上下文，否则用户点开才发现是个空壳
+    expect(finished.warning).toContain("文字稿生成失败");
+    expect(finished.error).toBeNull();
+  });
+
+  it("重试清空上一轮的降级原因，否则旧提示会赖在成功的任务上", async () => {
+    let warned = true;
+    const harness = createHarness({
+      extract: async () => ({
+        title: "某条抖音视频",
+        content: "正文",
+        itemType: "video",
+        sourceUri: "https://v.douyin.com/abc/",
+        ...(warned ? { warningReason: "文字稿生成失败：服务忙" } : {}),
+      }),
+    });
+    const [task] = harness.queue.enqueue([
+      { kind: "url", input: "https://v.douyin.com/abc/" },
+    ]);
+    await harness.queue.drain();
+    expect(harness.store.get(task.id)!.warning).toBeTruthy();
+
+    warned = false;
+    harness.queue.retry(task.id, { forceDuplicate: true });
+    await harness.queue.drain();
+    expect(harness.store.get(task.id)!.warning).toBeNull();
   });
 
   it("抽取没给标题时保留原始显示名，不写成空", async () => {

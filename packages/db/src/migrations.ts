@@ -287,6 +287,13 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    // 已完成但有缺失的任务要在列表上说出来（转写失败仍会入库并标 completed）
+    name: "0010-import-task-warning",
+    up: (db) => {
+      addColumnIfMissing(db, "import_tasks", "warning", "TEXT");
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

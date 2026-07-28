@@ -25,6 +25,7 @@ export interface ImportTaskStore {
       status: ImportTask["status"];
       stage: ImportStage | null;
       error: string | null;
+      warning: string | null;
       displayName: string;
       itemType: ImportTask["itemType"];
       resultItemId: string | null;
@@ -151,6 +152,7 @@ export class ImportQueue {
       status: "pending",
       stage: null,
       error: null,
+      warning: null,
       duplicateItemId: null,
       ...(options?.forceDuplicate !== undefined
         ? { forceDuplicate: options.forceDuplicate }
@@ -271,6 +273,8 @@ export class ImportQueue {
       this.updateAndNotify(id, {
         status: "completed",
         stage: null,
+        // 入库了但内容有缺失时，「已完成」这三个字必须带上下文
+        warning: extracted.warningReason ?? null,
         resultItemId,
       });
     } catch (error) {

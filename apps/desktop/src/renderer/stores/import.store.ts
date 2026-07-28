@@ -43,11 +43,17 @@ async function runTaskBatch(
   }
 }
 
-/** 侧栏筛选组的取值；active 合并 pending 与 processing */
+/**
+ * 侧栏筛选组的取值。
+ *
+ * active 合并 pending 与 processing；degraded 是 completed 的**子集**而不是
+ * 另一档状态——那些任务确实入了库，只是内容有缺失，所以两档会重复计数。
+ */
 export type ImportFilter =
   | "all"
   | "active"
   | "completed"
+  | "degraded"
   | "duplicate"
   | "failed"
   | "canceled";
@@ -96,6 +102,11 @@ function isActive(task: ImportTask): boolean {
   return task.status === "pending" || task.status === "processing";
 }
 
+/** 入库了但内容有缺失（转写失败等）；列表上不能只给一枚绿色的「已完成」 */
+export function isDegradedTask(task: ImportTask): boolean {
+  return task.status === "completed" && Boolean(task.warning);
+}
+
 function countActive(tasks: ImportTask[]): number {
   return tasks.filter(isActive).length;
 }
@@ -106,6 +117,7 @@ export function countByFilter(tasks: ImportTask[]): ImportCounts {
     all: tasks.length,
     active: 0,
     completed: 0,
+    degraded: 0,
     duplicate: 0,
     failed: 0,
     canceled: 0,
@@ -122,6 +134,10 @@ export function countByFilter(tasks: ImportTask[]): ImportCounts {
     } else if (task.status === "canceled") {
       counts.canceled += 1;
     }
+    // 有意与 completed 重复计数：降级的任务同样是完成了的
+    if (isDegradedTask(task)) {
+      counts.degraded += 1;
+    }
   }
   return counts;
 }
@@ -132,6 +148,8 @@ function matchesFilter(task: ImportTask, filter: ImportFilter): boolean {
       return true;
     case "active":
       return isActive(task);
+    case "degraded":
+      return isDegradedTask(task);
     default:
       return task.status === filter;
   }

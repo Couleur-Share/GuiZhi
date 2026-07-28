@@ -6,6 +6,7 @@ import {
   InboxIcon,
   Loader2Icon,
   PlusIcon,
+  TriangleAlertIcon,
   XCircleIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -134,6 +135,17 @@ export function SidebarImportsPanel() {
         />
       ),
       label: t("imports.panelCompleted", "已完成"),
+    },
+    // 紧跟「已完成」：它是那一档的子集，隔开摆会让人以为是另一种终态
+    {
+      id: "degraded",
+      icon: (
+        <TriangleAlertIcon
+          className="h-4 w-4 text-amber-500"
+          aria-hidden="true"
+        />
+      ),
+      label: t("imports.panelDegraded", "有缺失"),
     },
     {
       id: "duplicate",

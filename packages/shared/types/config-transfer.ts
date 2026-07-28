@@ -9,6 +9,7 @@
  * 忘了密码不是灾难，其余配置照常导入，只有 Key 需要手填。
  */
 
+import type { McpScope } from "../utils/mcp-scope";
 import type { IllustrationStyle } from "./illustration";
 
 export const CONFIG_TRANSFER_KIND = "guizhi-config";
@@ -55,6 +56,14 @@ export interface ConfigTransferFile {
   uiLayout?: Record<string, unknown>;
   illustrationStyles?: IllustrationStyle[];
   shortcuts?: ConfigTransferShortcuts;
+  /**
+   * MCP 可访问范围。
+   *
+   * 缺省与「明确写了全部可见」必须分开：前者是旧版本导出的文件压根没有这个
+   * 字段，导入时不该动本机的设置——把它按默认值处理，等于一份旧配置就能把
+   * 用户收紧过的范围悄悄放开，那正是这个字段要防的事。
+   */
+  mcpScope?: McpScope;
 }
 
 /** 应用前给用户看的摘要：这份文件里到底有什么 */
@@ -68,6 +77,12 @@ export interface ConfigTransferPreview {
   styleCount: number;
   shortcutCount: number;
   uiLayoutKeyCount: number;
+  /** 缺省表示这份文件没带 MCP 范围，导入后本机现有范围保持不变 */
+  mcpScope?: {
+    mode: McpScope["mode"];
+    collectionCount: number;
+    allowUncategorized: boolean;
+  };
 }
 
 export interface ConfigExportResult {

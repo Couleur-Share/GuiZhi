@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { AlertTriangleIcon, LockIcon } from "lucide-react";
 import type { ConfigTransferPreview } from "@guizhi/shared/types";
 import { Modal } from "../../ui/Modal";
@@ -16,6 +17,32 @@ function formatExportedAt(value: string, fallback: string): string {
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? fallback : date.toLocaleString();
+}
+
+/**
+ * MCP 范围三态。
+ *
+ * 「文件未包含」必须单独说：它与「全部可见」的结果天差地别（一个不动本机设置、
+ * 一个把范围放开），而用户在这一步唯一能做的判断就是看这份文件带了什么。
+ */
+function describeMcpScope(
+  scope: ConfigTransferPreview["mcpScope"],
+  t: TFunction,
+): string {
+  if (!scope) {
+    return t("settings.configImportRowMcpAbsent", "文件未包含，保持本机现状");
+  }
+  if (scope.mode === "all") {
+    return t("settings.configImportRowMcpAll", "全部知识库");
+  }
+  const base = t("settings.configImportRowMcpSelected", "{{count}} 个知识库", {
+    count: scope.collectionCount,
+  });
+  return scope.allowUncategorized
+    ? t("settings.configImportRowMcpWithUncategorized", "{{base}} · 含未分类", {
+        base,
+      })
+    : base;
 }
 
 /**
@@ -74,6 +101,10 @@ export function ConfigImportDialog({
           value: t("settings.configImportRowCount", "{{count}} 条", {
             count: preview.shortcutCount,
           }),
+        },
+        {
+          label: t("settings.configImportRowMcp", "MCP 可访问范围"),
+          value: describeMcpScope(preview.mcpScope, t),
         },
         {
           label: t("settings.configImportRowKeys", "API Key"),

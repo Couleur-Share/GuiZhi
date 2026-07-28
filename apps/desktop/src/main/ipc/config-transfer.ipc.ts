@@ -103,6 +103,7 @@ function buildExportFile(request: ConfigExportRequest): ConfigTransferFile {
     uiLayout: pickTransferableLocalStorage(request.uiLayout),
     illustrationStyles: mainParts.illustrationStyles,
     shortcuts: mainParts.shortcuts,
+    mcpScope: mainParts.mcpScope,
   };
 }
 

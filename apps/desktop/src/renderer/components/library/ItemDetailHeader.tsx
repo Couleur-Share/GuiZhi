@@ -6,6 +6,7 @@ import {
   ClockIcon,
   FolderIcon,
   HashIcon,
+  MoreHorizontalIcon,
   PinIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -27,6 +28,14 @@ import { formatItemTime, getItemTypeMeta } from "./type-meta";
 
 /** 标题最多撑到三行（text-xl / leading-snug 约 28px 一行），再长就内部滚动 */
 const TITLE_MAX_HEIGHT_PX = 84;
+
+/** 「更多」菜单右对齐到按钮：动作区贴着面板右缘，从左缘展开必然开到窗口外再被回弹 */
+const MORE_MENU_WIDTH_PX = 160;
+
+const ACTION_BUTTON_BASE =
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors";
+const ACTION_BUTTON_IDLE =
+  "text-muted-foreground hover:bg-accent/60 hover:text-foreground";
 
 const CHIP_TONES = {
   muted: "border-border/70 text-muted-foreground",
@@ -71,14 +80,91 @@ function ActionButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
-        active
-          ? "bg-primary/15 text-primary"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+      className={`${ACTION_BUTTON_BASE} ${
+        active ? "bg-primary/15 text-primary" : ACTION_BUTTON_IDLE
       }`}
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * 「更多」菜单：置顶、归档、移到回收站三个低频动作收在这里，
+ * 动作区因此从五个图标缩到三个——横向空间让给标题与元信息 chip，
+ * 五个一字排开时窄详情栏里一行标题只剩七八个字、chip 也会碎成四行。
+ * 顺带把破坏性的删除挡在一次点击之后。
+ */
+function MoreActionsButton({ item }: { item: KnowledgeItem }) {
+  const { t } = useTranslation();
+  const setStatus = useKnowledgeStore((state) => state.setStatus);
+  const togglePinned = useKnowledgeStore((state) => state.togglePinned);
+  const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
+
+  const isArchived = item.status === "archived";
+  const moreLabel = t("library.moreActions", "更多操作");
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={(event) => {
+          if (anchor) {
+            setAnchor(null);
+            return;
+          }
+          const rect = event.currentTarget.getBoundingClientRect();
+          setAnchor({
+            x: rect.right - MORE_MENU_WIDTH_PX,
+            y: rect.bottom + 4,
+          });
+        }}
+        aria-haspopup="menu"
+        aria-expanded={anchor !== null}
+        aria-label={moreLabel}
+        className={`${ACTION_BUTTON_BASE} ${ACTION_BUTTON_IDLE}`}
+      >
+        <MoreHorizontalIcon className="h-4 w-4" aria-hidden="true" />
+      </button>
+      {anchor ? (
+        <ContextMenu
+          x={anchor.x}
+          y={anchor.y}
+          ignoreRef={buttonRef}
+          onClose={() => setAnchor(null)}
+          items={[
+            {
+              label: item.isPinned
+                ? t("library.unpin", "取消置顶")
+                : t("library.pin", "置顶"),
+              icon: <PinIcon className="h-4 w-4" aria-hidden="true" />,
+              onClick: () => void togglePinned(item.id),
+            },
+            {
+              label: isArchived
+                ? t("library.unarchive", "取消归档")
+                : t("library.archive", "归档"),
+              icon: isArchived ? (
+                <ArchiveRestoreIcon className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ArchiveIcon className="h-4 w-4" aria-hidden="true" />
+              ),
+              onClick: () =>
+                void setStatus([item.id], isArchived ? "active" : "archived"),
+            },
+            {
+              label: t("library.moveToTrash", "移到回收站"),
+              icon: <Trash2Icon className="h-4 w-4" aria-hidden="true" />,
+              variant: "destructive",
+              onClick: () => void moveToTrash([item.id]),
+            },
+          ]}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -159,8 +245,8 @@ function CollectionChip({
 }
 
 /**
- * 详情头部：标题与动作同排，下面一排元信息 chip（类型 / 知识库 / 时间 / 字数），
- * 再下面是标签行。回收站条目只提供「恢复」。
+ * 详情头部：标题独占一行，下面一排元信息 chip（类型 / 知识库 / 来源 / 时间 / 字数）
+ * 与右对齐的动作区，再下面是标签行。回收站条目只提供「恢复」。
  * 传入 onClose 时（详情浮层）在动作区末尾追加关闭按钮。
  */
 export function ItemDetailHeader({
@@ -182,10 +268,7 @@ export function ItemDetailHeader({
   const flushPendingSave = useKnowledgeStore(
     (state) => state.flushPendingSave,
   );
-  const setStatus = useKnowledgeStore((state) => state.setStatus);
   const toggleFavorite = useKnowledgeStore((state) => state.toggleFavorite);
-  const togglePinned = useKnowledgeStore((state) => state.togglePinned);
-  const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const autoSave = useSettingsStore((state) => state.autoSave);
 
@@ -224,24 +307,77 @@ export function ItemDetailHeader({
 
   return (
     <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-4">
-      <div className="flex items-start gap-2">
-        <textarea
-          ref={titleRef}
-          rows={1}
-          data-testid="item-title-input"
-          value={item.title}
-          onChange={(event) => updateSelected({ title: event.target.value })}
-          // 标题是单行语义，回车不该在里面换行
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-            }
-          }}
-          readOnly={isTrashed}
-          placeholder={t("library.titlePlaceholder", "标题")}
-          className="min-w-0 flex-1 resize-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
-        />
-        <div className="flex shrink-0 items-center gap-0.5">
+      {/* 标题独占整行：与动作区同排时，窄详情栏里长标题会被挤成三行还看不全 */}
+      <textarea
+        ref={titleRef}
+        rows={1}
+        data-testid="item-title-input"
+        value={item.title}
+        onChange={(event) => updateSelected({ title: event.target.value })}
+        // 标题是单行语义，回车不该在里面换行
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+          }
+        }}
+        readOnly={isTrashed}
+        placeholder={t("library.titlePlaceholder", "标题")}
+        className="block w-full resize-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+      />
+
+      {/* 动作区并进元信息行右侧：不新增一行高度，与 Wiki 页面详情同形态 */}
+      <div className="mt-2.5 flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <MetaChip icon={typeMeta.icon}>
+            {t(typeMeta.labelKey, typeMeta.fallback)}
+          </MetaChip>
+          <CollectionChip item={item} disabled={isTrashed} />
+          <SourceChip item={item} />
+          {/* 置顶与归档改由菜单切换，状态就得由 chip 说出来——原先只靠按钮
+              的高亮底色与两个长得极像的归档图标区分，本就看不出来 */}
+          {item.isPinned ? (
+            <MetaChip
+              icon={<PinIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              {t("library.pinnedBadge", "已置顶")}
+            </MetaChip>
+          ) : null}
+          {item.status === "archived" ? (
+            <MetaChip
+              icon={<ArchiveIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              {t("library.archivedBadge", "已归档")}
+            </MetaChip>
+          ) : null}
+          <MetaChip
+            icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+            tone={saveTone}
+            title={saveError ?? undefined}
+          >
+            {saveLabel}
+          </MetaChip>
+          {wordCount > 0 ? (
+            <MetaChip
+              icon={<HashIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              {t("library.wordCount", "{{count}} 字", { count: wordCount })}
+            </MetaChip>
+          ) : null}
+          {isDirty && !isTrashed ? (
+            <button
+              type="button"
+              onClick={() => void flushPendingSave()}
+              className="inline-flex h-6 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              title={t("library.saveNow", "保存 (Ctrl+S)")}
+            >
+              <SaveIcon className="h-3 w-3" aria-hidden="true" />
+              {t("library.save", "保存")}
+            </button>
+          ) : null}
+        </div>
+
+        {/* 按钮 32px、chip 24px，上提 4px 才与第一行 chip 对齐 */}
+        <div className="-mt-1 flex shrink-0 items-center gap-0.5">
           {isTrashed ? (
             <button
               type="button"
@@ -268,38 +404,7 @@ export function ItemDetailHeader({
                   aria-hidden="true"
                 />
               </ActionButton>
-              <ActionButton
-                onClick={() => void togglePinned(item.id)}
-                title={
-                  item.isPinned
-                    ? t("library.unpin", "取消置顶")
-                    : t("library.pin", "置顶")
-                }
-                active={item.isPinned}
-              >
-                <PinIcon className="h-4 w-4" aria-hidden="true" />
-              </ActionButton>
-              {item.status === "archived" ? (
-                <ActionButton
-                  onClick={() => void setStatus([item.id], "active")}
-                  title={t("library.unarchive", "取消归档")}
-                >
-                  <ArchiveRestoreIcon className="h-4 w-4" aria-hidden="true" />
-                </ActionButton>
-              ) : (
-                <ActionButton
-                  onClick={() => void setStatus([item.id], "archived")}
-                  title={t("library.archive", "归档")}
-                >
-                  <ArchiveIcon className="h-4 w-4" aria-hidden="true" />
-                </ActionButton>
-              )}
-              <ActionButton
-                onClick={() => void moveToTrash([item.id])}
-                title={t("library.moveToTrash", "移到回收站")}
-              >
-                <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-              </ActionButton>
+              <MoreActionsButton item={item} />
             </>
           )}
           {onClose ? (
@@ -314,39 +419,6 @@ export function ItemDetailHeader({
             </>
           ) : null}
         </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-        <MetaChip icon={typeMeta.icon}>
-          {t(typeMeta.labelKey, typeMeta.fallback)}
-        </MetaChip>
-        <CollectionChip item={item} disabled={isTrashed} />
-        <SourceChip item={item} />
-        <MetaChip
-          icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
-          tone={saveTone}
-          title={saveError ?? undefined}
-        >
-          {saveLabel}
-        </MetaChip>
-        {wordCount > 0 ? (
-          <MetaChip
-            icon={<HashIcon className="h-3.5 w-3.5" aria-hidden="true" />}
-          >
-            {t("library.wordCount", "{{count}} 字", { count: wordCount })}
-          </MetaChip>
-        ) : null}
-        {isDirty && !isTrashed ? (
-          <button
-            type="button"
-            onClick={() => void flushPendingSave()}
-            className="inline-flex h-6 items-center gap-1 rounded-md bg-primary px-2 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            title={t("library.saveNow", "保存 (Ctrl+S)")}
-          >
-            <SaveIcon className="h-3 w-3" aria-hidden="true" />
-            {t("library.save", "保存")}
-          </button>
-        ) : null}
       </div>
 
       {!isTrashed ? (

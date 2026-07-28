@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
     CHECK(status IN ('pending','processing','completed','failed','canceled','duplicate')),
   stage TEXT,
   error TEXT,
+  -- 已入库但内容有缺失的原因（转写失败等）；与 error 互不替代，见 ImportTask.warning
+  warning TEXT,
   -- 抽取出的条目类型，用于列表图标；不加 CHECK，避免新增类型时又要重建表
   item_type TEXT,
   result_item_id TEXT,

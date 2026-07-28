@@ -925,6 +925,37 @@ body {
   border-top: 1px solid hsl(var(--border));
   margin: 1em 0;
 }
+/* GFM 表格。与上面 list-style 那处同源：本项目没装 @tailwindcss/typography，
+   .prose 的每条规则都得自己写，而 preflight 把所有元素的 border-width 清成 0，
+   表格于是既没有框线也没有单元格内边距，页面上只剩几列对齐的文字 */
+.prose table {
+  /* 列多到撑破容器时横向滚动，而不是溢出到卡片外被截掉。overflow 对 table
+     盒子不生效（实测计算回 visible），只有降成 block 才拦得住；配 max-content
+     让窄表按内容收紧。Chromium 下无障碍语义不受影响，仍报 table/row/cell */
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  margin-bottom: 0.75em;
+}
+.prose thead {
+  background: hsl(var(--muted));
+}
+.prose th,
+.prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.45em 0.75em;
+  vertical-align: top;
+}
+.prose th {
+  font-weight: 600;
+}
+/* GFM 的 `:---:` 列对齐落成 align 属性（在 sanitize 白名单里），
+   默认左对齐必须避开它，否则居中与右对齐的列会被无声改掉 */
+.prose th:not([align]),
+.prose td:not([align]) {
+  text-align: left;
+}
 
 /* Hide scrollbar utility */
 .scrollbar-hide {

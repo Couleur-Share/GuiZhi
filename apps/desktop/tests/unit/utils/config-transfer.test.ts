@@ -139,6 +139,43 @@ describe("信封校验", () => {
     expect(result.file!.shortcuts!.accelerators.showApp).toBe("Alt+Shift+P");
   });
 
+  it("文件没带 MCP 范围时不填默认值：旧配置不该把本机收紧过的范围放开", () => {
+    const result = parseConfigTransferFile(makeFile());
+
+    expect(result.ok).toBe(true);
+    expect(result.file!.mcpScope).toBeUndefined();
+  });
+
+  it("带了 MCP 范围就按 parseMcpScope 收敛", () => {
+    const result = parseConfigTransferFile({
+      ...makeFile(),
+      mcpScope: {
+        mode: "selected",
+        allowedCollectionIds: ["c1", "c1", "", "c2"],
+        allowUncategorized: false,
+      },
+    });
+
+    expect(result.file!.mcpScope).toEqual({
+      mode: "selected",
+      allowedCollectionIds: ["c1", "c2"],
+      allowUncategorized: false,
+    });
+  });
+
+  it("MCP 范围是坏数据时退回全部可见，而不是当成没带", () => {
+    const result = parseConfigTransferFile({
+      ...makeFile(),
+      mcpScope: { mode: "nonsense" },
+    });
+
+    expect(result.file!.mcpScope).toEqual({
+      mode: "all",
+      allowedCollectionIds: [],
+      allowUncategorized: true,
+    });
+  });
+
   it("拒绝别的 JSON 文件", () => {
     expect(parseConfigTransferFile({ hello: 1 }).ok).toBe(false);
     expect(parseConfigTransferFile("nope").ok).toBe(false);
@@ -217,6 +254,26 @@ describe("预览摘要", () => {
       styleCount: 2,
       shortcutCount: 1,
       uiLayoutKeyCount: 1,
+    });
+    // 没带范围与「全部可见」在界面上必须分得开
+    expect(preview.mcpScope).toBeUndefined();
+  });
+
+  it("带了 MCP 范围时给出模式与知识库数", () => {
+    const preview = buildConfigPreview(
+      makeFile({
+        mcpScope: {
+          mode: "selected",
+          allowedCollectionIds: ["c1", "c2", "c3"],
+          allowUncategorized: false,
+        },
+      }),
+    );
+
+    expect(preview.mcpScope).toEqual({
+      mode: "selected",
+      collectionCount: 3,
+      allowUncategorized: false,
     });
   });
 

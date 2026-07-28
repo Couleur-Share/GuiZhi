@@ -6,13 +6,14 @@ import fs from "fs";
 import path from "path";
 import { getToolsDir } from "../../runtime-paths";
 
-/** 服务固定监听端口（仅绑定 127.0.0.1） */
-export const FUNASR_PORT = 8620;
-export const FUNASR_BASE_URL = `http://127.0.0.1:${FUNASR_PORT}/v1`;
+// 端口与内置条目 id 渲染进程也要用（设置页据此挡住删除内置引擎），落在 shared
+export {
+  FUNASR_BASE_URL,
+  FUNASR_MODEL_ID,
+  FUNASR_PORT,
+  FUNASR_PROVIDER_ID,
+} from "@guizhi/shared/constants";
 
-/** ai-models.json 里内置条目的固定 id（安装时写入、卸载时移除） */
-export const FUNASR_PROVIDER_ID = "provider_local_funasr";
-export const FUNASR_MODEL_ID = "model_local_sensevoice";
 /** funasr-server 暴露的模型名 */
 export const FUNASR_MODEL_NAME = "sensevoice";
 

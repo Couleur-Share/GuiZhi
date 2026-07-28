@@ -18,8 +18,12 @@ import type {
   CoreAIModelRoute,
   CoreAIProviderConfig,
 } from "@guizhi/core";
-import { FUNASR_MODEL_ID, FUNASR_PROVIDER_ID } from "../media/funasr-paths";
-import { isManagedFunasrUrl } from "../media/funasr-service";
+import {
+  FUNASR_MODEL_ID,
+  FUNASR_PROVIDER_ID,
+  isLocalEngineProvider,
+  isManagedFunasrUrl,
+} from "@guizhi/shared/constants";
 
 /** 文件里的模型条目：结构同 CoreAIModelConfig，另带渲染进程独有的 chatParams */
 export type TransferModelConfig = CoreAIModelConfig & {
@@ -65,12 +69,6 @@ function isUsableModel(value: unknown): value is TransferModelConfig {
     nonEmpty(value.provider) &&
     nonEmpty(value.apiUrl) &&
     nonEmpty(value.model)
-  );
-}
-
-function isLocalEngineProvider(provider: CoreAIProviderConfig): boolean {
-  return (
-    provider.id === FUNASR_PROVIDER_ID || isManagedFunasrUrl(provider.apiUrl)
   );
 }
 

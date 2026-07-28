@@ -170,7 +170,10 @@ export interface SettingsState {
   setAiModel: (model: string) => void;
   addAiProvider: (config: Omit<AIProviderConfig, "id">) => void;
   updateAiProvider: (id: string, config: Partial<AIProviderConfig>) => void;
-  deleteAiProvider: (id: string) => void;
+  deleteAiProvider: (target: {
+    providerId?: string;
+    modelIds: string[];
+  }) => void;
   addAiModel: (config: Omit<AIModelConfig, "id">) => void;
   updateAiModel: (id: string, config: Partial<AIModelConfig>) => void;
   deleteAiModel: (id: string) => void;

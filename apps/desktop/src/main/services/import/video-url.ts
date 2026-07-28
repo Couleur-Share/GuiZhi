@@ -567,6 +567,15 @@ export async function extractVideoUrl(
         throw error;
       }
       transcriptionNote = `文字稿生成失败：${error instanceof Error ? error.message : String(error)}`;
+      // 导入是后台流程不弹提示，但转写失败会掏空整条条目——不留痕的话，
+      // 用户报「怎么没有文字稿」时双方都拿不出任何可查的东西
+      console.warn("[import] 语音转写失败:", error);
+      logAppError({
+        scope: "import",
+        action: "语音转写",
+        message: transcriptionNote,
+        url,
+      });
     } finally {
       prepared?.cleanup();
       if (tempDir) {
@@ -684,5 +693,7 @@ export async function extractVideoUrl(
     itemType: "video",
     sourceUri: metadata.webpageUrl || url,
     transcript,
+    // 正文里的那行注记同时上报到任务上，列表才不会只给一枚绿色的「已完成」
+    warningReason: transcriptionNote,
   };
 }

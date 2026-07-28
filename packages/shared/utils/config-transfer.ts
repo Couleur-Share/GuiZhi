@@ -14,6 +14,7 @@ import {
   CONFIG_TRANSFER_KIND,
   CONFIG_TRANSFER_VERSION,
 } from "../types/config-transfer";
+import { parseMcpScope } from "./mcp-scope";
 
 /**
  * 与本机绑定、导过去只会坏事的设置字段。
@@ -280,6 +281,11 @@ export function parseConfigTransferFile(
         ? (raw.illustrationStyles as ConfigTransferFile["illustrationStyles"])
         : undefined,
       shortcuts,
+      // parseMcpScope 对坏数据回「全部可见」，拿它处理缺省字段就会让一份旧配置
+      // 把本机收紧过的范围放开，所以这里先判在不在，再谈内容对不对
+      mcpScope: isPlainRecord(raw.mcpScope)
+        ? parseMcpScope(raw.mcpScope)
+        : undefined,
     },
   };
 }
@@ -307,5 +313,12 @@ export function buildConfigPreview(
       ? Object.values(file.shortcuts.accelerators).filter(Boolean).length
       : 0,
     uiLayoutKeyCount: Object.keys(file.uiLayout ?? {}).length,
+    mcpScope: file.mcpScope
+      ? {
+          mode: file.mcpScope.mode,
+          collectionCount: file.mcpScope.allowedCollectionIds.length,
+          allowUncategorized: file.mcpScope.allowUncategorized,
+        }
+      : undefined,
   };
 }

@@ -20,6 +20,7 @@ function makeTask(patch: Partial<ImportTask> = {}): ImportTask {
     status: patch.status ?? "completed",
     stage: patch.stage ?? null,
     error: patch.error ?? null,
+    warning: patch.warning ?? null,
     itemType: patch.itemType ?? null,
     resultItemId: patch.resultItemId ?? null,
     duplicateItemId: patch.duplicateItemId ?? null,
@@ -96,6 +97,12 @@ describe("列表筛选", () => {
     makeTask({ id: "d", status: "failed", displayName: "失败的" }),
     makeTask({ id: "e", status: "duplicate", displayName: "重复的" }),
     makeTask({ id: "f", status: "canceled", displayName: "取消的" }),
+    makeTask({
+      id: "g",
+      status: "completed",
+      displayName: "采到了但没有文字稿",
+      warning: "文字稿生成失败：本地转写服务启动失败",
+    }),
   ];
 
   it("active 合并 pending 与 processing", () => {
@@ -108,7 +115,17 @@ describe("列表筛选", () => {
   it("其余档位按状态精确匹配", () => {
     expect(filterTasks(tasks, "failed", "").map((task) => task.id)).toEqual(["d"]);
     expect(filterTasks(tasks, "canceled", "").map((task) => task.id)).toEqual(["f"]);
-    expect(filterTasks(tasks, "all", "")).toHaveLength(6);
+    expect(filterTasks(tasks, "all", "")).toHaveLength(7);
+  });
+
+  it("degraded 是 completed 的子集，两档都数得到同一条", () => {
+    expect(filterTasks(tasks, "degraded", "").map((task) => task.id)).toEqual([
+      "g",
+    ]);
+    expect(filterTasks(tasks, "completed", "").map((task) => task.id)).toEqual([
+      "c",
+      "g",
+    ]);
   });
 
   it("搜索同时匹配显示名与原始链接", () => {
@@ -128,9 +145,11 @@ describe("列表筛选", () => {
   it("计数与筛选口径一致", () => {
     const counts = countByFilter(tasks);
     expect(counts).toEqual({
-      all: 6,
+      all: 7,
       active: 2,
-      completed: 1,
+      // 降级那条同时计进 completed 与 degraded，各档之和因此不等于 all
+      completed: 2,
+      degraded: 1,
       duplicate: 1,
       failed: 1,
       canceled: 1,

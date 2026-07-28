@@ -7,10 +7,12 @@ import { createAISettingsActions } from "./settings/settings-ai-actions";
 import {
   attachProviderIdsToAIModels,
   buildAISettingsSyncPayload,
+  dropProviderNameAliases,
   normalizeAIProtocol,
   normalizeModelRouteDefaults,
   normalizePersistedAIModels,
   normalizePersistedAIProviders,
+  preserveLocalOnlyModelFields,
 } from "./settings/settings-ai";
 import { createDefaultSettingsValues } from "./settings/settings-defaults";
 import { createGeneralSettingsActions } from "./settings/settings-general-actions";
@@ -131,9 +133,15 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
     ? normalizePersistedAIProviders(aiSettings.aiProviders)
     : state.aiProviders;
   const aiModels = Array.isArray(aiSettings.aiModels)
-    ? attachProviderIdsToAIModels(
-        aiProviders,
-        normalizePersistedAIModels(aiSettings.aiModels),
+    ? preserveLocalOnlyModelFields(
+        state.aiModels,
+        dropProviderNameAliases(
+          aiProviders,
+          attachProviderIdsToAIModels(
+            aiProviders,
+            normalizePersistedAIModels(aiSettings.aiModels),
+          ),
+        ),
       )
     : state.aiModels;
   const aiProvider =

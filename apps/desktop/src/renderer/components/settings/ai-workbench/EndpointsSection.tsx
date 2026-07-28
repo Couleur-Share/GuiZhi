@@ -28,6 +28,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { isLocalEngineProvider } from "@guizhi/shared/constants";
+
 import {
   hasModelCapability,
   isConfiguredModel,
@@ -104,6 +106,7 @@ export function EndpointsSection({
   modelScenarioBadges,
   onTestEndpoint,
   onEditEndpoint,
+  onDeleteEndpoint,
   onUpdateEndpointCredentials,
   onAddProvider,
   onAddModel,
@@ -122,6 +125,7 @@ export function EndpointsSection({
   modelScenarioBadges: Map<string, string[]>;
   onTestEndpoint: (group: EndpointGroup) => void;
   onEditEndpoint: (group: EndpointGroup) => void;
+  onDeleteEndpoint: (group: EndpointGroup) => void;
   onUpdateEndpointCredentials: (
     group: EndpointGroup,
     credentials: { apiKey: string; apiUrl: string },
@@ -368,6 +372,12 @@ export function EndpointsSection({
   const endpointStatus = getEndpointStatus(selectedGroup);
   const providerMetaLabel = getProtocolLabel(selectedGroup.apiProtocol);
   const firstModel = selectedGroup.models[0];
+  // 内置本地转写引擎的条目只在安装时写入、卸载时移除，没有自愈路径：
+  // 在这里删掉只会剩下装着运行时却没有配置的状态，卸载入口在「设置 → 采集」
+  const localEngineSelected = isLocalEngineProvider({
+    id: selectedGroup.providerConfigId,
+    apiUrl: selectedGroup.apiUrl,
+  });
 
   return (
     <section className="h-full min-h-0 overflow-hidden">
@@ -561,6 +571,25 @@ export function EndpointsSection({
                       <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       {t("common.edit")}
                     </button>
+                    {/* 置灰按钮不派发指针事件，title 挂在外层才提示得出来 */}
+                    <span
+                      className="inline-flex"
+                      title={
+                        localEngineSelected
+                          ? t("settings.aiWorkbenchLocalEngineLocked")
+                          : undefined
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onDeleteEndpoint(selectedGroup)}
+                        disabled={localEngineSelected}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-red-500 hover:bg-red-500/5 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-60 disabled:hover:bg-transparent"
+                      >
+                        <Trash2Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                        {t("common.delete")}
+                      </button>
+                    </span>
                   </div>
                 </div>
 

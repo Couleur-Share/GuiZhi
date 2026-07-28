@@ -20,6 +20,7 @@ interface TaskRow {
   status: ImportTaskStatus;
   stage: ImportStage | null;
   error: string | null;
+  warning: string | null;
   item_type: KnowledgeItemType | null;
   result_item_id: string | null;
   duplicate_item_id: string | null;
@@ -66,6 +67,7 @@ function mapRow(row: TaskRow): ImportTask {
     status: row.status,
     stage: row.stage,
     error: row.error,
+    warning: row.warning,
     itemType: row.item_type,
     resultItemId: row.result_item_id,
     duplicateItemId: row.duplicate_item_id,
@@ -159,6 +161,8 @@ export class ImportTaskDB {
       status: ImportTaskStatus;
       stage: ImportStage | null;
       error: string | null;
+      /** 已入库但内容有缺失的原因；与 error 分开，见 ImportTask.warning */
+      warning: string | null;
       /** 抽取拿到真实标题后回写，替换建任务时的原始 URL / 首行 */
       displayName: string;
       itemType: KnowledgeItemType | null;
@@ -176,12 +180,13 @@ export class ImportTaskDB {
     }
     this.db.run(
       `UPDATE import_tasks SET
-         status = ?, stage = ?, error = ?, display_name = ?, item_type = ?,
+         status = ?, stage = ?, error = ?, warning = ?, display_name = ?, item_type = ?,
          result_item_id = ?, duplicate_item_id = ?, force_duplicate = ?, updated_at = ?
        WHERE id = ?`,
       patch.status ?? existing.status,
       patch.stage !== undefined ? patch.stage : existing.stage,
       patch.error !== undefined ? patch.error : existing.error,
+      patch.warning !== undefined ? patch.warning : existing.warning,
       patch.displayName?.trim() || existing.display_name,
       patch.itemType !== undefined ? patch.itemType : existing.item_type,
       patch.resultItemId !== undefined

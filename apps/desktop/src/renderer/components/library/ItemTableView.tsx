@@ -283,7 +283,7 @@ export function ItemTableView() {
         )}
       </div>
 
-      <ItemPagination />
+      <ItemPagination wide />
 
       {menuState ? (
         <ContextMenu

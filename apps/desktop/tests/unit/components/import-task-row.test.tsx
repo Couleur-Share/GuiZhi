@@ -18,6 +18,7 @@ function makeTask(patch: Partial<ImportTask> = {}): ImportTask {
     status: "processing",
     stage: "transcribing",
     error: null,
+    warning: null,
     itemType: "video",
     resultItemId: null,
     duplicateItemId: null,
@@ -81,6 +82,22 @@ describe("导入任务行", () => {
       screen.getByRole("button", { name: "手写一个混合检索 RAG 系统" }),
     );
     expect(onOpenItem).toHaveBeenCalledWith("item-9");
+  });
+
+  it("入库但缺了文字稿：徽标不能是绿色的「已完成」，原因要写在行里", () => {
+    renderRow(
+      makeTask({
+        status: "completed",
+        stage: null,
+        resultItemId: "item-9",
+        warning: "文字稿生成失败：本地转写服务启动失败",
+      }),
+    );
+    expect(screen.getByText("完成（有缺失）")).toBeInTheDocument();
+    expect(screen.queryByText("已完成")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("文字稿生成失败：本地转写服务启动失败"),
+    ).toBeInTheDocument();
   });
 
   it("重复：给出打开已有条目与创建副本两个出口", () => {

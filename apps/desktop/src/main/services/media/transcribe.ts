@@ -18,7 +18,10 @@ import {
 import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
 import { recordMainAiUsage } from "../ai-usage";
-import { isManagedFunasrUrl } from "./funasr-service";
+import {
+  isManagedFunasrUrl,
+  runExclusiveLocalTranscription,
+} from "./funasr-service";
 
 const TRANSCRIBE_TIMEOUT_MS = 10 * 60 * 1000;
 const TEST_TIMEOUT_MS = 60 * 1000;
@@ -186,15 +189,23 @@ export async function transcribeMediaFile(
   signal?: AbortSignal,
   options?: { diarize?: boolean },
 ): Promise<string> {
-  const timeoutSignal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
-  let raw: string;
-  try {
-    raw = await requestTranscription(
+  // 超时预算在真正开始发请求时才起算：内置引擎一次只做一条，排队等前一条
+  // 做完的时间不该记在自己头上，否则批量导入的第二条会以「转写超时」告终
+  const send = (): Promise<string> => {
+    const timeoutSignal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
+    return requestTranscription(
       filePath,
       config,
       signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
       options?.diarize === true,
     );
+  };
+
+  let raw: string;
+  try {
+    raw = isManagedFunasrUrl(config.apiUrl)
+      ? await runExclusiveLocalTranscription(send)
+      : await send();
   } catch (error) {
     recordTranscriptionUsage(config, true);
     throw error;

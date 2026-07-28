@@ -275,6 +275,58 @@ export function findMatchingAIProvider(
   );
 }
 
+/**
+ * 清掉与所属供应商同名的模型别名。
+ *
+ * 端点编辑曾把整份供应商配置灌进旗下每个模型（含供应商的 name），于是模型
+ * 路由的下拉里每一项都叫「云雾API」，八个模型一个都分不出。写入侧已经修好，
+ * 但落进 localStorage 与 ai-models.json 的值没有任何自愈路径，只能在读的
+ * 时候清：这样的别名与它上面那一行供应商名逐字相同、不携带任何信息，清掉后
+ * 回落到模型 id 严格优于现状；真想要这个别名，重新填一次即可。
+ */
+export function dropProviderNameAliases(
+  providers: AIProviderConfig[],
+  models: AIModelConfig[],
+): AIModelConfig[] {
+  return models.map((model) => {
+    const alias = model.name?.trim();
+    if (!alias) {
+      return model;
+    }
+    const provider = findMatchingAIProvider(providers, model);
+    return provider?.name?.trim() === alias
+      ? { ...model, name: undefined }
+      : model;
+  });
+}
+
+/**
+ * 把渲染进程独有的模型字段接回来。
+ *
+ * `chatParams` 只活在 localStorage：主进程的 ai-models.json 由
+ * `normalizeModelConfig` 逐字段重建，那份结构里没有这个字段（主进程的配图、
+ * 转写、总结链路都用不上对话参数）。而每次启动都会拿主进程那份去整体覆盖
+ * store，不接回来的话，用户调过的温度、惩罚项活不过一次重启——配置迁移更是
+ * 必然踩中，它的最后一步就是重启。
+ *
+ * 按 id 匹配、只补 incoming 里缺的那部分，所以「用户刚清空了参数」不会被复活。
+ */
+export function preserveLocalOnlyModelFields(
+  current: AIModelConfig[],
+  incoming: AIModelConfig[],
+): AIModelConfig[] {
+  const localOnly = new Map(
+    current.map((model) => [model.id, model.chatParams]),
+  );
+  return incoming.map((model) => {
+    if (model.chatParams !== undefined) {
+      return model;
+    }
+    const chatParams = localOnly.get(model.id);
+    return chatParams === undefined ? model : { ...model, chatParams };
+  });
+}
+
 export function attachProviderIdsToAIModels(
   providers: AIProviderConfig[],
   models: AIModelConfig[],

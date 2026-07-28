@@ -122,7 +122,16 @@ function StatusBadge({ task }: { task: ImportTask }) {
       );
     }
     case "completed":
-      return (
+      // 入库了但缺了文字稿这类东西时，绿色的「已完成」等于骗人——
+      // 用户点开条目才发现是个空壳，一批三十条里还挑不出是哪几条
+      return task.warning ? (
+        <span
+          className={`${base} bg-amber-500/10 text-amber-600 dark:text-amber-400`}
+        >
+          <TriangleAlertIcon className="h-2.5 w-2.5" aria-hidden="true" />
+          {t("imports.statusDegraded", "完成（有缺失）")}
+        </span>
+      ) : (
         <span
           className={`${base} bg-green-500/10 text-green-600 dark:text-green-400`}
         >
@@ -306,6 +315,12 @@ export function ImportTaskRow({
           {task.error ? (
             <p className="mt-1 break-words text-xs text-destructive/90">
               {task.error}
+            </p>
+          ) : null}
+
+          {task.warning ? (
+            <p className="mt-1 break-words text-xs text-amber-600 dark:text-amber-400">
+              {task.warning}
             </p>
           ) : null}
         </div>
