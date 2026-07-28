@@ -521,6 +521,23 @@ Markdown 只认单换行会把它和下一行正文渲染进同一段，页面�
 桌面 UA 会被 302 到 `douyin.com`，UA 是这条路的前提，别改。
 判定图文只看 `images` 字段——抖音给图文也生成了 play_addr（图片合成的幻灯片
 视频）。图文的条目组装走下面那份两个平台共用的 `import/image-note-entry.ts`。
+
+抖音评论不采（查过了，别再查一遍）。动机是充分的——作者常把资源链接放在评论区，
+简介里反而没有，而正文里一句「链接在评论区」对读到的人是条死路。但四种 UA 打同一个
+`douyin.com/video/<id>` 实测下来，只有一条路走得通：自报家门的 `GuiZhi/0.11.0`、
+普通 Chrome、移动端 Safari 三者拿到的 HTML **字节数完全相同**（72,914），
+都不含评论；只有 Googlebot UA 多吐出一段 `application/ld+json`（86,192），
+里面是 Schema.org 标准格式的 `{"@type":"Comment", text, creator, interactionStatistic}`。
+现走的 `iesdouyin.com` 分享页也补不上：`item_list[0]` 里 `comment_list` 这个字段
+确实在，但值恒为 `null`（同一份数据里 `statistics.comment_count` 是有值的，78），
+所以这不是「多读一个字段」而是「换一条抓取路径」。
+不做的理由不是技术上做不到，而是这与上面那条移动端 UA 性质不同：移动端 UA 声明的是
+「我用手机浏览器访问」，那是一个真实存在的客户端形态，没有谁被冒名；Googlebot UA
+声明的是「我是 Google 的爬虫」，抖音给它多吐数据是基于「这是 Google、会带来搜索
+流量」的商业约定，冒用它是拿一个不属于我们的身份换特权访问，而反查来源 IP 是否落在
+Google 的地址段是识别这件事的标准手段。归知是公开发行的软件，被识破的代价是 IP 被封、
+连带现有抖音采集一起挂掉，收益却只是偶尔多捡到一个链接（触发这次调研的那条视频，
+评论区恰恰没有链接，作者说的是「发太多疑似限流了」）。
 小红书不走 yt-dlp：yt-dlp 的 XiaoHongShu 提取器只出视频 formats，而小红书的
 主体内容是图文笔记（`type: "normal"`），那条路对图文一律报「No video formats
 found」；它的 `_VALID_URL` 也不认 `xhslink.com` 短链，分享口令里的链接直接落空；
