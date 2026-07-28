@@ -17,7 +17,7 @@ import { useImportStore } from "../../stores/import.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
-import { parseCaptureDraft } from "./capture-utils";
+import { parseCaptureDraft, resolveCaptureAction } from "./capture-utils";
 
 interface CaptureDialogProps {
   isOpen: boolean;
@@ -46,6 +46,10 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
   const [tagNames, setTagNames] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+  /** 文字夹链接时用户在提示栏上的改判；null 表示沿用自动判定 */
+  const [draftOverride, setDraftOverride] = useState<"urls" | "text" | null>(
+    null,
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -56,6 +60,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
       setTagNames([]);
       setTagDraft("");
       setIsDragOver(false);
+      setDraftOverride(null);
     }
   }, [isOpen, fetchCollections]);
 
@@ -73,15 +78,19 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
   };
 
   const parsedDraft = useMemo(() => parseCaptureDraft(draft), [draft]);
-  const canSubmit = parsedDraft.kind !== "empty" || filePaths.length > 0;
+  const captureAction = useMemo(
+    () => resolveCaptureAction(parsedDraft, draftOverride),
+    [parsedDraft, draftOverride],
+  );
+  const canSubmit = captureAction.kind !== "empty" || filePaths.length > 0;
 
   const submit = async () => {
     const inputs: EnqueueImportInput[] = [];
     const targetCollection = collectionId || null;
     const targetTags = tagNames.length > 0 ? tagNames : undefined;
 
-    if (parsedDraft.kind === "urls") {
-      for (const url of parsedDraft.urls) {
+    if (captureAction.kind === "urls") {
+      for (const url of captureAction.urls) {
         inputs.push({
           kind: "url",
           input: url,
@@ -89,10 +98,10 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
           tagNames: targetTags,
         });
       }
-    } else if (parsedDraft.kind === "text") {
+    } else if (captureAction.kind === "text") {
       inputs.push({
         kind: "text",
-        input: parsedDraft.text,
+        input: captureAction.text,
         collectionId: targetCollection,
         tagNames: targetTags,
       });
@@ -163,6 +172,36 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     await createItem({ collectionId: collectionId || null });
   };
 
+  // 从文字里抠出来的链接要显示出来：整段文字里可能不止一条，
+  // 用户得看得见我们挑的是哪个
+  const hintText = (() => {
+    if (captureAction.kind === "urls") {
+      const count = captureAction.urls.length;
+      if (parsedDraft.kind !== "mixed") {
+        return count > 1
+          ? t(
+              "capture.detectedUrls",
+              "识别到 {{count}} 个链接，将逐个抓取正文",
+              { count },
+            )
+          : t("capture.detectedUrl", "识别为网页链接，将抓取正文");
+      }
+      return count > 1
+        ? t(
+            "capture.extractedUrls",
+            "已从文字中提取 {{count}} 个链接，将逐个抓取正文",
+            { count },
+          )
+        : t("capture.extractedUrl", "已提取链接：{{url}}", {
+            url: captureAction.urls[0],
+          });
+    }
+    if (captureAction.kind === "text") {
+      return t("capture.detectedText", "将保存为文本笔记");
+    }
+    return t("capture.hint", "支持文本、链接与文本文件");
+  })();
+
   return (
     <Modal
       isOpen={isOpen}
@@ -201,30 +240,51 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             rows={6}
             placeholder={t(
               "capture.placeholder",
-              "粘贴文本、网页或视频链接，或将文本 / 图片 / 音视频文件拖到这里…",
+              "粘贴文本、链接或分享口令，或将文本 / 图片 / 音视频文件拖到这里…",
             )}
             className="w-full resize-none rounded-xl bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2 text-xs text-muted-foreground">
-            {parsedDraft.kind === "urls" ? (
-              <span className="inline-flex items-center gap-1 text-primary">
-                <GlobeIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {parsedDraft.urls.length > 1
-                  ? t(
-                      "capture.detectedUrls",
-                      "识别到 {{count}} 个链接，将逐个抓取正文",
-                      { count: parsedDraft.urls.length },
-                    )
-                  : t("capture.detectedUrl", "识别为网页链接，将抓取正文")}
-              </span>
-            ) : parsedDraft.kind === "text" ? (
-              <span className="inline-flex items-center gap-1">
-                <ClipboardPasteIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {t("capture.detectedText", "将保存为文本笔记")}
-              </span>
-            ) : (
-              <span>{t("capture.hint", "支持文本、链接与文本文件")}</span>
-            )}
+            <span
+              className={`inline-flex min-w-0 flex-1 items-center gap-1 ${
+                captureAction.kind === "urls" ? "text-primary" : ""
+              }`}
+            >
+              {captureAction.kind === "urls" ? (
+                <GlobeIcon
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+              ) : captureAction.kind === "text" ? (
+                <ClipboardPasteIcon
+                  className="h-3.5 w-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+              ) : null}
+              <span className="truncate">{hintText}</span>
+            </span>
+            {parsedDraft.kind === "mixed" ? (
+              <button
+                type="button"
+                data-testid="capture-switch-kind"
+                onClick={() =>
+                  setDraftOverride(
+                    captureAction.kind === "urls" ? "text" : "urls",
+                  )
+                }
+                className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              >
+                {captureAction.kind === "urls"
+                  ? t("capture.switchToText", "改为保存为文本")
+                  : parsedDraft.urls.length > 1
+                    ? t(
+                        "capture.switchToUrls",
+                        "改为采集其中的 {{count}} 个链接",
+                        { count: parsedDraft.urls.length },
+                      )
+                    : t("capture.switchToUrl", "改为采集其中的链接")}
+              </button>
+            ) : null}
           </div>
         </div>
 
