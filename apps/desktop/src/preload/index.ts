@@ -7,6 +7,7 @@ import { importApi } from "./api/import";
 import { wikiApi } from "./api/wiki";
 import { migrationApi } from "./api/migration";
 import { backupApi } from "./api/backup";
+import { configTransferApi } from "./api/config-transfer";
 import { askSessionApi } from "./api/ask";
 import { semanticApi } from "./api/semantic";
 import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
@@ -68,6 +69,7 @@ const api = {
   wiki: wikiApi,
   migration: migrationApi,
   backup: backupApi,
+  config: configTransferApi,
   askSession: askSessionApi,
   semantic: semanticApi,
   media: mediaApi,

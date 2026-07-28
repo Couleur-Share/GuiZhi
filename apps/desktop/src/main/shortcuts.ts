@@ -189,6 +189,40 @@ function saveShortcutModes(modes: Record<string, 'global' | 'local'>): boolean {
 }
 
 /**
+ * 导入配置时落盘快捷键。
+ *
+ * 只认 DEFAULT_SHORTCUTS 里已有的动作名——文件是外来的，不该由它决定注册哪些
+ * 动作。这里不重新注册：导入完成后应用会重启，registerShortcuts 届时从文件
+ * 重新加载，此刻注册纯属多余。写失败直接抛出，导入是用户主动点的，
+ * 「快捷键没导进来」必须说得出原因。
+ */
+export function persistImportedShortcuts(
+  accelerators: Record<string, string>,
+  modes: Record<string, 'global' | 'local'>,
+): void {
+  const incoming = migrateLegacyActionKey({ ...accelerators });
+  const nextShortcuts: Record<string, string> = { ...DEFAULT_SHORTCUTS };
+  for (const action of Object.keys(DEFAULT_SHORTCUTS)) {
+    // 空串是「用户清掉了这个快捷键」，与「文件里没写」不同，要保留
+    if (typeof incoming[action] === 'string') {
+      nextShortcuts[action] = incoming[action];
+    }
+  }
+  const nextModes = normalizeShortcutModes(migrateLegacyActionKey({ ...modes }));
+
+  const shortcutsPath = getConfiguredShortcutsPath();
+  fs.mkdirSync(path.dirname(shortcutsPath), { recursive: true });
+  fs.writeFileSync(shortcutsPath, JSON.stringify(nextShortcuts, null, 2));
+
+  const modePath = getConfiguredShortcutModePath();
+  fs.mkdirSync(path.dirname(modePath), { recursive: true });
+  fs.writeFileSync(modePath, JSON.stringify(nextModes, null, 2));
+
+  currentShortcuts = nextShortcuts;
+  shortcutModes = nextModes;
+}
+
+/**
  * Register a single global shortcut
  * 注册单个全局快捷键
  */

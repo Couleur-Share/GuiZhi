@@ -10,6 +10,7 @@ import { registerImportIPC } from "./import.ipc";
 import { registerWikiIPC } from "./wiki.ipc";
 import { registerMigrationIPC } from "./migration.ipc";
 import { registerBackupIPC } from "./backup.ipc";
+import { registerConfigTransferIPC } from "./config-transfer.ipc";
 import { registerAskIPC } from "./ask.ipc";
 import { registerSemanticIPC } from "./semantic.ipc";
 import { registerMediaIPC } from "./media.ipc";
@@ -56,6 +57,9 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.BACKUP_DELETE,
   IPC_CHANNELS.BACKUP_RESTORE,
   IPC_CHANNELS.EXPORT_MARKDOWN,
+  IPC_CHANNELS.CONFIG_EXPORT,
+  IPC_CHANNELS.CONFIG_READ,
+  IPC_CHANNELS.CONFIG_APPLY,
   IPC_CHANNELS.ASK_SESSION_LIST,
   IPC_CHANNELS.ASK_SESSION_GET,
   IPC_CHANNELS.ASK_SESSION_SAVE,
@@ -141,6 +145,7 @@ export function registerAllIPC(
   registerIpcGroup("wiki", () => registerWikiIPC(db));
   registerIpcGroup("migration", () => registerMigrationIPC(db));
   registerIpcGroup("backup", () => registerBackupIPC(db));
+  registerIpcGroup("config-transfer", () => registerConfigTransferIPC());
   registerIpcGroup("ask", () => registerAskIPC(db));
   registerIpcGroup("semantic", () => registerSemanticIPC(db));
   registerIpcGroup("media", () => registerMediaIPC(db));

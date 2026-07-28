@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { BackupFileInfo, BackupKind } from "@guizhi/shared/types";
 import { useSettingsStore } from "../../stores/settings.store";
+import { ConfigTransferSection } from "./config-transfer/ConfigTransferSection";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Select } from "../ui/Select";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -373,6 +374,9 @@ export function DataSettings() {
           </button>
         </SettingItem>
       </SettingSection>
+
+      {/* 配置迁移：设置本身的搬家，与上面的知识条目备份 / 导出分开 */}
+      <ConfigTransferSection />
 
       <ConfirmDialog
         isOpen={confirmState !== null}

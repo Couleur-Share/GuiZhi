@@ -37,8 +37,10 @@ export function SettingItem({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-border/70 last:border-0 transition-colors hover:bg-muted/20">
-      <div>
+    // gap-4 与 min-w-0：描述长到占满一行时，文字会一直顶到控件上；而右侧控件
+    // 若不给间距、左侧又不许收缩，两者要么贴死要么把行撑出去
+    <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border/70 last:border-0 transition-colors hover:bg-muted/20">
+      <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
         {description && (
           <div className="text-xs text-muted-foreground mt-0.5">

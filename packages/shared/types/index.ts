@@ -7,6 +7,7 @@ export * from "./illustration";
 export * from "./import";
 export * from "./wiki";
 export * from "./backup";
+export * from "./config-transfer";
 export * from "./ask";
 export * from "./semantic";
 export * from "./ytdlp";
