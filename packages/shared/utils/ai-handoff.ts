@@ -55,6 +55,14 @@ function withThousands(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+/** 精简版里口播稿开头给多少字：够看出主题与风格，又不至于把「精简」抵消掉 */
+const TRANSCRIPT_PREVIEW_CHARS = 180;
+
+/** 压成单行：预览要塞进一个引用块里，换行会把它拆成好几段引用 */
+function collapseWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
 /**
  * 把 `local-image://` / `local-video://` 引用换成占位说明。
  *
@@ -245,15 +253,27 @@ export function buildAiHandoff(
   }
 
   if (transcript) {
-    if (options.includeFullText) {
+    // 稿子本身比预览还短时直接全给：略去它既省不了 token，还要多写一句
+    // 「共 N 字未包含」，而 omittedChars 会报出一个实际上没省掉的数字
+    const tooShortToOmit = transcript.length <= TRANSCRIPT_PREVIEW_CHARS;
+    if (options.includeFullText || tooShortToOmit) {
       parts.push("", HANDOFF_TRANSCRIPT_HEADING, "", stripAssetLinks(transcript));
     } else {
       omittedChars += transcript.length;
+      // 除了字数，再给个开头。口播稿没有小节标题可列（排版那步明确禁止输出
+      // 标题），但开头几句足以看出这条是干货还是闲聊、切入点在哪，
+      // 接收方据此判断值不值得再要一次全文——只给一个字数它没法判断。
+      const opening = collapseWhitespace(stripAssetLinks(transcript)).slice(
+        0,
+        TRANSCRIPT_PREVIEW_CHARS,
+      );
       parts.push(
         "",
         HANDOFF_TRANSCRIPT_HEADING,
         "",
-        `> （完整口播文字稿共 ${withThousands(transcript.length)} 字，本次未包含。）`,
+        `> （完整口播文字稿共 ${withThousands(transcript.length)} 字，本次未包含。开头是：）`,
+        "",
+        `> ${opening}…`,
       );
     }
   }

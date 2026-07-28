@@ -8,8 +8,9 @@ import { readItem, searchKnowledge } from "../../../src/mcp/tools";
 
 const ALL_SCOPE: McpScope = { ...DEFAULT_MCP_SCOPE };
 
+/** 重复几遍凑到真实口播稿的量级：太短的稿子精简版会直接全给，测不出略去 */
 const TRANSCRIPT =
-  "大家好，今天我们聊聊状态管理。先说结论，Redux 用得好好的就别动它。";
+  "大家好，今天我们聊聊状态管理。先说结论，Redux 用得好好的就别动它。".repeat(10);
 
 function createTestDb(): DatabaseAdapter.Database {
   const db = new DatabaseAdapter(":memory:");

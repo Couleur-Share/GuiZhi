@@ -1,76 +1,13 @@
 import { detectForumPlatform } from "@guizhi/shared/utils/forum-platforms";
 import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
+import {
+  extractUrlsFromText,
+  isHttpUrlLike,
+} from "@guizhi/shared/utils/url-text";
 
-/** 判断输入整体是否为单个 http(s) 链接（用于采集自动识别）。 */
-export function isHttpUrlLike(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed || /\s/.test(trimmed) || !/^https?:\/\//i.test(trimmed)) {
-    return false;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 从正文里切链接的字符集：排除空白、成对包裹符与全角句读。
- *
- * 全角句读必须排除——小红书的口令是
- * `http://xhslink.com/a/xxx，复制本条信息…`，逗号紧贴着链接，只按空白切会把
- * 后半句一起吞进 URL。全角字母数字不排除，路径里出现中文是合法的。
- */
-const URL_IN_TEXT_RE =
-  /https?:\/\/[^\s<>"'`，。！？；：、（）【】《》「」『』…“”‘’]+/gi;
-
-/** 半角句读跟在链接后面时属于句子而非 URL（`/` `#` 之类不在其中） */
-const TRAILING_PUNCTUATION = ".,;:!?";
-
-function countChar(value: string, char: string): number {
-  let total = 0;
-  for (const current of value) {
-    if (current === char) {
-      total += 1;
-    }
-  }
-  return total;
-}
-
-/**
- * 修剪链接尾巴上的句读。括号按配平判断：维基百科那类
- * `/wiki/Foo_(bar)` 的右括号要留，`(见 https://x.com/a)` 里多出来的要去掉。
- */
-function trimUrlTail(value: string): string {
-  let url = value;
-  while (url) {
-    const last = url[url.length - 1];
-    const unbalanced =
-      (last === ")" && countChar(url, ")") > countChar(url, "(")) ||
-      (last === "]" && countChar(url, "]") > countChar(url, "["));
-    if (!TRAILING_PUNCTUATION.includes(last) && !unbalanced) {
-      break;
-    }
-    url = url.slice(0, -1);
-  }
-  return url;
-}
-
-/** 从一段文本里按出现顺序抠出去重后的 http(s) 链接 */
-export function extractUrlsFromText(value: string): string[] {
-  const urls: string[] = [];
-  const seen = new Set<string>();
-  for (const match of value.match(URL_IN_TEXT_RE) ?? []) {
-    const url = trimUrlTail(match);
-    if (!isHttpUrlLike(url) || seen.has(url)) {
-      continue;
-    }
-    seen.add(url);
-    urls.push(url);
-  }
-  return urls;
-}
+// 采集管线（主进程）也要从视频简介里抠链接，实现搬去了 shared。
+// 这里保留再导出，采集框那些调用点与测试不必跟着改路径。
+export { extractUrlsFromText, isHttpUrlLike };
 
 /** 该链接有专用采集连接器（视频平台 / 论坛），而不是走通用网页抓取 */
 function hasPlatformConnector(url: string): boolean {

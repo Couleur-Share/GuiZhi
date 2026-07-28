@@ -215,7 +215,9 @@ describe("formatTranscript", () => {
     expect(chat.mock.calls[0][1][1].content).not.toContain("说话人 N：");
   });
 
-  it("没有术语表时不掺入这段指令", async () => {
+  it("没有特有专名时仍带上通用技术词表", async () => {
+    // 实测毁得最狠的恰恰是没写进标题的通用词：SQL 听成 circle、
+    // function call 成了「方声扣」、Python 成了「拍摄」
     const chat = vi.fn(
       async (
         _config: AIClientConfig,
@@ -225,7 +227,54 @@ describe("formatTranscript", () => {
       }),
     );
     await formatTranscript(CHUNK_A, CONFIG, { chat: chat as never });
-    expect(chat.mock.calls[0][1][1].content).not.toContain("专有名词表");
+    const prompt = chat.mock.calls[0][1][1].content;
+
+    expect(prompt).not.toContain("专有名词表");
+    expect(prompt).toContain("常见技术名词");
+    for (const term of ["Python", "SQL", "schema", "function call", "Claude Code"]) {
+      expect(prompt).toContain(term);
+    }
+    expect(prompt).toContain("表以外的词不要改动");
+  });
+
+  it("两份词表分开列，模型才分得清哪些是作者真说过的专名", async () => {
+    const chat = vi.fn(
+      async (
+        _config: AIClientConfig,
+        messages: { role: string; content: string }[],
+      ) => ({
+        content: punctuate(extractChunk(messages[1].content)),
+      }),
+    );
+    await formatTranscript(CHUNK_A, CONFIG, {
+      chat: chat as never,
+      glossary: ["pi-agent"],
+    });
+    const prompt = chat.mock.calls[0][1][1].content;
+
+    expect(prompt).toContain("专有名词表（取自标题与简介）：pi-agent");
+    expect(prompt).toContain("常见技术名词：");
+    expect(prompt.indexOf("专有名词表")).toBeLessThan(
+      prompt.indexOf("常见技术名词"),
+    );
+  });
+
+  it("只删不含信息的寒暄，明说资源与链接要留", async () => {
+    // 结尾那段「源码在 GitHub / 我做了 Python 版」看着像推广，
+    // 实际是全篇最能直接用上的信息
+    const chat = vi.fn(
+      async (
+        _config: AIClientConfig,
+        messages: { role: string; content: string }[],
+      ) => ({
+        content: punctuate(extractChunk(messages[1].content)),
+      }),
+    );
+    await formatTranscript(CHUNK_A, CONFIG, { chat: chat as never });
+    const prompt = chat.mock.calls[0][1][1].content;
+
+    expect(prompt).toContain("寒暄套话");
+    expect(prompt).toContain("提到资源、链接、版本、后续计划的句子一律保留");
   });
 
   it("上报已完成块数（并发下报的是计数不是序号）", async () => {

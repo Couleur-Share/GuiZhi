@@ -779,6 +779,82 @@ describe("buildVideoContent", () => {
     expect(content).not.toContain("来源：<");
     expect(content).not.toContain("https://example.com/v");
   });
+
+  it("简介里的链接单独列一行，且从未截断的原文里抠", () => {
+    // 作者常把仓库地址、文档链接放在长简介末尾，而简介写进正文时截到 300 字
+    const content = buildVideoContent(
+      {
+        title: "t",
+        uploader: "作者A",
+        durationSeconds: 65,
+        description: `${"废话".repeat(200)}源码在 https://github.com/foo/bar 配套文档 https://example.com/doc`,
+        webpageUrl: "https://example.com/v",
+      },
+      "bilibili",
+    );
+
+    expect(content).toContain("> 相关链接：");
+    expect(content).toContain("https://github.com/foo/bar");
+    expect(content).toContain("https://example.com/doc");
+    // 简介本身仍然按 300 字截断，链接不受影响
+    expect(content).toContain("…");
+  });
+
+  it("简介里没有链接时不摆一个空行", () => {
+    const content = buildVideoContent(
+      {
+        title: "t",
+        uploader: "作者A",
+        durationSeconds: 65,
+        description: "纯文字简介，没有链接",
+        webpageUrl: "https://example.com/v",
+      },
+      "bilibili",
+    );
+
+    expect(content).not.toContain("相关链接");
+  });
+
+  it("链接一堆时只列前几条，避免推广短链刷屏", () => {
+    const many = Array.from(
+      { length: 12 },
+      (_, index) => `https://example.com/${index}`,
+    ).join(" ");
+    const content = buildVideoContent(
+      {
+        title: "t",
+        uploader: "作者A",
+        durationSeconds: 65,
+        description: many,
+        webpageUrl: "https://example.com/v",
+      },
+      "bilibili",
+    );
+
+    const linkLine = content
+      .split("\n")
+      .find((line) => line.startsWith("> 相关链接："))!;
+    expect(linkLine.match(/https:/g)).toHaveLength(5);
+  });
+
+  it("元数据引用块必须连续：链接行不能把简介与后续内容切开", () => {
+    // parseVideoMetaBlock 只吃连续的 `>` 行，中间夹空行会让解析提前截断
+    const content = buildVideoContent(
+      {
+        title: "t",
+        uploader: "作者A",
+        durationSeconds: 65,
+        description: "看这里 https://example.com/doc",
+        webpageUrl: "https://example.com/v",
+      },
+      "bilibili",
+      "文字稿生成失败：xxx",
+    );
+    const quoteBlock = content.split("\n\n")[0];
+
+    expect(quoteBlock.split("\n").every((line) => line.startsWith(">"))).toBe(true);
+    expect(quoteBlock).toContain("相关链接");
+  });
 });
 
 describe("stripTranscriptionNote", () => {

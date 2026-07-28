@@ -127,17 +127,54 @@ const SPEAKER_INSTRUCTION = [
 ].join("\n");
 
 /**
+ * 常驻的通用技术专名。
+ *
+ * 标题与简介抓到的是这一条内容特有的专名（pi-agent、seaco-paraformer），
+ * 但实测毁得最狠的恰恰是那些哪条技术视频都会出现、又偏偏不会写进标题的词。
+ * 一条讲 Agent 的抖音视频里：SQL 听成「circle」、function call 成了「方声扣」、
+ * Python 成了「拍摄」（"很多同学擅长的其实是拍摄"）、Claude Code 成了
+ * 「C code」、schema 成了「sma」「scama」、harness 成了「哈尼斯」。
+ * 这些词不依赖具体内容，值得常驻。
+ *
+ * 收得克制：每多一条都在撑大提示词，也多一分被过度匹配的机会。只放
+ * 「几乎必然出现 + 音译后完全不可读」的那批，泛用词（data、model、user）
+ * 不收——它们即便听错也还原得出来，反倒容易误伤。
+ */
+const COMMON_TECH_TERMS = [
+  // 语言与查询
+  "Python", "JavaScript", "TypeScript", "Java", "Rust", "Golang", "SQL", "CSS", "HTML",
+  // 接口与数据格式
+  "API", "JSON", "YAML", "Markdown", "HTTP", "schema", "function call", "SDK", "CLI",
+  // AI
+  "LLM", "token", "prompt", "embedding", "RAG", "Agent", "MCP", "GPT", "Claude",
+  "Gemini", "Transformer",
+  // 工具与生态
+  "Git", "GitHub", "Docker", "npm", "Node.js", "React", "Vue", "VS Code",
+  "Claude Code", "Cursor", "harness",
+  // 存储
+  "MySQL", "PostgreSQL", "Redis", "MongoDB", "SQLite",
+];
+
+/**
  * 术语表指令。措辞刻意收紧到「把文中已有的错误形式改成表中写法」：
  * 放开成自由改写就是拿幻觉换错字，比留着错字更糟。
+ *
+ * 两份表分开列而不是合并：前者是这条内容特有的、优先级更高，后者是通用的。
+ * 合成一锅会让模型分不清哪些是「作者真的说过的专名」。
  */
 function buildGlossaryInstruction(glossary: string[]): string {
-  return [
-    "",
-    `本条内容的专有名词表（取自标题与简介）：${glossary.join("、")}`,
-    "语音转写常把这类名词听错（如 dacker → Docker、us state → useState）。" +
-      "文中出现表内名词的错误形式时，改成表中写法——这是第 4 条的唯一放宽之处。" +
-      "表以外的词不要改动；表中没有在文里出现的词，也不要添加进去。",
-  ].join("\n");
+  const lines = [""];
+  if (glossary.length > 0) {
+    lines.push(`本条内容的专有名词表（取自标题与简介）：${glossary.join("、")}`);
+  }
+  lines.push(`常见技术名词：${COMMON_TECH_TERMS.join("、")}`);
+  lines.push(
+    "语音转写常把这类名词听错（如 dacker → Docker、us state → useState、" +
+      "circle → SQL）。文中出现表内名词的错误形式时，改成表中写法——" +
+      "这是第 4 条的唯一放宽之处。表以外的词不要改动；" +
+      "表中没有在文里出现的词，也不要添加进去。",
+  );
+  return lines.join("\n");
 }
 
 /**
@@ -148,7 +185,11 @@ const FORMAT_INSTRUCTIONS = [
   "下面是一段语音转写的原始文字，请整理排版，要求：",
   "1. 为全文添加或修正标点符号；",
   "2. 按语义划分自然段，段落之间用空行分隔；",
-  "3. 删除明显的口头填充词（嗯、啊、呃等）与转写残留的多余空格；",
+  // 只删纯寒暄，不碰结尾那段「源码在 GitHub / 我做了 Python 版 / 有 PDF 版」——
+  // 那看着像推广，实际是全篇最能直接用上的信息，删掉才是真的遗漏
+  "3. 删除明显的口头填充词（嗯、啊、呃等）、开场与结尾**不含任何信息**的寒暄套话" +
+    "（「话不多说」「感谢观看，我们下次见」这类），以及转写残留的多余空格；" +
+    "凡是提到资源、链接、版本、后续计划的句子一律保留；",
   "4. 仅在十分确定时修正明显的同音错别字；",
   "5. 严格保持原文的表述与信息：不概括、不扩写、不调整语序、不遗漏内容、不添加原文没有的信息，整理后字数应与原文相当；",
   "6. 输入可能是长文字稿的中间片段，开头结尾不完整属正常，按原样整理；",
@@ -159,10 +200,9 @@ function buildChunkMessages(
   chunk: string,
   glossary: string[],
 ): AIChatMessage[] {
-  const parts = [FORMAT_INSTRUCTIONS];
-  if (glossary.length > 0) {
-    parts.push(buildGlossaryInstruction(glossary));
-  }
+  // 通用词表不依赖具体内容，所以这一段总是给——此前只在标题/简介抓到专名时
+  // 才附术语指令，而恰恰是没写进标题的那些通用词错得最狠
+  const parts = [FORMAT_INSTRUCTIONS, buildGlossaryInstruction(glossary)];
   if (countSpeakerPrefixes(chunk) > 0) {
     parts.push(SPEAKER_INSTRUCTION);
   }

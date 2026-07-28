@@ -110,6 +110,31 @@ describe("buildAiHandoff", () => {
     expect(result.text).toContain("Zustand 的心智负担更低");
   });
 
+  it("精简版给出口播稿开头，好让接收方判断值不值得要全文", () => {
+    const opening = "先说结论：Redux 用得好好的就别动它，除非撞上这三种情况。";
+    const { text } = buildAiHandoff(
+      makeItem({ transcript: `${opening}${"后面还有很多内容。".repeat(60)}` }),
+      { includeFullText: false },
+    );
+
+    expect(text).toContain(opening);
+    // 预览压成单行塞进引用块，不能把引用拆成好几段
+    const preview = text.split("开头是：）")[1] ?? "";
+    expect(preview.split("\n").filter((line) => line.trim()).length).toBe(1);
+  });
+
+  it("口播稿比预览还短时直接全给，不假装略去了什么", () => {
+    // 略去 30 个字既省不了 token，还要多写一句说明，omittedChars 也会
+    // 报出一个实际上没省掉的数字
+    const result = buildAiHandoff(makeItem({ transcript: "就一句话。" }), {
+      includeFullText: false,
+    });
+
+    expect(result.text).toContain("就一句话。");
+    expect(result.text).not.toContain("本次未包含");
+    expect(result.omittedChars).toBe(0);
+  });
+
   it("精简版略去论坛逐楼回复，保留讨论总结", () => {
     const content = [
       "> 平台：V2EX · 作者：someone",

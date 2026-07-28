@@ -18,6 +18,7 @@ import {
   type VideoPlatform,
 } from "@guizhi/shared/utils/video-platforms";
 import type { ImportStage } from "@guizhi/shared/types";
+import { extractUrlsFromText } from "@guizhi/shared/utils/url-text";
 import { logAppError } from "../../diagnostic-log";
 import type { ExtractedContent } from "./connectors";
 import {
@@ -66,6 +67,8 @@ const AUDIO_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const AUDIO_MAX_FILESIZE = "300m";
 /** 简介压缩为元数据引用块单行展示，取前 300 字足够辨识 */
 const DESCRIPTION_MAX_LENGTH = 300;
+/** 简介里的链接最多列几条：抖音的推广文案能堆十几个短链，全列进去反成噪音 */
+const LINK_MAX_COUNT = 5;
 const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
 
 const PLATFORM_LABELS: Record<VideoPlatform, string> = {
@@ -287,6 +290,15 @@ export function buildVideoContent(
         ? `${description.slice(0, DESCRIPTION_MAX_LENGTH)}…`
         : description;
     quoteLines.push(`> 简介：${clipped}`);
+  }
+  // 链接从**未截断**的简介里抠，单独占一行。
+  //
+  // 简介被压成单行并截到 300 字，作者放在末尾的仓库地址、文档链接就这么没了
+  // ——而那恰恰是「这条视频能不能直接用上」最关键的东西。实测一条讲 Agent 的
+  // 视频，作者反复说「源码和配套文档都在下面」，记录里一个链接都没有。
+  const links = extractUrlsFromText(metadata.description).slice(0, LINK_MAX_COUNT);
+  if (links.length > 0) {
+    quoteLines.push(`> 相关链接：${links.join(" ")}`);
   }
 
   const parts: string[] = [quoteLines.join("\n")];
