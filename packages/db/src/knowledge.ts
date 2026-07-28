@@ -11,6 +11,7 @@ import { randomUUID } from "crypto";
 import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
 import { extractAllLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
+import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import type {
   BulkUpdateKnowledgeItemsInput,
   CreateKnowledgeItemInput,
@@ -61,7 +62,8 @@ const SNIPPET_MAX_LENGTH = 160;
  *
  * 原来是 `SELECT i.*`：一页 20 条长转写（每条几万字）就要从磁盘读出并跨进程
  * 序列化上百万字符，最终只用掉 3200 个。留足余量是因为 makeSnippet 会先剥掉
- * 代码块与 Markdown 语法，开头若全是元数据引用块，剥完可能不剩几个字。
+ * 代码块与 Markdown 语法，再剥掉开头的元数据引用块（连简介可达数百字），
+ * 余量不足就真的不剩几个字了。
  */
 const SNIPPET_SOURCE_LENGTH = 2000;
 
@@ -82,9 +84,20 @@ function mapTagRow(row: TagRow): Tag {
   };
 }
 
-/** 去掉常见 Markdown 语法，生成列表用纯文本摘要。 */
+/**
+ * 去掉常见 Markdown 语法，生成列表用纯文本摘要。
+ *
+ * 采集条目开头的元数据引用块（`> 平台：… · 作者：… · 时长：…`）要先剥掉：
+ * 它在列表里是重复信息——平台与类型各有专列——却能连同那条最长 300 字的简介
+ * 一起占满整段摘要，正文一个字都露不出来。剥在压平**之前**：这时换行还在，
+ * 边界交给现成的解析器判断，不必在压平后的文本里猜（猜错会吃掉正文开头）。
+ */
 export function makeSnippet(content: string): string {
-  const plain = (content ?? "")
+  const meta = parseVideoMetaBlock(content ?? "");
+  // 剥完不剩东西的（只采到元数据、正文还没生成）回退到原文：
+  // 列表上显示「平台：抖音 · 作者：…」也好过一片空白
+  const source = meta?.body.trim() ? meta.body : (content ?? "");
+  const plain = source
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]*)`/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")

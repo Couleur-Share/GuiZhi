@@ -487,6 +487,74 @@ describe("KnowledgeItemDB.list 只取摘要所需的正文前缀", () => {
   });
 });
 
+describe("摘要剥掉开头的元数据引用块", () => {
+  let db: DatabaseAdapter.Database;
+  let items: KnowledgeItemDB;
+
+  beforeEach(() => {
+    db = createTestDb();
+    items = new KnowledgeItemDB(db);
+  });
+
+  function snippetOf(content: string): string {
+    items.create({ title: "t", content });
+    return items.list({ scope: "all" }).entries[0].snippet;
+  }
+
+  it("视频条目的摘要从正文开始，不被平台/作者/简介占满", () => {
+    const snippet = snippetOf(
+      [
+        "> 平台：抖音 · 作者：诡狡程序猫 · 时长：2:01",
+        `> 简介：${"这段平台简介很长".repeat(30)}`,
+        "> 原标题：一个很长的抖音文案标题",
+        "",
+        "## 视频总结",
+        "",
+        "本文介绍了个人知识库的搭建方法。",
+      ].join("\n"),
+    );
+
+    expect(snippet).not.toContain("平台：");
+    expect(snippet).not.toContain("作者：");
+    expect(snippet).not.toContain("这段平台简介很长");
+    expect(snippet).not.toContain("原标题");
+    expect(snippet).toContain("本文介绍了个人知识库的搭建方法。");
+  });
+
+  it("论坛条目的元数据块同样剥掉（字段名不同也认）", () => {
+    const snippet = snippetOf(
+      [
+        "> 平台：V2EX · 作者：0x114514 · 节点：程序员 · 20 条回复",
+        "> 发布：2026-07-02",
+        "",
+        "## 讨论总结",
+        "",
+        "帖子围绕小公司前端使用 AI 的工作流展开。",
+      ].join("\n"),
+    );
+
+    expect(snippet).not.toContain("0x114514");
+    expect(snippet).toContain("帖子围绕小公司前端使用 AI 的工作流展开。");
+  });
+
+  it("只有元数据、正文还没生成时回退到原文，不给一片空白", () => {
+    const snippet = snippetOf("> 平台：抖音 · 作者：某某 · 时长：1:00");
+
+    expect(snippet).toContain("平台：抖音");
+  });
+
+  it("普通笔记不受影响", () => {
+    expect(snippetOf("手冲建议 92 度。")).toBe("手冲建议 92 度。");
+  });
+
+  it("正文里普通的引用块不会被当成元数据剥掉", () => {
+    // 只有首行是 `> 平台：…` 才算元数据块，否则原样保留
+    const snippet = snippetOf("> 他说这话的时候我在场。\n\n后来证明是对的。");
+
+    expect(snippet).toContain("他说这话的时候我在场。");
+  });
+});
+
 describe("KnowledgeItemDB.bulkUpdate", () => {
   let db: DatabaseAdapter.Database;
   let items: KnowledgeItemDB;
