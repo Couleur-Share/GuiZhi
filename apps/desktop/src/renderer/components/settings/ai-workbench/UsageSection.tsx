@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AIUsageSummary } from "@guizhi/shared/types";
-import type { AIUsageScenario } from "../../../stores/settings.store";
+import type { AIUsageScenarioId, AIUsageSummary } from "@guizhi/shared/types";
 
 const USAGE_WINDOW_DAYS = 30;
 
-/** 用 AIUsageScenario 做键：新增场景时这里漏配会直接编译不过 */
+/** 用 AIUsageScenarioId 做键：新增场景时这里漏配会直接编译不过 */
 const SCENARIO_LABELS: Record<
-  AIUsageScenario,
+  AIUsageScenarioId,
   { key: string; fallback: string }
 > = {
   qa: { key: "settings.aiScenarioQa", fallback: "问答" },
@@ -18,6 +17,15 @@ const SCENARIO_LABELS: Record<
   transcription: {
     key: "settings.aiScenarioTranscription",
     fallback: "语音转写",
+  },
+  formatting: {
+    key: "settings.aiScenarioFormatting",
+    fallback: "文字稿排版",
+  },
+  embedding: { key: "settings.aiScenarioEmbedding", fallback: "语义索引" },
+  illustration: {
+    key: "settings.aiScenarioIllustration",
+    fallback: "正文配图",
   },
 };
 
@@ -102,7 +110,7 @@ export function UsageSection() {
 
       <div className="space-y-1.5">
         {summary.byScenario.map((row) => {
-          const label = SCENARIO_LABELS[row.scenario as AIUsageScenario] as
+          const label = SCENARIO_LABELS[row.scenario as AIUsageScenarioId] as
             | { key: string; fallback: string }
             | undefined;
           const share =

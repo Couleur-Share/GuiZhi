@@ -17,6 +17,7 @@ import {
   type AIClientConfig,
 } from "@guizhi/core";
 import { splitTitleFromSummary } from "../media/media-summary";
+import { recordMainAiUsage } from "../ai-usage";
 
 /**
  * 总结只用得上这三个字段。刚抓下来的 ForumReply 与从已入库正文解析回来的
@@ -249,11 +250,28 @@ async function runChat(
   label: string,
 ): Promise<string> {
   const chat = options?.chat ?? chatCompletion;
-  const result = await chat(config, messages, {
-    temperature: SUMMARY_TEMPERATURE,
-    maxTokens: SUMMARY_MAX_TOKENS,
-    signal: options?.signal,
-    timeoutMs: SUMMARY_TIMEOUT_MS,
+  let result: Awaited<ReturnType<typeof chat>>;
+  try {
+    result = await chat(config, messages, {
+      temperature: SUMMARY_TEMPERATURE,
+      maxTokens: SUMMARY_MAX_TOKENS,
+      signal: options?.signal,
+      timeoutMs: SUMMARY_TIMEOUT_MS,
+    });
+  } catch (error) {
+    recordMainAiUsage({
+      scenario: "summary",
+      model: config.model,
+      failed: true,
+    });
+    throw error;
+  }
+  // 超长帖按回复分块，最多 8 块 + 一次综合，逐次记
+  recordMainAiUsage({
+    scenario: "summary",
+    model: config.model,
+    promptTokens: result.usage?.promptTokens,
+    completionTokens: result.usage?.completionTokens,
   });
   if (result.finishReason === "length") {
     console.warn(`[import] 论坛讨论总结${label}输出被 max_tokens 截断`);

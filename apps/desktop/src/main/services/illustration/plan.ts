@@ -21,6 +21,7 @@ import type {
   IllustrationShot,
   IllustrationStyle,
 } from "@guizhi/shared/types";
+import { recordMainAiUsage } from "../ai-usage";
 
 /**
  * 0.6 时同一篇文章两次策划连张数都不一样。
@@ -114,11 +115,29 @@ export async function planIllustrations(
   // 不上 response_format: json_object——中转站对它的支持参差不齐，
   // 解析侧本来就对「对象 / 裸数组 / 夹带解释文字」都做了容错抽取。
   const chat = options?.chat ?? chatCompletion;
-  const result = await chat(config, messages, {
-    temperature: PLAN_TEMPERATURE,
-    maxTokens: PLAN_MAX_TOKENS,
-    signal: options?.signal,
-    timeoutMs: PLAN_TIMEOUT_MS,
+  let result: Awaited<ReturnType<typeof chat>>;
+  try {
+    result = await chat(config, messages, {
+      temperature: PLAN_TEMPERATURE,
+      maxTokens: PLAN_MAX_TOKENS,
+      signal: options?.signal,
+      timeoutMs: PLAN_TIMEOUT_MS,
+    });
+  } catch (error) {
+    recordMainAiUsage({
+      scenario: "illustration",
+      model: config.model,
+      failed: true,
+    });
+    throw error;
+  }
+  // 策划与生图记在同一个场景下：它们是同一个功能的两步。DB 的主键含 model，
+  // 文本模型与生图模型天然落在不同行，明细并没有丢
+  recordMainAiUsage({
+    scenario: "illustration",
+    model: config.model,
+    promptTokens: result.usage?.promptTokens,
+    completionTokens: result.usage?.completionTokens,
   });
 
   const plan = parseIllustrationPlan(result.content, {

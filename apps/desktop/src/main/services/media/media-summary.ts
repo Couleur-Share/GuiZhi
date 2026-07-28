@@ -16,6 +16,7 @@ import {
   type AIClientConfig,
 } from "@guizhi/core";
 import { splitTranscriptChunks } from "./transcript-format";
+import { recordMainAiUsage } from "../ai-usage";
 
 /** 单发上限（字符）：超过则走 map-reduce 分块 */
 const SINGLE_SHOT_MAX_CHARS = 10_000;
@@ -205,11 +206,28 @@ async function runChat(
   label: string,
 ): Promise<string> {
   const chat = options?.chat ?? chatCompletion;
-  const result = await chat(config, messages, {
-    temperature: SUMMARY_TEMPERATURE,
-    maxTokens: SUMMARY_MAX_TOKENS,
-    signal: options?.signal,
-    timeoutMs: SUMMARY_TIMEOUT_MS,
+  let result: Awaited<ReturnType<typeof chat>>;
+  try {
+    result = await chat(config, messages, {
+      temperature: SUMMARY_TEMPERATURE,
+      maxTokens: SUMMARY_MAX_TOKENS,
+      signal: options?.signal,
+      timeoutMs: SUMMARY_TIMEOUT_MS,
+    });
+  } catch (error) {
+    recordMainAiUsage({
+      scenario: "summary",
+      model: config.model,
+      failed: true,
+    });
+    throw error;
+  }
+  // 总结是 map-reduce，一篇长稿最多十几次调用，逐次记账才对得上账单
+  recordMainAiUsage({
+    scenario: "summary",
+    model: config.model,
+    promptTokens: result.usage?.promptTokens,
+    completionTokens: result.usage?.completionTokens,
   });
   if (result.finishReason === "length") {
     console.warn(`[media] 内容总结${label}输出被 max_tokens 截断`);
@@ -333,19 +351,35 @@ export async function generateContentTitle(
     return null;
   }
   const chat = options?.chat ?? chatCompletion;
-  const result = await chat(
-    config,
-    [
-      { role: "system", content: TITLE_SYSTEM_PROMPT },
-      { role: "user", content: material },
-    ],
-    {
-      temperature: SUMMARY_TEMPERATURE,
-      maxTokens: TITLE_MAX_TOKENS,
-      signal: options?.signal,
-      timeoutMs: SUMMARY_TIMEOUT_MS,
-    },
-  );
+  let result: Awaited<ReturnType<typeof chat>>;
+  try {
+    result = await chat(
+      config,
+      [
+        { role: "system", content: TITLE_SYSTEM_PROMPT },
+        { role: "user", content: material },
+      ],
+      {
+        temperature: SUMMARY_TEMPERATURE,
+        maxTokens: TITLE_MAX_TOKENS,
+        signal: options?.signal,
+        timeoutMs: SUMMARY_TIMEOUT_MS,
+      },
+    );
+  } catch (error) {
+    recordMainAiUsage({
+      scenario: "summary",
+      model: config.model,
+      failed: true,
+    });
+    throw error;
+  }
+  recordMainAiUsage({
+    scenario: "summary",
+    model: config.model,
+    promptTokens: result.usage?.promptTokens,
+    completionTokens: result.usage?.completionTokens,
+  });
   // 部分模型仍会按「标题：xxx」作答，一并归一
   const raw = stripWrappingCodeFence(result.content.trim());
   const line = raw.split("\n").find((entry) => entry.trim()) ?? "";

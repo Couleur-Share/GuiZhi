@@ -17,6 +17,7 @@ import {
 } from "@guizhi/shared/utils/ai-protocol";
 import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
+import { recordMainAiUsage } from "../ai-usage";
 import { isManagedFunasrUrl } from "./funasr-service";
 
 const TRANSCRIBE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -161,6 +162,24 @@ export function cleanTranscriptText(raw: string): string {
     .trim();
 }
 
+/**
+ * 转写记账。内置本地引擎不记——它跑在用户自己的 CPU 上，一分钱不花，
+ * 记进用量面板等于凭空报出一笔不存在的开销。
+ */
+function recordTranscriptionUsage(
+  config: TranscriptionModelConfig,
+  failed: boolean,
+): void {
+  if (isManagedFunasrUrl(config.apiUrl)) {
+    return;
+  }
+  recordMainAiUsage({
+    scenario: "transcription",
+    model: config.model,
+    failed,
+  });
+}
+
 export async function transcribeMediaFile(
   filePath: string,
   config: TranscriptionModelConfig,
@@ -168,14 +187,21 @@ export async function transcribeMediaFile(
   options?: { diarize?: boolean },
 ): Promise<string> {
   const timeoutSignal = AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS);
-  const text = cleanTranscriptText(
-    await requestTranscription(
+  let raw: string;
+  try {
+    raw = await requestTranscription(
       filePath,
       config,
       signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
       options?.diarize === true,
-    ),
-  );
+    );
+  } catch (error) {
+    recordTranscriptionUsage(config, true);
+    throw error;
+  }
+  // 转写接口不回报 token，只记调用次数
+  recordTranscriptionUsage(config, false);
+  const text = cleanTranscriptText(raw);
   if (!text) {
     throw new Error("转写接口未返回有效文本");
   }

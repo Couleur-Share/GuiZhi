@@ -11,6 +11,7 @@ import { coreAIConfigService } from "@guizhi/core";
 import {
   buildChatEndpointFromBase,
   buildHeadersForProtocol,
+  extractUsageFromChatResponse,
   resolveAIProtocol,
   resolveProtocolBase,
 } from "@guizhi/shared/utils/ai-protocol";
@@ -21,8 +22,21 @@ import {
 } from "@guizhi/shared/utils/ocr-request";
 import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
+import { recordMainAiUsage } from "../ai-usage";
 
 const OCR_TIMEOUT_MS = 120_000;
+
+/** 响应体已经读成字符串，用量与文本各解析一次；坏 JSON 交给下游报错 */
+function readOcrUsage(
+  body: string,
+  protocol: AIProtocol,
+): { promptTokens?: number; completionTokens?: number } {
+  try {
+    return extractUsageFromChatResponse(JSON.parse(body), protocol) ?? {};
+  } catch {
+    return {};
+  }
+}
 
 export interface OcrModelConfig {
   apiUrl: string;
@@ -76,26 +90,40 @@ export async function recognizeImageFile(
   );
 
   const timeoutSignal = AbortSignal.timeout(OCR_TIMEOUT_MS);
-  const response = await fetchWithNetworkProxy(endpoint, {
-    method: "POST",
-    headers: {
-      ...buildHeadersForProtocol(protocol, config.apiKey),
-      "Content-Type": "application/json",
-    },
-    body: buildOcrRequestBody(
-      config.model,
-      `data:${mime};base64,${base64}`,
-      protocol,
-    ),
-    signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
-  });
+  let response: Response;
+  try {
+    response = await fetchWithNetworkProxy(endpoint, {
+      method: "POST",
+      headers: {
+        ...buildHeadersForProtocol(protocol, config.apiKey),
+        "Content-Type": "application/json",
+      },
+      body: buildOcrRequestBody(
+        config.model,
+        `data:${mime};base64,${base64}`,
+        protocol,
+      ),
+      signal: signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal,
+    });
+  } catch (error) {
+    recordMainAiUsage({ scenario: "ocr", model: config.model, failed: true });
+    throw error;
+  }
 
   if (!response.ok) {
+    recordMainAiUsage({ scenario: "ocr", model: config.model, failed: true });
     const detail = (await response.text().catch(() => "")).slice(0, 300);
     throw new Error(`OCR 请求失败 (HTTP ${response.status}): ${detail}`);
   }
 
-  const text = parseOcrResponse(await response.text(), protocol);
+  // 图文采集一条最多 9 张图就是 9 次视觉模型调用，逐张记
+  const body = await response.text();
+  recordMainAiUsage({
+    scenario: "ocr",
+    model: config.model,
+    ...readOcrUsage(body, protocol),
+  });
+  const text = parseOcrResponse(body, protocol);
   if (!text) {
     throw new Error("OCR 未识别到内容");
   }

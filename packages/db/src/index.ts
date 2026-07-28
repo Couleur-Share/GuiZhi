@@ -15,7 +15,13 @@ export {
 export type { Migration } from "./migrations";
 
 // Initialization
-export { initDatabase, getDatabase, closeDatabase, db } from "./init";
+export {
+  initDatabase,
+  getDatabase,
+  tryGetDatabase,
+  closeDatabase,
+  db,
+} from "./init";
 export type { InitDatabaseHooks } from "./init";
 export {
   acquireDatabaseClientLease,

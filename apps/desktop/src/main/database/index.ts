@@ -8,6 +8,7 @@ import {
   DatabaseAdapter,
   initDatabase as dbInit,
   getDatabase,
+  tryGetDatabase,
   closeDatabase,
   KnowledgeItemDB,
   WikiDB,
@@ -16,7 +17,7 @@ import type { InitDatabaseHooks } from "@guizhi/db";
 import { getDatabasePath } from "../runtime-paths";
 
 // ── Re-exports from @guizhi/db ────────────────────────────────────────────
-export { getDatabase, closeDatabase };
+export { getDatabase, tryGetDatabase, closeDatabase };
 export { DatabaseAdapter } from "@guizhi/db";
 export type { Database } from "@guizhi/db";
 export { SCHEMA_TABLES, SCHEMA_INDEXES, SCHEMA } from "@guizhi/db";

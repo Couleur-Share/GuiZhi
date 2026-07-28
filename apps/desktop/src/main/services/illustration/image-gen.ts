@@ -28,6 +28,7 @@ import type {
   IllustrationAspectRatio,
 } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
+import { recordMainAiUsage } from "../ai-usage";
 import { downloadToTempFile } from "../import/safe-fetch";
 import {
   buildAssetFileName,
@@ -483,7 +484,11 @@ export async function generateImage(
 
   for (let attempt = 0; ; attempt++) {
     try {
-      return await requestImage(endpoint, probe, options);
+      const image = await requestImage(endpoint, probe, options);
+      // 按「一张图」记而不是按「一次 HTTP」记：重试只发生在 5xx / 429 上，
+      // 那些请求没出图也不计费，按尝试次数记会凭空放大账单
+      recordMainAiUsage({ scenario: "illustration", model: config.model });
+      return image;
     } catch (error) {
       // 用户点的停止不是失败，也不该被写成「已自动重试 N 次」
       if (options?.signal?.aborted) {
@@ -493,6 +498,11 @@ export async function generateImage(
         error instanceof ImageGenAttemptError && error.retryable;
       const exhausted = attempt >= delays.length || Date.now() >= deadline;
       if (!retryable || exhausted) {
+        recordMainAiUsage({
+          scenario: "illustration",
+          model: config.model,
+          failed: true,
+        });
         // 重试过还是没成，得说出来：这时候用户手动再点一次多半也一样
         throw attempt > 0
           ? new Error(`${describe(error)}（已自动重试 ${attempt} 次）`, {

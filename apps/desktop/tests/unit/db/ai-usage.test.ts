@@ -109,6 +109,31 @@ describe("AIUsageDB", () => {
     expect(summary.completionTokens).toBe(3);
   });
 
+  it("失败调用单独计数，仍计入总次数", () => {
+    usage.record({
+      scenario: "illustration",
+      model: "gpt-image-2",
+      promptTokens: 0,
+      completionTokens: 0,
+    });
+    usage.record({
+      scenario: "illustration",
+      model: "gpt-image-2",
+      promptTokens: 0,
+      completionTokens: 0,
+      failed: true,
+    });
+
+    const summary = usage.summary(30);
+    expect(summary.calls).toBe(2);
+    expect(summary.failedCalls).toBe(1);
+    expect(summary.byScenario[0]).toMatchObject({
+      scenario: "illustration",
+      calls: 2,
+      failedCalls: 1,
+    });
+  });
+
   it("clear 清空统计", () => {
     usage.record({
       scenario: "qa",

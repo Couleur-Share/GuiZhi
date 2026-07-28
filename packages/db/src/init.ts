@@ -386,6 +386,17 @@ export function getDatabase(): Database.Database {
 }
 
 /**
+ * 拿数据库，没有就返回 null。
+ *
+ * 给「有则记一笔、没有就算了」的旁路用（用量记账是第一个）。这类调用方
+ * 必须把「库还没初始化」与「写入失败」分开：前者在单测和备份恢复期间都是
+ * 常态，走 getDatabase() 会抛，而按错误文本去认它太脆。
+ */
+export function tryGetDatabase(): Database.Database | null {
+  return db;
+}
+
+/**
  * Close database connection
  */
 export function closeDatabase(): void {

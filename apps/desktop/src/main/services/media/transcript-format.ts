@@ -22,6 +22,7 @@ import {
   TRANSCRIPT_FORMAT_LONG_CHARS,
 } from "@guizhi/shared/constants";
 import { countSpeakerPrefixes } from "@guizhi/shared/utils/speaker-note";
+import { recordMainAiUsage } from "../ai-usage";
 
 /** 单块上限：兼顾输出 token 限制与单请求耗时 */
 const CHUNK_MAX_CHARS = TRANSCRIPT_FORMAT_CHUNK_CHARS;
@@ -377,6 +378,13 @@ export async function formatTranscript(
         if (options?.signal?.aborted) {
           throw error;
         }
+        // 记在这里而不是重试成功之后：超时与限流同样可能已经产生费用，
+        // 而一篇长稿是几十块 × 最多两次尝试，漏记会低估一大截
+        recordMainAiUsage({
+          scenario: "formatting",
+          model: config.model,
+          failed: true,
+        });
         const message = error instanceof Error ? error.message : String(error);
         if (attempt >= MAX_ATTEMPTS_PER_CHUNK) {
           return { text: null, reason: message };
@@ -386,6 +394,14 @@ export async function formatTranscript(
         );
         continue;
       }
+      // 请求本身成功了就要记账，哪怕下面的验收把它判为不合格——
+      // 钱已经花了，「重试一次」花的是第二笔
+      recordMainAiUsage({
+        scenario: "formatting",
+        model: config.model,
+        promptTokens: result.usage?.promptTokens,
+        completionTokens: result.usage?.completionTokens,
+      });
       const reason = rejectFormattedChunk(chunk, result);
       if (!reason) {
         return { text: result.content.trim(), reason: "" };

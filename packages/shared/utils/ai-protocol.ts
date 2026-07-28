@@ -256,6 +256,56 @@ export function extractTextFromChatResponse(
   return flattenParts(message?.content);
 }
 
+export interface ChatTokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
+/**
+ * 从各协议的对话响应里提取 token 用量。与上面的文本提取同源：字段名各不
+ * 相同，取错就是恒为 0，而恒为 0 在用量面板上和「接口不回报」长得一样。
+ *
+ * 接口没回报时返回 undefined，调用方据此只记调用次数。
+ */
+export function extractUsageFromChatResponse(
+  payload: unknown,
+  protocol: AIProtocol,
+): ChatTokenUsage | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+  // Gemini 原生接口用 usageMetadata；它的 OpenAI 兼容层则是标准的 usage
+  const raw = (payload as { usage?: unknown; usageMetadata?: unknown }).usage ??
+    (payload as { usageMetadata?: unknown }).usageMetadata;
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+
+  const fields = raw as Record<string, unknown>;
+  const pick = (...names: string[]): number | null => {
+    for (const name of names) {
+      const value = Number(fields[name]);
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+    return null;
+  };
+
+  const prompt =
+    protocol === "anthropic"
+      ? pick("input_tokens")
+      : pick("prompt_tokens", "promptTokenCount");
+  const completion =
+    protocol === "anthropic"
+      ? pick("output_tokens")
+      : pick("completion_tokens", "candidatesTokenCount");
+  if (prompt === null && completion === null) {
+    return undefined;
+  }
+  return { promptTokens: prompt ?? 0, completionTokens: completion ?? 0 };
+}
+
 export function buildModelsEndpointFromBase(
   resolved: ResolvedAIProtocolBase,
 ): string {

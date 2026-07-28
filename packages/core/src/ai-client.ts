@@ -2,8 +2,10 @@ import type { AIProtocol } from "@guizhi/shared/types";
 import {
   buildChatEndpointFromBase,
   buildHeadersForProtocol,
+  extractUsageFromChatResponse,
   resolveAIProtocol,
   resolveProtocolBase,
+  type ChatTokenUsage,
 } from "@guizhi/shared/utils/ai-protocol";
 
 export interface AIClientConfig {
@@ -23,6 +25,13 @@ export interface AIChatResult {
   content: string;
   /** openai 系 finish_reason；anthropic 的 max_tokens 归一化为 "length" */
   finishReason?: string;
+  /**
+   * 本次调用的 token 用量；接口没回报时为 undefined。
+   *
+   * 主进程的总结、排版、论坛总结都走这里，而它们是按块发的——一篇长文字稿
+   * 就是三十多次调用。不带出用量的话，用量面板只能显示「N 次 · 0」。
+   */
+  usage?: ChatTokenUsage;
 }
 
 const AI_REQUEST_TIMEOUT_MS = 60_000;
@@ -132,6 +141,7 @@ export async function chatCompletion(
       choices?: { message?: { content?: string }; finish_reason?: string }[];
       content?: Array<{ type?: string; text?: string }>;
       stop_reason?: string;
+      usage?: Record<string, unknown>;
     };
 
     const content = isAnthropic
@@ -155,7 +165,11 @@ export async function chatCompletion(
         ? "length"
         : (rawFinishReason ?? undefined);
 
-    return { content, finishReason };
+    return {
+      content,
+      finishReason,
+      usage: extractUsageFromChatResponse(json, protocol),
+    };
   } finally {
     clearTimeout(timeout);
     externalSignal?.removeEventListener("abort", abortFromExternal);

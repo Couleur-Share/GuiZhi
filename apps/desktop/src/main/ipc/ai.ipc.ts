@@ -175,6 +175,9 @@ export function registerAIIPC(db: Database.Database): void {
         model: entry.model,
         promptTokens: Number(entry.promptTokens) || 0,
         completionTokens: Number(entry.completionTokens) || 0,
+        // 渲染进程一直在传 failed，这里此前漏接了：failed_calls 列、
+        // DAO 的入参、迁移 0005 三样都齐备，唯独统计出来恒为 0
+        failed: entry.failed === true,
       });
     },
   );
