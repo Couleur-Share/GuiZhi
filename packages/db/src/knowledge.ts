@@ -39,6 +39,8 @@ interface ItemRow {
   is_pinned: number;
   /** 仅 get() 的联查携带；其余查询为 undefined */
   source_uri?: string | null;
+  /** 仅 list() 的联查携带（来源平台列） */
+  platform?: string | null;
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
@@ -175,6 +177,14 @@ export class KnowledgeItemDB {
       );
       params.push(query.tagId);
     }
+    // 来源是 1:N（旧版迁移可能给同一条目带进多条记录），用 EXISTS 而不是
+    // JOIN，否则一条目会在列表里重复出现、总数也跟着虚高
+    if (query.platform) {
+      conditions.push(
+        "EXISTS (SELECT 1 FROM source_records sr WHERE sr.item_id = i.id AND sr.platform = ?)",
+      );
+      params.push(query.platform);
+    }
 
     const searchTerm = query.search?.trim() || "";
     const matchQuery = searchTerm
@@ -216,7 +226,10 @@ export class KnowledgeItemDB {
     const rows = this.db.all(
       `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
               i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at,
-              substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content
+              substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content,
+              (SELECT s.platform FROM source_records s
+               WHERE s.item_id = i.id
+               ORDER BY s.captured_at DESC LIMIT 1) AS platform
        FROM knowledge_items i ${joinClause} ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
       ...params,
       limit,
@@ -233,6 +246,7 @@ export class KnowledgeItemDB {
       collectionId: row.collection_id,
       isFavorite: row.is_favorite === 1,
       isPinned: row.is_pinned === 1,
+      platform: row.platform ?? null,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -294,6 +308,14 @@ export class KnowledgeItemDB {
        GROUP BY kit.tag_id`,
     ) as Array<{ tag_id: string; count: number }>;
 
+    const byPlatformRows = this.db.all(
+      `SELECT s.platform AS platform, COUNT(DISTINCT s.item_id) AS count
+       FROM source_records s
+       JOIN knowledge_items i ON i.id = s.item_id
+       WHERE i.deleted_at IS NULL AND i.status != 'archived' AND s.platform IS NOT NULL
+       GROUP BY s.platform`,
+    ) as Array<{ platform: string; count: number }>;
+
     return {
       uncategorized: scopeRow?.uncategorized ?? 0,
       all: scopeRow?.all_count ?? 0,
@@ -305,6 +327,9 @@ export class KnowledgeItemDB {
       ),
       byTag: Object.fromEntries(
         byTagRows.map((row) => [row.tag_id, row.count]),
+      ),
+      byPlatform: Object.fromEntries(
+        byPlatformRows.map((row) => [row.platform, row.count]),
       ),
     };
   }

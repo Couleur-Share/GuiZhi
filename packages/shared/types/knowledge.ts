@@ -95,6 +95,8 @@ export interface KnowledgeItemListEntry {
   collectionId?: string | null;
   isFavorite: boolean;
   isPinned: boolean;
+  /** 采集来源平台（SourcePlatform）；手工条目为 null */
+  platform?: string | null;
   deletedAt?: number | null;
   createdAt: number;
   updatedAt: number;
@@ -127,6 +129,8 @@ export interface KnowledgeItemQuery {
   scope: KnowledgeScope;
   collectionId?: string;
   tagId?: string;
+  /** 采集来源平台（SourcePlatform）；见 shared/utils/source-platforms.ts */
+  platform?: string;
   /** 全文搜索关键词；非空时结果按相关性排序 */
   search?: string;
   /**
@@ -199,6 +203,8 @@ export interface KnowledgeCounts {
   trash: number;
   byCollection: Record<string, number>;
   byTag: Record<string, number>;
+  /** 按采集来源平台分组；手工条目没有来源记录，不出现在任何一组里 */
+  byPlatform: Record<string, number>;
 }
 
 export interface CreateCollectionInput {

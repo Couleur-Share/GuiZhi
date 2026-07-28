@@ -33,6 +33,7 @@ interface UpdateCall {
 }
 
 let countsCalls = 0;
+let tagListCalls = 0;
 
 function stubUpdate(
   impl: (id: string, patch: UpdateKnowledgeItemInput) => Promise<KnowledgeItem | null>,
@@ -50,7 +51,15 @@ function stubUpdate(
         trash: 0,
         byCollection: {},
         byTag: {},
+        byPlatform: {},
       };
+    },
+  };
+  window.api.tag = {
+    ...(window.api.tag ?? {}),
+    list: async () => {
+      tagListCalls += 1;
+      return [];
     },
   };
 }
@@ -63,6 +72,7 @@ describe("knowledge.store 待保存队列", () => {
   beforeEach(() => {
     __resetPendingSaves();
     countsCalls = 0;
+    tagListCalls = 0;
     // 关掉 autoSave：由用例显式驱动落盘，等价于 Ctrl+S / 切换条目的路径
     useSettingsStore.setState({ autoSave: false });
     useKnowledgeStore.setState({
@@ -192,17 +202,20 @@ describe("knowledge.store 待保存队列", () => {
     expect(calls[0].patch.tagNames).toEqual(["读书", "笔记"]);
   });
 
-  it("标签落盘后重取侧栏计数，正文落盘不重取", async () => {
+  it("标签落盘后重取侧栏标签列表与计数，正文落盘不重取", async () => {
     stubUpdate(async (id, patch) => makeItem(id, String(patch.content ?? "")));
 
     selectItem(makeItem("A"));
     useKnowledgeStore.getState().updateSelected({ tagNames: ["读书"] });
     await useKnowledgeStore.getState().flushPendingSave();
     expect(countsCalls).toBe(1);
+    // 详情页新建的标签由 update 在 DAO 里顺手建出，不重取列表侧栏就少那一行
+    expect(tagListCalls).toBe(1);
 
-    // 标题与正文不改变任何侧栏读数，不该让每次防抖落盘都多打一次计数查询
+    // 标题与正文不改变任何侧栏读数，不该让每次防抖落盘都多打这两次查询
     useKnowledgeStore.getState().updateSelected({ content: "接着写" });
     await useKnowledgeStore.getState().flushPendingSave();
     expect(countsCalls).toBe(1);
+    expect(tagListCalls).toBe(1);
   });
 });

@@ -11,6 +11,7 @@
  * - 迁移只做结构演进与数据修复，不做业务逻辑。
  * - 追加迁移只能加在数组末尾，`name` 一旦发布不可更改。
  */
+import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import type Database from "./adapter";
 
 export interface Migration {
@@ -251,6 +252,39 @@ export const MIGRATIONS: Migration[] = [
         ALTER TABLE knowledge_items_migrate RENAME TO knowledge_items;
         ${KNOWLEDGE_ITEMS_INDEXES.join(";\n        ")};
       `);
+    },
+  },
+  {
+    // 侧栏「平台」分区：把 source_records.platform 补齐。
+    //
+    // 这一列建表时就在，但采集管线的 INSERT 从来没写过它，全库皆为 NULL；
+    // 唯一写过的是旧版 .NET 迁移，落进去的是老应用自己的一套取值。因此这里
+    // 不是「只补 NULL」而是**全部重算**：留着老取值会在分区里多出几个用户
+    // 认不出来的分组，而这一列此前没有任何读取方，重算不会弄丢任何在用的数据。
+    name: "0009-source-platform",
+    up: (db) => {
+      // 表不存在（只建了半个库的单测）就跳过，与 addColumnIfMissing 同一约定
+      if (!getTableDefinition(db, "source_records")) {
+        return;
+      }
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_sources_platform ON source_records(platform)",
+      );
+
+      const rows = db.all(
+        "SELECT id, source_type, source_uri FROM source_records",
+      ) as Array<{
+        id: string;
+        source_type: string;
+        source_uri: string | null;
+      }>;
+      for (const row of rows) {
+        db.run(
+          "UPDATE source_records SET platform = ? WHERE id = ?",
+          resolveSourcePlatform(row.source_type, row.source_uri),
+          row.id,
+        );
+      }
     },
   },
 ];

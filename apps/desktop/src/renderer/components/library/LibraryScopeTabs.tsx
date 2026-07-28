@@ -25,13 +25,14 @@ function CountBadge({ value, active }: { value: number; active: boolean }) {
 
 /**
  * 知识库范围分段控件：未分类 / 全部 / 收藏 / 归档。
- * 选中集合或标签时四个磁贴都不高亮（此时列表已被更窄的条件接管）。
+ * 选中集合、平台或标签时四个磁贴都不高亮（此时列表已被更窄的条件接管）。
  */
 export function LibraryScopeTabs() {
   const { t } = useTranslation();
   const scope = useKnowledgeStore((state) => state.scope);
   const collectionId = useKnowledgeStore((state) => state.collectionId);
   const tagId = useKnowledgeStore((state) => state.tagId);
+  const platform = useKnowledgeStore((state) => state.platform);
   const counts = useKnowledgeStore((state) => state.counts);
   const setScope = useKnowledgeStore((state) => state.setScope);
 
@@ -65,7 +66,8 @@ export function LibraryScopeTabs() {
   return (
     <div className="grid grid-cols-4 gap-1 rounded-lg bg-sidebar-accent/40 p-1">
       {tabs.map((tab) => {
-        const active = scope === tab.scope && !collectionId && !tagId;
+        const active =
+          scope === tab.scope && !collectionId && !tagId && !platform;
         return (
           <button
             key={tab.scope}

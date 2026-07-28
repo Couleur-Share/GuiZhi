@@ -78,10 +78,12 @@ function reconcileOptimisticTags(existing: Tag[], tagNames: string[]): Tag[] {
 }
 
 interface KnowledgeState {
-  // ── 导航 ──
+  // ── 导航（范围 / 知识库 / 标签 / 平台四者互斥）──
   scope: KnowledgeScope;
   collectionId: string | null;
   tagId: string | null;
+  /** 采集来源平台（SourcePlatform） */
+  platform: string | null;
   searchQuery: string;
   // ── 排序（搜索态下由相关度接管） ──
   sortBy: KnowledgeSortField;
@@ -111,6 +113,7 @@ interface KnowledgeState {
   setScope: (scope: KnowledgeScope) => void;
   selectCollection: (collectionId: string | null) => void;
   selectTag: (tagId: string | null) => void;
+  selectPlatform: (platform: string | null) => void;
   setSearchQuery: (query: string) => void;
   setSort: (sortBy: KnowledgeSortField, sortOrder: KnowledgeSortOrder) => void;
   setPage: (page: number) => void;
@@ -166,6 +169,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       scope: state.scope,
       collectionId: state.collectionId ?? undefined,
       tagId: state.tagId ?? undefined,
+      platform: state.platform ?? undefined,
       search: state.searchQuery.trim() || undefined,
       sortBy: state.sortBy,
       sortOrder: state.sortOrder,
@@ -275,9 +279,12 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
             : updated,
         }));
       }
-      // 标签增删会改侧栏的按标签计数；标题与正文不会，
-      // 不必让每次防抖落盘都多打一次计数查询
+      // 标签增删会改侧栏的标签列表与按标签计数；标题与正文不会，
+      // 不必让每次防抖落盘都多打这两次查询。
+      // 列表要重取是因为详情页新建的标签是 update 在 DAO 里顺手建出来的，
+      // 不经 tagStore.createTag 那条自带刷新的路径。
       if (patch.tagNames) {
+        await useTagStore.getState().fetchTags();
         await get().refreshCounts();
       }
     } catch (error) {
@@ -292,10 +299,36 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     }
   };
 
+  /**
+   * 切换导航轴。四条轴互斥：选中其一即清掉其余三条，并回到第一页、
+   * 清空详情与多选。缺省的字段一律复位，调用方只需给出自己那一条。
+   */
+  const navigateTo = (target: {
+    scope?: KnowledgeScope;
+    collectionId?: string | null;
+    tagId?: string | null;
+    platform?: string | null;
+  }) => {
+    void get().flushPendingSave();
+    set({
+      scope: target.scope ?? "all",
+      collectionId: target.collectionId ?? null,
+      tagId: target.tagId ?? null,
+      platform: target.platform ?? null,
+      page: 1,
+      selectedId: null,
+      selectedItem: null,
+      selectionIds: [],
+      selectionAnchorId: null,
+    });
+    void get().fetchList();
+  };
+
   return {
     scope: "all",
     collectionId: null,
     tagId: null,
+    platform: null,
     searchQuery: "",
     sortBy: "updatedAt",
     sortOrder: "desc",
@@ -314,48 +347,10 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     selectionIds: [],
     selectionAnchorId: null,
 
-    setScope: (scope) => {
-      void get().flushPendingSave();
-      set({
-        scope,
-        collectionId: null,
-        tagId: null,
-        page: 1,
-        selectedId: null,
-        selectedItem: null,
-        selectionIds: [],
-        selectionAnchorId: null,
-      });
-      void get().fetchList();
-    },
-    selectCollection: (collectionId) => {
-      void get().flushPendingSave();
-      set({
-        scope: "all",
-        collectionId,
-        tagId: null,
-        page: 1,
-        selectedId: null,
-        selectedItem: null,
-        selectionIds: [],
-        selectionAnchorId: null,
-      });
-      void get().fetchList();
-    },
-    selectTag: (tagId) => {
-      void get().flushPendingSave();
-      set({
-        scope: "all",
-        collectionId: null,
-        tagId,
-        page: 1,
-        selectedId: null,
-        selectedItem: null,
-        selectionIds: [],
-        selectionAnchorId: null,
-      });
-      void get().fetchList();
-    },
+    setScope: (scope) => navigateTo({ scope }),
+    selectCollection: (collectionId) => navigateTo({ collectionId }),
+    selectTag: (tagId) => navigateTo({ tagId }),
+    selectPlatform: (platform) => navigateTo({ platform }),
     setSearchQuery: (query) => {
       set({
         searchQuery: query,

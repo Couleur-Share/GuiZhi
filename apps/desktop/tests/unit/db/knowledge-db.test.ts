@@ -13,6 +13,29 @@ function createTestDb(): DatabaseAdapter.Database {
   return db;
 }
 
+let sourceSeq = 0;
+
+/** 补一条来源记录（正常由采集管线写入，DAO 层测试里手工造） */
+function addSource(
+  db: DatabaseAdapter.Database,
+  itemId: string,
+  sourceType: string,
+  platform: string | null,
+): void {
+  sourceSeq += 1;
+  db.run(
+    `INSERT INTO source_records
+       (id, item_id, source_type, source_uri, platform, captured_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    `src-${sourceSeq}`,
+    itemId,
+    sourceType,
+    null,
+    platform,
+    Date.now(),
+  );
+}
+
 describe("KnowledgeItemDB", () => {
   let db: DatabaseAdapter.Database;
   let items: KnowledgeItemDB;
@@ -301,6 +324,41 @@ describe("KnowledgeItemDB", () => {
     expect(counts.byTag[tag!.id]).toBe(1);
     expect(items.list({ scope: "all", collectionId: col.id }).total).toBe(1);
     expect(items.list({ scope: "all", tagId: tag!.id }).total).toBe(1);
+  });
+
+  it("按来源平台过滤与计数", () => {
+    const douyin = items.create({ title: "抖音条目" });
+    const bilibili = items.create({ title: "B 站条目" });
+    const trashed = items.create({ title: "删掉的抖音条目" });
+    items.create({ title: "手工笔记" });
+    addSource(db, douyin.id, "url", "douyin");
+    addSource(db, bilibili.id, "url", "bilibili");
+    addSource(db, trashed.id, "url", "douyin");
+    items.moveToTrash([trashed.id]);
+
+    const counts = items.counts();
+    expect(counts.byPlatform).toEqual({ douyin: 1, bilibili: 1 });
+
+    const byPlatform = items.list({ scope: "all", platform: "douyin" });
+    expect(byPlatform.total).toBe(1);
+    expect(byPlatform.entries[0].title).toBe("抖音条目");
+    // 列表投影带出平台，表格的「来源」列据此渲染
+    expect(byPlatform.entries[0].platform).toBe("douyin");
+    const manual = items
+      .list({ scope: "all" })
+      .entries.find((entry) => entry.title === "手工笔记");
+    expect(manual?.platform).toBeNull();
+    // 没有来源记录的手工条目不属于任何平台
+    expect(items.list({ scope: "all", platform: "web" }).total).toBe(0);
+  });
+
+  it("同一条目的多条来源记录不会让它在列表里重复出现", () => {
+    const item = items.create({ title: "重复采集过的条目" });
+    addSource(db, item.id, "url", "bilibili");
+    addSource(db, item.id, "url", "bilibili");
+
+    expect(items.counts().byPlatform.bilibili).toBe(1);
+    expect(items.list({ scope: "all", platform: "bilibili" }).total).toBe(1);
   });
 });
 

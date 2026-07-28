@@ -18,3 +18,21 @@ Glass theme system, settings framework, AI provider management, sync
 transports and the build/release pipeline) and replaces the business domain
 with a local-first AI personal knowledge base. Both projects are licensed
 under AGPL-3.0.
+
+第三方图标 / Third-party icons:
+
+  Simple Icons — https://github.com/simple-icons/simple-icons
+  Licensed under CC0-1.0
+
+界面中标识采集来源的平台 logo（抖音 / 哔哩哔哩 / 小红书 / YouTube / V2EX）
+取自 Simple Icons，路径数据内联在
+apps/desktop/src/renderer/components/ui/PlatformLogos.tsx。图标数据以
+CC0-1.0 发布，但商标本身归各平台所有，此处仅用于指称条目来自哪个平台，
+不表示任何关联或背书。
+
+The platform logos used to label an item's capture source (Douyin, Bilibili,
+Xiaohongshu, YouTube, V2EX) come from Simple Icons, with the path data
+inlined in apps/desktop/src/renderer/components/ui/PlatformLogos.tsx. The
+icon data is released under CC0-1.0, but the trademarks remain the property
+of their respective owners and are used here solely to identify the source
+of a captured item, implying no affiliation or endorsement.

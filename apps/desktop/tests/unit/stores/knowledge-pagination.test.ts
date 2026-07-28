@@ -126,6 +126,63 @@ describe("knowledge.store 服务端分页", () => {
   });
 });
 
+describe("knowledge.store 导航轴互斥", () => {
+  beforeEach(() => {
+    useKnowledgeStore.setState({
+      scope: "all",
+      collectionId: null,
+      tagId: null,
+      platform: null,
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      selectionIds: [],
+      selectionAnchorId: null,
+    });
+  });
+
+  it("四条轴同时只有一条生效，切换时其余复位", async () => {
+    const queries: KnowledgeItemQuery[] = [];
+    stubList(async (query) => {
+      queries.push(query);
+      return { entries: [], total: 0 };
+    });
+
+    useKnowledgeStore.getState().selectCollection("col-1");
+    await vi.waitFor(() => expect(queries).toHaveLength(1));
+    expect(queries[0]).toMatchObject({ scope: "all", collectionId: "col-1" });
+    expect(queries[0].platform).toBeUndefined();
+
+    // 选平台会清掉上一步的知识库，而不是叠加成两个条件
+    useKnowledgeStore.getState().selectPlatform("douyin");
+    await vi.waitFor(() => expect(queries).toHaveLength(2));
+    expect(queries[1]).toMatchObject({ scope: "all", platform: "douyin" });
+    expect(queries[1].collectionId).toBeUndefined();
+    expect(useKnowledgeStore.getState().collectionId).toBeNull();
+
+    // 反过来同样：切回标签后平台条件必须消失
+    useKnowledgeStore.getState().selectTag("tag-1");
+    await vi.waitFor(() => expect(queries).toHaveLength(3));
+    expect(queries[2]).toMatchObject({ scope: "all", tagId: "tag-1" });
+    expect(queries[2].platform).toBeUndefined();
+
+    useKnowledgeStore.getState().setScope("archived");
+    await vi.waitFor(() => expect(queries).toHaveLength(4));
+    expect(queries[3]).toMatchObject({ scope: "archived" });
+    expect(queries[3].tagId).toBeUndefined();
+    expect(useKnowledgeStore.getState().platform).toBeNull();
+  });
+
+  it("切换平台时回到第一页并清空多选", async () => {
+    stubList(async () => ({ entries: [], total: 0 }));
+
+    useKnowledgeStore.setState({ page: 7, selectionIds: ["a", "b"] });
+    useKnowledgeStore.getState().selectPlatform("v2ex");
+
+    expect(useKnowledgeStore.getState().page).toBe(1);
+    expect(useKnowledgeStore.getState().selectionIds).toEqual([]);
+  });
+});
+
 describe("knowledge.store 并发请求守卫", () => {
   beforeEach(() => {
     useKnowledgeStore.setState({

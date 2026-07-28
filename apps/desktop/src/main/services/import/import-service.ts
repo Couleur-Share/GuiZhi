@@ -4,6 +4,7 @@
 import { KnowledgeItemDB, ImportTaskDB } from "@guizhi/db";
 import type Database from "../../database/sqlite";
 import type { ImportTask } from "@guizhi/shared/types";
+import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import { extractContent } from "./connectors";
 import {
   ImportQueue,
@@ -60,14 +61,15 @@ function createPersistence(db: Database.Database): ImportPersistence {
         itemId = created.id;
         db.run(
           `INSERT INTO source_records
-             (id, item_id, source_type, source_uri, normalized_uri, content_hash, captured_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (id, item_id, source_type, source_uri, normalized_uri, content_hash, platform, captured_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           createSourceRecordId(),
           created.id,
           sourceKind,
           extracted.sourceUri,
           normalizedUri,
           contentHash,
+          resolveSourcePlatform(sourceKind, extracted.sourceUri),
           Date.now(),
         );
       });

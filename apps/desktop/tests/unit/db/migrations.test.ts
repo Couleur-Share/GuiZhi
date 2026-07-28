@@ -310,6 +310,85 @@ describe("0008-item-status-two-state 重建表迁移", () => {
   });
 });
 
+describe("0009-source-platform 回填迁移", () => {
+  function platformsById(
+    db: DatabaseAdapter.Database,
+  ): Record<string, string | null> {
+    const rows = db.all("SELECT id, platform FROM source_records") as Array<{
+      id: string;
+      platform: string | null;
+    }>;
+    return Object.fromEntries(rows.map((row) => [row.id, row.platform]));
+  }
+
+  function addSource(
+    db: DatabaseAdapter.Database,
+    id: string,
+    sourceType: string,
+    sourceUri: string | null,
+    platform: string | null = null,
+  ): void {
+    db.run(
+      `INSERT INTO source_records
+         (id, item_id, source_type, source_uri, platform, captured_at)
+       VALUES (?, ?, ?, ?, ?, 1)`,
+      id,
+      "item-1",
+      sourceType,
+      sourceUri,
+      platform,
+    );
+  }
+
+  it("按来源链接补齐老库的 platform", () => {
+    const db = createLegacyDbWithData();
+    addSource(db, "src-douyin", "url", "https://www.douyin.com/video/741234");
+    addSource(db, "src-v2ex", "url", "https://www.v2ex.com/t/1227616");
+    addSource(db, "src-file", "file", "D:\\notes\\a.md");
+    addSource(db, "src-text", "text", null);
+
+    runMigrations(db);
+
+    const platforms = platformsById(db);
+    // src-1 是建库时写的 https://example.com/a
+    expect(platforms["src-1"]).toBe("web");
+    expect(platforms["src-douyin"]).toBe("douyin");
+    expect(platforms["src-v2ex"]).toBe("v2ex");
+    expect(platforms["src-file"]).toBe("local");
+    expect(platforms["src-text"]).toBeNull();
+    db.close();
+  });
+
+  it("旧版迁移留下的自定义取值被重算成统一词表", () => {
+    const db = createLegacyDbWithData();
+    addSource(
+      db,
+      "src-legacy",
+      "url",
+      "https://www.bilibili.com/video/BV1xx411c7mD",
+      "Bilibili-Legacy",
+    );
+
+    runMigrations(db);
+
+    expect(platformsById(db)["src-legacy"]).toBe("bilibili");
+    db.close();
+  });
+
+  it("建出按平台查询用的索引", () => {
+    const db = createDb();
+    runMigrations(db);
+
+    const indexes = db
+      .all(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'source_records'",
+      )
+      .map((row) => (row as { name: string }).name);
+    expect(indexes).toContain("idx_sources_platform");
+    db.close();
+  });
+});
+
 describe("addColumnIfMissing", () => {
   it("缺列才加，已存在时静默跳过", () => {
     const db = new DatabaseAdapter(":memory:");

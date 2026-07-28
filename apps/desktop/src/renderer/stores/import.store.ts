@@ -6,6 +6,7 @@ import {
   runGuardedMutation,
 } from "./operation-error.store";
 import { describeLoadError } from "./load-error";
+import { useTagStore } from "./tag.store";
 
 /**
  * 批量操作逐条独立执行。
@@ -307,6 +308,11 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       // 新条目入库后刷新知识库视图与计数，并调度一轮语义索引
       if (task.status === "completed") {
         void useKnowledgeStore.getState().refreshAll();
+        // 采集弹窗里现敲的标签同样是入库时顺手建出来的，
+        // 不重取一次列表，侧栏的「标签」分区就少那一行
+        if (task.tagNames?.length) {
+          void useTagStore.getState().fetchTags();
+        }
         void import("./semantic.store").then(({ useSemanticStore }) =>
           useSemanticStore.getState().scheduleIndexing(),
         );

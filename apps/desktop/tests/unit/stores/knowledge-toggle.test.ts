@@ -73,6 +73,7 @@ describe("knowledge.store 收藏 / 置顶", () => {
         trash: 0,
         byCollection: {},
         byTag: {},
+        byPlatform: {},
       }),
     };
     useKnowledgeStore.setState({

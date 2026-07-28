@@ -20,6 +20,7 @@ import {
   getItemStatusMeta,
   getItemTypeMeta,
 } from "./type-meta";
+import { getSourcePlatformMeta, PlatformIcon } from "./platform-meta";
 
 const CELL = "px-4 py-2.5 align-middle";
 
@@ -97,6 +98,13 @@ export function ItemTableRow({
 
   const typeMeta = getItemTypeMeta(entry.itemType);
   const typeLabel = t(typeMeta.labelKey, typeMeta.fallback);
+  // 手工条目没有来源记录，这一格留空而不是编一个名字
+  const platformMeta = entry.platform
+    ? getSourcePlatformMeta(entry.platform)
+    : null;
+  const platformLabel = platformMeta
+    ? t(platformMeta.labelKey, platformMeta.fallback)
+    : null;
   const statusMeta = getItemStatusMeta(entry.status);
   const title = entry.title || t("library.untitled", "无标题");
 
@@ -202,6 +210,27 @@ export function ItemTableRow({
             style={style}
           >
             {typeLabel}
+          </td>
+        );
+
+      case "source":
+        return (
+          <td
+            key={column.id}
+            className={`${CELL} text-center text-xs text-muted-foreground`}
+            style={style}
+          >
+            {entry.platform ? (
+              <span className="flex min-w-0 items-center justify-center gap-1.5">
+                <PlatformIcon
+                  platform={entry.platform}
+                  className="h-3.5 w-3.5 shrink-0"
+                />
+                <span className="truncate">{platformLabel}</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground/50">-</span>
+            )}
           </td>
         );
 

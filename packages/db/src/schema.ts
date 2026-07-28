@@ -225,6 +225,8 @@ CREATE INDEX IF NOT EXISTS idx_item_tags_tag ON knowledge_item_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_sources_item ON source_records(item_id);
 CREATE INDEX IF NOT EXISTS idx_sources_normalized ON source_records(normalized_uri);
 CREATE INDEX IF NOT EXISTS idx_sources_hash ON source_records(content_hash);
+-- 侧栏「平台」分区每次刷新都要按平台分组数一遍，且列表过滤走 platform 等值
+CREATE INDEX IF NOT EXISTS idx_sources_platform ON source_records(platform);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_status ON import_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_created ON import_tasks(created_at DESC);
 -- getCatalog 是 Wiki 模块最高频的查询（编译时每个条目都要打一次），
