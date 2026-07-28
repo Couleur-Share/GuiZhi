@@ -10,6 +10,33 @@ import { TooltipLayer } from "../../../src/renderer/components/ui/TooltipLayer";
 
 const TITLE = "重新生成讨论总结";
 
+interface RectSpec {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+function toRect(spec: RectSpec): DOMRect {
+  return {
+    ...spec,
+    x: spec.left,
+    y: spec.top,
+    right: spec.left + spec.width,
+    bottom: spec.top + spec.height,
+    toJSON: () => ({}),
+  };
+}
+
+/** jsdom 不做布局，getBoundingClientRect 恒为 0，定位逻辑得自己喂尺寸 */
+function stubLayout(host: RectSpec, bubble: RectSpec) {
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+    function (this: Element) {
+      return toRect(this.getAttribute("role") === "tooltip" ? bubble : host);
+    },
+  );
+}
+
 function renderScene() {
   return render(
     <>
@@ -38,6 +65,7 @@ describe("TooltipLayer", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("悬停立即摘掉 title，延迟到了才渲染自绘气泡", () => {
@@ -146,5 +174,31 @@ describe("TooltipLayer", () => {
 
     scene.unmount();
     expect(host.getAttribute("title")).toBe(TITLE);
+  });
+
+  it("放得下就挂在触发元素下方", () => {
+    stubLayout(
+      { top: 100, left: 400, width: 44, height: 44 },
+      { top: 0, left: 0, width: 60, height: 28 },
+    );
+    renderScene();
+    hover(screen.getByTestId("host"));
+
+    const bubble = screen.getByRole("tooltip");
+    expect(bubble.style.top).toBe("152px");
+    expect(bubble.style.left).toBe("422px");
+  });
+
+  it("贴着窗口底边时翻到上方，不能压在触发元素身上", () => {
+    // 左下角 h-11 的设置按钮：翻转锚点取错会让气泡正好盖住齿轮图标
+    const host = { top: 700, left: 11, width: 44, height: 44 };
+    stubLayout(host, { top: 0, left: 0, width: 44, height: 28 });
+    renderScene();
+    hover(screen.getByTestId("host"));
+
+    const bubble = screen.getByRole("tooltip");
+    const top = Number.parseFloat(bubble.style.top);
+    expect(top + 28).toBeLessThanOrEqual(host.top);
+    expect(top).toBe(664);
   });
 });

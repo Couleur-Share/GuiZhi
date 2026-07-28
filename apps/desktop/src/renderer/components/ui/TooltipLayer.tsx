@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -14,8 +14,16 @@ const SHOW_DELAY_MS = 320;
 const VIEWPORT_MARGIN = 8;
 const TRIGGER_GAP = 8;
 
+interface TooltipAnchor {
+  top: number;
+  bottom: number;
+  center: number;
+}
+
 interface TooltipState {
   text: string;
+  // 触发元素的视口位置：夹回视口时每一轮都从它重新推导，不拿上一轮的结果接着算
+  anchor: TooltipAnchor;
   top: number;
   left: number;
 }
@@ -66,10 +74,16 @@ export function TooltipLayer() {
           return;
         }
         const rect = host.getBoundingClientRect();
+        const anchor: TooltipAnchor = {
+          top: rect.top,
+          bottom: rect.bottom,
+          center: rect.left + rect.width / 2,
+        };
         setTooltip({
           text: title,
-          top: rect.bottom + TRIGGER_GAP,
-          left: rect.left + rect.width / 2,
+          anchor,
+          top: anchor.bottom + TRIGGER_GAP,
+          left: anchor.center,
         });
       }, SHOW_DELAY_MS);
     };
@@ -173,25 +187,29 @@ export function TooltipLayer() {
     };
   }, []);
 
-  // 气泡宽度要等渲染出来才知道，量到之后再夹回视口内
-  useEffect(() => {
+  // 气泡尺寸要等渲染出来才知道，量到之后再夹回视口内。必须是 layout effect：
+  // 用 useEffect 的话浏览器会先按未夹取的坐标画一帧，界面上就是气泡冒出来又跳一下
+  useLayoutEffect(() => {
     const bubble = bubbleRef.current;
     if (!tooltip || !bubble) {
       return;
     }
 
     const rect = bubble.getBoundingClientRect();
+    const { anchor } = tooltip;
     const maxLeft = window.innerWidth - rect.width / 2 - VIEWPORT_MARGIN;
     const minLeft = rect.width / 2 + VIEWPORT_MARGIN;
-    const clampedLeft = Math.min(Math.max(tooltip.left, minLeft), maxLeft);
-    const overflowsBottom =
-      tooltip.top + rect.height + VIEWPORT_MARGIN > window.innerHeight;
-    const clampedTop = overflowsBottom
-      ? Math.max(VIEWPORT_MARGIN, tooltip.top - rect.height - TRIGGER_GAP * 2)
-      : tooltip.top;
+    const left = Math.min(Math.max(anchor.center, minLeft), maxLeft);
+    const below = anchor.bottom + TRIGGER_GAP;
+    // 下方放不下就翻到触发元素上方，锚点是它的 top：按 bottom 算会低整整一个
+    // 触发元素的高度，气泡直接压在触发元素身上（h-11 的图标按钮正好被盖住）
+    const top =
+      below + rect.height + VIEWPORT_MARGIN > window.innerHeight
+        ? Math.max(VIEWPORT_MARGIN, anchor.top - TRIGGER_GAP - rect.height)
+        : below;
 
-    if (clampedLeft !== tooltip.left || clampedTop !== tooltip.top) {
-      setTooltip({ ...tooltip, left: clampedLeft, top: clampedTop });
+    if (left !== tooltip.left || top !== tooltip.top) {
+      setTooltip({ ...tooltip, left, top });
     }
   }, [tooltip]);
 

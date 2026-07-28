@@ -48,8 +48,8 @@ function SidebarRailSettings({ controller }: SidebarRailProps) {
         <button
           type="button"
           data-testid="rail-settings"
+          // 齿轮就是「设置」的通用写法，气泡只是把图标念一遍；可访问名交给 aria-label
           aria-label={controller.t("header.settings")}
-          title={controller.t("header.settings")}
           onClick={openSettings}
           className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${controller.currentPage === "settings" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
         >
