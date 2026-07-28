@@ -189,6 +189,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
   collection_id TEXT,
   -- 采集时选定的标签（JSON 字符串数组），入库时打到条目上
   tag_names TEXT,
+  -- 各阶段耗时与 AI 开销（JSON 数组，见 ImportStageStat）；重试时清空
+  stage_stats TEXT,
   force_duplicate INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

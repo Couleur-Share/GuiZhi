@@ -44,6 +44,29 @@ export function getStageLabel(stage: ImportStage | null | undefined): {
 export const STALL_THRESHOLD_MS = 90_000;
 
 /**
+ * 处理中任务的**实际工作**时长，不含排队等待。
+ *
+ * 不能用 `now - createdAt`：那是入队时刻，而并发只有 2——一次丢进三十条链接，
+ * 最后一条能在队列里躺一个钟头，按它算出来的「已用 1:00:00」说的是「你多久以前
+ * 点了采集」，不是「这条跑了多久」。而这一行的全部用处就是判断它卡没卡死。
+ * 它还会和终态那行「共 X」对不上：一完成数字反而缩水，两个口径自相矛盾。
+ *
+ * 等式是「已结算的各阶段之和 + 当前阶段的已用」。后半段取 `updatedAt` 成立，
+ * 是因为处理期间每一次写库都带着阶段变更（`processTask` 里 8 处
+ * `updateAndNotify` 的 patch 全含 `stage`），阶段快照与 `updatedAt` 由同一次
+ * UPDATE 落下，当前阶段的起点就是它。
+ */
+export function resolveWorkElapsed(task: ImportTask, now: number): number {
+  const stats = task.stageStats;
+  if (!stats?.length) {
+    // 加统计之前的老任务没有这一列，退回原口径——不准，但不比以前差
+    return Math.max(0, now - task.createdAt);
+  }
+  const settled = stats.reduce((total, entry) => total + entry.ms, 0);
+  return settled + Math.max(0, now - task.updatedAt);
+}
+
+/**
  * 耗时格式化为 `M:SS` / `H:MM:SS`。
  * 走时钟写法而不是「3 分 7 秒」，是为了免掉一套单复数与中英差异的文案。
  */

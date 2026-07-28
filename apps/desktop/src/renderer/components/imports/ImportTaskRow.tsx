@@ -20,12 +20,14 @@ import type { ImportTask } from "@guizhi/shared/types";
 import { useImportStore } from "../../stores/import.store";
 import { useUIStore } from "../../stores/ui.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
+import { ImportStageStats } from "./ImportStageStats";
 import {
   formatDuration,
   getStageLabel,
   needsCaptureToolSetup,
   resolveTaskFolder,
   resolveTaskHost,
+  resolveWorkElapsed,
   STALL_THRESHOLD_MS,
 } from "./import-task-meta";
 
@@ -197,15 +199,28 @@ function RowAction({
 /**
  * 进度信息。视频链路可跑几十分钟，只有一个转圈无法区分「在推进」和「卡死」，
  * 所以给出任务已用时长；单个阶段超过阈值还没动静时补一条本阶段耗时。
+ *
+ * 排队与处理分开报：一次丢进几十条时并发只有 2，排在后面的任务能等上一个钟头，
+ * 把这段算进「已用」等于在说一件没发生的事。等待时长本身仍然有用（「它怎么还没
+ * 开始」），所以照报，只是标签说实话。
  */
 function ProgressHint({ task, now }: { task: ImportTask; now: number }) {
   const { t } = useTranslation();
-  if (task.status !== "processing" && task.status !== "pending") {
+  if (task.status === "pending") {
+    return (
+      <span>
+        {t("imports.queuedFor", "已排队 {{duration}}", {
+          duration: formatDuration(Math.max(0, now - task.createdAt)),
+        })}
+      </span>
+    );
+  }
+  if (task.status !== "processing") {
     return null;
   }
-  const elapsed = Math.max(0, now - task.createdAt);
+  const elapsed = resolveWorkElapsed(task, now);
   const inStage = Math.max(0, now - task.updatedAt);
-  const stalled = task.status === "processing" && inStage >= STALL_THRESHOLD_MS;
+  const stalled = inStage >= STALL_THRESHOLD_MS;
 
   return (
     <>
@@ -310,6 +325,7 @@ export function ImportTaskRow({
             ) : null}
             {typeMeta ? <span>{t(typeMeta.labelKey, typeMeta.fallback)}</span> : null}
             <ProgressHint task={task} now={now} />
+            <ImportStageStats task={task} />
           </div>
 
           {task.error ? (

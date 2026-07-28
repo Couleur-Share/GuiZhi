@@ -36,6 +36,46 @@ export interface AIChatResult {
 
 const AI_REQUEST_TIMEOUT_MS = 60_000;
 
+/**
+ * 是否为 Qwen 系模型。判定与渲染进程的 `renderer/services/ai.ts` 保持一致：
+ * 中转站的 provider 一律是 custom，所以模型名是唯一可靠的线索。
+ */
+function isQwenModel(config: AIClientConfig): boolean {
+  const provider = config.provider?.toLowerCase() ?? "";
+  return (
+    provider.includes("qwen") ||
+    provider.includes("dashscope") ||
+    config.model.toLowerCase().includes("qwen")
+  );
+}
+
+/**
+ * 端点不认识 `enable_thinking` 的判定。
+ *
+ * 只认「报错文本里点名了这个参数」：官方 OpenAI 对未知字段回
+ * `Unrecognized request argument supplied: enable_thinking`，各家中转站措辞不一
+ * 但都会带上字段名。按状态码判会把限流、余额不足一并卷进来，白重发一次。
+ */
+function mentionsThinkingParam(errorText: string): boolean {
+  return errorText.toLowerCase().includes("enable_thinking");
+}
+
+/** 从错误响应体里抠出 provider 给的说明；抠不出就报状态码 */
+function describeChatError(status: number, errorText: string): string {
+  try {
+    const errorJson = JSON.parse(errorText) as Record<string, unknown>;
+    const inner = errorJson.error as Record<string, unknown> | undefined;
+    const message =
+      (inner?.message as string) ?? (errorJson.message as string) ?? "";
+    if (message) {
+      return message;
+    }
+  } catch {
+    // 非 JSON 响应体，回落到状态码
+  }
+  return `AI API request failed (${status})`;
+}
+
 export async function chatCompletion(
   config: AIClientConfig,
   messages: AIChatMessage[],
@@ -101,6 +141,15 @@ export async function chatCompletion(
     }
   }
 
+  // Qwen3 系是混合推理模型，默认开思考。主进程这几条链路（文字稿排版、内容总结、
+  // 拟题）一律非流式，思考过程既读不到也用不上，只是白烧 token 和时间——实测给
+  // 1600 字文字稿补标点分段，思维链能写到两万字、单块 77 秒（还撞到过 300 秒不
+  // 返回），关掉后 10 秒，输出反而分得更细。渲染进程那份客户端早就这么做了，
+  // 这份从 fork 剥出来的精简实现一直漏着。
+  if (!isAnthropic && isQwenModel(config)) {
+    body.enable_thinking = false;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -113,28 +162,35 @@ export async function chatCompletion(
   }
   externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
 
-  try {
-    const response = await fetch(endpoint, {
+  const send = () =>
+    fetch(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
 
+  try {
+    let response = await send();
+
     if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      let errorMessage = `AI API request failed (${response.status})`;
-      try {
-        const errorJson = JSON.parse(errorText) as Record<string, unknown>;
-        const inner = errorJson.error as Record<string, unknown> | undefined;
-        errorMessage =
-          (inner?.message as string) ??
-          (errorJson.message as string) ??
-          errorMessage;
-      } catch {
-        // Use default error message
+      let errorText = await response.text().catch(() => "");
+      // 端点不认识 enable_thinking 时摘掉重发一次：这个参数只对混合推理模型有意义，
+      // 不认识它的端点不该因此整条链路失败。重发的请求不带该字段，不会再撞同一堵墙
+      if (
+        body.enable_thinking !== undefined &&
+        mentionsThinkingParam(errorText)
+      ) {
+        console.warn(
+          `[ai] 端点拒绝 enable_thinking，摘掉后重发一次：${errorText.slice(0, 200)}`,
+        );
+        delete body.enable_thinking;
+        response = await send();
+        errorText = response.ok ? "" : await response.text().catch(() => "");
       }
-      throw new Error(errorMessage);
+      if (!response.ok) {
+        throw new Error(describeChatError(response.status, errorText));
+      }
     }
 
     const json = (await response.json()) as {

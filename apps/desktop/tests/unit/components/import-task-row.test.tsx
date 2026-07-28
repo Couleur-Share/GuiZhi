@@ -74,6 +74,38 @@ describe("导入任务行", () => {
     expect(screen.queryByText(/本阶段/)).not.toBeInTheDocument();
   });
 
+  it("排队中报的是等待而不是「已用」：并发只有 2，后面的任务能等一个钟头", () => {
+    // 入队一小时还没轮到，此时它一个字节都没抓，说「已用 1:00:00」是在讲一件没发生的事
+    renderRow(
+      makeTask({
+        status: "pending",
+        stage: null,
+        createdAt: NOW - 3_600_000,
+        updatedAt: NOW - 3_600_000,
+      }),
+    );
+    expect(screen.getByText("已排队 1:00:00")).toBeInTheDocument();
+    expect(screen.queryByText(/已用/)).not.toBeInTheDocument();
+  });
+
+  it("处理中的「已用」不含排队等待，与完成后的「共 X」同一口径", () => {
+    // 入队 1 小时前，真正开跑只有 2 分 10 秒（已结算 2:00 + 当前阶段 10 秒）
+    renderRow(
+      makeTask({
+        status: "processing",
+        stage: "transcribing",
+        createdAt: NOW - 3_600_000,
+        updatedAt: NOW - 10_000,
+        stageStats: [
+          { stage: "fetching", ms: 5_000 },
+          { stage: "video-metadata", ms: 115_000 },
+          { stage: "transcribing", ms: 0 },
+        ],
+      }),
+    );
+    expect(screen.getByText("已用 2:10")).toBeInTheDocument();
+  });
+
   it("已完成：标题可点开条目", async () => {
     const onOpenItem = renderRow(
       makeTask({ status: "completed", stage: null, resultItemId: "item-9" }),
@@ -134,5 +166,75 @@ describe("导入任务行", () => {
     );
     expect(screen.getByLabelText("重试")).toBeInTheDocument();
     expect(screen.queryByLabelText("前往设置安装工具")).not.toBeInTheDocument();
+  });
+});
+
+describe("终态任务的阶段耗时", () => {
+  beforeAll(async () => {
+    installWindowMocks();
+    await i18nReady;
+    await changeLanguage("zh");
+  });
+
+  beforeEach(() => {
+    installWindowMocks();
+  });
+
+  const finished = (patch: Partial<ImportTask> = {}) =>
+    makeTask({
+      status: "completed",
+      stage: null,
+      resultItemId: "item-9",
+      stageStats: [
+        { stage: "transcribing", ms: 126_000 },
+        {
+          stage: "formatting",
+          ms: 493_000,
+          calls: 7,
+          failedCalls: 2,
+          promptTokens: 9_500,
+          completionTokens: 57_900,
+          models: ["qwen3.5-flash"],
+        },
+      ],
+      ...patch,
+    });
+
+  it("行上常驻总耗时与最慢阶段：扫一眼就看得出哪条不对劲", () => {
+    renderRow(finished());
+    expect(screen.getByText("共 10:19")).toBeInTheDocument();
+    expect(screen.getByText("· 最慢 文字稿排版 8:13")).toBeInTheDocument();
+  });
+
+  it("展开后逐阶段给出耗时、调用次数与 token", async () => {
+    renderRow(finished());
+    // 明细是确认细节用的，默认收起——一屏几十条任务不能每条都摊开
+    expect(screen.queryByText("2:06")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByText("共 10:19"));
+    expect(screen.getByText("2:06")).toBeInTheDocument();
+    expect(screen.getByText("8:13")).toBeInTheDocument();
+    expect(
+      screen.getByText(/7 次调用 · 2 次失败 · 67400 token · qwen3\.5-flash/),
+    ).toBeInTheDocument();
+  });
+
+  it("只有一个阶段时不说「最慢」：那等于把总耗时念第二遍", () => {
+    renderRow(finished({ stageStats: [{ stage: "fetching", ms: 3_000 }] }));
+    expect(screen.getByText("共 0:03")).toBeInTheDocument();
+    expect(screen.queryByText(/最慢/)).not.toBeInTheDocument();
+  });
+
+  it("运行中的任务不显示明细：那时该回答的是「还活着吗」，不是「花在哪了」", () => {
+    renderRow(finished({ status: "processing", stage: "formatting" }));
+    expect(screen.queryByText(/^共 /)).not.toBeInTheDocument();
+    // 已结算 2:06 + 8:13 再加当前阶段的 10 秒；createdAt 在 10 分钟前，
+    // 但那是入队时刻，与「这条跑了多久」无关
+    expect(screen.getByText("已用 10:29")).toBeInTheDocument();
+  });
+
+  it("老任务没有统计时整块不出现，不摆一个空壳", () => {
+    renderRow(finished({ stageStats: null }));
+    expect(screen.queryByText(/^共 /)).not.toBeInTheDocument();
   });
 });

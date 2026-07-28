@@ -263,7 +263,9 @@ function registerSingleShortcut(action: string, accelerator: string): boolean {
  * Register all global shortcuts (only if mode is 'global' for that shortcut)
  * 注册全局快捷键（仅当该快捷键模式为 'global' 时）
  */
-export function registerShortcuts(): void {
+export function registerShortcuts(
+  options: { skipGlobal?: boolean } = {},
+): void {
   // Load saved shortcut configuration
   // 加载保存的快捷键配置
   currentShortcuts = loadShortcuts();
@@ -272,6 +274,13 @@ export function registerShortcuts(): void {
   // Unregister all existing shortcuts
   // 注销所有现有快捷键
   globalShortcut.unregisterAll();
+
+  // 自动化实例与用户正在运行的归知并存（E2E 绕过了单实例门），抢注系统级快捷键
+  // 会把用户那个 Alt+Shift+P 夺走，且注册失败只打一条 warn，两边都发现不了。
+  // 配置照常加载，设置页里的快捷键列表仍要显示得出来。
+  if (options.skipGlobal) {
+    return;
+  }
   
   // Register each shortcut
   // 注册每个快捷键

@@ -7,11 +7,14 @@ import { randomUUID } from "crypto";
 import type {
   EnqueueImportInput,
   ImportStage,
+  ImportStageStat,
   ImportTask,
 } from "@guizhi/shared/types";
 import type { ExtractedContent } from "./connectors";
+import { runWithAiCallSink } from "../ai-call-context";
 import { normalizeUrl } from "./url-normalize";
 import { computeContentHash } from "./content-hash";
+import { ImportStageStatsRecorder } from "./stage-stats";
 
 export interface ImportTaskStore {
   create(input: EnqueueImportInput): ImportTask;
@@ -31,6 +34,7 @@ export interface ImportTaskStore {
       resultItemId: string | null;
       duplicateItemId: string | null;
       forceDuplicate: boolean;
+      stageStats: ImportStageStat[] | null;
     }>,
   ): ImportTask | null;
   resetProcessingToPending(): number;
@@ -154,6 +158,8 @@ export class ImportQueue {
       error: null,
       warning: null,
       duplicateItemId: null,
+      // 上一轮的耗时不能留：叠在这一轮上，两个数字都不再说明任何事
+      stageStats: null,
       ...(options?.forceDuplicate !== undefined
         ? { forceDuplicate: options.forceDuplicate }
         : {}),
@@ -185,11 +191,21 @@ export class ImportQueue {
     }
   }
 
+  /**
+   * 写库 + 广播。阶段有变化时顺带结算耗时并把统计一起带上——
+   * 这次 UPDATE 本来就要发，统计因此不额外增加任何一次 SQL 往返。
+   */
   private updateAndNotify(
     id: string,
     patch: Parameters<ImportTaskStore["update"]>[1],
+    recorder: ImportStageStatsRecorder,
   ): void {
-    const task = this.store.update(id, patch);
+    const next =
+      patch.stage !== undefined
+        ? (recorder.transition(patch.stage),
+          { ...patch, stageStats: recorder.snapshot() })
+        : patch;
+    const task = this.store.update(id, next);
     if (task) {
       this.onTaskChanged(task);
     }
@@ -203,8 +219,26 @@ export class ImportQueue {
     if (!task || task.status !== "pending") {
       return;
     }
+    // 记录器随任务走：并发下两条任务各有各的一份，AI 调用靠
+    // AsyncLocalStorage 的作用域落到正确的那一个，不会互相串账
+    const recorder = new ImportStageStatsRecorder();
+    await runWithAiCallSink(
+      (record) => recorder.recordAiCall(record),
+      () => this.processTask(id, task, controller, recorder),
+    );
+  }
 
-    this.updateAndNotify(id, { status: "processing", stage: "fetching" });
+  private async processTask(
+    id: string,
+    task: ImportTask,
+    controller: AbortController,
+    recorder: ImportStageStatsRecorder,
+  ): Promise<void> {
+    this.updateAndNotify(
+      id,
+      { status: "processing", stage: "fetching" },
+      recorder,
+    );
 
     try {
       this.throwIfAborted(controller);
@@ -212,26 +246,30 @@ export class ImportQueue {
         task.sourceKind,
         task.sourceInput,
         controller.signal,
-        (stage) => this.updateAndNotify(id, { stage }),
+        (stage) => this.updateAndNotify(id, { stage }, recorder),
       );
 
       this.throwIfAborted(controller);
       // 标题与类型在这里回写：建任务时只有原始 URL，一列长得一样的链接
       // 没法辨认采的是什么。写在去重判定之前，重复任务同样拿得到标题。
-      this.updateAndNotify(id, {
-        stage: "extracting",
-        displayName: extracted.title,
-        itemType: extracted.itemType,
-      });
+      this.updateAndNotify(
+        id,
+        {
+          stage: "extracting",
+          displayName: extracted.title,
+          itemType: extracted.itemType,
+        },
+        recorder,
+      );
 
       // 降级结果按失败处理：不入库，也不登记来源，
       // 否则空壳条目会占住该链接的 normalized_uri，重试永远判重为重复
       if (extracted.degradedReason) {
-        this.updateAndNotify(id, {
-          status: "failed",
-          stage: null,
-          error: extracted.degradedReason,
-        });
+        this.updateAndNotify(
+          id,
+          { status: "failed", stage: null, error: extracted.degradedReason },
+          recorder,
+        );
         return;
       }
 
@@ -249,17 +287,17 @@ export class ImportQueue {
           contentHash,
         );
         if (duplicateItemId) {
-          this.updateAndNotify(id, {
-            status: "duplicate",
-            stage: null,
-            duplicateItemId,
-          });
+          this.updateAndNotify(
+            id,
+            { status: "duplicate", stage: null, duplicateItemId },
+            recorder,
+          );
           return;
         }
       }
 
       this.throwIfAborted(controller);
-      this.updateAndNotify(id, { stage: "saving" });
+      this.updateAndNotify(id, { stage: "saving" }, recorder);
 
       const resultItemId = this.persistence.saveItem({
         extracted,
@@ -270,24 +308,32 @@ export class ImportQueue {
         contentHash,
       });
 
-      this.updateAndNotify(id, {
-        status: "completed",
-        stage: null,
-        // 入库了但内容有缺失时，「已完成」这三个字必须带上下文
-        warning: extracted.warningReason ?? null,
-        resultItemId,
-      });
+      this.updateAndNotify(
+        id,
+        {
+          status: "completed",
+          stage: null,
+          // 入库了但内容有缺失时，「已完成」这三个字必须带上下文
+          warning: extracted.warningReason ?? null,
+          resultItemId,
+        },
+        recorder,
+      );
     } catch (error) {
       if (controller.signal.aborted) {
-        this.updateAndNotify(id, { status: "canceled", stage: null });
+        this.updateAndNotify(
+          id,
+          { status: "canceled", stage: null },
+          recorder,
+        );
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
-      this.updateAndNotify(id, {
-        status: "failed",
-        stage: null,
-        error: message,
-      });
+      this.updateAndNotify(
+        id,
+        { status: "failed", stage: null, error: message },
+        recorder,
+      );
     }
   }
 

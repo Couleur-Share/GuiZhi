@@ -33,6 +33,10 @@ import {
   shouldUseDevServer,
 } from "./testing/e2e";
 import {
+  shouldPlaceWindowOffscreen,
+  showWindowOffscreen,
+} from "./testing/window-mode";
+import {
   getHistoricalDefaultUserDataPath,
   inspectDataPath,
   isLinkSafeDataPathRoot,
@@ -293,6 +297,17 @@ async function createWindow() {
 
   // Handle window ready-to-show: check if we should minimize on launch
   mainWindow.once("ready-to-show", () => {
+    // 自动化截图/e2e：显示但不出现在人眼前，也不抢焦点。
+    // 放在最前面是因为它必须盖过 minimizeOnLaunch——种子数据里若开了那个设置，
+    // 窗口会停在托盘里不绘制，截图随即全部超时。
+    if (shouldPlaceWindowOffscreen()) {
+      if (mainWindow) {
+        showWindowOffscreen(mainWindow);
+      }
+      emitWindowVisibility(true);
+      return;
+    }
+
     const launchArgs = Array.isArray(process.argv) ? process.argv : [];
     const hasHiddenArg = launchArgs.includes("--hidden");
     let openedAsHiddenByOs: boolean;
@@ -1011,7 +1026,7 @@ void app.whenReady().then(async () => {
 
     // Register global shortcuts
     // 注册快捷键
-    registerShortcuts();
+    registerShortcuts({ skipGlobal: isE2E });
 
     // Register shortcuts IPC
     // 注册快捷键 IPC

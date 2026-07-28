@@ -38,6 +38,56 @@ describe("ImportTaskDB", () => {
     expect(task.displayName).toBe("读书笔记.md");
   });
 
+  it("阶段统计往返：JSON 存取不丢字段", () => {
+    const task = tasks.create({ kind: "url", input: "https://example.com" });
+    const updated = tasks.update(task.id, {
+      stageStats: [
+        { stage: "transcribing", ms: 126_000 },
+        {
+          stage: "formatting",
+          ms: 493_000,
+          calls: 7,
+          failedCalls: 2,
+          promptTokens: 9_500,
+          completionTokens: 57_900,
+          models: ["qwen3.5-flash"],
+        },
+      ],
+    })!;
+
+    expect(updated.stageStats).toHaveLength(2);
+    expect(updated.stageStats![1]).toEqual({
+      stage: "formatting",
+      ms: 493_000,
+      calls: 7,
+      failedCalls: 2,
+      promptTokens: 9_500,
+      completionTokens: 57_900,
+      models: ["qwen3.5-flash"],
+    });
+    expect(tasks.get(task.id)!.stageStats).toEqual(updated.stageStats);
+  });
+
+  it("阶段统计：新建为空、传 null 清空、不传则保留", () => {
+    const task = tasks.create({ kind: "url", input: "https://example.com" });
+    expect(task.stageStats).toBeNull();
+
+    tasks.update(task.id, { stageStats: [{ stage: "fetching", ms: 100 }] });
+    // 不带这个字段的更新（改状态、写标题）不该把统计抹掉
+    expect(tasks.update(task.id, { status: "failed" })!.stageStats).toEqual([
+      { stage: "fetching", ms: 100 },
+    ]);
+    // 重试走的是显式 null
+    expect(tasks.update(task.id, { stageStats: null })!.stageStats).toBeNull();
+  });
+
+  it("坏掉的统计不连累整行：读不出来当没有，而不是让列表报错", () => {
+    const task = tasks.create({ kind: "url", input: "https://example.com" });
+    db.run("UPDATE import_tasks SET stage_stats = ? WHERE id = ?", "{坏", task.id);
+    expect(tasks.get(task.id)!.stageStats).toBeNull();
+    expect(tasks.get(task.id)!.status).toBe("pending");
+  });
+
   it("更新状态与去重结果", () => {
     const task = tasks.create({ kind: "url", input: "https://example.com" });
     const updated = tasks.update(task.id, {

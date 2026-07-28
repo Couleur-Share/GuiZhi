@@ -12,6 +12,7 @@
 import type { AIUsageScenarioId } from "@guizhi/shared/types";
 import { AIUsageDB } from "@guizhi/db";
 import { tryGetDatabase } from "../database";
+import { reportAiCall } from "./ai-call-context";
 
 export interface MainAiUsageEntry {
   scenario: AIUsageScenarioId;
@@ -23,9 +24,15 @@ export interface MainAiUsageEntry {
 }
 
 export function recordMainAiUsage(entry: MainAiUsageEntry): void {
+  if (!entry.model) {
+    return;
+  }
+  // 归属到当前导入任务（不在导入链路里时是空操作）。必须排在库句柄之前：
+  // 任务侧的阶段统计只写在任务行上，不该因为用量库不可用而跟着一起丢
+  reportAiCall(entry);
   // 库还没初始化（单测、备份恢复期间）不是故障，没什么可记的，也不该刷日志
   const db = tryGetDatabase();
-  if (!db || !entry.model) {
+  if (!db) {
     return;
   }
   try {

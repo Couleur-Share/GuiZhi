@@ -45,6 +45,28 @@ export const IMPORT_STAGES = [
 
 export type ImportStage = (typeof IMPORT_STAGES)[number];
 
+/**
+ * 单个阶段的实际开销。任务跑完后留在行上，用来回答「这次为什么这么久」。
+ *
+ * 记的是**结果**而不是请求参数：一次 1600 字的文字稿排版，输出 1570 字却烧掉
+ * 8271 个 completion token，这个比值自明地指出模型在闷头写思维链；而记一栏
+ * 「思考：已关闭」只说明我们发了什么，说明不了模型做了什么（实测有模型收下
+ * 关闭参数照样思考）。参数是上一个缺陷的形状，耗时与 token 才是通用的。
+ */
+export interface ImportStageStat {
+  stage: ImportStage;
+  /** 该阶段累计耗时（毫秒）。同一阶段被再次进入时累加，不新开一条 */
+  ms: number;
+  /** 该阶段发起的 AI 调用次数，含失败的（超时与限流同样可能计费） */
+  calls?: number;
+  /** 其中失败的次数 */
+  failedCalls?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  /** 该阶段用到的模型，按首次出现排序 */
+  models?: string[];
+}
+
 export interface ImportTask {
   id: string;
   sourceKind: ImportSourceKind;
@@ -78,6 +100,14 @@ export interface ImportTask {
   collectionId?: string | null;
   /** 入库时要打上的标签（采集弹窗里选的） */
   tagNames?: string[];
+  /**
+   * 各阶段的耗时与 AI 开销，按进入顺序排列；任务跑完前是已完成的那部分。
+   *
+   * 此前终态任务在界面上不留任何耗时痕迹（`ProgressHint` 只在运行时渲染），
+   * 一次「排版花了 8 分钟」的异常要靠翻数据库和日志才看得出来，而用户的
+   * 反馈恰恰是「在使用时没发现」。重试会清空它，否则两轮的耗时会叠在一起。
+   */
+  stageStats?: ImportStageStat[] | null;
   createdAt: number;
   updatedAt: number;
 }

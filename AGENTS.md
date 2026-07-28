@@ -409,6 +409,46 @@ ANSI 代码页写管道（简中是 cp936），这边按 UTF-8 解出来是一�
 的提示会赖在这一轮成功的任务上。转写失败同时进 `error.log`——此前只有排版失败在记，
 而排版失败顶多让稿子难读，转写失败掏空的是整条条目。
 
+主进程的 `chatCompletion` 给 Qwen 系补上 `enable_thinking: false`。Qwen3 系是混合
+推理模型、默认开思考，而主进程这几条链路（文字稿排版、内容总结、拟题）一律非流式，
+思考过程既读不到也用不上，纯粹白烧 token 和时间：实测给 1600 字文字稿补标点分段，
+思维链能写到两万字、单块 77 秒（还撞到过 300 秒不返回），关掉后 10 秒，输出反而
+分得更细。渲染进程那份客户端（`renderer/services/ai.ts`）早就这么做了，
+`packages/core` 这份从 fork 剥出来的精简实现一直漏着——排版占掉一次导入 79% 时长
+的根因就在这里，`CHUNK_TIMEOUT_MS` 从 120 提到 240 秒治的是它的症状。
+判定按模型名与 provider 两头认（与渲染进程同一套）：中转站的 provider 一律是
+custom，模型名是唯一可靠的线索，而 dashscope 上的部署又常被改成不带 qwen 的名字。
+anthropic 协议不带这个字段，那边是另一套请求体形状——中转站上挂着 qwen 名字的
+anthropic 端点是真实存在的，只看模型名会栽。
+端点不认识它时**摘掉重发一次**，判据是「报错文本里点名了这个参数」而不是状态码：
+官方 OpenAI 对未知字段回 `Unrecognized request argument supplied: enable_thinking`，
+各家中转站措辞不一但都会带上字段名；按状态码判会把限流、余额不足一并卷进来白重发
+一次，而那些错重来一万次也是同一个结果。重发仍失败时抛第二次的原话，不能粉饰成
+参数问题——真正的原因（模型不存在、鉴权不对）才是用户能据此行动的东西。
+
+阶段耗时与 AI 开销（`import_tasks.stage_stats`，迁移 0011）：一次导入里排版占掉
+79% 的时长，而这件事只能靠翻数据库和 grep 日志才发现——`ProgressHint` 在非运行态
+直接 `return null`，任务一结束耗时信息全部消失，连总时长都得拿两个时间戳的气泡去减。
+落点是任务行本身而不是「每次导入生成一份报告」：32 条任务就是 32 份没人会打开的
+文件，而用户的原话恰恰是「在使用时没发现」，需要主动打开才看得见的东西治不了这个。
+行上常驻「共 X · 最慢 Y」供扫视，完整明细收在点开之后。
+写库时机是白捡的：`updateAndNotify` 是全部 12 个阶段的唯一收口且本来就在写库，
+统计搭同一次 UPDATE 走，零额外 SQL 往返；字段挂在 `ImportTask` 上，`import:list`
+与 `import:changed` 自动带过去，不新增 IPC。
+**记结果不记参数**：一次 1600 字排版输出 1570 字却烧掉 8271 个 completion token，
+这个比值自明；而记一栏「思考：已关闭」只说明我们发了什么，说明不了模型做了什么
+（实测 deepseek 收下 `enable_thinking:false` 照样吐 reasoning），何况参数是上一个
+缺陷的形状，防不住下一个。**不判快慢**：什么叫慢取决于模型、网络与内容长度，
+写死阈值在慢渠道上天天误报，与「不给第 N 步 / 共 M 步」同一条理由。
+AI 调用归属走 `AsyncLocalStorage`（`main/services/ai-call-context.ts`）：队列并发是
+2，模块级的「当前任务」变量必然串账；而显式穿参要经 extract → connectors →
+video-url → transcript-format 四五层、再乘视频 / 图文 / 论坛三条子链，那些层没有
+一层关心记账。汇报点只有 `recordMainAiUsage` 一处（它本就是主进程 AI 调用的唯一
+收口），且必须排在 `tryGetDatabase()` 之前——任务侧的统计只写在任务行上，不该因为
+`ai_usage_daily` 不可用而跟着丢。`ai_usage_daily` 帮不上忙：主键是
+`(day, scenario, model)`、写入即聚合，任务维度在落库那一刻就被抹平了。
+重试必须清空这一列：队列排满时任务会长时间停在 pending，挂着上一轮的数字就是骗人。
+
 超时与时间预算：单块 `CHUNK_TIMEOUT_MS` 是 240 秒，不是 120。原来的 120 秒
 实测偏紧——同一条短提示词在云雾的 qwen3.5-flash 上耗时 75 / 117 / 130 秒
 都出现过，还撞到过两次 280 秒不返回，成因与生图那边记的是同一个（中转站按
@@ -963,8 +1003,85 @@ pnpm electron:dev        # 开发（Vite HMR + Electron）
 pnpm typecheck           # TS 全量检查
 pnpm test:unit           # vitest 单测
 pnpm lint                # eslint + 文件行数门禁
+pnpm shot                # 界面截图（窗口在屏幕外，不打扰用户）
 pnpm electron:build:win  # Windows 打包
 ```
+
+### 界面截图不要打扰用户
+
+改了 UI 想看效果时走 `pnpm shot`（`apps/desktop/scripts/screenshot.mjs`），
+不要手写一次性的启动脚本，也不要让用户自己去开应用截图。它拉起真实 Electron、
+截图、退出，全程约 5 秒，窗口不出现在屏幕上也不抢焦点——这些脚本经常在用户
+正干活时被跑起来，弹出来的窗口会把用户手上的东西整个顶掉。数据目录是一次性
+临时目录，碰不到用户的库，也不与用户正开着的归知抢单实例门（`GUIZHI_E2E=1`
+本来就绕过它）。默认截首屏；`--steps <file>` 传一个默认导出
+`async ({ win, app, shot }) => {}` 的模块，就能先点到目标界面再截。
+
+**窗口是「挪到屏幕外」而不是「隐藏」，这条改不得**（查过社区做法了，别再查
+一遍）。`main/testing/window-mode.ts` 的做法是保持 `visible`、把窗口挪到全体
+显示器边界之外、`setSkipTaskbar` + `setOpacity(0)`、并用 `showInactive()` 显示。
+实测这样截出来的首屏与正常显示时**逐字节相同**（同一 sha256），渲染路径没有
+差异；系统前台窗口自始至终不变，焦点不易主。透明度归零是第二道保险，防的是
+Windows 在 DPI 变化或显示器热插拔时把屏幕外的窗口拽回可见区域。
+
+社区主流方案是另一套，且**在这里不适用**——不了解这一点的人迟早会拿它来
+「修正」这段代码。Electron 没有 headless 模式（Playwright 团队在
+microsoft/playwright#16851 里的原话是 "it should be always visible"），
+issue #13288 下被反复引用的解法是在 `ready-to-show` 里直接 `return`、
+根本不调用 `show()`。它对**纯 DOM 断言**的 e2e 完全够用：Playwright 的
+`click` / `waitFor` / `fill` 走 CDP 与 DOM，不需要合成帧——实测那种状态下
+点击 239ms 正常完成。但截图需要一帧新的合成结果，而隐藏窗口的合成器是停摆的：
+实测 `requestAnimationFrame` 两秒只推进 **2** 帧（正常是 323 帧），
+`page.screenshot()` 三次里两次 15 秒超时、一次侥幸 1173ms 返回。
+`setBackgroundThrottling(false)` 救不了（Electron 文档说它能让 visibility
+state 保持 visible，但实测 rAF 仍是 2 帧、截图仍是两超时一成功）。
+所以「不 show」与「截图」不可兼得，我们要的是后者。
+另一种失败形态别混为一谈：`show()` 之后再 `hide()` 比从未 show 更糟，
+连 `locator.click()` 都会超时（实测 20s / 10s 双双失败）。
+真正的 headless 只有 Linux CI 上的 Xvfb，Windows 上没有对应物；VS Code 的
+Electron 冒烟测试干脆就让窗口正常显示，只在 README 里叮嘱测试别依赖焦点态。
+「屏幕外 + showInactive」也不是我们独创：`EchoTechFE/dimina-kit` 的
+electron-deck 为了截图走的是同一套（`setPosition(-3000, -3000)` +
+`showInactive()`），注释写的就是 *forces a real paint ... WITHOUT focus*。
+我们只是把固定坐标换成按显示器边界算，多屏布局下才不会露出来。
+
+截图默认带 `animations: "disabled"` + `caret: "hide"`：不加的话，界面就绪后
+立刻截的**第一张**会抓到淡入过渡的中间态——实测同一界面连截三张，默认选项下
+首张与后两张不一致，加上之后三张逐字节相同，耗时不变。
+
+将来做 macOS 时这套要重新验证：`showInactive()` 在那边虽不给焦点，却硬编码
+把窗口带到前台（electron#49393，2026-01 仍未合入可选项），全屏状态下还会
+触发切换桌面（electron#24703）。窗口在屏幕外时未必看得出来，但别假设它同样安静。
+
+`GUIZHI_WINDOW_MODE` 两个方向都能显式指定：`visible` 让 e2e 恢复可见（人工
+盯着跑时用，`pnpm shot --visible` 就是它），`offscreen` 反过来可用于
+`electron:dev`。E2E 同时跳过全局快捷键注册——自动化实例与用户正在运行的归知
+并存，抢注 `Alt+Shift+P` 会把用户那个夺走，而注册失败只打一条 warn，两边都
+发现不了。
+
+脚本带产物陈旧检测：源码比 `out/` 新时直接拒跑并提示先 build。少了这一步，
+改完忘了构建就会截到上一版界面，而截图看着完全正常——这种「改动像是没生效」
+最难自查（与 `src/mcp/` 那条债同源）。确认无所谓时用 `--stale-ok` 跳过。
+
+### 改主进程文件时把编辑攒成一次
+
+`electron:dev` 常年挂在用户的终端里，而 `vite-plugin-electron` 的 main 入口走的是
+默认 `onstart`——**每一次落盘都会杀掉整个 Electron 再开一个新窗口**，抢焦点，连的
+还是用户的正式数据目录。preload 只刷新渲染进程，`src/renderer/**`（含 i18n 的
+json）只走 HMR，都不打扰人；会触发重启的是 `src/main/**` 以及它 import 的
+`packages/{shared,db,core}`。
+
+所以改这些路径下的文件要先把整个文件的改动想清楚再一次写完，别对着同一个文件连发
+十几次小编辑。实测过一次代价：给导入任务加阶段统计那回，20 次分散的写入换来
+`startup.log` 里三分钟 20 次重启（21:03 四次、21:04 九次、21:05 七次），光
+`import-queue.ts` 就占了 7 次；按「每个文件一次」算本该只有 6 次。用户当时正开着
+应用，看到的就是窗口疯狂开合。
+
+这与上面那套离屏截图**不是一回事，别混为一谈**：`GUIZHI_WINDOW_MODE` 管的是「我主动
+拉起一个实例」，而这里是「用户自己的 dev server 被我的文件改动驱动」，那个环境变量
+对它不生效。排查时也别看错日志——截图实例的 `userData` 被重定向到临时目录
+（`configureE2ETestProfile`），`getLogsDir()` 跟着走，所以它的启动记录压根不会出现在
+用户的 `startup.log` 里；那里面出现的每一条都是真实启动。
 
 ## 编码约定
 

@@ -1,6 +1,6 @@
 {
   "name": "guizhi-monorepo",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "description": "GuiZhi monorepo - local-first AI personal knowledge base",
   "license": "AGPL-3.0",
@@ -26,6 +26,7 @@
     "test:run": "pnpm --filter @guizhi/desktop test:run",
     "test:e2e": "pnpm --filter @guizhi/desktop test:e2e",
     "test:e2e:smoke": "pnpm --filter @guizhi/desktop test:e2e:smoke",
+    "shot": "pnpm --filter @guizhi/desktop shot",
     "test:release": "pnpm --filter @guizhi/desktop test:release",
     "typecheck": "pnpm -r typecheck",
     "verify:release": "node --experimental-strip-types scripts/verify-release.mts",

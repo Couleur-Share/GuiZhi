@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "crypto";
 import type {
   EnqueueImportInput,
+  ImportStage,
   ImportTask,
 } from "@guizhi/shared/types";
 import {
@@ -9,6 +10,7 @@ import {
   type ImportPersistence,
   type ImportTaskStore,
 } from "../../../src/main/services/import/import-queue";
+import { reportAiCall } from "../../../src/main/services/ai-call-context";
 import type { ExtractedContent } from "../../../src/main/services/import/connectors";
 
 /** 内存版任务存储：模拟 ImportTaskDB 行为 */
@@ -33,6 +35,7 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
         resultItemId: null,
         duplicateItemId: null,
         collectionId: input.collectionId ?? null,
+        stageStats: null,
         forceDuplicate: input.forceDuplicate ?? false,
         createdAt: now,
         updatedAt: now,
@@ -76,6 +79,9 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
       if (patch.resultItemId !== undefined) row.resultItemId = patch.resultItemId;
       if (patch.duplicateItemId !== undefined)
         row.duplicateItemId = patch.duplicateItemId;
+      // 与 ImportTaskDB.update 一致：空数组落库为 null
+      if (patch.stageStats !== undefined)
+        row.stageStats = patch.stageStats?.length ? patch.stageStats : null;
       if (patch.forceDuplicate !== undefined)
         row.forceDuplicate = patch.forceDuplicate;
       row.updatedAt = Date.now();
@@ -111,6 +117,7 @@ function createHarness(options?: {
     kind: ImportTask["sourceKind"],
     input: string,
     signal: AbortSignal,
+    onStage: (stage: ImportStage) => void,
   ) => Promise<ExtractedContent>;
   findDuplicate?: ImportPersistence["findDuplicate"];
   concurrency?: number;
@@ -380,6 +387,116 @@ describe("ImportQueue", () => {
 
     expect(harness.store.get(first.id)!.status).toBe("completed");
     expect(harness.store.get(second.id)!.status).toBe("canceled");
+  });
+
+  it("阶段耗时与 AI 开销落在任务上：终态行才说得出「时间花在哪了」", async () => {
+    const harness = createHarness({
+      extract: async (_kind, input, _signal, onStage) => {
+        onStage("transcribing");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        onStage("formatting");
+        // 排版这一步真实发生的形态：多次调用，其中一次失败
+        reportAiCall({
+          model: "qwen3.5-flash",
+          promptTokens: 1358,
+          completionTokens: 8271,
+        });
+        reportAiCall({ model: "qwen3.5-flash", failed: true });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        return fakeExtracted(input);
+      },
+    });
+    const [task] = harness.queue.enqueue([{ kind: "url", input: "https://x/1" }]);
+    await harness.queue.drain();
+
+    const stats = harness.store.get(task.id)!.stageStats!;
+    expect(stats.map((entry) => entry.stage)).toEqual([
+      "fetching",
+      "transcribing",
+      "formatting",
+      "extracting",
+      "saving",
+    ]);
+    // AI 调用归到发起它的那个阶段，而不是笼统挂在任务上
+    expect(stats.find((entry) => entry.stage === "formatting")).toMatchObject({
+      calls: 2,
+      failedCalls: 1,
+      completionTokens: 8271,
+      models: ["qwen3.5-flash"],
+    });
+    expect(
+      stats.find((entry) => entry.stage === "transcribing")!.ms,
+    ).toBeGreaterThan(0);
+  });
+
+  it("并发任务各记各的账，不互相串（队列并发是 2）", async () => {
+    const harness = createHarness({
+      concurrency: 2,
+      extract: async (_kind, input, _signal, onStage) => {
+        onStage("formatting");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        reportAiCall({ model: input, completionTokens: input === "甲" ? 100 : 900 });
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return fakeExtracted(input);
+      },
+    });
+    const [first, second] = harness.queue.enqueue([
+      { kind: "text", input: "甲" },
+      { kind: "text", input: "乙" },
+    ]);
+    await harness.queue.drain();
+
+    const formattingOf = (id: string) =>
+      harness.store
+        .get(id)!
+        .stageStats!.find((entry) => entry.stage === "formatting")!;
+    expect(formattingOf(first.id)).toMatchObject({
+      calls: 1,
+      completionTokens: 100,
+      models: ["甲"],
+    });
+    expect(formattingOf(second.id)).toMatchObject({
+      calls: 1,
+      completionTokens: 900,
+      models: ["乙"],
+    });
+  });
+
+  it("重试立刻清空上一轮的耗时，重排期间不挂着旧数字", async () => {
+    let attempt = 0;
+    const harness = createHarness({
+      concurrency: 1,
+      extract: async (_kind, input, _signal, onStage) => {
+        if (input === "占位") {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          return fakeExtracted(input);
+        }
+        attempt += 1;
+        onStage("formatting");
+        reportAiCall({ model: "qwen3.5-flash", completionTokens: 8271 });
+        if (attempt === 1) {
+          throw new Error("网络不可达");
+        }
+        return fakeExtracted(input);
+      },
+    });
+
+    const [task] = harness.queue.enqueue([{ kind: "text", input: "会失败一次" }]);
+    await harness.queue.drain();
+    expect(harness.store.get(task.id)!.stageStats).not.toBeNull();
+
+    // 占满唯一的并发位，让重试的任务真的停在 pending 上——队列排着几十条时
+    // 这个窗口能有几十分钟，界面上挂着上一轮的耗时就是在骗人
+    harness.queue.enqueue([{ kind: "text", input: "占位" }]);
+    harness.queue.retry(task.id);
+    expect(harness.store.get(task.id)!.status).toBe("pending");
+    expect(harness.store.get(task.id)!.stageStats).toBeNull();
+
+    await harness.queue.drain();
+    // 第二轮只算自己这一次调用，不是两轮加起来的 2 次
+    const stats = harness.store.get(task.id)!.stageStats!;
+    expect(stats.find((entry) => entry.stage === "formatting")!.calls).toBe(1);
+    expect(harness.store.get(task.id)!.status).toBe("completed");
   });
 
   it("重启恢复：processing 复位为 pending 并重新执行", async () => {

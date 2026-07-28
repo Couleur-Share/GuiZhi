@@ -7,6 +7,7 @@ import type Database from "./adapter";
 import type {
   EnqueueImportInput,
   ImportStage,
+  ImportStageStat,
   ImportTask,
   ImportTaskStatus,
   KnowledgeItemType,
@@ -26,6 +27,7 @@ interface TaskRow {
   duplicate_item_id: string | null;
   collection_id: string | null;
   tag_names: string | null;
+  stage_stats: string | null;
   force_duplicate: number;
   created_at: number;
   updated_at: number;
@@ -43,6 +45,34 @@ function parseTagNames(raw: string | null): string[] {
       : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * stage_stats 存的是 JSON 数组；老行为 NULL。
+ *
+ * 坏数据一律当成「没有统计」而不是抛错：这一列纯属观测，
+ * 解析不动它不该让整个导入列表读不出来。
+ */
+function parseStageStats(raw: string | null): ImportStageStat[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const stats = parsed.filter(
+      (entry): entry is ImportStageStat =>
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as ImportStageStat).stage === "string" &&
+        typeof (entry as ImportStageStat).ms === "number",
+    );
+    return stats.length > 0 ? stats : null;
+  } catch {
+    return null;
   }
 }
 
@@ -73,6 +103,7 @@ function mapRow(row: TaskRow): ImportTask {
     duplicateItemId: row.duplicate_item_id,
     collectionId: row.collection_id,
     tagNames: parseTagNames(row.tag_names),
+    stageStats: parseStageStats(row.stage_stats),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -169,6 +200,8 @@ export class ImportTaskDB {
       resultItemId: string | null;
       duplicateItemId: string | null;
       forceDuplicate: boolean;
+      /** 各阶段耗时与 AI 开销；传 null 清空（重试时用） */
+      stageStats: ImportStageStat[] | null;
     }>,
   ): ImportTask | null {
     const existing = this.db.get(
@@ -181,7 +214,8 @@ export class ImportTaskDB {
     this.db.run(
       `UPDATE import_tasks SET
          status = ?, stage = ?, error = ?, warning = ?, display_name = ?, item_type = ?,
-         result_item_id = ?, duplicate_item_id = ?, force_duplicate = ?, updated_at = ?
+         result_item_id = ?, duplicate_item_id = ?, stage_stats = ?, force_duplicate = ?,
+         updated_at = ?
        WHERE id = ?`,
       patch.status ?? existing.status,
       patch.stage !== undefined ? patch.stage : existing.stage,
@@ -195,6 +229,11 @@ export class ImportTaskDB {
       patch.duplicateItemId !== undefined
         ? patch.duplicateItemId
         : existing.duplicate_item_id,
+      patch.stageStats !== undefined
+        ? patch.stageStats?.length
+          ? JSON.stringify(patch.stageStats)
+          : null
+        : existing.stage_stats,
       patch.forceDuplicate !== undefined
         ? patch.forceDuplicate
           ? 1
