@@ -590,7 +590,7 @@ describe("extractVideoUrl（抖音）", () => {
         apiKey: "sk-test",
         model: "whisper-1",
       }),
-      douyinNote: {
+      imageNote: {
         downloadImage: async () => {
           const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-note-"));
           const filePath = path.join(dir, "image.webp");
@@ -623,6 +623,139 @@ describe("extractVideoUrl（抖音）", () => {
     });
     expect(extracted.degradedReason).toContain("该作品已被作者删除");
     expect(extracted.sourceUri).toBeNull();
+  });
+});
+
+describe("extractVideoUrl（小红书）", () => {
+  const shareUrl =
+    "https://www.xiaohongshu.com/discovery/item/6a59e7f3000000000301fc49?xsec_token=CBai8=&xsec_source=pc_share";
+  const videoNote = {
+    noteId: "6a59e7f3000000000301fc49",
+    kind: "video" as const,
+    title: "小红书视频标题",
+    authoredTitle: true,
+    description: "笔记文案",
+    author: "司晨视觉",
+    durationSeconds: 128,
+    playUrls: [
+      "https://sns-video-bd.xhscdn.com/master.mp4",
+      "https://sns-video-hw.xhscdn.com/backup.mp4",
+    ],
+    imageMirrors: [] as string[][],
+    webpageUrl: "https://www.xiaohongshu.com/explore/6a59e7f3000000000301fc49",
+  };
+
+  /** 小红书链路一旦调用 yt-dlp 就说明分流没生效 */
+  const forbiddenRun: RunCommand = async () => {
+    throw new Error("小红书链路不应调用 yt-dlp");
+  };
+
+  it("元数据走笔记页解析，全程不碰 yt-dlp", async () => {
+    const extracted = await extractVideoUrl(shareUrl, "xiaohongshu", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchXiaohongshu: async (url) => {
+        // 带 token 的原始链接要原样传下去，去掉就取不到笔记
+        expect(url).toBe(shareUrl);
+        return videoNote;
+      },
+      getTranscriptionConfig: () => null,
+    });
+    expect(extracted.degradedReason).toBeUndefined();
+    expect(extracted.content).toContain("平台：小红书");
+    expect(extracted.content).toContain("作者：司晨视觉");
+    expect(extracted.content).toContain("2:08");
+    // 分享链每次带的 token 都不同，来源必须收敛到规范链接
+    expect(extracted.sourceUri).toBe(videoNote.webpageUrl);
+  });
+
+  it("配置转写模型 → 直下视频源，主源与备源一并交给下载器", async () => {
+    let received: string[] = [];
+    const extracted = await extractVideoUrl(shareUrl, "xiaohongshu", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchXiaohongshu: async () => videoNote,
+      downloadXiaohongshu: async (playUrls) => {
+        received = playUrls;
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-xhs-test-"));
+        const filePath = path.join(dir, "xiaohongshu.mp4");
+        fs.writeFileSync(filePath, "fake-video");
+        return { dir, filePath };
+      },
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: async (filePath) => ({ filePath, cleanup: () => {} }),
+      transcribe: async () => "小红书口播文字稿",
+      getFormatterConfig: () => null,
+      getSummaryConfig: () => null,
+    });
+    expect(received).toEqual(videoNote.playUrls);
+    expect(extracted.transcript).toBe("小红书口播文字稿");
+  });
+
+  it("图文笔记 → 图片条目，配图落盘且保留作者写的标题", async () => {
+    const stages: string[] = [];
+    const extracted = await extractVideoUrl(shareUrl, "xiaohongshu", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchXiaohongshu: async () => ({
+        ...videoNote,
+        kind: "note" as const,
+        title: "AI漫剧培训实战课程",
+        durationSeconds: null,
+        playUrls: [],
+        imageMirrors: [["https://sns-webpic-qc.xhscdn.com/a"]],
+      }),
+      // 配了转写模型也不该进转写：图文没有音轨
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      imageNote: {
+        downloadImage: async () => {
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-xhs-note-"));
+          const filePath = path.join(dir, "image.jpg");
+          fs.writeFileSync(filePath, "fake-image");
+          return { dir, filePath };
+        },
+        saveAsset: async () => "asset.jpg",
+        getOcrConfig: () => null,
+      },
+      onStage: (stage) => stages.push(stage),
+    });
+    expect(extracted.itemType).toBe("image");
+    expect(extracted.title).toBe("AI漫剧培训实战课程");
+    expect(extracted.content).toContain("平台：小红书 · 作者：司晨视觉 · 图文 1 张");
+    expect(extracted.content).toContain("![图 1](local-image://asset.jpg)");
+    expect(extracted.transcript).toBeUndefined();
+    expect(stages).toEqual(["video-metadata", "image-download"]);
+  });
+
+  it("笔记页解析失败 → 降级并透出原因，不占住去重", async () => {
+    const extracted = await extractVideoUrl(shareUrl, "xiaohongshu", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchXiaohongshu: async () => {
+        throw new Error("小红书拒绝了该链接（缺少 xsec_token 访问令牌…）");
+      },
+      getTranscriptionConfig: () => null,
+    });
+    expect(extracted.degradedReason).toContain("xsec_token");
+    expect(extracted.sourceUri).toBeNull();
+  });
+
+  it("视频笔记没给出播放地址 → 降级，不静默产出空条目", async () => {
+    const extracted = await extractVideoUrl(shareUrl, "xiaohongshu", {
+      getYtDlpPath: () => null,
+      run: forbiddenRun,
+      fetchXiaohongshu: async () => ({ ...videoNote, playUrls: [] }),
+      getTranscriptionConfig: () => null,
+    });
+    expect(extracted.degradedReason).toContain("未能取到视频播放地址");
   });
 });
 

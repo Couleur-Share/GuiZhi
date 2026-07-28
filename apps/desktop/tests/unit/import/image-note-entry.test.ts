@@ -10,10 +10,14 @@ vi.mock("electron", () => ({
 }));
 
 import {
-  buildDouyinNoteEntry,
+  buildImageNoteEntry,
   OCR_IMAGE_LIMIT,
-} from "../../../src/main/services/import/douyin-note";
-import type { DouyinAweme } from "../../../src/main/services/import/douyin";
+} from "../../../src/main/services/import/image-note-entry";
+import {
+  douyinImageNoteSource,
+  type DouyinAweme,
+} from "../../../src/main/services/import/douyin";
+import { xiaohongshuImageNoteSource } from "../../../src/main/services/import/xiaohongshu";
 
 const OCR_CONFIG = {
   apiUrl: "https://api.openai.com",
@@ -41,6 +45,11 @@ function buildAweme(imageCount: number): DouyinAweme {
   };
 }
 
+/** 抖音图文素材：本文件的大部分用例与平台无关，用它当代表 */
+function buildSource(imageCount: number) {
+  return douyinImageNoteSource(buildAweme(imageCount));
+}
+
 /** 下载桩：写一个真实临时文件，让资产落盘与清理链路都跑到 */
 function fakeDownload(onCall?: (mirrors: string[]) => void) {
   const dirs: string[] = [];
@@ -55,11 +64,11 @@ function fakeDownload(onCall?: (mirrors: string[]) => void) {
   return { download, dirs };
 }
 
-describe("buildDouyinNoteEntry", () => {
+describe("buildImageNoteEntry", () => {
   it("配图入资产库并嵌进正文，条目类型为 image", async () => {
     const { download, dirs } = fakeDownload();
     const saved: string[] = [];
-    const entry = await buildDouyinNoteEntry(buildAweme(2), {
+    const entry = await buildImageNoteEntry(buildSource(2), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async (filePath) => {
@@ -87,7 +96,7 @@ describe("buildDouyinNoteEntry", () => {
   it("配了视觉模型 → 逐张识别，结果按图号分节写进正文", async () => {
     const { download } = fakeDownload();
     const recognized: string[] = [];
-    const entry = await buildDouyinNoteEntry(buildAweme(2), {
+    const entry = await buildImageNoteEntry(buildSource(2), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => `asset-${recognized.length}.webp`,
@@ -108,7 +117,7 @@ describe("buildDouyinNoteEntry", () => {
 
   it("单张图时不再拆图号小标题", async () => {
     const { download } = fakeDownload();
-    const entry = await buildDouyinNoteEntry(buildAweme(1), {
+    const entry = await buildImageNoteEntry(buildSource(1), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => "asset.webp",
@@ -122,7 +131,7 @@ describe("buildDouyinNoteEntry", () => {
 
   it("未配置视觉模型 → 图片照常入库，正文给出可读提示", async () => {
     const { download } = fakeDownload();
-    const entry = await buildDouyinNoteEntry(buildAweme(1), {
+    const entry = await buildImageNoteEntry(buildSource(1), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => "asset.webp",
@@ -139,7 +148,7 @@ describe("buildDouyinNoteEntry", () => {
   it("超过张数上限 → 全部入库，只识别前 N 张并注明", async () => {
     const { download } = fakeDownload();
     let index = 0;
-    const entry = await buildDouyinNoteEntry(buildAweme(OCR_IMAGE_LIMIT + 2), {
+    const entry = await buildImageNoteEntry(buildSource(OCR_IMAGE_LIMIT + 2), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => `asset-${index++}.webp`,
@@ -158,7 +167,7 @@ describe("buildDouyinNoteEntry", () => {
   it("单张图下载失败 → 其余图片与文案照常入库，失败原因写进正文", async () => {
     const { download } = fakeDownload();
     let call = 0;
-    const entry = await buildDouyinNoteEntry(buildAweme(2), {
+    const entry = await buildImageNoteEntry(buildSource(2), {
       ...NO_TITLE,
       downloadImage: async (mirrors) => {
         call += 1;
@@ -179,7 +188,7 @@ describe("buildDouyinNoteEntry", () => {
   it("单张图识别失败 → 其余结果照常保留，正文注明失败张数", async () => {
     const { download } = fakeDownload();
     let index = 0;
-    const entry = await buildDouyinNoteEntry(buildAweme(2), {
+    const entry = await buildImageNoteEntry(buildSource(2), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => `asset-${index++}.webp`,
@@ -200,7 +209,7 @@ describe("buildDouyinNoteEntry", () => {
 
   it("识别全军覆没 → 正文如实交代原因，不静默留白", async () => {
     const { download } = fakeDownload();
-    const entry = await buildDouyinNoteEntry(buildAweme(2), {
+    const entry = await buildImageNoteEntry(buildSource(2), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => "asset.webp",
@@ -223,8 +232,8 @@ describe("buildDouyinNoteEntry", () => {
   it("取消会中断整条采集，不留下半成品条目", async () => {
     const controller = new AbortController();
     await expect(
-      buildDouyinNoteEntry(
-        buildAweme(2),
+      buildImageNoteEntry(
+        buildSource(2),
         {
           downloadImage: async () => {
             controller.abort();
@@ -240,7 +249,7 @@ describe("buildDouyinNoteEntry", () => {
   it("配了文本模型 → AI 拟题替换文案首行，素材含图中文字", async () => {
     const { download } = fakeDownload();
     let material = "";
-    const entry = await buildDouyinNoteEntry(buildAweme(1), {
+    const entry = await buildImageNoteEntry(buildSource(1), {
       downloadImage: download,
       saveAsset: async () => "asset.webp",
       getOcrConfig: () => OCR_CONFIG,
@@ -280,7 +289,7 @@ describe("buildDouyinNoteEntry", () => {
       getTitleConfig: () => titleConfig,
     };
 
-    const failed = await buildDouyinNoteEntry(buildAweme(1), {
+    const failed = await buildImageNoteEntry(buildSource(1), {
       ...base,
       generateTitle: async () => {
         throw new Error("HTTP 500");
@@ -288,7 +297,7 @@ describe("buildDouyinNoteEntry", () => {
     });
     expect(failed.title).toBe("我用这套方法做了一个生产级 RAG 系统。");
 
-    const empty = await buildDouyinNoteEntry(buildAweme(1), {
+    const empty = await buildImageNoteEntry(buildSource(1), {
       ...base,
       generateTitle: async () => null,
     });
@@ -297,7 +306,7 @@ describe("buildDouyinNoteEntry", () => {
 
   it("未配置文本模型 → 不发拟题请求", async () => {
     const { download } = fakeDownload();
-    const entry = await buildDouyinNoteEntry(buildAweme(1), {
+    const entry = await buildImageNoteEntry(buildSource(1), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => "asset.webp",
@@ -312,7 +321,7 @@ describe("buildDouyinNoteEntry", () => {
   it("按序上报子阶段", async () => {
     const { download } = fakeDownload();
     const stages: string[] = [];
-    await buildDouyinNoteEntry(buildAweme(1), {
+    await buildImageNoteEntry(buildSource(1), {
       ...NO_TITLE,
       downloadImage: download,
       saveAsset: async () => "asset.webp",
@@ -321,5 +330,38 @@ describe("buildDouyinNoteEntry", () => {
       onStage: (stage) => stages.push(stage),
     });
     expect(stages).toEqual(["image-download", "image-ocr"]);
+  });
+
+  it("小红书笔记有作者写的标题 → 照用，不去 AI 重拟", async () => {
+    const { download } = fakeDownload();
+    const entry = await buildImageNoteEntry(
+      xiaohongshuImageNoteSource({
+        noteId: "6a59e7f3000000000301fc49",
+        kind: "note",
+        title: "AI漫剧培训实战课程丨12天独立出片",
+        authoredTitle: true,
+        description: "司晨视觉AI漫剧实战班，带你用AI工具快速产出高质量剧情漫剧。",
+        author: "司晨视觉",
+        durationSeconds: null,
+        playUrls: [],
+        imageMirrors: [["https://sns-webpic-qc.xhscdn.com/a"]],
+        webpageUrl:
+          "https://www.xiaohongshu.com/explore/6a59e7f3000000000301fc49",
+      }),
+      {
+        downloadImage: download,
+        saveAsset: async () => "asset.jpg",
+        getOcrConfig: () => null,
+        getTitleConfig: () => {
+          throw new Error("原标题是人写的，不该再去解析拟题模型");
+        },
+      },
+    );
+
+    expect(entry.title).toBe("AI漫剧培训实战课程丨12天独立出片");
+    expect(entry.content).toContain("平台：小红书 · 作者：司晨视觉 · 图文 1 张");
+    expect(entry.sourceUri).toBe(
+      "https://www.xiaohongshu.com/explore/6a59e7f3000000000301fc49",
+    );
   });
 });

@@ -42,7 +42,9 @@ export function detectVideoPlatform(url: string): VideoPlatform | null {
   if (isHostOrSubdomain(hostname, "douyin.com", "iesdouyin.com")) {
     return "douyin";
   }
-  if (hostname.endsWith("xiaohongshu.com") || hostname === "xhslink.com") {
+  // xhslink.com 是小红书的分享短链域；两者都走桌面版分享页解析
+  // （见 import/xiaohongshu.ts），不经 yt-dlp
+  if (isHostOrSubdomain(hostname, "xiaohongshu.com", "xhslink.com")) {
     return "xiaohongshu";
   }
   return null;

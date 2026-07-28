@@ -7,14 +7,17 @@ vi.mock("electron", () => ({
 }));
 
 import {
-  buildDouyinNoteMetaLine,
+  douyinImageNoteSource,
   douyinShareUrl,
   extractAwemeId,
   fetchDouyinAweme,
   imageExtensionFromUrl,
   parseDouyinRouterData,
-  plainTextToMarkdown,
 } from "../../../src/main/services/import/douyin";
+import {
+  buildImageNoteMetaLine,
+  plainTextToMarkdown,
+} from "../../../src/main/services/import/image-note-entry";
 
 const AWEME_ID = "7663897644049173802";
 
@@ -330,20 +333,22 @@ describe("imageExtensionFromUrl", () => {
   });
 });
 
-describe("buildDouyinNoteMetaLine", () => {
-  it("元数据行带上图片张数", () => {
-    expect(
-      buildDouyinNoteMetaLine({
-        awemeId: AWEME_ID,
-        kind: "note",
-        title: "三张图",
-        description: "",
-        author: "作者A",
-        durationSeconds: null,
-        playUrl: null,
-        imageMirrors: [["a"], ["b"], ["c"]],
-        webpageUrl: `https://www.douyin.com/note/${AWEME_ID}`,
-      }),
-    ).toBe("平台：抖音 · 作者：作者A · 图文 3 张");
+describe("douyinImageNoteSource", () => {
+  it("元数据行带上图片张数；标题只是文案首行，要留给 AI 重拟", () => {
+    const source = douyinImageNoteSource({
+      awemeId: AWEME_ID,
+      kind: "note",
+      title: "三张图",
+      description: "",
+      author: "作者A",
+      durationSeconds: null,
+      playUrl: null,
+      imageMirrors: [["a"], ["b"], ["c"]],
+      webpageUrl: `https://www.douyin.com/note/${AWEME_ID}`,
+    });
+    expect(buildImageNoteMetaLine(source)).toBe(
+      "平台：抖音 · 作者：作者A · 图文 3 张",
+    );
+    expect(source.authoredTitle).toBe(false);
   });
 });

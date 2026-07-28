@@ -7,8 +7,11 @@ vi.mock("electron", () => ({
   app: {},
 }));
 
-import { buildDouyinNoteEntry } from "../../../src/main/services/import/douyin-note";
-import type { DouyinAweme } from "../../../src/main/services/import/douyin";
+import { buildImageNoteEntry } from "../../../src/main/services/import/image-note-entry";
+import {
+  douyinImageNoteSource,
+  type DouyinAweme,
+} from "../../../src/main/services/import/douyin";
 import { MarkdownBody } from "../../../src/renderer/components/library/MarkdownPreview";
 
 /**
@@ -58,7 +61,7 @@ const AWEME: DouyinAweme = {
 };
 
 async function noteContent(): Promise<string> {
-  const entry = await buildDouyinNoteEntry(AWEME, {
+  const entry = await buildImageNoteEntry(douyinImageNoteSource(AWEME), {
     downloadImage: async () => ({ dir: "", filePath: "/tmp/image.webp" }),
     saveAsset: async () => "asset.webp",
     getOcrConfig: () => null,

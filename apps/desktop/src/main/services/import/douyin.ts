@@ -13,6 +13,7 @@
  * 抖音改版就要跟着修——解析失败会降级成可读原因，不会静默产出空条目。
  */
 import path from "path";
+import type { ImageNoteSource } from "./image-note-entry";
 import { IMAGE_EXTENSIONS, MEDIA_SIZE_LIMITS } from "./media-files";
 import { downloadToTempFile, fetchHtml } from "./safe-fetch";
 
@@ -25,6 +26,7 @@ const AWEME_ID_RE = /^\d{6,}$/;
 /** 与 yt-dlp 链路的 --max-filesize 300m 对齐 */
 const MEDIA_MAX_BYTES = 300 * 1024 * 1024;
 const TITLE_MAX_LENGTH = 120;
+export const DOUYIN_LABEL = "抖音";
 
 export interface DouyinAweme {
   awemeId: string;
@@ -313,44 +315,17 @@ export async function downloadDouyinImage(
   throw new Error(failures.join("；") || "没有可用的图片地址");
 }
 
-/**
- * 行首会被 Markdown 当成块级标记的形态：标题、列表、引用、代码围栏、分隔线。
- * 转义掉它们，纯文本才会照原样渲染。
- */
-function escapeMarkdownBlockStart(line: string): string {
-  // 有序列表 `1.` / `1)`：只能转义标点，`\1` 不是合法转义
-  const ordered = /^(\d{1,9})[.)]\s/.exec(line);
-  if (ordered) {
-    return `${ordered[1]}\\${line.slice(ordered[1].length)}`;
-  }
-  return /^(#{1,6}(\s|$)|[-+*]\s|>|```|~~~|-{3,}$|={3,}$|_{3,}$)/.test(line)
-    ? `\\${line}`
-    : line;
-}
-
-/**
- * 纯文本转 Markdown 正文。
- *
- * 抖音文案是纯文本，原样存进正文会被 Markdown 吃掉结构：单个换行只当空格
- * （渲染出来整篇挤成一段），行首的 `1.` 会变成列表并把后面的段落吸进去。
- * 这里逐行转义行首标记再用空行分段，渲染结果与原文逐行对齐。
- */
-export function plainTextToMarkdown(text: string): string {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map(escapeMarkdownBlockStart)
-    .join("\n\n");
-}
-
-/** 图文作品正文顶部的元数据引用块内容 */
-export function buildDouyinNoteMetaLine(aweme: DouyinAweme): string {
-  return [
-    "平台：抖音",
-    aweme.author ? `作者：${aweme.author}` : "",
-    `图文 ${aweme.imageMirrors.length} 张`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+/** 图文作品 → 通用图文条目素材 */
+export function douyinImageNoteSource(aweme: DouyinAweme): ImageNoteSource {
+  return {
+    platformLabel: DOUYIN_LABEL,
+    title: aweme.title,
+    // 抖音没有标题字段，这个「标题」只是文案首行，配了文本模型就重拟
+    authoredTitle: false,
+    description: aweme.description,
+    author: aweme.author,
+    imageMirrors: aweme.imageMirrors,
+    webpageUrl: aweme.webpageUrl,
+    downloadImage: downloadDouyinImage,
+  };
 }

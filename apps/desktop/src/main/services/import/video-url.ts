@@ -3,9 +3,10 @@
  *
  * 元数据与音轨默认由 yt-dlp 提供（外部工具：优先用设置里配置的路径，
  * 否则查 PATH；未安装时降级保存链接并附安装指引，任务可在安装后重试）。
- * 抖音例外——它的接口需要签名 cookie，yt-dlp 拿不到，改走
- * `./douyin.ts` 的移动端分享页解析，不依赖 yt-dlp。
- * 命令执行与抖音抓取都以接口注入，便于单测用假实现驱动。
+ * 抖音与小红书例外，都不依赖 yt-dlp：抖音的接口要签名 cookie（走
+ * `./douyin.ts` 的移动端分享页），小红书的主体内容是 yt-dlp 根本不出的
+ * 图文笔记（走 `./xiaohongshu.ts` 的桌面版笔记页）。
+ * 命令执行与两个平台的抓取都以接口注入，便于单测用假实现驱动。
  */
 import { randomUUID } from "crypto";
 import { spawn } from "child_process";
@@ -20,11 +21,18 @@ import type { ImportStage } from "@guizhi/shared/types";
 import { logAppError } from "../../diagnostic-log";
 import type { ExtractedContent } from "./connectors";
 import {
+  douyinImageNoteSource,
   downloadDouyinMedia,
   fetchDouyinAweme,
   type DouyinAweme,
 } from "./douyin";
-import { buildDouyinNoteEntry, type DouyinNoteDeps } from "./douyin-note";
+import { buildImageNoteEntry, type ImageNoteDeps } from "./image-note-entry";
+import {
+  downloadXiaohongshuMedia,
+  fetchXiaohongshuNote,
+  xiaohongshuImageNoteSource,
+  type XiaohongshuNote,
+} from "./xiaohongshu";
 import { prepareAudioForTranscription } from "../media/audio-preprocess";
 import { resolveFfmpegExecutable } from "../media/ffmpeg-manager";
 import { ensureLocalTranscriptionService } from "../media/funasr-service";
@@ -214,8 +222,18 @@ export interface VideoUrlDeps {
     playUrl: string,
     signal?: AbortSignal,
   ) => Promise<{ dir: string; filePath: string }>;
-  /** 测试注入：抖音图文的配图下载与 OCR */
-  douyinNote?: Omit<DouyinNoteDeps, "onStage">;
+  /** 测试注入：小红书笔记页解析（默认走 xiaohongshu.ts） */
+  fetchXiaohongshu?: (
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<XiaohongshuNote>;
+  /** 测试注入：小红书视频下载（主源挂了逐个降级到备源） */
+  downloadXiaohongshu?: (
+    playUrls: string[],
+    signal?: AbortSignal,
+  ) => Promise<{ dir: string; filePath: string }>;
+  /** 测试注入：图文作品的配图下载与 OCR（抖音 / 小红书共用） */
+  imageNote?: Omit<ImageNoteDeps, "onStage">;
   /** 测试注入：转写配置解析（默认读 ai-config.json 的 audioText 路由） */
   getTranscriptionConfig?: () => TranscriptionModelConfig | null;
   /** 导入时是否区分说话人（读设置，默认关） */
@@ -342,7 +360,7 @@ interface MediaSource {
   downloadAudio: (
     signal?: AbortSignal,
   ) => Promise<{ dir: string; filePath: string }>;
-  /** 抖音图文作品：没有音轨，直接给出成品笔记条目 */
+  /** 图文作品（抖音 / 小红书）：没有音轨，直接给出成品笔记条目 */
   note?: ExtractedContent;
 }
 
@@ -364,9 +382,9 @@ async function resolveDouyinSource(
     return {
       metadata,
       downloadAudio: () => Promise.reject(new Error("图文作品没有音轨")),
-      note: await buildDouyinNoteEntry(
-        aweme,
-        { ...deps.douyinNote, onStage: deps.onStage },
+      note: await buildImageNoteEntry(
+        douyinImageNoteSource(aweme),
+        { ...deps.imageNote, onStage: deps.onStage },
         signal,
       ),
     };
@@ -381,6 +399,47 @@ async function resolveDouyinSource(
   return {
     metadata,
     downloadAudio: (downloadSignal) => download(playUrl, downloadSignal),
+  };
+}
+
+async function resolveXiaohongshuSource(
+  url: string,
+  deps: VideoUrlDeps,
+  signal?: AbortSignal,
+): Promise<MediaSource> {
+  const note = await (deps.fetchXiaohongshu ?? fetchXiaohongshuNote)(
+    url,
+    signal,
+  );
+  const metadata: YtDlpMetadata = {
+    title: note.title,
+    uploader: note.author,
+    durationSeconds: note.durationSeconds,
+    description: note.description,
+    webpageUrl: note.webpageUrl,
+  };
+
+  if (note.kind === "note") {
+    return {
+      metadata,
+      downloadAudio: () => Promise.reject(new Error("图文笔记没有音轨")),
+      note: await buildImageNoteEntry(
+        xiaohongshuImageNoteSource(note),
+        { ...deps.imageNote, onStage: deps.onStage },
+        signal,
+      ),
+    };
+  }
+
+  const playUrls = note.playUrls;
+  if (playUrls.length === 0) {
+    throw new Error("未能取到视频播放地址（页面结构可能已变化）");
+  }
+
+  const download = deps.downloadXiaohongshu ?? downloadXiaohongshuMedia;
+  return {
+    metadata,
+    downloadAudio: (downloadSignal) => download(playUrls, downloadSignal),
   };
 }
 
@@ -403,6 +462,23 @@ async function resolveYtDlpSource(
   };
 }
 
+function resolveMediaSource(
+  url: string,
+  platform: VideoPlatform,
+  deps: VideoUrlDeps,
+  run: RunCommand,
+  signal?: AbortSignal,
+): Promise<MediaSource> {
+  switch (platform) {
+    case "douyin":
+      return resolveDouyinSource(url, deps, signal);
+    case "xiaohongshu":
+      return resolveXiaohongshuSource(url, deps, signal);
+    default:
+      return resolveYtDlpSource(url, deps, run, signal);
+  }
+}
+
 export async function extractVideoUrl(
   url: string,
   platform: VideoPlatform,
@@ -414,10 +490,7 @@ export async function extractVideoUrl(
   let source: MediaSource;
   deps.onStage?.("video-metadata");
   try {
-    source =
-      platform === "douyin"
-        ? await resolveDouyinSource(url, deps, signal)
-        : await resolveYtDlpSource(url, deps, run, signal);
+    source = await resolveMediaSource(url, platform, deps, run, signal);
   } catch (error) {
     if (error instanceof Error && error.message === "已取消") {
       throw error;
