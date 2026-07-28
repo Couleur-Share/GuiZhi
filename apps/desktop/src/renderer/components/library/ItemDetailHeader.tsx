@@ -19,6 +19,7 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useSettingsStore } from "../../stores/settings.store";
 import { ContextMenu } from "../ui/ContextMenu";
+import { AiHandoffButton } from "./AiHandoffButton";
 import { TagEditor } from "./TagEditor";
 import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
@@ -252,6 +253,7 @@ export function ItemDetailHeader({
             </button>
           ) : (
             <>
+              <AiHandoffButton item={item} />
               <ActionButton
                 onClick={() => void toggleFavorite(item.id)}
                 title={

@@ -4,6 +4,8 @@ import type {
   BackupCreateResult,
   BackupFileInfo,
   BackupRestoreResult,
+  ExportAiHandoffRequest,
+  ExportAiHandoffResult,
   ExportMarkdownResult,
 } from "@guizhi/shared/types";
 
@@ -23,4 +25,8 @@ export const backupApi = {
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_RESTORE, fileName),
   exportMarkdown: (): Promise<ExportMarkdownResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.EXPORT_MARKDOWN),
+  exportAiHandoff: (
+    request: ExportAiHandoffRequest,
+  ): Promise<ExportAiHandoffResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.EXPORT_AI_HANDOFF, request),
 };

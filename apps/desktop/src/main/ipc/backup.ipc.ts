@@ -12,6 +12,8 @@ import type {
   BackupCreateResult,
   BackupFileInfo,
   BackupRestoreResult,
+  ExportAiHandoffRequest,
+  ExportAiHandoffResult,
   ExportMarkdownResult,
 } from "@guizhi/shared/types";
 import Database from "../database/sqlite";
@@ -26,7 +28,10 @@ import {
   performRestoreSwap,
   validateBackupFile,
 } from "../services/backup";
-import { exportKnowledgeToMarkdown } from "../services/export-markdown";
+import {
+  exportKnowledgeToMarkdown,
+  sanitizeFileName,
+} from "../services/export-markdown";
 
 const RESTORE_RELAUNCH_DELAY_MS = 800;
 
@@ -36,6 +41,15 @@ function formatExportTimestamp(date = new Date()): string {
     `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
     `-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
   );
+}
+
+/** 另存为对话框的默认落点；取不到下载目录时只给文件名，交给系统决定 */
+function resolveDefaultExportPath(fileName: string): string {
+  try {
+    return path.join(app.getPath("downloads"), fileName);
+  } catch {
+    return fileName;
+  }
 }
 
 function findBackupByFileName(fileName: unknown): BackupFileInfo | null {
@@ -162,6 +176,43 @@ export function registerBackupIPC(db: Database.Database): void {
           error: error instanceof Error ? error.message : String(error),
         };
       }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.EXPORT_AI_HANDOFF,
+    async (
+      event,
+      request: ExportAiHandoffRequest,
+    ): Promise<ExportAiHandoffResult> => {
+      if (typeof request?.text !== "string" || !request.text.trim()) {
+        return { success: false, error: "交接稿内容为空" };
+      }
+
+      const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      const fileName = `${sanitizeFileName(request.title ?? "") || "guizhi-note"}.md`;
+      const options = {
+        title: "另存为 AI 交接稿",
+        // 取不到下载目录时只给文件名，让系统自己决定落在哪儿
+        defaultPath: resolveDefaultExportPath(fileName),
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      };
+      const result = owner
+        ? await dialog.showSaveDialog(owner, options)
+        : await dialog.showSaveDialog(options);
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true };
+      }
+
+      try {
+        fs.writeFileSync(result.filePath, request.text, "utf8");
+      } catch (error) {
+        return {
+          success: false,
+          error: `写入文件失败：${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      return { success: true, filePath: result.filePath };
     },
   );
 }

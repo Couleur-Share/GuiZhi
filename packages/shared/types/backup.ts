@@ -46,3 +46,17 @@ export interface ExportMarkdownResult {
   dir?: string;
   error?: string;
 }
+
+/** 单条目「AI 交接稿」另存为：正文已由渲染进程序列化好，主进程只负责落盘 */
+export interface ExportAiHandoffRequest {
+  /** 条目标题，主进程清洗后作为默认文件名 */
+  title: string;
+  text: string;
+}
+
+export interface ExportAiHandoffResult {
+  success: boolean;
+  canceled?: boolean;
+  filePath?: string;
+  error?: string;
+}

@@ -2,6 +2,10 @@ import { useCallback, useState } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  BotIcon,
+  ClipboardCopyIcon,
+  FileDownIcon,
+  FileTextIcon,
   PinIcon,
   RotateCcwIcon,
   StarIcon,
@@ -16,6 +20,7 @@ import { useCollectionStore } from "../../stores/collection.store";
 import type { ContextMenuItem } from "../ui/ContextMenu";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useToast } from "../ui/Toast";
+import { useAiHandoff } from "./use-ai-handoff";
 
 /** 需要二次确认的不可逆动作 */
 export type ItemConfirmState =
@@ -46,6 +51,7 @@ export function useItemMenus({
   );
   const collections = useCollectionStore((state) => state.collections);
   const { showUndoToast } = useToast();
+  const { copyToClipboard, saveToFile } = useAiHandoff();
   const [confirmState, setConfirmState] = useState<ItemConfirmState>(null);
 
   /** 删除不弹确认框（打断太重），改成事后给一个撤销窗口 */
@@ -169,6 +175,28 @@ export function useItemMenus({
         onClick: () => onEditTags(entry),
       });
     }
+
+    items.push({
+      label: t("library.aiHandoff", "复制给 AI"),
+      icon: <BotIcon className="h-4 w-4" aria-hidden="true" />,
+      children: [
+        {
+          label: t("library.aiHandoffCopyFull", "复制给 AI（含完整文字稿）"),
+          icon: <ClipboardCopyIcon className="h-4 w-4" aria-hidden="true" />,
+          onClick: () => void copyToClipboard(entry.id, true),
+        },
+        {
+          label: t("library.aiHandoffCopyBrief", "复制精简版（只要总结）"),
+          icon: <FileTextIcon className="h-4 w-4" aria-hidden="true" />,
+          onClick: () => void copyToClipboard(entry.id, false),
+        },
+        {
+          label: t("library.aiHandoffSave", "另存为 .md 文件…"),
+          icon: <FileDownIcon className="h-4 w-4" aria-hidden="true" />,
+          onClick: () => void saveToFile(entry.id),
+        },
+      ],
+    });
 
     if (entry.status === "archived") {
       items.push({

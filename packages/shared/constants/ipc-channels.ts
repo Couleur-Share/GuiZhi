@@ -71,6 +71,9 @@ export const IPC_CHANNELS = {
   BACKUP_DELETE: "backup:delete",
   BACKUP_RESTORE: "backup:restore",
   EXPORT_MARKDOWN: "export:markdown",
+  /** 单条目的「AI 交接稿」另存为 .md（内容由渲染进程序列化好后传入） */
+  EXPORT_AI_HANDOFF: "export:aiHandoff",
+
   // 配置迁移（一键导入 / 导出全部软件设置，含加密后的 API Key）
   CONFIG_EXPORT: "config:export",
   CONFIG_READ: "config:read",

@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Collection, KnowledgeItem } from "@guizhi/shared/types";
 import { installWindowMocks } from "../../helpers/window";
 import { changeLanguage, i18nReady } from "../../../src/renderer/i18n";
+import { ToastProvider } from "../../../src/renderer/components/ui/Toast";
 import { ItemDetailHeader } from "../../../src/renderer/components/library/ItemDetailHeader";
 import {
   __resetPendingSaves,
@@ -75,6 +76,7 @@ describe("详情页的分类 chip", () => {
           trash: 0,
           byCollection: { "col-1": 1 },
           byTag: {},
+          byPlatform: {},
         };
       }),
     };
@@ -89,7 +91,11 @@ describe("详情页的分类 chip", () => {
 
   it("选中知识库后立即落盘，并重取侧栏计数", async () => {
     const user = userEvent.setup();
-    render(<ItemDetailHeader item={makeItem()} isTrashed={false} />);
+    render(
+      <ToastProvider>
+        <ItemDetailHeader item={makeItem()} isTrashed={false} />
+      </ToastProvider>,
+    );
 
     await user.click(screen.getByRole("button", { name: /未分类/ }));
     await user.click(screen.getByRole("button", { name: "心理情感" }));
@@ -105,10 +111,12 @@ describe("详情页的分类 chip", () => {
   it("移回未分类同样立即落盘", async () => {
     const user = userEvent.setup();
     render(
-      <ItemDetailHeader
-        item={{ ...makeItem(), collectionId: "col-1" }}
-        isTrashed={false}
-      />,
+      <ToastProvider>
+        <ItemDetailHeader
+          item={{ ...makeItem(), collectionId: "col-1" }}
+          isTrashed={false}
+        />
+      </ToastProvider>,
     );
 
     await user.click(screen.getByRole("button", { name: /心理情感/ }));
