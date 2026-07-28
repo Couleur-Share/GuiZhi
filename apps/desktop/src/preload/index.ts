@@ -14,7 +14,7 @@ import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
 import { illustrationApi } from "./api/illustration";
 import { logApi } from "./api/log";
 import { createBufferedSubscription } from "./app-command-subscription";
-import type { AppCommand } from "@guizhi/shared/types";
+import type { AppCommand, McpServerConfig } from "@guizhi/shared/types";
 
 const listenerMap = new Map<
   (...args: any[]) => void,
@@ -70,6 +70,10 @@ const api = {
   migration: migrationApi,
   backup: backupApi,
   config: configTransferApi,
+  mcp: {
+    getConfig: (): Promise<McpServerConfig> =>
+      ipcRenderer.invoke(IPC_CHANNELS.MCP_CONFIG),
+  },
   askSession: askSessionApi,
   semantic: semanticApi,
   media: mediaApi,

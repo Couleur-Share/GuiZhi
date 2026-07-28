@@ -74,6 +74,9 @@ export const IPC_CHANNELS = {
   /** 单条目的「AI 交接稿」另存为 .md（内容由渲染进程序列化好后传入） */
   EXPORT_AI_HANDOFF: "export:aiHandoff",
 
+  /** 随包发的 stdio MCP server 的接入信息（供设置页生成客户端配置） */
+  MCP_CONFIG: "mcp:config",
+
   // 配置迁移（一键导入 / 导出全部软件设置，含加密后的 API Key）
   CONFIG_EXPORT: "config:export",
   CONFIG_READ: "config:read",

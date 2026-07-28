@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { BackupFileInfo, BackupKind } from "@guizhi/shared/types";
 import { useSettingsStore } from "../../stores/settings.store";
 import { ConfigTransferSection } from "./config-transfer/ConfigTransferSection";
+import { McpSection } from "./McpSection";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Select } from "../ui/Select";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -374,6 +375,9 @@ export function DataSettings() {
           </button>
         </SettingItem>
       </SettingSection>
+
+      {/* 让外部 AI 工具直接读知识库；与上面「把内容搬出去」是两回事 */}
+      <McpSection />
 
       {/* 配置迁移：设置本身的搬家，与上面的知识条目备份 / 导出分开 */}
       <ConfigTransferSection />

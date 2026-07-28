@@ -75,6 +75,19 @@ module.exports = {
       from: "../../CHANGELOG.md",
       to: "CHANGELOG.md",
     },
+    // MCP server：放在 asar 外面，用户要在 mcp.json 里按绝对路径引用它
+    {
+      from: "out/mcp",
+      to: "mcp",
+    },
+    // MCP server 是独立进程，必须用与应用同一份 wasm 驱动——它的锁是
+    // `mkdir <db>.lock` 目录，跟原生 SQLite 的字节范围锁互不认识，换驱动会
+    // 读到未提交的数据。放在产物旁的 node_modules 下靠 Node 常规解析找到，
+    // 比手拼 app.asar.unpacked 路径可靠。
+    {
+      from: "../../node_modules/node-sqlite3-wasm",
+      to: "mcp/node_modules/node-sqlite3-wasm",
+    },
   ],
   asarUnpack: ["**/*.node", "**/node-sqlite3-wasm/**"],
   asar: true,
