@@ -37,6 +37,22 @@ describe("媒体文件导入连接器", () => {
     ).toBe(true);
   });
 
+  it("同一文件重复导入产出同一份正文，队列据此判重", async () => {
+    const sourcePath = path.join(workDir, "photo.png");
+    fs.writeFileSync(sourcePath, "png-bytes");
+
+    const first = await extractContent("file", sourcePath);
+    const second = await extractContent("file", sourcePath);
+
+    // 资产名改成按内容哈希取之后，同一文件两次抽取的正文逐字相同，
+    // 于是 computeContentHash 一致，导入队列会把第二次标成「重复」而不是
+    // 再建一条条目——此前资产名是随机的，两次正文必然不同，永远判不出重复
+    expect(second.content).toBe(first.content);
+    expect(
+      fs.readdirSync(path.join(workDir, "data", "assets", "images")),
+    ).toHaveLength(1);
+  });
+
   it("视频与音频：local-video 引用 + 对应 itemType", async () => {
     const videoPath = path.join(workDir, "demo.mp4");
     fs.writeFileSync(videoPath, "video-bytes");
