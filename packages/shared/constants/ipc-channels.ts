@@ -76,6 +76,11 @@ export const IPC_CHANNELS = {
 
   /** 随包发的 stdio MCP server 的接入信息（供设置页生成客户端配置） */
   MCP_CONFIG: "mcp:config",
+  /** MCP 可访问的知识库范围（读 / 写 config/mcp.json） */
+  MCP_GET_SCOPE: "mcp:getScope",
+  MCP_SET_SCOPE: "mcp:setScope",
+  /** 一键安装：主进程拼好 deeplink 并交给系统打开 */
+  MCP_INSTALL: "mcp:install",
 
   // 配置迁移（一键导入 / 导出全部软件设置，含加密后的 API Key）
   CONFIG_EXPORT: "config:export",

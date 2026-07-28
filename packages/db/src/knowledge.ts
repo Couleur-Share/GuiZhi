@@ -171,6 +171,23 @@ export class KnowledgeItemDB {
       conditions.push("i.collection_id = ?");
       params.push(query.collectionId);
     }
+    // 可访问范围（MCP 用）。与 collectionId 叠加而不是二选一：
+    // 前者是「在看哪个库」，后者是「最多能看见哪些库」。
+    if (query.collectionScope) {
+      const { ids, includeUncategorized } = query.collectionScope;
+      const branches: string[] = [];
+      if (ids.length > 0) {
+        branches.push(
+          `i.collection_id IN (${ids.map(() => "?").join(", ")})`,
+        );
+        params.push(...ids);
+      }
+      if (includeUncategorized) {
+        branches.push("i.collection_id IS NULL");
+      }
+      // 一个都没选就是「一条都不给看」，不能退化成不过滤——那正好反了
+      conditions.push(branches.length > 0 ? `(${branches.join(" OR ")})` : "0");
+    }
     if (query.tagId) {
       conditions.push(
         "EXISTS (SELECT 1 FROM knowledge_item_tags kit WHERE kit.item_id = i.id AND kit.tag_id = ?)",

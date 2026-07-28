@@ -131,6 +131,16 @@ export interface KnowledgeItemQuery {
   tagId?: string;
   /** 采集来源平台（SourcePlatform）；见 shared/utils/source-platforms.ts */
   platform?: string;
+  /**
+   * 把结果限制在若干知识库内（MCP 的可访问范围）。与 collectionId 是两回事：
+   * 那个是「用户此刻在看哪个库」，这个是「调用方最多能看见哪些库」，两者叠加。
+   * 不传 = 不限制。
+   */
+  collectionScope?: {
+    ids: string[];
+    /** 未分类条目（collection_id IS NULL）是否也算在内 */
+    includeUncategorized: boolean;
+  };
   /** 全文搜索关键词；非空时结果按相关性排序 */
   search?: string;
   /**

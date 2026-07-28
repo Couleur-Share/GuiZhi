@@ -9,6 +9,7 @@ import {
   ImageIcon,
   KeyIcon,
   KeyboardIcon,
+  PlugIcon,
   WifiIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -30,6 +31,9 @@ const SETTINGS_MENU = [
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
   { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
+  // 紧跟模型服务与正文配图：找 MCP 时的心理模型是「跟 AI 有关的设置」，
+  // 而它与「数据」那边「把内容搬出去」是两回事
+  { id: "mcp", labelKey: "settings.mcp", icon: PlugIcon },
   { id: "shortcuts", labelKey: "settings.shortcuts", icon: KeyboardIcon },
   { id: "security", labelKey: "settings.security", icon: KeyIcon },
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
@@ -85,6 +89,11 @@ const IllustrationSettings = lazy(() =>
     default: module.IllustrationSettings,
   })),
 );
+const McpSettings = lazy(() =>
+  import("./mcp/McpSettings").then((module) => ({
+    default: module.McpSettings,
+  })),
+);
 
 function SettingsContentFallback({ label }: { label: string }) {
   return (
@@ -135,6 +144,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <AISettingsPrototype />;
       case "illustration":
         return <IllustrationSettings />;
+      case "mcp":
+        return <McpSettings />;
       case "language":
         return <LanguageSettings />;
       case "shortcuts":

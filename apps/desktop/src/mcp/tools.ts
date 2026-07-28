@@ -10,6 +10,11 @@
 import type DatabaseAdapter from "@guizhi/db/adapter";
 import { CollectionDB, KnowledgeItemDB } from "@guizhi/db";
 import { buildAiHandoff } from "@guizhi/shared/utils/ai-handoff";
+import {
+  isItemVisibleToMcp,
+  isMcpScopeEmpty,
+  type McpScope,
+} from "@guizhi/shared/utils/mcp-scope";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -39,13 +44,26 @@ function collapseSnippet(text: string): string {
 export function searchKnowledge(
   db: DatabaseAdapter.Database,
   input: SearchInput,
+  scope: McpScope,
 ): string {
   const query = input.query?.trim();
   if (!query) {
     return "请给出检索关键词。";
   }
+  // 「选了指定范围但一个都没勾」是有效配置，只是什么都搜不到。不点破的话
+  // 用户看到的是「归知里明明有却搜不出来」，只会怀疑检索坏了
+  if (isMcpScopeEmpty(scope)) {
+    return "归知当前没有向 MCP 开放任何知识库。请在归知的「设置 → MCP 接入」里调整可访问范围。";
+  }
 
-  const collections = new CollectionDB(db).list();
+  const allCollections = new CollectionDB(db).list();
+  // 范围外的知识库连名字都不该出现在提示里
+  const collections =
+    scope.mode === "all"
+      ? allCollections
+      : allCollections.filter((collection) =>
+          scope.allowedCollectionIds.includes(collection.id),
+        );
   let collectionId: string | undefined;
   if (input.collection?.trim()) {
     const wanted = input.collection.trim().toLowerCase();
@@ -72,6 +90,13 @@ export function searchKnowledge(
     includeArchived: true,
     collectionId,
     platform: input.platform?.trim() || undefined,
+    collectionScope:
+      scope.mode === "all"
+        ? undefined
+        : {
+            ids: scope.allowedCollectionIds,
+            includeUncategorized: scope.allowUncategorized,
+          },
     limit,
   });
 
@@ -122,6 +147,7 @@ export interface ReadItemInput {
 export function readItem(
   db: DatabaseAdapter.Database,
   input: ReadItemInput,
+  scope: McpScope,
 ): { text: string; found: boolean } {
   const id = input.id?.trim();
   if (!id) {
@@ -132,6 +158,14 @@ export function readItem(
   if (!item) {
     return {
       text: `找不到 id 为 ${id} 的条目。它可能已被删除；用 search_knowledge 重新检索一次。`,
+      found: false,
+    };
+  }
+  // 明说「在范围外」而不是伪装成「不存在」：范围是用户自己在本机设的，
+  // 含糊其辞只会让他以为条目丢了
+  if (!isItemVisibleToMcp(scope, item.collectionId)) {
+    return {
+      text: `条目 ${id} 不在归知向 MCP 开放的范围内。可在归知的「设置 → MCP 接入」里调整可访问范围。`,
       found: false,
     };
   }

@@ -25,6 +25,7 @@ export type SettingsSectionId =
   | "network"
   | "ai"
   | "illustration"
+  | "mcp"
   | "language"
   | "shortcuts"
   | "about";

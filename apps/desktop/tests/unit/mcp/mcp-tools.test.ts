@@ -3,10 +3,10 @@ import DatabaseAdapter from "@guizhi/db/adapter";
 import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
 import { CollectionDB } from "@guizhi/db/collection";
 import { KnowledgeItemDB } from "@guizhi/db/knowledge";
-import {
-  readItem,
-  searchKnowledge,
-} from "../../../src/mcp/tools";
+import { DEFAULT_MCP_SCOPE, type McpScope } from "@guizhi/shared/utils/mcp-scope";
+import { readItem, searchKnowledge } from "../../../src/mcp/tools";
+
+const ALL_SCOPE: McpScope = { ...DEFAULT_MCP_SCOPE };
 
 const TRANSCRIPT =
   "大家好，今天我们聊聊状态管理。先说结论，Redux 用得好好的就别动它。";
@@ -77,7 +77,7 @@ describe("MCP 工具", () => {
 
   describe("search_knowledge", () => {
     it("命中的条目带上 id、类型、平台与知识库", () => {
-      const output = searchKnowledge(db, { query: "Zustand" });
+      const output = searchKnowledge(db, { query: "Zustand" }, ALL_SCOPE);
 
       expect(output).toContain(`id=${videoId}`);
       expect(output).toContain("type=video");
@@ -90,51 +90,52 @@ describe("MCP 工具", () => {
 
     it("中文词组走 recall 分词，不要求逐字连续", () => {
       // phrase 模式下这个串会被编译成一个要求逐字相邻的短语，必然零命中
-      const output = searchKnowledge(db, { query: "Zustand 判断标准" });
+      const output = searchKnowledge(db, { query: "Zustand 判断标准" }, ALL_SCOPE);
       expect(output).toContain(videoId);
     });
 
     it("按平台筛选", () => {
-      expect(searchKnowledge(db, { query: "Zustand", platform: "bilibili" })).toContain(
+      expect(searchKnowledge(db, { query: "Zustand", platform: "bilibili" }, ALL_SCOPE)).toContain(
         videoId,
       );
-      expect(searchKnowledge(db, { query: "Zustand", platform: "douyin" })).toContain(
+      expect(searchKnowledge(db, { query: "Zustand", platform: "douyin" }, ALL_SCOPE)).toContain(
         "没有找到",
       );
     });
 
     it("按知识库名筛选；名字不存在时列出现有的", () => {
-      expect(searchKnowledge(db, { query: "Zustand", collection: "前端" })).toContain(
+      expect(searchKnowledge(db, { query: "Zustand", collection: "前端" }, ALL_SCOPE)).toContain(
         videoId,
       );
 
-      const missing = searchKnowledge(db, {
-        query: "Zustand",
-        collection: "不存在的库",
-      });
+      const missing = searchKnowledge(
+        db,
+        { query: "Zustand", collection: "不存在的库" },
+        ALL_SCOPE,
+      );
       expect(missing).toContain("没有名为「不存在的库」的知识库");
       expect(missing).toContain("前端");
     });
 
     it("零命中时给的是可行动的提示，不是空字符串", () => {
-      const output = searchKnowledge(db, { query: "量子力学" });
+      const output = searchKnowledge(db, { query: "量子力学" }, ALL_SCOPE);
       expect(output).toContain("没有找到");
       expect(output.trim().length).toBeGreaterThan(10);
     });
 
     it("空关键词不当成「列出全库」", () => {
-      expect(searchKnowledge(db, { query: "   " })).toContain("请给出检索关键词");
+      expect(searchKnowledge(db, { query: "   " }, ALL_SCOPE)).toContain("请给出检索关键词");
     });
 
     it("limit 被夹在 1..50", () => {
-      const output = searchKnowledge(db, { query: "的", limit: 999 });
+      const output = searchKnowledge(db, { query: "的", limit: 999 }, ALL_SCOPE);
       expect(output).not.toContain("Error");
     });
   });
 
   describe("read_item", () => {
     it("返回 AI 交接稿：front matter、阅读须知、文字稿俱全", () => {
-      const { text, found } = readItem(db, { id: videoId });
+      const { text, found } = readItem(db, { id: videoId }, ALL_SCOPE);
 
       expect(found).toBe(true);
       expect(text).toContain('source: "https://www.bilibili.com/video/BV1xx"');
@@ -147,14 +148,14 @@ describe("MCP 工具", () => {
     });
 
     it("includeFullText=false 时略去文字稿但留下说明", () => {
-      const { text } = readItem(db, { id: videoId, includeFullText: false });
+      const { text } = readItem(db, { id: videoId, includeFullText: false }, ALL_SCOPE);
 
       expect(text).not.toContain(TRANSCRIPT);
       expect(text).toContain("本次未包含");
     });
 
     it("没有转写稿的笔记不挂 ASR 免责声明", () => {
-      const { text, found } = readItem(db, { id: noteId });
+      const { text, found } = readItem(db, { id: noteId }, ALL_SCOPE);
 
       expect(found).toBe(true);
       expect(text).toContain("手冲建议 92 度。");
@@ -162,7 +163,7 @@ describe("MCP 工具", () => {
     });
 
     it("查无此条走 found=false，并提示重新检索", () => {
-      const { text, found } = readItem(db, { id: "does-not-exist" });
+      const { text, found } = readItem(db, { id: "does-not-exist" }, ALL_SCOPE);
 
       expect(found).toBe(false);
       expect(text).toContain("找不到");
@@ -170,7 +171,69 @@ describe("MCP 工具", () => {
     });
 
     it("空 id 不去查库", () => {
-      expect(readItem(db, { id: "  " }).found).toBe(false);
+      expect(readItem(db, { id: "  " }, ALL_SCOPE).found).toBe(false);
+    });
+  });
+
+  describe("可访问范围", () => {
+    /** 只放行「前端」库；未分类不放行 */
+    function frontendOnly(): McpScope {
+      const frontend = new CollectionDB(db)
+        .list()
+        .find((collection) => collection.name === "前端");
+      return {
+        mode: "selected",
+        allowedCollectionIds: [frontend!.id],
+        allowUncategorized: false,
+      };
+    }
+
+    it("范围外的条目搜不到", () => {
+      // 「煮咖啡的水温」是未分类的，不在放行范围里
+      const output = searchKnowledge(db, { query: "咖啡" }, frontendOnly());
+      expect(output).toContain("没有找到");
+      expect(output).not.toContain(noteId);
+    });
+
+    it("范围内的条目照常搜得到", () => {
+      expect(searchKnowledge(db, { query: "Zustand" }, frontendOnly())).toContain(
+        videoId,
+      );
+    });
+
+    it("放行未分类后，未分类条目又可见", () => {
+      const scope: McpScope = { ...frontendOnly(), allowUncategorized: true };
+      expect(searchKnowledge(db, { query: "咖啡" }, scope)).toContain(noteId);
+    });
+
+    it("范围外的知识库名字不出现在「现有知识库」提示里", () => {
+      const scope: McpScope = {
+        mode: "selected",
+        allowedCollectionIds: [],
+        allowUncategorized: true,
+      };
+      expect(
+        searchKnowledge(db, { query: "Zustand", collection: "前端" }, scope),
+      ).toContain("没有名为「前端」的知识库");
+    });
+
+    it("范围外的条目 read_item 明说在范围外，不伪装成不存在", () => {
+      const { text, found } = readItem(db, { id: noteId }, frontendOnly());
+
+      expect(found).toBe(false);
+      expect(text).toContain("不在归知向 MCP 开放的范围内");
+      expect(text).not.toContain("可能已被删除");
+    });
+
+    it("一个都没放行时直接说清楚，而不是回「没有找到」", () => {
+      const empty: McpScope = {
+        mode: "selected",
+        allowedCollectionIds: [],
+        allowUncategorized: false,
+      };
+      expect(searchKnowledge(db, { query: "Zustand" }, empty)).toContain(
+        "没有向 MCP 开放任何知识库",
+      );
     });
   });
 });

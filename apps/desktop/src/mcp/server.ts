@@ -17,6 +17,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod";
 import { openKnowledgeDbReadOnly, type KnowledgeDbHandle } from "./db";
+import { readMcpScope } from "./scope";
 import { readItem, searchKnowledge } from "./tools";
 
 const SERVER_VERSION = "0.10.0";
@@ -87,8 +88,13 @@ server.registerTool(
   },
   async ({ query, limit, platform, collection }) => {
     try {
+      const handle = getHandle();
       return textResult(
-        searchKnowledge(getHandle().db, { query, limit, platform, collection }),
+        searchKnowledge(
+          handle.db,
+          { query, limit, platform, collection },
+          readMcpScope(handle.dbPath),
+        ),
       );
     } catch (error) {
       return textResult(`检索归知知识库失败：${describeError(error)}`, true);
@@ -117,7 +123,12 @@ server.registerTool(
   },
   async ({ id, includeFullText }) => {
     try {
-      const result = readItem(getHandle().db, { id, includeFullText });
+      const handle = getHandle();
+      const result = readItem(
+        handle.db,
+        { id, includeFullText },
+        readMcpScope(handle.dbPath),
+      );
       return textResult(result.text, !result.found);
     } catch (error) {
       return textResult(`读取归知条目失败：${describeError(error)}`, true);

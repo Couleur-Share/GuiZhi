@@ -14,7 +14,12 @@ import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
 import { illustrationApi } from "./api/illustration";
 import { logApi } from "./api/log";
 import { createBufferedSubscription } from "./app-command-subscription";
-import type { AppCommand, McpServerConfig } from "@guizhi/shared/types";
+import type {
+  AppCommand,
+  McpInstallResult,
+  McpServerConfig,
+} from "@guizhi/shared/types";
+import type { McpScope } from "@guizhi/shared/utils/mcp-scope";
 
 const listenerMap = new Map<
   (...args: any[]) => void,
@@ -73,6 +78,12 @@ const api = {
   mcp: {
     getConfig: (): Promise<McpServerConfig> =>
       ipcRenderer.invoke(IPC_CHANNELS.MCP_CONFIG),
+    getScope: (): Promise<McpScope> =>
+      ipcRenderer.invoke(IPC_CHANNELS.MCP_GET_SCOPE),
+    setScope: (scope: McpScope): Promise<McpScope> =>
+      ipcRenderer.invoke(IPC_CHANNELS.MCP_SET_SCOPE, scope),
+    install: (client: string): Promise<McpInstallResult> =>
+      ipcRenderer.invoke(IPC_CHANNELS.MCP_INSTALL, client),
   },
   askSession: askSessionApi,
   semantic: semanticApi,
