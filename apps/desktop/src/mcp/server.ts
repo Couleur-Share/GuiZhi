@@ -20,7 +20,11 @@ import { openKnowledgeDbReadOnly, type KnowledgeDbHandle } from "./db";
 import { readMcpScope } from "./scope";
 import { readItem, searchKnowledge } from "./tools";
 
-const SERVER_VERSION = "0.10.0";
+/** 构建时由 vite.mcp.config.ts 从 package.json 注入 */
+declare const __MCP_SERVER_VERSION__: string;
+// 用 tsx 直接跑源码（冒烟脚本）时没有这个注入，回落成一个看得出来的占位
+const SERVER_VERSION =
+  typeof __MCP_SERVER_VERSION__ === "string" ? __MCP_SERVER_VERSION__ : "0.0.0-dev";
 
 let handle: KnowledgeDbHandle | null = null;
 

@@ -1,5 +1,12 @@
 import { defineConfig } from "vite";
+import fs from "fs";
 import path from "path";
+
+// 版本号从 package.json 注入，不在源码里写死：写死的话每次发版都得记得同步，
+// 而漏掉不会有任何报错——MCP 客户端只是显示一个过期的版本号
+const { version } = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, "package.json"), "utf8"),
+) as { version: string };
 
 /**
  * MCP server 的独立构建。
@@ -13,6 +20,9 @@ import path from "path";
  * 靠 Node 常规的向上查找解析，不用手拼 app.asar.unpacked 路径。
  */
 export default defineConfig({
+  define: {
+    __MCP_SERVER_VERSION__: JSON.stringify(version),
+  },
   resolve: {
     alias: {
       "@guizhi/core": path.resolve(__dirname, "../../packages/core/src"),
