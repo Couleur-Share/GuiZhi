@@ -184,6 +184,42 @@ describe("sanitizeMediaSummary", () => {
 });
 
 describe("generateMediaSummary", () => {
+  it("系统提示词要求可扫读的结构与克制加粗", async () => {
+    const chat = vi.fn(async () => ({ content: "**一、要点**\n- 内容" }));
+    await generateMediaSummary(
+      { title: "测试", transcript: "口播原文。" },
+      CONFIG,
+      { chat: chat as never },
+    );
+    const systemPrompt = chat.mock.calls[0][1][0].content as string;
+    expect(systemPrompt).toContain("2-3 个短句");
+    expect(systemPrompt).toContain("最多两层列表");
+    expect(systemPrompt).toContain("顶层列表项对应小节标题承诺的分类");
+    expect(systemPrompt).toContain("加粗只用于");
+    expect(systemPrompt).toContain("表格");
+    expect(systemPrompt).toContain("围栏代码块");
+  });
+
+  it("篇幅指令按文字稿长度分档：短稿精简、长稿充分展开", async () => {
+    const shortChat = vi.fn(async () => ({ content: "**要点**\n- 内容" }));
+    await generateMediaSummary(
+      { title: "短视频", transcript: "短内容。" },
+      CONFIG,
+      { chat: shortChat as never },
+    );
+    const shortPrompt = shortChat.mock.calls[0][1][0].content as string;
+    expect(shortPrompt).toContain("150-300");
+
+    const longChat = vi.fn(async () => ({ content: "**要点**\n- 内容" }));
+    await generateMediaSummary(
+      { title: "长视频", transcript: "内容".repeat(4000) + "。" },
+      CONFIG,
+      { chat: longChat as never },
+    );
+    const longPrompt = longChat.mock.calls[0][1][0].content as string;
+    expect(longPrompt).toContain("800-1500");
+  });
+
   it("短文字稿单发：标题/简介/文字稿进入 user 消息，拆出 AI 标题", async () => {
     const chat = vi.fn(
       async (

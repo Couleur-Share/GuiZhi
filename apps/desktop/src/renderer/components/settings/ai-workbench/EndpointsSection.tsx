@@ -146,7 +146,7 @@ export function EndpointsSection({
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState("");
   const [activePanel, setActivePanel] = useState<"provider" | "routing">(
-    "provider",
+    "routing",
   );
   const [selectedEndpointKey, setSelectedEndpointKey] = useState<string | null>(
     endpointGroups[0]?.key ?? null,

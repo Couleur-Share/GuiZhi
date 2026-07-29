@@ -886,7 +886,16 @@ body {
   list-style: none;
 }
 .prose li {
-  margin-bottom: 0.25em;
+  margin-bottom: 0.35em;
+}
+/* 视频/音频总结用独占一行的 **加粗** 当小节标题（正文里不能用 ## 以免撞锚点） */
+.prose p:has(> strong:only-child) {
+  margin-top: 1.15em;
+  margin-bottom: 0.4em;
+  line-height: 1.45;
+}
+.prose p:has(> strong:only-child):first-child {
+  margin-top: 0;
 }
 .prose code {
   background: hsl(var(--muted));

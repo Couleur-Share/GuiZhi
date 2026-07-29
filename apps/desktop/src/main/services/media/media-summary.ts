@@ -32,23 +32,66 @@ const SUMMARY_MAX_TOKENS = 6144;
 const SUMMARY_TIMEOUT_MS = 180_000;
 const SUMMARY_TEMPERATURE = 0.3;
 
-const SUMMARY_SYSTEM_PROMPT =
+/**
+ * 篇幅按文字稿长度分档：短视频不注水，长视频不丢细节。
+ * 信息保留率大致在 20%–30%（口播→书面的压缩率），确保「只看总结也能掌握内容」。
+ */
+function summaryLengthGuidance(transcriptChars: number): string {
+  if (transcriptChars <= 2000) {
+    return "总结篇幅 150-300 字，精简即可；";
+  }
+  if (transcriptChars <= 5000) {
+    return "总结篇幅 400-800 字；";
+  }
+  if (transcriptChars <= 10000) {
+    return "总结篇幅 800-1500 字，确保各小节的具体方法、步骤与判断标准都保留；";
+  }
+  return "总结篇幅 1500-2500 字，这是一条长内容，确保每个小节的论点、论据、具体做法与关键数据都充分展开，不要为了压缩而丢掉细节；";
+}
+
+const SUMMARY_SYSTEM_BASE =
   "你是视频内容总结助手。用户会提供视频（或音频）的标题、简介与完整口播文字稿，" +
   "请为这条内容拟一个准确的标题，并生成一份结构化的内容总结，让用户不看视频也能掌握核心内容。要求：\n" +
-  "1. 第一行以「标题：」开头单独成行，输出你拟定的标题：15~30 字，准确概括核心内容，" +
+  "1. 第一行以「标题：」开头单独成行，输出你拟定的标题：15-30 字，准确概括核心内容，" +
   "书面语、不用夸张修辞与营销话术，不加书名号或引号；空一行后开始总结正文；\n" +
-  "2. 总结开头用一段话概括主旨：讲了什么主题、解决什么问题、给出什么结论；\n" +
-  "3. 正文按内容脉络分节：小节标题用「**加粗**」独立成行（可用 一、二、… 编号），" +
-  "要点用列表呈现（最多两层嵌套），关键术语、数据与结论加粗；\n" +
-  "4. 忠实于文字稿：保留具体的方法、步骤、参数与判断标准，不编造、不泛泛而谈；口语转为书面语；\n" +
-  "5. 篇幅与信息量匹配：信息密集的长视频可写 300~800 字，内容简单的短视频精简即可；\n" +
-  "6. 输出简体中文 Markdown；不要使用 #/## 级标题、--- 分隔线、表格或代码块；" +
-  "不要输出「视频总结」这类总标题，也不要任何前言或结尾说明。";
+  "2. 总结开头用 2-3 个短句概括主旨（每句一句一事）：先点主题，再说核心问题或现象，" +
+  "最后给出主要结论；不要用顿号或分号把多件事塞进同一句；\n" +
+  "3. 正文按内容脉络分 3-6 个小节（信息极少时可 2 个）：小节标题用「**加粗**」独立成行" +
+  "（可用 一、二、… 编号），其下用列表展开要点；\n" +
+  "4. 列表结构：顶层列表项对应小节标题承诺的分类（如标题写「五类效果」则恰好 5 条顶层项），" +
+  "每条用一到两句说完核心含义；同一类有多个方面或实例时用子列表展开，而不是全部拍平成顶层条目；" +
+  "全文最多两层列表；\n" +
+  "5. 加粗只用于：列表项开头的简短标签（如 **核心痛点**）、数字、专有名词与关键结论词；" +
+  "同一行内除标签外不要再加粗；禁止把整句或半句加粗；\n" +
+  "6. 忠实于文字稿：保留具体的方法、步骤、参数与判断标准，不编造、不泛泛而谈；口语转为书面语；" +
+  "如果作者明确声明某个话题「下一期再讲」「这里不展开」，在总结中只需一句话提及即可，" +
+  "不要把未展开的话题升格成与已充分讲解的话题同等篇幅的小节，" +
+  "小节标题里的分类数（如「五种用法」）应与原文实际充分讲解的分类数一致；\n";
+
+const SUMMARY_SYSTEM_TAIL =
+  "8. 输出简体中文 Markdown；不要使用 #/## 级标题或 --- 分隔线；" +
+  "不要输出「视频总结」这类总标题，也不要任何前言或结尾说明；\n" +
+  "9. 内容中涉及多项对比（如方案优劣、参数差异、价格对照）时可用 Markdown 表格呈现，" +
+  "列数控制在 3-5 列、行数不超过 8 行，能用列表讲清的不要为凑格式硬上表格；\n" +
+  "10. 技术类内容中出现的命令、代码片段、配置示例或 API 调用可用围栏代码块展示，" +
+  "标注语言名（如 ```python），仅保留原文中真实出现的片段，不要自行编造代码。";
+
+function buildSummarySystemPrompt(transcriptChars: number): string {
+  return (
+    SUMMARY_SYSTEM_BASE +
+    `7. 篇幅与信息量匹配：${summaryLengthGuidance(transcriptChars)}` +
+    "宁缺毋滥，不要为凑格式重复或注水；\n" +
+    SUMMARY_SYSTEM_TAIL
+  );
+}
 
 const SUMMARY_MAP_SYSTEM_PROMPT =
   "你是视频内容总结助手。下面是视频口播文字稿的一个片段，请按内容脉络提取这一段的结构化笔记：" +
-  "小节标题用「**加粗**」独立成行，要点用列表，保留具体的方法、步骤、数据与结论。" +
-  "输出简体中文 Markdown，不要使用 #/## 级标题、--- 分隔线或代码块；" +
+  "小节标题用「**加粗**」独立成行，要点用列表（最多两层）；" +
+  "顶层条目对应原文的分类或分点，同一类的多个方面用子列表展开。" +
+  "加粗只标列表标签、数字与专名；保留具体的方法、步骤、数据与结论。" +
+  "涉及多项对比时可用表格，技术类内容中的命令或代码片段可用围栏代码块。" +
+  "输出简体中文 Markdown，不要使用 #/## 级标题或 --- 分隔线；" +
   "只输出笔记本身，不要前言或结尾说明。";
 
 export interface MediaSummaryInput {
@@ -124,7 +167,7 @@ const REDUNDANT_TITLE_PATTERN = /^\*{0,2}(?:视频|音频|内容)?总结\*{0,2}[
 
 /** 输出协议的标题行（允许模型加粗） */
 const TITLE_LINE_PATTERN = /^\*{0,2}标题[:：]\s*(.+?)\*{0,2}$/;
-/** AI 标题兜底上限（协议要求 15~30 字，防模型跑偏写成长句） */
+/** AI 标题兜底上限（协议要求 15-30 字，防模型跑偏写成长句） */
 const TITLE_MAX_CHARS = 60;
 
 /** 归一化 AI 标题：压缩空白、去首尾书名号/引号、限长；无效返回 null */
@@ -258,7 +301,7 @@ export async function generateMediaSummary(
     const content = await runChat(
       config,
       [
-        { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+        { role: "system", content: buildSummarySystemPrompt(transcript.length) },
         {
           role: "user",
           content: buildSummaryUserPrompt(input, `文字稿：\n${transcript}`),
@@ -309,7 +352,7 @@ export async function generateMediaSummary(
   const reduced = await runChat(
     config,
     [
-      { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+      { role: "system", content: buildSummarySystemPrompt(transcript.length) },
       {
         role: "user",
         content: buildSummaryUserPrompt(
@@ -326,7 +369,7 @@ export async function generateMediaSummary(
 
 const TITLE_SYSTEM_PROMPT =
   "你是内容标题助手。用户会提供一条图文内容的文案与图中文字，请为它拟一个准确的标题。要求：\n" +
-  "1. 15~30 字，准确概括核心内容；\n" +
+  "1. 15-30 字，准确概括核心内容；\n" +
   "2. 书面语，不用夸张修辞与营销话术；不加书名号或引号；\n" +
   "3. 只输出标题本身，不要任何解释、前缀或后缀。";
 

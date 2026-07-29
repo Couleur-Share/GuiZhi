@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type ComponentProps, type ReactNode } from
 import { useTranslation } from 'react-i18next';
 import { DownloadIcon, CheckCircleIcon, XIcon, Loader2Icon, RefreshCwIcon, FolderOpenIcon, ExternalLinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { remarkGfmPlugins } from '../utils/remark-gfm-plugins';
 import rehypeSanitize from 'rehype-sanitize';
 import { Modal } from './ui/Modal';
 import { useSettingsStore } from '../stores/settings.store';
@@ -247,7 +247,7 @@ export function UpdateDialog({ isOpen, onClose, initialStatus }: UpdateDialogPro
       <div className="max-h-[360px] overflow-y-auto px-4 py-3 sm:max-h-[440px]">
         <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-headings:text-foreground prose-h1:text-base prose-h1:font-semibold prose-h2:text-sm prose-h2:font-semibold prose-h3:text-sm prose-h3:font-medium prose-p:my-2 prose-p:text-[13px] prose-p:text-foreground/85 prose-li:text-[13px] prose-li:text-foreground/85 prose-pre:overflow-x-auto prose-pre:border prose-pre:border-border prose-pre:bg-background/80 prose-code:text-primary">
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={remarkGfmPlugins}
             rehypePlugins={[rehypeSanitize]}
             components={releaseNoteMarkdownComponents}
           >

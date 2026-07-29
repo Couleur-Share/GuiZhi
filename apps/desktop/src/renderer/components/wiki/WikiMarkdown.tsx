@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { remarkGfmPlugins } from "../../utils/remark-gfm-plugins";
 import rehypeSanitize from "rehype-sanitize";
 import { slugifyHeading } from "@guizhi/shared/utils/wiki-body";
 
@@ -119,7 +119,7 @@ export function WikiMarkdown({
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-code:text-primary prose-a:text-primary">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkGfmPlugins}
         rehypePlugins={[rehypeSanitize, rehypeWikiHeadingIds]}
         components={components}
       >

@@ -93,6 +93,16 @@ function renderSection(
   );
 }
 
+/**
+ * 模型服务默认打开「模型路由」；这些用例测的是供应商详情，先点侧栏切过去。
+ */
+async function openProviderPanel(
+  user: ReturnType<typeof userEvent.setup>,
+  displayName: string,
+) {
+  await user.click(screen.getByRole("button", { name: new RegExp(displayName) }));
+}
+
 function modelRow(modelId: string) {
   return within(screen.getByTestId(`ai-model-row-${modelId}`));
 }
@@ -107,8 +117,10 @@ describe("模型服务里的内置本地转写引擎", () => {
    * 保护此前只加在服务商卡片的「删除」上，模型行漏掉了：删掉
    * SenseVoiceSmall 的后果与删掉整个服务商完全一样，且更容易误点。
    */
-  it("内置模型的删除与编辑都锁上，卸载入口指向采集设置", () => {
+  it("内置模型的删除与编辑都锁上，卸载入口指向采集设置", async () => {
+    const user = userEvent.setup();
     renderSection([BUILTIN_GROUP]);
+    await openProviderPanel(user, "本地转写引擎");
 
     const row = modelRow(FUNASR_MODEL_ID);
     expect(row.getByRole("button", { name: "删除" })).toBeDisabled();
@@ -122,8 +134,10 @@ describe("模型服务里的内置本地转写引擎", () => {
    * 值是安装程序填的（Key 就是占位串 local，本地服务不校验），
    * 摆成输入框等于在说这里缺东西。
    */
-  it("地址只读、不出现 Key 输入框", () => {
+  it("地址只读、不出现 Key 输入框", async () => {
+    const user = userEvent.setup();
     renderSection([BUILTIN_GROUP]);
+    await openProviderPanel(user, "本地转写引擎");
 
     expect(screen.queryByLabelText("端点 API 地址")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("端点 API Key")).not.toBeInTheDocument();
@@ -135,6 +149,7 @@ describe("模型服务里的内置本地转写引擎", () => {
     const onManageLocalEngine = vi.fn();
     const user = userEvent.setup();
     renderSection([BUILTIN_GROUP], { onManageLocalEngine });
+    await openProviderPanel(user, "本地转写引擎");
 
     await user.click(screen.getByRole("button", { name: "管理引擎" }));
     expect(onManageLocalEngine).toHaveBeenCalledTimes(1);
@@ -144,8 +159,10 @@ describe("模型服务里的内置本地转写引擎", () => {
    * 对照组：锁定只认安装写入的那个固定 id。用户自己配的服务商一切照旧，
    * 包括那些自己在 127.0.0.1:8620 上跑服务、手工添加进来的。
    */
-  it("用户自己配的服务商不受影响", () => {
+  it("用户自己配的服务商不受影响", async () => {
+    const user = userEvent.setup();
     renderSection([CLOUD_GROUP]);
+    await openProviderPanel(user, "云雾API");
 
     expect(modelRow("m_cloud").getByRole("button", { name: "删除" })).toBeEnabled();
     expect(screen.getByTestId("ai-endpoint-delete")).toBeEnabled();

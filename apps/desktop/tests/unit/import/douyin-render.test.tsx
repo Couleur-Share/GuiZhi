@@ -71,6 +71,29 @@ async function noteContent(): Promise<string> {
   return entry.content;
 }
 
+describe("Markdown 删除线与数字范围", () => {
+  /**
+   * remark-gfm 默认会把成对的 `~` 当删除线；中文总结常用 `300~500` 表范围。
+   * 与 Dify 等同理：singleTilde: false，只认 `~~text~~`。
+   */
+  it("数字范围里的单波浪号不会误渲染成删除线", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownBody content="- 减脂期每日制造300~500大卡热量缺口，持续3~4周后" />,
+    );
+    expect(html).not.toContain("<del>");
+    expect(html).toContain("300~500");
+    expect(html).toContain("3~4");
+  });
+
+  it("双波浪号删除线仍然生效", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownBody content="~~已删除的内容~~" />,
+    );
+    expect(html).toContain("<del>");
+    expect(html).toContain("已删除的内容");
+  });
+});
+
 describe("正文里的本地资产图", () => {
   /**
    * 这条路上有两道闸门：rehype-sanitize 的协议白名单，以及 react-markdown 自带的

@@ -315,7 +315,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div
               key={toast.id}
               className={`
-                flex items-start gap-3 px-5 py-3.5 rounded-2xl border shadow-2xl pointer-events-auto
+                px-4 py-3 rounded-2xl border shadow-2xl pointer-events-auto
                 max-w-[26rem]
                 ${
                   toast.leaving
@@ -326,35 +326,43 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 ${getBgColor(toast.type)}
               `}
             >
-              <span className="shrink-0">{getIcon(toast.type)}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-relaxed text-foreground break-words">
+              {/*
+                主行用 items-center：关闭按钮比文字高，items-start 会把图标和
+                文案顶到上沿，底下多出一截空白，看起来就是上窄下宽。
+                详情挂在主行下面，展开时不会把图标/关闭钮拽到整块正中间。
+              */}
+              <div className="flex items-center gap-3">
+                <span className="shrink-0">{getIcon(toast.type)}</span>
+                <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground break-words">
                   {toast.message}
                 </p>
-                {toast.detail ? <ToastDetail detail={toast.detail} /> : null}
-              </div>
-              {toast.action ? (
+                {toast.action ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.action?.onClick();
+                      removeToast(toast.id);
+                    }}
+                    data-testid="toast-action"
+                    className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+                  >
+                    {toast.action.label}
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => {
-                    toast.action?.onClick();
-                    removeToast(toast.id);
-                  }}
-                  data-testid="toast-action"
-                  className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+                  onClick={() => removeToast(toast.id)}
+                  className="shrink-0 rounded-lg p-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                  aria-label={t('common.close', 'Close')}
                 >
-                  {toast.action.label}
+                  <XIcon aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
                 </button>
+              </div>
+              {toast.detail ? (
+                <div className="pl-8">
+                  <ToastDetail detail={toast.detail} />
+                </div>
               ) : null}
-              <button
-                type="button"
-                onClick={() => removeToast(toast.id)}
-                className="shrink-0 -mr-2 p-1.5 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors"
-                aria-label={t('common.close', 'Close')}
-                title={t('common.close') || 'Close'}
-              >
-                <XIcon aria-hidden="true" className="w-4 h-4 text-muted-foreground" />
-              </button>
             </div>
           ))}
         </div>,

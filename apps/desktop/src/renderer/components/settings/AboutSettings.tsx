@@ -7,6 +7,7 @@ import {
   RefreshCwIcon,
   CheckCircleIcon,
   ArrowUpCircleIcon,
+  ClipboardCopyIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
@@ -16,6 +17,9 @@ import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
 import appIconUrl from "../../../assets/icon.png";
 import { isWebRuntime } from "../../runtime";
+import { copyTextToClipboard } from "../../utils/clipboard";
+
+const AUTHOR_EMAIL = "couleurapp@gmail.com";
 
 type UpdateCheckState = "idle" | "checking" | "latest" | "available";
 
@@ -119,6 +123,17 @@ export function AboutSettings() {
       return reason ? `${label}（${reason.slice(0, 120)}）` : label;
     }
     return t("settings.lastCheckLatest", { time });
+  };
+
+  const copyAuthorEmail = async () => {
+    try {
+      await copyTextToClipboard(AUTHOR_EMAIL);
+      showToast(t("toast.copied"));
+    } catch (error) {
+      showToast(t("settings.mcpCopyFailed"), "error", {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   const desktopUpdateDescription = (): string => {
@@ -308,9 +323,10 @@ export function AboutSettings() {
                   className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                 />
               </a>
-              <a
-                href="mailto:couleurapp@gmail.com"
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+              <button
+                type="button"
+                onClick={() => void copyAuthorEmail()}
+                className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-muted/50 group"
               >
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <MailIcon
@@ -319,10 +335,14 @@ export function AboutSettings() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium">couleurapp@gmail.com</div>
+                  <div className="text-sm font-medium">{AUTHOR_EMAIL}</div>
                   <div className="text-xs text-muted-foreground">Email</div>
                 </div>
-              </a>
+                <ClipboardCopyIcon
+                  aria-hidden="true"
+                  className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              </button>
             </div>
           </SettingSection>
 

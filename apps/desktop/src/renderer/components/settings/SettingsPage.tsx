@@ -206,7 +206,10 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
           className={
             activeSection === "ai"
               ? "h-full max-w-none"
-              : "w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl"
+              : // 用 px 钉死上限：html 的 font-size 随「字体大小」变，rem 制的
+                // max-w-5xl 在「小」时一起缩窄，右边会空出一块；断点仍是视口
+                // px，不受字号影响，所以只把上限改成中档（16px）下的等效像素。
+                "w-full max-w-[1024px] xl:max-w-[1152px] 2xl:max-w-[1280px]"
           }
         >
           {activeSection === "ai" ? null : (

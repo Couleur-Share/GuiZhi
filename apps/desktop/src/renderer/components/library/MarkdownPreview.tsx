@@ -1,6 +1,6 @@
 import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { remarkGfmPlugins } from "../../utils/remark-gfm-plugins";
 import rehypeHighlight from "rehype-highlight";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "highlight.js/styles/github-dark.css";
@@ -138,7 +138,7 @@ export function MarkdownBody({
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-pre:border prose-pre:border-border prose-pre:bg-background/80 prose-code:text-primary prose-a:text-primary">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkGfmPlugins}
         rehypePlugins={[[rehypeSanitize, sanitizeSchema], rehypeHighlight]}
         urlTransform={transformUrl}
         components={components}

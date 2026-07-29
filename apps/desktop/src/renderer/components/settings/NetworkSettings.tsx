@@ -156,7 +156,7 @@ export function NetworkSettings() {
           </>
         ) : null}
       </SettingSection>
-      <SettingSection title={t("settings.networkMirrorSource", "镜像源")}>
+      <SettingSection title={t("settings.networkMirrorSource", "应用更新")}>
         <SettingItem
           label={t("settings.tryMirrorSource")}
           description={t("settings.mirrorSourceRisk")}
