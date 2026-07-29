@@ -158,7 +158,7 @@ async function main() {
     };
 
     if (stepsFn) {
-      await stepsFn({ win, app, shot, outDir: args.out });
+      await stepsFn({ win, app, shot, outDir: args.out, userDataDir });
       // steps 一张都没截时兜一张，免得跑完只得到一个空目录
       if (taken.length === 0) await shot("final");
     } else {
