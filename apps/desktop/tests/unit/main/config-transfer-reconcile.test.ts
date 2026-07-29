@@ -149,19 +149,6 @@ describe("导入 AI 配置与本机对账", () => {
     expect(result.warnings).toContain("已清空 1 条指向不存在模型的路由");
   });
 
-  it("保留渲染进程独有的 chatParams（ai-models.json 里没有这个字段）", () => {
-    const result = reconcileImportedAiConfig(
-      {
-        providers: [],
-        models: [{ ...cloudModel, chatParams: { temperature: 0.4 } }],
-        routes: {},
-      },
-      localConfig(),
-    );
-
-    expect(result.models[0].chatParams).toEqual({ temperature: 0.4 });
-  });
-
   it("入参不是数组时当空处理", () => {
     const result = reconcileImportedAiConfig(
       { providers: null, models: undefined, routes: "nope" },

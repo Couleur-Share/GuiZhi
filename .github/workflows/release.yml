@@ -73,11 +73,13 @@ jobs:
       - name: Build for ${{ matrix.platform }} ${{ matrix.arch }}
         shell: bash
         working-directory: apps/desktop
+        # 必须是 pnpm build 而不是 pnpm vite build：MCP server 产物由
+        # build:mcp 用另一份 vite 配置产出，少了它 out/mcp 整个不存在
         run: |
           if [ "${{ matrix.platform }}" = "win" ]; then
-            pnpm vite build && pnpm electron-builder --config electron-builder.config.cjs --win --${{ matrix.arch }} --publish never
+            pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --${{ matrix.arch }} --publish never
           else
-            pnpm vite build && pnpm electron-builder --config electron-builder.config.cjs --linux --x64 --publish never
+            pnpm build && pnpm electron-builder --config electron-builder.config.cjs --linux --x64 --publish never
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

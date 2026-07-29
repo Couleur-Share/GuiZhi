@@ -60,18 +60,6 @@ export interface ChatCompletionResponse {
   };
 }
 
-export interface ChatParams {
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  topK?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  stream?: boolean;
-  enableThinking?: boolean;
-  customParams?: Record<string, string | number | boolean>;
-}
-
 export interface AIConfig {
   id?: string;
   provider: string;
@@ -79,7 +67,6 @@ export interface AIConfig {
   apiKey: string;
   apiUrl: string;
   model: string;
-  chatParams?: ChatParams;
 }
 
 export interface StreamCallbacks {

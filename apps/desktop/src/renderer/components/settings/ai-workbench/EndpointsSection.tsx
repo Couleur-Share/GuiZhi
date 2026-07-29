@@ -14,11 +14,12 @@ import {
   LinkIcon,
   ListPlusIcon,
   Loader2Icon,
+  PackageIcon,
   PencilIcon,
   PlusIcon,
   RouteIcon,
   SearchIcon,
-  Settings2Icon,
+  SettingsIcon,
   StarIcon,
   TestTubeIcon,
   Trash2Icon,
@@ -28,7 +29,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { isLocalEngineProvider } from "@guizhi/shared/constants";
+import { FUNASR_MODEL_ID, FUNASR_PROVIDER_ID } from "@guizhi/shared/constants";
 
 import {
   hasModelCapability,
@@ -98,7 +99,6 @@ function ModelRouteBadge({ label }: { label: string }) {
 
 export function EndpointsSection({
   routingContent,
-  advancedContent,
   endpointGroups,
   endpointStatuses,
   testingEndpointKey,
@@ -115,9 +115,9 @@ export function EndpointsSection({
   onTestModel,
   onEditModel,
   onDeleteModel,
+  onManageLocalEngine,
 }: {
   routingContent: ReactNode;
-  advancedContent: ReactNode;
   endpointGroups: EndpointGroup[];
   endpointStatuses: Record<string, EndpointStatus>;
   testingEndpointKey: string | null;
@@ -140,12 +140,14 @@ export function EndpointsSection({
   onTestModel: (model: AIModelConfig) => void;
   onEditModel: (model: AIModelConfig) => void;
   onDeleteModel: (model: AIModelConfig) => void;
+  /** 跳到「设置 → 采集」：内置转写引擎的安装 / 卸载都在那边 */
+  onManageLocalEngine: () => void;
 }) {
   const { t } = useTranslation();
   const [searchText, setSearchText] = useState("");
-  const [activePanel, setActivePanel] = useState<
-    "provider" | "routing" | "advanced"
-  >("provider");
+  const [activePanel, setActivePanel] = useState<"provider" | "routing">(
+    "provider",
+  );
   const [selectedEndpointKey, setSelectedEndpointKey] = useState<string | null>(
     endpointGroups[0]?.key ?? null,
   );
@@ -170,7 +172,8 @@ export function EndpointsSection({
       null,
     [endpointGroups, selectedEndpointKey],
   );
-  const selectedApiKey = selectedGroup?.apiKey || selectedGroup?.models[0]?.apiKey || "";
+  const selectedApiKey =
+    selectedGroup?.apiKey || selectedGroup?.models[0]?.apiKey || "";
   const selectedApiUrl = selectedGroup?.apiUrl || "";
   const [credentialDraft, setCredentialDraft] = useState({
     groupKey: selectedGroup?.key ?? "",
@@ -308,25 +311,16 @@ export function EndpointsSection({
                   <RouteIcon aria-hidden="true" className="h-4 w-4" />
                   {t("settings.aiWorkbenchModelRouting")}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActivePanel("advanced")}
-                  className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
-                    activePanel === "advanced"
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-background"
-                  }`}
-                >
-                  <Settings2Icon aria-hidden="true" className="h-4 w-4" />
-                  {t("settings.advancedParams")}
-                </button>
               </div>
               <div className="my-3 flex items-center gap-2 text-[12px] text-muted-foreground">
                 <span className="shrink-0">{t("settings.providerName")}</span>
                 <div className="h-px flex-1 bg-border" />
               </div>
               <div className="relative">
-                <SearchIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <SearchIcon
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                />
                 <input
                   type="search"
                   value={searchText}
@@ -355,8 +349,6 @@ export function EndpointsSection({
               <h1 className="mb-4 text-lg font-semibold">{t("settings.ai")}</h1>
               {activePanel === "routing" ? (
                 routingContent
-              ) : activePanel === "advanced" ? (
-                advancedContent
               ) : (
                 <div className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">
                   {t("settings.aiWorkbenchNoModels")}
@@ -372,12 +364,16 @@ export function EndpointsSection({
   const endpointStatus = getEndpointStatus(selectedGroup);
   const providerMetaLabel = getProtocolLabel(selectedGroup.apiProtocol);
   const firstModel = selectedGroup.models[0];
-  // 内置本地转写引擎的条目只在安装时写入、卸载时移除，没有自愈路径：
-  // 在这里删掉只会剩下装着运行时却没有配置的状态，卸载入口在「设置 → 采集」
-  const localEngineSelected = isLocalEngineProvider({
-    id: selectedGroup.providerConfigId,
-    apiUrl: selectedGroup.apiUrl,
-  });
+  // 内置本地转写引擎的条目只在安装时写入、卸载时移除，没有自愈路径：地址、
+  // 密钥、模型全由安装程序填好，在这里改一个字或删一行，剩下的就是装着 3GB
+  // 运行时却转写不了的状态，而界面上看不出发生过什么。管理入口在「设置 → 采集」。
+  //
+  // 只认安装写入的那个固定 id，不用 isLocalEngineProvider——那条判据还认
+  // 127.0.0.1:8620 这个地址，是给配置导入剔除对端设备条目用的，宁可多剔一条。
+  // 拿到这里会把「自己在同一端口上跑了服务、手工添加」的用户一并锁死，
+  // 那是他自己的条目，改不了也删不掉纯属帮倒忙。
+  const localEngineSelected =
+    selectedGroup.providerConfigId === FUNASR_PROVIDER_ID;
 
   return (
     <section className="h-full min-h-0 overflow-hidden">
@@ -403,25 +399,16 @@ export function EndpointsSection({
                 <RouteIcon aria-hidden="true" className="h-4 w-4" />
                 {t("settings.aiWorkbenchModelRouting")}
               </button>
-              <button
-                type="button"
-                onClick={() => setActivePanel("advanced")}
-                className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
-                  activePanel === "advanced"
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-background"
-                }`}
-              >
-                <Settings2Icon aria-hidden="true" className="h-4 w-4" />
-                {t("settings.advancedParams")}
-              </button>
             </div>
             <div className="my-3 flex items-center gap-2 text-[12px] text-muted-foreground">
               <span className="shrink-0">{t("settings.providerName")}</span>
               <div className="h-px flex-1 bg-border" />
             </div>
             <div className="relative mt-3">
-              <SearchIcon aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <SearchIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              />
               <input
                 type="search"
                 value={searchText}
@@ -441,10 +428,16 @@ export function EndpointsSection({
                   group.provider,
                   group.models,
                 );
-                const groupDetail = getEndpointHost(
+                const groupHost = getEndpointHost(
                   group.apiUrl,
                   getProtocolLabel(group.apiProtocol),
                 );
+                // 内置引擎在这一行就交代清楚：不说的话它和用户自己配的服务商
+                // 在列表里长得一模一样，得点进去才知道是两回事
+                const groupDetail =
+                  group.providerConfigId === FUNASR_PROVIDER_ID
+                    ? `${t("settings.aiWorkbenchBuiltin", "内置")} · ${groupHost}`
+                    : groupHost;
 
                 return (
                   <button
@@ -502,11 +495,11 @@ export function EndpointsSection({
           </div>
         </aside>
 
-        {activePanel === "routing" || activePanel === "advanced" ? (
+        {activePanel === "routing" ? (
           <div className="min-w-0 overflow-y-auto px-6 py-5">
             <div className="w-full">
               <h1 className="mb-4 text-lg font-semibold">{t("settings.ai")}</h1>
-              {activePanel === "routing" ? routingContent : advancedContent}
+              {routingContent}
             </div>
           </div>
         ) : (
@@ -530,16 +523,35 @@ export function EndpointsSection({
                         <h4 className="truncate text-base font-semibold">
                           {getEndpointDisplayName(selectedGroup)}
                         </h4>
-                        <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                          {providerMetaLabel}
-                        </span>
+                        {localEngineSelected ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                            <PackageIcon
+                              aria-hidden="true"
+                              className="h-3 w-3"
+                            />
+                            {t("settings.aiWorkbenchBuiltin", "内置")}
+                          </span>
+                        ) : null}
+                        {/* 托管条目不摆协议徽章：用户既选不了也用不上这个信息，
+                            而 1024px 宽下多这一枚正好把右侧动作区挤到第二行 */}
+                        {localEngineSelected ? null : (
+                          <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {providerMetaLabel}
+                          </span>
+                        )}
                         <span
                           className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${getStatusToneClass(endpointStatus.tone)}`}
                         >
                           {endpointStatus.tone === "ready" ? (
-                            <CheckCircle2Icon aria-hidden="true" className="h-3 w-3" />
+                            <CheckCircle2Icon
+                              aria-hidden="true"
+                              className="h-3 w-3"
+                            />
                           ) : (
-                            <AlertCircleIcon aria-hidden="true" className="h-3 w-3" />
+                            <AlertCircleIcon
+                              aria-hidden="true"
+                              className="h-3 w-3"
+                            />
                           )}
                           {endpointStatus.label}
                         </span>
@@ -557,21 +569,41 @@ export function EndpointsSection({
                       className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
                     >
                       {testingEndpointKey === selectedGroup.key ? (
-                        <Loader2Icon aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                        <Loader2Icon
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 animate-spin"
+                        />
                       ) : (
-                        <TestTubeIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                        <TestTubeIcon
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                        />
                       )}
                       {t("settings.testConnection")}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onEditEndpoint(selectedGroup)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted"
-                    >
-                      <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                      {t("common.edit")}
-                    </button>
                     {/* 置灰按钮不派发指针事件，title 挂在外层才提示得出来 */}
+                    <span
+                      className="inline-flex"
+                      title={
+                        localEngineSelected
+                          ? t("settings.aiWorkbenchLocalEngineReadOnly")
+                          : undefined
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onEditEndpoint(selectedGroup)}
+                        disabled={localEngineSelected}
+                        data-testid="ai-endpoint-edit"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+                      >
+                        <PencilIcon
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                        />
+                        {t("common.edit")}
+                      </button>
+                    </span>
                     <span
                       className="inline-flex"
                       title={
@@ -584,9 +616,13 @@ export function EndpointsSection({
                         type="button"
                         onClick={() => onDeleteEndpoint(selectedGroup)}
                         disabled={localEngineSelected}
+                        data-testid="ai-endpoint-delete"
                         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-red-500 hover:bg-red-500/5 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-60 disabled:hover:bg-transparent"
                       >
-                        <Trash2Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                        <Trash2Icon
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5"
+                        />
                         {t("common.delete")}
                       </button>
                     </span>
@@ -597,7 +633,15 @@ export function EndpointsSection({
                   <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="text-xs font-medium text-muted-foreground">
-                        {t("settings.aiWorkbenchEndpointCredentials", "Endpoint credentials")}
+                        {localEngineSelected
+                          ? t(
+                              "settings.aiWorkbenchLocalEngineSection",
+                              "内置引擎",
+                            )
+                          : t(
+                              "settings.aiWorkbenchEndpointCredentials",
+                              "Endpoint credentials",
+                            )}
                       </div>
                       {credentialsDirty ? (
                         <div className="flex shrink-0 items-center gap-1">
@@ -624,51 +668,37 @@ export function EndpointsSection({
                       ) : null}
                     </div>
                     <div className="space-y-2">
+                      {localEngineSelected ? (
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          {t(
+                            "settings.aiWorkbenchLocalEngineManaged",
+                            "地址、密钥与下方模型都由「设置 → 采集」的一键安装自动配置，无需填写。服务只监听本机，不需要密钥。",
+                          )}
+                        </p>
+                      ) : null}
                       <div className="flex min-w-0 items-center gap-3">
-                        <LinkIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <LinkIcon
+                          aria-hidden="true"
+                          className="h-4 w-4 shrink-0 text-muted-foreground"
+                        />
                         <label className="min-w-0 flex-1">
                           <span className="mb-1 block text-xs text-muted-foreground">
                             {t("settings.apiUrl")}
                           </span>
-                          <input
-                            type="text"
-                            value={credentialDraft.apiUrl}
-                            onChange={(event) =>
-                              setCredentialDraft((draft) => ({
-                                ...draft,
-                                apiUrl: event.target.value,
-                              }))
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") {
-                                saveCredentials();
-                              }
-                              if (event.key === "Escape") {
-                                resetCredentials();
-                              }
-                            }}
-                            aria-label={t(
-                              "settings.aiWorkbenchEndpointApiUrl",
-                              "Endpoint API URL",
-                            )}
-                            className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/15"
-                          />
-                        </label>
-                      </div>
-                      <div className="flex min-w-0 items-center gap-3">
-                        <KeyRoundIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <label className="min-w-0 flex-1">
-                          <span className="mb-1 block text-xs text-muted-foreground">
-                            {t("settings.apiKey")}
+                        {localEngineSelected ? (
+                          // 不带边框：同样的高度加一圈边框就是一个 disabled 的
+                          // 输入框，而这里要说的恰恰是「这不是让你填的东西」
+                          <span className="flex h-9 w-full items-center truncate rounded-md bg-muted/50 px-3 font-mono text-sm text-muted-foreground">
+                            {selectedApiUrl}
                           </span>
-                          <span className="relative block">
+                        ) : (
                             <input
-                              type={showApiKey ? "text" : "password"}
-                              value={credentialDraft.apiKey}
+                              type="text"
+                              value={credentialDraft.apiUrl}
                               onChange={(event) =>
                                 setCredentialDraft((draft) => ({
                                   ...draft,
-                                  apiKey: event.target.value,
+                                  apiUrl: event.target.value,
                                 }))
                               }
                               onKeyDown={(event) => {
@@ -680,38 +710,99 @@ export function EndpointsSection({
                                 }
                               }}
                               aria-label={t(
-                                "settings.aiWorkbenchEndpointApiKey",
-                                "Endpoint API Key",
+                                "settings.aiWorkbenchEndpointApiUrl",
+                                "Endpoint API URL",
                               )}
-                              placeholder={maskApiKey(selectedApiKey)}
-                              className="h-9 w-full rounded-md border border-border bg-background px-3 pr-9 font-mono text-sm outline-none transition-colors placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/15"
+                              className="h-9 w-full rounded-md border border-border bg-background px-3 font-mono text-sm outline-none transition-colors focus:ring-2 focus:ring-primary/15"
                             />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowApiKey((visible) => !visible)
-                              }
-                              aria-label={
-                                showApiKey
-                                  ? t("common.hide", "Hide")
-                                  : t("common.show", "Show")
-                              }
-                              title={
-                                showApiKey
-                                  ? t("common.hide", "Hide")
-                                  : t("common.show", "Show")
-                              }
-                              className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                              {showApiKey ? (
-                                <EyeOffIcon aria-hidden="true" className="h-4 w-4" />
-                              ) : (
-                                <EyeIcon aria-hidden="true" className="h-4 w-4" />
-                              )}
-                            </button>
-                          </span>
+                          )}
                         </label>
                       </div>
+                      {/* 内置引擎的 Key 是安装程序填的占位串，本地服务根本不校验：
+                          摆一个带「显示密码」的输入框只会让人以为这里缺一个秘密 */}
+                      {localEngineSelected ? (
+                        <button
+                          type="button"
+                          onClick={onManageLocalEngine}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          <SettingsIcon
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5"
+                          />
+                          {t(
+                            "settings.aiWorkbenchLocalEngineManage",
+                            "管理引擎",
+                          )}
+                        </button>
+                      ) : (
+                        <div className="flex min-w-0 items-center gap-3">
+                          <KeyRoundIcon
+                            aria-hidden="true"
+                            className="h-4 w-4 shrink-0 text-muted-foreground"
+                          />
+                          <label className="min-w-0 flex-1">
+                            <span className="mb-1 block text-xs text-muted-foreground">
+                              {t("settings.apiKey")}
+                            </span>
+                            <span className="relative block">
+                              <input
+                                type={showApiKey ? "text" : "password"}
+                                value={credentialDraft.apiKey}
+                                onChange={(event) =>
+                                  setCredentialDraft((draft) => ({
+                                    ...draft,
+                                    apiKey: event.target.value,
+                                  }))
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    saveCredentials();
+                                  }
+                                  if (event.key === "Escape") {
+                                    resetCredentials();
+                                  }
+                                }}
+                                aria-label={t(
+                                  "settings.aiWorkbenchEndpointApiKey",
+                                  "Endpoint API Key",
+                                )}
+                                placeholder={maskApiKey(selectedApiKey)}
+                                className="h-9 w-full rounded-md border border-border bg-background px-3 pr-9 font-mono text-sm outline-none transition-colors placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/15"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowApiKey((visible) => !visible)
+                                }
+                                aria-label={
+                                  showApiKey
+                                    ? t("common.hide", "Hide")
+                                    : t("common.show", "Show")
+                                }
+                                title={
+                                  showApiKey
+                                    ? t("common.hide", "Hide")
+                                    : t("common.show", "Show")
+                                }
+                                className="absolute right-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              >
+                                {showApiKey ? (
+                                  <EyeOffIcon
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
+                                ) : (
+                                  <EyeIcon
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
+                                )}
+                              </button>
+                            </span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -720,51 +811,60 @@ export function EndpointsSection({
                   <div className="text-sm font-semibold">
                     {t("settings.model")}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onFetchModels({
-                          providerId: selectedGroup.providerConfigId,
-                          provider: selectedGroup.provider,
-                          apiProtocol: selectedGroup.apiProtocol,
-                          apiKey:
-                            selectedGroup.apiKey || firstModel?.apiKey || "",
-                          apiUrl: selectedGroup.apiUrl,
-                        })
-                      }
-                      aria-label={t("settings.fetchModels")}
-                      title={t("settings.fetchModels")}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
-                    >
-                      <ListPlusIcon aria-hidden="true" className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onAddModel(
-                          {
+                  {/* 内置引擎只有 SenseVoiceSmall 一个模型，也是安装时写进去的：
+                      「获取模型列表」拉回来的还是它，「添加模型」加出来的东西没有用处 */}
+                  {localEngineSelected ? null : (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onFetchModels({
                             providerId: selectedGroup.providerConfigId,
                             provider: selectedGroup.provider,
                             apiProtocol: selectedGroup.apiProtocol,
                             apiKey:
                               selectedGroup.apiKey || firstModel?.apiKey || "",
                             apiUrl: selectedGroup.apiUrl,
-                          },
-                          { lockEndpoint: true },
-                        )
-                      }
-                      aria-label={t("settings.addModel")}
-                      title={t("settings.addModel")}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
-                    >
-                      <PlusIcon aria-hidden="true" className="h-4 w-4" />
-                    </button>
-                  </div>
+                          })
+                        }
+                        aria-label={t("settings.fetchModels")}
+                        title={t("settings.fetchModels")}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
+                      >
+                        <ListPlusIcon aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onAddModel(
+                            {
+                              providerId: selectedGroup.providerConfigId,
+                              provider: selectedGroup.provider,
+                              apiProtocol: selectedGroup.apiProtocol,
+                              apiKey:
+                                selectedGroup.apiKey ||
+                                firstModel?.apiKey ||
+                                "",
+                              apiUrl: selectedGroup.apiUrl,
+                            },
+                            { lockEndpoint: true },
+                          )
+                        }
+                        aria-label={t("settings.addModel")}
+                        title={t("settings.addModel")}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted"
+                      >
+                        <PlusIcon aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="divide-y divide-border">
                   {selectedGroup.models.map((model) => {
+                    // 安装时写入的那一条：删了或改了地址，磁盘上 3GB 运行时还在
+                    // 却转写不了，而这套记录没有自愈路径，只能回「采集」重装
+                    const builtinModel = model.id === FUNASR_MODEL_ID;
                     // 类型徽章：嵌入 / 转写 / 文生图为专用模型，其余按对话模型展示
                     const typeBadge: ModelBadge =
                       model.capabilities?.embedding === true
@@ -827,6 +927,7 @@ export function EndpointsSection({
                     return (
                       <div
                         key={model.id}
+                        data-testid={`ai-model-row-${model.id}`}
                         className="group flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-muted/20 md:flex-row md:items-center md:justify-between"
                       >
                         <div className="flex min-w-0 items-center gap-3">
@@ -868,9 +969,15 @@ export function EndpointsSection({
                             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted disabled:opacity-50"
                           >
                             {testingModelId === model.id ? (
-                              <Loader2Icon aria-hidden="true" className="h-3.5 w-3.5 animate-spin" />
+                              <Loader2Icon
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5 animate-spin"
+                              />
                             ) : (
-                              <TestTubeIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                              <TestTubeIcon
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
                             )}
                           </button>
                           {!model.isDefault ? (
@@ -881,27 +988,61 @@ export function EndpointsSection({
                               title={t("settings.setDefault")}
                               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                             >
-                              <StarIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                              <StarIcon
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
                             </button>
                           ) : null}
-                          <button
-                            type="button"
-                            onClick={() => onEditModel(model)}
-                            aria-label={t("common.edit")}
-                            title={t("common.edit")}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                          {/* 置灰按钮不派发指针事件，title 挂在外层才提示得出来 */}
+                          <span
+                            className="inline-flex"
+                            title={
+                              builtinModel
+                                ? t("settings.aiWorkbenchLocalEngineReadOnly")
+                                : undefined
+                            }
                           >
-                            <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeleteModel(model)}
-                            aria-label={t("common.delete")}
-                            title={t("common.delete")}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-red-500 hover:bg-red-500/5"
+                            <button
+                              type="button"
+                              onClick={() => onEditModel(model)}
+                              disabled={builtinModel}
+                              aria-label={t("common.edit")}
+                              title={
+                                builtinModel ? undefined : t("common.edit")
+                              }
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                            >
+                              <PencilIcon
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                            </button>
+                          </span>
+                          <span
+                            className="inline-flex"
+                            title={
+                              builtinModel
+                                ? t("settings.aiWorkbenchLocalEngineLocked")
+                                : undefined
+                            }
                           >
-                            <Trash2Icon aria-hidden="true" className="h-3.5 w-3.5" />
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeleteModel(model)}
+                              disabled={builtinModel}
+                              aria-label={t("common.delete")}
+                              title={
+                                builtinModel ? undefined : t("common.delete")
+                              }
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-red-500 hover:bg-red-500/5 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-50 disabled:hover:bg-transparent"
+                            >
+                              <Trash2Icon
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5"
+                              />
+                            </button>
+                          </span>
                         </div>
                       </div>
                     );

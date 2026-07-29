@@ -173,18 +173,6 @@ export const MODEL_ROUTE_DEFINITIONS: ScenarioDefinition[] = [
   },
 ];
 
-export const DEFAULT_CHAT_PARAMS: ModelFormState["chatParams"] = {
-  temperature: 0.7,
-  maxTokens: 2048,
-  topP: 1,
-  topK: "",
-  frequencyPenalty: 0,
-  presencePenalty: 0,
-  stream: false,
-  enableThinking: false,
-  customParamsText: "",
-};
-
 export const DEFAULT_MODEL_CAPABILITIES: ModelFormState["capabilities"] = {
   chat: true,
   vision: false,
@@ -206,5 +194,4 @@ export const EMPTY_FORM: ModelFormState = {
   apiUrl: "https://api.openai.com",
   model: "",
   capabilities: DEFAULT_MODEL_CAPABILITIES,
-  chatParams: DEFAULT_CHAT_PARAMS,
 };

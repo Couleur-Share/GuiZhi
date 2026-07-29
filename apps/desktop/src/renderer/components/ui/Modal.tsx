@@ -8,7 +8,8 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
-  subtitle?: string;
+  /** 收 ReactNode 而不只是字符串：副标题里常要带一个图标（如来源平台 logo） */
+  subtitle?: ReactNode;
   headerActions?: ReactNode;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl" | "2xl" | "full" | "fullscreen";

@@ -2,8 +2,8 @@
  * 配置迁移的主进程侧：采集本进程持有的那部分设置、应用导入、以及应用前的快照。
  *
  * 分工：渲染进程的 localStorage 是 guizhi-settings（含 AI 服务商 / 模型 / 路由，
- * 且是 ai-models.json 的超集——多出 chatParams 与 scenarioModelDefaults）的真相源，
- * 由它采集；配图风格与快捷键落在 config 目录下的 JSON 里，只有主进程读得到。
+ * 且是 ai-models.json 的超集——多出 scenarioModelDefaults）的真相源，由它采集；
+ * 配图风格与快捷键落在 config 目录下的 JSON 里，只有主进程读得到。
  */
 import fs from "fs";
 import path from "path";
@@ -29,7 +29,6 @@ import {
 } from "../../shortcuts";
 import { readMcpScope, writeMcpScope } from "../mcp-scope";
 import { reconcileImportedAiConfig } from "./ai-reconcile";
-import type { TransferModelConfig } from "./ai-reconcile";
 
 export { decryptConfigSecrets, encryptConfigSecrets } from "./config-crypto";
 export type { ConfigDecryptResult } from "./config-crypto";
@@ -129,7 +128,7 @@ export function collectMainConfigParts(): MainConfigParts {
 export interface ApplyMainConfigResult {
   /** 对账后的最终 AI 配置，渲染进程用它覆盖 localStorage，两侧才不会打架 */
   aiProviders: unknown[];
-  aiModels: TransferModelConfig[];
+  aiModels: CoreAIModelConfig[];
   modelRouteDefaults: Record<string, string>;
   warnings: string[];
 }
@@ -155,7 +154,7 @@ export function applyMainConfigParts(
 
   coreAIConfigService.replace({
     providers: reconciled.providers,
-    models: reconciled.models as CoreAIModelConfig[],
+    models: reconciled.models,
     modelRouteDefaults: reconciled.routes,
   });
 

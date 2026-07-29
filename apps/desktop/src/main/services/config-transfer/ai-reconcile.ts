@@ -25,11 +25,6 @@ import {
   isManagedFunasrUrl,
 } from "@guizhi/shared/constants";
 
-/** 文件里的模型条目：结构同 CoreAIModelConfig，另带渲染进程独有的 chatParams */
-export type TransferModelConfig = CoreAIModelConfig & {
-  chatParams?: unknown;
-};
-
 export interface AiReconcileInput {
   providers: unknown;
   models: unknown;
@@ -38,7 +33,7 @@ export interface AiReconcileInput {
 
 export interface AiReconcileResult {
   providers: CoreAIProviderConfig[];
-  models: TransferModelConfig[];
+  models: CoreAIModelConfig[];
   routes: Partial<Record<CoreAIModelRoute, string>>;
   warnings: string[];
 }
@@ -62,7 +57,7 @@ function isUsableProvider(value: unknown): value is CoreAIProviderConfig {
 }
 
 /** 与 normalizeModelConfig 的抛错条件一致 */
-function isUsableModel(value: unknown): value is TransferModelConfig {
+function isUsableModel(value: unknown): value is CoreAIModelConfig {
   return (
     isPlainRecord(value) &&
     nonEmpty(value.id) &&
@@ -72,7 +67,7 @@ function isUsableModel(value: unknown): value is TransferModelConfig {
   );
 }
 
-function isLocalEngineModel(model: TransferModelConfig): boolean {
+function isLocalEngineModel(model: CoreAIModelConfig): boolean {
   return (
     model.id === FUNASR_MODEL_ID ||
     model.providerId === FUNASR_PROVIDER_ID ||
@@ -127,7 +122,7 @@ export function reconcileImportedAiConfig(
 
   // 本机自己的内置引擎条目原样保留
   const localProviders = local.providers.filter(isUsableProvider).filter(isLocalEngineProvider);
-  const localModels = (local.models as TransferModelConfig[])
+  const localModels = local.models
     .filter(isUsableModel)
     .filter(isLocalEngineModel);
   if (localModels.length > 0) {

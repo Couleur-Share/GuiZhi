@@ -25,17 +25,6 @@ export type ModelFormState = {
   apiUrl: string;
   model: string;
   capabilities: Required<AIModelCapabilities>;
-  chatParams: {
-    temperature: number;
-    maxTokens: number;
-    topP: number;
-    topK: string;
-    frequencyPenalty: number;
-    presencePenalty: number;
-    stream: boolean;
-    enableThinking: boolean;
-    customParamsText: string;
-  };
 };
 
 export type EndpointStatus = {

@@ -161,7 +161,7 @@ export async function chatCompletion(
   messages: ChatMessage[],
   options?: ChatCompletionOptions,
 ): Promise<ChatCompletionResult> {
-  const { provider, apiKey, apiUrl, model, chatParams } = config;
+  const { provider, apiKey, apiUrl, model } = config;
   const providerId = provider?.toLowerCase() || "";
   const protocol = resolveAIProtocol(config);
   const isGemini = protocol === "gemini";
@@ -184,18 +184,16 @@ export async function chatCompletion(
     resolveProtocolBase(apiUrl, protocol),
   );
 
-  // 合并参数：config.chatParams < options（options 优先级更高）
-  // Merge parameters: config.chatParams < options (options takes precedence)
+  // 生成参数由调用方按用途给定（问答要发散、Wiki 编译要稳定），未给的走保守默认
   const mergedParams = {
-    temperature: options?.temperature ?? chatParams?.temperature ?? 0.7,
-    maxTokens: options?.maxTokens ?? chatParams?.maxTokens ?? 2048,
-    topP: options?.topP ?? chatParams?.topP,
-    topK: options?.topK ?? chatParams?.topK,
-    frequencyPenalty: options?.frequencyPenalty ?? chatParams?.frequencyPenalty,
-    presencePenalty: options?.presencePenalty ?? chatParams?.presencePenalty,
-    stream: options?.stream ?? chatParams?.stream ?? false,
-    enableThinking:
-      options?.enableThinking ?? chatParams?.enableThinking ?? false,
+    temperature: options?.temperature ?? 0.7,
+    maxTokens: options?.maxTokens ?? 2048,
+    topP: options?.topP,
+    topK: options?.topK,
+    frequencyPenalty: options?.frequencyPenalty,
+    presencePenalty: options?.presencePenalty,
+    stream: options?.stream ?? false,
+    enableThinking: options?.enableThinking ?? false,
   };
 
   if (isAnthropic) {
@@ -334,17 +332,6 @@ export async function chatCompletion(
   } else if (mergedParams.enableThinking) {
     // 其他支持思考的模型（如 DeepSeek）
     body.enable_thinking = true;
-  }
-
-  // 处理自定义参数 / Handle custom parameters
-  const customParams = chatParams?.customParams;
-  if (customParams && typeof customParams === "object") {
-    const bodyAny = body as unknown as Record<string, unknown>;
-    for (const [key, value] of Object.entries(customParams)) {
-      if (key && value !== undefined && value !== "") {
-        bodyAny[key] = value;
-      }
-    }
   }
 
   // 处理输出格式 / Handle response format (Issue #38)

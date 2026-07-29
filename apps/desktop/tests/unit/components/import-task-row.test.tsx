@@ -30,7 +30,7 @@ function makeTask(patch: Partial<ImportTask> = {}): ImportTask {
   };
 }
 
-function renderRow(task: ImportTask, onOpenItem = vi.fn()) {
+function renderRow(task: ImportTask, onOpenItem = vi.fn(), onOpenDetail = vi.fn()) {
   render(
     <ImportTaskRow
       task={task}
@@ -39,6 +39,7 @@ function renderRow(task: ImportTask, onOpenItem = vi.fn()) {
       hasSelection={false}
       onToggle={vi.fn()}
       onOpenItem={onOpenItem}
+      onOpenDetail={onOpenDetail}
     />,
   );
   return onOpenItem;
@@ -206,17 +207,27 @@ describe("终态任务的阶段耗时", () => {
     expect(screen.getByText("· 最慢 文字稿排版 8:13")).toBeInTheDocument();
   });
 
-  it("展开后逐阶段给出耗时、调用次数与 token", async () => {
-    renderRow(finished());
-    // 明细是确认细节用的，默认收起——一屏几十条任务不能每条都摊开
+  it("点摘要打开详情：明细不摊在行上，一屏几十条会被撑成一片", async () => {
+    const onOpenDetail = vi.fn();
+    renderRow(finished(), vi.fn(), onOpenDetail);
     expect(screen.queryByText("2:06")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByText("共 10:19"));
-    expect(screen.getByText("2:06")).toBeInTheDocument();
-    expect(screen.getByText("8:13")).toBeInTheDocument();
-    expect(
-      screen.getByText(/7 次调用 · 2 次失败 · 67400 token · qwen3\.5-flash/),
-    ).toBeInTheDocument();
+    expect(onOpenDetail).toHaveBeenCalled();
+  });
+
+  it("失败任务没有耗时摘要可点，详情入口仍要够得着", async () => {
+    // 而它恰恰是最需要看清楚的那种，所以入口常驻在动作条上
+    const onOpenDetail = vi.fn();
+    renderRow(
+      finished({ status: "failed", stageStats: null, error: "HTTP 522" }),
+      vi.fn(),
+      onOpenDetail,
+    );
+    expect(screen.queryByText(/^共 /)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("任务详情"));
+    expect(onOpenDetail).toHaveBeenCalled();
   });
 
   it("只有一个阶段时不说「最慢」：那等于把总耗时念第二遍", () => {
@@ -225,7 +236,7 @@ describe("终态任务的阶段耗时", () => {
     expect(screen.queryByText(/最慢/)).not.toBeInTheDocument();
   });
 
-  it("运行中的任务不显示明细：那时该回答的是「还活着吗」，不是「花在哪了」", () => {
+  it("运行中的任务不显示耗时摘要：那时该回答的是「还活着吗」，不是「花在哪了」", () => {
     renderRow(finished({ status: "processing", stage: "formatting" }));
     expect(screen.queryByText(/^共 /)).not.toBeInTheDocument();
     // 已结算 2:06 + 8:13 再加当前阶段的 10 秒；createdAt 在 10 分钟前，

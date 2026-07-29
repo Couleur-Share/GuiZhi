@@ -38,18 +38,6 @@ export interface AIModelCapabilities {
   imageGeneration?: boolean;
 }
 
-export interface ChatModelParams {
-  temperature?: number;
-  maxTokens?: number;
-  topP?: number;
-  topK?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
-  stream?: boolean;
-  enableThinking?: boolean;
-  customParams?: Record<string, string | number | boolean>;
-}
-
 export interface AIModelConfig {
   id: string;
   name?: string;
@@ -62,7 +50,6 @@ export interface AIModelConfig {
   isDefault?: boolean;
   lastVerifiedAt?: string;
   capabilities?: AIModelCapabilities;
-  chatParams?: ChatModelParams;
 }
 
 export interface AIProviderConfig {

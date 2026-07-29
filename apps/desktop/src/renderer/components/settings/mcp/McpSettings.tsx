@@ -133,7 +133,7 @@ export function McpSettings() {
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
                 {t(
                   "settings.mcpMissing",
-                  "没有找到 MCP server 组件。这通常意味着当前是开发构建，先执行一次完整构建即可。",
+                  "没有找到 MCP server 组件。开发构建先执行一次 pnpm build；安装版出现这个提示说明安装包不完整，更新或重装即可。",
                 )}
               </p>
             ) : null}

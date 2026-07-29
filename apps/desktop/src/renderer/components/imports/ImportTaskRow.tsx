@@ -8,6 +8,7 @@ import {
   ExternalLinkIcon,
   FileTextIcon,
   GlobeIcon,
+  InfoIcon,
   Loader2Icon,
   RotateCcwIcon,
   SettingsIcon,
@@ -20,7 +21,7 @@ import type { ImportTask } from "@guizhi/shared/types";
 import { useImportStore } from "../../stores/import.store";
 import { useUIStore } from "../../stores/ui.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
-import { ImportStageStats } from "./ImportStageStats";
+import { ImportStageSummary } from "./ImportStageSummary";
 import {
   formatDuration,
   getStageLabel,
@@ -251,6 +252,7 @@ export function ImportTaskRow({
   hasSelection,
   onToggle,
   onOpenItem,
+  onOpenDetail,
 }: {
   task: ImportTask;
   now: number;
@@ -258,6 +260,11 @@ export function ImportTaskRow({
   hasSelection: boolean;
   onToggle: (event: React.MouseEvent) => void;
   onOpenItem: (itemId: string) => void;
+  /**
+   * 打开任务详情。弹窗由工作区持有单例而不是每行挂一个——一屏几十行，
+   * 每行一个实例意味着几十份 toast 与 store 订阅，而同时只可能开一个。
+   */
+  onOpenDetail: () => void;
 }) {
   const { t } = useTranslation();
   const cancelTask = useImportStore((state) => state.cancelTask);
@@ -325,7 +332,7 @@ export function ImportTaskRow({
             ) : null}
             {typeMeta ? <span>{t(typeMeta.labelKey, typeMeta.fallback)}</span> : null}
             <ProgressHint task={task} now={now} />
-            <ImportStageStats task={task} />
+            <ImportStageSummary task={task} onOpenDetail={onOpenDetail} />
           </div>
 
           {task.error ? (
@@ -368,6 +375,15 @@ export function ImportTaskRow({
             <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </RowAction>
         ) : null}
+
+        {/* 失败与取消的任务多半没有耗时摘要可点，而它们恰恰最需要看清楚，
+            所以详情入口挂在动作条上、对所有任务常驻 */}
+        <RowAction
+          label={t("imports.taskDetail", "任务详情")}
+          onClick={onOpenDetail}
+        >
+          <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        </RowAction>
 
         {needsCaptureToolSetup(task.error) ? (
           <RowAction

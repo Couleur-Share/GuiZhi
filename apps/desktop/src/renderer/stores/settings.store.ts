@@ -12,7 +12,6 @@ import {
   normalizeModelRouteDefaults,
   normalizePersistedAIModels,
   normalizePersistedAIProviders,
-  preserveLocalOnlyModelFields,
 } from "./settings/settings-ai";
 import { createDefaultSettingsValues } from "./settings/settings-defaults";
 import { createGeneralSettingsActions } from "./settings/settings-general-actions";
@@ -43,7 +42,6 @@ export type {
   AIModelRoute,
   AIProviderConfig,
   AIUsageScenario,
-  ChatModelParams,
   ModelRouteDefaults,
   ScenarioModelDefaults,
   SupportedLanguage,
@@ -133,14 +131,11 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
     ? normalizePersistedAIProviders(aiSettings.aiProviders)
     : state.aiProviders;
   const aiModels = Array.isArray(aiSettings.aiModels)
-    ? preserveLocalOnlyModelFields(
-        state.aiModels,
-        dropProviderNameAliases(
+    ? dropProviderNameAliases(
+        aiProviders,
+        attachProviderIdsToAIModels(
           aiProviders,
-          attachProviderIdsToAIModels(
-            aiProviders,
-            normalizePersistedAIModels(aiSettings.aiModels),
-          ),
+          normalizePersistedAIModels(aiSettings.aiModels),
         ),
       )
     : state.aiModels;

@@ -24,19 +24,17 @@ import {
   type AIModelConfig,
   type AIModelRoute,
 } from "../../stores/settings.store";
+import { useUIStore } from "../../stores/ui.store";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useToast } from "../ui/Toast";
 import { Spinner } from "../ui/Spinner";
-import { AdvancedSection } from "./ai-workbench/AdvancedSection";
 import { EMPTY_FORM, MODEL_ROUTE_DEFINITIONS } from "./ai-workbench/constants";
 import { EndpointFormModal } from "./ai-workbench/EndpointFormModal";
 import { EndpointsSection } from "./ai-workbench/EndpointsSection";
 import {
-  buildChatParams,
   buildEndpointKey,
   buildEndpointGroupKey,
   cloneDefaultCapabilities,
-  cloneDefaultChatParams,
   createFormFromModel,
   getModelDisplayName,
   getEndpointDisplayName,
@@ -145,7 +143,9 @@ function findProviderForModel(
   model: AIModelConfig,
 ): EndpointGroup | undefined {
   if (model.providerId?.trim()) {
-    return providers.find((provider) => provider.providerConfigId === model.providerId);
+    return providers.find(
+      (provider) => provider.providerConfigId === model.providerId,
+    );
   }
 
   return providers.find(
@@ -281,6 +281,9 @@ export function AISettingsPrototype() {
   const settings = useSettingsStore();
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const requestSettingsSection = useUIStore(
+    (state) => state.requestSettingsSection,
+  );
 
   const [modelForm, setModelForm] = useState<ModelFormState>(EMPTY_FORM);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -465,9 +468,6 @@ export function AISettingsPrototype() {
       capabilities: preset?.capabilities
         ? { ...cloneDefaultCapabilities(), ...preset.capabilities }
         : cloneDefaultCapabilities(),
-      chatParams: preset?.chatParams
-        ? { ...cloneDefaultChatParams(), ...preset.chatParams }
-        : cloneDefaultChatParams(),
     };
 
     return nextForm;
@@ -516,7 +516,6 @@ export function AISettingsPrototype() {
     setShowModelForm(false);
     setModelForm({
       ...EMPTY_FORM,
-      chatParams: cloneDefaultChatParams(),
       capabilities: cloneDefaultCapabilities(),
     });
   };
@@ -526,7 +525,6 @@ export function AISettingsPrototype() {
     setAvailableModels([]);
     setModelForm({
       ...EMPTY_FORM,
-      chatParams: cloneDefaultChatParams(),
       capabilities: cloneDefaultCapabilities(),
     });
   };
@@ -591,14 +589,6 @@ export function AISettingsPrototype() {
       return;
     }
 
-    const supportsChat = modelForm.capabilities.chat === true;
-    const nextChatParams = supportsChat ? buildChatParams(modelForm) : undefined;
-
-    if (supportsChat && !nextChatParams) {
-      showToast(t("settings.aiWorkbenchInvalidCustomParams"), "error");
-      return;
-    }
-
     setSavingModel(true);
     const payload = {
       name: modelForm.name.trim(),
@@ -612,7 +602,6 @@ export function AISettingsPrototype() {
         ...cloneDefaultCapabilities(),
         ...modelForm.capabilities,
       },
-      chatParams: nextChatParams,
     };
 
     if (editingModelId) {
@@ -641,17 +630,6 @@ export function AISettingsPrototype() {
       modelId,
       attributes: inferModelAttributes(modelId),
     }));
-    const hasChatModel = inferredModels.some(
-      (item) => item.attributes.capabilities.chat === true,
-    );
-    const nextChatParams = hasChatModel
-      ? buildChatParams(modelForm)
-      : undefined;
-
-    if (hasChatModel && !nextChatParams) {
-      showToast(t("settings.aiWorkbenchInvalidCustomParams"), "error");
-      return;
-    }
 
     setSavingModel(true);
     for (const { modelId, attributes } of inferredModels) {
@@ -667,8 +645,6 @@ export function AISettingsPrototype() {
           ...cloneDefaultCapabilities(),
           ...attributes.capabilities,
         },
-        chatParams:
-          attributes.capabilities.chat === true ? nextChatParams : undefined,
       });
     }
     setSavingModel(false);
@@ -904,9 +880,7 @@ export function AISettingsPrototype() {
   };
 
   const handleTestDefaultModel = async () => {
-    const model =
-      resolvedRouteModels.mainText ||
-      resolvedRouteModels.fastText;
+    const model = resolvedRouteModels.mainText || resolvedRouteModels.fastText;
 
     if (!model || !isConfiguredModel(model)) {
       showToast(t("settings.aiWorkbenchNoDefaultModel"), "error");
@@ -1013,27 +987,6 @@ export function AISettingsPrototype() {
     </div>
   );
 
-  const advancedContent = (
-    <AdvancedSection
-      onConfigure={() => {
-        const group = endpointGroups[0];
-        if (!group) {
-          openAddEndpoint();
-          return;
-        }
-        openAddModel(
-          {
-            provider: group.provider,
-            apiProtocol: group.apiProtocol,
-            apiKey: group.apiKey,
-            apiUrl: group.apiUrl,
-          },
-          { lockEndpoint: true },
-        );
-      }}
-    />
-  );
-
   // 旗下模型会一并删除，确认框必须把这个数字说出来
   const deleteEndpointMessage = pendingDeleteEndpoint
     ? t(
@@ -1073,7 +1026,6 @@ export function AISettingsPrototype() {
 
       <EndpointsSection
         routingContent={routingContent}
-        advancedContent={advancedContent}
         endpointGroups={endpointGroups}
         endpointStatuses={resolvedEndpointStatuses}
         testingEndpointKey={testingEndpointKey}
@@ -1090,6 +1042,7 @@ export function AISettingsPrototype() {
         onTestModel={(model) => void handleTestModel(model)}
         onEditModel={openEditModel}
         onDeleteModel={(model) => setPendingDeleteModel(model)}
+        onManageLocalEngine={() => requestSettingsSection("general")}
       />
 
       <ConfirmDialog

@@ -130,7 +130,6 @@ export function toAIConfig(model: AIModelConfig): AIConfig {
     apiKey: model.apiKey,
     apiUrl: model.apiUrl,
     model: model.model,
-    chatParams: model.chatParams,
   };
 }
 

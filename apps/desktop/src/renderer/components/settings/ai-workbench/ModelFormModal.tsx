@@ -1,10 +1,9 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
-import { ChevronDownIcon, Loader2Icon, TestTubeIcon } from "lucide-react";
+import { Loader2Icon, TestTubeIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { BaseFields } from "./model-form/BaseFields";
-import { ChatParamsSection } from "./model-form/ChatParamsSection";
 import { Modal } from "../../ui/Modal";
 import type { ModelFormState } from "./types";
 
@@ -31,7 +30,6 @@ export function ModelFormModal({
 }) {
   const { t } = useTranslation();
   const draftTestingKey = editingModelId || "__draft__";
-  const [showAdvancedParams, setShowAdvancedParams] = useState(false);
 
   return (
     <Modal
@@ -52,40 +50,6 @@ export function ModelFormModal({
           fetchingModels={false}
           lockEndpointFields={lockEndpointFields}
         />
-
-        {/* Advanced params — moved after model list */}
-        <div className="rounded-xl border border-border/60 bg-muted/20">
-          <button
-            type="button"
-            onClick={() => setShowAdvancedParams((prev) => !prev)}
-            aria-expanded={showAdvancedParams}
-            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
-          >
-            <div>
-              <div className="text-sm font-medium">
-                {t("settings.advancedParams")}
-              </div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {t("settings.aiWorkbenchChatParamsDesc")}
-              </div>
-            </div>
-            <ChevronDownIcon
-              aria-hidden="true"
-              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
-                showAdvancedParams ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-
-          {showAdvancedParams ? (
-            <div className="border-t border-border/60 p-4">
-              <ChatParamsSection
-                modelForm={modelForm}
-                setModelForm={setModelForm}
-              />
-            </div>
-          ) : null}
-        </div>
 
         <div className="flex items-center justify-between border-t border-border pt-4">
           <button

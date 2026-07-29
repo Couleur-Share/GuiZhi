@@ -25,6 +25,64 @@ function readLatestChangelogSection() {
     .trim();
 }
 
+const extraResources = [
+  {
+    from: "resources/icon.ico",
+    to: "icon.ico",
+  },
+  {
+    from: "resources/icon.png",
+    to: "icon.png",
+  },
+  // 注意：macOS 图标资产（icon.icns / icon.iconset / tray 模板图案）仍是
+  // PromptHub 图案；恢复 mac 发布矩阵前必须替换为归知图标（Windows 的
+  // icon.ico / icon.png 已是归知图标）。
+  {
+    from: "resources/icon.iconset",
+    to: "icon.iconset",
+  },
+  {
+    from: "resources/tray",
+    to: "tray",
+  },
+  {
+    from: "../../CHANGELOG.md",
+    to: "CHANGELOG.md",
+  },
+  // MCP server：放在 asar 外面，用户要在 mcp.json 里按绝对路径引用它
+  {
+    from: "out/mcp",
+    to: "mcp",
+  },
+  // MCP server 是独立进程，必须用与应用同一份 wasm 驱动——它的锁是
+  // `mkdir <db>.lock` 目录，跟原生 SQLite 的字节范围锁互不认识，换驱动会
+  // 读到未提交的数据。放在产物旁的 node_modules 下靠 Node 常规解析找到，
+  // 比手拼 app.asar.unpacked 路径可靠。
+  {
+    from: "../../node_modules/node-sqlite3-wasm",
+    to: "mcp/node_modules/node-sqlite3-wasm",
+  },
+];
+
+/**
+ * 源不存在时 electron-builder 只是跳过那一条，不报错也不中止。MCP server
+ * 产物就这么在 v0.11~v0.13 三个安装包里整个缺席（CI 当时跑的是 vite build，
+ * 不含 build:mcp），用户侧唯一的迹象是设置页一句「组件缺失」。
+ * 打包前逐条确认，缺了当场失败。
+ */
+function assertExtraResourcesExist() {
+  const missing = extraResources
+    .map((entry) => entry.from)
+    .filter((from) => !fs.existsSync(path.resolve(__dirname, from)));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `extraResources 源缺失：${missing.join("、")}。` +
+        `out/ 下的产物需要先执行 pnpm build（含 build:mcp）。`,
+    );
+  }
+}
+
 const enableMacReleaseSigning =
   process.env.GUIZHI_MAC_RELEASE_SIGN === "true";
 
@@ -51,44 +109,10 @@ module.exports = {
     main: "out/main/index.js",
   },
   files: ["out/**/*"],
-  extraResources: [
-    {
-      from: "resources/icon.ico",
-      to: "icon.ico",
-    },
-    {
-      from: "resources/icon.png",
-      to: "icon.png",
-    },
-    // 注意：macOS 图标资产（icon.icns / icon.iconset / tray 模板图案）仍是
-    // PromptHub 图案；恢复 mac 发布矩阵前必须替换为归知图标（Windows 的
-    // icon.ico / icon.png 已是归知图标）。
-    {
-      from: "resources/icon.iconset",
-      to: "icon.iconset",
-    },
-    {
-      from: "resources/tray",
-      to: "tray",
-    },
-    {
-      from: "../../CHANGELOG.md",
-      to: "CHANGELOG.md",
-    },
-    // MCP server：放在 asar 外面，用户要在 mcp.json 里按绝对路径引用它
-    {
-      from: "out/mcp",
-      to: "mcp",
-    },
-    // MCP server 是独立进程，必须用与应用同一份 wasm 驱动——它的锁是
-    // `mkdir <db>.lock` 目录，跟原生 SQLite 的字节范围锁互不认识，换驱动会
-    // 读到未提交的数据。放在产物旁的 node_modules 下靠 Node 常规解析找到，
-    // 比手拼 app.asar.unpacked 路径可靠。
-    {
-      from: "../../node_modules/node-sqlite3-wasm",
-      to: "mcp/node_modules/node-sqlite3-wasm",
-    },
-  ],
+  extraResources,
+  beforePack: () => {
+    assertExtraResourcesExist();
+  },
   asarUnpack: ["**/*.node", "**/node-sqlite3-wasm/**"],
   asar: true,
   npmRebuild: false,

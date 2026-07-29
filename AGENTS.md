@@ -171,6 +171,25 @@ chip 会碎成四行，头部反而比改之前更高（实测 390px 下 4 行 c
 置顶与归档随之改由 chip 表达：状态不能只活在菜单项的文案里。归档态原本仅靠
 `ArchiveIcon` / `ArchiveRestoreIcon` 两个长得极像的图标区分，本来就看不出来。
 
+逐模型采样参数（「高级参数」：temperature / maxTokens / topP / topK / 两个 penalty /
+stream / enableThinking / customParams）在 v0.13 整个删掉了，别再加回来。它以
+`AIModelConfig.chatParams` 的形态存在过，UI 是设置页「模型配置」下的第三个面板加
+模型编辑弹窗里的折叠区。删的理由是它**从来就没真正生效过**，而一个半通的旋钮比没有
+旋钮更坏：八个字段里，temperature 与 maxTokens 被每个场景显式传参覆盖
+（摘要、标签 0.3、Wiki 编译 0.2、问答各有各的值，`options?.x ?? chatParams?.x` 的
+右边永远轮不到），stream 由「调用方给没给 `onDelta`」决定，enableThinking 被
+`runScenarioChat` 写死成 false；剩下 topP / topK / 两个 penalty / customParams 只在
+「OpenAI 兼容或 Gemini 协议」且「走渲染进程那四个场景」时才进请求体——anthropic
+分支另起一个请求体，连 temperature 都不发，而主进程那整条链路（排版、内容总结、
+拟题、论坛总结、配图策划）压根不读它，`packages/core` 的 `normalizeModelConfig`
+逐字段重建对象、写盘时就把它丢了。
+真要重做，先解决那个绕不过去的设计问题：场景的 temperature 是有意调的（Wiki 编译
+要稳定、标签要收敛），用户配的值该不该盖掉它？而表单给每个字段都铺了默认值，
+分不出「用户没动过」与「用户就是想要 0.7」，`??` 兜底那套写法在这里必然失效。
+需要给单个模型塞特殊请求字段（`reasoning_effort` 这类）的话，`customParams` 那个
+逃生舱也一并没了，得在 `services/ai.ts` 的 `chatCompletion` 里按模型名硬编码——
+`enable_thinking` 已经是这么处理的。
+
 AI 用量记账覆盖主进程：`main/services/ai-usage.ts` 的 `recordMainAiUsage`。
 此前 `recordAiUsage` 只有渲染进程那三条链路在调，主进程的配图、总结、排版、转写、
 OCR 一条都不记——而配图按张计费，是全应用最贵的一项，面板给出的不是「少一点」
@@ -431,7 +450,24 @@ anthropic 端点是真实存在的，只看模型名会栽。
 直接 `return null`，任务一结束耗时信息全部消失，连总时长都得拿两个时间戳的气泡去减。
 落点是任务行本身而不是「每次导入生成一份报告」：32 条任务就是 32 份没人会打开的
 文件，而用户的原话恰恰是「在使用时没发现」，需要主动打开才看得见的东西治不了这个。
-行上常驻「共 X · 最慢 Y」供扫视，完整明细收在点开之后。
+行上常驻「共 X · 最慢 Y」供扫视，完整明细在详情弹窗里。
+明细的主体是**一条堆叠时间条**而不是一列数字：阶段是顺序的、各段之和恰好等于总耗时，
+所以堆叠条就是这条任务的时间线，段宽即占比。九行数字要逐个比大小才知道谁最贵。
+颜色只承载一个信息——哪段最慢（琥珀，与「完成（有缺失）」同一套语言）；其余相邻段
+交替两档 `primary` 透明度只为分开边界，条与图例的对应关系靠**位置**不靠颜色，
+所以不需要九种可分辨的色值，也就不必绕过语义令牌。
+四舍五入到 0:00 的阶段折成一行「另有 N 个」（可点开看全部）：单独占行是纯噪音，
+一字不提又像漏了阶段。图例整块共用**一个** grid、逐行只吐单元格——每行各自成 grid
+的话名称列的 `auto` 按各自内容取宽就对不齐，而给死宽度在中英两种语言下必有一边难看
+（中文四到六个字，英文最长的 `Extracting text from images` 有 27 个字符）。
+详情弹窗（`ImportTaskDetailModal`）由**工作区持有单例**、按 id 取任务，不是每行挂一个：
+一屏几十行意味着几十份 toast 与 store 订阅，而同时只可能开一个；按 id 而不是存快照，
+任务还在跑时弹窗才跟着更新。入口有两个——耗时摘要，以及动作条上常驻的「任务详情」，
+后者不能省：失败与取消的任务多半没有耗时摘要可点，而它们恰恰最需要看清楚。
+「复制诊断信息」把这些一次性带走（`import-task-report.ts`，纯函数好测）。它与界面显示
+有一处**故意的不同**：报告列出全部阶段、不折叠亚秒的那几个——折叠是为了扫视时的信噪比，
+而报告的读者是排查的人或模型，少一行就是少一条线索。取不到应用版本时省掉那一行而不是
+留一个空的「应用：」；单元格里的 `|` 要转义，否则表格被从中间切断。
 写库时机是白捡的：`updateAndNotify` 是全部 12 个阶段的唯一收口且本来就在写库，
 统计搭同一次 UPDATE 走，零额外 SQL 往返；字段挂在 `ImportTask` 上，`import:list`
 与 `import:changed` 自动带过去，不新增 IPC。
@@ -703,17 +739,14 @@ token 本身的一部分，修剪尾巴时不能连它一起削掉，削了就�
 在此之前零调用方。scrypt 参数随文件走，所以 `parseConfigTransferFile` 必须卡住
 上界，否则一份构造过的文件靠一个巨大的 N 就能把主进程拖死。
 采集必须由渲染进程发起：主进程读不到 localStorage，而 `guizhi-settings` 才是 AI
-配置的真相源（比 `ai-models.json` 多出 `chatParams` 与 `scenarioModelDefaults`，
-`normalizeModelConfig` 是逐字段重建对象、写入时直接丢弃这两个）。主进程补上配图
+配置的真相源（比 `ai-models.json` 多出 `scenarioModelDefaults`，
+`normalizeModelConfig` 是逐字段重建对象、写入时直接丢弃它）。主进程补上配图
 风格、快捷键与 MCP 可访问范围这三份它独有的 JSON。反过来，应用导入必须落到主进程，
 因为要做 funasr 对账、要写 config 目录、也因为渲染进程写完 localStorage 就重启了。
-`chatParams` 那句有个必须配套的后果：每次启动 `loadSettingsFromMainProcess` 都拿
-主进程那份去整体覆盖 store，而它按定义就缺这个字段——不接回来，用户调过的温度活
-不过一次重启，配置迁移更是必然踩中（它的最后一步就是重启，文件里带过来的参数刚写
-进 localStorage 就被抹掉，而 reconcile 那边早有一条用例锁着「保留 chatParams」）。
-修在 `preserveLocalOnlyModelFields`（按 id 只补 incoming 里缺的那部分，所以「用户
-刚清空了参数」不会被复活），不去动 `normalizeModelConfig`：ai-models.json 不带
-对话参数是有意的边界，主进程那几条链路根本用不上它。
+注意「localStorage 是超集」这件事本身就是维护成本：每次启动
+`loadSettingsFromMainProcess` 都拿主进程那份去整体覆盖 store，凡是只活在渲染进程的
+模型字段都活不过一次重启，得单独接回来。v0.13 删掉逐模型采样参数（见下）的一半理由
+就是它——那是当时唯一需要这层保护的字段。
 MCP 可访问范围（`config/mcp.json`）比另外两份更需要小心：它是隐私边界，不带过去
 是**静默放开**——用户在旧机器上把私人日记那个库排除掉，新机器上却是默认全开，而
 界面上没有任何迹象。带过去最坏是过度收紧（知识库 id 在没恢复备份的机器上会失配，
@@ -832,6 +865,15 @@ MCP 同时做一次 38ms 的重查询，归知侧最慢 18ms、中位 3ms、零�
 Node。产物走 `extraResources` 落在 asar 外（要按绝对路径引用），
 `node-sqlite3-wasm` 整包复制到产物旁的 `node_modules/` 下靠 Node 常规解析找到，
 比手拼 `app.asar.unpacked` 路径可靠，代价是多 1.25MB 副本。
+打包前必须跑 `pnpm build` 而不是 `pnpm vite build`：MCP 产物由另一份 vite 配置
+（`build:mcp`）产出，后者不含它。`release.yml` 当年就是这么写的、加 MCP 时没跟着
+改，于是 v0.11 ~ v0.13 三个安装包里 `guizhi-mcp.mjs` 整个缺席，装了归知的人在设置页
+只看得到一句「组件缺失」，而 CI 从头到尾绿灯——`extraResources` 的源不存在时
+electron-builder **只是跳过那一条，不报错也不中止**（同目录的 `node-sqlite3-wasm`
+源在、照常复制，所以 `resources/mcp/` 还真的存在，只是空剩一个 node_modules）。
+质量流水线跑的是 `pnpm build`、但不打包，两条路各错一半，谁也照不见谁。
+守卫因此加在 `beforePack`（`assertExtraResourcesExist`）而不是 CI 脚本里：
+逐条确认 `from` 存在，缺了当场抛错，本地直接调 electron-builder 也拦得住。
 用的是 v1 世代的 API 形态但装的是 **v2**（`@modelcontextprotocol/server`，
 与 2026-07-28 spec 同日发布）。选它的风险是客户端未必跟上，已实测排除：
 用 `2025-06-18` 旧协议版本握手，server 正常协商并回同一版本。`inputSchema` 收

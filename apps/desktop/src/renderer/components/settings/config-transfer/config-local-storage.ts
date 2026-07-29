@@ -2,8 +2,7 @@
  * 配置迁移在渲染进程这一侧的读写：localStorage 里的设置与界面偏好。
  *
  * 主进程读不到 localStorage，而 guizhi-settings 恰恰是 AI 配置的真相源
- * （比 ai-models.json 多出 chatParams 与 scenarioModelDefaults），所以采集
- * 必须由渲染进程发起。
+ * （比 ai-models.json 多出 scenarioModelDefaults），所以采集必须由渲染进程发起。
  */
 import {
   pickTransferableLocalStorage,

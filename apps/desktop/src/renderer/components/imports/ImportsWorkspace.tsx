@@ -9,6 +9,7 @@ import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { ImportsBulkBar } from "./ImportsBulkBar";
 import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
+import { ImportTaskDetailModal } from "./ImportTaskDetailModal";
 import { ImportTaskRow } from "./ImportTaskRow";
 
 function isRunning(task: ImportTask): boolean {
@@ -40,6 +41,9 @@ export function ImportsWorkspace() {
   const setAppModule = useUIStore((state) => state.setAppModule);
 
   const [now, setNow] = useState(() => Date.now());
+  // 详情弹窗按 id 记而不是把整条任务存下来：任务还在跑时会不断有新状态推过来，
+  // 存快照的话弹窗会停在打开那一刻，越看越不对
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetchTasks();
@@ -53,6 +57,9 @@ export function ImportsWorkspace() {
     () => tasks.filter((task) => selectionIds.includes(task.id)),
     [tasks, selectionIds],
   );
+  const detailTask = detailTaskId
+    ? (tasks.find((task) => task.id === detailTaskId) ?? null)
+    : null;
   const activeCount = tasks.filter(isRunning).length;
   const failedIds = tasks
     .filter((task) => task.status === "failed")
@@ -189,11 +196,22 @@ export function ImportsWorkspace() {
                   toggleSelection(task.id);
                 }}
                 onOpenItem={(itemId) => void openItem(itemId)}
+                onOpenDetail={() => setDetailTaskId(task.id)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* 任务被「清理已完成」删掉时 detailTask 会变成 null，弹窗跟着消失 */}
+      {detailTask ? (
+        <ImportTaskDetailModal
+          task={detailTask}
+          isOpen={detailTaskId !== null}
+          onClose={() => setDetailTaskId(null)}
+          onOpenItem={(itemId) => void openItem(itemId)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { app } from "electron";
 import fs from "fs";
 import path from "path";
 
+import { configureRuntimePaths as configureCoreRuntimePaths } from "@guizhi/core";
+
 import type Database from "../database/sqlite";
 
 interface E2ESeedDocument {
@@ -38,6 +40,11 @@ export function configureE2ETestProfile(
   fs.mkdirSync(resolvedDir, { recursive: true });
   app.setName("GuiZhi E2E");
   app.setPath("userData", resolvedDir);
+  // packages/core 有一份状态独立的同名路径解析，`config/` 下那三份 JSON
+  // （ai-models / illustration-styles / mcp）全走它，而它认不得 app.setPath。
+  // 不一起指过来的话，自动化实例会读写用户真实的 AI 配置——`pnpm shot` 截出来
+  // 的是用户的模型列表，而任何落盘到设置的操作改的都是用户那份 Key。
+  configureCoreRuntimePaths({ userDataPath: resolvedDir });
   return resolvedDir;
 }
 

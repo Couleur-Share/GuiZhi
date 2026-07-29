@@ -1,13 +1,6 @@
-import type {
-  AIModelConfig,
-  ChatModelParams,
-} from "../../../stores/settings.store";
+import type { AIModelConfig } from "../../../stores/settings.store";
 
-import {
-  DEFAULT_CHAT_PARAMS,
-  DEFAULT_MODEL_CAPABILITIES,
-  PROVIDER_OPTIONS,
-} from "./constants";
+import { DEFAULT_MODEL_CAPABILITIES, PROVIDER_OPTIONS } from "./constants";
 import type { ModelFormState, ModelOption, ProviderOption } from "./types";
 
 const MODEL_CATEGORY_CONFIG: Array<{
@@ -143,78 +136,8 @@ const PROVIDER_CATEGORY_MAP: Record<string, string> = {
   ollama: "Llama",
 };
 
-export function cloneDefaultChatParams(): ModelFormState["chatParams"] {
-  return { ...DEFAULT_CHAT_PARAMS };
-}
-
 export function cloneDefaultCapabilities(): ModelFormState["capabilities"] {
   return { ...DEFAULT_MODEL_CAPABILITIES };
-}
-
-function formatCustomParams(
-  customParams?: Record<string, string | number | boolean>,
-): string {
-  if (!customParams || Object.keys(customParams).length === 0) {
-    return "";
-  }
-  return JSON.stringify(customParams, null, 2);
-}
-
-function parseCustomParams(
-  text: string,
-):
-  | { success: true; value: Record<string, string | number | boolean> }
-  | { success: false } {
-  if (!text.trim()) {
-    return { success: true, value: {} };
-  }
-
-  try {
-    const parsed = JSON.parse(text);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { success: false };
-    }
-
-    const result: Record<string, string | number | boolean> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (
-        typeof value !== "string" &&
-        typeof value !== "number" &&
-        typeof value !== "boolean"
-      ) {
-        return { success: false };
-      }
-      result[key] = value;
-    }
-
-    return { success: true, value: result };
-  } catch {
-    return { success: false };
-  }
-}
-
-export function buildChatParams(form: ModelFormState): ChatModelParams | null {
-  const customParams = parseCustomParams(form.chatParams.customParamsText);
-  if (!customParams.success) {
-    return null;
-  }
-
-  return {
-    temperature: form.chatParams.temperature,
-    maxTokens: form.chatParams.maxTokens,
-    topP: form.chatParams.topP,
-    topK: form.chatParams.topK.trim()
-      ? Number(form.chatParams.topK)
-      : undefined,
-    frequencyPenalty: form.chatParams.frequencyPenalty,
-    presencePenalty: form.chatParams.presencePenalty,
-    stream: form.chatParams.stream,
-    enableThinking: form.chatParams.enableThinking,
-    customParams:
-      Object.keys(customParams.value).length > 0
-        ? customParams.value
-        : undefined,
-  };
 }
 
 export function getProviderInfo(
@@ -468,8 +391,6 @@ export function applyModelIdToForm(
 }
 
 export function createFormFromModel(model: AIModelConfig): ModelFormState {
-  const chatParams = model.chatParams;
-
   return {
     name: model.name || "",
     providerId: model.providerId,
@@ -488,20 +409,6 @@ export function createFormFromModel(model: AIModelConfig): ModelFormState {
       rerank: model.capabilities?.rerank === true,
       audioTranscription: model.capabilities?.audioTranscription === true,
       imageGeneration: model.capabilities?.imageGeneration === true,
-    },
-    chatParams: {
-      temperature: chatParams?.temperature ?? DEFAULT_CHAT_PARAMS.temperature,
-      maxTokens: chatParams?.maxTokens ?? DEFAULT_CHAT_PARAMS.maxTokens,
-      topP: chatParams?.topP ?? DEFAULT_CHAT_PARAMS.topP,
-      topK: chatParams?.topK != null ? String(chatParams.topK) : "",
-      frequencyPenalty:
-        chatParams?.frequencyPenalty ?? DEFAULT_CHAT_PARAMS.frequencyPenalty,
-      presencePenalty:
-        chatParams?.presencePenalty ?? DEFAULT_CHAT_PARAMS.presencePenalty,
-      stream: chatParams?.stream ?? DEFAULT_CHAT_PARAMS.stream,
-      enableThinking:
-        chatParams?.enableThinking ?? DEFAULT_CHAT_PARAMS.enableThinking,
-      customParamsText: formatCustomParams(chatParams?.customParams),
     },
   };
 }

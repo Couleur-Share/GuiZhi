@@ -40,6 +40,22 @@ export function getStageLabel(stage: ImportStage | null | undefined): {
   return stage ? (STAGE_LABELS[stage] ?? STAGE_LABELS.fetching) : STAGE_LABELS.fetching;
 }
 
+/**
+ * 状态文案。`StatusBadge` 自己按状态挑徽标样式，用不上这张表；
+ * 而详情弹窗与诊断文本只需要一个名字，两处共用同一份。
+ */
+export const STATUS_LABELS: Record<
+  ImportTask["status"],
+  { key: string; fallback: string }
+> = {
+  pending: { key: "imports.statusPending", fallback: "等待中" },
+  processing: { key: "imports.statusProcessing", fallback: "处理中" },
+  completed: { key: "imports.statusCompleted", fallback: "已完成" },
+  duplicate: { key: "imports.statusDuplicate", fallback: "重复内容" },
+  canceled: { key: "imports.statusCanceled", fallback: "已取消" },
+  failed: { key: "imports.statusFailed", fallback: "失败" },
+};
+
 /** 单个阶段超过这个时长仍无进展，行内给出「本阶段已 x」提示 */
 export const STALL_THRESHOLD_MS = 90_000;
 
