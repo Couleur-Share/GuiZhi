@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档 / Documentation
+    url: https://github.com/Couleur-Share/GuiZhi/blob/main/docs/README.md
+    about: 快速上手、采集平台、模型路由、MCP、已知限制 / Getting started, platforms, models, MCP, limitations
+  - name: 讨论交流 / Communication
+    url: https://github.com/Couleur-Share/GuiZhi/discussions
+    about: 在 GitHub Discussions 中与其他用户讨论交流 / Communicate with other users in GitHub Discussions

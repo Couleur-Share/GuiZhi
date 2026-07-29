@@ -1,0 +1,58 @@
+name: 功能请求 / Feature request
+title: "[Feature] "
+description: 提出你的功能请求 / Propose your feature request
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 在提交问题之前，请确认以下事项：
+
+        1. 请 **确保** 您已经查阅了 [README](https://github.com/Couleur-Share/GuiZhi#readme)、[文档](https://github.com/Couleur-Share/GuiZhi/blob/main/docs/README.md) 与 [已知限制](https://github.com/Couleur-Share/GuiZhi/blob/main/docs/known-limitations.md)，确认软件尚未提供类似功能
+        2. 请 **确保** [已有的问题](https://github.com/Couleur-Share/GuiZhi/issues?q=is%3Aissue) 中没有人提交过相似 issue，否则请在已有的 issue 下讨论
+        3. 请 **务必** 给 issue 填写一个简洁明了的标题，以便他人快速检索
+        4. 请 **务必** 按模板详细描述需求与使用场景，否则 issue 可能被关闭
+
+        ## Before submitting the issue, please make sure of the following checklist:
+
+        1. Please make sure you have read the [README](https://github.com/Couleur-Share/GuiZhi#readme), [docs](https://github.com/Couleur-Share/GuiZhi/blob/main/docs/README.md) and [Known limitations](https://github.com/Couleur-Share/GuiZhi/blob/main/docs/known-limitations.md) and that a similar feature does not already exist
+        2. Please make sure there is no similar issue in the [existing issues](https://github.com/Couleur-Share/GuiZhi/issues?q=is%3Aissue); otherwise discuss under the existing issue
+        3. Please fill in a concise and clear title so others can find it quickly
+        4. Please describe the request and use case in detail according to the template; otherwise the issue may be closed
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 功能描述 / Feature description
+      description: 详细清晰地描述你的功能请求 / A clear and concise description of what the feature is
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景 / Use case
+      description: 请描述你的功能请求的使用场景 / Please describe the use case of your feature request
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 现有替代方案 / Alternatives
+      description: 你现在是怎么绕过的？有没有参考过别的工具？ / How do you work around this today? Any reference tools?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: os
+    attributes:
+      label: 适用系统 / Target OS
+      description: 请选择该功能适用的操作系统（至少选择一个） / Please select the operating system(s) for this feature (select at least one)
+      options:
+        - label: Windows
+        - label: Linux
+        - label: macOS
+    validations:
+      required: true
