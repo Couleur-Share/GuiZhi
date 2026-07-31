@@ -9,4 +9,9 @@ allowBuilds:
   electron-winstaller: true
   esbuild: true
 
+# electron-builder 26 的 app-builder-lib 读 ElectronDownloadCacheMode.ReadWrite，
+# 该枚举从 @electron/get@3.1.0 才导出；^3.0.0 会解析到 3.0.0 并在打包时炸。
+overrides:
+  "@electron/get@3": "3.1.0"
+
 shamefullyHoist: true
