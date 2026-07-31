@@ -15,6 +15,16 @@ export interface FfmpegStatus {
   path?: string;
   /** 内置托管版的目标路径（未安装也返回，供 UI 展示） */
   managedPath: string;
+  /**
+   * 当前平台是否提供应用内一键安装。
+   * 仅 Windows 为 true；Mac / Linux 靠包管理器或自定义路径。
+   */
+  installSupported: boolean;
+  /**
+   * 应用内装不了时的推荐安装命令（如 `brew install ffmpeg`）。
+   * 无统一命令的平台（Linux 各发行版不同）不填，由 UI 给通用文案。
+   */
+  installHintCommand?: string;
 }
 
 export interface FfmpegInstallResult {

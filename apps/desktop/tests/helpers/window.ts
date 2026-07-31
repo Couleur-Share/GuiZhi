@@ -42,16 +42,6 @@ export function createWindowApiMock(overrides?: DeepPartial<MockRecord>) {
         get: vi.fn().mockResolvedValue(null),
         set: vi.fn().mockResolvedValue(true),
       },
-      security: {
-        status: vi.fn().mockResolvedValue({
-          masterPasswordConfigured: false,
-          unlocked: true,
-        }),
-        setMasterPassword: vi.fn().mockResolvedValue({ success: true }),
-        changeMasterPassword: vi.fn().mockResolvedValue({ success: true }),
-        unlock: vi.fn().mockResolvedValue({ success: true }),
-        lock: vi.fn().mockResolvedValue({ success: true }),
-      },
       ai: {
         httpRequest: vi.fn().mockResolvedValue({
           ok: false,

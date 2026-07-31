@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { useSettingsStore } from "../../../stores/settings.store";
@@ -9,6 +10,9 @@ import { FunasrEngineRow } from "./FunasrEngineRow";
 /**
  * 采集区：三个可选外部引擎的安装与状态。
  * 主行只留「名称 + 状态 + 主操作」，路径、重新检测、移除都在各行的高级面板里。
+ *
+ * 说话人分离依赖 Windows 本地 Python FunASR；非 Windows 禁用开关。
+ * Mac GGUF 引擎也不支持分离。
  */
 export function CaptureSection() {
   const { t } = useTranslation();
@@ -22,6 +26,13 @@ export function CaptureSection() {
   const setTranscribeDiarize = useSettingsStore(
     (state) => state.setTranscribeDiarize,
   );
+
+  const [platform, setPlatform] = useState<string | null>(null);
+  useEffect(() => {
+    void window.electron?.updater?.getPlatform?.().then(setPlatform);
+  }, []);
+  // 与 funasr installSupported 对齐：仅 Windows 有本地引擎
+  const diarizeAvailable = platform === null || platform === "win32";
 
   const customPathHint = t(
     "settings.captureCustomPathHint",
@@ -99,15 +110,23 @@ export function CaptureSection() {
 
       <SettingItem
         label={t("settings.transcribeDiarize", "导入时区分说话人")}
-        description={t(
-          "settings.transcribeDiarizeDesc",
-          "访谈、会议这类多人内容才有意义：转写会慢一倍，且只有内置本地引擎支持。单人内容开着没有收益。",
-        )}
+        description={
+          diarizeAvailable
+            ? t(
+                "settings.transcribeDiarizeDesc",
+                "访谈、会议这类多人内容才有意义：转写会慢一倍，且只有内置本地引擎支持。单人内容开着没有收益。",
+              )
+            : t(
+                "settings.transcribeDiarizeUnavailable",
+                "仅 Windows 本地转写引擎支持说话人分离；本平台请使用云端转写，此开关无效。",
+              )
+        }
       >
         <ToggleSwitch
           ariaLabel={t("settings.transcribeDiarize", "导入时区分说话人")}
-          checked={transcribeDiarize}
+          checked={diarizeAvailable ? transcribeDiarize : false}
           onChange={setTranscribeDiarize}
+          disabled={!diarizeAvailable}
         />
       </SettingItem>
     </SettingSection>

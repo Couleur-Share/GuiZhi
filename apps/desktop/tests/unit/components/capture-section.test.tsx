@@ -13,6 +13,7 @@ const YTDLP_MANAGED = {
   version: "2026.07.04",
   path: "C:/Users/test/AppData/Roaming/GuiZhi/tools/yt-dlp.exe",
   managedPath: "C:/Users/test/AppData/Roaming/GuiZhi/tools/yt-dlp.exe",
+  installSupported: true,
 };
 
 // 与用户截图一致：ffmpeg 来自系统 PATH，应用没有托管副本可移除
@@ -22,6 +23,7 @@ const FFMPEG_ON_PATH = {
   version: "8.1-essentials_build-www.gyan.dev",
   path: "ffmpeg",
   managedPath: "C:/Users/test/AppData/Roaming/GuiZhi/tools/ffmpeg.exe",
+  installSupported: true,
 };
 
 const FUNASR_INSTALLED = {
@@ -30,6 +32,7 @@ const FUNASR_INSTALLED = {
   port: 8620,
   dir: "C:/Users/test/AppData/Roaming/GuiZhi/tools/funasr",
   version: "1.3.29",
+  installSupported: true,
 };
 
 function installEngineMocks() {
@@ -468,6 +471,88 @@ describe("采集区", () => {
         row("funasr").getByRole("button", { name: "一键安装" }),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("Mac 上 ffmpeg 未安装时给复制 brew 命令，不给一键安装", async () => {
+    const user = userEvent.setup({ writeToClipboard: true });
+    window.api.ffmpeg.status.mockResolvedValue({
+      installed: false,
+      source: null,
+      managedPath: "/Users/test/Library/Application Support/GuiZhi/tools/ffmpeg",
+      installSupported: false,
+      installHintCommand: "brew install ffmpeg",
+    });
+    renderSection();
+
+    await waitFor(() =>
+      expect(
+        row("ffmpeg").getByRole("button", { name: "复制 brew 命令" }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      row("ffmpeg").queryByRole("button", { name: "一键安装" }),
+    ).not.toBeInTheDocument();
+    expect(
+      row("ffmpeg").getByText(/brew install ffmpeg/),
+    ).toBeInTheDocument();
+
+    await user.click(row("ffmpeg").getByRole("button", { name: "复制 brew 命令" }));
+    await waitFor(() =>
+      expect(screen.getByText(/已复制：brew install ffmpeg/)).toBeInTheDocument(),
+    );
+  });
+
+  it("Intel Mac 上本地转写不给出安装入口，文案导向 audioText", async () => {
+    window.electron.updater.getPlatform.mockResolvedValue("darwin");
+    window.api.funasr.status.mockResolvedValue({
+      installed: false,
+      running: false,
+      port: 8620,
+      dir: "/Users/test/Library/Application Support/GuiZhi/tools/funasr",
+      installSupported: false,
+    });
+    renderSection();
+
+    await waitFor(() =>
+      expect(
+        row("funasr").getByText(/本平台未提供本地引擎/),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      row("funasr").queryByRole("button", { name: "一键安装" }),
+    ).not.toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.getByText(/无此能力|此开关无效/)).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("switch", { name: "导入时区分说话人" }),
+    ).toBeDisabled();
+  });
+
+  it("Apple Silicon Mac 给出 GGUF 一键安装入口，说话人分离仍禁用", async () => {
+    window.electron.updater.getPlatform.mockResolvedValue("darwin");
+    window.api.funasr.status.mockResolvedValue({
+      installed: false,
+      running: false,
+      port: 8620,
+      dir: "/Users/test/Library/Application Support/GuiZhi/tools/funasr",
+      installSupported: true,
+      installFlavor: "gguf",
+    });
+    renderSection();
+
+    await waitFor(() =>
+      expect(
+        row("funasr").getByText(/约需 300MB/),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      row("funasr").getByRole("button", { name: "一键安装" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("switch", { name: "导入时区分说话人" }),
+    ).toBeDisabled();
   });
 
   it("IPC 层抛错时给出可读提示，而不是留下未处理的 rejection", async () => {

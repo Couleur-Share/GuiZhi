@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/Couleur-Share/GuiZhi/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Couleur-Share/GuiZhi?include_prereleases&style=for-the-badge&color=2ea043" /></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-8250df?style=for-the-badge" /></a>
-  <a href="#下载安装"><img alt="Platform" src="https://img.shields.io/badge/Windows_·_Linux-1f6feb?style=for-the-badge" /></a>
+  <a href="#下载安装"><img alt="Platform" src="https://img.shields.io/badge/Windows_·_macOS_·_Linux-1f6feb?style=for-the-badge" /></a>
 </p>
 
 <p align="center">
@@ -40,10 +40,15 @@ SQLite，交给 AI 做摘要、打标签、编织成互相链接的 Wiki 页面�
 | --- | --- |
 | Windows x64 | `GuiZhi-Setup-<版本>-x64.exe` |
 | Windows arm64 | `GuiZhi-Setup-<版本>-arm64.exe` |
+| macOS Apple Silicon | `GuiZhi-<版本>-arm64.dmg` |
+| macOS Intel | `GuiZhi-<版本>-x64.dmg` |
 | Linux x64 | `GuiZhi-<版本>-x64.AppImage` / `GuiZhi-<版本>-amd64.deb` |
 
-安装包暂未做代码签名，Windows SmartScreen 弹提示时选择「更多信息 → 仍要运行」。
-macOS 版本待签名证书就绪后提供。首次启动若检测到旧 .NET 版 `guizhi.db`，会提示一键迁移。
+安装包暂未做正式代码签名。Windows SmartScreen 弹提示时选择「更多信息 → 仍要运行」。
+macOS 包仅做 ad-hoc 签名、未经 Apple 公证：若提示无法验证开发者，到「系统设置 →
+隐私与安全性」选择仍要打开；若提示「已损坏」，在终端执行
+`xattr -dr com.apple.quarantine /Applications/GuiZhi.app`。首次启动若检测到旧
+.NET 版 `guizhi.db`，会提示一键迁移。
 
 ## 快速上手
 
@@ -88,7 +93,9 @@ macOS 版本待签名证书就绪后提供。首次启动若检测到旧 .NET �
 ```bash
 pnpm install
 pnpm electron:dev          # 开发
-pnpm electron:build:win    # 打包（须含 MCP 产物，勿只跑 vite build）
+pnpm electron:build:win    # Windows 打包（须含 MCP 产物，勿只跑 vite build）
+pnpm electron:build:mac    # macOS 打包（须在 macOS 上）
+pnpm electron:build:linux  # Linux 打包
 ```
 
 质量门禁与仓库结构见 [从源码构建](./docs/building.md)。

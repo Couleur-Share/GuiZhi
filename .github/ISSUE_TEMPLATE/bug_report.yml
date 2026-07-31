@@ -87,7 +87,7 @@ body:
       options:
         - label: Windows
         - label: Linux
-        - label: macOS（实验 / experimental）
+        - label: macOS
     validations:
       required: true
 

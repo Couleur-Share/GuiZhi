@@ -58,6 +58,35 @@ export function getFfmpegDownloadUrls(
   ];
 }
 
+/** 应用内一键安装仅 Windows（yt-dlp/FFmpeg-Builds 官方 zip） */
+export function isFfmpegInstallSupported(
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform === "win32";
+}
+
+/**
+ * 应用内装不了时的推荐命令。Mac 统一走 Homebrew；
+ * Linux 发行版命令不一，不返回具体命令。
+ */
+export function getFfmpegInstallHintCommand(
+  platform: NodeJS.Platform = process.platform,
+): string | undefined {
+  return platform === "darwin" ? "brew install ffmpeg" : undefined;
+}
+
+function withFfmpegInstallCapability(
+  status: Omit<FfmpegStatus, "installSupported" | "installHintCommand">,
+  platform: NodeJS.Platform,
+): FfmpegStatus {
+  const installHintCommand = getFfmpegInstallHintCommand(platform);
+  return {
+    ...status,
+    installSupported: isFfmpegInstallSupported(platform),
+    ...(installHintCommand ? { installHintCommand } : {}),
+  };
+}
+
 /**
  * FFmpeg-Builds 的 release tag 恒为 `latest`，没有版本号可比；但它构建出的
  * ffmpeg 版本串尾部带构建日期，形如 `N-125753-g6095372a70-20260724`，
@@ -190,49 +219,67 @@ export function resolveFfmpegExecutable(
 
 export async function getFfmpegStatus(
   configuredPath: string | null,
-  options?: { probe?: FfmpegVersionProbe; managedPath?: string },
+  options?: {
+    probe?: FfmpegVersionProbe;
+    managedPath?: string;
+    /** 单测注入；生产默认 process.platform */
+    platform?: NodeJS.Platform;
+  },
 ): Promise<FfmpegStatus> {
   const probe = options?.probe ?? probeFfmpegVersion;
   const managedPath = options?.managedPath ?? getManagedFfmpegPath();
+  const platform = options?.platform ?? process.platform;
 
   const custom = configuredPath?.trim();
   if (custom) {
     const version = await probe(custom);
-    return {
-      installed: version !== null,
-      source: version !== null ? "custom" : null,
-      version: version ?? undefined,
-      path: custom,
-      managedPath,
-    };
+    return withFfmpegInstallCapability(
+      {
+        installed: version !== null,
+        source: version !== null ? "custom" : null,
+        version: version ?? undefined,
+        path: custom,
+        managedPath,
+      },
+      platform,
+    );
   }
 
   if (fs.existsSync(managedPath)) {
     const version = await probe(managedPath);
     if (version) {
-      return {
-        installed: true,
-        source: "managed",
-        version,
-        path: managedPath,
-        managedPath,
-      };
+      return withFfmpegInstallCapability(
+        {
+          installed: true,
+          source: "managed",
+          version,
+          path: managedPath,
+          managedPath,
+        },
+        platform,
+      );
     }
     // 托管副本损坏：继续探测系统 PATH
   }
 
   const pathVersion = await probe("ffmpeg");
   if (pathVersion) {
-    return {
-      installed: true,
-      source: "path",
-      version: pathVersion,
-      path: "ffmpeg",
-      managedPath,
-    };
+    return withFfmpegInstallCapability(
+      {
+        installed: true,
+        source: "path",
+        version: pathVersion,
+        path: "ffmpeg",
+        managedPath,
+      },
+      platform,
+    );
   }
 
-  return { installed: false, source: null, managedPath };
+  return withFfmpegInstallCapability(
+    { installed: false, source: null, managedPath },
+    platform,
+  );
 }
 
 /** 从下载的 zip 中解出 bin/ffmpeg.exe 到目标路径 */

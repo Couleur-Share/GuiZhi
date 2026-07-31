@@ -1,11 +1,14 @@
 /**
- * 本地转写服务进程托管：按需启动 funasr-server、健康检查、随应用退出停止。
+ * 本地转写服务进程托管：按需启动、健康检查、随应用退出停止。
  *
- * 设计：服务不常驻——首次转写 / 测试 / 安装时 ensure 启动（模型加载约
- * 10-20 秒），已在监听的实例（含外部手动启动的）直接采用；应用退出时
- * 结束由本模块拉起的进程。
+ * - Windows：spawn venv 里的 FastAPI server.py
+ * - macOS arm64：主进程内起 GGUF HTTP shim，再调 llama-funasr-sensevoice
+ *
+ * 设计：服务不常驻——首次转写 / 测试 / 安装时 ensure 启动；已在监听的
+ * 实例（含外部手动启动的）直接采用；应用退出时结束由本模块拉起的进程。
  */
 import { spawn, type ChildProcess } from "child_process";
+import fs from "fs";
 import net from "net";
 import { StringDecoder } from "string_decoder";
 import { isManagedFunasrUrl } from "@guizhi/shared/constants";
@@ -15,8 +18,15 @@ import {
   FUNASR_PORT,
   getFunasrPaths,
   isFunasrInstalled,
+  isFunasrPythonInstalled,
+  resolveFunasrEngineFlavor,
+  resolveGgufSensevoiceCli,
 } from "./funasr-paths";
 import { ensureFunasrServerScript } from "./funasr-server-script";
+import {
+  startGgufShim,
+  type GgufShimHandle,
+} from "./funasr-gguf-shim";
 
 const DEFAULT_BOOT_TIMEOUT_MS = 2 * 60 * 1000;
 const HEALTH_POLL_INTERVAL_MS = 2000;
@@ -24,6 +34,7 @@ const PORT_PROBE_TIMEOUT_MS = 1500;
 const LOG_TAIL_MAX = 4096;
 
 let child: ChildProcess | null = null;
+let ggufShim: GgufShimHandle | null = null;
 let childExited = false;
 let logTail = "";
 let detachLogging: (() => void) | null = null;
@@ -148,7 +159,7 @@ export function isFunasrPortListening(
 
 export { isManagedFunasrUrl } from "@guizhi/shared/constants";
 
-async function startAndWait(bootTimeoutMs: number): Promise<void> {
+async function startPythonAndWait(bootTimeoutMs: number): Promise<void> {
   const paths = getFunasrPaths();
   // 脚本内容随应用版本走：升级后无需重装引擎，这里覆盖到最新
   ensureFunasrServerScript(paths.serverScript);
@@ -206,6 +217,43 @@ async function startAndWait(bootTimeoutMs: number): Promise<void> {
   throw new Error("本地转写服务启动超时");
 }
 
+async function startGgufAndWait(): Promise<void> {
+  const paths = getFunasrPaths();
+  const cliPath = resolveGgufSensevoiceCli(paths);
+  if (!cliPath) {
+    throw new Error("未找到 llama-funasr-sensevoice，请重新安装本地转写引擎");
+  }
+  if (!fs.existsSync(paths.sensevoiceGguf) || !fs.existsSync(paths.vadGguf)) {
+    throw new Error("缺少 SenseVoice / VAD 模型文件，请重新安装本地转写引擎");
+  }
+  lastActivityAt = 0;
+  ggufShim = await startGgufShim({
+    cliPath,
+    modelPath: paths.sensevoiceGguf,
+    vadPath: paths.vadGguf,
+    onActivity: () => {
+      lastActivityAt = Date.now();
+    },
+  });
+  if (!(await probeFunasrHealth(2000))) {
+    await stopGgufShimQuiet();
+    throw new Error("本地转写服务启动失败：健康探测未通过");
+  }
+}
+
+async function stopGgufShimQuiet(): Promise<void> {
+  const handle = ggufShim;
+  ggufShim = null;
+  if (!handle) {
+    return;
+  }
+  try {
+    await handle.close();
+  } catch {
+    // 关闭失败不阻断后续启动
+  }
+}
+
 /**
  * 健康探测失败之后的分流：端口被占着就认下这个实例，否则才拉新的。
  *
@@ -222,7 +270,16 @@ async function startOrAdopt(bootTimeoutMs: number): Promise<void> {
   if (!isFunasrInstalled()) {
     throw new Error("本地转写引擎未安装");
   }
-  await startAndWait(bootTimeoutMs);
+  const flavor = resolveFunasrEngineFlavor();
+  if (flavor === "python") {
+    await startPythonAndWait(bootTimeoutMs);
+    return;
+  }
+  if (flavor === "gguf") {
+    await startGgufAndWait();
+    return;
+  }
+  throw new Error("本地转写引擎未安装");
 }
 
 /**
@@ -268,6 +325,7 @@ export function runExclusiveLocalTranscription<T>(
 
 /** 停止由本模块拉起的服务进程（Windows 下杀进程树，避免遗留 python 子进程） */
 export function stopFunasrService(): void {
+  void stopGgufShimQuiet();
   const pid = child?.pid;
   detachLogging?.();
   child = null;
@@ -299,4 +357,12 @@ export async function ensureLocalTranscriptionService(
     return;
   }
   await ensureFunasrService();
+}
+
+/**
+ * 说话人分离只绑 Windows Python 引擎（cam++）。
+ * Mac GGUF 也走同一 managed URL，不能只靠 URL 判断。
+ */
+export function supportsLocalDiarization(apiUrl: string): boolean {
+  return isManagedFunasrUrl(apiUrl) && isFunasrPythonInstalled();
 }

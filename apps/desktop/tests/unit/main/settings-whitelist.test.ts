@@ -20,7 +20,8 @@ describe("isPersistedSettingKey", () => {
   });
 
   it("拦截主进程内部状态与未知键", () => {
-    // settings 表和用户设置共用一张表，master_password 也在里面
+    // settings 表和用户设置共用一张表，master_password 也在里面；
+    // 已撤的「安全」设置分区派生字段也不该被写入
     expect(isPersistedSettingKey("master_password")).toBe(false);
     expect(isPersistedSettingKey("security")).toBe(false);
     expect(isPersistedSettingKey("webdavPassword")).toBe(false);

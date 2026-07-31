@@ -8,9 +8,11 @@ import {
   CheckCircleIcon,
   ArrowUpCircleIcon,
   ClipboardCopyIcon,
+  ListChecksIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
+import { useUIStore } from "../../stores/ui.store";
 import { useUpdaterStore } from "../../stores/updater.store";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Modal } from "../ui/Modal";
@@ -26,6 +28,9 @@ type UpdateCheckState = "idle" | "checking" | "latest" | "available";
 export function AboutSettings() {
   const { t } = useTranslation();
   const settings = useSettingsStore();
+  const requestSetupChecklist = useUIStore(
+    (state) => state.requestSetupChecklist,
+  );
   const { showToast } = useToast();
   const webRuntime = isWebRuntime();
 
@@ -179,6 +184,24 @@ export function AboutSettings() {
               {"\u2022"} {t("settings.projectInfoDesc3")}
             </p>
           </div>
+          {!webRuntime ? (
+            <SettingItem
+              label={t("setup.openFromAbout", "打开设置引导")}
+              description={t(
+                "setup.openFromAboutDesc",
+                "再次查看文本模型与采集工具的配置清单",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => requestSetupChecklist()}
+                className="h-8 px-4 rounded-lg border border-border text-sm text-foreground transition-colors hover:bg-muted/60 inline-flex items-center gap-1.5"
+              >
+                <ListChecksIcon aria-hidden="true" className="w-4 h-4" />
+                {t("setup.openFromAbout", "打开设置引导")}
+              </button>
+            </SettingItem>
+          ) : null}
         </SettingSection>
 
         {webRuntime ? (
@@ -289,7 +312,7 @@ export function AboutSettings() {
               description={t("settings.reportIssueDesc")}
             >
               <a
-                href="https://github.com/Couleur-Share/GuiZhi/issues/new"
+                href="https://github.com/Couleur-Share/GuiZhi/issues/new/choose"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="h-8 px-4 rounded-lg bg-orange-500 text-white text-sm hover:bg-orange-600 transition-colors inline-flex items-center gap-1.5"

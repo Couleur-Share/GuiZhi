@@ -7,7 +7,6 @@ import {
   ArrowLeftIcon,
   BrainIcon,
   ImageIcon,
-  KeyIcon,
   KeyboardIcon,
   PlugIcon,
   WifiIcon,
@@ -35,7 +34,6 @@ const SETTINGS_MENU = [
   // 而它与「数据」那边「把内容搬出去」是两回事
   { id: "mcp", labelKey: "settings.mcp", icon: PlugIcon },
   { id: "shortcuts", labelKey: "settings.shortcuts", icon: KeyboardIcon },
-  { id: "security", labelKey: "settings.security", icon: KeyIcon },
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
 ];
 
@@ -52,11 +50,6 @@ const AppearanceSettings = lazy(() =>
 const LanguageSettings = lazy(() =>
   import("./LanguageSettings").then((module) => ({
     default: module.LanguageSettings,
-  })),
-);
-const SecuritySettings = lazy(() =>
-  import("./SecuritySettings").then((module) => ({
-    default: module.SecuritySettings,
   })),
 );
 const ShortcutsSettings = lazy(() =>
@@ -134,8 +127,6 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <GeneralSettings />;
       case "appearance":
         return <AppearanceSettings />;
-      case "security":
-        return <SecuritySettings />;
       case "data":
         return <DataSettings />;
       case "network":

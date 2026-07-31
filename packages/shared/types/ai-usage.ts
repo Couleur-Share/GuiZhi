@@ -34,6 +34,15 @@ export interface AIUsageDailyRow {
   completionTokens: number;
 }
 
+/** 按模型名聚合；同名模型跨场景合并（写入时记的是 API 模型名） */
+export interface AIUsageModelRow {
+  model: string;
+  calls: number;
+  failedCalls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
 export interface AIUsageSummary {
   /** 统计窗口天数 */
   days: number;
@@ -42,6 +51,7 @@ export interface AIUsageSummary {
   promptTokens: number;
   completionTokens: number;
   byScenario: AIUsageDailyRow[];
+  byModel: AIUsageModelRow[];
 }
 
 export interface AIUsageRecordInput {

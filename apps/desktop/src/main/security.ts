@@ -2,7 +2,11 @@ import crypto from 'crypto';
 import type Database from './database/sqlite';
 
 /**
- * 主密码存储。
+ * 主密码存储与 AES-GCM 加解密。
+ *
+ * 设置页的主密码 UI / IPC 已撤（尚未有内容接入，保留入口只会给人假安全感）。
+ * 本文件仍保留：配置迁移复用 `encryptText` / `decryptText`；主密码存取函数
+ * 休眠，供以后做应用锁或私密库时接回。
  *
  * 历史格式把 scrypt 派生出的密钥（`hash` 字段）原样写进 settings 表——
  * 那既是校验值也是 AES 密钥，等于密钥和密文躺在同一个文件里，scrypt 的

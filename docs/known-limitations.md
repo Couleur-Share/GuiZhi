@@ -4,9 +4,13 @@
 
 ## 平台与安装
 
-- **macOS** 安装包暂缓，等签名与公证证书
-- **FunASR / ffmpeg 一键安装仅支持 Windows**；Linux 请用系统包管理器装 ffmpeg
-- 安装包暂未做代码签名，Windows SmartScreen 可能拦截
+- **macOS** 安装包已发布，但仅 ad-hoc 签名、未经 Apple 公证；首次打开需在
+  「隐私与安全性」手动允许，或对「已损坏」提示执行 `xattr -dr com.apple.quarantine`
+- **FunASR 一键安装**：Windows（Python SenseVoice，约 3GB，含说话人分离）；
+  **macOS Apple Silicon**（FunASR llama.cpp / GGUF，约 300MB，无说话人分离）。
+  Intel Mac / Linux 请在「模型服务」配置云端 `audioText`。**ffmpeg 一键安装仅支持 Windows**；macOS 设置页提供
+  `brew install ffmpeg` 复制入口，也可依赖 PATH / 自定义路径；Linux 请用系统包管理器
+- Windows / Linux 安装包暂未做代码签名，SmartScreen 可能拦截
 
 ## 采集
 

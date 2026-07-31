@@ -202,6 +202,8 @@ export async function getYtDlpStatus(
 ): Promise<YtDlpStatus> {
   const probe = options?.probe ?? probeYtDlpVersion;
   const managedPath = options?.managedPath ?? getManagedYtDlpPath();
+  // win / mac / linux 均有官方资产；与 ffmpeg / funasr 不同，这里恒为 true
+  const installSupported = true;
 
   const custom = configuredPath?.trim();
   if (custom) {
@@ -212,6 +214,7 @@ export async function getYtDlpStatus(
       version: version ?? undefined,
       path: custom,
       managedPath,
+      installSupported,
     };
   }
 
@@ -224,6 +227,7 @@ export async function getYtDlpStatus(
         version,
         path: managedPath,
         managedPath,
+        installSupported,
       };
     }
     // 托管副本损坏：继续探测系统 PATH
@@ -237,10 +241,11 @@ export async function getYtDlpStatus(
       version: pathVersion,
       path: "yt-dlp",
       managedPath,
+      installSupported,
     };
   }
 
-  return { installed: false, source: null, managedPath };
+  return { installed: false, source: null, managedPath, installSupported };
 }
 
 let installInFlight = false;

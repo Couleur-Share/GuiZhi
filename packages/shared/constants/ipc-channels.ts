@@ -172,13 +172,6 @@ export const IPC_CHANNELS = {
   SETTINGS_GET: "settings:get",
   SETTINGS_SET: "settings:set",
 
-  // Security
-  SECURITY_SET_MASTER_PASSWORD: "security:setMasterPassword",
-  SECURITY_CHANGE_MASTER_PASSWORD: "security:changeMasterPassword",
-  SECURITY_UNLOCK: "security:unlock",
-  SECURITY_STATUS: "security:status",
-  SECURITY_LOCK: "security:lock",
-
   // App runtime
   APP_RELAUNCH: "app:relaunch",
   APP_GET_CACHE_SIZE: "app:getCacheSize",

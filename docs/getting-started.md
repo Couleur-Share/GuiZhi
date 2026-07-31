@@ -8,12 +8,17 @@
 | --- | --- |
 | Windows x64 | `GuiZhi-Setup-<版本>-x64.exe` |
 | Windows arm64 | `GuiZhi-Setup-<版本>-arm64.exe` |
+| macOS Apple Silicon | `GuiZhi-<版本>-arm64.dmg` |
+| macOS Intel | `GuiZhi-<版本>-x64.dmg` |
 | Linux x64 | `GuiZhi-<版本>-x64.AppImage` / `GuiZhi-<版本>-amd64.deb` |
 
-安装包暂未做代码签名，Windows SmartScreen 弹提示时选择「更多信息 → 仍要运行」。
-macOS 版本待签名证书就绪后提供。
+安装包暂未做正式代码签名。Windows SmartScreen 弹提示时选择「更多信息 → 仍要运行」。
+macOS 包仅做 ad-hoc 签名、未经 Apple 公证：若提示无法验证开发者，到「系统设置 →
+隐私与安全性」选择仍要打开；若提示「已损坏」，在终端执行
+`xattr -dr com.apple.quarantine /Applications/GuiZhi.app`。
 
 首次启动若检测到旧 .NET 版的 `guizhi.db`，会提示一键迁移。
+首次启动若尚未配置文本模型，会出现**设置清单**（文本模型 / 转写 / yt-dlp / 语义检索），可「稍后再说」；之后可在「设置 → 关于」再次打开。
 
 ## 五步走通
 

@@ -49,22 +49,6 @@ const api = {
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),
 
-  // Security
-  security: {
-    status: () => ipcRenderer.invoke(IPC_CHANNELS.SECURITY_STATUS),
-    setMasterPassword: (password: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.SECURITY_SET_MASTER_PASSWORD, password),
-    changeMasterPassword: (oldPassword: string, newPassword: string) =>
-      ipcRenderer.invoke(
-        IPC_CHANNELS.SECURITY_CHANGE_MASTER_PASSWORD,
-        oldPassword,
-        newPassword,
-      ),
-    unlock: (password: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.SECURITY_UNLOCK, password),
-    lock: () => ipcRenderer.invoke(IPC_CHANNELS.SECURITY_LOCK),
-  },
-
   settings: settingsApi,
   ai: aiApi,
   knowledge: knowledgeApi,

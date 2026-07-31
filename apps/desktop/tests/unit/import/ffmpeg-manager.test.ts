@@ -17,8 +17,10 @@ import {
   extractFfmpegFromZip,
   fetchLatestFfmpegBuildDate,
   getFfmpegDownloadUrls,
+  getFfmpegInstallHintCommand,
   getFfmpegStatus,
   getManagedFfmpegBinaryName,
+  isFfmpegInstallSupported,
   parseFfmpegBuildDate,
   resolveFfmpegExecutable,
   toBuildDate,
@@ -142,6 +144,15 @@ describe("getManagedFfmpegBinaryName / getFfmpegDownloadUrls", () => {
     expect(getFfmpegDownloadUrls("linux")).toEqual([]);
     expect(getFfmpegDownloadUrls("darwin")).toEqual([]);
   });
+
+  it("一键安装仅 Windows；Mac 给出 brew 命令", () => {
+    expect(isFfmpegInstallSupported("win32")).toBe(true);
+    expect(isFfmpegInstallSupported("darwin")).toBe(false);
+    expect(isFfmpegInstallSupported("linux")).toBe(false);
+    expect(getFfmpegInstallHintCommand("darwin")).toBe("brew install ffmpeg");
+    expect(getFfmpegInstallHintCommand("linux")).toBeUndefined();
+    expect(getFfmpegInstallHintCommand("win32")).toBeUndefined();
+  });
 });
 
 describe("resolveFfmpegExecutable（生效顺序）", () => {
@@ -214,10 +225,23 @@ describe("getFfmpegStatus", () => {
     const status = await getFfmpegStatus(null, {
       probe: async () => null,
       managedPath: path.join(workDir, "ffmpeg.exe"),
+      platform: "win32",
     });
     expect(status.installed).toBe(false);
     expect(status.source).toBeNull();
     expect(status.managedPath).toContain("ffmpeg.exe");
+    expect(status.installSupported).toBe(true);
+  });
+
+  it("darwin 未安装时带回 brew 指引、不支持应用内安装", async () => {
+    const status = await getFfmpegStatus(null, {
+      probe: async () => null,
+      managedPath: path.join(workDir, "ffmpeg"),
+      platform: "darwin",
+    });
+    expect(status.installed).toBe(false);
+    expect(status.installSupported).toBe(false);
+    expect(status.installHintCommand).toBe("brew install ffmpeg");
   });
 });
 

@@ -65,6 +65,57 @@ describe("AIUsageDB", () => {
     expect(summary.calls).toBe(4);
   });
 
+  it("按模型分组：同名模型跨场景合并，按调用次数倒序", () => {
+    usage.record({
+      scenario: "wiki",
+      model: "flash",
+      promptTokens: 100,
+      completionTokens: 20,
+    });
+    usage.record({
+      scenario: "summary",
+      model: "flash",
+      promptTokens: 50,
+      completionTokens: 10,
+    });
+    usage.record({
+      scenario: "embedding",
+      model: "embed-small",
+      promptTokens: 30,
+      completionTokens: 0,
+    });
+    usage.record({
+      scenario: "embedding",
+      model: "embed-small",
+      promptTokens: 20,
+      completionTokens: 0,
+    });
+    usage.record({
+      scenario: "illustration",
+      model: "gpt-image-2",
+      promptTokens: 0,
+      completionTokens: 0,
+    });
+
+    const summary = usage.summary(30);
+    expect(summary.byModel.map((row) => row.model)).toEqual([
+      "flash",
+      "embed-small",
+      "gpt-image-2",
+    ]);
+    expect(summary.byModel[0]).toMatchObject({
+      model: "flash",
+      calls: 2,
+      promptTokens: 150,
+      completionTokens: 30,
+    });
+    expect(summary.byModel[1]).toMatchObject({
+      model: "embed-small",
+      calls: 2,
+      promptTokens: 50,
+    });
+  });
+
   it("provider 不回报 token 时只累加调用次数", () => {
     usage.record({
       scenario: "summary",
@@ -129,6 +180,11 @@ describe("AIUsageDB", () => {
     expect(summary.failedCalls).toBe(1);
     expect(summary.byScenario[0]).toMatchObject({
       scenario: "illustration",
+      calls: 2,
+      failedCalls: 1,
+    });
+    expect(summary.byModel[0]).toMatchObject({
+      model: "gpt-image-2",
       calls: 2,
       failedCalls: 1,
     });

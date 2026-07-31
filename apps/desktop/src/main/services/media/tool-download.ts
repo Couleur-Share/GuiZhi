@@ -80,9 +80,10 @@ export async function downloadToFile(
   url: string,
   targetPath: string,
   onProgress?: (progress: ToolDownloadProgress) => void,
+  options?: { timeoutMs?: number },
 ): Promise<void> {
   const response = await fetchWithNetworkProxy(url, {
-    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    signal: AbortSignal.timeout(options?.timeoutMs ?? DOWNLOAD_TIMEOUT_MS),
   });
   if (!response.ok || !response.body) {
     throw new Error(`HTTP ${response.status}`);

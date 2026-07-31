@@ -4,9 +4,9 @@ name: Desktop Build and Release
 #   gh release edit <tag> --draft=false --latest
 # 正式对外发布。
 #
-# 当前发布平台：Windows (x64 / arm64) + Linux (AppImage / deb)。
-# macOS 需要签名与公证证书，待证书就绪后再恢复 mac 矩阵
-# （resources/icon.icns 与 tray 模板图案也需要一并替换为归知图标）。
+# 当前发布平台：Windows (x64 / arm64) + macOS (x64 / arm64，identity "-" ad-hoc) +
+# Linux (AppImage / deb)。有 Apple Developer ID 后再开 GUIZHI_MAC_RELEASE_SIGN
+# 走正式签名与公证；icon.iconset 仍待换成归知图案。
 
 on:
   push:
@@ -20,6 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macOS：Intel runner 打 x64，Apple Silicon runner 打 arm64
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+          - os: macos-15
+            platform: mac
+            arch: arm64
           - os: windows-latest
             platform: win
             arch: x64
@@ -40,6 +47,18 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24"
+          # 仅在 macOS arm64 runner 上使用 arm64 Node
+          architecture: ${{ matrix.platform == 'mac' && matrix.arch == 'arm64' && 'arm64' || 'x64' }}
+
+      - name: Check Environment Architecture
+        shell: bash
+        run: |
+          echo "System Architecture (uname -m): $(uname -m)"
+          echo "Node Architecture (process.arch): $(node -p 'process.arch')"
+          if [ "${{ matrix.platform }}" = "mac" ] && [ "${{ matrix.arch }}" = "arm64" ] && [ "$(node -p 'process.arch')" != "arm64" ]; then
+            echo "ERROR: Node.js is not arm64 on macOS arm64 runner!"
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -76,13 +95,119 @@ jobs:
         # 必须是 pnpm build 而不是 pnpm vite build：MCP server 产物由
         # build:mcp 用另一份 vite 配置产出，少了它 out/mcp 整个不存在
         run: |
+          # 空 CSC_LINK 会被 @electron/osx-sign 当成相对路径，unset 掉
+          if [ -z "${CSC_LINK:-}" ]; then
+            unset CSC_LINK
+          fi
+
           if [ "${{ matrix.platform }}" = "win" ]; then
             pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --${{ matrix.arch }} --publish never
+          elif [ "${{ matrix.platform }}" = "mac" ]; then
+            # 不设 GUIZHI_MAC_RELEASE_SIGN：config 里 identity "-" 走官方 ad-hoc
+            # 不要设 CSC_IDENTITY_AUTO_DISCOVERY=false，否则会跳过整条签名流水线
+            pnpm build && pnpm electron-builder --config electron-builder.config.cjs --mac --${{ matrix.arch }} --publish never
           else
             pnpm build && pnpm electron-builder --config electron-builder.config.cjs --linux --x64 --publish never
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify macOS app architecture
+        if: matrix.platform == 'mac'
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          ZIP_FILE=$(find dist -maxdepth 1 -name "GuiZhi-*-${{ matrix.arch }}.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Expected macOS ZIP artifact not found for ${{ matrix.arch }}"
+            exit 1
+          fi
+
+          TMP_DIR=$(mktemp -d)
+          ditto -x -k "$ZIP_FILE" "$TMP_DIR/app"
+          APP_BIN=$(find "$TMP_DIR/app" -path "*/GuiZhi.app/Contents/MacOS/GuiZhi" | head -n 1)
+          if [ -z "$APP_BIN" ]; then
+            echo "GuiZhi.app binary not found inside $ZIP_FILE"
+            exit 1
+          fi
+
+          ACTUAL_ARCHS=$(lipo -archs "$APP_BIN")
+          echo "Detected macOS binary archs: $ACTUAL_ARCHS"
+          if [ "${{ matrix.arch }}" = "x64" ] && [ "$ACTUAL_ARCHS" != "x86_64" ]; then
+            echo "Expected x86_64 binary, got: $ACTUAL_ARCHS"
+            exit 1
+          fi
+          if [ "${{ matrix.arch }}" = "arm64" ] && [ "$ACTUAL_ARCHS" != "arm64" ]; then
+            echo "Expected arm64 binary, got: $ACTUAL_ARCHS"
+            exit 1
+          fi
+          rm -rf "$TMP_DIR"
+
+      - name: Verify macOS ad-hoc signature
+        if: matrix.platform == 'mac'
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          validate_adhoc_app() {
+            local app_path="$1"
+
+            codesign --verify --deep --strict --verbose=2 "$app_path"
+
+            local codesign_info
+            codesign_info=$(codesign -dv --verbose=2 "$app_path" 2>&1)
+            echo "$codesign_info"
+            if ! echo "$codesign_info" | grep -qiE 'Signature=adhoc|flags=0x2\(adhoc\)'; then
+              echo "Expected ad-hoc signature on $app_path"
+              exit 1
+            fi
+            if echo "$codesign_info" | grep -q "Authority=Developer ID Application:"; then
+              echo "Unexpected Developer ID signature while unsigned release path is active"
+              exit 1
+            fi
+          }
+
+          cleanup() {
+            if [ -n "${DMG_MOUNT_DIR:-}" ] && mount | grep -q "$DMG_MOUNT_DIR"; then
+              hdiutil detach "$DMG_MOUNT_DIR" -quiet || true
+            fi
+            rm -rf "${TMP_DIR:-}" "${DMG_MOUNT_DIR:-}"
+          }
+          trap cleanup EXIT
+
+          ZIP_FILE=$(find dist -maxdepth 1 -name "GuiZhi-*-${{ matrix.arch }}.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Expected macOS ZIP artifact not found for ${{ matrix.arch }}"
+            exit 1
+          fi
+
+          TMP_DIR=$(mktemp -d)
+          ditto -x -k "$ZIP_FILE" "$TMP_DIR/app"
+          APP_PATH=$(find "$TMP_DIR/app" -maxdepth 4 -type d -name "GuiZhi.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "GuiZhi.app not found inside $ZIP_FILE"
+            exit 1
+          fi
+
+          echo "Verifying ZIP app: $APP_PATH"
+          validate_adhoc_app "$APP_PATH"
+
+          DMG_FILE=$(find dist -maxdepth 1 -name "GuiZhi-*-${{ matrix.arch }}.dmg" | head -n 1)
+          if [ -z "$DMG_FILE" ]; then
+            echo "Expected macOS DMG artifact not found for ${{ matrix.arch }}"
+            exit 1
+          fi
+
+          DMG_MOUNT_DIR=$(mktemp -d)
+          hdiutil attach "$DMG_FILE" -mountpoint "$DMG_MOUNT_DIR" -nobrowse -quiet
+
+          DMG_APP_PATH=$(find "$DMG_MOUNT_DIR" -maxdepth 2 -type d -name "GuiZhi.app" | head -n 1)
+          if [ -z "$DMG_APP_PATH" ]; then
+            echo "GuiZhi.app not found inside $DMG_FILE"
+            exit 1
+          fi
+
+          echo "Verifying DMG app: $DMG_APP_PATH"
+          validate_adhoc_app "$DMG_APP_PATH"
 
       - name: Normalize Windows update metadata
         if: matrix.platform == 'win'
@@ -112,6 +237,22 @@ jobs:
             esac
           done
 
+      - name: Normalize macOS update metadata
+        if: matrix.platform == 'mac'
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          # x64 保留 latest-mac.yml；arm64 单独存，release job 一并上传
+          if [ -f "dist/latest-mac.yml" ]; then
+            if [ "${{ matrix.arch }}" = "arm64" ]; then
+              mv dist/latest-mac.yml dist/latest-mac-arm64.yml
+              echo "Saved ARM64 manifest as latest-mac-arm64.yml"
+            else
+              cp dist/latest-mac.yml dist/latest-mac-x64.yml
+              echo "Created latest-mac-x64.yml alias"
+            fi
+          fi
+
       - name: Remove debug files
         shell: bash
         working-directory: apps/desktop
@@ -135,7 +276,19 @@ jobs:
             fi
           }
 
-          if [ "${{ matrix.platform }}" = "win" ]; then
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            copy_if_exists "dist/GuiZhi-${VERSION}-${{ matrix.arch }}.dmg"
+            copy_if_exists "dist/GuiZhi-${VERSION}-${{ matrix.arch }}.dmg.blockmap"
+            copy_if_exists "dist/GuiZhi-${VERSION}-${{ matrix.arch }}.zip"
+            copy_if_exists "dist/GuiZhi-${VERSION}-${{ matrix.arch }}.zip.blockmap"
+
+            if [ "${{ matrix.arch }}" = "arm64" ]; then
+              copy_if_exists "dist/latest-mac-arm64.yml"
+            else
+              copy_if_exists "dist/latest-mac.yml"
+              copy_if_exists "dist/latest-mac-x64.yml"
+            fi
+          elif [ "${{ matrix.platform }}" = "win" ]; then
             copy_if_exists "dist/GuiZhi-Setup-${VERSION}-${{ matrix.arch }}.exe"
 
             if [ "${{ matrix.arch }}" = "arm64" ]; then
@@ -206,9 +359,13 @@ jobs:
           | 平台 | 下载 |
           |------|------|
           | Windows | [![Windows x64](https://img.shields.io/badge/Windows_x64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-x64.exe) [![Windows arm64](https://img.shields.io/badge/Windows_arm64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-arm64.exe) |
+          | macOS | [![macOS Apple Silicon](https://img.shields.io/badge/macOS_Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-arm64.dmg) [![macOS Intel](https://img.shields.io/badge/macOS_Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-x64.dmg) |
           | Linux | [![Linux AppImage](https://img.shields.io/badge/Linux_AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-x64.AppImage) [![Linux deb](https://img.shields.io/badge/Linux_deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-amd64.deb) |
 
-          > macOS 版本待签名证书就绪后提供。
+          > macOS 安装包目前仅做 ad-hoc 签名、未经 Apple 公证。若系统提示无法验证开发者，请到「系统设置 → 隐私与安全性」选择仍要打开；若提示「已损坏」，在终端执行：
+          > \`\`\`
+          > xattr -dr com.apple.quarantine /Applications/GuiZhi.app
+          > \`\`\`
 
           ---
 
@@ -245,11 +402,22 @@ jobs:
 
           copy_unique "GuiZhi-Setup-${VERSION}-x64.exe"
           copy_unique "GuiZhi-Setup-${VERSION}-arm64.exe"
+          copy_unique "GuiZhi-${VERSION}-arm64.dmg"
+          copy_unique "GuiZhi-${VERSION}-arm64.dmg.blockmap"
+          copy_unique "GuiZhi-${VERSION}-arm64.zip"
+          copy_unique "GuiZhi-${VERSION}-arm64.zip.blockmap"
+          copy_unique "GuiZhi-${VERSION}-x64.dmg"
+          copy_unique "GuiZhi-${VERSION}-x64.dmg.blockmap"
+          copy_unique "GuiZhi-${VERSION}-x64.zip"
+          copy_unique "GuiZhi-${VERSION}-x64.zip.blockmap"
           copy_unique "GuiZhi-${VERSION}-x64.AppImage"
           copy_unique "GuiZhi-${VERSION}-amd64.deb"
           copy_unique "latest.yml"
           copy_unique "latest-x64.yml"
           copy_unique "latest-arm64.yml"
+          copy_unique "latest-mac.yml"
+          copy_unique "latest-mac-x64.yml"
+          copy_unique "latest-mac-arm64.yml"
           copy_unique "latest-linux.yml"
 
           echo "Files to upload (deduplicated):"
@@ -259,12 +427,18 @@ jobs:
           node apps/desktop/scripts/fix-manifest-hashes.js \
             release_assets/latest.yml \
             release_assets/latest-arm64.yml \
-            release_assets/latest-x64.yml
+            release_assets/latest-x64.yml \
+            release_assets/latest-mac.yml \
+            release_assets/latest-mac-arm64.yml \
+            release_assets/latest-mac-x64.yml
 
           node apps/desktop/scripts/verify-update-manifest.js \
             release_assets/latest.yml \
             release_assets/latest-arm64.yml \
-            release_assets/latest-x64.yml
+            release_assets/latest-x64.yml \
+            release_assets/latest-mac.yml \
+            release_assets/latest-mac-arm64.yml \
+            release_assets/latest-mac-x64.yml
 
           # 4. 创建 / 更新 Draft Release（验证后手动 promote）
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then

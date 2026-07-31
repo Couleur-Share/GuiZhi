@@ -20,7 +20,6 @@ export type LibraryViewMode = "card" | "list";
 export type SettingsSectionId =
   | "general"
   | "appearance"
-  | "security"
   | "data"
   | "network"
   | "ai"
@@ -87,6 +86,10 @@ interface UIState {
   pendingSettingsSection: SettingsSectionId | null;
   requestSettingsSection: (section: SettingsSectionId) => void;
   consumeSettingsSectionRequest: () => SettingsSectionId | null;
+  /** 关于页等强制打开首次设置清单（不持久化） */
+  setupChecklistRequest: boolean;
+  requestSetupChecklist: () => void;
+  consumeSetupChecklistRequest: () => boolean;
 }
 
 export const useUIStore = create<UIState>()(
@@ -142,6 +145,13 @@ export const useUIStore = create<UIState>()(
         const section = get().pendingSettingsSection;
         set({ pendingSettingsSection: null });
         return section;
+      },
+      setupChecklistRequest: false,
+      requestSetupChecklist: () => set({ setupChecklistRequest: true }),
+      consumeSetupChecklistRequest: () => {
+        const requested = get().setupChecklistRequest;
+        set({ setupChecklistRequest: false });
+        return requested;
       },
     }),
     {

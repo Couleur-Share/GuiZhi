@@ -23,6 +23,10 @@ import {
   resolveAutoUpdateSkipReason,
   type AutoUpdateCheckTrigger,
 } from "./services/update-check";
+import {
+  isCoreTextModelReady,
+  SETUP_DISMISSED_KEY,
+} from "./services/setup-readiness";
 
 const SettingsPage = lazy(() =>
   import("./components/settings/SettingsPage").then((m) => ({
@@ -37,6 +41,11 @@ const CaptureDialog = lazy(() =>
 const MigrationDialog = lazy(() =>
   import("./components/migration/MigrationDialog").then((m) => ({
     default: m.MigrationDialog,
+  })),
+);
+const SetupChecklistDialog = lazy(() =>
+  import("./components/setup/SetupChecklistDialog").then((m) => ({
+    default: m.SetupChecklistDialog,
   })),
 );
 const UpdateDialog = lazy(() =>
@@ -248,6 +257,41 @@ function App() {
       })
       .catch(() => {});
   }, []);
+
+  // 首次设置清单：核心模型未就绪且未 dismiss 时自动弹出；与迁移弹窗错开
+  const [shouldOfferSetup, setShouldOfferSetup] = useState(false);
+  const [showSetupChecklist, setShowSetupChecklist] = useState(false);
+  const [setupSessionClosed, setSetupSessionClosed] = useState(false);
+  const setupChecklistRequest = useUIStore(
+    (state) => state.setupChecklistRequest,
+  );
+  const consumeSetupChecklistRequest = useUIStore(
+    (state) => state.consumeSetupChecklistRequest,
+  );
+
+  useEffect(() => {
+    if (!setupChecklistRequest) {
+      return;
+    }
+    consumeSetupChecklistRequest();
+    setSetupSessionClosed(false);
+    setShowSetupChecklist(true);
+  }, [setupChecklistRequest, consumeSetupChecklistRequest]);
+
+  useEffect(() => {
+    if (!shouldOfferSetup || setupSessionClosed || showSetupChecklist) {
+      return;
+    }
+    if (legacyMigration) {
+      return;
+    }
+    setShowSetupChecklist(true);
+  }, [
+    shouldOfferSetup,
+    setupSessionClosed,
+    showSetupChecklist,
+    legacyMigration,
+  ]);
 
   // Update status (used for TopBar indicator)
   // 更新状态（用于顶部栏显示更新提示）
@@ -639,6 +683,31 @@ function App() {
       }
 
       await loadSettingsFromMainProcess();
+      if (disposed) {
+        return;
+      }
+
+      // 首次设置清单：已 dismiss 跳过；核心模型已配则静默记下，避免打扰老用户
+      if (localStorage.getItem(SETUP_DISMISSED_KEY)) {
+        return;
+      }
+      const settings = useSettingsStore.getState();
+      if (
+        isCoreTextModelReady(
+          settings.aiModels,
+          settings.modelRouteDefaults,
+          {
+            aiProvider: settings.aiProvider,
+            aiApiKey: settings.aiApiKey,
+            aiApiUrl: settings.aiApiUrl,
+            aiModel: settings.aiModel,
+          },
+        )
+      ) {
+        localStorage.setItem(SETUP_DISMISSED_KEY, "1");
+        return;
+      }
+      setShouldOfferSetup(true);
     })();
 
     return () => {
@@ -757,6 +826,25 @@ function App() {
               isOpen={Boolean(legacyMigration)}
               itemCount={legacyMigration.itemCount}
               onClose={() => setLegacyMigration(null)}
+            />
+          </Suspense>
+        ) : null}
+
+        {/* First-run setup checklist */}
+        {/* 首次使用设置清单 */}
+        {showSetupChecklist ? (
+          <Suspense fallback={null}>
+            <SetupChecklistDialog
+              isOpen={showSetupChecklist}
+              onClose={() => {
+                setShowSetupChecklist(false);
+                setSetupSessionClosed(true);
+              }}
+              onDismissPermanently={() => {
+                setShowSetupChecklist(false);
+                setSetupSessionClosed(true);
+                setShouldOfferSetup(false);
+              }}
             />
           </Suspense>
         ) : null}

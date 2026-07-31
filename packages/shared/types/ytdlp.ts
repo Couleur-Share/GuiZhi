@@ -15,6 +15,8 @@ export interface YtDlpStatus {
   path?: string;
   /** 内置托管版的目标路径（未安装也返回，供 UI 展示） */
   managedPath: string;
+  /** 当前平台是否提供应用内一键安装（win / mac / linux 均有官方资产） */
+  installSupported: boolean;
 }
 
 export interface YtDlpInstallResult {

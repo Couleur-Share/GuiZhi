@@ -4,7 +4,6 @@ import type { ImportTask } from "@guizhi/shared/types";
 import { registerSettingsIPC } from "./settings.ipc";
 import { registerImageIPC } from "./image.ipc";
 import { registerAIIPC } from "./ai.ipc";
-import { registerSecurityIPC } from "./security.ipc";
 import { registerKnowledgeIPC } from "./knowledge.ipc";
 import { registerImportIPC } from "./import.ipc";
 import { registerWikiIPC } from "./wiki.ipc";
@@ -106,11 +105,6 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.FUNASR_UNINSTALL,
   IPC_CHANNELS.SETTINGS_GET,
   IPC_CHANNELS.SETTINGS_SET,
-  IPC_CHANNELS.SECURITY_SET_MASTER_PASSWORD,
-  IPC_CHANNELS.SECURITY_CHANGE_MASTER_PASSWORD,
-  IPC_CHANNELS.SECURITY_UNLOCK,
-  IPC_CHANNELS.SECURITY_STATUS,
-  IPC_CHANNELS.SECURITY_LOCK,
 ] as const;
 
 function resetAllRegisteredIpcHandlers(): void {
@@ -157,7 +151,6 @@ export function registerAllIPC(
   registerIpcGroup("media", () => registerMediaIPC(db));
   registerIpcGroup("illustration", () => registerIllustrationIPC(db));
   registerIpcGroup("settings", () => registerSettingsIPC(db));
-  registerIpcGroup("security", () => registerSecurityIPC(db));
   registerIpcGroup("image", () => registerImageIPC());
   registerIpcGroup("ai", () => registerAIIPC(db));
 }

@@ -8,7 +8,10 @@ vi.mock("electron", () => ({
 }));
 
 import {
+  getGgufRuntimeDownloadUrls,
+  getGgufRuntimeAssetName,
   getPythonDownloadUrls,
+  isFunasrInstallSupported,
   removeBuiltinTranscription,
   upsertBuiltinTranscription,
 } from "../../../src/main/services/media/funasr-manager";
@@ -64,6 +67,27 @@ describe("getPythonDownloadUrls", () => {
 
     expect(getPythonDownloadUrls("linux")).toEqual([]);
     expect(getPythonDownloadUrls("darwin")).toEqual([]);
+  });
+});
+
+describe("isFunasrInstallSupported", () => {
+  it("Windows 与 macOS arm64 支持应用内安装；其余否", () => {
+    expect(isFunasrInstallSupported("win32", "x64")).toBe(true);
+    expect(isFunasrInstallSupported("win32", "arm64")).toBe(true);
+    expect(isFunasrInstallSupported("darwin", "arm64")).toBe(true);
+    expect(isFunasrInstallSupported("darwin", "x64")).toBe(false);
+    expect(isFunasrInstallSupported("linux", "x64")).toBe(false);
+  });
+});
+
+describe("getGgufRuntimeDownloadUrls", () => {
+  it("仅 darwin arm64 提供官方源与镜像", () => {
+    const urls = getGgufRuntimeDownloadUrls("darwin", "arm64");
+    expect(urls[0]).toContain("github.com/modelscope/FunASR/releases/download/");
+    expect(urls[0]).toContain(getGgufRuntimeAssetName());
+    expect(urls.length).toBeGreaterThanOrEqual(3);
+    expect(getGgufRuntimeDownloadUrls("darwin", "x64")).toEqual([]);
+    expect(getGgufRuntimeDownloadUrls("win32", "x64")).toEqual([]);
   });
 });
 

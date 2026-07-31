@@ -78,7 +78,7 @@ export function hasAISettingsPayload(settings: Partial<Settings>): boolean {
  * 机密会流进渲染进程，渲染进程也能往表里写任意键——包括会被 spawn 的
  * 工具路径。这里用 Settings 的字段集合做双向白名单。
  *
- * `security` 不在其中：它是 securityStatus() 的派生值，不接受写入。
+ * `master_password` 等内部键不在 Settings 类型里，不会进白名单。
  * AI 相关键走 config/ai-models.json，由 stripAISettingsPayload 单独剥离。
  */
 const PERSISTED_SETTINGS_KEYS = new Set<string>([

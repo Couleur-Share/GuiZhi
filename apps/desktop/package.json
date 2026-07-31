@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "main": "out/main/index.js",
@@ -109,7 +109,7 @@
     "clsx": "^2.1.0",
     "concurrently": "^9.0.0",
     "electron": "33",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^26.15.7",
     "electron-updater": "^6.6.2",
     "eslint": "^9.0.0",
     "eslint-plugin-react": "^7.37.0",

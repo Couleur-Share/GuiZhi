@@ -42,9 +42,9 @@
 
 | 工具 | 用途 | 平台 |
 | --- | --- | --- |
-| yt-dlp | B 站 / YouTube 解析与音轨下载 | 全平台 |
-| ffmpeg | 音频转码为 16kHz 单声道再送转写 | Windows 一键装，其他平台用包管理器 |
-| FunASR (SenseVoiceSmall) | 完全离线的本地语音转写 | 仅 Windows |
+| yt-dlp | B 站 / YouTube 解析与音轨下载 | 全平台一键装 |
+| ffmpeg | 音频转码为 16kHz 单声道再送转写 | Windows 一键装；macOS 用 Homebrew / PATH；Linux 用包管理器 |
+| FunASR (SenseVoiceSmall) | 完全离线的本地语音转写 | Windows（Python，含说话人分离）；macOS Apple Silicon（GGUF，无分离）；其余平台配云端 `audioText` |
 
 FunASR 装完会自动写入内置 Provider 并接管 `audioText` 路由；服务按需拉起，不常驻。
 

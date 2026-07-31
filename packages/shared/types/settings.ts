@@ -29,11 +29,6 @@ export interface Settings {
   minimizeOnLaunch?: boolean;
   // Global desktop network proxy.
   networkProxy?: NetworkProxySettings;
-  // Security
-  security?: {
-    masterPasswordConfigured: boolean;
-    unlocked: boolean;
-  };
   // 本地定时备份（主进程调度器读取）
   backupAutoEnabled?: boolean;
   backupIntervalHours?: number;

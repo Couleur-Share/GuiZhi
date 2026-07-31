@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpCircleIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ArrowUpCircleIcon,
+  ClipboardCopyIcon,
+  DownloadIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
   FfmpegStatus,
@@ -67,9 +72,22 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function hasInstallHint(
+  status: BinaryEngineStatus,
+): status is FfmpegStatus & { installHintCommand: string } {
+  return (
+    "installHintCommand" in status &&
+    typeof status.installHintCommand === "string" &&
+    status.installHintCommand.length > 0
+  );
+}
+
 /**
  * 二进制引擎（yt-dlp / ffmpeg）设置行：状态探测、一键安装 / 更新内置版、
  * 移除内置版、自定义路径。两者除文案与 API 命名空间外完全同构。
+ *
+ * 当前平台若不支持应用内安装（ffmpeg 在 Mac / Linux），主操作改为复制
+ * 推荐命令或不给安装按钮，避免点了必失败。
  */
 export function BinaryEngineRow({
   engineId,
@@ -175,6 +193,20 @@ export function BinaryEngineRow({
     }
   };
 
+  const copyInstallHint = async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      showToast(
+        t("settings.captureCommandCopied", "已复制：{{command}}", { command }),
+        "success",
+      );
+    } catch (cause) {
+      showToast(t("settings.captureCopyFailed", "复制失败"), "error", {
+        detail: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
+  };
+
   const removeManaged = async () => {
     if (isRemoving) {
       return;
@@ -224,6 +256,23 @@ export function BinaryEngineRow({
           ? t("settings.captureSourceCustom", "自定义路径")
           : "";
 
+  // 缺字段按「支持」处理：同版本主进程总会带上；旧 mock / 热更新瞬时缺省不应藏按钮
+  const installUnsupported = status?.installSupported === false;
+
+  const unsupportedMissingHint =
+    status && installUnsupported && state === "missing"
+      ? hasInstallHint(status)
+        ? t(
+            "settings.ffmpegBrewHint",
+            "本平台不提供应用内安装；终端执行 {{command}}，或在高级选项里指定路径",
+            { command: status.installHintCommand },
+          )
+        : t(
+            "settings.ffmpegPackageManagerHint",
+            "本平台不提供应用内安装；请用系统包管理器安装，或在高级选项里指定路径",
+          )
+      : null;
+
   const detail =
     state === "ready"
       ? [
@@ -240,7 +289,7 @@ export function BinaryEngineRow({
         : state === "error"
           ? error ?? ""
           : state === "missing"
-            ? texts.missingHint
+            ? (unsupportedMissingHint ?? texts.missingHint)
             : "";
 
   const percent =
@@ -268,6 +317,7 @@ export function BinaryEngineRow({
   /**
    * 内置版的主操作遵循「先检查、有更新才给更新按钮」：
    * 未检查 → 检查更新 / 检查中 → 检查中… / 有更新 → 更新到 X / 已是最新 → 不给按钮。
+   * 平台不支持应用内安装时：未装给「复制 brew 命令」；已装（PATH/自定义）不诱人装内置版。
    */
   const primary = ((): CaptureEngineRowProps["primary"] => {
     if (isInstalling) {
@@ -285,6 +335,23 @@ export function BinaryEngineRow({
     // 还没探测出结果（或探测失败）时不知道装没装，任何动作都是瞎猜。
     // 状态徽章已经在说「检测中 / 检测失败」，主操作位留空即可。
     if (!status) {
+      return undefined;
+    }
+    if (status.installSupported === false) {
+      if (status.installed) {
+        return undefined;
+      }
+      if (hasInstallHint(status)) {
+        const command = status.installHintCommand;
+        return {
+          kind: "button",
+          label: t("settings.captureCopyBrewCommand", "复制 brew 命令"),
+          icon: ClipboardCopyIcon,
+          emphasized: true,
+          busy: false,
+          onClick: () => void copyInstallHint(command),
+        };
+      }
       return undefined;
     }
     if (!status.installed) {

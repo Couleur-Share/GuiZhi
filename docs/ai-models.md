@@ -17,7 +17,8 @@
 - **混合检索**：FTS 与 embedding 并行召回、RRF 融合；embedding 未配置时静默退化为纯 FTS
 - **摘要与标签**：短文单发、长文 map-reduce；一键生成可点选的标签建议
 - **图片 OCR**：识别结果作为「图中文字」写入正文，进入全文与语义索引
-- **音视频转写**：远程 `/audio/transcriptions`，或安装本地 FunASR；可选说话人分离（本地引擎，默认关）
+- **音视频转写**：远程 `/audio/transcriptions`，或安装本地 FunASR（Windows Python /
+  macOS Apple Silicon GGUF）；可选说话人分离（仅 Windows Python 引擎，默认关）
 - **正文配图**：先策划后逐张生成，风格可编辑；设置页「正文配图」与条目面板共用同一套预设
 
 支持 OpenAI 兼容 / Gemini / Anthropic 三种协议，内置多家服务商预设，也可填自定义端点。

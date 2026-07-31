@@ -5,6 +5,9 @@
 
 export type FunasrInstallPhase = "runtime" | "deps" | "models";
 
+/** python = Windows 全量；gguf = macOS arm64 轻量 */
+export type FunasrInstallFlavor = "python" | "gguf";
+
 export interface FunasrStatus {
   installed: boolean;
   /** 服务当前是否在运行（按需启动，未运行不代表异常） */
@@ -13,8 +16,15 @@ export interface FunasrStatus {
   port: number;
   /** 托管安装目录（未安装也返回，供 UI 展示） */
   dir: string;
-  /** funasr 包版本（已安装时） */
+  /** funasr / GGUF 运行时版本（已安装时） */
   version?: string;
+  /**
+   * 当前平台是否提供应用内一键安装。
+   * Windows 与 macOS Apple Silicon；其余平台请配置云端 audioText。
+   */
+  installSupported: boolean;
+  /** 本机将装 / 已装的引擎形态（决定磁盘占用文案） */
+  installFlavor?: FunasrInstallFlavor;
 }
 
 export interface FunasrInstallProgress {

@@ -21,6 +21,7 @@ import { recordMainAiUsage } from "../ai-usage";
 import {
   isManagedFunasrUrl,
   runExclusiveLocalTranscription,
+  supportsLocalDiarization,
 } from "./funasr-service";
 
 const TRANSCRIBE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -83,9 +84,12 @@ export function buildTranscriptionsEndpoint(
   );
 }
 
-/** 说话人分离是内置引擎的扩展字段，云端 OpenAI 兼容接口没有也未必宽容 */
+/**
+ * 说话人分离是 Windows Python 引擎的扩展字段。
+ * Mac GGUF 与云端 OpenAI 兼容接口都没有 cam++。
+ */
 export function supportsDiarization(apiUrl: string): boolean {
-  return isManagedFunasrUrl(apiUrl);
+  return supportsLocalDiarization(apiUrl);
 }
 
 /** 发起转写请求并返回原始文本（可能为空串——测试静音样本时属正常） */

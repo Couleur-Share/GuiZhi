@@ -9,9 +9,12 @@ import { CaptureEngineRow, type EngineState } from "./CaptureEngineRow";
 import { useEngineStatus } from "./use-engine-status";
 
 /**
- * 本地转写引擎（托管 funasr-server + SenseVoiceSmall）设置行：
- * 一键安装（分阶段进度）、卸载。安装完成后主进程会写入内置模型并接上
- * 「语音转写」路由，普通用户无需接触 API 地址 / Key。
+ * 本地转写引擎设置行：一键安装（分阶段进度）、卸载。
+ * 安装完成后主进程写入内置模型并接上「语音转写」路由。
+ *
+ * Windows = Python SenseVoice（约 3GB，含说话人分离）；
+ * macOS Apple Silicon = FunASR GGUF（约 300MB，无分离）；
+ * 其余平台隐藏安装入口。
  */
 export function FunasrEngineRow() {
   const { t } = useTranslation();
@@ -97,6 +100,7 @@ export function FunasrEngineRow() {
     }
   };
 
+  const installSupported = status?.installSupported !== false;
   const state: EngineState = error
     ? "error"
     : status === null
@@ -111,7 +115,12 @@ export function FunasrEngineRow() {
       : progress?.phase === "deps"
         ? t("settings.funasrPhaseDeps", "安装依赖（约 700MB，需要几分钟）")
         : progress?.phase === "models"
-          ? t("settings.funasrPhaseModels", "下载语音模型（约 1GB）")
+          ? status?.installFlavor === "gguf"
+            ? t(
+                "settings.funasrPhaseModelsGguf",
+                "下载语音模型（约 250MB）",
+              )
+            : t("settings.funasrPhaseModels", "下载语音模型（约 1GB）")
           : "";
 
   const busyText = isInstalling
@@ -126,25 +135,37 @@ export function FunasrEngineRow() {
       ? t("settings.funasrUninstalling", "卸载中…")
       : undefined;
 
+  const isGguf = status?.installFlavor === "gguf";
   const detail =
     state === "ready"
       ? // 「待命」是常态，说了等于没说——徽章的「已就绪」已经覆盖；
         // 只有真的在跑（占着内存）才值得单独标一下
         [
-          // funasr 是 pip 包，版本号是语义化的，不是日期
           `v${status?.version ?? "?"}`,
           status?.running ? t("settings.funasrRunning", "运行中") : "",
         ]
           .filter(Boolean)
           .join(" · ")
       : state === "missing"
-        ? t(
-            "settings.funasrDiskHint",
-            "音频不出本机、不按时长计费，约需 3GB 磁盘",
-          )
+        ? installSupported
+          ? isGguf
+            ? t(
+                "settings.funasrDiskHintGguf",
+                "音频不出本机、不按时长计费；Apple Silicon，约需 300MB 磁盘",
+              )
+            : t(
+                "settings.funasrDiskHint",
+                "音频不出本机、不按时长计费，约需 3GB 磁盘",
+              )
+          : t(
+              "settings.funasrUnsupportedHint",
+              "本平台未提供本地引擎；请在「模型服务」配置语音转写（audioText）路由",
+            )
         : state === "error"
           ? error ?? ""
           : "";
+
+  const showInstallActions = installSupported;
 
   return (
     <CaptureEngineRow
@@ -156,35 +177,37 @@ export function FunasrEngineRow() {
       detail={detail}
       busyText={busyText}
       progressPercent={isInstalling ? (progress?.percent ?? null) : null}
-      // 只在「确认没装」时才给安装按钮：探测中不知道装没装，装好之后也没有
-      // 「更新」这回事——上游是 pip 装出来的运行时，重装只是修复手段
-      //（约 700MB / 数分钟），不该占着主操作位诱人误点，挪进高级面板。
+      // 只在「确认没装」且本平台支持安装时才给按钮：探测中不知道装没装，
+      // 装好之后也没有「更新」这回事——上游是 pip / GGUF 装出来的运行时，重装只是
+      // 修复手段，不该占着主操作位诱人误点，挪进高级面板。
       primary={
-        isInstalling
-          ? {
-              kind: "button",
-              label: t("settings.captureInstalling", "安装中…"),
-              icon: DownloadIcon,
-              emphasized: false,
-              busy: true,
-              onClick: () => {},
-            }
-          : status && !status.installed
+        !showInstallActions
+          ? undefined
+          : isInstalling
             ? {
                 kind: "button",
-                label: t("settings.captureInstall", "一键安装"),
+                label: t("settings.captureInstalling", "安装中…"),
                 icon: DownloadIcon,
-                emphasized: true,
-                busy: isUninstalling,
-                onClick: () => void install(),
+                emphasized: false,
+                busy: true,
+                onClick: () => {},
               }
-            : undefined
+            : status && !status.installed
+              ? {
+                  kind: "button",
+                  label: t("settings.captureInstall", "一键安装"),
+                  icon: DownloadIcon,
+                  emphasized: true,
+                  busy: isUninstalling,
+                  onClick: () => void install(),
+                }
+              : undefined
       }
       isRefreshing={isRefreshing}
       onRefresh={() => void refresh(true)}
       activePath={status?.installed ? status.dir : undefined}
       reinstall={
-        status?.installed
+        showInstallActions && status?.installed
           ? {
               label: t("settings.funasrReinstall", "重新安装"),
               busy: isInstalling || isUninstalling,
@@ -193,14 +216,19 @@ export function FunasrEngineRow() {
           : undefined
       }
       remove={
-        status?.installed
+        showInstallActions && status?.installed
           ? {
               label: t("settings.funasrUninstall", "卸载引擎"),
               confirmTitle: t("settings.funasrUninstall", "卸载引擎"),
-              confirmMessage: t(
-                "settings.funasrUninstallConfirm",
-                "确定卸载本地转写引擎？将删除运行时与模型文件（约 3GB），并移除对应的语音转写路由。",
-              ),
+              confirmMessage: isGguf
+                ? t(
+                    "settings.funasrUninstallConfirmGguf",
+                    "确定卸载本地转写引擎？将删除运行时与模型文件（约 300MB），并移除对应的语音转写路由。",
+                  )
+                : t(
+                    "settings.funasrUninstallConfirm",
+                    "确定卸载本地转写引擎？将删除运行时与模型文件（约 3GB），并移除对应的语音转写路由。",
+                  ),
               busy: isUninstalling,
               onConfirm: () => void uninstall(),
             }

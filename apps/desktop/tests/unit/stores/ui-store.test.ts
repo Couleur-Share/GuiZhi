@@ -11,6 +11,7 @@ describe("useUIStore", () => {
       appModule: "library",
       isSidebarCollapsed: false,
       libraryViewMode: "card",
+      setupChecklistRequest: false,
     });
   });
 
@@ -61,5 +62,14 @@ describe("useUIStore", () => {
     expect(useUIStore.getState().libraryViewMode).toBe("list");
     useUIStore.getState().setLibraryViewMode("comfortable" as never);
     expect(useUIStore.getState().libraryViewMode).toBe("card");
+  });
+
+  it("requestSetupChecklist 可消费一次", () => {
+    expect(useUIStore.getState().setupChecklistRequest).toBe(false);
+    useUIStore.getState().requestSetupChecklist();
+    expect(useUIStore.getState().setupChecklistRequest).toBe(true);
+    expect(useUIStore.getState().consumeSetupChecklistRequest()).toBe(true);
+    expect(useUIStore.getState().setupChecklistRequest).toBe(false);
+    expect(useUIStore.getState().consumeSetupChecklistRequest()).toBe(false);
   });
 });

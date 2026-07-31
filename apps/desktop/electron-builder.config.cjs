@@ -34,9 +34,8 @@ const extraResources = [
     from: "resources/icon.png",
     to: "icon.png",
   },
-  // 注意：macOS 图标资产（icon.icns / icon.iconset / tray 模板图案）仍是
-  // PromptHub 图案；恢复 mac 发布矩阵前必须替换为归知图标（Windows 的
-  // icon.ico / icon.png 已是归知图标）。
+  // Dock 用 mac.icon → icon.png（归知）。icon.iconset 仍是 PromptHub
+  // 图案，仅作托盘模板缺失时的回退；有证书前不阻塞发布。
   {
     from: "resources/icon.iconset",
     to: "icon.iconset",
@@ -86,6 +85,9 @@ function assertExtraResourcesExist() {
 const enableMacReleaseSigning =
   process.env.GUIZHI_MAC_RELEASE_SIGN === "true";
 
+// 未签名公开分发：identity "-" 走 electron-builder 官方 ad-hoc（需 ≥26）。
+// hardenedRuntime 保持 false——26.0.13+ 若对 ad-hoc 开 hardenedRuntime，
+// 未配 entitlements 时易撞 Team ID / 媒体权限问题；有证书的正式路径才开。
 const macReleaseSigningConfig = enableMacReleaseSigning
   ? {
       hardenedRuntime: true,
@@ -95,7 +97,8 @@ const macReleaseSigningConfig = enableMacReleaseSigning
     }
   : {
       hardenedRuntime: false,
-      identity: null,
+      identity: "-",
+      notarize: false,
     };
 
 module.exports = {
@@ -129,7 +132,8 @@ module.exports = {
       },
     ],
     artifactName: "${productName}-${version}-${arch}.${ext}",
-    icon: "resources/icon.icns",
+    // 归知 PNG；Mac CI 上 electron-builder 会转成 icns。旧 icon.icns 仍是 PromptHub。
+    icon: "resources/icon.png",
     category: "public.app-category.productivity",
     gatekeeperAssess: false,
     ...macReleaseSigningConfig,

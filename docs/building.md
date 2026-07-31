@@ -16,8 +16,13 @@ pnpm test:e2e      # Playwright 真实 Electron 冒烟
 
 # 打包（须用 pnpm build，含 MCP 产物；不要只跑 vite build）
 pnpm electron:build:win
+pnpm electron:build:mac    # 须在 macOS 上；默认 ad-hoc 签名
 pnpm electron:build:linux
 ```
+
+macOS 正式 Developer ID 签名与公证需设 `GUIZHI_MAC_RELEASE_SIGN=true` 并配置
+证书相关环境变量；未配置时 `mac.identity` 为 `"-"`（electron-builder ≥26 官方
+ad-hoc），用户需手动绕过 Gatekeeper。
 
 界面改动想截图又不打扰本机：用 `pnpm shot`（窗口挪到屏幕外，数据目录为临时目录）。源码比 `out/` 新时会提示先 build，确认无所谓可用 `--stale-ok`。
 

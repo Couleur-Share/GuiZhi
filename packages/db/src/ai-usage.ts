@@ -6,7 +6,11 @@
  * 这里按 天 × 场景 × 模型 聚合，保留最近若干天。
  */
 import type Database from "./adapter";
-import type { AIUsageDailyRow, AIUsageSummary } from "@guizhi/shared/types";
+import type {
+  AIUsageDailyRow,
+  AIUsageModelRow,
+  AIUsageSummary,
+} from "@guizhi/shared/types";
 
 /** 超出这个天数的记录在下次写入时清理 */
 const RETENTION_DAYS = 90;
@@ -19,6 +23,24 @@ interface UsageRow {
   failed_calls: number;
   prompt_tokens: number;
   completion_tokens: number;
+}
+
+interface UsageTotals {
+  calls: number;
+  failedCalls: number;
+  promptTokens: number;
+  completionTokens: number;
+}
+
+function addUsage(target: UsageTotals, row: UsageRow): void {
+  target.calls += row.calls;
+  target.failedCalls += row.failed_calls ?? 0;
+  target.promptTokens += row.prompt_tokens;
+  target.completionTokens += row.completion_tokens;
+}
+
+function sortByCallsDesc<T extends { calls: number }>(rows: T[]): T[] {
+  return rows.sort((left, right) => right.calls - left.calls);
 }
 
 /** 本地日期（YYYY-MM-DD）：用量按用户所在时区的自然日聚合 */
@@ -71,7 +93,7 @@ export class AIUsageDB {
     this.db.run("DELETE FROM ai_usage_daily WHERE day < ?", cutoff);
   }
 
-  /** 最近 days 天的按场景汇总 + 总计 */
+  /** 最近 days 天的按场景 / 按模型汇总 + 总计 */
   summary(days: number): AIUsageSummary {
     const since = toLocalDay(
       Date.now() - Math.max(0, days - 1) * 24 * 60 * 60 * 1000,
@@ -83,24 +105,36 @@ export class AIUsageDB {
     ) as UsageRow[];
 
     const byScenario = new Map<string, AIUsageDailyRow>();
-    let calls = 0;
-    let failedCalls = 0;
-    let promptTokens = 0;
-    let completionTokens = 0;
+    const byModel = new Map<string, AIUsageModelRow>();
+    const totals: UsageTotals = {
+      calls: 0,
+      failedCalls: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+    };
     for (const row of rows) {
-      calls += row.calls;
-      failedCalls += row.failed_calls ?? 0;
-      promptTokens += row.prompt_tokens;
-      completionTokens += row.completion_tokens;
-      const existing = byScenario.get(row.scenario);
-      if (existing) {
-        existing.calls += row.calls;
-        existing.failedCalls += row.failed_calls ?? 0;
-        existing.promptTokens += row.prompt_tokens;
-        existing.completionTokens += row.completion_tokens;
+      addUsage(totals, row);
+
+      const scenarioRow = byScenario.get(row.scenario);
+      if (scenarioRow) {
+        addUsage(scenarioRow, row);
       } else {
         byScenario.set(row.scenario, {
           scenario: row.scenario,
+          calls: row.calls,
+          failedCalls: row.failed_calls ?? 0,
+          promptTokens: row.prompt_tokens,
+          completionTokens: row.completion_tokens,
+        });
+      }
+
+      const modelKey = row.model || "(unknown)";
+      const modelRow = byModel.get(modelKey);
+      if (modelRow) {
+        addUsage(modelRow, row);
+      } else {
+        byModel.set(modelKey, {
+          model: modelKey,
           calls: row.calls,
           failedCalls: row.failed_calls ?? 0,
           promptTokens: row.prompt_tokens,
@@ -111,13 +145,9 @@ export class AIUsageDB {
 
     return {
       days,
-      calls,
-      failedCalls,
-      promptTokens,
-      completionTokens,
-      byScenario: [...byScenario.values()].sort(
-        (left, right) => right.calls - left.calls,
-      ),
+      ...totals,
+      byScenario: sortByCallsDesc([...byScenario.values()]),
+      byModel: sortByCallsDesc([...byModel.values()]),
     };
   }
 
