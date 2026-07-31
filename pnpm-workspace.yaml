@@ -11,7 +11,10 @@ allowBuilds:
 
 # electron-builder 26 的 app-builder-lib 读 ElectronDownloadCacheMode.ReadWrite，
 # 该枚举从 @electron/get@3.1.0 才导出；^3.0.0 会解析到 3.0.0 并在打包时炸。
+# @types/minimatch@6 是空壳 stub（无 .d.ts），shamefullyHoist 后被 tsc 自动扫进
+# 程序却找不到定义文件；钉回带真实声明的 5.1.2。
 overrides:
   "@electron/get@3": "3.1.0"
+  "@types/minimatch": "5.1.2"
 
 shamefullyHoist: true

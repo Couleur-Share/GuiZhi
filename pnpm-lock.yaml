@@ -6,6 +6,7 @@ settings:
 
 overrides:
   '@electron/get@3': 3.1.0
+  '@types/minimatch': 5.1.2
 
 importers:
 
@@ -1543,9 +1544,8 @@ packages:
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
 
-  '@types/minimatch@6.0.0':
-    resolution: {integrity: sha512-zmPitbQ8+6zNutpwgcQuLcsEpn/Cj54Kbn7L5pX0Os5kdWplB7xPgEh/g+SWOB/qmows2gpuCaPyduq8ZZRnxA==}
-    deprecated: This is a stub types definition. minimatch provides its own type definitions, so you do not need this installed.
+  '@types/minimatch@5.1.2':
+    resolution: {integrity: sha512-K0VQKziLUWkVKiRVrx4a40iPaxTUefQmjtkQofBkYRcoaaL/8rhwDWww9qWbrgicNOgnpIsMxyNIUM4+n6dUIA==}
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
@@ -6272,7 +6272,7 @@ snapshots:
 
   '@types/glob@7.2.0':
     dependencies:
-      '@types/minimatch': 6.0.0
+      '@types/minimatch': 5.1.2
       '@types/node': 24.13.3
     optional: true
 
@@ -6306,9 +6306,7 @@ snapshots:
     dependencies:
       '@types/unist': 3.0.3
 
-  '@types/minimatch@6.0.0':
-    dependencies:
-      minimatch: 10.2.6
+  '@types/minimatch@5.1.2':
     optional: true
 
   '@types/ms@2.1.0': {}

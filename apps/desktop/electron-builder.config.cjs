@@ -132,8 +132,9 @@ module.exports = {
       },
     ],
     artifactName: "${productName}-${version}-${arch}.${ext}",
-    // 归知 PNG；Mac CI 上 electron-builder 会转成 icns。旧 icon.icns 仍是 PromptHub。
-    icon: "resources/icon.png",
+    // 归知 PNG ≥512（electron-builder 26 硬门槛）；icon.png 仍是 256 供其它用途。
+    // 旧 icon.icns / icon.iconset 仍是 PromptHub 图案。
+    icon: "resources/icon-mac.png",
     category: "public.app-category.productivity",
     gatekeeperAssess: false,
     ...macReleaseSigningConfig,
@@ -149,6 +150,8 @@ module.exports = {
     icon: "resources/icon.ico",
   },
   linux: {
+    // scoped 包名 @guizhi/desktop 会被收成 @guizhidesktop，AppImage 拒收 @
+    executableName: "GuiZhi",
     target: [
       {
         target: "AppImage",
