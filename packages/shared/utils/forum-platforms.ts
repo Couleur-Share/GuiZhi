@@ -6,7 +6,7 @@
  * 认不出来的链接一律返回 null，退回通用网页抓取。
  */
 
-export type ForumPlatform = "v2ex";
+export type ForumPlatform = "v2ex" | "nga";
 
 export interface ForumTarget {
   platform: ForumPlatform;
@@ -17,13 +17,34 @@ export interface ForumTarget {
 /** V2EX 帖子路径：/t/1227616（可带 #reply107 锚点与查询串） */
 const V2EX_TOPIC_PATH = /^\/t\/(\d+)/;
 
+/** NGA 读帖页：/read.php?tid=37194262（可带 fav/rand 等噪音参数） */
+const NGA_READ_PATH = /\/read\.php$/i;
+
+function isNgaHostname(hostname: string): boolean {
+  return (
+    hostname === "bbs.nga.cn" ||
+    hostname.endsWith(".bbs.nga.cn") ||
+    hostname === "ngabbs.com" ||
+    hostname.endsWith(".ngabbs.com") ||
+    hostname === "nga.178.com" ||
+    hostname.endsWith(".nga.178.com")
+  );
+}
+
+/** 规范来源链接：去掉 fav/rand 等一次性参数，保证同一帖去重稳定 */
+export function ngaCanonicalUrl(topicId: string): string {
+  return `https://bbs.nga.cn/read.php?tid=${topicId}`;
+}
+
 export function detectForumPlatform(url: string): ForumTarget | null {
   let hostname: string;
   let pathname: string;
+  let searchParams: URLSearchParams;
   try {
     const parsed = new URL(url);
     hostname = parsed.hostname.toLowerCase();
     pathname = parsed.pathname;
+    searchParams = parsed.searchParams;
   } catch {
     return null;
   }
@@ -32,6 +53,13 @@ export function detectForumPlatform(url: string): ForumTarget | null {
   if (hostname === "v2ex.com" || hostname.endsWith(".v2ex.com")) {
     const topicId = V2EX_TOPIC_PATH.exec(pathname)?.[1];
     return topicId ? { platform: "v2ex", topicId } : null;
+  }
+
+  if (isNgaHostname(hostname) && NGA_READ_PATH.test(pathname)) {
+    const tid = searchParams.get("tid")?.trim() ?? "";
+    if (/^\d+$/.test(tid)) {
+      return { platform: "nga", topicId: tid };
+    }
   }
 
   return null;

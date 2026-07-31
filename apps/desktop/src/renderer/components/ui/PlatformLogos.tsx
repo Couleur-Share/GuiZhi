@@ -4,11 +4,12 @@ import type { ComponentType } from "react";
  * 采集来源平台的品牌 logo。
  *
  * 路径取自 Simple Icons v16（CC0-1.0），商标本身仍归各平台所有，此处仅用于
- * 标识条目来源。不装 `@icons-pack/react-simple-icons`：只用得上五个 glyph，
+ * 标识条目来源。不装 `@icons-pack/react-simple-icons`：只用得上有限几个 glyph，
  * 为此引一个 3400 图标的依赖不划算，而且这里要按主题换色，包给的组件也帮不上忙。
  *
  * 抖音用 TikTok 的音符：字节这两个产品共用同一个符号，Simple Icons 也只收了
- * 一份（没有 douyin slug），不是拿相近的东西凑数。
+ * 一份（没有 douyin slug），不是拿相近的东西凑数。NGA 在 Simple Icons 里没有
+ * 条目，对应 glyph 是自绘的。
  *
  * viewBox 从 `0 0 24 24` 撑到 `-2 -2 28 28`，是为了给图形留出 lucide 那样的
  * 内边距——Simple Icons 是实心填充且铺满画布，与描边图标同尺寸摆在一起会明显
@@ -95,6 +96,24 @@ export function V2exLogo({ className }: PlatformLogoProps) {
       aria-hidden="true"
     >
       <path d="M.671 1.933h13.821a1.342 1.342 0 0 1 .98.425l8.166 8.725a1.342 1.342 0 0 1 0 1.834l-8.166 8.724a1.342 1.342 0 0 1-.98.426H.673A.671.671 0 0 1 0 21.395v-6.878h13.19l2.276-2.28a.336.336 0 0 0 0-.474l-2.276-2.28H0V2.604a.671.671 0 0 1 .671-.671Z" />
+    </svg>
+  );
+}
+
+/**
+ * NGA（自绘指称 glyph，Simple Icons 无此条目）。
+ * 盾形外轮廓 + 中心 N，用来和其它品牌 logo 同一列扫视区分。
+ */
+export function NgaLogo({ className }: PlatformLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="-2 -2 28 28"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path d="M12 1.5c.4 0 .8.1 1.1.3l7.4 4.3c.7.4 1.1 1.1 1.1 1.9v8c0 .8-.4 1.5-1.1 1.9l-7.4 4.3c-.3.2-.7.3-1.1.3s-.8-.1-1.1-.3l-7.4-4.3C2.8 17.5 2.4 16.8 2.4 16V8c0-.8.4-1.5 1.1-1.9l7.4-4.3c.3-.2.7-.3 1.1-.3zm0 2.2L5.4 7.5v9l6.6 3.8 6.6-3.8v-9L12 3.7zm-3.2 4.1h2.1l2.3 4.2V7.8h2.1v8.4h-2.1l-2.3-4.2v4.2H8.8V7.8z" />
     </svg>
   );
 }

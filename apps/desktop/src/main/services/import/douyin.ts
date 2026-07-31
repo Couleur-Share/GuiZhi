@@ -13,8 +13,10 @@
  * 抖音改版就要跟着修——解析失败会降级成可读原因，不会静默产出空条目。
  */
 import path from "path";
+import { PlatformParseError } from "@guizhi/shared/utils/platform-parse-error";
 import type { ImageNoteSource } from "./image-note-entry";
 import { IMAGE_EXTENSIONS, MEDIA_SIZE_LIMITS } from "./media-files";
+import { logPlatformStructureMissing } from "./platform-parse-log";
 import { downloadToTempFile, fetchHtml } from "./safe-fetch";
 
 /** 分享页只在移动端 UA 下服务端渲染，桌面 UA 会被 302 到 douyin.com */
@@ -177,6 +179,16 @@ function sliceRouterDataJson(html: string): string | null {
   return null;
 }
 
+function throwDouyinStructureMissing(html: string, message: string): never {
+  logPlatformStructureMissing({
+    platform: DOUYIN_LABEL,
+    marker: ROUTER_DATA_MARKER,
+    html,
+    action: "解析抖音分享页",
+  });
+  throw new PlatformParseError("structure_missing", message);
+}
+
 /** 解析分享页里的 `window._ROUTER_DATA`；作品不可用时抛出平台给的原因 */
 export function parseDouyinRouterData(
   html: string,
@@ -184,7 +196,8 @@ export function parseDouyinRouterData(
 ): DouyinAweme {
   const json = sliceRouterDataJson(html);
   if (!json) {
-    throw new Error(
+    throwDouyinStructureMissing(
+      html,
       "分享页未返回作品数据（抖音可能已改版，或该链接需要在 App 内打开）",
     );
   }
@@ -193,7 +206,10 @@ export function parseDouyinRouterData(
   try {
     payload = JSON.parse(json) as { loaderData?: Record<string, unknown> };
   } catch {
-    throw new Error("分享页数据解析失败（页面结构可能已变化）");
+    throwDouyinStructureMissing(
+      html,
+      "分享页数据解析失败（页面结构可能已变化）",
+    );
   }
 
   // 承载数据的 key 形如 `video_(id)/page`，按内容找比按名字找更耐改版
@@ -206,7 +222,10 @@ export function parseDouyinRouterData(
     const filtered = info?.filter_list?.[0];
     const reason =
       readString(filtered?.detail_msg) || readString(filtered?.notice);
-    throw new Error(reason || "作品不存在或已被删除");
+    throw new PlatformParseError(
+      "note_unavailable",
+      reason || "作品不存在或已被删除",
+    );
   }
 
   const desc = readString(item.desc);
@@ -255,7 +274,10 @@ export async function fetchDouyinAweme(
     const landed = await fetchPage(url, signal);
     awemeId = extractAwemeId(landed.finalUrl);
     if (!awemeId) {
-      throw new Error("无法从该链接解析出抖音作品 ID");
+      throw new PlatformParseError(
+        "note_unavailable",
+        "无法从该链接解析出抖音作品 ID",
+      );
     }
   }
 

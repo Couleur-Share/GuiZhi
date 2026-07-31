@@ -28,11 +28,14 @@ under AGPL-3.0.
 取自 Simple Icons，路径数据内联在
 apps/desktop/src/renderer/components/ui/PlatformLogos.tsx。图标数据以
 CC0-1.0 发布，但商标本身归各平台所有，此处仅用于指称条目来自哪个平台，
-不表示任何关联或背书。
+不表示任何关联或背书。NGA 条目在 Simple Icons 中不存在，对应 glyph 为
+归知自绘，同样仅用于指称来源。
 
 The platform logos used to label an item's capture source (Douyin, Bilibili,
 Xiaohongshu, YouTube, V2EX) come from Simple Icons, with the path data
 inlined in apps/desktop/src/renderer/components/ui/PlatformLogos.tsx. The
 icon data is released under CC0-1.0, but the trademarks remain the property
 of their respective owners and are used here solely to identify the source
-of a captured item, implying no affiliation or endorsement.
+of a captured item, implying no affiliation or endorsement. The NGA glyph
+is an original mark (Simple Icons has no NGA entry), used for the same
+referential purpose.

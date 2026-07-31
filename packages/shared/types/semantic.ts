@@ -13,6 +13,13 @@ export interface SemanticIndexStatus {
   /** 应当被索引的条目数（未删除且内容非空） */
   eligibleItems: number;
   totalChunks: number;
+  /**
+   * 最近一次语义检索耗时（毫秒）；尚未检索过为 null。
+   * 进程内观测，不落库。
+   */
+  lastSearchMs: number | null;
+  /** 最近一次检索扫描的分块数 */
+  lastScannedChunks: number | null;
 }
 
 /** 待索引条目（内容随批下发，渲染进程直接分块嵌入） */

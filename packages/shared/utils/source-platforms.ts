@@ -24,6 +24,7 @@ export const SOURCE_PLATFORMS = [
   "xiaohongshu",
   "youtube",
   "v2ex",
+  "nga",
   "web",
   "local",
 ] as const;

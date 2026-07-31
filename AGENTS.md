@@ -634,6 +634,16 @@ Markdown 只认单换行会把它和下一行正文渲染进同一段，页面�
 没做通用论坛协议：Discourse 的 `/t/{id}.json` 在 linux.do 会被 Cloudflare
 挡成 403，逐站适配是唯一可行路径，`detectForumPlatform` 因此是白名单式判定。
 
+论坛帖子采集（NGA）：`import/nga.ts` 走 `read.php?tid=&page=&lite=js`。
+首次请求会 403 并在正文下发 `guestJs=…`，带上该 cookie 即可读公开帖
+（无需用户登录）；需登录版块仍会明确报错。响应常为 GBK，外层是
+`window.script_muti_get_var_store={…}` 而非纯 JSON，经 `fetchRawText`
+（可接受 403 body）解码。长帖按页顺序拉齐（约 20 楼/页）；BBCode 转
+Markdown；附件图串行入库为 `local-image://`，全帖上限 `NGA_IMAGE_LIMIT`
+（80），超出或失败保留外链并 `warningReason`。`sourceUri` 规范为
+`https://bbs.nga.cn/read.php?tid={id}`（去掉 fav/rand）。组装仍走
+`forum-post.ts`，与 V2EX 共用讨论总结与详情分段。
+
 抖音不走 yt-dlp：yt-dlp 的 Douyin 提取器打 `douyin.com/aweme/v1/web/aweme/detail/`，
 该接口对没有签名 cookie（`__ac_signature` / `ttwid`，由页面 JS 挑战生成）的请求
 返回空 body，报「Fresh cookies are needed」。`import/douyin.ts` 改走
@@ -1004,8 +1014,9 @@ dbx 的权限矩阵同理——归知只有两个只读工具，没有分级，�
   就在同一份 `__INITIAL_STATE__` 里但没有读。合集（多篇连载）也没有识别。
 - 图文采集的 OCR 按张调用视觉模型，默认上限 9 张（`OCR_IMAGE_LIMIT`），
  超出的图片只入库不识别。上限是硬编码常量，没有做成设置项。
-- 论坛采集只认 V2EX。超长帖的总结按回复分块，上限 8 块（`MAX_CHUNKS`），
- 再长的部分不进总结素材，但回复本身完整入库。
+- 论坛采集认 V2EX 与 NGA。超长帖的总结按回复分块，上限 8 块（`MAX_CHUNKS`），
+  再长的部分不进总结素材，但回复本身完整入库。NGA 公开帖走 guestJs + `lite=js`，
+  需登录版块仍采不到；附件图全帖上限 80 张（`NGA_IMAGE_LIMIT`），超出保留外链。
 - 文字稿排版的超时与预算都是一刀切的常量，没有按模型类型区分：思考类模型
  和普通模型的耗时差一个量级，前者需要 240 秒，后者十几秒就够，现在两者
  共用同一套阈值。`fastText` 路由在设置页写的是「低成本对话模型」，但没有

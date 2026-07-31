@@ -9,6 +9,9 @@
  * 回复接口不支持分页，总是一次返回整帖，因此不必翻页。
  */
 import { fetchJson } from "./safe-fetch";
+import type { ForumReply, ForumThread } from "./forum-types";
+
+export type { ForumReply, ForumThread } from "./forum-types";
 
 const V2EX_API_BASE = "https://www.v2ex.com/api";
 
@@ -28,32 +31,6 @@ interface V2exReply {
   content?: string;
   created?: number;
   member?: { username?: string };
-}
-
-export interface ForumReply {
-  /** 楼层号，从 1 开始 */
-  floor: number;
-  author: string;
-  content: string;
-  /** Unix 毫秒 */
-  createdAt: number;
-}
-
-export interface ForumThread {
-  platform: "v2ex";
-  topicId: string;
-  title: string;
-  author: string;
-  /** 节点 / 板块名 */
-  node: string;
-  /** Unix 毫秒 */
-  createdAt: number;
-  /** 平台声明的回复总数（可能与实际抓到的条数不等） */
-  replyCount: number;
-  /** 主楼正文 */
-  content: string;
-  replies: ForumReply[];
-  webpageUrl: string;
 }
 
 /**

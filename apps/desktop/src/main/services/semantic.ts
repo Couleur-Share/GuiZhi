@@ -3,6 +3,10 @@
  *
  * 哈希是判定与落库的唯一锚点：listPending 计算并下发 contentHash，
  * 渲染进程完成嵌入后原样回传，避免两端标准化算法漂移。
+ *
+ * 检索走进程内向量缓存（见 semantic-vector-cache），避免每次全表解码 BLOB。
+ * 没有 ANN：精确全量扫描。触发 ANN 的门槛见 known-limitations /
+ * semantic-vector-cache 文件头注释（chunks≥5万 或 缓存命中后中位>500ms）。
  */
 import { SemanticIndexDB } from "@guizhi/db";
 import type {
@@ -11,9 +15,16 @@ import type {
   SemanticSearchHit,
 } from "@guizhi/shared/types";
 import Database from "../database/sqlite";
+import { logAppError } from "../diagnostic-log";
 import { computeContentHash } from "./import/content-hash";
+import { ensureSemanticVectorCache } from "./semantic-vector-cache";
 
 const SNIPPET_MAX_LENGTH = 160;
+/** 缓存命中后仍超过该耗时才记一条诊断（节流） */
+const SLOW_SEARCH_MS = 300;
+const SLOW_LOG_COOLDOWN_MS = 60_000;
+/** 打分循环每处理这么多向量让出一次事件循环 */
+const YIELD_EVERY_CHUNKS = 2_000;
 
 interface EligibleItemRow {
   id: string;
@@ -138,6 +149,11 @@ export function listPendingSemanticItems(
   return resolvePendingItems(db, model, limit);
 }
 
+/** 进程内：最近一次检索观测（不必落库） */
+let lastSearchMs: number | null = null;
+let lastScannedChunks: number | null = null;
+let lastSlowLogAt = 0;
+
 /**
  * 索引进度。
  *
@@ -160,11 +176,10 @@ export function getSemanticStatus(
     indexedItems: Math.max(0, eligibleItems - pending),
     eligibleItems,
     totalChunks: new SemanticIndexDB(db).stats().totalChunks,
+    lastSearchMs,
+    lastScannedChunks,
   };
 }
-
-/** 每批取用的分块数：内存峰值与让出频率的折中 */
-const SEARCH_BATCH_SIZE = 500;
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
@@ -174,9 +189,8 @@ function yieldToEventLoop(): Promise<void> {
  * 余弦 top-k：向量均已 L2 归一化，点积即余弦相似度；
  * 条目分数取其分块最高分，返回按分数倒序的前 limit 个条目。
  *
- * 没有 ANN 索引，这里是全量扫描。分批取用并在批间让出事件循环——
- * 一次性搬完整份索引再连着算完，会把主进程占满：所有 IPC 排队，
- * 卡住的不只是问答，而是整个界面。
+ * 没有 ANN 索引，这里是全量扫描（可走内存缓存）。批间让出事件循环——
+ * 连着算完会把主进程占满：所有 IPC 排队，卡住的不只是问答，而是整个界面。
  */
 export async function searchSemanticByVector(
   db: Database.Database,
@@ -184,44 +198,35 @@ export async function searchSemanticByVector(
   queryVector: Float32Array,
   limit: number,
 ): Promise<SemanticSearchHit[]> {
+  const started = Date.now();
   const index = new SemanticIndexDB(db);
-  // 打分只需要「哪个条目的哪一块、多少分」，正文留到最后再取
+  const cache = ensureSemanticVectorCache(db, index, model);
   const bestByItem = new Map<
     string,
     { chunkIndex: number; score: number }
   >();
   const dims = queryVector.length;
+  const chunkCount = cache.itemIds.length;
+  let scanned = 0;
 
-  let cursor = 0;
-  for (;;) {
-    const batch = index.loadVectorsForSearch(model, SEARCH_BATCH_SIZE, cursor);
-    if (batch.length === 0) {
-      break;
-    }
-    cursor = batch[batch.length - 1].rowid;
-
-    for (const chunk of batch) {
-      // 维度不一致说明这批向量出自别的模型，跳过
-      if (chunk.vector.length !== dims) {
-        continue;
-      }
+  if (cache.dims === dims && dims > 0) {
+    for (let i = 0; i < chunkCount; i++) {
+      const offset = i * dims;
       let dot = 0;
-      for (let i = 0; i < dims; i++) {
-        dot += queryVector[i] * chunk.vector[i];
+      for (let d = 0; d < dims; d++) {
+        dot += queryVector[d] * cache.vectors[offset + d];
       }
-      const existing = bestByItem.get(chunk.itemId);
+      const itemId = cache.itemIds[i];
+      const chunkIndex = cache.chunkIndexes[i];
+      const existing = bestByItem.get(itemId);
       if (!existing || dot > existing.score) {
-        bestByItem.set(chunk.itemId, {
-          chunkIndex: chunk.chunkIndex,
-          score: dot,
-        });
+        bestByItem.set(itemId, { chunkIndex, score: dot });
+      }
+      scanned++;
+      if (scanned % YIELD_EVERY_CHUNKS === 0) {
+        await yieldToEventLoop();
       }
     }
-
-    if (batch.length < SEARCH_BATCH_SIZE) {
-      break;
-    }
-    await yieldToEventLoop();
   }
 
   const top = [...bestByItem.entries()]
@@ -236,7 +241,7 @@ export async function searchSemanticByVector(
       .map((row) => [`${row.itemId}:${row.chunkIndex}`, row]),
   );
 
-  return top.map(([itemId, best]) => {
+  const hits = top.map(([itemId, best]) => {
     const row = snippets.get(`${itemId}:${best.chunkIndex}`);
     const snippet = (row?.chunkText ?? "").replace(/\s+/g, " ").trim();
     return {
@@ -249,4 +254,30 @@ export async function searchSemanticByVector(
       score: best.score,
     };
   });
+
+  lastSearchMs = Date.now() - started;
+  lastScannedChunks = scanned;
+  if (
+    lastSearchMs >= SLOW_SEARCH_MS &&
+    Date.now() - lastSlowLogAt >= SLOW_LOG_COOLDOWN_MS
+  ) {
+    lastSlowLogAt = Date.now();
+    logAppError({
+      scope: "semantic",
+      action: "语义检索",
+      message: `语义检索耗时 ${lastSearchMs}ms（扫描 ${scanned} 分块）`,
+      lastSearchMs,
+      lastScannedChunks: scanned,
+      model,
+    });
+  }
+
+  return hits;
+}
+
+/** 单测用：重置进程内观测 */
+export function resetSemanticSearchTelemetryForTests(): void {
+  lastSearchMs = null;
+  lastScannedChunks = null;
+  lastSlowLogAt = 0;
 }

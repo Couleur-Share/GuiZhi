@@ -26,6 +26,8 @@ beforeEach(() => {
       indexedItems: 15,
       eligibleItems: 15,
       totalChunks: 42,
+      lastSearchMs: null,
+      lastScannedChunks: null,
     }),
   };
   useSemanticStore.setState({ isIndexing: false, indexedThisRun: 0, notice: null });

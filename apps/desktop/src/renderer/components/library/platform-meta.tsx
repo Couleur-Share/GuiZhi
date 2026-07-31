@@ -3,6 +3,7 @@ import type { SourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import {
   BilibiliLogo,
   DouyinLogo,
+  NgaLogo,
   V2exLogo,
   XiaohongshuLogo,
   YoutubeLogo,
@@ -20,7 +21,7 @@ export interface SourcePlatformMeta {
 /**
  * 侧栏「平台」分区与表格「来源」列的图标与名称。
  *
- * 五个专有平台用各自的品牌 logo（`ui/PlatformLogos.tsx`）而不是形态近似的通用
+ * 六个专有平台用各自的品牌 logo（`ui/PlatformLogos.tsx`）而不是形态近似的通用
  * 图标：音符、电视、书这类替身要先读懂旁边的文字才对得上号，等于没帮上忙，而
  * 这一列的全部用处就是不看文字也能扫出哪行是哪个平台。
  *
@@ -63,6 +64,12 @@ export const SOURCE_PLATFORM_META: Record<SourcePlatform, SourcePlatformMeta> =
       fallback: "V2EX",
       Icon: V2exLogo,
       colorClass: "text-foreground",
+    },
+    nga: {
+      labelKey: "library.platformNga",
+      fallback: "NGA",
+      Icon: NgaLogo,
+      colorClass: "text-[#548C2F]",
     },
     web: {
       labelKey: "library.platformWeb",

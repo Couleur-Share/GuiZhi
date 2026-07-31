@@ -1,4 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("electron", () => ({
+  session: { defaultSession: {} },
+  app: { getVersion: () => "0.0.0-test" },
+}));
+
 import DatabaseAdapter from "@guizhi/db/adapter";
 import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
 import { KnowledgeItemDB } from "@guizhi/db/knowledge";
@@ -7,8 +13,13 @@ import {
   buildSemanticSourceText,
   getSemanticStatus,
   listPendingSemanticItems,
+  resetSemanticSearchTelemetryForTests,
   searchSemanticByVector,
 } from "../../../src/main/services/semantic";
+import {
+  getSemanticVectorCache,
+  invalidateSemanticVectorCache,
+} from "../../../src/main/services/semantic-vector-cache";
 
 const MODEL = "text-embedding-3-small";
 
@@ -29,6 +40,7 @@ describe("语义索引 pending 判定与状态", () => {
     db = createTestDb();
     items = new KnowledgeItemDB(db);
     semantic = new SemanticIndexDB(db);
+    resetSemanticSearchTelemetryForTests();
   });
 
   function applyPending(itemId: string, contentHash: string, model = MODEL) {
@@ -58,6 +70,8 @@ describe("语义索引 pending 判定与状态", () => {
       indexedItems: 1,
       eligibleItems: 1,
       totalChunks: 1,
+      lastSearchMs: null,
+      lastScannedChunks: null,
     });
   });
 
@@ -157,6 +171,10 @@ describe("语义索引 pending 判定与状态", () => {
 });
 
 describe("searchSemanticByVector（余弦 top-k）", () => {
+  beforeEach(() => {
+    resetSemanticSearchTelemetryForTests();
+  });
+
   it("按点积倒序返回条目级最高分，维度不匹配的分块被跳过", async () => {
     const db = createTestDb();
     const items = new KnowledgeItemDB(db);
@@ -335,5 +353,68 @@ describe("searchSemanticByVector（余弦 top-k）", () => {
     }
     expect(seen).toHaveLength(20);
     expect(new Set(seen).size).toBe(20);
+  });
+
+  it("检索后 status 带回 lastSearchMs / lastScannedChunks", async () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const semantic = new SemanticIndexDB(db);
+    const item = items.create({ title: "t", content: "c" });
+    semantic.replaceItemChunks({
+      itemId: item.id,
+      contentHash: "h",
+      model: MODEL,
+      dims: 2,
+      chunks: [{ text: "块", vector: new Float32Array([1, 0]) }],
+    });
+
+    expect(getSemanticStatus(db, MODEL).lastSearchMs).toBeNull();
+    await searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 5);
+    const status = getSemanticStatus(db, MODEL);
+    expect(status.lastScannedChunks).toBe(1);
+    expect(status.lastSearchMs).toEqual(expect.any(Number));
+    expect(status.lastSearchMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("invalidate 后不会继续使用旧向量缓存", async () => {
+    const db = createTestDb();
+    const items = new KnowledgeItemDB(db);
+    const semantic = new SemanticIndexDB(db);
+    const item = items.create({ title: "t", content: "c" });
+    semantic.replaceItemChunks({
+      itemId: item.id,
+      contentHash: "h1",
+      model: MODEL,
+      dims: 2,
+      chunks: [{ text: "旧", vector: new Float32Array([1, 0]) }],
+    });
+
+    await searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 1);
+    expect(getSemanticVectorCache(db, MODEL)?.itemIds).toHaveLength(1);
+
+    semantic.replaceItemChunks({
+      itemId: item.id,
+      contentHash: "h2",
+      model: MODEL,
+      dims: 2,
+      chunks: [
+        { text: "新A", vector: new Float32Array([0, 1]) },
+        { text: "新B", vector: new Float32Array([1, 0]) },
+      ],
+    });
+    // 未失效时缓存仍是旧的一块
+    expect(getSemanticVectorCache(db, MODEL)?.itemIds).toHaveLength(1);
+
+    invalidateSemanticVectorCache(db, MODEL);
+    expect(getSemanticVectorCache(db, MODEL)).toBeUndefined();
+
+    const hits = await searchSemanticByVector(
+      db,
+      MODEL,
+      new Float32Array([1, 0]),
+      1,
+    );
+    expect(getSemanticVectorCache(db, MODEL)?.itemIds).toHaveLength(2);
+    expect(hits[0].snippet).toContain("新B");
   });
 });

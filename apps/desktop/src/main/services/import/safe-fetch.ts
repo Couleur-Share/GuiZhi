@@ -40,6 +40,8 @@ export interface SafeRequestOptions {
   userAgent?: string;
   accept?: string;
   referer?: string;
+  /** 原样写入 Cookie 头（NGA guestJs 握手） */
+  cookie?: string;
 }
 
 export interface FetchHtmlResult {
@@ -136,6 +138,7 @@ function openRequest(
           Accept: options.accept ?? HTML_ACCEPT,
           "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
           ...(options.referer ? { Referer: options.referer } : {}),
+          ...(options.cookie ? { Cookie: options.cookie } : {}),
         },
         agent: getHttpRequestAgent(parsed),
         timeout: IDLE_TIMEOUT_MS,
@@ -174,16 +177,21 @@ function openRequest(
 /**
  * 跟随重定向直到拿到最终响应，每一跳都重新做安全校验。
  * 消费在 consume 回调内完成，确保底层请求的错误仍能传到读流的一方。
+ *
+ * acceptStatuses：除 2xx 外也交给 consume 读 body 的状态码。
+ * NGA 的 guestJs 挑战就是 403 正文里下发 cookie 值，丢掉 body 就没法握手。
  */
 async function requestFollowingRedirects<T>(
   rawUrl: string,
-  options: SafeRequestOptions,
+  options: SafeRequestOptions & { acceptStatuses?: readonly number[] },
   consume: (
     response: http.IncomingMessage,
     finalUrl: string,
+    statusCode: number,
   ) => Promise<T>,
 ): Promise<T> {
   let currentUrl = rawUrl;
+  const acceptStatuses = options.acceptStatuses ?? [];
 
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
     const parsed = new URL(currentUrl);
@@ -197,11 +205,14 @@ async function requestFollowingRedirects<T>(
       currentUrl = new URL(response.headers.location, currentUrl).toString();
       continue;
     }
-    if (statusCode < 200 || statusCode >= 300) {
+    const accepted =
+      (statusCode >= 200 && statusCode < 300) ||
+      acceptStatuses.includes(statusCode);
+    if (!accepted) {
       response.resume();
       throw new Error(`HTTP ${statusCode}`);
     }
-    return await consume(response, currentUrl);
+    return await consume(response, currentUrl, statusCode);
   }
 
   throw new Error("重定向次数过多");
@@ -250,6 +261,62 @@ export async function fetchHtml(
         "页面超过大小上限",
       );
       return { finalUrl, html: decodeHtmlBody(body, contentType), contentType };
+    },
+  );
+}
+
+export interface FetchRawTextResult {
+  status: number;
+  text: string;
+  contentType: string;
+  finalUrl: string;
+  /** Set-Cookie 头拆成的 name=value（NGA 握手要 ngaPassportUid 等） */
+  setCookies: string[];
+}
+
+export interface FetchRawTextOptions extends Omit<SafeRequestOptions, "signal"> {
+  signal?: AbortSignal;
+  /** 除 2xx 外也读 body 的状态码（NGA guestJs 挑战是 403） */
+  acceptStatuses?: readonly number[];
+  maxBytes?: number;
+}
+
+/**
+ * 抓取任意文本响应。NGA 的 lite=js 既不是纯 JSON 也不是 HTML：
+ * 正文是 `window.script_muti_get_var_store={...}`，编码常是 GBK，
+ * 且 guestJs 握手必须读 403 body。
+ */
+export async function fetchRawText(
+  rawUrl: string,
+  options: FetchRawTextOptions = {},
+): Promise<FetchRawTextResult> {
+  const { signal, acceptStatuses, maxBytes, ...requestOptions } = options;
+  return requestFollowingRedirects(
+    rawUrl,
+    { accept: "*/*", ...requestOptions, signal, acceptStatuses },
+    async (response, finalUrl, statusCode) => {
+      const contentType = String(response.headers["content-type"] ?? "");
+      const body = await readBody(
+        response,
+        maxBytes ?? JSON_MAX_BYTES,
+        "接口响应超过大小上限",
+      );
+      const rawCookies = response.headers["set-cookie"];
+      const setCookies = (Array.isArray(rawCookies)
+        ? rawCookies
+        : rawCookies
+          ? [rawCookies]
+          : []
+      )
+        .map((line) => line.split(";")[0]?.trim())
+        .filter((part): part is string => Boolean(part) && part.includes("="));
+      return {
+        status: statusCode,
+        text: decodeTextBody(body, contentType),
+        contentType,
+        finalUrl,
+        setCookies,
+      };
     },
   );
 }
@@ -374,18 +441,43 @@ function writeBodyToFile(
 
 /** 按 Content-Type / meta charset 解码（默认 UTF-8，常见 GBK 站点回退处理）。 */
 function decodeHtmlBody(body: Buffer, contentType: string): string {
+  return decodeTextBody(body, contentType, { peekMeta: true });
+}
+
+/**
+ * 通用文本解码。NGA lite=js 响应里常带 `"encode":"gbk"`，
+ * 按 UTF-8 硬解会得到一串乱码，JSON 解析随之失败。
+ */
+function decodeTextBody(
+  body: Buffer,
+  contentType: string,
+  options: { peekMeta?: boolean } = {},
+): string {
   const headerCharset = /charset=([\w-]+)/i.exec(contentType)?.[1];
-  const utf8Text = body.toString("utf8");
-  const metaCharset =
-    /<meta[^>]+charset=["']?([\w-]+)/i.exec(utf8Text.slice(0, 2048))?.[1];
-  const charset = (headerCharset || metaCharset || "utf-8").toLowerCase();
+  const latinPeek = body.toString("latin1").slice(0, 4096);
+  const ngaEncode = /"encode"\s*:\s*"(gbk|gb2312|utf-8|utf8)"/i.exec(
+    latinPeek,
+  )?.[1];
+  let metaCharset: string | undefined;
+  if (options.peekMeta) {
+    const utf8Peek = body.toString("utf8").slice(0, 2048);
+    metaCharset =
+      /<meta[^>]+charset=["']?([\w-]+)/i.exec(utf8Peek)?.[1];
+  }
+  const charset = (
+    headerCharset ||
+    ngaEncode ||
+    metaCharset ||
+    "utf-8"
+  ).toLowerCase();
 
   if (charset === "utf-8" || charset === "utf8") {
-    return utf8Text;
+    return body.toString("utf8");
   }
+  const decoderCharset = charset === "gb2312" ? "gbk" : charset;
   try {
-    return new TextDecoder(charset).decode(body);
+    return new TextDecoder(decoderCharset).decode(body);
   } catch {
-    return utf8Text;
+    return body.toString("utf8");
   }
 }

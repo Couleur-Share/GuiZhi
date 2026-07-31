@@ -19,8 +19,10 @@
  */
 import fs from "fs/promises";
 import path from "path";
+import { PlatformParseError } from "@guizhi/shared/utils/platform-parse-error";
 import { IMAGE_EXTENSIONS, MEDIA_SIZE_LIMITS } from "./media-files";
 import type { ImageNoteSource } from "./image-note-entry";
+import { logPlatformStructureMissing } from "./platform-parse-log";
 import { downloadToTempFile, fetchHtml } from "./safe-fetch";
 
 /**
@@ -224,6 +226,16 @@ function readDuration(video: RawNote["video"], streams: RawStream[]): number | n
     : null;
 }
 
+function throwXhsStructureMissing(html: string, message: string): never {
+  logPlatformStructureMissing({
+    platform: XIAOHONGSHU_LABEL,
+    marker: INITIAL_STATE_MARKER,
+    html,
+    action: "解析小红书笔记页",
+  });
+  throw new PlatformParseError("structure_missing", message);
+}
+
 /** 解析笔记页里的 `__INITIAL_STATE__`；取不到笔记时抛出可读原因 */
 export function parseXiaohongshuNote(
   html: string,
@@ -231,14 +243,17 @@ export function parseXiaohongshuNote(
 ): XiaohongshuNote {
   const json = sliceInitialStateJson(html);
   if (!json) {
-    throw new Error("笔记页未返回数据（小红书可能已改版）");
+    throwXhsStructureMissing(html, "笔记页未返回数据（小红书可能已改版）");
   }
 
   let state: RawState;
   try {
     state = JSON.parse(json) as RawState;
   } catch {
-    throw new Error("笔记页数据解析失败（页面结构可能已变化）");
+    throwXhsStructureMissing(
+      html,
+      "笔记页数据解析失败（页面结构可能已变化）",
+    );
   }
 
   const detailMap = state.note?.noteDetailMap ?? {};
@@ -249,7 +264,8 @@ export function parseXiaohongshuNote(
   ].find((candidate) => candidate && detailMap[candidate]?.note);
   const item = noteId ? detailMap[noteId]?.note : undefined;
   if (!noteId || !item) {
-    throw new Error(
+    throw new PlatformParseError(
+      "note_unavailable",
       "页面里没有笔记内容（链接可能缺少 xsec_token 访问令牌，或笔记已被删除）。" +
         "请在小红书里用「分享 → 复制链接」重新复制完整链接。",
     );
@@ -317,7 +333,8 @@ export async function fetchXiaohongshuNote(
   // 缺 token / 笔记已删时小红书不报错，而是 302 到站内 404 页——那个页面同样
   // 带 __INITIAL_STATE__，不先认出来的话，报错会变成含糊的「没有笔记内容」
   if (new URL(page.finalUrl).pathname.startsWith("/404")) {
-    throw new Error(
+    throw new PlatformParseError(
+      "token_invalid",
       "小红书拒绝了该链接（缺少 xsec_token 访问令牌，或笔记已被删除）。" +
         "请在小红书里用「分享 → 复制链接」重新复制完整链接。",
     );

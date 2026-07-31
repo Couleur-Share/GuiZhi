@@ -38,6 +38,15 @@ describe("resolveSourcePlatform", () => {
     expect(resolveSourcePlatform("url", "https://www.v2ex.com/t/1227616")).toBe(
       "v2ex",
     );
+    expect(
+      resolveSourcePlatform(
+        "url",
+        "https://bbs.nga.cn/read.php?tid=37194262&fav=:FE2BE56B0&rand=862",
+      ),
+    ).toBe("nga");
+    expect(
+      resolveSourcePlatform("url", "https://ngabbs.com/read.php?tid=123"),
+    ).toBe("nga");
   });
 
   it("认不出的链接归到网页兜底桶", () => {

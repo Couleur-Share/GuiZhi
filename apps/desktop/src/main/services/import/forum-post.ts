@@ -22,11 +22,14 @@ import {
   type ForumSummaryInput,
   type ForumSummaryResult,
 } from "./forum-summary";
-import { fetchV2exThread, type ForumReply, type ForumThread } from "./v2ex";
+import type { ForumReply, ForumThread } from "./forum-types";
+import { fetchNgaThread } from "./nga";
+import { fetchV2exThread } from "./v2ex";
 import { resolveMediaSummaryConfig } from "../media/media-summary";
 
 const PLATFORM_LABELS: Record<ForumTarget["platform"], string> = {
   v2ex: "V2EX",
+  nga: "NGA",
 };
 
 /** 失败原因写进正文时的截断长度 */
@@ -56,6 +59,8 @@ async function fetchThreadByPlatform(
   switch (target.platform) {
     case "v2ex":
       return fetchV2exThread(target.topicId, {}, signal);
+    case "nga":
+      return fetchNgaThread(target.topicId, {}, signal);
     default:
       throw new Error(
         `暂不支持的论坛: ${target.platform satisfies never}`,
@@ -220,5 +225,6 @@ export async function extractForumPost(
     content,
     itemType: "forum",
     sourceUri: thread.webpageUrl,
+    warningReason: thread.warningReason,
   };
 }

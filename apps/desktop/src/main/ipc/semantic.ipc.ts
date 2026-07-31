@@ -11,6 +11,7 @@ import {
   listPendingSemanticItems,
   searchSemanticByVector,
 } from "../services/semantic";
+import { invalidateSemanticVectorCache } from "../services/semantic-vector-cache";
 
 const PENDING_BATCH_MAX = 50;
 const SEARCH_LIMIT_MAX = 20;
@@ -75,6 +76,7 @@ export function registerSemanticIPC(db: Database.Database): void {
             vector: new Float32Array(chunk.vector),
           })),
         });
+        invalidateSemanticVectorCache(db, input.model);
         return true;
       } catch (error) {
         // 条目可能在嵌入期间被彻底删除（外键约束失败），跳过即可
@@ -108,5 +110,9 @@ export function registerSemanticIPC(db: Database.Database): void {
     },
   );
 
-  ipcMain.handle(IPC_CHANNELS.SEMANTIC_CLEAR, () => semantic.clearAll());
+  ipcMain.handle(IPC_CHANNELS.SEMANTIC_CLEAR, () => {
+    const changes = semantic.clearAll();
+    invalidateSemanticVectorCache(db);
+    return changes;
+  });
 }
