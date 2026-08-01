@@ -102,6 +102,19 @@ describe("buildImportTaskReport", () => {
     expect(noisy).toContain("## 缺失提示\n\n文字稿生成失败：本地转写服务启动失败");
   });
 
+  it("平台解析错误码翻成可读文案，并保留错误码一行供排查", () => {
+    const report = buildImportTaskReport(
+      makeTask({
+        status: "failed",
+        error: "[structure_missing] 分享页未返回作品数据（抖音可能已改版）",
+      }),
+      context,
+    );
+    expect(report).toContain("平台页面结构可能已变更：分享页未返回作品数据（抖音可能已改版）");
+    expect(report).toContain("错误码：structure_missing");
+    expect(report).not.toContain("[structure_missing]");
+  });
+
   it("标题里的竖线要转义，否则表格被从中间切断", () => {
     const report = buildImportTaskReport(
       makeTask({

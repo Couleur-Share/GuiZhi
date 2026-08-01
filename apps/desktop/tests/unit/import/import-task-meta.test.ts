@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { ImportTask } from "@guizhi/shared/types";
 import {
   formatDuration,
+  formatImportTaskError,
+  formatImportTaskErrorForReport,
   needsCaptureToolSetup,
   resolveTaskFolder,
   resolveTaskHost,
@@ -86,6 +88,45 @@ describe("needsCaptureToolSetup", () => {
     expect(needsCaptureToolSetup("HTTP 522：源站没有响应")).toBe(false);
     expect(needsCaptureToolSetup("yt-dlp 退出码 1: 视频不存在")).toBe(false);
     expect(needsCaptureToolSetup(null)).toBe(false);
+  });
+});
+
+const identityT = (
+  _key: string,
+  fallback: string,
+  options?: Record<string, unknown>,
+) =>
+  fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
+    String(options?.[name] ?? ""),
+  );
+
+describe("formatImportTaskError", () => {
+  it("把 [structure_missing] 翻成可读标签，正文保留", () => {
+    expect(
+      formatImportTaskError(
+        "[structure_missing] 分享页未返回作品数据（抖音可能已改版）",
+        identityT,
+      ),
+    ).toBe(
+      "平台页面结构可能已变更：分享页未返回作品数据（抖音可能已改版）",
+    );
+  });
+
+  it("没有稳定码时原样返回", () => {
+    expect(formatImportTaskError("HTTP 522：源站没有响应", identityT)).toBe(
+      "HTTP 522：源站没有响应",
+    );
+  });
+
+  it("诊断文本额外带上错误码一行", () => {
+    expect(
+      formatImportTaskErrorForReport(
+        "[token_invalid] 小红书拒绝了该链接",
+        identityT,
+      ),
+    ).toBe(
+      "链接缺少访问令牌，请用分享面板复制完整链接：小红书拒绝了该链接\n错误码：token_invalid",
+    );
   });
 });
 

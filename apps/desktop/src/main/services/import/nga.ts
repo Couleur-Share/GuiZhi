@@ -8,14 +8,17 @@
  * 访客首次请求会 403 并在正文里下发 `guestJs=…` 挑战；带上该 cookie
  * 再请求即可读公开帖，全程不必用户登录。需登录的版块仍会报错，提示清楚。
  *
- * 长帖按页顺序拉齐（默认约 20 楼/页）；附件图入库为 local-image://，
- * 全帖软上限 NGA_IMAGE_LIMIT，超出保留外链并记 warning。
+ * 入库策略与 V2EX 不同：NGA 长帖水楼多，条目只保留主楼 + 楼主回复；
+ * 另按页采样他人回复（上限 NGA_SUMMARY_MAX_PAGES）专供讨论总结。
+ * 楼主回复走 authorid 过滤拉取，避免为镜像两千楼而翻百页。
+ * 附件图只处理主楼与楼主回复里的，软上限 NGA_IMAGE_LIMIT。
  */
 import fs from "fs/promises";
 import path from "path";
 import { ngaCanonicalUrl } from "@guizhi/shared/utils/forum-platforms";
+import { normalizeForumSnippet } from "@guizhi/shared/utils/forum-note";
 import { PlatformParseError } from "@guizhi/shared/utils/platform-parse-error";
-import type { ForumReply, ForumThread } from "./forum-types";
+import { asForumReplyTo, type ForumReply, type ForumThread } from "./forum-types";
 import {
   IMAGE_EXTENSIONS,
   MEDIA_SIZE_LIMITS,
@@ -36,6 +39,13 @@ const NGA_UA =
 const DEFAULT_PAGE_SIZE = 20;
 /** 全帖附件图入库上限；超出保留外链，避免千楼长帖拖死导入 */
 export const NGA_IMAGE_LIMIT = 80;
+/**
+ * 为讨论总结采样的最大页数（含第 1 页）。
+ * 约 12×20=240 楼，够 forum-summary 的分块上限消化，又不必镜像整帖。
+ */
+export const NGA_SUMMARY_MAX_PAGES = 12;
+/** 楼主发言按 authorid 拉取时的页数上限（防止异常账号拖死） */
+export const NGA_OP_MAX_PAGES = 40;
 const DEFAULT_ATTACH_BASE = "https://img.nga.cn/attachments";
 const RETRY_DELAYS_MS = [1_500, 4_000];
 
@@ -58,6 +68,7 @@ interface NgaPost {
   author?: string;
   authorid?: number;
   lou?: number;
+  pid?: number;
   postdatetimestamp?: number;
   attachs?: Record<string, NgaAttach> | NgaAttach[];
 }
@@ -103,6 +114,12 @@ export interface NgaDeps {
   retryDelaysMs?: number[];
   /** 测试注入：附件图上限 */
   imageLimit?: number;
+  /** 测试注入：讨论总结采样页上限 */
+  maxSummaryPages?: number;
+  /** 测试注入：楼主 authorid 拉取页上限 */
+  maxOpPages?: number;
+  /** 测试注入：按 pid 补拉父楼次数上限 */
+  maxParentFetches?: number;
 }
 
 type ImageExtension = (typeof IMAGE_EXTENSIONS)[number];
@@ -414,6 +431,12 @@ function collectPostImageUrls(post: NgaPost, attachBase: string): string[] {
 /**
  * NGA BBCode → Markdown。只覆盖常见标签；未知标签剥壳留文本。
  * imageMap 有命中时把 [img] 换成 local-image://，否则保留 https 外链。
+ *
+ * 章节标题是可读性的关键：泥潭作者常用
+ * `[align=center][b][size=…]标题[/size][/b][/align]` 或 `[h]标题[/h]`，
+ * 也常见 `[b][size=…]标题[/size][/b]`（size 包在粗体内）。后者若先套 `**`
+ * 再剥 size，会留下 `** 标题 **` 这种 CommonMark 不认的写法。
+ * 折叠 → `<details>`，强调色 → 白名单 class，靠 sanitize 放行。
  */
 export function ngaBbcodeToMarkdown(
   raw: string,
@@ -428,24 +451,42 @@ export function ngaBbcodeToMarkdown(
   let text = decodeHtmlEntities(raw).replace(/\r\n?/g, "\n");
   text = text.replace(/<br\s*\/?>/gi, "\n");
 
-  // 折叠：保留标题与正文
+  // 折叠：可交互的 details（标题缺省用「展开」）
   text = text.replace(
     /\[collapse(?:=([^\]]+))?\]([\s\S]*?)\[\/collapse\]/gi,
     (_m, title: string | undefined, body: string) => {
-      const heading = title?.trim() ? `**${title.trim()}**\n\n` : "";
-      return `${heading}${body.trim()}`;
+      const summary = escapeHtmlText(title?.trim() || "展开");
+      const inner = body.trim();
+      return `\n\n<details>\n<summary>${summary}</summary>\n\n${inner}\n\n</details>\n\n`;
+    },
+  );
+
+  // 强调色：白名单 class，不内联任意 CSS
+  text = text.replace(
+    /\[color=([^\]]+)\]([\s\S]*?)\[\/color\]/gi,
+    (_m, color: string, body: string) => {
+      const cls = forumColorClass(color);
+      const inner = body.trim();
+      if (!inner) {
+        return "";
+      }
+      return cls
+        ? `<span class="${cls}">${inner}</span>`
+        : inner;
     },
   );
 
   // 引用
   text = text.replace(
     /\[quote\]([\s\S]*?)\[\/quote\]/gi,
-    (_m, body: string) =>
-      body
+    (_m, body: string) => {
+      const cleaned = stripReplyHeaderNoise(body);
+      return cleaned
         .trim()
         .split("\n")
         .map((line) => `> ${line}`)
-        .join("\n"),
+        .join("\n");
+    },
   );
 
   // 列表
@@ -475,27 +516,68 @@ export function ngaBbcodeToMarkdown(
     },
   );
 
-  // 行内样式
-  text = text.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, "**$1**");
-  text = text.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, "*$1*");
-  text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, "$1");
-  text = text.replace(/\[del\]([\s\S]*?)\[\/del\]/gi, "~~$1~~");
-  text = text.replace(/\[strikeout\]([\s\S]*?)\[\/strikeout\]/gi, "~~$1~~");
+  // 分隔线标题（NGA 的 [h]…[/h]，空内容就是一条线）
+  text = text.replace(/\[h\]([\s\S]*?)\[\/h\]/gi, (_m, body: string) => {
+    const title = stripInlineBbcode(body).replace(/\n+/g, " ").trim();
+    return title ? `\n\n## ${title}\n\n` : "\n\n---\n\n";
+  });
 
-  // 纯展示标签：剥壳
+  // 居中块：短标题升级为 ##
   text = text.replace(
-    /\[(?:align|size|color|font|h|l)(?:=[^\]]*)?\]/gi,
-    "",
+    /\[align=center\]([\s\S]*?)\[\/align\]/gi,
+    (_m, body: string) => {
+      const title = extractCenteredHeading(body);
+      if (title) {
+        return `\n\n## ${title}\n\n`;
+      }
+      return `\n\n${body}\n\n`;
+    },
+  );
+
+  // size+粗体短标题（两种嵌套顺序都认），避免剥 size 后留下带空格的 **
+  text = text.replace(
+    /\[size=(\d+)%\]\s*\[b\]([\s\S]*?)\[\/b\]\s*\[\/size\]/gi,
+    (_m, size: string, body: string) => formatSizedBold(Number(size), body),
   );
   text = text.replace(
-    /\[\/(?:align|size|color|font|h|l|b|i|u|del|strikeout)\]/gi,
+    /\[b\]\s*\[size=(\d+)%\]([\s\S]*?)\[\/size\]\s*\[\/b\]/gi,
+    (_m, size: string, body: string) => formatSizedBold(Number(size), body),
+  );
+
+  // 先剥字号/字体，再处理粗体，避免 `**[size]…[/size]**` → `** 标题 **`
+  text = text.replace(/\[(?:size|font)(?:=[^\]]*)?\]/gi, "");
+  text = text.replace(/\[\/(?:size|font)\]/gi, "");
+
+  text = text.replace(/\[b\]([\s\S]*?)\[\/b\]/gi, (_m, body: string) =>
+    formatBoldMarkdown(body),
+  );
+  text = text.replace(/\[i\]([\s\S]*?)\[\/i\]/gi, (_m, body: string) => {
+    const inner = stripInlineBbcode(body).replace(/\n+/g, " ").trim();
+    return inner ? `<em>${inner}</em>` : "";
+  });
+  text = text.replace(/\[u\]([\s\S]*?)\[\/u\]/gi, (_m, body: string) =>
+    stripInlineBbcode(body).trim(),
+  );
+  text = text.replace(/\[del\]([\s\S]*?)\[\/del\]/gi, (_m, body: string) => {
+    const inner = stripInlineBbcode(body).replace(/\n+/g, " ").trim();
+    return inner ? `~~${inner}~~` : "";
+  });
+  text = text.replace(
+    /\[strikeout\]([\s\S]*?)\[\/strikeout\]/gi,
+    (_m, body: string) => {
+      const inner = stripInlineBbcode(body).replace(/\n+/g, " ").trim();
+      return inner ? `~~${inner}~~` : "";
+    },
+  );
+
+  // 残留展示标签：剥壳（color 已转 span）
+  text = text.replace(/\[(?:align|color|l)(?:=[^\]]*)?\]/gi, "");
+  text = text.replace(
+    /\[\/(?:align|color|h|l|b|i|u|del|strikeout)\]/gi,
     "",
   );
 
-  // 表情占位：留下可读提示而不是空白
   text = text.replace(/\[s:[^\]]+\]/gi, "");
-
-  // 残留未知标签
   text = text.replace(/\[\/?[a-z0-9*]+(?:=[^\]]*)?\]/gi, "");
 
   return text
@@ -503,11 +585,221 @@ export function ngaBbcodeToMarkdown(
     .trim();
 }
 
-function resolveAuthor(
-  post: NgaPost,
+const FORUM_COLOR_CLASSES: Record<string, string> = {
+  red: "forum-color-red",
+  blue: "forum-color-blue",
+  green: "forum-color-green",
+  orange: "forum-color-orange",
+  purple: "forum-color-purple",
+  gray: "forum-color-muted",
+  grey: "forum-color-muted",
+  silver: "forum-color-muted",
+};
+
+function forumColorClass(raw: string): string | null {
+  const key = raw.trim().toLowerCase().replace(/^#/, "");
+  if (FORUM_COLOR_CLASSES[key]) {
+    return FORUM_COLOR_CLASSES[key];
+  }
+  // 泥潭偶发写 skyblue / royalblue 等，归到蓝
+  if (key.includes("red") || key === "crimson") {
+    return "forum-color-red";
+  }
+  if (key.includes("blue")) {
+    return "forum-color-blue";
+  }
+  if (key.includes("green")) {
+    return "forum-color-green";
+  }
+  return null;
+}
+
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatSizedBold(sizePercent: number, body: string): string {
+  const title = stripInlineBbcode(body).replace(/\n+/g, " ").trim();
+  if (!title) {
+    return "";
+  }
+  if (
+    Number.isFinite(sizePercent) &&
+    sizePercent >= 120 &&
+    title.length <= 48 &&
+    !/^[-*+>]\s/.test(title)
+  ) {
+    return `\n\n## ${title}\n\n`;
+  }
+  return `<strong>${title}</strong>`;
+}
+
+/** 剥掉字号/颜色/粗斜体等，只留纯文本，用于判断是不是章节标题 */
+function stripInlineBbcode(raw: string): string {
+  return raw
+    .replace(/\[(?:size|color|font|b|i|u)(?:=[^\]]*)?\]/gi, "")
+    .replace(/\[\/(?:size|color|font|b|i|u)\]/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n");
+}
+
+/**
+ * 居中块是否是「章节标题」：剥壳后只有一行、不太长、不像列表/链接。
+ * 阈值取 48——泥潭小标题通常几个到十几个字，再长多半是居中段落。
+ */
+function extractCenteredHeading(body: string): string | null {
+  const plain = stripInlineBbcode(body)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (plain.length !== 1) {
+    return null;
+  }
+  const title = plain[0];
+  if (title.length === 0 || title.length > 48) {
+    return null;
+  }
+  if (/^[-*+>]\s/.test(title) || /^https?:\/\//i.test(title)) {
+    return null;
+  }
+  return title;
+}
+
+/**
+ * `[b]…[/b]` → `<strong>`。
+ * 不用 `**…**`：CommonMark 在中文/中文标点旁容易判不成对强调，
+ * 页面上就会露出字面量星号（「可以说**挑选镜框…**」那种）。
+ * 已有 rehype-raw + sanitize，`<strong>` 稳定可渲染。
+ */
+function formatBoldMarkdown(body: string): string {
+  const plain = stripInlineBbcode(body);
+  const trimmed = plain.replace(/^\s+|\s+$/g, "");
+  if (!trimmed) {
+    return "";
+  }
+  const lines = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0) {
+    return "";
+  }
+  if (lines.length === 1) {
+    return `<strong>${lines[0]}</strong>`;
+  }
+  if (trimmed.length > 200) {
+    return lines.join("\n\n");
+  }
+  return lines.map((line) => `<strong>${line}</strong>`).join("\n\n");
+}
+
+/** 引用块里的 Reply / Post by 样板行，转引用时清掉，避免讨论区满屏英文噪音 */
+function stripReplyHeaderNoise(quoteBody: string): string {
+  return quoteBody
+    .replace(/\[pid=[^\]]*\][\s\S]*?\[\/pid\]/gi, "")
+    .replace(/\[b\]\s*Post by[\s\S]*?\[\/b\]/gi, "")
+    .replace(/Reply to Reply Post by[^\n]*/gi, "")
+    .replace(/Post by\s*\[[^\]]*\][^\n]*/gi, "")
+    .replace(/\[uid[^\]]*\]|\[\/uid\]/gi, "");
+}
+
+export const NGA_REPLY_SNIPPET_MAX = 200;
+/** 按 pid 补拉父楼的次数上限，避免楼主几百条回复拖垮导入 */
+export const NGA_PARENT_FETCH_MAX = 30;
+
+export interface NgaReplyContext {
+  replyTo?: {
+    author: string;
+    floor?: number;
+    snippet: string;
+    pid?: number;
+  };
+  /** 去掉首条「回复引用头」后的 BBCode，供转 Markdown */
+  content: string;
+}
+
+/**
+ * 从楼主回复原文抽出被回复楼的上下文。
+ * 命中带 pid / Post by 的首条 [quote] 时剥掉它，避免正文与卡片重复。
+ */
+export function extractNgaReplyContext(raw: string): NgaReplyContext {
+  const text = decodeHtmlEntities(raw);
+  const match = /^(\s*)\[quote\]([\s\S]*?)\[\/quote\]/i.exec(text);
+  if (!match) {
+    return { content: text };
+  }
+  const quoteBody = match[2];
+  const looksLikeReplyHeader =
+    /\[pid=/i.test(quoteBody) ||
+    /Post by/i.test(quoteBody) ||
+    /Reply to Reply Post by/i.test(quoteBody);
+  if (!looksLikeReplyHeader) {
+    return { content: text };
+  }
+
+  const pidMatch = /\[pid=(\d+)(?:,[^\]]*)?\]/i.exec(quoteBody);
+  const pid = pidMatch ? Number(pidMatch[1]) : undefined;
+
+  let author = "";
+  const uidName = /Post by\s*\[uid[^\]]*\]\s*([^[]+?)\s*\[\/uid\]/i.exec(
+    quoteBody,
+  );
+  if (uidName) {
+    author = uidName[1].trim();
+  } else {
+    const plainName =
+      /Post by\s+([^\n(#]+)/i.exec(quoteBody) ??
+      /Reply to Reply Post by\s+([^\n(#]+)/i.exec(quoteBody);
+    if (plainName) {
+      author = plainName[1].trim();
+    }
+  }
+
+  const snippet = normalizeForumSnippet(
+    stripReplyHeaderNoise(quoteBody).replace(
+      /\[\/?[a-z0-9*]+(?:=[^\]]*)?\]/gi,
+      "",
+    ),
+    NGA_REPLY_SNIPPET_MAX,
+  );
+
+  const rest = text.slice(match[0].length).replace(/^\s+/, "");
+  if (!author && !snippet && pid == null) {
+    return { content: text };
+  }
+
+  return {
+    replyTo: {
+      author: author || "某人",
+      snippet,
+      pid: Number.isFinite(pid) ? pid : undefined,
+    },
+    content: rest,
+  };
+}
+
+function plainSnippetFromBbcode(raw: string): string {
+  return normalizeForumSnippet(
+    stripInlineBbcode(raw).replace(/\[\/?[a-z0-9*]+(?:=[^\]]*)?\]/gi, ""),
+    NGA_REPLY_SNIPPET_MAX,
+  );
+}
+
+function resolveAuthor(  post: NgaPost,
   users: Record<string, NgaUser> | undefined,
   fallback?: string,
 ): string {
+  const uid = post.authorid;
+  // __U 里的昵称优先：lite=js 分页里 post.author 经常缺席，只剩 authorid
+  if (uid != null && users) {
+    const name = users[String(uid)]?.username?.trim();
+    if (name) {
+      return name;
+    }
+  }
   const direct = post.author?.trim();
   if (direct) {
     return direct;
@@ -515,14 +807,10 @@ function resolveAuthor(
   if (fallback?.trim()) {
     return fallback.trim();
   }
-  const uid = post.authorid;
-  if (uid != null && users) {
-    const name = users[String(uid)]?.username?.trim();
-    if (name) {
-      return name;
-    }
+  if (uid != null && uid < 0) {
+    return "匿名";
   }
-  return uid != null && uid < 0 ? "匿名" : "";
+  return uid != null ? `UID:${uid}` : "";
 }
 
 function resolveNodeName(data: NgaPageData, fid: number | undefined): string {
@@ -544,8 +832,24 @@ function toMillis(seconds: number | undefined): number {
     : Date.now();
 }
 
-function pageUrl(topicId: string, page: number): string {
-  return `${NGA_ORIGIN}/read.php?tid=${encodeURIComponent(topicId)}&page=${page}&lite=js`;
+function pageUrl(
+  topicId: string,
+  page: number,
+  authorId?: number,
+): string {
+  const params = new URLSearchParams({
+    tid: topicId,
+    page: String(page),
+    lite: "js",
+  });
+  if (authorId != null && Number.isFinite(authorId) && authorId !== 0) {
+    params.set("authorid", String(authorId));
+  }
+  return `${NGA_ORIGIN}/read.php?${params.toString()}`;
+}
+
+function pidUrl(pid: number): string {
+  return `${NGA_ORIGIN}/read.php?pid=${encodeURIComponent(String(pid))}&lite=js`;
 }
 
 function assertPageOk(store: NgaStore): NgaPageData {
@@ -600,11 +904,13 @@ async function requestPage(
   cookie: string | undefined,
   deps: NgaDeps,
   signal?: AbortSignal,
+  authorId?: number,
 ): Promise<{ store: NgaStore; cookie: string | undefined }> {
   const get = deps.fetchRawText ?? fetchRawText;
   const delays = deps.retryDelaysMs ?? RETRY_DELAYS_MS;
   let lastError: unknown;
   let currentCookie = cookie;
+  const url = pageUrl(topicId, page, authorId);
 
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     if (attempt > 0) {
@@ -612,7 +918,7 @@ async function requestPage(
     }
     try {
       // 始终接受 403：分页中途 guest 会话失效时要能读挑战正文再握手
-      const result = await get(pageUrl(topicId, page), {
+      const result = await get(url, {
         signal,
         userAgent: NGA_UA,
         referer: ngaCanonicalUrl(topicId),
@@ -634,7 +940,7 @@ async function requestPage(
             "需要登录后才能查看该帖（访客无权访问）",
           );
         }
-        const retry = await get(pageUrl(topicId, page), {
+        const retry = await get(url, {
           signal,
           userAgent: NGA_UA,
           referer: ngaCanonicalUrl(topicId),
@@ -685,6 +991,66 @@ async function requestPage(
   }
 
   throw new PlatformParseError("network", describeNgaError(lastError));
+}
+
+/** 按 pid 拉单楼（补楼主回复的父楼上下文） */
+async function requestPid(
+  pid: number,
+  topicId: string,
+  cookie: string | undefined,
+  deps: NgaDeps,
+  signal?: AbortSignal,
+): Promise<{ post: NgaPost | null; users: Record<string, NgaUser>; cookie: string | undefined }> {
+  const get = deps.fetchRawText ?? fetchRawText;
+  let currentCookie = cookie;
+  try {
+    const result = await get(pidUrl(pid), {
+      signal,
+      userAgent: NGA_UA,
+      referer: ngaCanonicalUrl(topicId),
+      cookie: currentCookie,
+      acceptStatuses: [403],
+    });
+    currentCookie =
+      mergeNgaCookies(currentCookie, result.setCookies ?? [], result.text) ||
+      currentCookie;
+
+    let text = result.text;
+    if (result.status === 403) {
+      if (!currentCookie?.includes("guestJs=")) {
+        return { post: null, users: {}, cookie: currentCookie };
+      }
+      const retry = await get(pidUrl(pid), {
+        signal,
+        userAgent: NGA_UA,
+        referer: ngaCanonicalUrl(topicId),
+        cookie: currentCookie,
+      });
+      currentCookie =
+        mergeNgaCookies(currentCookie, retry.setCookies ?? [], retry.text) ||
+        currentCookie;
+      text = retry.text;
+    }
+
+    const data = assertPageOk(parseNgaStore(text));
+    const posts = asPostList(data.__R);
+    const post =
+      posts.find((p) => p.pid === pid) ??
+      posts.find((p) => p.lou !== 0) ??
+      posts[0] ??
+      null;
+    return {
+      post,
+      users: data.__U ?? {},
+      cookie: currentCookie,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "已取消") {
+      throw error;
+    }
+    console.warn(`[import] NGA 按 pid=${pid} 补拉父楼失败:`, error);
+    return { post: null, users: {}, cookie: currentCookie };
+  }
 }
 
 interface LocalizedImages {
@@ -775,7 +1141,7 @@ function appendOrphanAttachments(
 }
 
 /**
- * 抓取 NGA 帖子与全部回复，并把附件图尽量入库。
+ * 抓取 NGA 帖子：主楼入库，讨论区只留楼主回复；另采样若干页供总结。
  */
 export async function fetchNgaThread(
   topicId: string,
@@ -791,81 +1157,128 @@ export async function fetchNgaThread(
 
   const attachBase = resolveAttachBase(page1);
   const users: Record<string, NgaUser> = { ...(page1.__U ?? {}) };
-  const posts = asPostList(page1.__R);
+  const samplePosts = asPostList(page1.__R);
 
   const rows =
     typeof page1.__ROWS === "number" && page1.__ROWS > 0
       ? page1.__ROWS
-      : posts.length;
+      : samplePosts.length;
   const totalPages = Math.max(1, Math.ceil(rows / DEFAULT_PAGE_SIZE));
+  const maxSummaryPages = deps.maxSummaryPages ?? NGA_SUMMARY_MAX_PAGES;
+  const summaryPageCap = Math.min(totalPages, maxSummaryPages);
 
   let cookie = first.cookie;
-  for (let page = 2; page <= totalPages; page++) {
+  const extraWarnings: string[] = [];
+
+  for (let page = 2; page <= summaryPageCap; page++) {
     signal?.throwIfAborted();
     try {
       const next = await requestPage(topicId, page, cookie, deps, signal);
       cookie = next.cookie ?? cookie;
       const data = assertPageOk(next.store);
       Object.assign(users, data.__U ?? {});
-      posts.push(...asPostList(data.__R));
+      samplePosts.push(...asPostList(data.__R));
     } catch (error) {
       if (error instanceof Error && error.message === "已取消") {
         throw error;
       }
-      // 后续页失败：保留已抓到的楼层，记 warning，总比整帖作废强
-      console.warn(`[import] NGA 第 ${page} 页抓取失败，保留已抓楼层:`, error);
+      console.warn(`[import] NGA 总结采样第 ${page} 页失败:`, error);
       const reason = error instanceof Error ? error.message : String(error);
-      const partialWarning = `第 ${page} 页及之后抓取失败（${reason}），仅保留部分楼层`;
-      return finalizeThread({
-        topicId,
-        topic,
-        page1,
-        posts,
-        users,
-        attachBase,
-        deps,
-        signal,
-        extraWarnings: [partialWarning],
-      });
+      extraWarnings.push(
+        `第 ${page} 页及之后采样失败（${reason}），讨论总结素材可能不完整`,
+      );
+      break;
     }
+  }
+
+  if (totalPages > summaryPageCap) {
+    extraWarnings.push(
+      `原帖约 ${totalPages} 页，讨论总结仅采样前 ${summaryPageCap} 页；讨论区只保留楼主回复`,
+    );
+  }
+
+  const opFromSample =
+    samplePosts.find((p) => p.lou === 0) ?? samplePosts[0];
+  const opAuthorId =
+    typeof topic.authorid === "number"
+      ? topic.authorid
+      : typeof opFromSample?.authorid === "number"
+        ? opFromSample.authorid
+        : undefined;
+
+  const opPosts: NgaPost[] = [];
+  const maxOpPages = deps.maxOpPages ?? NGA_OP_MAX_PAGES;
+
+  if (opAuthorId != null && opAuthorId !== 0) {
+    for (let page = 1; page <= maxOpPages; page++) {
+      signal?.throwIfAborted();
+      try {
+        const next = await requestPage(
+          topicId,
+          page,
+          cookie,
+          deps,
+          signal,
+          opAuthorId,
+        );
+        cookie = next.cookie ?? cookie;
+        const data = assertPageOk(next.store);
+        Object.assign(users, data.__U ?? {});
+        const pagePosts = asPostList(data.__R);
+        if (pagePosts.length === 0) {
+          break;
+        }
+        opPosts.push(...pagePosts);
+        if (pagePosts.length < DEFAULT_PAGE_SIZE) {
+          break;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "已取消") {
+          throw error;
+        }
+        console.warn(`[import] NGA 楼主发言第 ${page} 页失败:`, error);
+        const reason = error instanceof Error ? error.message : String(error);
+        extraWarnings.push(
+          `楼主发言第 ${page} 页抓取失败（${reason}），楼主回复可能不完整`,
+        );
+        break;
+      }
+    }
+  }
+
+  // authorid 过滤失败或不可用时，从采样里挑同作者的楼，总比讨论区全空强
+  if (opPosts.length === 0 && opAuthorId != null && opAuthorId !== 0) {
+    for (const post of samplePosts) {
+      if (post.authorid === opAuthorId) {
+        opPosts.push(post);
+      }
+    }
+    if (opPosts.length > 0) {
+      extraWarnings.push(
+        "未能按楼主筛选拉取完整发言，讨论区仅含采样页内的楼主回复",
+      );
+    }
+  } else if (opPosts.length === 0 && opFromSample) {
+    opPosts.push(opFromSample);
+    extraWarnings.push("无法识别楼主账号，讨论区未收录后续回复");
   }
 
   return finalizeThread({
     topicId,
     topic,
     page1,
-    posts,
+    samplePosts,
+    opPosts,
     users,
     attachBase,
     deps,
     signal,
+    cookie,
+    extraWarnings,
   });
 }
 
-async function finalizeThread(input: {
-  topicId: string;
-  topic: NgaTopic;
-  page1: NgaPageData;
-  posts: NgaPost[];
-  users: Record<string, NgaUser>;
-  attachBase: string;
-  deps: NgaDeps;
-  signal?: AbortSignal;
-  extraWarnings?: string[];
-}): Promise<ForumThread> {
-  const {
-    topicId,
-    topic,
-    page1,
-    posts,
-    users,
-    attachBase,
-    deps,
-    signal,
-    extraWarnings = [],
-  } = input;
-
-  // 按 lou 去重（翻页偶发重叠），主楼与回复分开
+function dedupePostsByFloor(posts: NgaPost[]): Map<number, NgaPost> {
   const byFloor = new Map<number, NgaPost>();
   for (const post of posts) {
     const lou = typeof post.lou === "number" ? post.lou : byFloor.size;
@@ -873,16 +1286,78 @@ async function finalizeThread(input: {
       byFloor.set(lou, post);
     }
   }
-  const ordered = [...byFloor.entries()].sort((a, b) => a[0] - b[0]);
-  const opEntry = ordered.find(([lou]) => lou === 0) ?? ordered[0];
+  return byFloor;
+}
+
+function toForumReply(
+  lou: number,
+  post: NgaPost,
+  users: Record<string, NgaUser>,
+  formatPost: (bbcode: string, post: NgaPost) => string,
+  replyTo?: ForumReply["replyTo"],
+  bbcodeOverride?: string,
+): ForumReply | null {
+  const body = formatPost(bbcodeOverride ?? post.content ?? "", post);
+  if (!body && !replyTo) {
+    return null;
+  }
+  return {
+    floor: lou,
+    author: resolveAuthor(post, users),
+    content: body,
+    createdAt: toMillis(post.postdatetimestamp),
+    replyTo,
+  };
+}
+
+async function finalizeThread(input: {
+  topicId: string;
+  topic: NgaTopic;
+  page1: NgaPageData;
+  samplePosts: NgaPost[];
+  opPosts: NgaPost[];
+  users: Record<string, NgaUser>;
+  attachBase: string;
+  deps: NgaDeps;
+  signal?: AbortSignal;
+  cookie?: string;
+  extraWarnings?: string[];
+}): Promise<ForumThread> {
+  const {
+    topicId,
+    topic,
+    page1,
+    samplePosts,
+    opPosts,
+    users,
+    attachBase,
+    deps,
+    signal,
+    extraWarnings = [],
+  } = input;
+  let cookie = input.cookie;
+
+  const opByFloor = dedupePostsByFloor(opPosts);
+  const sampleByFloor = dedupePostsByFloor(samplePosts);
+
+  const opEntry =
+    [...opByFloor.entries()].find(([lou]) => lou === 0) ??
+    [...sampleByFloor.entries()].find(([lou]) => lou === 0) ??
+    [...opByFloor.entries()][0] ??
+    [...sampleByFloor.entries()][0];
   if (!opEntry) {
     throw new PlatformParseError("structure_missing", "帖子没有主楼内容");
   }
   const [, opPost] = opEntry;
 
+  // 附件图只处理主楼 + 入库的楼主回复，不给采样里的水楼烧配额
+  const imageSourcePosts = [...opByFloor.values()];
+  if (!opByFloor.has(0) && opPost) {
+    imageSourcePosts.unshift(opPost);
+  }
   const allUrls: string[] = [];
   const seenUrls = new Set<string>();
-  for (const [, post] of ordered) {
+  for (const post of imageSourcePosts) {
     for (const url of collectPostImageUrls(post, attachBase)) {
       if (!seenUrls.has(url)) {
         seenUrls.add(url);
@@ -898,8 +1373,8 @@ async function finalizeThread(input: {
   );
   const warnings = [...extraWarnings, ...warningParts];
 
-  const formatPost = (post: NgaPost): string => {
-    const markdown = ngaBbcodeToMarkdown(post.content ?? "", {
+  const formatPost = (bbcode: string, post: NgaPost): string => {
+    const markdown = ngaBbcodeToMarkdown(bbcode, {
       attachBase,
       imageMap,
     });
@@ -910,24 +1385,94 @@ async function finalizeThread(input: {
     decodeHtmlEntities(topic.subject ?? opPost.subject ?? "").trim() ||
     `NGA 帖子 ${topicId}`;
   const author = resolveAuthor(opPost, users, topic.author);
-  const content = formatPost(opPost);
+  const content = formatPost(opPost.content ?? "", opPost);
+
+  const maxParentFetches = deps.maxParentFetches ?? NGA_PARENT_FETCH_MAX;
+  let parentFetches = 0;
+  const parentCache = new Map<
+    number,
+    { author: string; floor?: number; snippet: string }
+  >();
 
   const replies: ForumReply[] = [];
-  for (const [lou, post] of ordered) {
+  for (const [lou, post] of [...opByFloor.entries()].sort(
+    (a, b) => a[0] - b[0],
+  )) {
     if (lou === 0) {
       continue;
     }
-    const body = formatPost(post);
-    if (!body) {
+    const ctx = extractNgaReplyContext(post.content ?? "");
+    let replyTo: ForumReply["replyTo"] = ctx.replyTo
+      ? asForumReplyTo(ctx.replyTo)
+      : undefined;
+
+    const needParent =
+      ctx.replyTo?.pid != null &&
+      ctx.replyTo.pid > 0 &&
+      !ctx.replyTo.snippet.trim();
+    if (needParent && parentFetches < maxParentFetches) {
+      const pid = ctx.replyTo!.pid!;
+      let cached = parentCache.get(pid);
+      if (!cached) {
+        parentFetches += 1;
+        const fetched = await requestPid(pid, topicId, cookie, deps, signal);
+        cookie = fetched.cookie ?? cookie;
+        Object.assign(users, fetched.users);
+        if (fetched.post) {
+          cached = {
+            author:
+              resolveAuthor(fetched.post, users) || ctx.replyTo!.author,
+            floor:
+              typeof fetched.post.lou === "number"
+                ? fetched.post.lou
+                : undefined,
+            snippet: plainSnippetFromBbcode(fetched.post.content ?? ""),
+          };
+          parentCache.set(pid, cached);
+        }
+      }
+      if (cached) {
+        replyTo = asForumReplyTo(cached);
+      }
+    }
+
+    const reply = toForumReply(
+      lou,
+      post,
+      users,
+      formatPost,
+      replyTo,
+      ctx.content,
+    );
+    if (reply) {
+      replies.push(reply);
+    }
+  }
+
+  const summaryReplies: ForumReply[] = [];
+  for (const [lou, post] of [...sampleByFloor.entries()].sort(
+    (a, b) => a[0] - b[0],
+  )) {
+    if (lou === 0) {
       continue;
     }
-    replies.push({
-      floor: lou,
-      author: resolveAuthor(post, users),
-      content: body,
-      createdAt: toMillis(post.postdatetimestamp),
-    });
+    const ctx = extractNgaReplyContext(post.content ?? "");
+    const reply = toForumReply(
+      lou,
+      post,
+      users,
+      formatPost,
+      ctx.replyTo ? asForumReplyTo(ctx.replyTo) : undefined,
+      ctx.content,
+    );
+    if (reply) {
+      summaryReplies.push(reply);
+    }
   }
+
+  // 采样页几乎没有他人回复时，用楼主回复撑总结素材
+  const summaryMaterial =
+    summaryReplies.length > 0 ? summaryReplies : replies;
 
   return {
     platform: "nga",
@@ -940,6 +1485,8 @@ async function finalizeThread(input: {
       typeof topic.replies === "number" ? topic.replies : replies.length,
     content,
     replies,
+    summaryReplies: summaryMaterial,
+    replyRetention: "op-only",
     webpageUrl: ngaCanonicalUrl(topicId),
     warningReason: warnings.length > 0 ? warnings.join("；") : undefined,
   };

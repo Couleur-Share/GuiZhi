@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPlatformParseCode,
   PlatformParseError,
+  splitPlatformParseErrorMessage,
 } from "@guizhi/shared/utils/platform-parse-error";
 
 describe("PlatformParseError", () => {
@@ -20,5 +21,20 @@ describe("PlatformParseError", () => {
       getPlatformParseCode(new Error("[token_invalid] 缺少令牌")),
     ).toBe("token_invalid");
     expect(getPlatformParseCode(new Error("网络错误"))).toBeNull();
+  });
+
+  it("split 拆出 code 与正文", () => {
+    expect(
+      splitPlatformParseErrorMessage(
+        "[guest_denied] 需要登录后才能查看该帖",
+      ),
+    ).toEqual({
+      code: "guest_denied",
+      body: "需要登录后才能查看该帖",
+    });
+    expect(splitPlatformParseErrorMessage("普通错误")).toEqual({
+      code: null,
+      body: "普通错误",
+    });
   });
 });

@@ -74,6 +74,7 @@
     "material-icon-theme": "^5.35.0",
     "node-sqlite3-wasm": "^0.8.0",
     "react-force-graph-2d": "^1.29.1",
+    "rehype-raw": "^7.0.0",
     "smol-toml": "^1.7.0",
     "socks-proxy-agent": "^7.0.0",
     "turndown": "^7.2.4",

@@ -9,6 +9,7 @@ vi.mock("electron", () => ({
 import {
   escapeControlCharsInJsonStrings,
   extractGuestJs,
+  extractNgaReplyContext,
   fetchNgaThread,
   mergeNgaCookies,
   ngaBbcodeToMarkdown,
@@ -36,7 +37,7 @@ function pagePayload(overrides: {
 } = {}) {
   const page = overrides.page ?? 1;
   const replies = overrides.replies ?? [
-    { lou: 1, author: "楼一", content: "第一页回复", ts: 1690703400 },
+    { lou: 1, author: "楼一", content: "第一页回复", ts: 1690703400, authorid: 2 },
   ];
   const r: Record<string, unknown> = {
     "0": {
@@ -55,7 +56,7 @@ function pagePayload(overrides: {
     r[String(index + 1)] = {
       lou: reply.lou,
       author: reply.author,
-      authorid: 2,
+      authorid: reply.authorid ?? 2,
       content: reply.content,
       postdatetimestamp: reply.ts,
     };
@@ -87,6 +88,41 @@ interface NgaReplyDraft {
   author: string;
   content: string;
   ts: number;
+  authorid?: number;
+}
+
+/** 模拟 NGA 的 authorid 过滤：只留下该作者的楼 */
+function filterPayloadByAuthor(
+  payload: ReturnType<typeof pagePayload>,
+  authorId: number | undefined,
+): ReturnType<typeof pagePayload> {
+  if (authorId == null) {
+    return payload;
+  }
+  const filtered: Record<string, unknown> = {};
+  let index = 0;
+  for (const value of Object.values(payload.__R)) {
+    const post = value as { authorid?: number };
+    if (post.authorid === authorId) {
+      filtered[String(index)] = value;
+      index += 1;
+    }
+  }
+  return {
+    ...payload,
+    __R: filtered,
+    __ROWS: index,
+  };
+}
+
+function authorIdFromUrl(url: string): number | undefined {
+  const match = /[?&]authorid=(-?\d+)/.exec(url);
+  return match ? Number(match[1]) : undefined;
+}
+
+function pageFromUrl(url: string): number {
+  const match = /[?&]page=(\d+)/.exec(url);
+  return match ? Number(match[1]) : 1;
 }
 
 function textResult(
@@ -192,15 +228,77 @@ describe("NGA 解析工具", () => {
         ]),
       },
     );
-    expect(md).toContain("**粗**");
+    expect(md).toContain("<strong>粗</strong>");
     expect(md).toContain("> 引用行");
     expect(md).toContain("[链](https://a.com)");
     expect(md).toContain("![图](local-image://import-abcd.jpg)");
   });
+
+  it("居中粗体短标题收成二级标题，不留下失效的 **", () => {
+    const md = ngaBbcodeToMarkdown(
+      "[align=center][size=150%][b]\n配镜过程分享\n[/b][/size][/align]\n这块主要是分享",
+    );
+    expect(md).toContain("## 配镜过程分享");
+    expect(md).not.toMatch(/\*\*\s*配镜过程分享/);
+    expect(md).toContain("这块主要是分享");
+  });
+
+  it("[h] 标题与空分隔线", () => {
+    expect(ngaBbcodeToMarkdown("[h]前言[/h]正文")).toContain("## 前言");
+    expect(ngaBbcodeToMarkdown("[h][/h]")).toContain("---");
+  });
+
+  it("粗体内换行会 trim；中文夹缝用 strong 而非 **", () => {
+    expect(ngaBbcodeToMarkdown("[b]\n前言\n[/b]")).toBe("<strong>前言</strong>");
+    expect(
+      ngaBbcodeToMarkdown(
+        "可以说[b]挑选镜框是和验光同等重要的步骤。[/b]实践中",
+      ),
+    ).toBe(
+      "可以说<strong>挑选镜框是和验光同等重要的步骤。</strong>实践中",
+    );
+  });
+
+  it("size 包在粗体内的短标题收成 ##，不留下带空格的 **", () => {
+    const md = ngaBbcodeToMarkdown(
+      "[b][size=150%] 配镜过程分享 [/size][/b]\n正文一段",
+    );
+    expect(md).toContain("## 配镜过程分享");
+    expect(md).not.toMatch(/\*\*\s*配镜过程分享/);
+  });
+
+  it("collapse 产出 details，color 产出白名单 class", () => {
+    const md = ngaBbcodeToMarkdown(
+      "[collapse=有些长折叠了]隐藏内容[/collapse]\n[color=red]强烈建议[/color]",
+    );
+    expect(md).toContain("<details>");
+    expect(md).toContain("<summary>有些长折叠了</summary>");
+    expect(md).toContain("隐藏内容");
+    expect(md).toContain('<span class="forum-color-red">强烈建议</span>');
+  });
+
+  it("extractNgaReplyContext 抽出引用头并剥掉首条 quote", () => {
+    const raw =
+      "[quote][pid=123,1,1]Reply[/pid] [b]Post by [uid=9]lyzlegend[/uid] (2023-07-30 16:35):[/b]\n对方原话在这里比较长[/quote]\n楼主回答";
+    const ctx = extractNgaReplyContext(raw);
+    expect(ctx.replyTo?.author).toBe("lyzlegend");
+    expect(ctx.replyTo?.pid).toBe(123);
+    expect(ctx.replyTo?.snippet).toContain("对方原话");
+    expect(ctx.content).toBe("楼主回答");
+  });
+
+  it("extractNgaReplyContext 摘要不留下字面量 br", () => {
+    const raw =
+      "[quote][pid=1,1,1]Reply[/pid] [b]Post by [uid=1]牧云吹雪[/uid] (2024-01-01 12:00):[/b]<br/><br/>想看看楼主整个眼镜是什么样的[/quote]\n楼主答";
+    const ctx = extractNgaReplyContext(raw);
+    expect(ctx.replyTo?.author).toBe("牧云吹雪");
+    expect(ctx.replyTo?.snippet).toBe("想看看楼主整个眼镜是什么样的");
+    expect(ctx.replyTo?.snippet).not.toMatch(/<br/i);
+  });
 });
 
 describe("fetchNgaThread", () => {
-  it("guestJs 握手后拉帖并替换附件图", async () => {
+  it("guestJs 握手后拉帖并替换附件图；讨论区不收录他人回复", async () => {
     const calls: string[] = [];
     const thread = await fetchNgaThread(
       "37194262",
@@ -217,7 +315,11 @@ describe("fetchNgaThread", () => {
           }
           expect(options.cookie).toContain("guestJs=abc_guest");
           expect(options.cookie).toContain("ngaPassportUid=guest-test");
-          return textResult(wrapStore(pagePayload()));
+          const payload = filterPayloadByAuthor(
+            pagePayload(),
+            authorIdFromUrl(url),
+          );
+          return textResult(wrapStore(payload));
         },
         downloadImage: async () => ({
           dir: "C:\\tmp\\nga-img",
@@ -237,18 +339,45 @@ describe("fetchNgaThread", () => {
     expect(thread.content).toContain(
       "![图](local-image://import-deadbeef012345.jpg)",
     );
-    expect(thread.replies).toHaveLength(1);
-    expect(thread.replies[0]?.floor).toBe(1);
+    expect(thread.replyRetention).toBe("op-only");
+    expect(thread.replies).toHaveLength(0);
+    expect(thread.summaryReplies).toHaveLength(1);
+    expect(thread.summaryReplies?.[0]?.floor).toBe(1);
     expect(calls.some((url) => url.includes("page=1"))).toBe(true);
+    expect(calls.some((url) => url.includes("authorid=1"))).toBe(true);
   });
 
-  it("分页合并多页回复", async () => {
+  it("采样他人回复供总结，入库只留楼主回复", async () => {
     const thread = await fetchNgaThread(
       "37194262",
       {
         retryDelaysMs: [],
         fetchRawText: async (url) => {
-          if (url.includes("page=1")) {
+          const authorId = authorIdFromUrl(url);
+          const page = pageFromUrl(url);
+          if (authorId === 1) {
+            return textResult(
+              wrapStore(
+                filterPayloadByAuthor(
+                  pagePayload({
+                    page: 1,
+                    rows: 22,
+                    replies: [
+                      {
+                        lou: 5,
+                        author: "楼主",
+                        content: "楼主补充",
+                        ts: 1690703600,
+                        authorid: 1,
+                      },
+                    ],
+                  }),
+                  1,
+                ),
+              ),
+            );
+          }
+          if (page === 1) {
             return textResult(
               wrapStore(
                 pagePayload({
@@ -260,6 +389,7 @@ describe("fetchNgaThread", () => {
                       author: "A",
                       content: "p1",
                       ts: 1690703400,
+                      authorid: 2,
                     },
                   ],
                 }),
@@ -278,6 +408,7 @@ describe("fetchNgaThread", () => {
                     author: "B",
                     content: "p2",
                     ts: 1690703500,
+                    authorid: 2,
                   },
                 ],
               }),
@@ -290,11 +421,71 @@ describe("fetchNgaThread", () => {
       },
     );
 
-    expect(thread.replies.map((r) => r.floor).sort((a, b) => a - b)).toEqual([
-      1, 20,
-    ]);
+    expect(thread.replies.map((r) => r.floor)).toEqual([5]);
+    expect(thread.replies[0]?.content).toContain("楼主补充");
+    expect(
+      thread.summaryReplies?.map((r) => r.floor).sort((a, b) => a - b),
+    ).toEqual([1, 20]);
     expect(thread.content).toContain("主楼正文");
     expect(thread.warningReason).toMatch(/下载失败|外链/);
+  });
+
+  it("超长帖只采样有限页并写清 warning", async () => {
+    const pagesRequested = new Set<number>();
+    const thread = await fetchNgaThread(
+      "37194262",
+      {
+        retryDelaysMs: [],
+        maxSummaryPages: 2,
+        fetchRawText: async (url) => {
+          const authorId = authorIdFromUrl(url);
+          const page = pageFromUrl(url);
+          if (authorId == null) {
+            pagesRequested.add(page);
+          }
+          return textResult(
+            wrapStore(
+              filterPayloadByAuthor(
+                pagePayload({
+                  page,
+                  rows: 200,
+                  replies:
+                    page === 1
+                      ? [
+                          {
+                            lou: 1,
+                            author: "A",
+                            content: "early",
+                            ts: 1,
+                            authorid: 2,
+                          },
+                        ]
+                      : [
+                          {
+                            lou: page * 10,
+                            author: "B",
+                            content: `p${page}`,
+                            ts: page,
+                            authorid: 2,
+                          },
+                        ],
+                }),
+                authorId,
+              ),
+            ),
+          );
+        },
+        downloadImage: async () => {
+          throw new Error("skip");
+        },
+      },
+    );
+
+    expect([...pagesRequested].sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(thread.warningReason).toMatch(/仅采样前 2 页/);
+    expect(
+      thread.summaryReplies?.map((r) => r.floor).sort((a, b) => a - b),
+    ).toEqual([1, 20]);
   });
 
   it("附件图超过上限时保留外链并 warning", async () => {
@@ -310,15 +501,18 @@ describe("fetchNgaThread", () => {
       {
         retryDelaysMs: [],
         imageLimit: 1,
-        fetchRawText: async () =>
+        fetchRawText: async (url) =>
           textResult(
             wrapStore(
-              pagePayload({
-                opContent: "只有附件",
-                attachs,
-                replies: [],
-                rows: 1,
-              }),
+              filterPayloadByAuthor(
+                pagePayload({
+                  opContent: "只有附件",
+                  attachs,
+                  replies: [],
+                  rows: 1,
+                }),
+                authorIdFromUrl(url),
+              ),
             ),
           ),
         downloadImage: async () => ({
@@ -350,7 +544,7 @@ describe("fetchNgaThread", () => {
 });
 
 describe("extractForumPost · NGA", () => {
-  it("把 warningReason 带到 ExtractedContent", async () => {
+  it("把 warningReason 带到 ExtractedContent，元数据标明楼主保留策略", async () => {
     const result = await extractForumPost(
       { platform: "nga", topicId: "1" },
       {
@@ -361,9 +555,25 @@ describe("extractForumPost · NGA", () => {
           author: "a",
           node: "n",
           createdAt: Date.now(),
-          replyCount: 0,
+          replyCount: 2040,
           content: "body",
-          replies: [],
+          replies: [
+            {
+              floor: 12,
+              author: "a",
+              content: "楼主回",
+              createdAt: Date.now(),
+            },
+          ],
+          summaryReplies: [
+            {
+              floor: 1,
+              author: "他人",
+              content: "提问",
+              createdAt: Date.now(),
+            },
+          ],
+          replyRetention: "op-only",
           webpageUrl: "https://bbs.nga.cn/read.php?tid=1",
           warningReason: "2 张附件图下载失败，已保留外链",
         }),
@@ -373,5 +583,14 @@ describe("extractForumPost · NGA", () => {
     expect(result.itemType).toBe("forum");
     expect(result.warningReason).toBe("2 张附件图下载失败，已保留外链");
     expect(result.content).toContain("平台：NGA");
+    expect(result.content).toContain(
+      "2040 条回复（入库保留楼主 1 条）",
+    );
+    expect(result.content).toContain(
+      "## 讨论（楼主 1 条 · 原帖共 2040 条）",
+    );
+    expect(result.content).toContain("### 12 楼 · a");
+    expect(result.content).toContain("仅保留楼主回复");
+    expect(result.content).not.toContain("原始讨论已完整入库");
   });
 });

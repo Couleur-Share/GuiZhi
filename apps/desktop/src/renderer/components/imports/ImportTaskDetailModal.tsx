@@ -22,6 +22,7 @@ import { useImportStore } from "../../stores/import.store";
 import { ImportStageBreakdown } from "./ImportStageBreakdown";
 import { buildImportTaskReport } from "./import-task-report";
 import {
+  formatImportTaskError,
   getStageLabel,
   resolveTaskFolder,
   resolveTaskHost,
@@ -177,7 +178,7 @@ export function ImportTaskDetailModal({
               {t("imports.reportError", "报错")}
             </div>
             <p className="mt-0.5 break-words text-xs text-destructive">
-              {task.error}
+              {formatImportTaskError(task.error, t)}
             </p>
           </div>
         ) : null}

@@ -897,6 +897,60 @@ body {
 .prose p:has(> strong:only-child):first-child {
   margin-top: 0;
 }
+
+/* 论坛 BBCode：折叠与强调色（class 由 sanitize 白名单放行） */
+.prose details {
+  margin: 0.75em 0;
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: hsl(var(--muted) / 0.35);
+}
+.prose details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: hsl(var(--foreground) / 0.9);
+  list-style: none;
+}
+.prose details > summary::-webkit-details-marker {
+  display: none;
+}
+.prose details > summary::before {
+  content: "+ ";
+  color: hsl(var(--muted-foreground));
+}
+.prose details[open] > summary::before {
+  content: "− ";
+}
+.prose details > *:not(summary) {
+  margin-top: 0.5rem;
+}
+.prose .forum-color-red {
+  color: hsl(0 72% 58%);
+}
+.prose .forum-color-blue {
+  color: hsl(217 78% 58%);
+}
+.prose .forum-color-green {
+  color: hsl(142 55% 42%);
+}
+.prose .forum-color-orange {
+  color: hsl(28 85% 52%);
+}
+.prose .forum-color-purple {
+  color: hsl(271 60% 58%);
+}
+.prose .forum-color-muted {
+  color: hsl(var(--muted-foreground));
+}
+.prose mark {
+  /* 搜索高亮：琥珀色，避开主题 primary 蓝与深蓝底融在一起 */
+  background-color: rgb(251 191 36 / 0.9);
+  color: rgb(69 26 3);
+  border-radius: 0.2rem;
+  padding: 0 0.15rem;
+}
+
 .prose code {
   background: hsl(var(--muted));
   padding: 0.15em 0.4em;

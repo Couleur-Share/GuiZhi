@@ -13,13 +13,21 @@ export const FORUM_SUMMARY_HEADING = "## 讨论总结";
 export const FORUM_BODY_HEADING = "## 正文";
 export const FORUM_REPLIES_HEADING = "## 讨论";
 
-/** 回复小节标题带条数：`## 讨论（107 条）` */
-const REPLIES_HEADING_LINE = /^##\s*讨论(?:（\d+\s*条）)?$/;
+/**
+ * 回复小节标题：`## 讨论（107 条）` 或 NGA 的
+ * `## 讨论（楼主 12 条 · 原帖共 2040 条）`
+ */
+const REPLIES_HEADING_LINE =
+  /^##\s*讨论(?:（(?:楼主\s*)?\d+\s*条(?:\s*·\s*原帖共\s*\d+\s*条)?）)?$/;
 const SUMMARY_HEADING_LINE = /^##\s*讨论总结$/;
 const BODY_HEADING_LINE = /^##\s*正文$/;
-/** 逐楼回复的头行：`**1 楼 · wowo243**` */
-const REPLY_HEAD_LINE = /^\*\*(\d+)\s*楼\s*·\s*(.+?)\*\*$/;
-/** 二级标题（`###` 不算——总结体内的小标题用的就是三级） */
+/** 旧格式：`**1 楼 · wowo243**` */
+const REPLY_HEAD_BOLD = /^\*\*(\d+)\s*楼\s*·\s*(.+?)\*\*$/;
+/** 新格式：`### 1 楼 · wowo243`（卡片视图与上下文块用这个） */
+const REPLY_HEAD_H3 = /^###\s*(\d+)\s*楼\s*·\s*(.+)$/;
+/** `> 回复 @某人：摘要` 或 `> 回复 @某人（12 楼）：摘要` */
+const REPLY_TO_LINE = /^>\s*回复\s*@(.+?)(?:（(\d+)\s*楼）)?：(.*)$/;
+/** 二级标题（`###` 不算——总结体内的小标题与楼层头用的就是三级） */
 const SECTION_HEADING_LINE = /^##\s/;
 /** 采集时留下的总结状态注记，重新生成成功后它们就过时了 */
 const SUMMARY_NOTE_LINE = /^>\s*(?:未配置文本模型|讨论总结生成失败)/;
@@ -82,6 +90,54 @@ export interface ForumReplyEntry {
   floor: number;
   author: string;
   content: string;
+  replyTo?: {
+    author: string;
+    floor?: number;
+    snippet: string;
+  };
+}
+
+/**
+ * 被回复楼摘要给人扫的，不是 Markdown。
+ * NGA lite=js 正文常夹 `<br/>`，若不收成空白，卡片里会露出字面量标签。
+ */
+export function normalizeForumSnippet(raw: string, maxLen = 200): string {
+  return raw
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/?p>/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
+/**
+ * 把一条回复写成讨论段里的一块（采集与单测共用）。
+ * 楼层用 ###，上下文用引用行，正文另起，方便卡片解析。
+ */
+export function formatForumReplyBlock(reply: {
+  floor: number;
+  author: string;
+  content: string;
+  replyTo?: { author: string; floor?: number; snippet: string };
+}): string {
+  const parts = [`### ${reply.floor} 楼 · ${reply.author || "匿名"}`];
+  if (reply.replyTo) {
+    const who = reply.replyTo.author.trim() || "某人";
+    const snippet = normalizeForumSnippet(reply.replyTo.snippet);
+    const floorPart =
+      reply.replyTo.floor != null && Number.isFinite(reply.replyTo.floor)
+        ? `（${reply.replyTo.floor} 楼）`
+        : "";
+    parts.push(
+      snippet
+        ? `> 回复 @${who}${floorPart}：${snippet}`
+        : `> 回复 @${who}${floorPart}：`,
+    );
+  }
+  if (reply.content.trim()) {
+    parts.push(reply.content.trim());
+  }
+  return parts.join("\n\n");
 }
 
 /**
@@ -89,10 +145,28 @@ export interface ForumReplyEntry {
  *
  * 重新生成讨论总结时不必再去抓一次网页——回复在采集时已经完整写进正文，
  * 而原帖可能已经被删或者又多了几十楼，用库里这份反而与条目本身一致。
+ * 同时认旧的 `**N 楼 · 作者**` 与新的 `### N 楼 · 作者`。
  */
 export function parseForumReplies(content: string): ForumReplyEntry[] {
   const section = splitForumNoteSections(content).replies;
-  if (!section) {
+  if (section) {
+    return parseForumReplySection(section);
+  }
+  // 详情页「讨论」标签传入的已是 replies 段正文（无 ## 讨论 标题）
+  if (
+    REPLY_HEAD_H3.test(content.trim().split("\n")[0] ?? "") ||
+    REPLY_HEAD_BOLD.test(content.trim().split("\n")[0] ?? "") ||
+    content.includes("\n### ") ||
+    /^\*\*\d+\s*楼/m.test(content)
+  ) {
+    return parseForumReplySection(content);
+  }
+  return [];
+}
+
+/** 解析「## 讨论」小节内部（不含小节标题本身） */
+export function parseForumReplySection(section: string): ForumReplyEntry[] {
+  if (!section.trim()) {
     return [];
   }
 
@@ -102,14 +176,26 @@ export function parseForumReplies(content: string): ForumReplyEntry[] {
   let body: string[] = [];
 
   const flush = () => {
-    const text = body.join("\n").trim();
-    if (floor > 0 && text) {
-      entries.push({ floor, author, content: text });
+    if (floor <= 0) {
+      return;
     }
+    const { replyTo, content: text } = splitReplyToPrefix(body.join("\n"));
+    if (!text && !replyTo) {
+      return;
+    }
+    entries.push({
+      floor,
+      author,
+      content: text,
+      replyTo,
+    });
   };
 
   for (const line of section.split("\n")) {
-    const head = REPLY_HEAD_LINE.exec(line.trim());
+    const trimmed = line.trim();
+    const headH3 = REPLY_HEAD_H3.exec(trimmed);
+    const headBold = REPLY_HEAD_BOLD.exec(trimmed);
+    const head = headH3 ?? headBold;
     if (head) {
       flush();
       floor = Number(head[1]);
@@ -121,6 +207,83 @@ export function parseForumReplies(content: string): ForumReplyEntry[] {
   }
   flush();
   return entries;
+}
+
+/** 从楼层正文开头剥离「> 回复 @x：…」上下文行 */
+function splitReplyToPrefix(raw: string): {
+  replyTo?: ForumReplyEntry["replyTo"];
+  content: string;
+} {
+  const lines = raw.split("\n");
+  let index = 0;
+  while (index < lines.length && lines[index].trim() === "") {
+    index += 1;
+  }
+  if (index >= lines.length) {
+    return { content: "" };
+  }
+  const match = REPLY_TO_LINE.exec(lines[index].trim());
+  if (!match) {
+    return { content: raw.trim() };
+  }
+  const floorRaw = match[2];
+  const floorNum = floorRaw ? Number(floorRaw) : undefined;
+  const replyTo: ForumReplyEntry["replyTo"] = {
+    author: match[1].trim(),
+    snippet: normalizeForumSnippet(match[3] ?? ""),
+    ...(floorNum != null && Number.isFinite(floorNum) ? { floor: floorNum } : {}),
+  };
+  const rest = lines.slice(index + 1).join("\n").trim();
+  return { replyTo, content: rest };
+}
+
+/**
+ * 解析「回复 @x」要点哪一楼：优先写明的楼层；否则在已入库楼层里按作者唯一匹配。
+ * 找不到或多名同作者时返回 null（调用方提示未入库/无法定位）。
+ */
+export function resolveReplyTargetFloor(
+  replies: ForumReplyEntry[],
+  replyTo: { author: string; floor?: number },
+): number | null {
+  if (replyTo.floor != null && Number.isFinite(replyTo.floor)) {
+    return replies.some((r) => r.floor === replyTo.floor) ? replyTo.floor : null;
+  }
+  const author = replyTo.author.trim().toLowerCase();
+  if (!author) {
+    return null;
+  }
+  const hits = replies.filter(
+    (r) => (r.author || "").trim().toLowerCase() === author,
+  );
+  return hits.length === 1 ? hits[0].floor : null;
+}
+
+/**
+ * 讨论区楼层过滤：扫楼层号、作者、正文、被回复摘要。
+ * 空关键字原样返回；大小写不敏感（中文不受影响）。
+ */
+export function filterForumReplies(
+  replies: ForumReplyEntry[],
+  query: string,
+): ForumReplyEntry[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return replies;
+  }
+  return replies.filter((reply) => forumReplySearchText(reply).includes(needle));
+}
+
+function forumReplySearchText(reply: ForumReplyEntry): string {
+  return [
+    String(reply.floor),
+    `${reply.floor} 楼`,
+    reply.author,
+    reply.content,
+    reply.replyTo?.author ?? "",
+    reply.replyTo?.snippet ?? "",
+  ]
+    .join("\n")
+    .toLowerCase();
 }
 
 /**

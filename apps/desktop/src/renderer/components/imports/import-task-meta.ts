@@ -1,4 +1,6 @@
 import type { ImportStage, ImportTask } from "@guizhi/shared/types";
+import type { PlatformParseErrorCode } from "@guizhi/shared/utils/platform-parse-error";
+import { splitPlatformParseErrorMessage } from "@guizhi/shared/utils/platform-parse-error";
 
 /**
  * 子阶段文案。视频链路会跑元数据 → 下载 → 转码 → 转写 → 排版 → 总结六步，
@@ -133,4 +135,67 @@ export function needsCaptureToolSetup(error: string | null | undefined): boolean
     return false;
   }
   return /yt-dlp|ffmpeg/i.test(error) && /未安装|not installed|尚未安装/i.test(error);
+}
+
+/** 与 i18n `imports.parseError.*` 对齐的中文兜底（测试 / 缺 key 时用） */
+export const PLATFORM_PARSE_ERROR_LABELS: Record<
+  PlatformParseErrorCode,
+  string
+> = {
+  structure_missing: "平台页面结构可能已变更",
+  note_unavailable: "内容不可用或已删除",
+  token_invalid: "链接缺少访问令牌，请用分享面板复制完整链接",
+  guest_denied: "需要登录后才能查看，暂不支持",
+  network: "网络或站点暂时不可达",
+};
+
+type ErrorTranslate = (
+  key: string,
+  fallback: string,
+  options?: Record<string, unknown>,
+) => string;
+
+/**
+ * 把任务 `error` 里的 `[structure_missing]` 等前缀翻成可读标签。
+ * 没有稳定码时原样返回；诊断报告另附错误码一行，见 formatImportTaskErrorForReport。
+ */
+export function formatImportTaskError(
+  error: string | null | undefined,
+  t: ErrorTranslate,
+): string {
+  if (!error) {
+    return "";
+  }
+  const { code, body } = splitPlatformParseErrorMessage(error);
+  if (!code) {
+    return error;
+  }
+  const label = t(
+    `imports.parseError.${code}`,
+    PLATFORM_PARSE_ERROR_LABELS[code],
+  );
+  if (!body || body === error) {
+    return label;
+  }
+  if (body.startsWith(label)) {
+    return body;
+  }
+  return `${label}：${body}`;
+}
+
+/** 诊断文本用：可读文案 + 稳定错误码（排查要靠后者） */
+export function formatImportTaskErrorForReport(
+  error: string | null | undefined,
+  t: ErrorTranslate,
+): string {
+  if (!error) {
+    return "";
+  }
+  const { code } = splitPlatformParseErrorMessage(error);
+  const display = formatImportTaskError(error, t);
+  if (!code) {
+    return display;
+  }
+  const codeLine = t("imports.parseErrorCode", "错误码：{{code}}", { code });
+  return `${display}\n${codeLine}`;
 }

@@ -48,9 +48,20 @@ export function getPlatformParseCode(
     return error.code;
   }
   const message = error instanceof Error ? error.message : String(error);
+  return splitPlatformParseErrorMessage(message).code;
+}
+
+/** 把 `[code] 正文` 拆开；没有稳定前缀时 code 为 null、body 为原文 */
+export function splitPlatformParseErrorMessage(message: string): {
+  code: PlatformParseErrorCode | null;
+  body: string;
+} {
   const match = CODE_PREFIX_RE.exec(message);
   if (!match || !isPlatformParseErrorCode(match[1])) {
-    return null;
+    return { code: null, body: message };
   }
-  return match[1];
+  return {
+    code: match[1],
+    body: message.slice(match[0].length).trim() || message,
+  };
 }

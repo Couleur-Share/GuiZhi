@@ -24,6 +24,7 @@ import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
 import { ImportStageSummary } from "./ImportStageSummary";
 import {
   formatDuration,
+  formatImportTaskError,
   getStageLabel,
   needsCaptureToolSetup,
   resolveTaskFolder,
@@ -337,7 +338,7 @@ export function ImportTaskRow({
 
           {task.error ? (
             <p className="mt-1 break-words text-xs text-destructive/90">
-              {task.error}
+              {formatImportTaskError(task.error, t)}
             </p>
           ) : null}
 

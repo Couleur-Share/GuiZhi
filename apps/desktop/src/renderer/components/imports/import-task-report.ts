@@ -13,6 +13,7 @@ import {
   STAGE_LABELS,
   STATUS_LABELS,
   formatDuration,
+  formatImportTaskErrorForReport,
 } from "./import-task-meta";
 
 /** i18next 的 `t(key, fallback, options)`，只取用得上的这一段签名 */
@@ -126,7 +127,12 @@ export function buildImportTaskReport(
   }
 
   if (task.error) {
-    lines.push("", `## ${t("imports.reportError", "报错")}`, "", task.error);
+    lines.push(
+      "",
+      `## ${t("imports.reportError", "报错")}`,
+      "",
+      formatImportTaskErrorForReport(task.error, t),
+    );
   }
   if (task.warning) {
     lines.push("", `## ${t("imports.reportWarning", "缺失提示")}`, "", task.warning);

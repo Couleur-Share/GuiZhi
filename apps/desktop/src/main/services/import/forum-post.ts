@@ -1,11 +1,9 @@
 /**
- * 论坛帖子的条目组装：元数据引用块 + 讨论总结 + 主楼正文 + 逐楼回复。
+ * 论坛帖子的条目组装：元数据引用块 + 讨论总结 + 主楼正文 + 讨论区回复。
  *
- * 帖子的价值往往不在主楼而在讨论区——几十上百条回复里散着方案、参数与
- * 踩坑经验。因此这里把回复完整入库（全文检索与语义索引都吃得到），
- * 同时在正文顶部放一份 AI 按方案聚类的总结，用户不必逐楼翻。
- *
- * 三个小节标题同时是详情页分段的锚点，改动需同步 shared/utils/forum-note.ts。
+ * V2EX 短帖把回复完整入库；NGA 长帖只保留楼主回复，另用采样素材做总结，
+ * 避免镜像几千楼水帖。三个小节标题同时是详情页分段锚点，改动需同步
+ * shared/utils/forum-note.ts。
  */
 import type { ImportStage } from "@guizhi/shared/types";
 import type { ForumTarget } from "@guizhi/shared/utils/forum-platforms";
@@ -13,6 +11,7 @@ import {
   FORUM_BODY_HEADING,
   FORUM_REPLIES_HEADING,
   FORUM_SUMMARY_HEADING,
+  formatForumReplyBlock,
 } from "@guizhi/shared/utils/forum-note";
 import { appendOriginalTitleNote } from "@guizhi/shared/utils/media-summary";
 import type { AIClientConfig } from "@guizhi/core";
@@ -76,6 +75,18 @@ function formatDate(timestamp: number): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
+function retentionNote(thread: ForumThread): string {
+  if (thread.replyRetention === "op-only") {
+    return "条目讨论区仅保留楼主回复，完整楼层见原帖链接。";
+  }
+  return "原始讨论已完整入库。";
+}
+
+/** 交给模型的讨论素材：NGA 用采样页，其余用入库回复 */
+function summaryMaterial(thread: ForumThread): ForumReply[] {
+  return thread.summaryReplies ?? thread.replies;
+}
+
 /**
  * 元数据引用块。首字段沿用「平台：」，让详情页的来源 chip
  * （parseVideoMetaBlock）不必为论坛条目另开一套解析。
@@ -91,7 +102,13 @@ export function buildForumMetaBlock(thread: ForumThread): string {
   if (thread.node) {
     facts.push(`节点：${thread.node}`);
   }
-  facts.push(`${thread.replyCount} 条回复`);
+  if (thread.replyRetention === "op-only") {
+    facts.push(
+      `${thread.replyCount} 条回复（入库保留楼主 ${thread.replies.length} 条）`,
+    );
+  } else {
+    facts.push(`${thread.replyCount} 条回复`);
+  }
 
   return [
     `> ${facts.join(" · ")}`,
@@ -99,17 +116,19 @@ export function buildForumMetaBlock(thread: ForumThread): string {
   ].join("\n");
 }
 
-/** 逐楼回复。楼层与作者写进加粗行，正文另起一段，保证 Markdown 列表/代码块不被打断 */
-function buildRepliesSection(replies: ForumReply[]): string[] {
+/** 逐楼回复。楼层用 ###，可选上下文引用行，正文另起 */
+function buildRepliesSection(thread: ForumThread): string[] {
+  const replies = thread.replies;
   if (replies.length === 0) {
     return [];
   }
-  const parts = [`${FORUM_REPLIES_HEADING}（${replies.length} 条）`];
+  const heading =
+    thread.replyRetention === "op-only"
+      ? `${FORUM_REPLIES_HEADING}（楼主 ${replies.length} 条 · 原帖共 ${thread.replyCount} 条）`
+      : `${FORUM_REPLIES_HEADING}（${replies.length} 条）`;
+  const parts = [heading];
   for (const reply of replies) {
-    parts.push(
-      `**${reply.floor} 楼 · ${reply.author || "匿名"}**`,
-      reply.content,
-    );
+    parts.push(formatForumReplyBlock(reply));
   }
   return parts;
 }
@@ -123,21 +142,23 @@ interface SummarySection {
 
 /**
  * 生成讨论总结；未配置模型或生成失败都不阻断采集，
- * 改为在正文里如实交代，原始讨论照常入库。
+ * 改为在正文里如实交代。
  */
 async function buildSummarySection(
   thread: ForumThread,
   deps: ForumPostDeps,
   signal?: AbortSignal,
 ): Promise<SummarySection> {
-  if (thread.replies.length === 0) {
+  const material = summaryMaterial(thread);
+  if (material.length === 0) {
     return { parts: [], title: null };
   }
 
+  const note = retentionNote(thread);
   const config = (deps.getSummaryConfig ?? resolveMediaSummaryConfig)();
   if (!config) {
     return {
-      parts: ["> 未配置文本模型，讨论总结未生成；原始讨论已完整入库。"],
+      parts: [`> 未配置文本模型，讨论总结未生成；${note}`],
       title: null,
     };
   }
@@ -149,7 +170,7 @@ async function buildSummarySection(
       {
         title: thread.title,
         content: thread.content,
-        replies: thread.replies,
+        replies: material,
       },
       config,
       { signal },
@@ -167,7 +188,7 @@ async function buildSummarySection(
       error instanceof Error ? error.message : String(error)
     ).slice(0, SUMMARY_ERROR_MAX_LENGTH);
     return {
-      parts: [`> 讨论总结生成失败：${reason}。原始讨论已完整入库。`],
+      parts: [`> 讨论总结生成失败：${reason}。${note}`],
       title: null,
     };
   }
@@ -182,7 +203,7 @@ export async function extractForumPost(
   deps: ForumPostDeps = {},
   signal?: AbortSignal,
 ): Promise<ExtractedContent> {
-  // 抓取主楼与整帖回复要串两个请求，先把阶段报出去，
+  // 抓取主楼与回复要串多个请求，先把阶段报出去，
   // 否则这段时间界面只显示笼统的「抓取中」
   deps.onStage?.("forum-replies");
 
@@ -210,7 +231,7 @@ export async function extractForumPost(
   if (thread.content) {
     parts.push(FORUM_BODY_HEADING, thread.content);
   }
-  parts.push(...buildRepliesSection(thread.replies));
+  parts.push(...buildRepliesSection(thread));
 
   let title = thread.title;
   let content = parts.join("\n\n");

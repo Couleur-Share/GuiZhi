@@ -298,9 +298,9 @@ describe("extractForumPost", () => {
     expect(entry.content).toContain("## 正文");
     expect(entry.content).toContain("家里的设备有群辉 nas。");
     expect(entry.content).toContain("## 讨论（2 条）");
-    expect(entry.content).toContain("**1 楼 · wowo243**");
+    expect(entry.content).toContain("### 1 楼 · wowo243");
     expect(entry.content).toContain("zerotier 试试");
-    expect(entry.content).toContain("**2 楼 · onlychen**");
+    expect(entry.content).toContain("### 2 楼 · onlychen");
   });
 
   it("元数据两行紧邻，能被来源 chip 的解析整块剥离", async () => {
@@ -325,7 +325,7 @@ describe("extractForumPost", () => {
     const sections = splitForumNoteSections(entry.content);
     expect(sections.body).toBe("家里的设备有群辉 nas。");
     expect(sections.summary).toBe("**ZeroTier**\n- 多人推荐");
-    expect(sections.replies).toContain("**1 楼 · wowo243**");
+    expect(sections.replies).toContain("### 1 楼 · wowo243");
   });
 
   it("模型重拟标题时替换原标题，原标题记进元数据引用块", async () => {
@@ -357,7 +357,7 @@ describe("extractForumPost", () => {
 
     expect(entry.content).toContain("> 未配置文本模型，讨论总结未生成");
     expect(entry.content).not.toContain("## 讨论总结");
-    expect(entry.content).toContain("**1 楼 · wowo243**");
+    expect(entry.content).toContain("### 1 楼 · wowo243");
     expect(entry.degradedReason).toBeUndefined();
   });
 
@@ -372,7 +372,7 @@ describe("extractForumPost", () => {
     });
 
     expect(entry.content).toContain("> 讨论总结生成失败：模型额度不足");
-    expect(entry.content).toContain("**1 楼 · wowo243**");
+    expect(entry.content).toContain("### 1 楼 · wowo243");
     expect(entry.degradedReason).toBeUndefined();
     warn.mockRestore();
   });

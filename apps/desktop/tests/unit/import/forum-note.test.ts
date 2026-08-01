@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterForumReplies,
+  formatForumReplyBlock,
+  normalizeForumSnippet,
   parseForumReplies,
+  resolveReplyTargetFloor,
   splitForumNoteSections,
   upsertForumSummarySection,
+  type ForumReplyEntry,
 } from "@guizhi/shared/utils/forum-note";
 
 /** 采集端 buildForumEntry 的现行输出形态 */
@@ -136,6 +141,177 @@ describe("parseForumReplies", () => {
 
   it("没有讨论段时返回空数组", () => {
     expect(parseForumReplies("> 平台：V2EX · 作者：a · 0 条回复\n\n## 正文\n\n只有主楼")).toEqual([]);
+  });
+
+  it("认 NGA 楼主精选讨论标题与 ### 楼层头、回复上下文", () => {
+    const content = [
+      "> 平台：NGA · 作者：a · 2040 条回复（入库保留楼主 1 条）",
+      "> 发布：2026-07-16",
+      "",
+      "## 讨论（楼主 1 条 · 原帖共 2040 条）",
+      "",
+      "### 12 楼 · a",
+      "",
+      "> 回复 @lyzlegend：对方在问镜片怎么选",
+      "",
+      "楼主补充说明",
+    ].join("\n");
+
+    expect(parseForumReplies(content)).toEqual([
+      {
+        floor: 12,
+        author: "a",
+        content: "楼主补充说明",
+        replyTo: {
+          author: "lyzlegend",
+          snippet: "对方在问镜片怎么选",
+        },
+      },
+    ]);
+  });
+
+  it("读库时洗净摘要里残留的 br 标签（旧条目不必重采）", () => {
+    const content = [
+      "### 6 楼 · a",
+      "",
+      "> 回复 @牧云吹雪：<br/> <br/> 想看看楼主整个眼镜是什么样的",
+      "",
+      "楼主回复正文",
+    ].join("\n");
+
+    expect(parseForumReplies(content)[0]?.replyTo?.snippet).toBe(
+      "想看看楼主整个眼镜是什么样的",
+    );
+  });
+});
+
+describe("normalizeForumSnippet", () => {
+  it("把 br 收成空格并压空白", () => {
+    expect(normalizeForumSnippet("<br/><br/>大佬写的太好了<br/>下一段")).toBe(
+      "大佬写的太好了 下一段",
+    );
+  });
+
+  it("写入楼层块时也不留下字面量 br", () => {
+    const block = formatForumReplyBlock({
+      floor: 1,
+      author: "a",
+      content: "答",
+      replyTo: {
+        author: "b",
+        snippet: "<br/><br/>对方原话",
+      },
+    });
+    expect(block).toContain("> 回复 @b：对方原话");
+    expect(block).not.toMatch(/<br/i);
+  });
+
+  it("有楼层时写出「（N 楼）」", () => {
+    const block = formatForumReplyBlock({
+      floor: 12,
+      author: "a",
+      content: "答",
+      replyTo: {
+        author: "lyzlegend",
+        floor: 8,
+        snippet: "对方在问",
+      },
+    });
+    expect(block).toContain("> 回复 @lyzlegend（8 楼）：对方在问");
+  });
+});
+
+describe("resolveReplyTargetFloor / 回复行楼层解析", () => {
+  const replies: ForumReplyEntry[] = [
+    { floor: 1, author: "楼主", content: "主楼" },
+    { floor: 8, author: "lyzlegend", content: "提问" },
+    { floor: 12, author: "楼主", content: "回答" },
+    { floor: 20, author: "同名", content: "甲" },
+    { floor: 21, author: "同名", content: "乙" },
+  ];
+
+  it("解析带楼层的回复行", () => {
+    const content = [
+      "### 12 楼 · 楼主",
+      "",
+      "> 回复 @lyzlegend（8 楼）：对方在问镜片怎么选",
+      "",
+      "楼主补充",
+    ].join("\n");
+    expect(parseForumReplies(content)[0]?.replyTo).toEqual({
+      author: "lyzlegend",
+      floor: 8,
+      snippet: "对方在问镜片怎么选",
+    });
+  });
+
+  it("旧格式无楼层仍可解析", () => {
+    const content = [
+      "### 12 楼 · 楼主",
+      "",
+      "> 回复 @lyzlegend：对方在问镜片怎么选",
+      "",
+      "楼主补充",
+    ].join("\n");
+    expect(parseForumReplies(content)[0]?.replyTo).toEqual({
+      author: "lyzlegend",
+      snippet: "对方在问镜片怎么选",
+    });
+  });
+
+  it("优先按写明的楼层跳转；楼不在库里则 null", () => {
+    expect(
+      resolveReplyTargetFloor(replies, { author: "x", floor: 8 }),
+    ).toBe(8);
+    expect(
+      resolveReplyTargetFloor(replies, { author: "x", floor: 999 }),
+    ).toBeNull();
+  });
+
+  it("无楼层时按作者唯一匹配；重名或不存在则 null", () => {
+    expect(
+      resolveReplyTargetFloor(replies, { author: "lyzlegend" }),
+    ).toBe(8);
+    expect(resolveReplyTargetFloor(replies, { author: "同名" })).toBeNull();
+    expect(resolveReplyTargetFloor(replies, { author: "不存在" })).toBeNull();
+  });
+});
+
+describe("filterForumReplies", () => {
+  const sample: ForumReplyEntry[] = [
+    {
+      floor: 6,
+      author: "楼主",
+      content: "整副眼镜的侧视图在附件",
+      replyTo: {
+        author: "牧云吹雪",
+        snippet: "想看看楼主整个眼镜是什么样的",
+      },
+    },
+    {
+      floor: 14,
+      author: "楼主",
+      content: "数码型不推荐一般人随便配",
+      replyTo: { author: "FreezeLegend", snippet: "渐进片相关的问题" },
+    },
+  ];
+
+  it("空关键字返回全部", () => {
+    expect(filterForumReplies(sample, "  ")).toEqual(sample);
+  });
+
+  it("按楼层号、被回复作者、正文命中", () => {
+    expect(filterForumReplies(sample, "6").map((r) => r.floor)).toEqual([6]);
+    expect(
+      filterForumReplies(sample, "牧云吹雪").map((r) => r.floor),
+    ).toEqual([6]);
+    expect(
+      filterForumReplies(sample, "渐进片").map((r) => r.floor),
+    ).toEqual([14]);
+  });
+
+  it("无命中返回空数组", () => {
+    expect(filterForumReplies(sample, "蔡司智锐")).toEqual([]);
   });
 });
 

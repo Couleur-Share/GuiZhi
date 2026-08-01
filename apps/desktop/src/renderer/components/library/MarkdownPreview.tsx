@@ -1,9 +1,17 @@
-import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  forwardRef,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { remarkGfmPlugins } from "../../utils/remark-gfm-plugins";
 import rehypeHighlight from "rehype-highlight";
+import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import "highlight.js/styles/github-dark.css";
+import { highlightReactChildren } from "./highlight-text";
 import { ImageLightbox, type LightboxImage } from "./ImageLightbox";
 
 const LOCAL_ASSET_PROTOCOLS = ["local-image", "local-video"];
@@ -11,9 +19,33 @@ const LOCAL_ASSET_PROTOCOLS = ["local-image", "local-video"];
 /**
  * 默认 schema 只放行 http/https，本地资产图的 src 会被整个剥掉（渲染成空 img）。
  * 这两个协议由主进程的 `local-media-protocol` 校验文件名与扩展名，可以放行。
+ * 论坛 BBCode 还会产出 details（折叠）与带白名单 class 的 span（强调色）。
  */
+const FORUM_COLOR_CLASSES = [
+  "forum-color-red",
+  "forum-color-blue",
+  "forum-color-green",
+  "forum-color-orange",
+  "forum-color-purple",
+  "forum-color-muted",
+] as const;
+
 const sanitizeSchema = {
   ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    "details",
+    "summary",
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    span: [
+      ...(defaultSchema.attributes?.span ?? []),
+      ["className", ...FORUM_COLOR_CLASSES],
+    ],
+    details: [...(defaultSchema.attributes?.details ?? []), "open"],
+    summary: [...(defaultSchema.attributes?.summary ?? [])],
+  },
   protocols: {
     ...defaultSchema.protocols,
     src: [...(defaultSchema.protocols?.src ?? []), ...LOCAL_ASSET_PROTOCOLS],
@@ -61,9 +93,15 @@ const CITATION_HREF_PREFIX = "#qa-cite=";
 export function MarkdownBody({
   content,
   onCitationClick,
+  centeredHeadings = false,
+  highlightQuery,
 }: {
   content: string;
   onCitationClick?: (ordinal: number) => void;
+  /** 论坛主楼等：章节标题居中显示 */
+  centeredHeadings?: boolean;
+  /** 讨论搜索：在渲染树里标出关键字 */
+  highlightQuery?: string;
 }) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -77,8 +115,22 @@ export function MarkdownBody({
 
   const components = useMemo<
     ComponentProps<typeof ReactMarkdown>["components"]
-  >(
-    () => ({
+  >(() => {
+    const needle = highlightQuery?.trim() ?? "";
+    const mark = (children: ReactNode) =>
+      needle ? highlightReactChildren(children, needle) : children;
+
+    return {
+      p: ({ children }) => <p>{mark(children)}</p>,
+      li: ({ children }) => <li>{mark(children)}</li>,
+      strong: ({ children }) => <strong>{mark(children)}</strong>,
+      em: ({ children }) => <em>{mark(children)}</em>,
+      h1: ({ children }) => <h1>{mark(children)}</h1>,
+      h2: ({ children }) => <h2>{mark(children)}</h2>,
+      h3: ({ children }) => <h3>{mark(children)}</h3>,
+      td: ({ children }) => <td>{mark(children)}</td>,
+      th: ({ children }) => <th>{mark(children)}</th>,
+      blockquote: ({ children }) => <blockquote>{mark(children)}</blockquote>,
       a: ({
         children,
         href,
@@ -94,19 +146,19 @@ export function MarkdownBody({
                 onClick={() => onCitationClick(ordinal)}
                 className="mx-0.5 inline rounded bg-primary/10 px-1 align-baseline text-[0.85em] font-medium text-primary no-underline transition-colors hover:bg-primary/20"
               >
-                {children}
+                {mark(children)}
               </button>
             );
           }
         }
         const safeHref = resolveSafeHref(href);
         if (!safeHref) {
-          return <span {...props}>{children}</span>;
+          return <span {...props}>{mark(children)}</span>;
         }
         // 外链经系统浏览器打开（Electron 的 setWindowOpenHandler 已接管 target=_blank）
         return (
           <a {...props} href={safeHref} target="_blank" rel="noopener noreferrer">
-            {children}
+            {mark(children)}
           </a>
         );
       },
@@ -131,15 +183,31 @@ export function MarkdownBody({
           />
         );
       },
-    }),
-    [localImages, onCitationClick],
-  );
+    };
+  }, [highlightQuery, localImages, onCitationClick]);
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none break-words prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90 prose-pre:border prose-pre:border-border prose-pre:bg-background/80 prose-code:text-primary prose-a:text-primary">
+    <div
+      className={[
+        "prose prose-sm dark:prose-invert max-w-none break-words",
+        "prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90",
+        "prose-pre:border prose-pre:border-border prose-pre:bg-background/80",
+        "prose-code:text-primary prose-a:text-primary",
+        // 论坛主楼：章节标题居中，贴近泥潭排版习惯
+        centeredHeadings
+          ? "prose-headings:text-center prose-h2:mt-8 prose-h2:mb-4 prose-h3:mt-6"
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <ReactMarkdown
         remarkPlugins={remarkGfmPlugins}
-        rehypePlugins={[[rehypeSanitize, sanitizeSchema], rehypeHighlight]}
+        rehypePlugins={[
+          rehypeRaw,
+          [rehypeSanitize, sanitizeSchema],
+          rehypeHighlight,
+        ]}
         urlTransform={transformUrl}
         components={components}
       >
@@ -156,10 +224,26 @@ export function MarkdownBody({
   );
 }
 
-export function MarkdownPreview({ content }: { content: string }) {
+export const MarkdownPreview = forwardRef<
+  HTMLDivElement,
+  {
+    content: string;
+    /** 论坛主楼等：章节标题居中显示 */
+    centeredHeadings?: boolean;
+    /** 面板查找：高亮关键字 */
+    highlightQuery?: string;
+  }
+>(function MarkdownPreview(
+  { content, centeredHeadings = false, highlightQuery },
+  ref,
+) {
   return (
-    <div className="h-full overflow-y-auto px-6 py-4">
-      <MarkdownBody content={content} />
+    <div ref={ref} className="h-full overflow-y-auto px-6 py-4">
+      <MarkdownBody
+        content={content}
+        centeredHeadings={centeredHeadings}
+        highlightQuery={highlightQuery}
+      />
     </div>
   );
-}
+});
