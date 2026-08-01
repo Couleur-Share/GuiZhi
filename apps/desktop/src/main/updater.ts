@@ -13,6 +13,11 @@ import {
   extractLatestChangelogSection,
   parseChangelogVersions,
 } from "../utils/changelog";
+import {
+  pickPreviewFeedRelease,
+  releaseTagForPreviewFeed,
+  type GithubReleaseCandidate,
+} from "./updater-channel";
 
 // Simplified update info type (for IPC transmission)
 // 简化的更新信息类型（用于 IPC 传输）
@@ -134,24 +139,6 @@ function getMirrorSources(
   ];
 }
 
-function getOfficialFeedUrl(
-  channel: UpdateChannel,
-  releaseTag?: string,
-): string {
-  return `https://github.com/${OFFICIAL_REPO.owner}/${OFFICIAL_REPO.repo}/releases/${getFeedSuffix(channel, releaseTag)}`;
-}
-
-function getOfficialFeedConfig(channel: UpdateChannel, releaseTag?: string) {
-  if (channel === "preview") {
-    return {
-      provider: "generic" as const,
-      channel: getGenericChannelName(),
-      url: getOfficialFeedUrl(channel, releaseTag),
-    };
-  }
-  return OFFICIAL_REPO;
-}
-
 function applyMirrorDownloadSettings(useMirror: boolean) {
   const updater = autoUpdater as unknown as {
     useMultipleRangeRequest?: boolean;
@@ -166,8 +153,8 @@ interface FeedContext {
 
 let lastFeedContext: FeedContext = { channel: "stable" };
 
-async function fetchLatestPreviewReleaseTag(): Promise<string | null> {
-  return await new Promise<string | null>((resolve, reject) => {
+async function fetchGithubReleases(): Promise<GithubReleaseCandidate[]> {
+  return await new Promise<GithubReleaseCandidate[]>((resolve, reject) => {
     const request = https.get(
       {
         hostname: "api.github.com",
@@ -197,19 +184,7 @@ async function fetchLatestPreviewReleaseTag(): Promise<string | null> {
           }
 
           try {
-            const releases = JSON.parse(body) as Array<{
-              draft?: boolean;
-              prerelease?: boolean;
-              tag_name?: string;
-            }>;
-            const latestPreview = releases.find(
-              (release) =>
-                release.prerelease === true &&
-                release.draft !== true &&
-                typeof release.tag_name === "string" &&
-                release.tag_name.length > 0,
-            );
-            resolve(latestPreview?.tag_name || null);
+            resolve(JSON.parse(body) as GithubReleaseCandidate[]);
           } catch (error) {
             reject(error instanceof Error ? error : new Error(String(error)));
           }
@@ -231,16 +206,17 @@ async function resolveFeedContext(
     return { channel };
   }
 
-  // Preview channel is intentionally prerelease-only. Stable releases are not
-  // fallback candidates; users return to stable updates by switching channels.
-  const releaseTag = await fetchLatestPreviewReleaseTag();
-  if (!releaseTag) {
+  // 预览通道 = 正式版 ∪ prerelease，取更高版本（electron-builder beta 语义）。
+  // 官方源靠 allowPrerelease；镜像是 generic，赢家若是 prerelease 才钉 tag。
+  const releases = await fetchGithubReleases();
+  const choice = pickPreviewFeedRelease(releases);
+  if (!choice) {
     throw new Error(
-      "Update check failed: No published prerelease preview release is currently available.",
+      "Update check failed: No published release is currently available.",
     );
   }
 
-  return { channel, releaseTag };
+  return { channel, releaseTag: releaseTagForPreviewFeed(choice) };
 }
 
 function applyUpdaterPreferences(channel: UpdateChannel): void {
@@ -291,9 +267,7 @@ function applyFeedContext(
     return;
   }
 
-  autoUpdater.setFeedURL(
-    getOfficialFeedConfig(context.channel, context.releaseTag),
-  );
+  autoUpdater.setFeedURL(OFFICIAL_REPO);
 }
 
 function toCheckResult(result: unknown): {
