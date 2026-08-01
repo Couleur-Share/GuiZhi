@@ -56,5 +56,14 @@ jobs:
       - name: Check renderer bundle budget
         run: pnpm --filter @guizhi/desktop bundle:budget
 
+      # Electron 在 Linux 上必须有显示服务器；无 Xvfb 时窗口起不来，
+      # firstWindow / locator 会一直等到测试超时。构建步骤已经产出 out/，
+      # 这里只跑用例，避免再编一遍。
+      - name: Install Xvfb for Electron smoke
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Electron smoke tests
-        run: pnpm --filter @guizhi/desktop test:e2e:smoke
+        working-directory: apps/desktop
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: xvfb-run -a pnpm exec playwright test smoke.spec.ts
