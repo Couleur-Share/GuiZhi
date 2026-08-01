@@ -98,7 +98,7 @@ describe("详情页的分类 chip", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /未分类/ }));
-    await user.click(screen.getByRole("button", { name: "心理情感" }));
+    await user.click(screen.getByRole("menuitem", { name: "心理情感" }));
 
     // 混进正文的防抖保存队列时，这里要等 800ms 才落盘、且永远不刷新计数
     expect(bulkUpdateCalls).toEqual([
@@ -120,7 +120,7 @@ describe("详情页的分类 chip", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /心理情感/ }));
-    await user.click(screen.getByRole("button", { name: "未分类" }));
+    await user.click(screen.getByRole("menuitem", { name: "未分类" }));
 
     expect(bulkUpdateCalls).toEqual([
       { ids: ["item-1"], patch: { collectionId: null } },

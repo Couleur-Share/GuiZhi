@@ -302,6 +302,13 @@ export const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, "import_tasks", "stage_stats", "TEXT");
     },
   },
+  {
+    // 来源刷新副本必须能回到原条目做差异确认；不能只靠同链接猜关联。
+    name: "0012-import-task-refresh-origin",
+    up: (db) => {
+      addColumnIfMissing(db, "import_tasks", "refresh_of_item_id", "TEXT");
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

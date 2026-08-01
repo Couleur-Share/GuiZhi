@@ -9,6 +9,7 @@ import type {
   CreateKnowledgeItemInput,
   CreateTagInput,
   KnowledgeItemQuery,
+  KnowledgeFacetCountsQuery,
   KnowledgeItemStatus,
   UpdateCollectionInput,
   UpdateKnowledgeItemInput,
@@ -83,7 +84,11 @@ export function registerKnowledgeIPC(db: Database.Database): void {
     cleanupOrphanAssets(items, assetRefs);
     return changed;
   });
-  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_COUNTS, () => items.counts());
+  ipcMain.handle(
+    IPC_CHANNELS.KNOWLEDGE_COUNTS,
+    (_event, query?: KnowledgeFacetCountsQuery) =>
+      items.counts(query ?? { scope: "all" }),
+  );
 
   // ── 集合 ──────────────────────────────────────────────────────────────────
   ipcMain.handle(IPC_CHANNELS.COLLECTION_LIST, () => collections.list());

@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from "lucide-react";
+import {
+  PauseIcon,
+  PlayIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask } from "@guizhi/shared/types";
 import { filterTasks, useImportStore } from "../../stores/import.store";
@@ -36,6 +43,8 @@ export function ImportsWorkspace() {
   const fetchTasks = useImportStore((state) => state.fetchTasks);
   const retryTasks = useImportStore((state) => state.retryTasks);
   const clearFinished = useImportStore((state) => state.clearFinished);
+  const queueState = useImportStore((state) => state.queueState);
+  const toggleQueuePaused = useImportStore((state) => state.toggleQueuePaused);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
   const setScope = useKnowledgeStore((state) => state.setScope);
   const setAppModule = useUIStore((state) => state.setAppModule);
@@ -103,7 +112,11 @@ export function ImportsWorkspace() {
         {/* 队列读出来之前不报数：否则会先写「共 0 条」再跳成真实条数 */}
         {hasLoaded ? (
           <span className="truncate text-xs text-muted-foreground/70">
-            {activeCount > 0
+            {queueState.paused
+              ? t("imports.summaryPaused", "队列已暂停 · 等待 {{pending}}", {
+                  pending: queueState.pendingCount,
+                })
+              : activeCount > 0
               ? t("imports.summaryActive", "共 {{total}} 条 · 进行中 {{active}}", {
                   total: tasks.length,
                   active: activeCount,
@@ -149,6 +162,23 @@ export function ImportsWorkspace() {
             {t("imports.retryAllFailed", "重试失败 {{count}}", {
               count: failedIds.length,
             })}
+          </button>
+        ) : null}
+        {queueState.pendingCount > 0 || queueState.paused ? (
+          <button
+            type="button"
+            onClick={() => void toggleQueuePaused()}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
+            aria-pressed={queueState.paused}
+          >
+            {queueState.paused ? (
+              <PlayIcon className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <PauseIcon className="h-4 w-4" aria-hidden="true" />
+            )}
+            {queueState.paused
+              ? t("imports.resumeQueue", "继续队列")
+              : t("imports.pauseQueue", "暂停队列")}
           </button>
         ) : null}
         <button

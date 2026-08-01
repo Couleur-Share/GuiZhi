@@ -8,6 +8,7 @@ import type {
   EnqueueImportInput,
   ImportStage,
   ImportStageStat,
+  ImportQueueState,
   ImportTask,
 } from "@guizhi/shared/types";
 import type { ExtractedContent } from "./connectors";
@@ -81,13 +82,36 @@ export class ImportQueue {
 
   private readonly pendingIds: string[] = [];
   private readonly running = new Map<string, AbortController>();
+  /** 暂停只阻止新任务起跑；已在进行的下载/转写不强杀，避免浪费已花的时间和费用。 */
+  private paused = false;
 
   constructor(options: ImportQueueOptions) {
     this.store = options.store;
     this.persistence = options.persistence;
     this.extract = options.extract;
     this.onTaskChanged = options.onTaskChanged;
-    this.concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+    this.concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY));
+  }
+
+  getState(): ImportQueueState {
+    return {
+      paused: this.paused,
+      runningCount: this.running.size,
+      pendingCount: this.pendingIds.length,
+      concurrency: this.concurrency,
+    };
+  }
+
+  /** 不取消在途工作，只冻结尚未启动的任务。 */
+  pause(): ImportQueueState {
+    this.paused = true;
+    return this.getState();
+  }
+
+  resume(): ImportQueueState {
+    this.paused = false;
+    this.pump();
+    return this.getState();
   }
 
   /**
@@ -180,6 +204,9 @@ export class ImportQueue {
   }
 
   private pump(): void {
+    if (this.paused) {
+      return;
+    }
     while (this.running.size < this.concurrency && this.pendingIds.length > 0) {
       const id = this.pendingIds.shift()!;
       const controller = new AbortController();

@@ -23,6 +23,7 @@ import { Input } from "../ui/Input";
 import { useToast } from "../ui/Toast";
 import { CollectionIconPicker } from "./CollectionIconPicker";
 import { LibraryScopeTabs } from "./LibraryScopeTabs";
+import { SmartViewsSection } from "./SmartViewsSection";
 import { LibrarySidebarRow } from "./LibrarySidebarRow";
 import { PlatformIcon, SOURCE_PLATFORM_META } from "./platform-meta";
 import { TAG_DOT_CLASSES } from "./type-meta";
@@ -116,10 +117,12 @@ export function SidebarLibraryPanel() {
   const isTrashActive =
     scope === "trash" && !activeCollectionId && !activeTagId && !activePlatform;
 
-  // 只列有条目的平台：全摆出来的话，从不用抖音的人要盯着五个 0 找自己那一行。
-  // 顺序取常量表的固定顺序而不是按数量排，免得采集一条就重排一次
+  // 只列当前分面下有条目的平台：全摆出来的话，从不用抖音的人要盯着五个 0 找自己那一行。
+  // 当前已选的 0 保留，否则用户会卡在一个侧栏里看不见的筛选条件中；顺序固定，
+  // 不按数量排，免得采集一条就重排一次。
   const activePlatforms = SOURCE_PLATFORMS.filter(
-    (platform) => (counts?.byPlatform[platform] ?? 0) > 0,
+    (platform) =>
+      (counts?.byPlatform[platform] ?? 0) > 0 || platform === activePlatform,
   );
 
   // 标签同理只列有条目的：摘掉最后一条引用后那一行点进去只会是空列表。
@@ -261,6 +264,8 @@ export function SidebarLibraryPanel() {
       <div className="pt-3">
         <LibraryScopeTabs />
       </div>
+
+      <SmartViewsSection />
 
       {/* 集合 */}
       <SectionHeading

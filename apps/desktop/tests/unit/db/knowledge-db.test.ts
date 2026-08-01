@@ -87,7 +87,11 @@ describe("KnowledgeItemDB", () => {
   });
 
   it("标签全文检索命中", () => {
-    items.create({ title: "打标签的条目", content: "正文", tagNames: ["前端"] });
+    items.create({
+      title: "打标签的条目",
+      content: "正文",
+      tagNames: ["前端"],
+    });
     const result = items.list({ scope: "all", search: "前端" });
     expect(result.total).toBe(1);
   });
@@ -352,6 +356,53 @@ describe("KnowledgeItemDB", () => {
     expect(items.list({ scope: "all", platform: "web" }).total).toBe(0);
   });
 
+  it("组合筛选时按分面组联动计数，而非继续显示全局总数", () => {
+    const collections = new CollectionDB(db);
+    const programming = collections.create({ name: "编程开发" });
+    const life = collections.create({ name: "生活" });
+    const both = items.create({
+      title: "编程开发的 B 站视频",
+      collectionId: programming.id,
+      tagNames: ["前端"],
+    });
+    const programmingDouyin = items.create({
+      title: "编程开发的抖音视频",
+      collectionId: programming.id,
+      tagNames: ["后端"],
+    });
+    const lifeBilibili = items.create({
+      title: "生活的 B 站视频",
+      collectionId: life.id,
+      tagNames: ["生活"],
+    });
+    addSource(db, both.id, "url", "bilibili");
+    addSource(db, programmingDouyin.id, "url", "douyin");
+    addSource(db, lifeBilibili.id, "url", "bilibili");
+
+    const tags = new TagDB(db);
+    const frontend = tags.findByName("前端")!;
+    const backend = tags.findByName("后端")!;
+    const lifestyle = tags.findByName("生活")!;
+    const counts = items.counts({
+      scope: "all",
+      collectionId: programming.id,
+      platform: "bilibili",
+    });
+
+    // 截图里的“编程开发 + 哔哩哔哩”情形：两个已选行均为 1。
+    expect(counts.byCollection).toEqual({
+      [programming.id]: 1,
+      [life.id]: 1,
+    });
+    expect(counts.byPlatform).toEqual({ bilibili: 1, douyin: 1 });
+    // 标签组没有自身选项，因此同时受知识库与平台约束。
+    expect(counts.byTag).toEqual({ [frontend.id]: 1 });
+    expect(counts.byTag[backend.id]).toBeUndefined();
+    expect(counts.byTag[lifestyle.id]).toBeUndefined();
+    // 顶部范围仍是跨筛选的全局概览。
+    expect(counts.all).toBe(3);
+  });
+
   it("同一条目的多条来源记录不会让它在列表里重复出现", () => {
     const item = items.create({ title: "重复采集过的条目" });
     addSource(db, item.id, "url", "bilibili");
@@ -359,6 +410,30 @@ describe("KnowledgeItemDB", () => {
 
     expect(items.counts().byPlatform.bilibili).toBe(1);
     expect(items.list({ scope: "all", platform: "bilibili" }).total).toBe(1);
+  });
+
+  it("按平台筛选时来源列显示命中的来源，而非另一条更新的来源", () => {
+    const item = items.create({ title: "多来源条目" });
+    addSource(db, item.id, "url", "douyin");
+    addSource(db, item.id, "url", "web");
+    db.run(
+      "UPDATE source_records SET captured_at = ? WHERE item_id = ? AND platform = ?",
+      1_000,
+      item.id,
+      "douyin",
+    );
+    db.run(
+      "UPDATE source_records SET captured_at = ? WHERE item_id = ? AND platform = ?",
+      2_000,
+      item.id,
+      "web",
+    );
+
+    // 默认浏览仍显示最新来源；筛选态则必须与筛选条件同口径。
+    expect(items.list({ scope: "all" }).entries[0].platform).toBe("web");
+    expect(
+      items.list({ scope: "all", platform: "douyin" }).entries[0].platform,
+    ).toBe("douyin");
   });
 });
 

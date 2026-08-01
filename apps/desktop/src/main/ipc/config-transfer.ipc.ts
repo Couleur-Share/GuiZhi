@@ -14,6 +14,7 @@ import type {
   ConfigExportResult,
   ConfigReadResult,
   ConfigTransferFile,
+  ConfigApplySelection,
 } from "@guizhi/shared/types";
 import {
   CONFIG_TRANSFER_KIND,
@@ -43,6 +44,11 @@ export interface ConfigExportRequest {
   uiLayout?: Record<string, unknown>;
   includeSecrets: boolean;
   password?: string;
+  /** 可选同步项默认全开；关闭后字段不写入文件，导入端自然保持本机值。 */
+  includeUiLayout?: boolean;
+  includeIllustrationStyles?: boolean;
+  includeShortcuts?: boolean;
+  includeMcpScope?: boolean;
 }
 
 /**
@@ -100,10 +106,14 @@ function buildExportFile(request: ConfigExportRequest): ConfigTransferFile {
     appVersion: app.getVersion(),
     settings: stripNonPortableSettings(request.settings ?? {}),
     settingsVersion: request.settingsVersion,
-    uiLayout: pickTransferableLocalStorage(request.uiLayout),
-    illustrationStyles: mainParts.illustrationStyles,
-    shortcuts: mainParts.shortcuts,
-    mcpScope: mainParts.mcpScope,
+    uiLayout: request.includeUiLayout === false
+      ? undefined
+      : pickTransferableLocalStorage(request.uiLayout),
+    illustrationStyles: request.includeIllustrationStyles === false
+      ? undefined
+      : mainParts.illustrationStyles,
+    shortcuts: request.includeShortcuts === false ? undefined : mainParts.shortcuts,
+    mcpScope: request.includeMcpScope === false ? undefined : mainParts.mcpScope,
   };
 }
 
@@ -201,6 +211,7 @@ function handleApply(
   _event: IpcMainInvokeEvent,
   filePath: string,
   password?: string,
+  selection: ConfigApplySelection = {},
 ): ConfigApplyResult {
   if (!filePath || filePath !== lastReadFilePath) {
     return { success: false, error: "请重新选择要导入的配置文件" };
@@ -230,11 +241,15 @@ function handleApply(
   }
 
   try {
-    const applied = applyMainConfigParts(file);
-    const settings = stripNonPortableSettings(file.settings ?? {});
-    settings.aiProviders = applied.aiProviders;
-    settings.aiModels = applied.aiModels;
-    settings.modelRouteDefaults = applied.modelRouteDefaults;
+    const applied = applyMainConfigParts(file, selection);
+    const settings = selection.settings === false
+      ? {}
+      : stripNonPortableSettings(file.settings ?? {});
+    if (selection.settings !== false) {
+      settings.aiProviders = applied.aiProviders;
+      settings.aiModels = applied.aiModels;
+      settings.modelRouteDefaults = applied.modelRouteDefaults;
+    }
 
     const warnings = [...applied.warnings];
     if (decrypted.failed) {
@@ -248,7 +263,9 @@ function handleApply(
       success: true,
       settings,
       settingsVersion: file.settingsVersion,
-      uiLayout: pickTransferableLocalStorage(file.uiLayout),
+      uiLayout: selection.uiLayout === false
+        ? undefined
+        : pickTransferableLocalStorage(file.uiLayout),
       mainSyncSettings: buildMainSyncSettings(settings),
       warnings,
       snapshotDir: snapshotDir ?? undefined,

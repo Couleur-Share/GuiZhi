@@ -46,11 +46,59 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
             }
         }
 
+        function focusFirstSubmenuItem(index: number) {
+            requestAnimationFrame(() => {
+                menuRef.current
+                    ?.querySelector<HTMLButtonElement>(`[data-parent-index='${index}']:not(:disabled)`)
+                    ?.focus();
+            });
+        }
+
         function handleKeyDown(event: KeyboardEvent) {
             if (event.key === 'Escape') {
                 setOpenSubmenu(null);
                 onClose();
+                return;
             }
+            const current = document.activeElement as HTMLButtonElement | null;
+            const parentIndex = current?.dataset.parentIndex;
+            const rootIndex = current?.dataset.menuIndex;
+
+            if (event.key === 'ArrowRight' && rootIndex !== undefined) {
+                const index = Number(rootIndex);
+                const item = items[index];
+                if (item?.children?.length) {
+                    event.preventDefault();
+                    handleOpenSubmenu(index, current?.parentElement as HTMLDivElement);
+                    focusFirstSubmenuItem(index);
+                }
+                return;
+            }
+
+            if (event.key === 'ArrowLeft' && parentIndex !== undefined) {
+                event.preventDefault();
+                setOpenSubmenu(null);
+                menuRef.current
+                    ?.querySelector<HTMLButtonElement>(`[data-menu-index='${parentIndex}']:not(:disabled)`)
+                    ?.focus();
+                return;
+            }
+
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+            const targets = Array.from(
+                menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitem']:not(:disabled)") ?? [],
+            );
+            if (targets.length === 0) return;
+            event.preventDefault();
+            const currentIndex = targets.indexOf(current as HTMLButtonElement);
+            const nextIndex = event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                    ? targets.length - 1
+                    : event.key === 'ArrowUp'
+                        ? (currentIndex <= 0 ? targets.length - 1 : currentIndex - 1)
+                        : (currentIndex + 1) % targets.length;
+            targets[nextIndex].focus();
         }
 
         // Adjust position if menu goes off screen
@@ -63,6 +111,7 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
                 menuRef.current.style.top = `${window.innerHeight - rect.height - 8}px`;
             }
         }
+        menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitem']:not(:disabled)")?.focus();
 
         document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('keydown', handleKeyDown);
@@ -76,6 +125,8 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
             document.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', onClose);
         };
+    // 菜单实例只在打开时创建；items 在此期间不应变更，避免导航过程中重绑并抢焦点。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [onClose, x, y, ignoreRef]);
 
     const cancelScheduledSubmenuClose = () => {
@@ -113,6 +164,8 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
     return createPortal(
         <div
             ref={menuRef}
+            role="menu"
+            aria-orientation="vertical"
             className="fixed z-[99999] min-w-[160px] py-1 bg-popover rounded-md border border-border shadow-lg animate-in fade-in zoom-in-95 duration-quick ease-enter"
             style={{ left: x, top: y }}
             onContextMenu={(e) => e.preventDefault()}
@@ -141,6 +194,8 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
                     >
                         <button
                             type="button"
+                            role="menuitem"
+                            data-menu-index={index}
                             aria-haspopup={hasChildren ? "menu" : undefined}
                             aria-expanded={hasChildren ? isSubmenuOpen : undefined}
                             onClick={(e) => {
@@ -194,7 +249,9 @@ export function ContextMenu({ x, y, items, onClose, ignoreRef }: ContextMenuProp
                                     {item.children?.map((child, childIndex) => (
                                         <button
                                             type="button"
+                                            role="menuitem"
                                             key={`${index}-${childIndex}`}
+                                            data-parent-index={index}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 if (child.disabled) {

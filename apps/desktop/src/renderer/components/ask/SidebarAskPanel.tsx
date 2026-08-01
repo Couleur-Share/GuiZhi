@@ -88,6 +88,11 @@ function SemanticIndexCard() {
                 ms: status.lastSearchMs,
               },
             )}
+        {status.lastSearchMs != null
+          ? status.lastSearchCacheHit
+            ? t("ask.semanticCacheWarm", " · 向量缓存命中")
+            : t("ask.semanticCacheCold", " · 向量缓存已加载")
+          : null}
       </p>
       {pending > 0 || isIndexing ? (
         <button

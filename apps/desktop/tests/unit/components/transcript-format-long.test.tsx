@@ -48,7 +48,7 @@ beforeEach(() => {
 
 /** 文字稿标签页默认不选中，先切过去才有排版按钮 */
 async function openTranscriptTab(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /文字稿/ }));
+  await user.click(screen.getByRole("button", { name: /^文字稿/ }));
 }
 
 describe("长文字稿的 AI 排版", () => {

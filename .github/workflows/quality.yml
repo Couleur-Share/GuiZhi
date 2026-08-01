@@ -52,3 +52,9 @@ jobs:
 
       - name: Build
         run: pnpm --filter @guizhi/desktop build
+
+      - name: Check renderer bundle budget
+        run: pnpm --filter @guizhi/desktop bundle:budget
+
+      - name: Electron smoke tests
+        run: pnpm --filter @guizhi/desktop test:e2e:smoke

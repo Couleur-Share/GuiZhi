@@ -16,6 +16,7 @@ import type {
   BulkUpdateKnowledgeItemsInput,
   CreateKnowledgeItemInput,
   KnowledgeCounts,
+  KnowledgeFacetCountsQuery,
   KnowledgeItem,
   KnowledgeItemListEntry,
   KnowledgeItemListResult,
@@ -56,6 +57,8 @@ interface TagRow {
 }
 
 const LIST_DEFAULT_LIMIT = 200;
+/** SQLite 参数上限在不同运行时不完全一致，批量写统一留出余量。 */
+const BULK_WRITE_CHUNK_SIZE = 400;
 const SNIPPET_MAX_LENGTH = 160;
 /**
  * 列表只取正文前这么多字用来生成摘要。
@@ -143,6 +146,96 @@ function normalizeTagNames(names: readonly string[] | undefined): string[] {
   return result;
 }
 
+type FacetGroup = "collection" | "tag" | "platform";
+
+interface FacetCountSql {
+  joinClause: string;
+  whereClause: string;
+  params: unknown[];
+}
+
+/**
+ * 为一个分面组建立计数查询。
+ *
+ * 这是标准的 disjunctive faceting：统计「平台」时去掉平台本身的选中值，
+ * 仍保留知识库、标签、范围和搜索；这样一行数字表示再点该行后会得到多少条，
+ * 而不会因为自己已选就把同组其它值全部压成 0。
+ */
+function buildFacetCountSql(
+  query: KnowledgeFacetCountsQuery,
+  omit: FacetGroup,
+): FacetCountSql {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  switch (query.scope) {
+    case "uncategorized":
+      conditions.push(
+        "i.deleted_at IS NULL",
+        "i.collection_id IS NULL",
+        "i.status != 'archived'",
+      );
+      break;
+    case "favorites":
+      conditions.push("i.deleted_at IS NULL", "i.is_favorite = 1");
+      break;
+    case "archived":
+      conditions.push("i.deleted_at IS NULL", "i.status = 'archived'");
+      break;
+    case "trash":
+      conditions.push("i.deleted_at IS NOT NULL");
+      break;
+    case "all":
+    default:
+      conditions.push("i.deleted_at IS NULL");
+      if (!query.includeArchived) {
+        conditions.push("i.status != 'archived'");
+      }
+      break;
+  }
+
+  if (omit !== "collection" && query.collectionId) {
+    conditions.push("i.collection_id = ?");
+    params.push(query.collectionId);
+  }
+  if (omit !== "tag" && query.tagId) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM knowledge_item_tags kit WHERE kit.item_id = i.id AND kit.tag_id = ?)",
+    );
+    params.push(query.tagId);
+  }
+  if (omit !== "platform" && query.platform) {
+    conditions.push(
+      "EXISTS (SELECT 1 FROM source_records sr WHERE sr.item_id = i.id AND sr.platform = ?)",
+    );
+    params.push(query.platform);
+  }
+
+  const searchTerm = query.search?.trim() || "";
+  const matchQuery = searchTerm
+    ? buildFtsMatchQuery(searchTerm, query.searchMode ?? "phrase")
+    : null;
+  if (searchTerm && !matchQuery) {
+    conditions.push("0");
+  }
+
+  const joinClause = matchQuery
+    ? `JOIN (
+        SELECT item_id FROM knowledge_fts
+        WHERE knowledge_fts MATCH ?
+      ) f ON f.item_id = i.id`
+    : "";
+  if (matchQuery) {
+    params.unshift(matchQuery);
+  }
+
+  return {
+    joinClause,
+    whereClause: `WHERE ${conditions.join(" AND ")}`,
+    params,
+  };
+}
+
 export class KnowledgeItemDB {
   constructor(private readonly db: Database.Database) {}
 
@@ -190,9 +283,7 @@ export class KnowledgeItemDB {
       const { ids, includeUncategorized } = query.collectionScope;
       const branches: string[] = [];
       if (ids.length > 0) {
-        branches.push(
-          `i.collection_id IN (${ids.map(() => "?").join(", ")})`,
-        );
+        branches.push(`i.collection_id IN (${ids.map(() => "?").join(", ")})`);
         params.push(...ids);
       }
       if (includeUncategorized) {
@@ -253,14 +344,25 @@ export class KnowledgeItemDB {
     ) as { count: number } | undefined;
     const total = totalRow?.count ?? 0;
 
+    // 平台筛选是「任一来源命中」，而列表列若仍一律拿最新来源，旧库中
+    // 同一条目的多来源记录会出现“筛选抖音却显示网页”的自相矛盾。筛选态
+    // 优先投影实际命中的平台；未筛选时保留“最新来源”的日常浏览语义。
+    const platformProjection = query.platform
+      ? `(SELECT s.platform FROM source_records s
+          WHERE s.item_id = i.id AND s.platform = ?
+          ORDER BY s.captured_at DESC LIMIT 1)`
+      : `(SELECT s.platform FROM source_records s
+          WHERE s.item_id = i.id
+          ORDER BY s.captured_at DESC LIMIT 1)`;
+    const projectionParams = query.platform ? [query.platform] : [];
+
     const rows = this.db.all(
       `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
               i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at,
               substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content,
-              (SELECT s.platform FROM source_records s
-               WHERE s.item_id = i.id
-               ORDER BY s.captured_at DESC LIMIT 1) AS platform
+              ${platformProjection} AS platform
        FROM knowledge_items i ${joinClause} ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
+      ...projectionParams,
       ...params,
       limit,
       offset,
@@ -303,7 +405,7 @@ export class KnowledgeItemDB {
     return this.mapItemRow(row, tags);
   }
 
-  counts(): KnowledgeCounts {
+  counts(query: KnowledgeFacetCountsQuery = { scope: "all" }): KnowledgeCounts {
     const scopeRow = this.db.get(
       `SELECT
          SUM(CASE WHEN deleted_at IS NULL AND collection_id IS NULL AND status != 'archived' THEN 1 ELSE 0 END) AS uncategorized,
@@ -322,28 +424,34 @@ export class KnowledgeItemDB {
         }
       | undefined;
 
-    // 集合与标签的计数必须排除归档：点进侧栏某个集合时 scope 被复位成 all，
-    // 而 all 是不含归档的。少了这个条件，侧栏显示 10、点进去只有 7
+    const collectionSql = buildFacetCountSql(query, "collection");
     const byCollectionRows = this.db.all(
-      `SELECT collection_id, COUNT(*) AS count FROM knowledge_items
-       WHERE deleted_at IS NULL AND status != 'archived' AND collection_id IS NOT NULL
+      `SELECT i.collection_id, COUNT(*) AS count FROM knowledge_items i
+       ${collectionSql.joinClause} ${collectionSql.whereClause}
+       AND collection_id IS NOT NULL
        GROUP BY collection_id`,
+      ...collectionSql.params,
     ) as Array<{ collection_id: string; count: number }>;
 
+    const tagSql = buildFacetCountSql(query, "tag");
     const byTagRows = this.db.all(
-      `SELECT kit.tag_id AS tag_id, COUNT(*) AS count
-       FROM knowledge_item_tags kit
-       JOIN knowledge_items i ON i.id = kit.item_id
-       WHERE i.deleted_at IS NULL AND i.status != 'archived'
-       GROUP BY kit.tag_id`,
+      `SELECT facet_tag.tag_id AS tag_id, COUNT(*) AS count
+       FROM knowledge_items i
+       JOIN knowledge_item_tags facet_tag ON facet_tag.item_id = i.id
+       ${tagSql.joinClause} ${tagSql.whereClause}
+       GROUP BY facet_tag.tag_id`,
+      ...tagSql.params,
     ) as Array<{ tag_id: string; count: number }>;
 
+    const platformSql = buildFacetCountSql(query, "platform");
     const byPlatformRows = this.db.all(
       `SELECT s.platform AS platform, COUNT(DISTINCT s.item_id) AS count
        FROM source_records s
        JOIN knowledge_items i ON i.id = s.item_id
-       WHERE i.deleted_at IS NULL AND i.status != 'archived' AND s.platform IS NOT NULL
+       ${platformSql.joinClause} ${platformSql.whereClause}
+       AND s.platform IS NOT NULL
        GROUP BY s.platform`,
+      ...platformSql.params,
     ) as Array<{ platform: string; count: number }>;
 
     return {
@@ -413,9 +521,7 @@ export class KnowledgeItemDB {
       content: input.content ?? existing.content,
       summary: input.summary !== undefined ? input.summary : existing.summary,
       transcript:
-        input.transcript !== undefined
-          ? input.transcript
-          : existing.transcript,
+        input.transcript !== undefined ? input.transcript : existing.transcript,
       itemType: input.itemType ?? existing.item_type,
       status: input.status ?? existing.status,
       collectionId:
@@ -482,58 +588,67 @@ export class KnowledgeItemDB {
     );
     const touchesTags = addNames.length > 0 || removeNames.size > 0;
 
+    const targetIds = [...new Set(ids)];
     const now = Date.now();
     let changed = 0;
     const run = this.db.transaction(() => {
-      for (const id of ids) {
+      // 不涉及标签时，旧实现会为每个 id 做一次 SELECT + UPDATE。整理数百条
+      // 导入内容时主进程会被同步 wasm 往返占住；普通字段可安全地集合更新。
+      const assignments = ["updated_at = ?"];
+      const assignmentParams: unknown[] = [now];
+      if (input.collectionId !== undefined) {
+        assignments.push("collection_id = ?");
+        assignmentParams.push(input.collectionId);
+      }
+      if (input.status !== undefined) {
+        assignments.push("status = ?");
+        assignmentParams.push(input.status);
+      }
+      if (input.isFavorite !== undefined) {
+        assignments.push("is_favorite = ?");
+        assignmentParams.push(input.isFavorite ? 1 : 0);
+      }
+      if (input.isPinned !== undefined) {
+        assignments.push("is_pinned = ?");
+        assignmentParams.push(input.isPinned ? 1 : 0);
+      }
+      for (
+        let start = 0;
+        start < targetIds.length;
+        start += BULK_WRITE_CHUNK_SIZE
+      ) {
+        const batch = targetIds.slice(start, start + BULK_WRITE_CHUNK_SIZE);
+        changed += this.db.run(
+          `UPDATE knowledge_items SET ${assignments.join(", ")}
+           WHERE id IN (${batch.map(() => "?").join(", ")})`,
+          ...assignmentParams,
+          ...batch,
+        ).changes;
+      }
+
+      if (!touchesTags) {
+        return;
+      }
+      for (const id of targetIds) {
         const existing = this.db.get(
-          "SELECT * FROM knowledge_items WHERE id = ?",
+          "SELECT id, title, content FROM knowledge_items WHERE id = ?",
           id,
-        ) as ItemRow | undefined;
+        ) as Pick<ItemRow, "id" | "title" | "content"> | undefined;
         if (!existing) {
           continue;
         }
-
-        const next = {
-          collectionId:
-            input.collectionId !== undefined
-              ? input.collectionId
-              : existing.collection_id,
-          status: input.status ?? existing.status,
-          isFavorite:
-            input.isFavorite !== undefined
-              ? input.isFavorite
-              : existing.is_favorite === 1,
-          isPinned:
-            input.isPinned !== undefined
-              ? input.isPinned
-              : existing.is_pinned === 1,
-        };
-
-        this.db.run(
-          `UPDATE knowledge_items SET
-             collection_id = ?, status = ?, is_favorite = ?, is_pinned = ?, updated_at = ?
-           WHERE id = ?`,
-          next.collectionId,
-          next.status,
-          next.isFavorite ? 1 : 0,
-          next.isPinned ? 1 : 0,
-          now,
-          id,
+        const current = (this.loadTagsFor([id]).get(id) ?? []).map(
+          (tag) => tag.name,
         );
-
-        if (touchesTags) {
-          const current = (this.loadTagsFor([id]).get(id) ?? []).map(
-            (tag) => tag.name,
-          );
-          const kept = current.filter(
-            (name) => !removeNames.has(name.toLowerCase()),
-          );
-          const merged = normalizeTagNames([...kept, ...addNames]);
-          const tags = this.replaceTags(id, merged, now);
-          this.writeFts(id, existing.title, existing.content, tags);
-        }
-        changed += 1;
+        const kept = current.filter(
+          (name) => !removeNames.has(name.toLowerCase()),
+        );
+        const tags = this.replaceTags(
+          id,
+          normalizeTagNames([...kept, ...addNames]),
+          now,
+        );
+        this.writeFts(id, existing.title, existing.content, tags);
       }
     });
     run();
@@ -819,7 +934,10 @@ export class KnowledgeItemDB {
       itemId,
     ) as { fts_rowid: number } | undefined | null;
     if (mapped) {
-      this.db.run("DELETE FROM knowledge_fts WHERE rowid = ?", mapped.fts_rowid);
+      this.db.run(
+        "DELETE FROM knowledge_fts WHERE rowid = ?",
+        mapped.fts_rowid,
+      );
       this.db.run("DELETE FROM knowledge_fts_map WHERE item_id = ?", itemId);
       return;
     }

@@ -25,6 +25,14 @@ test("冒烟：新建条目 → 搜索命中 → 数据设置手动备份", asyn
       timeout: 20_000,
     });
 
+    // 全新用户目录会出现首次使用引导；冒烟要覆盖这个真实启动路径，
+    // 显式选择“稍后再说”后再操作主界面，而不是强制点击被遮罩挡住的按钮。
+    const setupLater = window.getByRole("button", { name: /稍后再说|maybe later/i });
+    if (await setupLater.waitFor({ state: "visible", timeout: 3_000 }).then(() => true).catch(() => false)) {
+      await setupLater.click();
+      await expect(setupLater).toBeHidden();
+    }
+
     // 顶栏「新建」→ 快速采集里的空白笔记；命名后 Ctrl+S 立即落盘，写入 FTS 索引
     await window.getByTestId("topbar-new").click();
     await window.getByTestId("capture-blank-note").click();

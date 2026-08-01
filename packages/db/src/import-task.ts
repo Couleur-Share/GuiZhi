@@ -26,6 +26,7 @@ interface TaskRow {
   result_item_id: string | null;
   duplicate_item_id: string | null;
   collection_id: string | null;
+  refresh_of_item_id: string | null;
   tag_names: string | null;
   stage_stats: string | null;
   force_duplicate: number;
@@ -102,6 +103,7 @@ function mapRow(row: TaskRow): ImportTask {
     resultItemId: row.result_item_id,
     duplicateItemId: row.duplicate_item_id,
     collectionId: row.collection_id,
+    refreshOfItemId: row.refresh_of_item_id,
     tagNames: parseTagNames(row.tag_names),
     stageStats: parseStageStats(row.stage_stats),
     createdAt: row.created_at,
@@ -130,13 +132,14 @@ export class ImportTaskDB {
     const id = randomUUID();
     this.db.run(
       `INSERT INTO import_tasks
-         (id, source_kind, source_input, display_name, status, collection_id, tag_names, force_duplicate, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`,
+         (id, source_kind, source_input, display_name, status, collection_id, refresh_of_item_id, tag_names, force_duplicate, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
       id,
       input.kind,
       input.input,
       makeDisplayName(input),
       input.collectionId ?? null,
+      input.refreshOfItemId ?? null,
       input.tagNames?.length ? JSON.stringify(input.tagNames) : null,
       input.forceDuplicate ? 1 : 0,
       now,

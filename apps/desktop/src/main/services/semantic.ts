@@ -17,7 +17,10 @@ import type {
 import Database from "../database/sqlite";
 import { logAppError } from "../diagnostic-log";
 import { computeContentHash } from "./import/content-hash";
-import { ensureSemanticVectorCache } from "./semantic-vector-cache";
+import {
+  ensureSemanticVectorCache,
+  getSemanticVectorCache,
+} from "./semantic-vector-cache";
 
 const SNIPPET_MAX_LENGTH = 160;
 /** 缓存命中后仍超过该耗时才记一条诊断（节流） */
@@ -152,7 +155,64 @@ export function listPendingSemanticItems(
 /** 进程内：最近一次检索观测（不必落库） */
 let lastSearchMs: number | null = null;
 let lastScannedChunks: number | null = null;
+let lastSearchCacheHit: boolean | null = null;
 let lastSlowLogAt = 0;
+
+interface ScoredItem {
+  itemId: string;
+  chunkIndex: number;
+  score: number;
+}
+
+/**
+ * 固定大小最小堆：全量精确打分后只保留前 k 个条目，避免再对全部条目 O(n log n) 排序。
+ * k 由 IPC 限制在很小的范围，适合大库中的问答召回。
+ */
+function selectTopItems(
+  entries: Iterable<[string, { chunkIndex: number; score: number }]>,
+  limit: number,
+): ScoredItem[] {
+  const heap: ScoredItem[] = [];
+  const isLowerPriority = (left: ScoredItem, right: ScoredItem) =>
+    left.score < right.score ||
+    (left.score === right.score && left.itemId > right.itemId);
+  const siftUp = (index: number) => {
+    let child = index;
+    while (child > 0) {
+      const parent = Math.floor((child - 1) / 2);
+      if (!isLowerPriority(heap[child], heap[parent])) break;
+      [heap[child], heap[parent]] = [heap[parent], heap[child]];
+      child = parent;
+    }
+  };
+  const siftDown = () => {
+    let parent = 0;
+    for (;;) {
+      const left = parent * 2 + 1;
+      const right = left + 1;
+      let smallest = parent;
+      if (left < heap.length && isLowerPriority(heap[left], heap[smallest])) smallest = left;
+      if (right < heap.length && isLowerPriority(heap[right], heap[smallest])) smallest = right;
+      if (smallest === parent) return;
+      [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];
+      parent = smallest;
+    }
+  };
+
+  for (const [itemId, best] of entries) {
+    const candidate = { itemId, ...best };
+    if (heap.length < limit) {
+      heap.push(candidate);
+      siftUp(heap.length - 1);
+    } else if (isLowerPriority(heap[0], candidate)) {
+      heap[0] = candidate;
+      siftDown();
+    }
+  }
+  return heap.sort(
+    (left, right) => right.score - left.score || left.itemId.localeCompare(right.itemId),
+  );
+}
 
 /**
  * 索引进度。
@@ -178,6 +238,7 @@ export function getSemanticStatus(
     totalChunks: new SemanticIndexDB(db).stats().totalChunks,
     lastSearchMs,
     lastScannedChunks,
+    lastSearchCacheHit,
   };
 }
 
@@ -200,6 +261,7 @@ export async function searchSemanticByVector(
 ): Promise<SemanticSearchHit[]> {
   const started = Date.now();
   const index = new SemanticIndexDB(db);
+  const cacheHit = Boolean(getSemanticVectorCache(db, model));
   const cache = ensureSemanticVectorCache(db, index, model);
   const bestByItem = new Map<
     string,
@@ -229,20 +291,18 @@ export async function searchSemanticByVector(
     }
   }
 
-  const top = [...bestByItem.entries()]
-    .sort((left, right) => right[1].score - left[1].score)
-    .slice(0, Math.max(1, limit));
+  const top = selectTopItems(bestByItem, Math.max(1, limit));
 
   const snippets = new Map(
     index
       .loadChunkSnippets(
-        top.map(([itemId, best]) => ({ itemId, chunkIndex: best.chunkIndex })),
+        top.map(({ itemId, chunkIndex }) => ({ itemId, chunkIndex })),
       )
       .map((row) => [`${row.itemId}:${row.chunkIndex}`, row]),
   );
 
-  const hits = top.map(([itemId, best]) => {
-    const row = snippets.get(`${itemId}:${best.chunkIndex}`);
+  const hits = top.map(({ itemId, chunkIndex, score }) => {
+    const row = snippets.get(`${itemId}:${chunkIndex}`);
     const snippet = (row?.chunkText ?? "").replace(/\s+/g, " ").trim();
     return {
       itemId,
@@ -251,12 +311,13 @@ export async function searchSemanticByVector(
         snippet.length > SNIPPET_MAX_LENGTH
           ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
           : snippet,
-      score: best.score,
+      score,
     };
   });
 
   lastSearchMs = Date.now() - started;
   lastScannedChunks = scanned;
+  lastSearchCacheHit = cacheHit;
   if (
     lastSearchMs >= SLOW_SEARCH_MS &&
     Date.now() - lastSlowLogAt >= SLOW_LOG_COOLDOWN_MS
@@ -279,5 +340,6 @@ export async function searchSemanticByVector(
 export function resetSemanticSearchTelemetryForTests(): void {
   lastSearchMs = null;
   lastScannedChunks = null;
+  lastSearchCacheHit = null;
   lastSlowLogAt = 0;
 }

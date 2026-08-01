@@ -3,6 +3,7 @@ import type {
   BulkUpdateKnowledgeItemsInput,
   CreateKnowledgeItemInput,
   KnowledgeCounts,
+  KnowledgeFacetCountsQuery,
   KnowledgeItem,
   KnowledgeItemListEntry,
   KnowledgeItemStatus,
@@ -23,6 +24,8 @@ export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 /** fetchList 的请求序号：只有最后一次发出的请求可以写回结果 */
 let listRequestSeq = 0;
+/** refreshCounts 同样可能乱序返回；不能让旧筛选的数字覆盖新筛选。 */
+let countsRequestSeq = 0;
 
 /**
  * 可本地编辑并防抖持久化的字段。
@@ -34,6 +37,14 @@ type EditablePatch = Pick<
   UpdateKnowledgeItemInput,
   "title" | "content" | "tagNames"
 >;
+
+/** 可保存/恢复的知识库筛选快照。搜索词刻意不写入，避免打开视图时带回过期的临时检索。 */
+export interface LibraryFacetFilters {
+  scope: KnowledgeScope;
+  collectionId: string | null;
+  tagId: string | null;
+  platform: string | null;
+}
 
 /**
  * 待落盘的编辑，按条目 id 分桶。
@@ -78,7 +89,7 @@ function reconcileOptimisticTags(existing: Tag[], tagNames: string[]): Tag[] {
 }
 
 interface KnowledgeState {
-  // ── 导航（范围 / 知识库 / 标签 / 平台四者互斥）──
+  // ── 筛选（范围 + 知识库 + 标签 + 平台可组合）──
   scope: KnowledgeScope;
   collectionId: string | null;
   tagId: string | null;
@@ -114,6 +125,10 @@ interface KnowledgeState {
   selectCollection: (collectionId: string | null) => void;
   selectTag: (tagId: string | null) => void;
   selectPlatform: (platform: string | null) => void;
+  /** 清空知识库 / 标签 / 平台三类细分条件，保留当前范围与搜索词 */
+  clearFacetFilters: () => void;
+  /** 智能视图恢复筛选快照；与点击侧栏同样会重置分页和多选 */
+  applyFacetFilters: (filters: LibraryFacetFilters) => void;
   setSearchQuery: (query: string) => void;
   setSort: (sortBy: KnowledgeSortField, sortOrder: KnowledgeSortOrder) => void;
   setPage: (page: number) => void;
@@ -175,6 +190,17 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       sortOrder: state.sortOrder,
       limit: state.pageSize,
       offset: (state.page - 1) * state.pageSize,
+    };
+  };
+
+  const buildFacetCountsQuery = (): KnowledgeFacetCountsQuery => {
+    const state = get();
+    return {
+      scope: state.scope,
+      collectionId: state.collectionId ?? undefined,
+      tagId: state.tagId ?? undefined,
+      platform: state.platform ?? undefined,
+      search: state.searchQuery.trim() || undefined,
     };
   };
 
@@ -300,28 +326,25 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
   };
 
   /**
-   * 切换导航轴。四条轴互斥：选中其一即清掉其余三条，并回到第一页、
-   * 清空详情与多选。缺省的字段一律复位，调用方只需给出自己那一条。
+   * 更新筛选条件。范围与三个 facet 是正交的：例如“收藏的抖音条目”与
+   * “工作库里的某标签”都是重度用户每天会用到的查询，不能再互相清空。
    */
-  const navigateTo = (target: {
-    scope?: KnowledgeScope;
-    collectionId?: string | null;
-    tagId?: string | null;
-    platform?: string | null;
-  }) => {
+  const updateFilters = (target: Partial<LibraryFacetFilters>) => {
     void get().flushPendingSave();
     set({
-      scope: target.scope ?? "all",
-      collectionId: target.collectionId ?? null,
-      tagId: target.tagId ?? null,
-      platform: target.platform ?? null,
+      ...(target.scope !== undefined ? { scope: target.scope } : {}),
+      ...(target.collectionId !== undefined
+        ? { collectionId: target.collectionId }
+        : {}),
+      ...(target.tagId !== undefined ? { tagId: target.tagId } : {}),
+      ...(target.platform !== undefined ? { platform: target.platform } : {}),
       page: 1,
       selectedId: null,
       selectedItem: null,
       selectionIds: [],
       selectionAnchorId: null,
     });
-    void get().fetchList();
+    void get().refreshAll();
   };
 
   return {
@@ -347,10 +370,25 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     selectionIds: [],
     selectionAnchorId: null,
 
-    setScope: (scope) => navigateTo({ scope }),
-    selectCollection: (collectionId) => navigateTo({ collectionId }),
-    selectTag: (tagId) => navigateTo({ tagId }),
-    selectPlatform: (platform) => navigateTo({ platform }),
+    setScope: (scope) => updateFilters({ scope }),
+    selectCollection: (collectionId) =>
+      updateFilters({
+        collectionId:
+          collectionId && get().collectionId === collectionId
+            ? null
+            : collectionId,
+      }),
+    selectTag: (tagId) =>
+      updateFilters({
+        tagId: tagId && get().tagId === tagId ? null : tagId,
+      }),
+    selectPlatform: (platform) =>
+      updateFilters({
+        platform: platform && get().platform === platform ? null : platform,
+      }),
+    clearFacetFilters: () =>
+      updateFilters({ collectionId: null, tagId: null, platform: null }),
+    applyFacetFilters: (filters) => updateFilters(filters),
     setSearchQuery: (query) => {
       set({
         searchQuery: query,
@@ -358,7 +396,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         selectionIds: [],
         selectionAnchorId: null,
       });
-      void get().fetchList();
+      void get().refreshAll();
     },
 
     setSort: (sortBy, sortOrder) => {
@@ -495,11 +533,18 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     refreshCounts: async () => {
+      const requestId = ++countsRequestSeq;
       try {
-        const counts = await window.api.knowledge.counts();
-        set({ counts });
+        const counts = await window.api.knowledge.counts(
+          buildFacetCountsQuery(),
+        );
+        if (requestId === countsRequestSeq) {
+          set({ counts });
+        }
       } catch (error) {
-        console.error("加载侧栏计数失败:", error);
+        if (requestId === countsRequestSeq) {
+          console.error("加载侧栏计数失败:", error);
+        }
       }
     },
 
@@ -652,13 +697,17 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       ),
 
     restoreItems: async (ids) => {
-      await runGuardedMutation("library.actionRestore", "恢复条目", async () => {
-        await window.api.knowledge.restore(ids);
-        if (ids.includes(get().selectedId ?? "")) {
-          set({ selectedId: null, selectedItem: null });
-        }
-        await get().refreshAll();
-      });
+      await runGuardedMutation(
+        "library.actionRestore",
+        "恢复条目",
+        async () => {
+          await window.api.knowledge.restore(ids);
+          if (ids.includes(get().selectedId ?? "")) {
+            set({ selectedId: null, selectedItem: null });
+          }
+          await get().refreshAll();
+        },
+      );
     },
 
     deleteForever: async (ids) => {

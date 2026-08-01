@@ -15,6 +15,7 @@ import {
 import type { CoreAIModelConfig } from "@guizhi/core";
 import type {
   ConfigTransferFile,
+  ConfigApplySelection,
   ConfigTransferShortcuts,
   IllustrationStyle,
 } from "@guizhi/shared/types";
@@ -141,33 +142,35 @@ export interface ApplyMainConfigResult {
  */
 export function applyMainConfigParts(
   file: ConfigTransferFile,
+  selection: ConfigApplySelection = {},
 ): ApplyMainConfigResult {
   const settings = (file.settings ?? {}) as Record<string, unknown>;
-  const reconciled = reconcileImportedAiConfig(
-    {
-      providers: settings.aiProviders,
-      models: settings.aiModels,
-      routes: settings.modelRouteDefaults,
-    },
-    coreAIConfigService.read(),
-  );
+  const currentAi = coreAIConfigService.read();
+  const reconciled = selection.settings === false
+    ? { providers: currentAi.providers, models: currentAi.models, routes: currentAi.modelRouteDefaults, warnings: [] }
+    : reconcileImportedAiConfig(
+        { providers: settings.aiProviders, models: settings.aiModels, routes: settings.modelRouteDefaults },
+        currentAi,
+      );
 
-  coreAIConfigService.replace({
-    providers: reconciled.providers,
-    models: reconciled.models,
-    modelRouteDefaults: reconciled.routes,
-  });
+  if (selection.settings !== false) {
+    coreAIConfigService.replace({
+      providers: reconciled.providers,
+      models: reconciled.models,
+      modelRouteDefaults: reconciled.routes,
+    });
+  }
 
   const warnings = [...reconciled.warnings];
 
-  if (Array.isArray(file.illustrationStyles) && file.illustrationStyles.length > 0) {
+  if (selection.illustrationStyles !== false && Array.isArray(file.illustrationStyles) && file.illustrationStyles.length > 0) {
     const result = coreIllustrationStyleService.write(file.illustrationStyles);
     if (!result.success) {
       warnings.push(`配图风格未能导入：${result.error ?? "未知原因"}`);
     }
   }
 
-  if (file.shortcuts) {
+  if (selection.shortcuts !== false && file.shortcuts) {
     try {
       persistImportedShortcuts(
         file.shortcuts.accelerators,
@@ -181,7 +184,7 @@ export function applyMainConfigParts(
   }
 
   // 只在文件真带了范围时才写：旧版本导出的文件没有这个字段，本机现有范围保持原样
-  if (file.mcpScope) {
+  if (selection.mcpScope !== false && file.mcpScope) {
     try {
       writeMcpScope(file.mcpScope);
       if (file.mcpScope.mode === "selected") {

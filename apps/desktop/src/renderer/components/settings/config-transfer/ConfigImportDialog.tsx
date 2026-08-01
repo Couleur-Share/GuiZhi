@@ -5,6 +5,8 @@ import { AlertTriangleIcon, LockIcon } from "lucide-react";
 import type { ConfigTransferPreview } from "@guizhi/shared/types";
 import { Modal } from "../../ui/Modal";
 import { PasswordInput } from "../shared";
+import { ToggleSwitch } from "../shared";
+import type { ConfigApplySelection } from "@guizhi/shared/types";
 
 const GHOST_BUTTON =
   "inline-flex h-9 items-center gap-1.5 rounded-lg border border-border/70 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary";
@@ -62,14 +64,18 @@ export function ConfigImportDialog({
   isBusy: boolean;
   passwordError: string | null;
   onClose: () => void;
-  onConfirm: (password: string) => void;
+  onConfirm: (password: string, selection: ConfigApplySelection) => void;
 }) {
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
+  const [selection, setSelection] = useState<Required<ConfigApplySelection>>({
+    settings: true, uiLayout: true, illustrationStyles: true, shortcuts: true, mcpScope: true,
+  });
 
   useEffect(() => {
     if (preview) {
       setPassword("");
+      setSelection({ settings: true, uiLayout: true, illustrationStyles: true, shortcuts: true, mcpScope: true });
     }
   }, [preview]);
 
@@ -165,6 +171,28 @@ export function ConfigImportDialog({
           </div>
         )}
 
+        <div className="space-y-1 rounded-lg border border-border/60 px-4 py-3">
+          <p className="mb-1 text-sm font-medium text-foreground">
+            {t("settings.configImportSelection", "选择要应用的内容")}
+          </p>
+          {([
+            ["settings", t("settings.configImportSelectionSettings", "服务商、模型与通用设置")],
+            ["uiLayout", t("settings.configImportSelectionLayout", "界面布局")],
+            ["illustrationStyles", t("settings.configImportSelectionStyles", "正文配图风格")],
+            ["shortcuts", t("settings.configImportSelectionShortcuts", "快捷键")],
+            ["mcpScope", t("settings.configImportSelectionMcp", "MCP 访问范围")],
+          ] as Array<[keyof ConfigApplySelection, string]>).map(([key, label]) => (
+            <div key={key} className="flex items-center justify-between gap-3 py-1">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <ToggleSwitch
+                checked={selection[key] !== false}
+                onChange={(checked) => setSelection((current) => ({ ...current, [key]: checked }))}
+                ariaLabel={label}
+              />
+            </div>
+          ))}
+        </div>
+
         <div className="flex gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3">
           <AlertTriangleIcon
             className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
@@ -186,7 +214,7 @@ export function ConfigImportDialog({
         <button
           type="button"
           disabled={!canConfirm}
-          onClick={() => onConfirm(password)}
+          onClick={() => onConfirm(password, selection)}
           className={DESTRUCTIVE_BUTTON}
           data-testid="config-import-confirm"
         >

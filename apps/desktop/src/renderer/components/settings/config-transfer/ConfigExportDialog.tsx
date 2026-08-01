@@ -21,18 +21,33 @@ export function ConfigExportDialog({
   isOpen: boolean;
   isBusy: boolean;
   onClose: () => void;
-  onExport: (options: { includeSecrets: boolean; password: string }) => void;
+  onExport: (options: {
+    includeSecrets: boolean;
+    password: string;
+    includeUiLayout: boolean;
+    includeIllustrationStyles: boolean;
+    includeShortcuts: boolean;
+    includeMcpScope: boolean;
+  }) => void;
 }) {
   const { t } = useTranslation();
   const [includeSecrets, setIncludeSecrets] = useState(true);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [includeUiLayout, setIncludeUiLayout] = useState(true);
+  const [includeIllustrationStyles, setIncludeIllustrationStyles] = useState(true);
+  const [includeShortcuts, setIncludeShortcuts] = useState(true);
+  const [includeMcpScope, setIncludeMcpScope] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
       setIncludeSecrets(true);
       setPassword("");
       setConfirmPassword("");
+      setIncludeUiLayout(true);
+      setIncludeIllustrationStyles(true);
+      setIncludeShortcuts(true);
+      setIncludeMcpScope(true);
     }
   }, [isOpen]);
 
@@ -120,6 +135,27 @@ export function ConfigExportDialog({
           </div>
         )}
 
+        <div className="space-y-2 rounded-lg border border-border/60 px-4 py-3">
+          <p className="text-sm font-medium text-foreground">
+            {t("settings.configExportOptional", "选择要同步的偏好")}
+          </p>
+          {[
+            [includeUiLayout, setIncludeUiLayout, t("settings.configExportLayout", "界面布局与视图偏好")],
+            [includeIllustrationStyles, setIncludeIllustrationStyles, t("settings.configExportStyles", "正文配图风格")],
+            [includeShortcuts, setIncludeShortcuts, t("settings.configExportShortcuts", "快捷键")],
+            [includeMcpScope, setIncludeMcpScope, t("settings.configExportMcpScope", "MCP 访问范围")],
+          ].map(([checked, onChange, label]) => (
+            <div key={String(label)} className="flex items-center justify-between gap-3 py-1">
+              <span className="text-xs text-muted-foreground">{String(label)}</span>
+              <ToggleSwitch
+                checked={Boolean(checked)}
+                onChange={onChange as (next: boolean) => void}
+                ariaLabel={String(label)}
+              />
+            </div>
+          ))}
+        </div>
+
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t(
             "settings.configExportScopeNote",
@@ -135,7 +171,14 @@ export function ConfigExportDialog({
         <button
           type="button"
           disabled={!canExport || isBusy}
-          onClick={() => onExport({ includeSecrets, password })}
+          onClick={() => onExport({
+            includeSecrets,
+            password,
+            includeUiLayout,
+            includeIllustrationStyles,
+            includeShortcuts,
+            includeMcpScope,
+          })}
           className={PRIMARY_BUTTON}
           data-testid="config-export-confirm"
         >

@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { EnqueueImportInput, ImportTask } from "@guizhi/shared/types";
+import type {
+  EnqueueImportInput,
+  ImportQueueState,
+  ImportTask,
+} from "@guizhi/shared/types";
 import { useKnowledgeStore } from "./knowledge.store";
 import {
   reportOperationError,
@@ -73,6 +77,8 @@ interface ImportState {
   loadError: string | null;
   /** 进行中任务数（rail 角标） */
   activeCount: number;
+  /** 调度器状态和任务列表分开：暂停并不改变 pending 任务的持久化状态。 */
+  queueState: ImportQueueState;
   filter: ImportFilter;
   setFilter: (filter: ImportFilter) => void;
   query: string;
@@ -84,6 +90,7 @@ interface ImportState {
   selectVisible: () => void;
   clearSelection: () => void;
   fetchTasks: () => Promise<void>;
+  toggleQueuePaused: () => Promise<void>;
   enqueue: (inputs: EnqueueImportInput[]) => Promise<ImportTask[]>;
   cancelTask: (id: string) => Promise<void>;
   retryTask: (id: string, forceDuplicate?: boolean) => Promise<void>;
@@ -109,6 +116,15 @@ export function isDegradedTask(task: ImportTask): boolean {
 
 function countActive(tasks: ImportTask[]): number {
   return tasks.filter(isActive).length;
+}
+
+function fallbackQueueState(tasks: ImportTask[]): ImportQueueState {
+  return {
+    paused: false,
+    runningCount: tasks.filter((task) => task.status === "processing").length,
+    pendingCount: tasks.filter((task) => task.status === "pending").length,
+    concurrency: 2,
+  };
 }
 
 /** 侧栏筛选组的各档计数 */
@@ -184,6 +200,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   hasLoaded: false,
   loadError: null,
   activeCount: 0,
+  queueState: { paused: false, runningCount: 0, pendingCount: 0, concurrency: 2 },
   filter: "all",
   query: "",
   selectionIds: [],
@@ -226,10 +243,15 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     set({ loadError: null });
     try {
       const tasks = await window.api.import.list();
+      // 老的测试桩和升级中的 preload 可能还没有这个方法；列表仍要能读出来。
+      const queueState = window.api.import.getQueueState
+        ? await window.api.import.getQueueState()
+        : fallbackQueueState(tasks);
       const alive = new Set(tasks.map((task) => task.id));
       set((state) => ({
         tasks,
         activeCount: countActive(tasks),
+        queueState,
         // 清理/删除之后选中集合里可能留着已经不存在的 id
         selectionIds: state.selectionIds.filter((id) => alive.has(id)),
       }));
@@ -241,6 +263,19 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
       set({ hasLoaded: true });
     }
+  },
+
+  toggleQueuePaused: async () => {
+    await runGuardedMutation(
+      "imports.actionToggleQueue",
+      "切换队列状态",
+      async () => {
+        const queueState = get().queueState.paused
+          ? await window.api.import.resume()
+          : await window.api.import.pause();
+        set({ queueState });
+      },
+    );
   },
 
   enqueue: async (inputs) => {
@@ -320,7 +355,15 @@ export const useImportStore = create<ImportState>()((set, get) => ({
                 candidate.id === task.id ? task : candidate,
               )
             : [task, ...state.tasks];
-        return { tasks, activeCount: countActive(tasks) };
+        return {
+          tasks,
+          activeCount: countActive(tasks),
+          queueState: {
+            ...state.queueState,
+            runningCount: tasks.filter((task) => task.status === "processing").length,
+            pendingCount: tasks.filter((task) => task.status === "pending").length,
+          },
+        };
       });
 
       // 新条目入库后刷新知识库视图与计数，并调度一轮语义索引

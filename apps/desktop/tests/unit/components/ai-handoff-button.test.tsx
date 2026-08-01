@@ -113,7 +113,7 @@ describe("复制给 AI 按钮", () => {
 
     await user.click(screen.getByRole("button", { name: "更多 AI 导出方式" }));
     await user.click(
-      screen.getByRole("button", { name: "复制精简版（只要总结）" }),
+      screen.getByRole("menuitem", { name: "复制精简版（只要总结）" }),
     );
 
     const text = await copiedText();
@@ -127,7 +127,7 @@ describe("复制给 AI 按钮", () => {
     setup();
 
     await user.click(screen.getByRole("button", { name: "更多 AI 导出方式" }));
-    await user.click(screen.getByRole("button", { name: "另存为 .md 文件…" }));
+    await user.click(screen.getByRole("menuitem", { name: "另存为 .md 文件…" }));
 
     expect(exportCalls).toHaveLength(1);
     expect(exportCalls[0].title).toBe("用 Zustand 替换 Redux 的三个前提");

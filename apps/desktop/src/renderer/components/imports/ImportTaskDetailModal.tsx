@@ -6,10 +6,10 @@
  * 阶段耗时与 AI 开销、来源、时间、报错与缺失提示，外加一颗把这些一次性带走的
  * 「复制诊断信息」——用户报「这批采集特别慢」时，双方手上得有数。
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardCopyIcon, ExternalLinkIcon, RotateCcwIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ImportTask } from "@guizhi/shared/types";
+import type { ImportTask, KnowledgeItem } from "@guizhi/shared/types";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import { Modal } from "../ui/Modal";
 import {
@@ -56,6 +56,10 @@ export function ImportTaskDetailModal({
   const { showToast } = useToast();
   const retryTask = useImportStore((state) => state.retryTask);
   const [isCopying, setIsCopying] = useState(false);
+  const [refreshPair, setRefreshPair] = useState<{
+    original: KnowledgeItem;
+    refreshed: KnowledgeItem;
+  } | null>(null);
 
   const host = resolveTaskHost(task);
   const folder = resolveTaskFolder(task);
@@ -77,6 +81,29 @@ export function ImportTaskDetailModal({
         ? (task.duplicateItemId ?? null)
         : null;
   const canRetry = task.status === "failed" || task.status === "canceled";
+
+  useEffect(() => {
+    const originalId = task.refreshOfItemId;
+    const refreshedId = task.status === "completed" ? task.resultItemId : null;
+    if (!isOpen || !originalId || !refreshedId) {
+      setRefreshPair(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      window.api.knowledge.get(originalId),
+      window.api.knowledge.get(refreshedId),
+    ])
+      .then(([original, refreshed]) => {
+        if (!cancelled && original && refreshed) setRefreshPair({ original, refreshed });
+      })
+      .catch(() => {
+        if (!cancelled) setRefreshPair(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, task.refreshOfItemId, task.resultItemId, task.status]);
 
   const copyReport = async () => {
     if (isCopying) {
@@ -194,6 +221,29 @@ export function ImportTaskDetailModal({
           </div>
         ) : null}
 
+        {refreshPair ? (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-3">
+            <div className="text-xs font-medium text-foreground">
+              {t("imports.refreshComparison", "来源刷新待确认")}
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+              {t("imports.refreshComparisonHint", "刷新结果保留为未分类副本，原条目没有被覆盖。确认内容后再移动或删除副本。")}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-md bg-background/60 p-2">
+                <div className="text-muted-foreground">{t("imports.refreshOriginal", "原条目")}</div>
+                <div className="mt-0.5 truncate text-foreground">{refreshPair.original.title || t("library.untitled", "无标题")}</div>
+                <div className="mt-0.5 text-muted-foreground">{refreshPair.original.content.trim().length} {t("library.wordUnit", "字")}</div>
+              </div>
+              <div className="rounded-md bg-background/60 p-2">
+                <div className="text-muted-foreground">{t("imports.refreshNew", "刷新副本")}</div>
+                <div className="mt-0.5 truncate text-foreground">{refreshPair.refreshed.title || t("library.untitled", "无标题")}</div>
+                <div className="mt-0.5 text-muted-foreground">{refreshPair.refreshed.content.trim().length} {t("library.wordUnit", "字")}</div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {openableItemId || canRetry ? (
           <div className="flex items-center gap-2 border-t border-border pt-4">
             {openableItemId ? (
@@ -209,6 +259,18 @@ export function ImportTaskDetailModal({
                 {task.status === "duplicate"
                   ? t("imports.openExisting", "打开已有条目")
                   : t("imports.openItem", "打开条目")}
+              </button>
+            ) : null}
+            {refreshPair ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenItem(refreshPair.original.id);
+                  onClose();
+                }}
+                className={`${ACTION_BASE} border border-border text-muted-foreground hover:bg-accent hover:text-foreground`}
+              >
+                {t("imports.openOriginal", "打开原条目")}
               </button>
             ) : null}
             {canRetry ? (

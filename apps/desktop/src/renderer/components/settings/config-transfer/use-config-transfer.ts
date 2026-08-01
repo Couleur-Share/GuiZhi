@@ -6,7 +6,7 @@
  */
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ConfigTransferPreview, Settings } from "@guizhi/shared/types";
+import type { ConfigApplySelection, ConfigTransferPreview, Settings } from "@guizhi/shared/types";
 import { useToast } from "../../ui/Toast";
 import {
   readSettingsSnapshot,
@@ -29,7 +29,14 @@ export function useConfigTransfer() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const exportConfig = useCallback(
-    async (options: { includeSecrets: boolean; password: string }) => {
+    async (options: {
+      includeSecrets: boolean;
+      password: string;
+      includeUiLayout: boolean;
+      includeIllustrationStyles: boolean;
+      includeShortcuts: boolean;
+      includeMcpScope: boolean;
+    }) => {
       setBusy("export");
       try {
         const snapshot = readSettingsSnapshot();
@@ -39,6 +46,10 @@ export function useConfigTransfer() {
           uiLayout: readUiLayoutSnapshot(),
           includeSecrets: options.includeSecrets,
           password: options.password,
+          includeUiLayout: options.includeUiLayout,
+          includeIllustrationStyles: options.includeIllustrationStyles,
+          includeShortcuts: options.includeShortcuts,
+          includeMcpScope: options.includeMcpScope,
         });
         if (result.canceled) {
           return false;
@@ -103,7 +114,7 @@ export function useConfigTransfer() {
   }, []);
 
   const applyImport = useCallback(
-    async (password: string) => {
+    async (password: string, selection: ConfigApplySelection = {}) => {
       if (!pending) {
         return;
       }
@@ -111,7 +122,7 @@ export function useConfigTransfer() {
       setPasswordError(null);
       let relaunching = false;
       try {
-        const result = await window.api.config.apply(pending.filePath, password);
+        const result = await window.api.config.apply(pending.filePath, password, selection);
         if (!result.success) {
           if (result.wrongPassword) {
             // 密码错就留在弹窗里就地改，关掉再让用户重选一遍文件太折腾

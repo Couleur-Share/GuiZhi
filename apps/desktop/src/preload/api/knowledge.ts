@@ -7,6 +7,7 @@ import type {
   CreateKnowledgeItemInput,
   CreateTagInput,
   KnowledgeCounts,
+  KnowledgeFacetCountsQuery,
   KnowledgeItem,
   KnowledgeItemListResult,
   KnowledgeItemQuery,
@@ -44,8 +45,8 @@ export const knowledgeApi = {
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_DELETE_FOREVER, ids),
   emptyTrash: (): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH),
-  counts: (): Promise<KnowledgeCounts> =>
-    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_COUNTS),
+  counts: (query?: KnowledgeFacetCountsQuery): Promise<KnowledgeCounts> =>
+    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_COUNTS, query),
 };
 
 export const collectionApi = {

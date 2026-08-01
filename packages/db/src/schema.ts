@@ -187,6 +187,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
   result_item_id TEXT,
   duplicate_item_id TEXT,
   collection_id TEXT,
+  -- 来源刷新副本关联的原条目；普通导入为 NULL
+  refresh_of_item_id TEXT REFERENCES knowledge_items(id) ON DELETE SET NULL,
   -- 采集时选定的标签（JSON 字符串数组），入库时打到条目上
   tag_names TEXT,
   -- 各阶段耗时与 AI 开销（JSON 数组，见 ImportStageStat）；重试时清空

@@ -36,6 +36,9 @@ export const IPC_CHANNELS = {
   IMPORT_LIST: "import:list",
   IMPORT_CANCEL: "import:cancel",
   IMPORT_RETRY: "import:retry",
+  IMPORT_QUEUE_STATE: "import:queueState",
+  IMPORT_PAUSE: "import:pause",
+  IMPORT_RESUME: "import:resume",
   /** 主进程 → 渲染进程：自动备份开始 / 结束（这段主线程是冻住的） */
   BACKUP_AUTO_STATUS: "backup:autoStatus",
   IMPORT_REMOVE: "import:remove",

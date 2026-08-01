@@ -160,6 +160,25 @@ export interface KnowledgeItemQuery {
 }
 
 /**
+ * 侧栏分面计数的上下文。
+ *
+ * 三个分面（知识库 / 标签 / 平台）在统计各自的选项时会忽略同组条件，
+ * 但保留这里的其余条件；范围数字仍是全局概览，不受此对象影响。
+ */
+export interface KnowledgeFacetCountsQuery {
+  scope: KnowledgeScope;
+  collectionId?: string;
+  tagId?: string;
+  /** 采集来源平台（SourcePlatform）；见 shared/utils/source-platforms.ts */
+  platform?: string;
+  /** 与列表相同的全文检索条件，避免搜索结果与侧栏可选项脱节。 */
+  search?: string;
+  searchMode?: "phrase" | "recall";
+  /** scope=all 时是否纳入归档；正常知识库浏览保持 false。 */
+  includeArchived?: boolean;
+}
+
+/**
  * 批量修改多个条目。
  *
  * 标签用「追加 / 移除」而不是整体替换：批量打标签时各条目原有的标签不一样，
@@ -204,7 +223,11 @@ export interface UpdateKnowledgeItemInput {
   tagNames?: string[];
 }
 
-/** 侧栏计数（未删除条目；除 trash 外都排除归档，与点进去看到的列表同口径） */
+/**
+ * 侧栏计数。
+ *
+ * 范围数字是全局概览；三个 by… 映射则是当前筛选上下文下的分面计数。
+ */
 export interface KnowledgeCounts {
   uncategorized: number;
   all: number;

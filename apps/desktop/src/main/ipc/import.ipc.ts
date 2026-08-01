@@ -24,6 +24,9 @@ export function registerImportIPC(
       service!.queue.enqueue(Array.isArray(inputs) ? inputs : []),
   );
   ipcMain.handle(IPC_CHANNELS.IMPORT_LIST, () => service!.taskDb.list());
+  ipcMain.handle(IPC_CHANNELS.IMPORT_QUEUE_STATE, () => service!.queue.getState());
+  ipcMain.handle(IPC_CHANNELS.IMPORT_PAUSE, () => service!.queue.pause());
+  ipcMain.handle(IPC_CHANNELS.IMPORT_RESUME, () => service!.queue.resume());
   ipcMain.handle(IPC_CHANNELS.IMPORT_CANCEL, (_event, id: string) =>
     service!.queue.cancel(id),
   );

@@ -19,6 +19,19 @@ export const IMPORT_TASK_STATUSES = [
 export type ImportTaskStatus = (typeof IMPORT_TASK_STATUSES)[number];
 
 /**
+ * 主进程调度器的瞬时状态。
+ *
+ * pending 是持久化任务状态，paused 则是本次应用运行期的调度开关；二者分开，
+ * 才不会把「暂时别再启动新任务」误写成一批看似异常的任务状态。
+ */
+export interface ImportQueueState {
+  paused: boolean;
+  runningCount: number;
+  pendingCount: number;
+  concurrency: number;
+}
+
+/**
  * 导入子阶段。
  *
  * 视频链路会串起元数据解析、音频下载、转码、转写、排版、总结六步，
@@ -98,6 +111,8 @@ export interface ImportTask {
   /** 去重命中的已有条目 id */
   duplicateItemId?: string | null;
   collectionId?: string | null;
+  /** 来源刷新副本对应的原条目；普通导入为 null。 */
+  refreshOfItemId?: string | null;
   /** 入库时要打上的标签（采集弹窗里选的） */
   tagNames?: string[];
   /**
@@ -117,6 +132,8 @@ export interface EnqueueImportInput {
   /** 文本内容 / 文件绝对路径 / URL */
   input: string;
   collectionId?: string | null;
+  /** 来源刷新时保留原条目关联，供任务详情展示新旧差异。 */
+  refreshOfItemId?: string | null;
   /**
    * 入库时直接打上的标签。
    *

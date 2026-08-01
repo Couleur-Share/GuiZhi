@@ -15,6 +15,7 @@ import { Select } from "../ui/Select";
 import { useToast } from "../ui/Toast";
 import { useImportStore } from "../../stores/import.store";
 import { useCollectionStore } from "../../stores/collection.store";
+import { useTagStore } from "../../stores/tag.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { parseCaptureDraft, resolveCaptureAction } from "./capture-utils";
@@ -38,6 +39,8 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     (state) => state.fetchCollections,
   );
   const createItem = useKnowledgeStore((state) => state.createItem);
+  const tags = useTagStore((state) => state.tags);
+  const fetchTags = useTagStore((state) => state.fetchTags);
   const setAppModule = useUIStore((state) => state.setAppModule);
 
   const [draft, setDraft] = useState("");
@@ -54,6 +57,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
   useEffect(() => {
     if (isOpen) {
       void fetchCollections();
+      void fetchTags();
     } else {
       setDraft("");
       setFilePaths([]);
@@ -62,7 +66,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
       setIsDragOver(false);
       setDraftOverride(null);
     }
-  }, [isOpen, fetchCollections]);
+  }, [isOpen, fetchCollections, fetchTags]);
 
   const addTag = (name: string) => {
     const trimmed = name.trim();
@@ -83,6 +87,15 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     [parsedDraft, draftOverride],
   );
   const canSubmit = captureAction.kind !== "empty" || filePaths.length > 0;
+  const matchingTags = tagDraft.trim()
+    ? tags
+        .filter(
+          (tag) =>
+            tag.name.toLowerCase().includes(tagDraft.trim().toLowerCase()) &&
+            !tagNames.some((name) => name.toLowerCase() === tag.name.toLowerCase()),
+        )
+        .slice(0, 6)
+    : [];
 
   const submit = async () => {
     const inputs: EnqueueImportInput[] = [];
@@ -316,7 +329,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border px-3 py-2">
+        <div className="relative flex flex-wrap items-center gap-1.5 rounded-xl border border-border px-3 py-2">
           <TagIcon
             className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
             aria-hidden="true"
@@ -358,6 +371,27 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             placeholder={t("capture.tagsPlaceholder", "打标签（回车添加）")}
             className="h-6 min-w-32 flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
           />
+          {matchingTags.length > 0 ? (
+            <div
+              role="listbox"
+              aria-label={t("capture.existingTags", "已有标签")}
+              className="absolute left-8 right-2 top-full z-20 mt-1 rounded-lg border border-border bg-popover p-1 shadow-lg"
+            >
+              {matchingTags.map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => addTag(tag.name)}
+                  className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent"
+                >
+                  {tag.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

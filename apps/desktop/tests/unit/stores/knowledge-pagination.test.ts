@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  KnowledgeCounts,
+  KnowledgeFacetCountsQuery,
   KnowledgeItemListEntry,
   KnowledgeItemQuery,
   KnowledgeItemListResult,
@@ -30,8 +32,23 @@ function makeEntry(id: string): KnowledgeItemListEntry {
 function stubList(
   impl: (query: KnowledgeItemQuery) => Promise<KnowledgeItemListResult>,
 ): void {
-  window.api.knowledge = { ...(window.api.knowledge ?? {}), list: impl };
+  window.api.knowledge = {
+    ...(window.api.knowledge ?? {}),
+    list: impl,
+    counts: async () => EMPTY_COUNTS,
+  };
 }
+
+const EMPTY_COUNTS: KnowledgeCounts = {
+  uncategorized: 0,
+  all: 0,
+  favorites: 0,
+  archived: 0,
+  trash: 0,
+  byCollection: {},
+  byTag: {},
+  byPlatform: {},
+};
 
 describe("knowledge.store 服务端分页", () => {
   beforeEach(() => {
@@ -126,7 +143,7 @@ describe("knowledge.store 服务端分页", () => {
   });
 });
 
-describe("knowledge.store 导航轴互斥", () => {
+describe("knowledge.store 组合导航筛选", () => {
   beforeEach(() => {
     useKnowledgeStore.setState({
       scope: "all",
@@ -140,7 +157,7 @@ describe("knowledge.store 导航轴互斥", () => {
     });
   });
 
-  it("四条轴同时只有一条生效，切换时其余复位", async () => {
+  it("范围与知识库、标签、平台可组合，切换范围不丢失 facet", async () => {
     const queries: KnowledgeItemQuery[] = [];
     stubList(async (query) => {
       queries.push(query);
@@ -152,24 +169,62 @@ describe("knowledge.store 导航轴互斥", () => {
     expect(queries[0]).toMatchObject({ scope: "all", collectionId: "col-1" });
     expect(queries[0].platform).toBeUndefined();
 
-    // 选平台会清掉上一步的知识库，而不是叠加成两个条件
+    // 平台与知识库组合，才能表达“某个库里的抖音条目”。
     useKnowledgeStore.getState().selectPlatform("douyin");
     await vi.waitFor(() => expect(queries).toHaveLength(2));
-    expect(queries[1]).toMatchObject({ scope: "all", platform: "douyin" });
-    expect(queries[1].collectionId).toBeUndefined();
-    expect(useKnowledgeStore.getState().collectionId).toBeNull();
+    expect(queries[1]).toMatchObject({
+      scope: "all",
+      collectionId: "col-1",
+      platform: "douyin",
+    });
+    expect(useKnowledgeStore.getState().collectionId).toBe("col-1");
 
-    // 反过来同样：切回标签后平台条件必须消失
+    // 再加标签仍保留前两项。
     useKnowledgeStore.getState().selectTag("tag-1");
     await vi.waitFor(() => expect(queries).toHaveLength(3));
-    expect(queries[2]).toMatchObject({ scope: "all", tagId: "tag-1" });
-    expect(queries[2].platform).toBeUndefined();
+    expect(queries[2]).toMatchObject({
+      scope: "all",
+      collectionId: "col-1",
+      tagId: "tag-1",
+      platform: "douyin",
+    });
 
     useKnowledgeStore.getState().setScope("archived");
     await vi.waitFor(() => expect(queries).toHaveLength(4));
-    expect(queries[3]).toMatchObject({ scope: "archived" });
-    expect(queries[3].tagId).toBeUndefined();
-    expect(useKnowledgeStore.getState().platform).toBeNull();
+    expect(queries[3]).toMatchObject({
+      scope: "archived",
+      collectionId: "col-1",
+      tagId: "tag-1",
+      platform: "douyin",
+    });
+    expect(useKnowledgeStore.getState().platform).toBe("douyin");
+  });
+
+  it("每次组合筛选都把当前上下文交给分面计数", async () => {
+    const countQueries: KnowledgeFacetCountsQuery[] = [];
+    stubList(async () => ({ entries: [], total: 0 }));
+    window.api.knowledge = {
+      ...window.api.knowledge,
+      counts: async (query?: KnowledgeFacetCountsQuery) => {
+        countQueries.push(query!);
+        return EMPTY_COUNTS;
+      },
+    };
+
+    useKnowledgeStore.getState().selectCollection("col-1");
+    await vi.waitFor(() => expect(countQueries).toHaveLength(1));
+    expect(countQueries[0]).toMatchObject({
+      scope: "all",
+      collectionId: "col-1",
+    });
+
+    useKnowledgeStore.getState().selectPlatform("bilibili");
+    await vi.waitFor(() => expect(countQueries).toHaveLength(2));
+    expect(countQueries[1]).toMatchObject({
+      scope: "all",
+      collectionId: "col-1",
+      platform: "bilibili",
+    });
   });
 
   it("切换平台时回到第一页并清空多选", async () => {
@@ -219,5 +274,29 @@ describe("knowledge.store 并发请求守卫", () => {
     expect(useKnowledgeStore.getState().total).toBe(1);
     // 过期请求也不该提前收起加载态
     expect(useKnowledgeStore.getState().isLoading).toBe(false);
+  });
+
+  it("旧的侧栏计数响应不能覆盖新筛选的数字", async () => {
+    const resolvers: ((counts: KnowledgeCounts) => void)[] = [];
+    stubList(async () => ({ entries: [], total: 0 }));
+    window.api.knowledge = {
+      ...window.api.knowledge,
+      counts: () =>
+        new Promise<KnowledgeCounts>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    };
+
+    const first = useKnowledgeStore.getState().refreshCounts();
+    const second = useKnowledgeStore.getState().refreshCounts();
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2));
+
+    resolvers[1]({ ...EMPTY_COUNTS, byPlatform: { bilibili: 1 } });
+    resolvers[0]({ ...EMPTY_COUNTS, byPlatform: { douyin: 9 } });
+    await Promise.all([first, second]);
+
+    expect(useKnowledgeStore.getState().counts?.byPlatform).toEqual({
+      bilibili: 1,
+    });
   });
 });

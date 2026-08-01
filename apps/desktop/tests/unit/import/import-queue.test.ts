@@ -186,6 +186,29 @@ describe("ImportQueue", () => {
     expect(harness.savedItems).toHaveLength(5);
   });
 
+  it("暂停只冻结尚未启动的任务，继续后按原队列执行", async () => {
+    const harness = createHarness({ concurrency: 1 });
+    harness.queue.pause();
+    const [task] = harness.queue.enqueue([{ kind: "text", input: "稍后再跑" }]);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(harness.store.get(task.id)!.status).toBe("pending");
+    expect(harness.queue.getState()).toMatchObject({
+      paused: true,
+      pendingCount: 1,
+      runningCount: 0,
+    });
+
+    harness.queue.resume();
+    await harness.queue.drain();
+    expect(harness.store.get(task.id)!.status).toBe("completed");
+    expect(harness.queue.getState()).toMatchObject({
+      paused: false,
+      pendingCount: 0,
+      runningCount: 0,
+    });
+  });
+
   it("抽取成功后回写真实标题与条目类型", async () => {
     const harness = createHarness({
       extract: async () => ({

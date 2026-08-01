@@ -72,6 +72,7 @@ describe("语义索引 pending 判定与状态", () => {
       totalChunks: 1,
       lastSearchMs: null,
       lastScannedChunks: null,
+      lastSearchCacheHit: null,
     });
   });
 
@@ -374,6 +375,10 @@ describe("searchSemanticByVector（余弦 top-k）", () => {
     expect(status.lastScannedChunks).toBe(1);
     expect(status.lastSearchMs).toEqual(expect.any(Number));
     expect(status.lastSearchMs).toBeGreaterThanOrEqual(0);
+    expect(status.lastSearchCacheHit).toBe(false);
+
+    await searchSemanticByVector(db, MODEL, new Float32Array([1, 0]), 5);
+    expect(getSemanticStatus(db, MODEL).lastSearchCacheHit).toBe(true);
   });
 
   it("invalidate 后不会继续使用旧向量缓存", async () => {

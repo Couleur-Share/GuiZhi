@@ -39,6 +39,15 @@ const SIZE_CONFIG = {
   },
 };
 
+const FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "[href]",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "[tabindex]:not([tabindex='-1'])",
+].join(", ");
+
 export function Modal({
   isOpen,
   onClose,
@@ -162,6 +171,29 @@ export function Modal({
 
   if (!shouldRender) return null;
 
+  const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") return;
+    const modal = modalRef.current;
+    if (!modal) return;
+    const targets = Array.from(
+      modal.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter((target) => !target.hasAttribute("disabled"));
+    if (targets.length === 0) {
+      event.preventDefault();
+      modal.focus();
+      return;
+    }
+    const current = document.activeElement as HTMLElement | null;
+    const index = current ? targets.indexOf(current) : -1;
+    if (event.shiftKey && (index <= 0 || current === modal)) {
+      event.preventDefault();
+      targets[targets.length - 1].focus();
+    } else if (!event.shiftKey && (index === -1 || index === targets.length - 1)) {
+      event.preventDefault();
+      targets[0].focus();
+    }
+  };
+
   const isFullscreen = size === "fullscreen";
   const config =
     SIZE_CONFIG[size as keyof typeof SIZE_CONFIG] || SIZE_CONFIG.md;
@@ -197,6 +229,7 @@ export function Modal({
         aria-describedby={title && subtitle ? subtitleId : undefined}
         aria-label={title ? undefined : t("common.dialog", "Dialog")}
         tabIndex={-1}
+        onKeyDown={trapFocus}
         className={clsx(
           "relative app-wallpaper-panel-strong shadow-[0_0_100px_-20px_rgba(0,0,0,0.6)] border border-border",
           "overflow-hidden flex flex-col rounded-2xl focus:outline-none",

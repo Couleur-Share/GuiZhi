@@ -13,6 +13,7 @@
 | [MCP 接入](./mcp.md) | 让 Cursor / Codex 直接搜本机知识库 |
 | [数据与备份](./data.md) | 数据目录、备份恢复、配置迁移、旧版迁移 |
 | [已知限制](./known-limitations.md) | 平台、能力与边界，提 issue 前请先看 |
+| [质量门禁与性能基线](./quality-gates.md) | 发布前验证、包体预算与性能观测口径 |
 
 ## 开发者
 

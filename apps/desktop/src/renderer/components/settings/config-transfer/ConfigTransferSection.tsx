@@ -96,7 +96,7 @@ export function ConfigTransferSection() {
         isBusy={busy === "apply"}
         passwordError={passwordError}
         onClose={cancelImport}
-        onConfirm={(password) => void applyImport(password)}
+        onConfirm={(password, selection) => void applyImport(password, selection)}
       />
     </>
   );

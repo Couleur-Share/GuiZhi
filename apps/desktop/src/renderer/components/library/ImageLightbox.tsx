@@ -1,6 +1,7 @@
 import Lightbox from "yet-another-react-lightbox";
 import Counter from "yet-another-react-lightbox/plugins/counter";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
+import type { LightboxProps } from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/counter.css";
 
@@ -8,6 +9,14 @@ export interface LightboxImage {
   src: string;
   alt?: string;
 }
+
+// yet-another-react-lightbox narrows slot styles more than React's CSSProperties,
+// while Electron still needs this vendor property to keep the window drag region
+// from swallowing the viewer controls. Keep the cast at this integration boundary.
+type LightboxSlotStyle = NonNullable<
+  NonNullable<LightboxProps["styles"]>[keyof NonNullable<LightboxProps["styles"]>]
+>;
+const NO_DRAG = { WebkitAppRegion: "no-drag" } as LightboxSlotStyle;
 
 /**
  * 图片查看器：滚轮缩放、拖拽平移、双击放大、键盘 +/-/方向键，多图左右切换。
@@ -41,20 +50,20 @@ export function ImageLightbox({
       styles={{
         // Windows 无边框窗：TitleBar/TopBar 的 drag 区无视 z-index 吞指针事件。
         // 关闭钮中心正好压在 TopBar 上沿（约 y=32），不标 no-drag 就点不中。
-        root: { WebkitAppRegion: "no-drag" },
+        root: NO_DRAG,
         container: {
           backgroundColor: "rgba(0, 0, 0, .88)",
-          WebkitAppRegion: "no-drag",
+          ...NO_DRAG,
         },
         // Zoom 的 transform 会建层，不抬 z-index 时工具栏偶发被盖住
-        toolbar: { zIndex: 1, WebkitAppRegion: "no-drag" },
+        toolbar: { zIndex: 1, ...NO_DRAG },
         // 默认按钮只有投影，压在浅色图上几乎看不见
         button: {
           filter: "none",
           color: "#fff",
           backgroundColor: "rgba(0, 0, 0, .5)",
           borderRadius: "10px",
-          WebkitAppRegion: "no-drag",
+          ...NO_DRAG,
         },
         // 关闭图标是镂空 X：SVG 默认只命中描边，点正中间会穿到下层
         icon: { pointerEvents: "none" },

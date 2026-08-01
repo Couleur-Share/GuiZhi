@@ -9,7 +9,7 @@
  * 回复接口不支持分页，总是一次返回整帖，因此不必翻页。
  */
 import { fetchJson } from "./safe-fetch";
-import type { ForumReply, ForumThread } from "./forum-types";
+import type { ForumThread } from "./forum-types";
 
 export type { ForumReply, ForumThread } from "./forum-types";
 

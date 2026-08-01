@@ -116,3 +116,12 @@ export interface ConfigApplyResult {
   snapshotDir?: string;
   error?: string;
 }
+
+/** 导入方决定实际应用哪些配置域；缺省保持历史上的“全部应用”。 */
+export interface ConfigApplySelection {
+  settings?: boolean;
+  uiLayout?: boolean;
+  illustrationStyles?: boolean;
+  shortcuts?: boolean;
+  mcpScope?: boolean;
+}
