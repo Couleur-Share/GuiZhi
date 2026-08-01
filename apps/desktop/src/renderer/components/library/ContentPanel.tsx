@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   AudioLinesIcon,
   ImageIcon,
@@ -17,27 +26,50 @@ import type {
   TranscribeProgress,
   TranscribeStage,
 } from "@guizhi/shared/types";
-import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
+import {
+  filterForumReplies,
+  parseForumReplySection,
+  resolveReplyTargetFloor,
+  splitForumNoteSections,
+  type ForumReplyEntry,
+} from "@guizhi/shared/utils/forum-note";
 import { splitImageNoteSections } from "@guizhi/shared/utils/image-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { useToast } from "../ui/Toast";
 import { ImageGallery } from "./ImageGallery";
+import {
+  ForumDiscussionView,
+  type ForumDiscussionHandle,
+} from "./ForumDiscussionView";
+import {
+  defaultCatalogOpen,
+  ForumFloorCatalog,
+} from "./ForumFloorCatalog";
+import { highlightText } from "./highlight-text";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { PanelFindBar } from "./PanelFindBar";
+import {
+  loadContentReadingMemory,
+  patchContentReadingMemory,
+  type ReadingPanelTab,
+} from "./reading-memory";
+import { useMarkFindNavigation } from "./use-mark-find";
 import {
   useMediaSummaryAction,
   useTranscriptActions,
 } from "./use-media-actions";
 
-type PanelTab =
-  | "body"
-  | "transcript"
-  | "images"
-  | "recognized"
-  | "summary"
-  | "replies";
+type PanelTab = ReadingPanelTab;
+
+const FINDABLE_TABS: PanelTab[] = ["summary", "body", "transcript", "replies"];
+
+function noopMatchCount(_count: number): void {
+  /* 讨论区在非激活标签时仍挂载（保滚动），勿回写查找计数 */
+}
 
 function TabButton({
   active,
@@ -95,9 +127,70 @@ function ToolButton({
   );
 }
 
+function MarkdownTabPane({
+  active,
+  content,
+  centeredHeadings,
+  highlightQuery,
+  scrollRef,
+}: {
+  active: boolean;
+  content: string;
+  centeredHeadings?: boolean;
+  highlightQuery?: string;
+  scrollRef?: RefObject<HTMLDivElement | null>;
+}) {
+  return (
+    <div className={active ? "h-full" : "hidden"} aria-hidden={!active}>
+      <MarkdownPreview
+        ref={scrollRef}
+        content={content}
+        centeredHeadings={centeredHeadings}
+        highlightQuery={highlightQuery}
+      />
+    </div>
+  );
+}
+
+function useDebouncedScrollSave(
+  itemId: string,
+  tab: PanelTab,
+  getScrollTop: () => number | null,
+) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flush = useCallback(() => {
+    const top = getScrollTop();
+    if (top == null) {
+      return;
+    }
+    patchContentReadingMemory(itemId, {
+      tab,
+      scrollTopByTab: { [tab]: top },
+    });
+  }, [getScrollTop, itemId, tab]);
+
+  const onScroll = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(flush, 200);
+  }, [flush]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      flush();
+    };
+  }, [flush, itemId]);
+
+  return onScroll;
+}
+
 /**
  * 正文面板：正文与文字稿以标签页并列，各自的操作放在面板头部右侧。
- * 文字稿从原来的固定卡片改为标签页，避免在正文上方挤占版面。
  */
 export function ContentPanel({
   item,
@@ -107,6 +200,7 @@ export function ContentPanel({
   isTrashed: boolean;
 }) {
   const { t } = useTranslation();
+  const { showToast } = useToast();
   const updateSelected = useKnowledgeStore((state) => state.updateSelected);
   const showLineNumbers = useSettingsStore((state) => state.showLineNumbers);
   const editorMarkdownPreview = useSettingsStore(
@@ -117,31 +211,28 @@ export function ContentPanel({
 
   const [tab, setTab] = useState<PanelTab>("body");
   const [isPreview, setIsPreview] = useState(editorMarkdownPreview);
+  const [findQuery, setFindQuery] = useState("");
+  const [findActiveIndex, setFindActiveIndex] = useState(0);
+  const [findMatchCount, setFindMatchCount] = useState(0);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogActiveFloor, setCatalogActiveFloor] = useState<number | null>(
+    null,
+  );
   const lastViewItemIdRef = useRef<string | null>(null);
+  const restoredRef = useRef(false);
 
-  // 切换条目回到默认视图：有内容进渲染视图，空内容（新建笔记）直接进编辑
-  useEffect(() => {
-    if (lastViewItemIdRef.current === item.id) {
-      return;
-    }
-    lastViewItemIdRef.current = item.id;
-    const preview = editorMarkdownPreview && Boolean(item.content.trim());
-    setIsPreview(preview);
-    // 论坛帖打开先看讨论总结：主楼往往只是提问，结论都在回复里
-    const preferSummary =
-      preview &&
-      item.itemType === "forum" &&
-      Boolean(splitForumNoteSections(item.content).summary);
-    setTab(preferSummary ? "summary" : "body");
-  }, [item.id, item.content, item.itemType, editorMarkdownPreview]);
+  const summaryScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const recognizedScrollRef = useRef<HTMLDivElement>(null);
+  const transcriptScrollRef = useRef<HTMLDivElement>(null);
+  const emptyScrollRef = useRef<HTMLDivElement>(null);
+  const discussionRef = useRef<ForumDiscussionHandle>(null);
 
   const isMediaItem = item.itemType === "audio" || item.itemType === "video";
   const showTranscriptTab =
     !isTrashed &&
     (transcriptActions.canTranscribe || transcriptActions.transcript.length > 0);
 
-  // 图片条目：文案 / 图片 / 图中文字 混在一屏里很难读，渲染视图下拆成三个标签。
-  // 「显示原文」是看完整 Markdown 源码，此时不再分段。
   const sections =
     item.itemType === "image" && !isTrashed && isPreview
       ? splitImageNoteSections(item.content)
@@ -149,7 +240,6 @@ export function ContentPanel({
   const showImagesTab = sections !== null;
   const showRecognizedTab = Boolean(sections?.recognized);
 
-  // 论坛条目：讨论总结 / 主楼 / 逐楼回复同样拆开看，一屏滚到一百楼没法读
   const forumSections =
     item.itemType === "forum" && !isTrashed && isPreview
       ? splitForumNoteSections(item.content)
@@ -167,12 +257,226 @@ export function ContentPanel({
   };
   const activeTab: PanelTab = availableTabs[tab] ? tab : "body";
 
-  // 渲染视图中元数据引用块交给来源 chip 展示，正文只渲染剩余部分
+  const replies = useMemo(
+    () =>
+      forumSections?.replies
+        ? parseForumReplySection(forumSections.replies)
+        : [],
+    [forumSections?.replies],
+  );
+
+  const getScrollTop = useCallback((): number | null => {
+    if (activeTab === "summary") {
+      return summaryScrollRef.current?.scrollTop ?? null;
+    }
+    if (activeTab === "body") {
+      return bodyScrollRef.current?.scrollTop ?? null;
+    }
+    if (activeTab === "recognized") {
+      return recognizedScrollRef.current?.scrollTop ?? null;
+    }
+    if (activeTab === "transcript") {
+      return transcriptScrollRef.current?.scrollTop ?? null;
+    }
+    if (activeTab === "replies") {
+      return discussionRef.current?.getScrollElement()?.scrollTop ?? null;
+    }
+    return null;
+  }, [activeTab]);
+
+  const onPaneScroll = useDebouncedScrollSave(item.id, activeTab, getScrollTop);
+
+  // 切换条目：恢复记忆或默认视图
+  useEffect(() => {
+    if (lastViewItemIdRef.current === item.id) {
+      return;
+    }
+    lastViewItemIdRef.current = item.id;
+    restoredRef.current = false;
+    const preview = editorMarkdownPreview && Boolean(item.content.trim());
+    setIsPreview(preview);
+    setFindQuery("");
+    setFindActiveIndex(0);
+    setFindMatchCount(0);
+
+    const memory = loadContentReadingMemory(item.id);
+    const forum = item.itemType === "forum" && preview
+      ? splitForumNoteSections(item.content)
+      : null;
+    const replyCount = forum?.replies
+      ? parseForumReplySection(forum.replies).length
+      : 0;
+
+    if (memory && memory.tab && (
+      memory.tab === "body" ||
+      (memory.tab === "summary" && forum?.summary) ||
+      (memory.tab === "replies" && forum?.replies) ||
+      (memory.tab === "transcript" && showTranscriptTab) ||
+      (memory.tab === "images" && item.itemType === "image") ||
+      (memory.tab === "recognized" && item.itemType === "image")
+    )) {
+      setTab(memory.tab);
+      setFindQuery(
+        memory.tab === "replies" ? (memory.repliesQuery ?? "") : "",
+      );
+      setCatalogOpen(
+        memory.catalogOpen ?? defaultCatalogOpen(replyCount),
+      );
+    } else {
+      const preferSummary =
+        preview &&
+        item.itemType === "forum" &&
+        Boolean(forum?.summary);
+      setTab(preferSummary ? "summary" : "body");
+      setCatalogOpen(defaultCatalogOpen(replyCount));
+    }
+  }, [item.id, item.content, item.itemType, editorMarkdownPreview, showTranscriptTab]);
+
+  // 恢复滚动位置（等 pane 挂好）
+  useLayoutEffect(() => {
+    if (restoredRef.current) {
+      return;
+    }
+    const memory = loadContentReadingMemory(item.id);
+    if (!memory) {
+      restoredRef.current = true;
+      return;
+    }
+    const top = memory.scrollTopByTab[activeTab];
+    if (top == null) {
+      restoredRef.current = true;
+      return;
+    }
+    const apply = () => {
+      if (activeTab === "summary" && summaryScrollRef.current) {
+        summaryScrollRef.current.scrollTop = top;
+      } else if (activeTab === "body" && bodyScrollRef.current) {
+        bodyScrollRef.current.scrollTop = top;
+      } else if (activeTab === "recognized" && recognizedScrollRef.current) {
+        recognizedScrollRef.current.scrollTop = top;
+      } else if (activeTab === "transcript" && transcriptScrollRef.current) {
+        transcriptScrollRef.current.scrollTop = top;
+      } else if (activeTab === "replies") {
+        const el = discussionRef.current?.getScrollElement();
+        if (el) {
+          el.scrollTop = top;
+        }
+      }
+      restoredRef.current = true;
+    };
+    requestAnimationFrame(apply);
+  }, [activeTab, item.id]);
+
+  useEffect(() => {
+    patchContentReadingMemory(item.id, { tab: activeTab });
+  }, [activeTab, item.id]);
+
+  useEffect(() => {
+    if (activeTab === "replies") {
+      patchContentReadingMemory(item.id, {
+        repliesQuery: findQuery,
+        catalogOpen,
+      });
+    }
+  }, [activeTab, catalogOpen, findQuery, item.id]);
+
   const previewContent = isMediaItem
     ? parseVideoMetaBlock(item.content)?.body ?? item.content
     : forumSections
       ? forumSections.body
       : (sections?.caption ?? item.content);
+
+  const markContainerRef =
+    activeTab === "summary"
+      ? summaryScrollRef
+      : activeTab === "body"
+        ? bodyScrollRef
+        : activeTab === "recognized"
+          ? recognizedScrollRef
+          : activeTab === "transcript"
+            ? transcriptScrollRef
+            : emptyScrollRef;
+
+  const markContentKey =
+    activeTab === "summary"
+      ? forumSections?.summary ?? ""
+      : activeTab === "body"
+        ? forumSections?.body ?? sections?.caption ?? previewContent
+        : activeTab === "recognized"
+          ? sections?.recognized ?? ""
+          : activeTab === "transcript"
+            ? transcriptActions.transcript
+            : "";
+
+  useMarkFindNavigation({
+    containerRef: markContainerRef,
+    query: activeTab === "replies" ? "" : findQuery,
+    activeIndex: findActiveIndex,
+    onMatchCountChange:
+      activeTab === "replies" ? noopMatchCount : setFindMatchCount,
+    contentKey: `${item.id}:${activeTab}:${markContentKey.length}`,
+  });
+
+  const showFindBar =
+    isPreview &&
+    !isTrashed &&
+    FINDABLE_TABS.includes(activeTab) &&
+    (activeTab !== "transcript" || Boolean(transcriptActions.transcript)) &&
+    (activeTab !== "replies" || showRepliesTab) &&
+    (activeTab !== "summary" || showForumSummaryTab);
+
+  const findPlaceholder =
+    activeTab === "replies"
+      ? t("library.forumRepliesFilterPlaceholder", "搜索楼层、作者或内容…")
+      : t("library.panelFindPlaceholder", "在当前页查找…");
+
+  const handleSelectFloor = useCallback(
+    (floor: number) => {
+      const inFiltered =
+        !findQuery.trim() ||
+        filterIncludesFloor(replies, findQuery, floor);
+      if (!inFiltered) {
+        setFindQuery("");
+        setFindActiveIndex(0);
+      }
+      setCatalogActiveFloor(floor);
+      requestAnimationFrame(() => {
+        discussionRef.current?.scrollToFloor(floor);
+      });
+    },
+    [findQuery, replies],
+  );
+
+  const handleReplyToClick = useCallback(
+    (replyTo: NonNullable<ForumReplyEntry["replyTo"]>) => {
+      const target = resolveReplyTargetFloor(replies, replyTo);
+      if (target == null) {
+        showToast(
+          t(
+            "library.forumReplyJumpMiss",
+            "该楼未入库或无法定位",
+          ),
+          "warning",
+        );
+        return;
+      }
+      handleSelectFloor(target);
+    },
+    [handleSelectFloor, replies, showToast, t],
+  );
+
+  const changeTab = (next: PanelTab) => {
+    const top = getScrollTop();
+    if (top != null) {
+      patchContentReadingMemory(item.id, {
+        tab: activeTab,
+        scrollTopByTab: { [activeTab]: top },
+      });
+    }
+    setTab(next);
+    setFindActiveIndex(0);
+    restoredRef.current = true;
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
@@ -181,7 +485,7 @@ export function ContentPanel({
           {showForumSummaryTab ? (
             <TabButton
               active={activeTab === "summary"}
-              onClick={() => setTab("summary")}
+              onClick={() => changeTab("summary")}
             >
               <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
               {t("library.forumSummarySection", "讨论总结")}
@@ -189,7 +493,7 @@ export function ContentPanel({
           ) : null}
           <TabButton
             active={activeTab === "body"}
-            onClick={() => setTab("body")}
+            onClick={() => changeTab("body")}
           >
             {sections
               ? t("library.captionSection", "文案")
@@ -198,7 +502,7 @@ export function ContentPanel({
           {showRepliesTab ? (
             <TabButton
               active={activeTab === "replies"}
-              onClick={() => setTab("replies")}
+              onClick={() => changeTab("replies")}
             >
               <MessagesSquareIcon className="h-3 w-3" aria-hidden="true" />
               {t("library.forumRepliesSection", "讨论")}
@@ -207,7 +511,7 @@ export function ContentPanel({
           {showImagesTab ? (
             <TabButton
               active={activeTab === "images"}
-              onClick={() => setTab("images")}
+              onClick={() => changeTab("images")}
             >
               <ImageIcon className="h-3 w-3" aria-hidden="true" />
               {t("library.imagesSection", "图片")}
@@ -216,7 +520,7 @@ export function ContentPanel({
           {showRecognizedTab ? (
             <TabButton
               active={activeTab === "recognized"}
-              onClick={() => setTab("recognized")}
+              onClick={() => changeTab("recognized")}
             >
               <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
               {t("library.recognizedSection", "图中文字")}
@@ -225,7 +529,7 @@ export function ContentPanel({
           {showTranscriptTab ? (
             <TabButton
               active={activeTab === "transcript"}
-              onClick={() => setTab("transcript")}
+              onClick={() => changeTab("transcript")}
             >
               <AudioLinesIcon className="h-3 w-3" aria-hidden="true" />
               {t("library.transcript", "文字稿")}
@@ -240,6 +544,20 @@ export function ContentPanel({
           ) : null}
 
           <span className="min-w-0 flex-1" />
+
+          {showFindBar ? (
+            <PanelFindBar
+              query={findQuery}
+              onQueryChange={(next) => {
+                setFindQuery(next);
+                setFindActiveIndex(0);
+              }}
+              activeIndex={findActiveIndex}
+              matchCount={findMatchCount}
+              onActiveIndexChange={setFindActiveIndex}
+              placeholder={findPlaceholder}
+            />
+          ) : null}
 
           {activeTab !== "transcript" ? (
             <>
@@ -299,8 +617,6 @@ export function ContentPanel({
                         "library.transcribeDiarize",
                         "重新生成并区分说话人",
                       )}
-                      // 只有被点的那个转圈，其余置灰——两个都转会让人以为
-                      // 整个界面都在忙
                       busy={transcriptActions.runningAction === "diarize"}
                       disabled={transcriptActions.isRunning}
                     >
@@ -321,21 +637,84 @@ export function ContentPanel({
           )}
         </div>
 
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1" onScrollCapture={onPaneScroll}>
           {activeTab === "transcript" ? (
-            <TranscriptPane actions={transcriptActions} />
+            <TranscriptPane
+              actions={transcriptActions}
+              scrollRef={transcriptScrollRef}
+              highlightQuery={findQuery}
+            />
           ) : activeTab === "images" ? (
             <ImageGallery content={item.content} />
-          ) : activeTab === "recognized" ? (
-            <MarkdownPreview content={sections?.recognized ?? ""} />
-          ) : activeTab === "summary" ? (
-            <MarkdownPreview content={forumSections?.summary ?? ""} />
-          ) : activeTab === "replies" ? (
-            <MarkdownPreview content={forumSections?.replies ?? ""} />
+          ) : forumSections ? (
+            <div key={item.id} className="h-full">
+              {showForumSummaryTab ? (
+                <MarkdownTabPane
+                  active={activeTab === "summary"}
+                  content={forumSections.summary}
+                  highlightQuery={
+                    activeTab === "summary" ? findQuery : undefined
+                  }
+                  scrollRef={summaryScrollRef}
+                />
+              ) : null}
+              <MarkdownTabPane
+                active={activeTab === "body"}
+                content={forumSections.body}
+                centeredHeadings
+                highlightQuery={activeTab === "body" ? findQuery : undefined}
+                scrollRef={bodyScrollRef}
+              />
+              {showRepliesTab ? (
+                <div
+                  className={activeTab === "replies" ? "h-full" : "hidden"}
+                  aria-hidden={activeTab !== "replies"}
+                >
+                  <ForumDiscussionView
+                    ref={discussionRef}
+                    content={forumSections.replies}
+                    query={findQuery}
+                    activeIndex={findActiveIndex}
+                    findNavEnabled={activeTab === "replies"}
+                    onMatchCountChange={setFindMatchCount}
+                    onReplyToClick={handleReplyToClick}
+                    catalog={
+                      <ForumFloorCatalog
+                        replies={replies}
+                        open={catalogOpen}
+                        onOpenChange={setCatalogOpen}
+                        activeFloor={catalogActiveFloor}
+                        onSelectFloor={handleSelectFloor}
+                      />
+                    }
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : sections ? (
+            <div key={item.id} className="h-full">
+              <MarkdownTabPane
+                active={activeTab === "body"}
+                content={sections.caption}
+                highlightQuery={activeTab === "body" ? findQuery : undefined}
+                scrollRef={bodyScrollRef}
+              />
+              {showRecognizedTab ? (
+                <MarkdownTabPane
+                  active={activeTab === "recognized"}
+                  content={sections.recognized}
+                  highlightQuery={
+                    activeTab === "recognized" ? findQuery : undefined
+                  }
+                  scrollRef={recognizedScrollRef}
+                />
+              ) : null}
+            </div>
           ) : isTrashed || isPreview ? (
-            // 回收站视图不显示元数据卡片，保留完整原文避免信息丢失
             <MarkdownPreview
+              ref={bodyScrollRef}
               content={isTrashed ? item.content : previewContent}
+              highlightQuery={findQuery}
             />
           ) : (
             <MarkdownEditor
@@ -369,16 +748,24 @@ export function ContentPanel({
   );
 }
 
+function filterIncludesFloor(
+  replies: ForumReplyEntry[],
+  query: string,
+  floor: number,
+): boolean {
+  const reply = replies.find((r) => r.floor === floor);
+  if (!reply) {
+    return false;
+  }
+  return filterForumReplies([reply], query).length > 0;
+}
+
 const STAGE_LABELS: Record<TranscribeStage, { key: string; text: string }> = {
   transcribing: { key: "library.stageTranscribing", text: "正在转写" },
   formatting: { key: "library.stageFormatting", text: "正在排版文字稿" },
   summarizing: { key: "library.stageSummarizing", text: "正在生成总结" },
 };
 
-/**
- * 只报当前阶段与已用时长，不报百分比——funasr 给不出可用的分母。
- * 阶段是必须的：三步都以分钟计，光说「正在转写」会让后两步看起来像卡住。
- */
 function transcribeStatusText(
   t: TFunction,
   progress: TranscribeProgress | null,
@@ -389,7 +776,6 @@ function transcribeStatusText(
   const label = STAGE_LABELS[progress.stage] ?? STAGE_LABELS.transcribing;
   const stage = t(label.key, label.text);
   const elapsed = formatClock(progress.elapsedMs);
-  // 心跳停了一分钟以上才值得说，正常间隔本来就是秒级
   if (progress.stalledMs !== undefined && progress.stalledMs >= 60_000) {
     return t(
       "library.transcribeStalled",
@@ -408,7 +794,15 @@ function formatClock(ms: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptActions> }) {
+function TranscriptPane({
+  actions,
+  scrollRef,
+  highlightQuery,
+}: {
+  actions: ReturnType<typeof useTranscriptActions>;
+  scrollRef?: RefObject<HTMLDivElement | null>;
+  highlightQuery?: string;
+}) {
   const { t } = useTranslation();
 
   if (!actions.transcript) {
@@ -442,7 +836,7 @@ function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptA
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 py-4">
+    <div ref={scrollRef} className="h-full overflow-y-auto px-6 py-4">
       {actions.isRunning ? (
         <p className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-accent/50 px-2.5 py-1 text-xs text-muted-foreground">
           <Loader2Icon className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -465,7 +859,9 @@ function TranscriptPane({ actions }: { actions: ReturnType<typeof useTranscriptA
         </p>
       ) : null}
       <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
-        {actions.transcript}
+        {highlightQuery?.trim()
+          ? highlightText(actions.transcript, highlightQuery)
+          : actions.transcript}
       </p>
     </div>
   );
