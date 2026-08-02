@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction } from "react";
+import { type Dispatch, type RefObject, type SetStateAction } from "react";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
@@ -18,6 +18,8 @@ export function PanelFindBar({
   matchCount,
   onActiveIndexChange,
   placeholder,
+  inputRef,
+  onClose,
 }: {
   query: string;
   onQueryChange: (query: string) => void;
@@ -25,6 +27,8 @@ export function PanelFindBar({
   matchCount: number;
   onActiveIndexChange: Dispatch<SetStateAction<number>>;
   placeholder: string;
+  inputRef?: RefObject<HTMLInputElement>;
+  onClose: () => void;
 }) {
   const { t } = useTranslation();
   const filtering = query.trim().length > 0;
@@ -44,13 +48,14 @@ export function PanelFindBar({
   };
 
   return (
-    <div className="flex h-6 w-[min(100%,18rem)] shrink-0 items-center gap-1">
-      <div className="flex h-6 min-w-0 flex-1 items-center gap-1 rounded-md border border-border/70 bg-background/70 px-1.5">
+    <div className="flex h-8 w-72 max-w-[calc(100%_-_1rem)] items-center gap-1 rounded-lg border border-border bg-background/95 p-1 shadow-lg backdrop-blur-sm">
+      <div className="flex h-6 min-w-0 flex-1 items-center gap-1 px-1.5">
         <SearchIcon
           className="h-3 w-3 shrink-0 text-muted-foreground/70"
           aria-hidden="true"
         />
         <input
+          ref={inputRef}
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
@@ -62,6 +67,9 @@ export function PanelFindBar({
               } else {
                 goNext();
               }
+            } else if (event.key === "Escape") {
+              event.preventDefault();
+              onClose();
             }
           }}
           placeholder={placeholder}
@@ -109,6 +117,14 @@ export function PanelFindBar({
           </button>
         </>
       ) : null}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("common.close", "关闭")}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+      >
+        <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

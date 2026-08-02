@@ -16,6 +16,7 @@ import {
   formatDuration,
   parseYtDlpMetadata,
   stripTranscriptionNote,
+  upsertTranscriptionSourceNote,
   YtDlpNotFoundError,
   type RunCommand,
 } from "../../../src/main/services/import/video-url";
@@ -38,18 +39,20 @@ describe("detectVideoPlatform", () => {
       detectVideoPlatform("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
     ).toBe("youtube");
     expect(detectVideoPlatform("https://youtu.be/dQw4w9WgXcQ")).toBe("youtube");
-    expect(
-      detectVideoPlatform("https://www.youtube.com/shorts/abcdef"),
-    ).toBe("youtube");
+    expect(detectVideoPlatform("https://www.youtube.com/shorts/abcdef")).toBe(
+      "youtube",
+    );
     expect(detectVideoPlatform("https://v.douyin.com/xyz/")).toBe("douyin");
-    expect(
-      detectVideoPlatform("https://www.xiaohongshu.com/explore/123"),
-    ).toBe("xiaohongshu");
+    expect(detectVideoPlatform("https://www.xiaohongshu.com/explore/123")).toBe(
+      "xiaohongshu",
+    );
   });
 
   it("普通网页与非视频路径不误判", () => {
     expect(detectVideoPlatform("https://example.com/article")).toBeNull();
-    expect(detectVideoPlatform("https://www.bilibili.com/read/cv123")).toBeNull();
+    expect(
+      detectVideoPlatform("https://www.bilibili.com/read/cv123"),
+    ).toBeNull();
     expect(detectVideoPlatform("https://www.youtube.com/@channel")).toBeNull();
     expect(detectVideoPlatform("not-a-url")).toBeNull();
   });
@@ -129,6 +132,50 @@ describe("extractVideoUrl", () => {
     expect(extracted.content).toContain("5:05");
     expect(extracted.content).toContain("未配置「语音转写」模型");
     expect(extracted.sourceUri).toBe(SAMPLE_METADATA.webpage_url);
+  });
+
+  it("发布者字幕优先：即使未配置 ASR 也直接入库，不下载音轨", async () => {
+    const stages: string[] = [];
+    const transcribe = vi.fn();
+    const extracted = await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run: async () => ({ stdout: JSON.stringify(SAMPLE_METADATA) }),
+      getPlatformCaptions: async () => ({
+        text: "这是发布者提供的字幕。",
+        source: "platform-subtitles",
+        language: "zh-CN",
+      }),
+      getTranscriptionConfig: () => null,
+      getSummaryConfig: () => null,
+      transcribe,
+      onStage: (stage) => stages.push(stage),
+    });
+
+    expect(extracted.transcript).toBe("这是发布者提供的字幕。");
+    expect(extracted.content).toContain("> 文字稿来源：发布者字幕（zh-CN）");
+    expect(extracted.content).not.toContain("未配置「语音转写」模型");
+    expect(transcribe).not.toHaveBeenCalled();
+    expect(stages).toEqual(["video-metadata", "video-captions"]);
+  });
+
+  it("平台字幕缺失时回退到 ASR，并如实标明模型来源", async () => {
+    const extracted = await extractVideoUrl(url, "bilibili", {
+      getYtDlpPath: () => null,
+      run: buildAudioAwareRun(),
+      getPlatformCaptions: async () => null,
+      getTranscriptionConfig: () => ({
+        apiUrl: "https://api.openai.com",
+        apiKey: "sk-test",
+        model: "whisper-1",
+      }),
+      prepareAudio: passthroughPrepareAudio,
+      transcribe: async () => "ASR 文字稿",
+      getFormatterConfig: () => null,
+      getSummaryConfig: () => null,
+    });
+
+    expect(extracted.transcript).toBe("ASR 文字稿");
+    expect(extracted.content).toContain("> 文字稿来源：音频识别（whisper-1）");
   });
 
   it("配置转写模型 → 下载音频、预处理后生成文字稿", async () => {
@@ -473,6 +520,7 @@ describe("extractVideoUrl", () => {
     expect(extracted.transcript).toBe("这是转写出来的文字稿");
     expect(stages).toEqual([
       "video-metadata",
+      "video-captions",
       "video-audio",
       "transcoding",
       "transcribing",
@@ -489,7 +537,7 @@ describe("extractVideoUrl", () => {
       getTranscriptionConfig: () => null,
       onStage: (stage) => stages.push(stage),
     });
-    expect(stages).toEqual(["video-metadata"]);
+    expect(stages).toEqual(["video-metadata", "video-captions"]);
   });
 
   it("元数据解析失败 → 降级并透出 yt-dlp 原始错误", async () => {
@@ -508,7 +556,8 @@ describe("extractVideoUrl", () => {
 });
 
 describe("extractVideoUrl（抖音）", () => {
-  const douyinUrl = "https://www.iesdouyin.com/share/video/7663897644049173802/";
+  const douyinUrl =
+    "https://www.iesdouyin.com/share/video/7663897644049173802/";
   const videoAweme = {
     awemeId: "7663897644049173802",
     kind: "video" as const,
@@ -553,7 +602,9 @@ describe("extractVideoUrl（抖音）", () => {
       fetchDouyin: async () => videoAweme,
       downloadDouyin: async (playUrl) => {
         downloaded = playUrl;
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-douyin-test-"));
+        const dir = fs.mkdtempSync(
+          path.join(os.tmpdir(), "guizhi-douyin-test-"),
+        );
         const filePath = path.join(dir, "douyin.mp4");
         fs.writeFileSync(filePath, "fake-video");
         return { dir, filePath };
@@ -598,8 +649,8 @@ describe("extractVideoUrl（抖音）", () => {
           return { dir, filePath };
         },
         saveAsset: async () => "asset.webp",
-        getOcrConfig: () => null,
         // 不读真实 ai-config.json，单测不该发出网络请求
+        getOcrConfig: () => null,
         getTitleConfig: () => null,
       },
       onStage: (stage) => stages.push(stage),
@@ -717,7 +768,9 @@ describe("extractVideoUrl（小红书）", () => {
       }),
       imageNote: {
         downloadImage: async () => {
-          const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-xhs-note-"));
+          const dir = fs.mkdtempSync(
+            path.join(os.tmpdir(), "guizhi-xhs-note-"),
+          );
           const filePath = path.join(dir, "image.jpg");
           fs.writeFileSync(filePath, "fake-image");
           return { dir, filePath };
@@ -729,7 +782,9 @@ describe("extractVideoUrl（小红书）", () => {
     });
     expect(extracted.itemType).toBe("image");
     expect(extracted.title).toBe("AI漫剧培训实战课程");
-    expect(extracted.content).toContain("平台：小红书 · 作者：司晨视觉 · 图文 1 张");
+    expect(extracted.content).toContain(
+      "平台：小红书 · 作者：司晨视觉 · 图文 1 张",
+    );
     expect(extracted.content).toContain("![图 1](local-image://asset.jpg)");
     expect(extracted.transcript).toBeUndefined();
     expect(stages).toEqual(["video-metadata", "image-download"]);
@@ -852,7 +907,9 @@ describe("buildVideoContent", () => {
     );
     const quoteBlock = content.split("\n\n")[0];
 
-    expect(quoteBlock.split("\n").every((line) => line.startsWith(">"))).toBe(true);
+    expect(quoteBlock.split("\n").every((line) => line.startsWith(">"))).toBe(
+      true,
+    );
     expect(quoteBlock).toContain("相关链接");
   });
 });
@@ -889,5 +946,20 @@ describe("stripTranscriptionNote", () => {
   it("无注记的内容原样返回", () => {
     const clean = buildVideoContent(metadata, "bilibili");
     expect(stripTranscriptionNote(clean)).toBe(clean);
+  });
+
+  it("手动重新转录会覆盖已有来源注记", () => {
+    const content = buildVideoContent(
+      metadata,
+      "bilibili",
+      undefined,
+      "平台 AI 字幕（zh-CN）",
+    );
+    const updated = upsertTranscriptionSourceNote(
+      content,
+      "音频识别（whisper-1）",
+    );
+    expect(updated).toContain("> 文字稿来源：音频识别（whisper-1）");
+    expect(updated).not.toContain("平台 AI 字幕");
   });
 });

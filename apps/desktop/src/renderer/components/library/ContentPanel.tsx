@@ -15,6 +15,7 @@ import {
   MessagesSquareIcon,
   RotateCcwIcon,
   ScanTextIcon,
+  SearchIcon,
   ScrollTextIcon,
   SparklesIcon,
   UsersIcon,
@@ -44,10 +45,7 @@ import {
   ForumDiscussionView,
   type ForumDiscussionHandle,
 } from "./ForumDiscussionView";
-import {
-  defaultCatalogOpen,
-  ForumFloorCatalog,
-} from "./ForumFloorCatalog";
+import { defaultCatalogOpen, ForumFloorCatalog } from "./ForumFloorCatalog";
 import { highlightText } from "./highlight-text";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
@@ -212,6 +210,7 @@ export function ContentPanel({
   const [tab, setTab] = useState<PanelTab>("body");
   const [isPreview, setIsPreview] = useState(editorMarkdownPreview);
   const [findQuery, setFindQuery] = useState("");
+  const [isFindOpen, setIsFindOpen] = useState(false);
   const [findActiveIndex, setFindActiveIndex] = useState(0);
   const [findMatchCount, setFindMatchCount] = useState(0);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -227,11 +226,13 @@ export function ContentPanel({
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const emptyScrollRef = useRef<HTMLDivElement>(null);
   const discussionRef = useRef<ForumDiscussionHandle>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
 
   const isMediaItem = item.itemType === "audio" || item.itemType === "video";
   const showTranscriptTab =
     !isTrashed &&
-    (transcriptActions.canTranscribe || transcriptActions.transcript.length > 0);
+    (transcriptActions.canTranscribe ||
+      transcriptActions.transcript.length > 0);
 
   const sections =
     item.itemType === "image" && !isTrashed && isPreview
@@ -296,41 +297,45 @@ export function ContentPanel({
     const preview = editorMarkdownPreview && Boolean(item.content.trim());
     setIsPreview(preview);
     setFindQuery("");
+    setIsFindOpen(false);
     setFindActiveIndex(0);
     setFindMatchCount(0);
 
     const memory = loadContentReadingMemory(item.id);
-    const forum = item.itemType === "forum" && preview
-      ? splitForumNoteSections(item.content)
-      : null;
+    const forum =
+      item.itemType === "forum" && preview
+        ? splitForumNoteSections(item.content)
+        : null;
     const replyCount = forum?.replies
       ? parseForumReplySection(forum.replies).length
       : 0;
 
-    if (memory && memory.tab && (
-      memory.tab === "body" ||
-      (memory.tab === "summary" && forum?.summary) ||
-      (memory.tab === "replies" && forum?.replies) ||
-      (memory.tab === "transcript" && showTranscriptTab) ||
-      (memory.tab === "images" && item.itemType === "image") ||
-      (memory.tab === "recognized" && item.itemType === "image")
-    )) {
+    if (
+      memory &&
+      memory.tab &&
+      (memory.tab === "body" ||
+        (memory.tab === "summary" && forum?.summary) ||
+        (memory.tab === "replies" && forum?.replies) ||
+        (memory.tab === "transcript" && showTranscriptTab) ||
+        (memory.tab === "images" && item.itemType === "image") ||
+        (memory.tab === "recognized" && item.itemType === "image"))
+    ) {
       setTab(memory.tab);
-      setFindQuery(
-        memory.tab === "replies" ? (memory.repliesQuery ?? "") : "",
-      );
-      setCatalogOpen(
-        memory.catalogOpen ?? defaultCatalogOpen(replyCount),
-      );
+      setFindQuery(memory.tab === "replies" ? (memory.repliesQuery ?? "") : "");
+      setCatalogOpen(memory.catalogOpen ?? defaultCatalogOpen(replyCount));
     } else {
       const preferSummary =
-        preview &&
-        item.itemType === "forum" &&
-        Boolean(forum?.summary);
+        preview && item.itemType === "forum" && Boolean(forum?.summary);
       setTab(preferSummary ? "summary" : "body");
       setCatalogOpen(defaultCatalogOpen(replyCount));
     }
-  }, [item.id, item.content, item.itemType, editorMarkdownPreview, showTranscriptTab]);
+  }, [
+    item.id,
+    item.content,
+    item.itemType,
+    editorMarkdownPreview,
+    showTranscriptTab,
+  ]);
 
   // 恢复滚动位置（等 pane 挂好）
   useLayoutEffect(() => {
@@ -381,7 +386,7 @@ export function ContentPanel({
   }, [activeTab, catalogOpen, findQuery, item.id]);
 
   const previewContent = isMediaItem
-    ? parseVideoMetaBlock(item.content)?.body ?? item.content
+    ? (parseVideoMetaBlock(item.content)?.body ?? item.content)
     : forumSections
       ? forumSections.body
       : (sections?.caption ?? item.content);
@@ -399,11 +404,11 @@ export function ContentPanel({
 
   const markContentKey =
     activeTab === "summary"
-      ? forumSections?.summary ?? ""
+      ? (forumSections?.summary ?? "")
       : activeTab === "body"
-        ? forumSections?.body ?? sections?.caption ?? previewContent
+        ? (forumSections?.body ?? sections?.caption ?? previewContent)
         : activeTab === "recognized"
-          ? sections?.recognized ?? ""
+          ? (sections?.recognized ?? "")
           : activeTab === "transcript"
             ? transcriptActions.transcript
             : "";
@@ -430,11 +435,36 @@ export function ContentPanel({
       ? t("library.forumRepliesFilterPlaceholder", "搜索楼层、作者或内容…")
       : t("library.panelFindPlaceholder", "在当前页查找…");
 
+  // 正文查找不常驻工具栏：详情栏在非全屏窗口下较窄，固定输入框会挤掉
+  // 标签与正文操作。保留搜索按钮，并使用浏览器/编辑器通用的 Ctrl/Cmd+F 打开浮层。
+  useEffect(() => {
+    if (!showFindBar) {
+      setIsFindOpen(false);
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setIsFindOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showFindBar]);
+
+  useEffect(() => {
+    if (!isFindOpen) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => findInputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [isFindOpen]);
+
   const handleSelectFloor = useCallback(
     (floor: number) => {
       const inFiltered =
-        !findQuery.trim() ||
-        filterIncludesFloor(replies, findQuery, floor);
+        !findQuery.trim() || filterIncludesFloor(replies, findQuery, floor);
       if (!inFiltered) {
         setFindQuery("");
         setFindActiveIndex(0);
@@ -452,10 +482,7 @@ export function ContentPanel({
       const target = resolveReplyTargetFloor(replies, replyTo);
       if (target == null) {
         showToast(
-          t(
-            "library.forumReplyJumpMiss",
-            "该楼未入库或无法定位",
-          ),
+          t("library.forumReplyJumpMiss", "该楼未入库或无法定位"),
           "warning",
         );
         return;
@@ -480,72 +507,171 @@ export function ContentPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border app-wallpaper-panel">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border app-wallpaper-panel">
         <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-          {showForumSummaryTab ? (
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {showForumSummaryTab ? (
+              <TabButton
+                active={activeTab === "summary"}
+                onClick={() => changeTab("summary")}
+              >
+                <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
+                {t("library.forumSummarySection", "讨论总结")}
+              </TabButton>
+            ) : null}
             <TabButton
-              active={activeTab === "summary"}
-              onClick={() => changeTab("summary")}
+              active={activeTab === "body"}
+              onClick={() => changeTab("body")}
             >
-              <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
-              {t("library.forumSummarySection", "讨论总结")}
+              {sections
+                ? t("library.captionSection", "文案")
+                : t("library.bodySection", "正文")}
             </TabButton>
-          ) : null}
-          <TabButton
-            active={activeTab === "body"}
-            onClick={() => changeTab("body")}
-          >
-            {sections
-              ? t("library.captionSection", "文案")
-              : t("library.bodySection", "正文")}
-          </TabButton>
-          {showRepliesTab ? (
-            <TabButton
-              active={activeTab === "replies"}
-              onClick={() => changeTab("replies")}
-            >
-              <MessagesSquareIcon className="h-3 w-3" aria-hidden="true" />
-              {t("library.forumRepliesSection", "讨论")}
-            </TabButton>
-          ) : null}
-          {showImagesTab ? (
-            <TabButton
-              active={activeTab === "images"}
-              onClick={() => changeTab("images")}
-            >
-              <ImageIcon className="h-3 w-3" aria-hidden="true" />
-              {t("library.imagesSection", "图片")}
-            </TabButton>
-          ) : null}
-          {showRecognizedTab ? (
-            <TabButton
-              active={activeTab === "recognized"}
-              onClick={() => changeTab("recognized")}
-            >
-              <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
-              {t("library.recognizedSection", "图中文字")}
-            </TabButton>
-          ) : null}
-          {showTranscriptTab ? (
-            <TabButton
-              active={activeTab === "transcript"}
-              onClick={() => changeTab("transcript")}
-            >
-              <AudioLinesIcon className="h-3 w-3" aria-hidden="true" />
-              {t("library.transcript", "文字稿")}
-              {transcriptActions.transcript ? (
-                <span className="text-[10px] opacity-60">
-                  {t("library.transcriptLength", "{{count}} 字", {
-                    count: transcriptActions.transcript.length,
-                  })}
-                </span>
-              ) : null}
-            </TabButton>
-          ) : null}
+            {showRepliesTab ? (
+              <TabButton
+                active={activeTab === "replies"}
+                onClick={() => changeTab("replies")}
+              >
+                <MessagesSquareIcon className="h-3 w-3" aria-hidden="true" />
+                {t("library.forumRepliesSection", "讨论")}
+              </TabButton>
+            ) : null}
+            {showImagesTab ? (
+              <TabButton
+                active={activeTab === "images"}
+                onClick={() => changeTab("images")}
+              >
+                <ImageIcon className="h-3 w-3" aria-hidden="true" />
+                {t("library.imagesSection", "图片")}
+              </TabButton>
+            ) : null}
+            {showRecognizedTab ? (
+              <TabButton
+                active={activeTab === "recognized"}
+                onClick={() => changeTab("recognized")}
+              >
+                <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
+                {t("library.recognizedSection", "图中文字")}
+              </TabButton>
+            ) : null}
+            {showTranscriptTab ? (
+              <TabButton
+                active={activeTab === "transcript"}
+                onClick={() => changeTab("transcript")}
+              >
+                <AudioLinesIcon className="h-3 w-3" aria-hidden="true" />
+                {t("library.transcript", "文字稿")}
+                {transcriptActions.transcript ? (
+                  <span className="text-[10px] opacity-60">
+                    {t("library.transcriptLength", "{{count}} 字", {
+                      count: transcriptActions.transcript.length,
+                    })}
+                  </span>
+                ) : null}
+              </TabButton>
+            ) : null}
+          </div>
 
-          <span className="min-w-0 flex-1" />
+          <div className="ml-1 flex shrink-0 items-center gap-1">
+            {showFindBar ? (
+              <ToolButton
+                onClick={() => setIsFindOpen(true)}
+                label={t("library.panelFindOpen", "在当前页查找 (Ctrl+F)")}
+              >
+                <SearchIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              </ToolButton>
+            ) : null}
 
-          {showFindBar ? (
+            {activeTab !== "transcript" ? (
+              <>
+                {!isTrashed && summaryAction.available ? (
+                  <ToolButton
+                    onClick={() => void summaryAction.summarize()}
+                    label={summaryAction.label}
+                    busy={summaryAction.isRunning}
+                  >
+                    <ScrollTextIcon
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
+                  </ToolButton>
+                ) : null}
+                {!isTrashed ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsPreview(!isPreview)}
+                    className="inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground transition-colors hover:border-border hover:bg-accent/60 hover:text-foreground"
+                  >
+                    {isPreview
+                      ? t("library.showSource", "显示原文")
+                      : t("library.renderMarkdown", "Markdown 渲染")}
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {transcriptActions.transcript ? (
+                  <ToolButton
+                    onClick={() => void transcriptActions.format()}
+                    label={
+                      transcriptActions.formatProgress
+                        ? t(
+                            "library.transcriptFormatProgress",
+                            "正在排版…已完成 {{current}}/{{total}} 块",
+                            {
+                              current: transcriptActions.formatProgress.current,
+                              total: transcriptActions.formatProgress.total,
+                            },
+                          )
+                        : t("library.transcriptFormat", "AI 排版")
+                    }
+                    busy={transcriptActions.isFormatting}
+                    disabled={transcriptActions.isRunning}
+                  >
+                    <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  </ToolButton>
+                ) : null}
+                {transcriptActions.canTranscribe &&
+                transcriptActions.transcript ? (
+                  <>
+                    {transcriptActions.canDiarize ? (
+                      <ToolButton
+                        onClick={() =>
+                          void transcriptActions.transcribe({ diarize: true })
+                        }
+                        label={t(
+                          "library.transcribeDiarize",
+                          "重新生成并区分说话人",
+                        )}
+                        busy={transcriptActions.runningAction === "diarize"}
+                        disabled={transcriptActions.isRunning}
+                      >
+                        <UsersIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                      </ToolButton>
+                    ) : null}
+                    <ToolButton
+                      onClick={() => void transcriptActions.transcribe()}
+                      label={t(
+                        "library.transcribeRegenerate",
+                        "重新生成文字稿",
+                      )}
+                      busy={transcriptActions.runningAction === "transcribe"}
+                      disabled={transcriptActions.isRunning}
+                    >
+                      <RotateCcwIcon
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
+                    </ToolButton>
+                  </>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
+
+        {isFindOpen && showFindBar ? (
+          <div className="absolute right-2 top-11 z-20 flex w-full max-w-[calc(100%_-_1rem)] justify-end">
             <PanelFindBar
               query={findQuery}
               onQueryChange={(next) => {
@@ -556,86 +682,11 @@ export function ContentPanel({
               matchCount={findMatchCount}
               onActiveIndexChange={setFindActiveIndex}
               placeholder={findPlaceholder}
+              inputRef={findInputRef}
+              onClose={() => setIsFindOpen(false)}
             />
-          ) : null}
-
-          {activeTab !== "transcript" ? (
-            <>
-              {!isTrashed && summaryAction.available ? (
-                <ToolButton
-                  onClick={() => void summaryAction.summarize()}
-                  label={summaryAction.label}
-                  busy={summaryAction.isRunning}
-                >
-                  <ScrollTextIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                </ToolButton>
-              ) : null}
-              {!isTrashed ? (
-                <button
-                  type="button"
-                  onClick={() => setIsPreview(!isPreview)}
-                  className="inline-flex h-6 shrink-0 items-center rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground transition-colors hover:border-border hover:bg-accent/60 hover:text-foreground"
-                >
-                  {isPreview
-                    ? t("library.showSource", "显示原文")
-                    : t("library.renderMarkdown", "Markdown 渲染")}
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <>
-              {transcriptActions.transcript ? (
-                <ToolButton
-                  onClick={() => void transcriptActions.format()}
-                  label={
-                    transcriptActions.formatProgress
-                      ? t(
-                          "library.transcriptFormatProgress",
-                          "正在排版…已完成 {{current}}/{{total}} 块",
-                          {
-                            current: transcriptActions.formatProgress.current,
-                            total: transcriptActions.formatProgress.total,
-                          },
-                        )
-                      : t("library.transcriptFormat", "AI 排版")
-                  }
-                  busy={transcriptActions.isFormatting}
-                  disabled={transcriptActions.isRunning}
-                >
-                  <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                </ToolButton>
-              ) : null}
-              {transcriptActions.canTranscribe &&
-              transcriptActions.transcript ? (
-                <>
-                  {transcriptActions.canDiarize ? (
-                    <ToolButton
-                      onClick={() =>
-                        void transcriptActions.transcribe({ diarize: true })
-                      }
-                      label={t(
-                        "library.transcribeDiarize",
-                        "重新生成并区分说话人",
-                      )}
-                      busy={transcriptActions.runningAction === "diarize"}
-                      disabled={transcriptActions.isRunning}
-                    >
-                      <UsersIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                    </ToolButton>
-                  ) : null}
-                  <ToolButton
-                    onClick={() => void transcriptActions.transcribe()}
-                    label={t("library.transcribeRegenerate", "重新生成文字稿")}
-                    busy={transcriptActions.runningAction === "transcribe"}
-                    disabled={transcriptActions.isRunning}
-                  >
-                    <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  </ToolButton>
-                </>
-              ) : null}
-            </>
-          )}
-        </div>
+          </div>
+        ) : null}
 
         <div className="min-h-0 flex-1" onScrollCapture={onPaneScroll}>
           {activeTab === "transcript" ? (

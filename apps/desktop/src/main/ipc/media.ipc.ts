@@ -56,7 +56,7 @@ import {
 import {
   downloadBestAudio,
   runCommand,
-  stripTranscriptionNote,
+  upsertTranscriptionSourceNote,
   YtDlpNotFoundError,
 } from "../services/import/video-url";
 import { prepareAudioForTranscription } from "../services/media/audio-preprocess";
@@ -199,7 +199,9 @@ async function applyMediaSummarySafely(
       { title: item.title, transcript },
       summaryConfig,
     );
-    console.log(`[media] 内容总结完成（item=${item.id}，${summary.length} 字）`);
+    console.log(
+      `[media] 内容总结完成（item=${item.id}，${summary.length} 字）`,
+    );
     let next = upsertMediaSummarySection(
       content,
       mediaSummaryHeading(item.itemType),
@@ -343,11 +345,11 @@ async function transcribeAndSave(
     progress.setStage("formatting");
     const text = await formatTranscriptSafely(rawText, item);
     progress.setStage("summarizing");
-    const summarized = await applyMediaSummarySafely(
-      item,
-      stripTranscriptionNote(item.content),
-      text,
+    const sourceContent = upsertTranscriptionSourceNote(
+      item.content,
+      `音频识别（${config.model}）`,
     );
+    const summarized = await applyMediaSummarySafely(item, sourceContent, text);
     const patch: { transcript: string; content?: string; title?: string } = {
       transcript: text,
     };
@@ -512,7 +514,8 @@ export function registerMediaIPC(db: Database.Database): void {
       if (diarize && !supportsDiarization(config.apiUrl)) {
         return {
           success: false,
-          error: "区分说话人只有内置本地转写引擎支持，当前「语音转写」路由指向的是外部接口",
+          error:
+            "区分说话人只有内置本地转写引擎支持，当前「语音转写」路由指向的是外部接口",
         };
       }
 
@@ -757,7 +760,7 @@ export function registerMediaIPC(db: Database.Database): void {
         probe: withCachedVersion(probeYtDlpVersion),
       });
       return checkYtDlpUpdate(
-        current.source === "managed" ? current.version ?? null : null,
+        current.source === "managed" ? (current.version ?? null) : null,
       );
     },
   );
@@ -816,7 +819,7 @@ export function registerMediaIPC(db: Database.Database): void {
         probe: withCachedVersion(probeFfmpegVersion),
       });
       return checkFfmpegUpdate(
-        current.source === "managed" ? current.version ?? null : null,
+        current.source === "managed" ? (current.version ?? null) : null,
       );
     },
   );
@@ -857,7 +860,11 @@ export function registerMediaIPC(db: Database.Database): void {
     IPC_CHANNELS.FUNASR_STATUS,
     (_event, force?: boolean): Promise<FunasrStatus> =>
       // 无配置输入，缓存键固定；running 会随转写按需启动而变，靠 TTL 与手动重新检测收敛
-      funasrStatusCache.read(FUNASR_STATUS_CACHE_KEY, getFunasrStatus, force === true),
+      funasrStatusCache.read(
+        FUNASR_STATUS_CACHE_KEY,
+        getFunasrStatus,
+        force === true,
+      ),
   );
 
   ipcMain.handle(

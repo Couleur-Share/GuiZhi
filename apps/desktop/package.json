@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "main": "out/main/index.js",

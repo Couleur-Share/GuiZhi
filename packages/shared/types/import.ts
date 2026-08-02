@@ -44,6 +44,7 @@ export const IMPORT_STAGES = [
   "saving",
   // ── 在线视频子阶段 ──
   "video-metadata",
+  "video-captions",
   "video-audio",
   "transcoding",
   "transcribing",

@@ -6,6 +6,7 @@ const FULL_CONTENT = [
   "> 平台：哔哩哔哩 · 作者：UP主 · 时长：12:52",
   "> 简介：文档在公众号【白玩 · 在路上】",
   "> 原标题：什么是Web核心指标？2026前端必会的 LCP/INP/CLS 全解析",
+  "> 文字稿来源：发布者字幕（zh-CN）",
   "",
   "## 视频总结",
   "",
@@ -13,7 +14,7 @@ const FULL_CONTENT = [
 ].join("\n");
 
 describe("parseVideoMetaBlock", () => {
-  it("解析平台/作者/时长/简介/原标题，正文剥离元数据块", () => {
+  it("解析平台/作者/时长/简介/原标题/文字稿来源，正文剥离元数据块", () => {
     const meta = parseVideoMetaBlock(FULL_CONTENT);
     expect(meta).not.toBeNull();
     expect(meta!.platform).toBe("哔哩哔哩");
@@ -24,6 +25,7 @@ describe("parseVideoMetaBlock", () => {
     expect(meta!.originalTitle).toBe(
       "什么是Web核心指标？2026前端必会的 LCP/INP/CLS 全解析",
     );
+    expect(meta!.transcriptSource).toBe("发布者字幕（zh-CN）");
     expect(meta!.body.startsWith("## 视频总结")).toBe(true);
     expect(meta!.body).not.toContain("平台：");
     expect(meta!.body).not.toContain("简介：");

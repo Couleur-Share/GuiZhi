@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   SettingsIcon,
   PaletteIcon,
@@ -37,56 +44,88 @@ const SETTINGS_MENU = [
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
 ];
 
+const loadGeneralSettings = () => import("./GeneralSettings");
+const loadAppearanceSettings = () => import("./AppearanceSettings");
+const loadLanguageSettings = () => import("./LanguageSettings");
+const loadShortcutsSettings = () => import("./ShortcutsSettings");
+const loadAboutSettings = () => import("./AboutSettings");
+const loadDataSettings = () => import("./DataSettings");
+const loadNetworkSettings = () => import("./NetworkSettings");
+const loadAISettings = () => import("./AISettingsPrototype");
+const loadIllustrationSettings = () => import("./IllustrationSettings");
+const loadMcpSettings = () => import("./mcp/McpSettings");
+
 const GeneralSettings = lazy(() =>
-  import("./GeneralSettings").then((module) => ({
+  loadGeneralSettings().then((module) => ({
     default: module.GeneralSettings,
   })),
 );
 const AppearanceSettings = lazy(() =>
-  import("./AppearanceSettings").then((module) => ({
+  loadAppearanceSettings().then((module) => ({
     default: module.AppearanceSettings,
   })),
 );
 const LanguageSettings = lazy(() =>
-  import("./LanguageSettings").then((module) => ({
+  loadLanguageSettings().then((module) => ({
     default: module.LanguageSettings,
   })),
 );
 const ShortcutsSettings = lazy(() =>
-  import("./ShortcutsSettings").then((module) => ({
+  loadShortcutsSettings().then((module) => ({
     default: module.ShortcutsSettings,
   })),
 );
 const AboutSettings = lazy(() =>
-  import("./AboutSettings").then((module) => ({
+  loadAboutSettings().then((module) => ({
     default: module.AboutSettings,
   })),
 );
 const DataSettings = lazy(() =>
-  import("./DataSettings").then((module) => ({
+  loadDataSettings().then((module) => ({
     default: module.DataSettings,
   })),
 );
 const NetworkSettings = lazy(() =>
-  import("./NetworkSettings").then((module) => ({
+  loadNetworkSettings().then((module) => ({
     default: module.NetworkSettings,
   })),
 );
 const AISettingsPrototype = lazy(() =>
-  import("./AISettingsPrototype").then((module) => ({
+  loadAISettings().then((module) => ({
     default: module.AISettingsPrototype,
   })),
 );
 const IllustrationSettings = lazy(() =>
-  import("./IllustrationSettings").then((module) => ({
+  loadIllustrationSettings().then((module) => ({
     default: module.IllustrationSettings,
   })),
 );
 const McpSettings = lazy(() =>
-  import("./mcp/McpSettings").then((module) => ({
+  loadMcpSettings().then((module) => ({
     default: module.McpSettings,
   })),
 );
+
+/**
+ * 应用启动后的空闲时段预热设置页及其所有分区。
+ * 同一动态 import 会复用 ESM 模块缓存，首次点击时不会再触发 Suspense 加载态。
+ */
+export function prefetchSettingsSections(): void {
+  for (const loadSection of [
+    loadGeneralSettings,
+    loadAppearanceSettings,
+    loadLanguageSettings,
+    loadShortcutsSettings,
+    loadAboutSettings,
+    loadDataSettings,
+    loadNetworkSettings,
+    loadAISettings,
+    loadIllustrationSettings,
+    loadMcpSettings,
+  ]) {
+    void loadSection().catch(() => {});
+  }
+}
 
 function SettingsContentFallback({ label }: { label: string }) {
   return (
@@ -105,6 +144,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   );
   const [activeSection, setActiveSection] =
     useState<SettingsSectionId>("general");
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -120,6 +160,12 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
       setActiveSection(requestedSection);
     }
   }, [consumeSettingsSectionRequest, pendingSettingsSection]);
+
+  // 内容区是设置页共用的滚动容器；切换分区时必须归零，避免把上一页的
+  // scrollTop 带到内容长度不同的下一页。
+  useLayoutEffect(() => {
+    contentScrollRef.current?.scrollTo({ top: 0 });
+  }, [activeSection]);
 
   const renderContent = () => {
     switch (activeSection) {
@@ -186,6 +232,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
 
       {/* 设置内容区 - 自适应宽度 */}
       <div
+        ref={contentScrollRef}
         className={
           activeSection === "ai"
             ? "flex-1 overflow-hidden app-wallpaper-section"

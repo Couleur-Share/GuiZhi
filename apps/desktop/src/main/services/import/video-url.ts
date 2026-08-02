@@ -48,6 +48,11 @@ import {
   resolveTranscriptFormatterConfig,
 } from "../media/transcript-format";
 import {
+  downloadPlatformCaptions,
+  type PlatformCaption,
+  type PlatformCaptionSource,
+} from "./video-captions";
+import {
   generateMediaSummary,
   resolveMediaSummaryConfig,
 } from "../media/media-summary";
@@ -140,9 +145,7 @@ export const runCommand: RunCommand = (executable, args, options) => {
 
     child.on("error", (error: NodeJS.ErrnoException) => {
       finish(() =>
-        reject(
-          error.code === "ENOENT" ? new YtDlpNotFoundError() : error,
-        ),
+        reject(error.code === "ENOENT" ? new YtDlpNotFoundError() : error),
       );
     });
 
@@ -216,10 +219,7 @@ export interface VideoUrlDeps {
   getFfmpegPath?: () => string | null;
   run?: RunCommand;
   /** 测试注入：抖音分享页解析（默认走 douyin.ts） */
-  fetchDouyin?: (
-    url: string,
-    signal?: AbortSignal,
-  ) => Promise<DouyinAweme>;
+  fetchDouyin?: (url: string, signal?: AbortSignal) => Promise<DouyinAweme>;
   /** 测试注入：抖音无水印视频下载 */
   downloadDouyin?: (
     playUrl: string,
@@ -248,6 +248,10 @@ export interface VideoUrlDeps {
     signal?: AbortSignal,
     options?: { diarize?: boolean },
   ) => Promise<string>;
+  /** 测试注入：平台字幕获取（发布者字幕优先，其次平台自动字幕） */
+  getPlatformCaptions?: (
+    signal?: AbortSignal,
+  ) => Promise<PlatformCaption | null>;
   /** 测试注入：音频预处理（默认 ffmpeg 转码 16kHz 单声道 mp3） */
   prepareAudio?: typeof prepareAudioForTranscription;
   /** 测试注入：排版模型解析（默认读 ai-config.json 的 fastText 路由） */
@@ -271,6 +275,7 @@ export function buildVideoContent(
   metadata: YtDlpMetadata,
   platform: VideoPlatform,
   transcriptionNote?: string,
+  transcriptionSource?: string,
 ): string {
   const metaLine = [
     `平台：${PLATFORM_LABELS[platform]}`,
@@ -296,9 +301,15 @@ export function buildVideoContent(
   // 简介被压成单行并截到 300 字，作者放在末尾的仓库地址、文档链接就这么没了
   // ——而那恰恰是「这条视频能不能直接用上」最关键的东西。实测一条讲 Agent 的
   // 视频，作者反复说「源码和配套文档都在下面」，记录里一个链接都没有。
-  const links = extractUrlsFromText(metadata.description).slice(0, LINK_MAX_COUNT);
+  const links = extractUrlsFromText(metadata.description).slice(
+    0,
+    LINK_MAX_COUNT,
+  );
   if (links.length > 0) {
     quoteLines.push(`> 相关链接：${links.join(" ")}`);
+  }
+  if (transcriptionSource) {
+    quoteLines.push(`> 文字稿来源：${transcriptionSource}`);
   }
 
   const parts: string[] = [quoteLines.join("\n")];
@@ -312,19 +323,47 @@ export function buildVideoContent(
 const TRANSCRIPTION_NOTE_PREFIXES = [
   "> 文字稿生成失败",
   "> 未配置「语音转写」模型",
+  "> 文字稿来源：",
 ];
 
 /** 重新生成文字稿成功后，从正文中移除历史转写状态注记 */
 export function stripTranscriptionNote(content: string): string {
   return content
     .split("\n\n")
-    .filter(
-      (paragraph) =>
-        !TRANSCRIPTION_NOTE_PREFIXES.some((prefix) =>
-          paragraph.startsWith(prefix),
-        ),
+    .map((paragraph) =>
+      paragraph
+        .split("\n")
+        .filter(
+          (line) =>
+            !TRANSCRIPTION_NOTE_PREFIXES.some((prefix) =>
+              line.startsWith(prefix),
+            ),
+        )
+        .join("\n"),
     )
+    .filter(Boolean)
     .join("\n\n");
+}
+
+/**
+ * 重转录会替换文字稿，来源也必须同步更新；否则「平台字幕」被手动 ASR 覆盖后，
+ * 元数据还显示旧来源，反而比不展示更误导。来源行固定放在连续元数据引用块内，
+ * 这样详情、导出与全文检索都读得到。
+ */
+export function upsertTranscriptionSourceNote(
+  content: string,
+  source: string,
+): string {
+  const lines = stripTranscriptionNote(content).split("\n");
+  if (!/^>\s*平台[:：]/.test(lines[0] ?? "")) {
+    return content;
+  }
+  let end = 0;
+  while (end < lines.length && lines[end].startsWith(">")) {
+    end++;
+  }
+  lines.splice(end, 0, `> 文字稿来源：${source}`);
+  return lines.join("\n");
 }
 
 function buildNotInstalledReason(platform: VideoPlatform): string {
@@ -341,7 +380,10 @@ export async function downloadBestAudio(
   run: RunCommand,
   signal?: AbortSignal,
 ): Promise<{ dir: string; filePath: string }> {
-  const dir = path.join(os.tmpdir(), `guizhi-video-${randomUUID().slice(0, 8)}`);
+  const dir = path.join(
+    os.tmpdir(),
+    `guizhi-video-${randomUUID().slice(0, 8)}`,
+  );
   fs.mkdirSync(dir, { recursive: true });
   await run(
     executable,
@@ -372,6 +414,8 @@ interface MediaSource {
   downloadAudio: (
     signal?: AbortSignal,
   ) => Promise<{ dir: string; filePath: string }>;
+  /** 可选的平台字幕；只有 yt-dlp 平台实现，失败时由调用方转 ASR */
+  downloadCaptions?: (signal?: AbortSignal) => Promise<PlatformCaption | null>;
   /** 图文作品（抖音 / 小红书）：没有音轨，直接给出成品笔记条目 */
   note?: ExtractedContent;
 }
@@ -471,6 +515,8 @@ async function resolveYtDlpSource(
     metadata: parseYtDlpMetadata(result.stdout),
     downloadAudio: (downloadSignal) =>
       downloadBestAudio(executable, url, run, downloadSignal),
+    downloadCaptions: (downloadSignal) =>
+      downloadPlatformCaptions(executable, url, run, downloadSignal),
   };
 }
 
@@ -531,13 +577,37 @@ export async function extractVideoUrl(
   }
   const metadata = source.metadata;
 
-  // 配置了转写模型才下载音频（元数据条目本身不依赖下载）
+  // 先试平台字幕。它已带时间轴与原始标点，且无需下载音频或耗费转写额度；
+  // 无字幕 / 自动字幕取不到才进入 ASR。抖音、小红书自建连接器暂时没有这一层，
+  // 会自然落到既有 ASR 路径。
   let transcript: string | null = null;
   let transcriptionNote: string | undefined;
+  let transcriptionSource: PlatformCaptionSource | "asr" | null = null;
+  let captionLanguage: string | undefined;
+  const getPlatformCaptions =
+    deps.getPlatformCaptions ?? source.downloadCaptions;
+  if (getPlatformCaptions) {
+    deps.onStage?.("video-captions");
+    try {
+      const captions = await getPlatformCaptions(signal);
+      if (captions) {
+        transcript = captions.text;
+        transcriptionSource = captions.source;
+        captionLanguage = captions.language;
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === "已取消") {
+        throw error;
+      }
+      // 字幕是优化路径，不能因为平台接口波动让整条视频连 ASR 都走不了。
+      console.warn("[import] 平台字幕获取失败，改用语音转写:", error);
+    }
+  }
+
   const transcriptionConfig = (
     deps.getTranscriptionConfig ?? resolveTranscriptionConfig
   )();
-  if (transcriptionConfig) {
+  if (!transcript && transcriptionConfig) {
     const transcribe = deps.transcribe ?? transcribeMediaFile;
     const prepareAudio = deps.prepareAudio ?? prepareAudioForTranscription;
     let tempDir: string | null = null;
@@ -562,6 +632,7 @@ export async function extractVideoUrl(
         // 目标不是内置引擎时 transcribe 内部会忽略这个字段，不必在这里判
         { diarize: deps.getDiarize?.() === true },
       );
+      transcriptionSource = "asr";
     } catch (error) {
       if (error instanceof Error && error.message === "已取消") {
         throw error;
@@ -583,8 +654,9 @@ export async function extractVideoUrl(
       }
     }
 
-    // 转写成功后顺带 AI 排版（补标点/分段）；失败保留原始转写，不阻断导入
-    if (transcript) {
+    // ASR 输出才需要补标点与分段；平台字幕本身已有发布者/平台给出的结构，
+    // 再让模型“排版”反而可能改坏原句与时间语义。
+    if (transcript && transcriptionSource === "asr") {
       const formatterConfig = (
         deps.getFormatterConfig ?? resolveTranscriptFormatterConfig
       )();
@@ -635,7 +707,7 @@ export async function extractVideoUrl(
         }
       }
     }
-  } else {
+  } else if (!transcript) {
     transcriptionNote =
       "未配置「语音转写」模型，本次仅保存视频信息；配置后可在任务列表重试生成文字稿。";
   }
@@ -671,7 +743,20 @@ export async function extractVideoUrl(
   }
 
   let title = metadata.title || url;
-  let content = buildVideoContent(metadata, platform, transcriptionNote);
+  const transcriptionSourceNote =
+    transcriptionSource === "platform-subtitles"
+      ? `发布者字幕${captionLanguage ? `（${captionLanguage}）` : ""}`
+      : transcriptionSource === "platform-ai-captions"
+        ? `平台 AI 字幕${captionLanguage ? `（${captionLanguage}）` : ""}`
+        : transcriptionSource === "asr"
+          ? `音频识别（${transcriptionConfig?.model ?? "已配置模型"}）`
+          : undefined;
+  let content = buildVideoContent(
+    metadata,
+    platform,
+    transcriptionNote,
+    transcriptionSourceNote,
+  );
   if (summary) {
     content = upsertMediaSummarySection(
       content,

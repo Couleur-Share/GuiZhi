@@ -15,6 +15,8 @@ export interface VideoMetaBlock {
   originalTitle?: string;
   /** 平台简介（导入时压缩为单行写入引用块） */
   description?: string;
+  /** 文字稿来自发布者字幕、平台 AI 字幕或音频识别，供用户判断适用范围 */
+  transcriptSource?: string;
   /** 去掉元数据引用块后的正文 */
   body: string;
 }
@@ -47,11 +49,14 @@ export function parseVideoMetaBlock(content: string): VideoMetaBlock | null {
     const text = stripQuoteMarker(lines[end]);
     const originalTitle = /^原标题[:：]\s*(.+)$/.exec(text);
     const description = /^简介[:：]\s*(.+)$/.exec(text);
+    const transcriptSource = /^文字稿来源[:：]\s*(.+)$/.exec(text);
     if (originalTitle) {
       meta.originalTitle = originalTitle[1].trim();
     } else if (description) {
       // 简介整行取值，不参与 · 拆分（内容本身可能含 · 字符）
       meta.description = description[1].trim();
+    } else if (transcriptSource) {
+      meta.transcriptSource = transcriptSource[1].trim();
     } else {
       // 首行形如「平台：X · 作者：Y · 时长：Z」，字段间以 · 分隔
       for (const part of text.split("·")) {

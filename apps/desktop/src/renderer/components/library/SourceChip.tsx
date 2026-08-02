@@ -46,6 +46,9 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
     meta?.description
       ? `${t("library.mediaMetaDescription", "简介")}：${meta.description}`
       : null,
+    meta?.transcriptSource
+      ? `${t("library.mediaMetaTranscriptSource", "文字稿来源")}：${meta.transcriptSource}`
+      : null,
     sourceUrl?.href,
   ]
     .filter(Boolean)

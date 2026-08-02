@@ -10,36 +10,44 @@ import { splitPlatformParseErrorMessage } from "@guizhi/shared/utils/platform-pa
  * 的视频任务会直接跳过下载与转写四步），渲染进程无从预知，写死的分母只会骗人。
  * 判断卡死靠的是下面的已耗时与本阶段耗时。
  */
-export const STAGE_LABELS: Record<ImportStage, { key: string; fallback: string }> =
-  {
-    fetching: { key: "imports.stageFetching", fallback: "抓取中" },
-    extracting: { key: "imports.stageExtracting", fallback: "解析中" },
-    saving: { key: "imports.stageSaving", fallback: "入库中" },
-    "video-metadata": {
-      key: "imports.stageVideoMetadata",
-      fallback: "解析视频信息",
-    },
-    "video-audio": { key: "imports.stageVideoAudio", fallback: "下载音轨" },
-    transcoding: { key: "imports.stageTranscoding", fallback: "音频转码" },
-    transcribing: { key: "imports.stageTranscribing", fallback: "语音转写" },
-    formatting: { key: "imports.stageFormatting", fallback: "文字稿排版" },
-    summarizing: { key: "imports.stageSummarizing", fallback: "生成总结" },
-    "image-download": {
-      key: "imports.stageImageDownload",
-      fallback: "下载配图",
-    },
-    "image-ocr": { key: "imports.stageImageOcr", fallback: "识别图中文字" },
-    "forum-replies": {
-      key: "imports.stageForumReplies",
-      fallback: "整理讨论区",
-    },
-  };
+export const STAGE_LABELS: Record<
+  ImportStage,
+  { key: string; fallback: string }
+> = {
+  fetching: { key: "imports.stageFetching", fallback: "抓取中" },
+  extracting: { key: "imports.stageExtracting", fallback: "解析中" },
+  saving: { key: "imports.stageSaving", fallback: "入库中" },
+  "video-metadata": {
+    key: "imports.stageVideoMetadata",
+    fallback: "解析视频信息",
+  },
+  "video-captions": {
+    key: "imports.stageVideoCaptions",
+    fallback: "获取平台字幕",
+  },
+  "video-audio": { key: "imports.stageVideoAudio", fallback: "下载音轨" },
+  transcoding: { key: "imports.stageTranscoding", fallback: "音频转码" },
+  transcribing: { key: "imports.stageTranscribing", fallback: "语音转写" },
+  formatting: { key: "imports.stageFormatting", fallback: "文字稿排版" },
+  summarizing: { key: "imports.stageSummarizing", fallback: "生成总结" },
+  "image-download": {
+    key: "imports.stageImageDownload",
+    fallback: "下载配图",
+  },
+  "image-ocr": { key: "imports.stageImageOcr", fallback: "识别图中文字" },
+  "forum-replies": {
+    key: "imports.stageForumReplies",
+    fallback: "整理讨论区",
+  },
+};
 
 export function getStageLabel(stage: ImportStage | null | undefined): {
   key: string;
   fallback: string;
 } {
-  return stage ? (STAGE_LABELS[stage] ?? STAGE_LABELS.fetching) : STAGE_LABELS.fetching;
+  return stage
+    ? (STAGE_LABELS[stage] ?? STAGE_LABELS.fetching)
+    : STAGE_LABELS.fetching;
 }
 
 /**
@@ -130,11 +138,15 @@ export function resolveTaskFolder(task: ImportTask): string | null {
  *
  * 这类失败靠重试永远好不了，得先去设置页装工具；行内因此多给一个直达按钮。
  */
-export function needsCaptureToolSetup(error: string | null | undefined): boolean {
+export function needsCaptureToolSetup(
+  error: string | null | undefined,
+): boolean {
   if (!error) {
     return false;
   }
-  return /yt-dlp|ffmpeg/i.test(error) && /未安装|not installed|尚未安装/i.test(error);
+  return (
+    /yt-dlp|ffmpeg/i.test(error) && /未安装|not installed|尚未安装/i.test(error)
+  );
 }
 
 /** 与 i18n `imports.parseError.*` 对齐的中文兜底（测试 / 缺 key 时用） */

@@ -9,6 +9,9 @@ import {
   ArrowUpCircleIcon,
   ClipboardCopyIcon,
   ListChecksIcon,
+  DatabaseIcon,
+  ScanSearchIcon,
+  SparklesIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
@@ -48,7 +51,9 @@ export function AboutSettings() {
   const lastCheckError = useUpdaterStore((state) => state.lastCheckError);
 
   useEffect(() => {
-    void window.electron?.updater?.getVersion().then((v) => setAppVersion(v || ""));
+    void window.electron?.updater
+      ?.getVersion()
+      .then((v) => setAppVersion(v || ""));
   }, []);
 
   useEffect(() => {
@@ -142,51 +147,88 @@ export function AboutSettings() {
   };
 
   const desktopUpdateDescription = (): string => {
-    const base =
-      settings.updateChannel === "preview"
-        ? t("settings.previewChannelActiveDesc", {
-            version: appVersion || "...",
-          })
-        : `${t("settings.version")}: ${appVersion || "..."} \u00b7 ${t(
-            "settings.stableChannel",
-          )}`;
     const lastCheckLabel = buildLastCheckLabel();
-    return lastCheckLabel ? `${base} \u00b7 ${lastCheckLabel}` : base;
+    const channel =
+      settings.updateChannel === "preview"
+        ? t("settings.previewChannel")
+        : t("settings.stableChannel");
+    return lastCheckLabel
+      ? `${channel} \u00b7 ${lastCheckLabel}`
+      : t("settings.updateCheckPending", { channel });
   };
+
+  const currentVersion = webRuntime ? webVersion : appVersion;
+  const currentChannel =
+    !webRuntime && settings.updateChannel === "preview"
+      ? t("settings.previewChannel")
+      : t("settings.stableChannel");
 
   return (
     <>
       <div className="space-y-6">
-        {/* 应用信息卡片 */}
-        <div className="text-center py-6">
-          <div className="w-16 h-16 mx-auto mb-3 rounded-2xl overflow-hidden">
+        {/* 应用身份与版本状态 */}
+        <div className="flex flex-col items-center gap-3 py-2 text-center sm:flex-row sm:justify-center sm:text-left">
+          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl">
             <img
               src={appIconUrl}
               alt="GuiZhi"
               className="w-full h-full object-cover"
             />
           </div>
-          <h2 className="text-lg font-semibold">GuiZhi</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("settings.version")} {webRuntime ? (webVersion || "...") : (appVersion || "...")}
-          </p>
+          <div>
+            <h2 className="text-lg font-semibold">GuiZhi</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t("settings.currentVersion", {
+                version: currentVersion || "...",
+              })}
+              <span aria-hidden="true"> · </span>
+              {currentChannel}
+            </p>
+          </div>
         </div>
 
-        <SettingSection title={t("settings.projectInfo")}>
-          <div className="px-4 py-3 text-sm text-muted-foreground space-y-1">
-            <p>
-              {"\u2022"} {t("settings.projectInfoDesc1")}
-            </p>
-            <p>
-              {"\u2022"} {t("settings.projectInfoDesc2")}
-            </p>
-            <p>
-              {"\u2022"} {t("settings.projectInfoDesc3")}
-            </p>
+        <SettingSection title={t("settings.productOverview")}>
+          <div className="grid grid-cols-1 divide-y divide-border/70 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="px-4 py-4">
+              <DatabaseIcon
+                aria-hidden="true"
+                className="mb-2 h-5 w-5 text-primary"
+              />
+              <h4 className="text-sm font-medium">
+                {t("settings.productOverviewLocalTitle")}
+              </h4>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("settings.productOverviewLocalDesc")}
+              </p>
+            </div>
+            <div className="px-4 py-4">
+              <ScanSearchIcon
+                aria-hidden="true"
+                className="mb-2 h-5 w-5 text-primary"
+              />
+              <h4 className="text-sm font-medium">
+                {t("settings.productOverviewCaptureTitle")}
+              </h4>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("settings.productOverviewCaptureDesc")}
+              </p>
+            </div>
+            <div className="px-4 py-4">
+              <SparklesIcon
+                aria-hidden="true"
+                className="mb-2 h-5 w-5 text-primary"
+              />
+              <h4 className="text-sm font-medium">
+                {t("settings.productOverviewAiTitle")}
+              </h4>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("settings.productOverviewAiDesc")}
+              </p>
+            </div>
           </div>
           {!webRuntime ? (
             <SettingItem
-              label={t("setup.openFromAbout", "打开设置引导")}
+              label={t("settings.setupGuideTitle")}
               description={t(
                 "setup.openFromAboutDesc",
                 "再次查看文本模型与采集工具的配置清单",
@@ -195,7 +237,7 @@ export function AboutSettings() {
               <button
                 type="button"
                 onClick={() => requestSetupChecklist()}
-                className="h-8 px-4 rounded-lg border border-border text-sm text-foreground transition-colors hover:bg-muted/60 inline-flex items-center gap-1.5"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
               >
                 <ListChecksIcon aria-hidden="true" className="w-4 h-4" />
                 {t("setup.openFromAbout", "打开设置引导")}
@@ -212,7 +254,9 @@ export function AboutSettings() {
                 updateState === "latest"
                   ? t("settings.noUpdateDesc", { version: webVersion })
                   : updateState === "available"
-                    ? t("settings.updateAvailableDesc", { version: latestVersion })
+                    ? t("settings.updateAvailableDesc", {
+                        version: latestVersion,
+                      })
                     : t("settings.webUpdatesManagedDesc")
               }
             >

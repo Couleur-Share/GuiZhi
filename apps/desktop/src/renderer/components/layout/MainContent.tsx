@@ -3,6 +3,12 @@ import { useUIStore } from "../../stores/ui.store";
 import { Spinner } from "../ui/Spinner";
 import { MODULE_WORKSPACES, prefetchAppModules } from "./module-chunks";
 
+function prefetchSettings(): void {
+  void import("../settings/SettingsPage")
+    .then(({ prefetchSettingsSections }) => prefetchSettingsSections())
+    .catch(() => {});
+}
+
 const loadingFallback = (
   <div className="delayed-fade-in flex flex-1 items-center justify-center">
     <Spinner />
@@ -18,12 +24,19 @@ export function MainContent() {
   useEffect(() => {
     if (typeof window.requestIdleCallback !== "function") {
       prefetchAppModules();
+      prefetchSettings();
       return;
     }
     // 一直没有空闲时段就 2 秒后强制执行，别让预取无限期推迟
-    const handle = window.requestIdleCallback(prefetchAppModules, {
-      timeout: 2000,
-    });
+    const handle = window.requestIdleCallback(
+      () => {
+        prefetchAppModules();
+        prefetchSettings();
+      },
+      {
+        timeout: 2000,
+      },
+    );
     return () => window.cancelIdleCallback(handle);
   }, []);
 
