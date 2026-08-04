@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatImportTaskError,
   formatImportTaskErrorForReport,
+  formatImportTaskWarning,
   needsCaptureToolSetup,
   resolveTaskFolder,
   resolveTaskHost,
@@ -127,6 +128,20 @@ describe("formatImportTaskError", () => {
     ).toBe(
       "链接缺少访问令牌，请用分享面板复制完整链接：小红书拒绝了该链接\n错误码：token_invalid",
     );
+  });
+});
+
+describe("formatImportTaskWarning", () => {
+  it("把旧任务里的文字稿 HTTP 403 翻成可行动的说明", () => {
+    expect(
+      formatImportTaskWarning("文字稿生成失败：HTTP 403", identityT),
+    ).toContain("平台拒绝访问音频（HTTP 403）");
+  });
+
+  it("未知的降级原因仍保留原文，不丢诊断线索", () => {
+    expect(
+      formatImportTaskWarning("文字稿生成失败：本地转写服务启动失败", identityT),
+    ).toBe("文字稿生成失败：本地转写服务启动失败");
   });
 });
 

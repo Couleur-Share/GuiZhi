@@ -183,6 +183,9 @@ describe("0003-item-type-forum 重建表迁移", () => {
 
     // 论坛条目现在能入库
     expect(getTableDefinition(db, "knowledge_items")).toContain("'forum'");
+    // 复核字段是后续增量；从更早的重建表升级时也必须补上。
+    expect(hasColumn(db, "knowledge_items", "review_status")).toBe(true);
+    expect(hasColumn(db, "knowledge_items", "review_reasons")).toBe(true);
     db.run(
       "INSERT INTO knowledge_items (id, title, item_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
       "item-2",

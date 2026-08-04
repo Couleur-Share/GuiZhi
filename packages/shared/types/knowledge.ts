@@ -28,6 +28,17 @@ export const KNOWLEDGE_ITEM_STATUSES = ["active", "archived"] as const;
 
 export type KnowledgeItemStatus = (typeof KNOWLEDGE_ITEM_STATUSES)[number];
 
+/**
+ * 导入后是否仍需人工复核。
+ *
+ * 这不是新的工作流状态，也不阻断阅读、搜索或问答：归知是个人知识库，
+ * 自动抽取有缺口时先保住已经拿到的内容，再把不确定性明确交给用户处理。
+ */
+export const KNOWLEDGE_REVIEW_STATUSES = ["clear", "needs_review"] as const;
+
+export type KnowledgeReviewStatus =
+  (typeof KNOWLEDGE_REVIEW_STATUSES)[number];
+
 export const TAG_COLOR_KEYS = [
   "red",
   "orange",
@@ -75,6 +86,10 @@ export interface KnowledgeItem {
   collectionId?: string | null;
   isFavorite: boolean;
   isPinned: boolean;
+  /** 导入质量检查的结果；手工创建及未发现异常的条目为 clear。 */
+  reviewStatus?: KnowledgeReviewStatus;
+  /** 需要复核的具体原因，保留采集阶段的可读诊断。 */
+  reviewReasons?: string[];
   /** 最近一次采集的来源 URI（source_records 联查带出；手工条目为 null） */
   sourceUri?: string | null;
   /** 软删除时间；null 表示未在回收站 */
@@ -207,6 +222,8 @@ export interface CreateKnowledgeItemInput {
   status?: KnowledgeItemStatus;
   collectionId?: string | null;
   tagNames?: string[];
+  reviewStatus?: KnowledgeReviewStatus;
+  reviewReasons?: string[];
 }
 
 export interface UpdateKnowledgeItemInput {
@@ -219,6 +236,8 @@ export interface UpdateKnowledgeItemInput {
   collectionId?: string | null;
   isFavorite?: boolean;
   isPinned?: boolean;
+  reviewStatus?: KnowledgeReviewStatus;
+  reviewReasons?: string[];
   /** 全量替换标签（按名称，缺失的自动创建） */
   tagNames?: string[];
 }

@@ -20,9 +20,11 @@ import { useToast } from "../ui/Toast";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { useImportStore } from "../../stores/import.store";
 import { ImportStageBreakdown } from "./ImportStageBreakdown";
+import { ImportCompletionCard } from "./ImportCompletionCard";
 import { buildImportTaskReport } from "./import-task-report";
 import {
   formatImportTaskError,
+  formatImportTaskWarning,
   getStageLabel,
   resolveTaskFolder,
   resolveTaskHost,
@@ -46,11 +48,13 @@ export function ImportTaskDetailModal({
   isOpen,
   onClose,
   onOpenItem,
+  onAskAboutItem,
 }: {
   task: ImportTask;
   isOpen: boolean;
   onClose: () => void;
   onOpenItem: (itemId: string) => void;
+  onAskAboutItem: (item: KnowledgeItem) => void;
 }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -60,6 +64,7 @@ export function ImportTaskDetailModal({
     original: KnowledgeItem;
     refreshed: KnowledgeItem;
   } | null>(null);
+  const [completedItem, setCompletedItem] = useState<KnowledgeItem | null>(null);
 
   const host = resolveTaskHost(task);
   const folder = resolveTaskFolder(task);
@@ -81,6 +86,31 @@ export function ImportTaskDetailModal({
         ? (task.duplicateItemId ?? null)
         : null;
   const canRetry = task.status === "failed" || task.status === "canceled";
+
+  useEffect(() => {
+    if (!isOpen || !openableItemId) {
+      setCompletedItem(null);
+      return;
+    }
+    // preload API 在桌面运行时必定存在，但测试与降级运行时可能只挂了部分桥；
+    // 成果卡读不到不该让整张任务详情弹窗崩掉。
+    const getItem = window.api?.knowledge?.get;
+    if (!getItem) {
+      setCompletedItem(null);
+      return;
+    }
+    let cancelled = false;
+    getItem(openableItemId)
+      .then((item) => {
+        if (!cancelled) setCompletedItem(item);
+      })
+      .catch(() => {
+        if (!cancelled) setCompletedItem(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, openableItemId]);
 
   useEffect(() => {
     const originalId = task.refreshOfItemId;
@@ -185,6 +215,20 @@ export function ImportTaskDetailModal({
           </Field>
         </div>
 
+        {completedItem ? (
+          <ImportCompletionCard
+            item={completedItem}
+            onOpen={() => {
+              onOpenItem(completedItem.id);
+              onClose();
+            }}
+            onAsk={() => {
+              onAskAboutItem(completedItem);
+              onClose();
+            }}
+          />
+        ) : null}
+
         <div>
           <div className="mb-2 text-xs font-medium text-foreground">
             {t("imports.reportStages", "阶段耗时")}
@@ -216,7 +260,7 @@ export function ImportTaskDetailModal({
               {t("imports.reportWarning", "缺失提示")}
             </div>
             <p className="mt-0.5 break-words text-xs text-amber-600 dark:text-amber-400">
-              {task.warning}
+              {formatImportTaskWarning(task.warning, t)}
             </p>
           </div>
         ) : null}

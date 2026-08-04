@@ -21,6 +21,7 @@ import type {
   KnowledgeItemListEntry,
   KnowledgeItemListResult,
   KnowledgeItemQuery,
+  KnowledgeReviewStatus,
   KnowledgeItemStatus,
   KnowledgeSortField,
   Tag,
@@ -39,6 +40,8 @@ interface ItemRow {
   collection_id: string | null;
   is_favorite: number;
   is_pinned: number;
+  review_status: KnowledgeReviewStatus;
+  review_reasons: string | null;
   /** 仅 get() 的联查携带；其余查询为 undefined */
   source_uri?: string | null;
   /** 仅 list() 的联查携带（来源平台列） */
@@ -144,6 +147,25 @@ function normalizeTagNames(names: readonly string[] | undefined): string[] {
     result.push(name);
   }
   return result;
+}
+
+/** 复核原因是观测信息；旧库或手工编辑出的坏 JSON 都不能拖垮条目详情。 */
+function parseReviewReasons(raw: string | null): string[] {
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((reason): reason is string => typeof reason === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeReviewReasons(reasons: readonly string[] | undefined): string[] {
+  return [...new Set((reasons ?? []).map((reason) => reason.trim()).filter(Boolean))];
 }
 
 type FacetGroup = "collection" | "tag" | "platform";
@@ -478,12 +500,13 @@ export class KnowledgeItemDB {
     const now = Date.now();
     const id = randomUUID();
     const tagNames = normalizeTagNames(input.tagNames);
+    const reviewReasons = normalizeReviewReasons(input.reviewReasons);
 
     const run = this.db.transaction(() => {
       this.db.run(
         `INSERT INTO knowledge_items
-           (id, title, content, transcript, item_type, status, collection_id, is_favorite, is_pinned, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+           (id, title, content, transcript, item_type, status, collection_id, is_favorite, is_pinned, review_status, review_reasons, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)`,
         id,
         input.title ?? "",
         input.content ?? "",
@@ -491,6 +514,8 @@ export class KnowledgeItemDB {
         input.itemType ?? "note",
         input.status ?? "active",
         input.collectionId ?? null,
+        input.reviewStatus ?? (reviewReasons.length > 0 ? "needs_review" : "clear"),
+        reviewReasons.length > 0 ? JSON.stringify(reviewReasons) : null,
         now,
         now,
       );
@@ -516,6 +541,10 @@ export class KnowledgeItemDB {
     }
 
     const now = Date.now();
+    const reviewReasons =
+      input.reviewReasons !== undefined
+        ? normalizeReviewReasons(input.reviewReasons)
+        : parseReviewReasons(existing.review_reasons);
     const next = {
       title: input.title ?? existing.title,
       content: input.content ?? existing.content,
@@ -536,6 +565,12 @@ export class KnowledgeItemDB {
         input.isPinned !== undefined
           ? input.isPinned
           : existing.is_pinned === 1,
+      reviewStatus:
+        input.reviewStatus ??
+        (input.reviewReasons !== undefined && reviewReasons.length > 0
+          ? "needs_review"
+          : existing.review_status),
+      reviewReasons,
     };
 
     const run = this.db.transaction(() => {
@@ -543,7 +578,7 @@ export class KnowledgeItemDB {
         `UPDATE knowledge_items SET
            title = ?, content = ?, summary = ?, transcript = ?,
            item_type = ?, status = ?, collection_id = ?,
-           is_favorite = ?, is_pinned = ?, updated_at = ?
+           is_favorite = ?, is_pinned = ?, review_status = ?, review_reasons = ?, updated_at = ?
          WHERE id = ?`,
         next.title,
         next.content,
@@ -554,6 +589,8 @@ export class KnowledgeItemDB {
         next.collectionId,
         next.isFavorite ? 1 : 0,
         next.isPinned ? 1 : 0,
+        next.reviewStatus,
+        next.reviewReasons.length > 0 ? JSON.stringify(next.reviewReasons) : null,
         now,
         id,
       );
@@ -860,6 +897,8 @@ export class KnowledgeItemDB {
       collectionId: row.collection_id,
       isFavorite: row.is_favorite === 1,
       isPinned: row.is_pinned === 1,
+      reviewStatus: row.review_status ?? "clear",
+      reviewReasons: parseReviewReasons(row.review_reasons),
       sourceUri: row.source_uri ?? null,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,

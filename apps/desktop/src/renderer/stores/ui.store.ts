@@ -86,6 +86,10 @@ interface UIState {
   pendingSettingsSection: SettingsSectionId | null;
   requestSettingsSection: (section: SettingsSectionId) => void;
   consumeSettingsSectionRequest: () => SettingsSectionId | null;
+  /** 从条目等上下文入口带进 AI 问答的草稿；不持久化，避免下次启动意外发送旧问题。 */
+  pendingAskDraft: string | null;
+  requestAskDraft: (draft: string) => void;
+  consumeAskDraft: () => string | null;
   /** 关于页等强制打开首次设置清单（不持久化） */
   setupChecklistRequest: boolean;
   requestSetupChecklist: () => void;
@@ -145,6 +149,13 @@ export const useUIStore = create<UIState>()(
         const section = get().pendingSettingsSection;
         set({ pendingSettingsSection: null });
         return section;
+      },
+      pendingAskDraft: null,
+      requestAskDraft: (draft) => set({ pendingAskDraft: draft.trim() || null }),
+      consumeAskDraft: () => {
+        const draft = get().pendingAskDraft;
+        set({ pendingAskDraft: null });
+        return draft;
       },
       setupChecklistRequest: false,
       requestSetupChecklist: () => set({ setupChecklistRequest: true }),

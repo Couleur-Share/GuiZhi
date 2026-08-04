@@ -6,6 +6,7 @@ import type Database from "../../database/sqlite";
 import type { ImportTask } from "@guizhi/shared/types";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import { extractContent } from "./connectors";
+import { assessImportReview } from "./review-assessment";
 import {
   ImportQueue,
   createSourceRecordId,
@@ -49,6 +50,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
       contentHash,
     }) {
       let itemId = "";
+      const review = assessImportReview(extracted, sourceKind);
       const run = db.transaction(() => {
         const created = items.create({
           title: extracted.title || undefined,
@@ -57,6 +59,11 @@ function createPersistence(db: Database.Database): ImportPersistence {
           itemType: extracted.itemType,
           collectionId,
           tagNames: tagNames.length > 0 ? tagNames : undefined,
+          // 状态留在条目而非 import_tasks：用户清理任务记录后仍可回到原文
+          // 完成复核。评估既接住连接器已知的部分失败，也检查解析后的短正文
+          // 与不可识别字符；它们都不阻断对已获得内容的保存。
+          reviewStatus: review.reviewRequired ? "needs_review" : "clear",
+          reviewReasons: review.reasons,
         });
         itemId = created.id;
         db.run(

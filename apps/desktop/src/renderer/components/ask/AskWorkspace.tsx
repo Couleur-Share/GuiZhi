@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDownIcon, SendIcon, SquareIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAskStore } from "../../stores/ask.store";
+import { useUIStore } from "../../stores/ui.store";
 import { Spinner } from "../ui/Spinner";
 import { AskEmptyState } from "./AskEmptyState";
 import { AskMessageCard } from "./AskMessageCard";
 
 /** 距底部多少像素以内算「跟在最新消息上」 */
 const STICK_TO_BOTTOM_THRESHOLD_PX = 80;
+/** 六行正文 + 上下内边距；再长就让输入框自身滚动，不能吞掉回答区。 */
+const ASK_INPUT_MAX_HEIGHT_PX = 136;
 
 /**
  * AI 问答页：基于知识库的多轮问答，
@@ -21,16 +24,57 @@ export function AskWorkspace() {
   const ask = useAskStore((state) => state.ask);
   const stop = useAskStore((state) => state.stop);
   const initialize = useAskStore((state) => state.initialize);
+  const consumeAskDraft = useUIStore((state) => state.consumeAskDraft);
 
   const [draft, setDraft] = useState("");
   const [stuckToBottom, setStuckToBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const resizeInput = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+    // 先松开旧高度再读 scrollHeight：否则从长问题删回短问题时只会越长不缩。
+    input.style.height = "auto";
+    const nextHeight = Math.min(input.scrollHeight, ASK_INPUT_MAX_HEIGHT_PX);
+    input.style.height = `${nextHeight}px`;
+    input.style.overflowY =
+      input.scrollHeight > ASK_INPUT_MAX_HEIGHT_PX ? "auto" : "hidden";
+  }, []);
+
+  // 不按换行符计行：预填的问题会随着窄窗口自动折行，也必须跟着展开。
+  useLayoutEffect(() => {
+    resizeInput();
+  }, [draft, resizeInput]);
+
+  // 侧栏拖宽或窗口缩放时，自动折行数会变；监听元素尺寸才能及时收缩/展开。
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    const observer = new ResizeObserver(resizeInput);
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [resizeInput]);
+
   // 恢复上次会话（会话列表与消息持久化在主进程 SQLite）
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  // 从导入结果等上下文入口进来时，只预填而不自动发送：用户先确认问题，
+  // 也保留继续补充自己的意图，避免一次误点就消耗模型调用。
+  useEffect(() => {
+    const draft = consumeAskDraft();
+    if (!draft) {
+      return;
+    }
+    setDraft(draft);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [consumeAskDraft]);
 
   const scrollToBottom = useCallback(() => {
     const container = scrollRef.current;
@@ -141,12 +185,12 @@ export function AskWorkspace() {
                 submit();
               }
             }}
-            rows={Math.min(6, Math.max(1, draft.split("\n").length))}
+            rows={1}
             placeholder={t(
               "ask.placeholder",
               "输入问题，Enter 发送，Shift+Enter 换行",
             )}
-            className="min-h-9 flex-1 resize-none rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:border-primary/50 focus:outline-none"
+            className="min-h-9 flex-1 resize-none rounded-xl border border-border bg-background/60 px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 transition-[height] duration-quick focus:border-primary/50 focus:outline-none"
           />
           {isRunning ? (
             <button

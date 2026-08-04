@@ -309,6 +309,21 @@ export const MIGRATIONS: Migration[] = [
       addColumnIfMissing(db, "import_tasks", "refresh_of_item_id", "TEXT");
     },
   },
+  {
+    // 导入成功并不总等于内容可以放心依赖：例如视频正文入库了、文字稿失败。
+    // 这里不挡住已拿到的内容，而是把不确定性持久化到条目本身；任务记录被
+    // 清理后，用户仍能在详情页完成复核。
+    name: "0013-knowledge-item-review-status",
+    up: (db) => {
+      addColumnIfMissing(
+        db,
+        "knowledge_items",
+        "review_status",
+        "TEXT NOT NULL DEFAULT 'clear'",
+      );
+      addColumnIfMissing(db, "knowledge_items", "review_reasons", "TEXT");
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

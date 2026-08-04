@@ -49,6 +49,10 @@ CREATE TABLE IF NOT EXISTS knowledge_items (
   collection_id TEXT REFERENCES collections(id) ON DELETE SET NULL,
   is_favorite INTEGER NOT NULL DEFAULT 0,
   is_pinned INTEGER NOT NULL DEFAULT 0,
+  -- 采集成功但内容有缺失时不阻断入库，而是留下待人工复核标记。
+  review_status TEXT NOT NULL DEFAULT 'clear'
+    CHECK(review_status IN ('clear','needs_review')),
+  review_reasons TEXT,
   deleted_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

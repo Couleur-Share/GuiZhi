@@ -65,6 +65,26 @@ describe("KnowledgeItemDB", () => {
     expect(loaded?.content).toContain("你好");
   });
 
+  it("导入异常的复核状态会随条目持久化，并可在人工确认后清除", () => {
+    const created = items.create({
+      title: "缺少文字稿的视频",
+      content: "视频元数据与总结",
+      itemType: "video",
+      reviewStatus: "needs_review",
+      reviewReasons: ["文字稿生成失败：音频资源不可用"],
+    });
+
+    expect(created.reviewStatus).toBe("needs_review");
+    expect(created.reviewReasons).toEqual(["文字稿生成失败：音频资源不可用"]);
+
+    const reviewed = items.update(created.id, {
+      reviewStatus: "clear",
+      reviewReasons: [],
+    });
+    expect(reviewed?.reviewStatus).toBe("clear");
+    expect(reviewed?.reviewReasons).toEqual([]);
+  });
+
   it("中文全文检索按字命中", () => {
     items.create({ title: "归知介绍", content: "本地优先的个人知识库" });
     items.create({ title: "无关条目", content: "completely unrelated" });

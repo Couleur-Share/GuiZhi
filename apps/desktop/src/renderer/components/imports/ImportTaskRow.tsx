@@ -25,6 +25,7 @@ import { ImportStageSummary } from "./ImportStageSummary";
 import {
   formatDuration,
   formatImportTaskError,
+  formatImportTaskWarning,
   getStageLabel,
   needsCaptureToolSetup,
   resolveTaskFolder,
@@ -243,8 +244,9 @@ function ProgressHint({ task, now }: { task: ImportTask; now: number }) {
 }
 
 /**
- * 导入任务行。终态任务的操作收进悬停浮出的图标条——一屏几十条已完成任务，
- * 每条常驻两个带文字的按钮会把列表撑成两倍高，且全是重复文案。
+ * 导入任务行。多数终态操作仍收进悬停浮出的图标条，避免一屏几十条任务被
+ * 重复按钮撑高；唯独刚完成的任务在状态旁常驻「查看成果」，把用户带到
+ * 入库事实与后续动作，而不是只留一个含义模糊的绿色完成标记。
  */
 export function ImportTaskRow({
   task,
@@ -327,6 +329,15 @@ export function ImportTaskRow({
 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
             <StatusBadge task={task} />
+            {task.status === "completed" && task.resultItemId ? (
+              <button
+                type="button"
+                onClick={onOpenDetail}
+                className="inline-flex h-5 items-center rounded-md bg-primary/10 px-1.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/15 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {t("imports.viewResult", "查看成果")}
+              </button>
+            ) : null}
             {host ? <span className="truncate">{host}</span> : null}
             {folder ? (
               <span className="max-w-[18rem] truncate">{folder}</span>
@@ -344,7 +355,7 @@ export function ImportTaskRow({
 
           {task.warning ? (
             <p className="mt-1 break-words text-xs text-amber-600 dark:text-amber-400">
-              {task.warning}
+              {formatImportTaskWarning(task.warning, t)}
             </p>
           ) : null}
         </div>

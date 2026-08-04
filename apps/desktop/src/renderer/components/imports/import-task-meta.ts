@@ -211,3 +211,45 @@ export function formatImportTaskErrorForReport(
   const codeLine = t("imports.parseErrorCode", "错误码：{{code}}", { code });
   return `${display}\n${codeLine}`;
 }
+
+/**
+ * warning 代表条目已经入库、只有一部分内容没拿到。它也要像 task.error 一样
+ * 翻译：老版本直接把 `HTTP 403` 放给用户，既看不出是权限、下架还是平台风控，
+ * 也不知道下一步该做什么。原始状态码保留在说明里，方便复制诊断信息继续排查。
+ */
+export function formatImportTaskWarning(
+  warning: string | null | undefined,
+  t: ErrorTranslate,
+): string {
+  if (!warning) {
+    return "";
+  }
+  if (!warning.startsWith("文字稿生成失败：")) {
+    return warning;
+  }
+  if (/HTTP\s*403/.test(warning)) {
+    return t(
+      "imports.transcriptionFailure403",
+      "文字稿生成失败：平台拒绝访问音频（HTTP 403）。视频可能仅限登录或私密可见，也可能是平台暂时限制解析；请确认链接能在未登录状态打开后稍后重试。",
+    );
+  }
+  if (/HTTP\s*401/.test(warning)) {
+    return t(
+      "imports.transcriptionFailure401",
+      "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件导入。",
+    );
+  }
+  if (/HTTP\s*404/.test(warning)) {
+    return t(
+      "imports.transcriptionFailure404",
+      "文字稿生成失败：音频资源已不可用（HTTP 404）。视频可能已删除、下架或链接已失效。",
+    );
+  }
+  if (/HTTP\s*429/.test(warning)) {
+    return t(
+      "imports.transcriptionFailure429",
+      "文字稿生成失败：平台暂时限制了音频访问（HTTP 429）。请稍后重试，避免连续重复提交。",
+    );
+  }
+  return warning;
+}

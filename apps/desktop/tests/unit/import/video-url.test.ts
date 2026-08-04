@@ -11,6 +11,7 @@ vi.mock("electron", () => ({
 
 import {
   buildVideoContent,
+  describeTranscriptionFailure,
   detectVideoPlatform,
   extractVideoUrl,
   formatDuration,
@@ -75,6 +76,20 @@ describe("parseYtDlpMetadata / formatDuration", () => {
   it("时长格式化", () => {
     expect(formatDuration(305)).toBe("5:05");
     expect(formatDuration(3721)).toBe("1:02:01");
+  });
+});
+
+describe("describeTranscriptionFailure", () => {
+  it("把平台拒绝音频的 HTTP 403 说清原因和下一步", () => {
+    expect(describeTranscriptionFailure(new Error("HTTP 403"))).toBe(
+      "文字稿生成失败：平台拒绝访问音频（HTTP 403）。视频可能仅限登录或私密可见，也可能是平台暂时限制解析；请确认链接能在未登录状态打开后稍后重试。",
+    );
+  });
+
+  it("未知错误保留完整原文，方便后续诊断", () => {
+    expect(describeTranscriptionFailure(new Error("服务返回了未知字段"))).toBe(
+      "文字稿生成失败：服务返回了未知字段",
+    );
   });
 });
 

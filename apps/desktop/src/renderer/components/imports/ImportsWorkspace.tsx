@@ -8,9 +8,10 @@ import {
   XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ImportTask } from "@guizhi/shared/types";
+import type { ImportTask, KnowledgeItem } from "@guizhi/shared/types";
 import { filterTasks, useImportStore } from "../../stores/import.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
+import { useAskStore } from "../../stores/ask.store";
 import { useUIStore } from "../../stores/ui.store";
 import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
@@ -48,6 +49,8 @@ export function ImportsWorkspace() {
   const selectItem = useKnowledgeStore((state) => state.selectItem);
   const setScope = useKnowledgeStore((state) => state.setScope);
   const setAppModule = useUIStore((state) => state.setAppModule);
+  const requestAskDraft = useUIStore((state) => state.requestAskDraft);
+  const newAskSession = useAskStore((state) => state.newSession);
 
   const [now, setNow] = useState(() => Date.now());
   // 详情弹窗按 id 记而不是把整条任务存下来：任务还在跑时会不断有新状态推过来，
@@ -101,6 +104,20 @@ export function ImportsWorkspace() {
     setAppModule("library");
     setScope("all");
     await selectItem(itemId);
+  };
+
+  const askAboutItem = (item: KnowledgeItem) => {
+    // 这是围绕一条新导入内容开始的讨论，不该污染用户刚刚浏览的历史会话。
+    // 仅当当前会话已有消息时 newSession 才会实际换 ID；空白会话直接复用。
+    newAskSession();
+    // 当前问答引擎会从全库检索，标题是把召回收窄到这条导入结果的稳定锚点；
+    // 只预填不发送，用户能先改成自己的问题，也不会因误点消耗模型调用。
+    requestAskDraft(
+      t("imports.askAboutItemDraft", "请优先围绕「{{title}}」这条导入内容，概括核心观点与可复用结论。", {
+        title: item.title || t("library.untitled", "无标题"),
+      }),
+    );
+    setAppModule("ask");
   };
 
   return (
@@ -240,6 +257,7 @@ export function ImportsWorkspace() {
           isOpen={detailTaskId !== null}
           onClose={() => setDetailTaskId(null)}
           onOpenItem={(itemId) => void openItem(itemId)}
+          onAskAboutItem={askAboutItem}
         />
       ) : null}
     </div>

@@ -83,6 +83,31 @@ const PLATFORM_LABELS: Record<VideoPlatform, string> = {
   xiaohongshu: "小红书",
 };
 
+/**
+ * 转写失败常发生在下载音轨这一步。只把 `HTTP 403` 原样交给用户没有解释力：
+ * 它既可能是作品访问权限，也可能是平台临时风控。这里保留状态码，同时说清
+ * 常见原因和下一步；未知错误仍完整保留，免得把诊断线索静默吞掉。
+ */
+export function describeTranscriptionFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/HTTP\s*403/.test(message)) {
+    return "文字稿生成失败：平台拒绝访问音频（HTTP 403）。视频可能仅限登录或私密可见，也可能是平台暂时限制解析；请确认链接能在未登录状态打开后稍后重试。";
+  }
+  if (/HTTP\s*401/.test(message)) {
+    return "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件导入。";
+  }
+  if (/HTTP\s*404/.test(message)) {
+    return "文字稿生成失败：音频资源已不可用（HTTP 404）。视频可能已删除、下架或链接已失效。";
+  }
+  if (/HTTP\s*429/.test(message)) {
+    return "文字稿生成失败：平台暂时限制了音频访问（HTTP 429）。请稍后重试，避免连续重复提交。";
+  }
+  if (/HTTP\s*5\d\d/.test(message)) {
+    return "文字稿生成失败：平台或转写服务暂时不可用（服务器错误）。请稍后重试。";
+  }
+  return `文字稿生成失败：${message}`;
+}
+
 export class YtDlpNotFoundError extends Error {
   constructor() {
     super("YT_DLP_NOT_FOUND");
@@ -637,7 +662,7 @@ export async function extractVideoUrl(
       if (error instanceof Error && error.message === "已取消") {
         throw error;
       }
-      transcriptionNote = `文字稿生成失败：${error instanceof Error ? error.message : String(error)}`;
+      transcriptionNote = describeTranscriptionFailure(error);
       // 导入是后台流程不弹提示，但转写失败会掏空整条条目——不留痕的话，
       // 用户报「怎么没有文字稿」时双方都拿不出任何可查的东西
       console.warn("[import] 语音转写失败:", error);

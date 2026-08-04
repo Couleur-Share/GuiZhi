@@ -50,6 +50,7 @@ import { highlightText } from "./highlight-text";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PanelFindBar } from "./PanelFindBar";
+import { ReviewRequiredNotice } from "./ReviewRequiredNotice";
 import {
   loadContentReadingMemory,
   patchContentReadingMemory,
@@ -669,6 +670,8 @@ export function ContentPanel({
             )}
           </div>
         </div>
+
+        <ReviewRequiredNotice item={item} disabled={isTrashed} />
 
         {isFindOpen && showFindBar ? (
           <div className="absolute right-2 top-11 z-20 flex w-full max-w-[calc(100%_-_1rem)] justify-end">

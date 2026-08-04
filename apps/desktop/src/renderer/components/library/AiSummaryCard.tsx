@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Loader2Icon, RotateCcwIcon, SparklesIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  Loader2Icon,
+  RotateCcwIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
@@ -22,10 +28,13 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
     (state) => state.requestSettingsSection,
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  // 摘要可能很长，默认不抢占正文首屏；用户主动生成后再展开以便确认结果。
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  // 切换条目时复位生成状态（避免上一条的 spinner 残留）
+  // 切换条目时复位临时状态，避免上一条的 spinner 或展开状态残留。
   useEffect(() => {
     setIsGenerating(false);
+    setIsExpanded(false);
   }, [item.id]);
 
   const generate = async () => {
@@ -46,6 +55,7 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
       const updated = await window.api.knowledge.update(itemId, { summary });
       if (updated) {
         applyServerItem(updated);
+        setIsExpanded(true);
       }
       // 截断的摘要照常写入（半篇也比没有强），但不能装作它是完整的
       if (truncated) {
@@ -61,10 +71,7 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
       }
     } catch (error) {
       if (error instanceof AiNotConfiguredError) {
-        showToast(
-          t("ask.notConfigured", "尚未配置 AI 服务"),
-          "error",
-        );
+        showToast(t("ask.notConfigured", "尚未配置 AI 服务"), "error");
         requestSettingsSection("ai");
       } else {
         showToast(
@@ -81,7 +88,11 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
 
   if (!item.summary && !isGenerating) {
     return (
-      <button type="button" onClick={() => void generate()} className={ACTION_CHIP}>
+      <button
+        type="button"
+        onClick={() => void generate()}
+        className={ACTION_CHIP}
+      >
         <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
         {t("library.aiSummaryGenerate", "生成 AI 摘要")}
       </button>
@@ -91,12 +102,37 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
   // 与动作按钮同处一个 flex 行，摘要卡片占满整行另起一排
   return (
     <div className="w-full rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-3">
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <SparklesIcon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-        <span className="text-xs font-medium text-primary">
-          {t("library.aiSummary", "AI 摘要")}
-        </span>
-        <span className="min-w-0 flex-1" />
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setIsExpanded((expanded) => !expanded)}
+          aria-expanded={isExpanded}
+          aria-label={
+            isExpanded
+              ? t("library.aiSummaryCollapse", "收起 AI 摘要")
+              : t("library.aiSummaryExpand", "展开 AI 摘要")
+          }
+          className="-ml-1 flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-primary/[0.06]"
+        >
+          <SparklesIcon
+            className="h-3.5 w-3.5 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+          <span className="text-xs font-medium text-primary">
+            {t("library.aiSummary", "AI 摘要")}
+          </span>
+          {isExpanded ? (
+            <ChevronUpIcon
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+          ) : (
+            <ChevronDownIcon
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+          )}
+        </button>
         {isGenerating ? (
           <Loader2Icon
             className="h-3.5 w-3.5 animate-spin text-muted-foreground"
@@ -114,13 +150,15 @@ export function AiSummaryCard({ item }: { item: KnowledgeItem }) {
           </button>
         )}
       </div>
-      {item.summary ? (
-        <MarkdownBody content={item.summary} />
-      ) : (
-        <p className="text-xs text-muted-foreground">
+      {item.summary && isExpanded ? (
+        <div className="mt-1.5">
+          <MarkdownBody content={item.summary} />
+        </div>
+      ) : isGenerating ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">
           {t("library.aiSummaryGenerating", "正在生成摘要…")}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
