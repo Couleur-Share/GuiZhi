@@ -9,6 +9,7 @@
  * 少一行就是少一条线索，宁可啰嗦。
  */
 import type { ImportStageStat, ImportTask } from "@guizhi/shared/types";
+import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
 import {
   STAGE_LABELS,
   STATUS_LABELS,
@@ -29,6 +30,7 @@ export interface ImportTaskReportContext {
   /** 应用版本与平台（`window.electron.updater`）；取不到就不写这一行 */
   appVersion?: string;
   platform?: string;
+  captureBrowser?: string;
   /** 测试注入：绝对时间的格式化 */
   formatTime?: (ms: number) => string;
 }
@@ -71,22 +73,36 @@ export function buildImportTaskReport(
   const formatTime =
     context.formatTime ?? ((ms: number) => new Date(ms).toLocaleString());
   const status = STATUS_LABELS[task.status] ?? STATUS_LABELS.failed;
+  const capturePlatform = task.sourceKind === "url"
+    ? detectPlatformCapturePlatform(task.sourceInput)
+    : null;
+  const safeSource = task.captureStrategy === "authenticated"
+    ? capturePlatform ?? "authenticated-platform"
+    : task.sourceInput;
 
+  const authenticated = task.captureStrategy === "authenticated";
   const lines: string[] = [
     `# ${t("imports.reportTitle", "导入任务诊断")}`,
     "",
-    `- ${t("imports.reportTask", "任务")}：${task.displayName || task.sourceInput}`,
     `- ${t("imports.reportStatus", "状态")}：${t(status.key, status.fallback)}`,
   ];
+  if (!authenticated) {
+    lines.push(`- ${t("imports.reportTask", "任务")}：${task.displayName || safeSource}`);
+  }
   if (task.itemType) {
     lines.push(`- ${t("imports.reportType", "类型")}：${task.itemType}`);
   }
-  lines.push(
-    `- ${t("imports.reportSource", "来源")}：${task.sourceInput}`,
-    `- ${t("imports.reportQueuedAt", "入队")}：${formatTime(task.createdAt)}`,
-    `- ${t("imports.reportUpdatedAt", "更新")}：${formatTime(task.updatedAt)}`,
-    `- ${t("imports.reportTaskId", "任务 ID")}：${task.id}`,
-  );
+  lines.push(`- ${t("imports.reportSource", "来源")}：${safeSource}`);
+  if (authenticated) {
+    lines.push(`- ${t("imports.reportCaptureStrategy", "采集策略")}：authenticated`);
+  }
+  if (!authenticated) {
+    lines.push(
+      `- ${t("imports.reportQueuedAt", "入队")}：${formatTime(task.createdAt)}`,
+      `- ${t("imports.reportUpdatedAt", "更新")}：${formatTime(task.updatedAt)}`,
+      `- ${t("imports.reportTaskId", "任务 ID")}：${task.id}`,
+    );
+  }
   if (context.appVersion) {
     lines.push(
       `- ${t("imports.reportApp", "应用")}：GuiZhi ${context.appVersion}${
@@ -122,17 +138,20 @@ export function buildImportTaskReport(
         `| ${escapeCell(name)} | ${formatDuration(stat.ms)} | ${shareOf(
           stat.ms,
           totalMs,
-        )} | ${escapeCell(aiDetailOf(stat, t))} |`,
+        )} | ${authenticated ? "" : escapeCell(aiDetailOf(stat, t))} |`,
       );
     }
   }
 
   if (task.error) {
+    const safeError = authenticated
+      ? (task.error.match(/^\[([a-z_]+)\]/)?.[1] ?? "unknown")
+      : formatImportTaskErrorForReport(task.error, t);
     lines.push(
       "",
       `## ${t("imports.reportError", "报错")}`,
       "",
-      formatImportTaskErrorForReport(task.error, t),
+      safeError,
     );
   }
   if (task.warning) {
@@ -140,8 +159,13 @@ export function buildImportTaskReport(
       "",
       `## ${t("imports.reportWarning", "缺失提示")}`,
       "",
-      formatImportTaskWarning(task.warning, t),
+      authenticated
+        ? t("imports.authenticatedWarningPresent", "认证采集存在非阻断 warning")
+        : formatImportTaskWarning(task.warning, t),
     );
+  }
+  if (context.captureBrowser) {
+    lines.push(`- ${t("imports.reportBrowser", "浏览器")}：${context.captureBrowser}`);
   }
 
   return `${lines.join("\n")}\n`;

@@ -35,7 +35,11 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
         resultItemId: null,
         duplicateItemId: null,
         collectionId: input.collectionId ?? null,
+        refreshOfItemId: input.refreshOfItemId ?? null,
+        tagNames: input.tagNames ?? [],
         stageStats: null,
+        captureStrategy: input.captureStrategy ?? "standard",
+        commentLimit: input.commentLimit ?? 0,
         forceDuplicate: input.forceDuplicate ?? false,
         createdAt: now,
         updatedAt: now,
@@ -84,6 +88,10 @@ function createMemoryStore(): ImportTaskStore & { rows: Map<string, ImportTask &
         row.stageStats = patch.stageStats?.length ? patch.stageStats : null;
       if (patch.forceDuplicate !== undefined)
         row.forceDuplicate = patch.forceDuplicate;
+      if (patch.captureStrategy !== undefined)
+        row.captureStrategy = patch.captureStrategy;
+      if (patch.commentLimit !== undefined)
+        row.commentLimit = patch.commentLimit;
       row.updatedAt = Date.now();
       return { ...row };
     },
@@ -121,6 +129,11 @@ function createHarness(options?: {
   ) => Promise<ExtractedContent>;
   findDuplicate?: ImportPersistence["findDuplicate"];
   concurrency?: number;
+  captureComments?: (
+    task: ImportTask,
+    resultItemId: string,
+    signal: AbortSignal,
+  ) => Promise<void>;
 }): Harness {
   const store = createMemoryStore();
   const savedItems: string[] = [];
@@ -135,8 +148,11 @@ function createHarness(options?: {
         return id;
       },
     },
-    extract:
-      options?.extract ?? (async (_kind, input) => fakeExtracted(input)),
+    extract: (task, signal, onStage) =>
+      options?.extract
+        ? options.extract(task.sourceKind, task.sourceInput, signal, onStage)
+        : Promise.resolve(fakeExtracted(task.sourceInput)),
+    captureComments: options?.captureComments,
     onTaskChanged: (task) => events.push(task),
     concurrency: options?.concurrency,
   });
@@ -538,7 +554,7 @@ describe("ImportQueue", () => {
           return "item-recovered";
         },
       },
-      extract: async (_kind, input) => fakeExtracted(input),
+      extract: async (task) => fakeExtracted(task.sourceInput),
       onTaskChanged: () => {},
     });
 
@@ -596,5 +612,42 @@ describe("ImportQueue", () => {
     // 不入库是关键：空壳条目会占住该链接的 normalized_uri，让重试永远判重
     expect(finished.resultItemId).toBeNull();
     expect(harness.savedItems).toHaveLength(0);
+  });
+
+  it("重启恢复认证任务时不自动启动浏览器，保留策略等待手动重试", async () => {
+    const harness = createHarness();
+    harness.queue.pause();
+    const [task] = harness.queue.enqueue([{
+      kind: "url",
+      input: "https://www.douyin.com/video/123",
+      captureStrategy: "authenticated",
+    }]);
+
+    harness.queue.recover();
+    const recovered = harness.store.get(task.id)!;
+    expect(recovered.status).toBe("failed");
+    expect(recovered.captureStrategy).toBe("authenticated");
+    expect(recovered.error).toContain("login_required");
+    expect(harness.savedItems).toEqual([]);
+  });
+
+  it("正文成功而评论失败：任务仍完成并写非阻断 warning", async () => {
+    const harness = createHarness({
+      captureComments: async () => {
+        throw new Error("[login_required] 登录已失效");
+      },
+    });
+    const [task] = harness.queue.enqueue([{
+      kind: "url",
+      input: "https://www.douyin.com/video/123",
+      captureStrategy: "authenticated",
+      commentLimit: 20,
+    }]);
+    await harness.queue.drain();
+
+    const finished = harness.store.get(task.id)!;
+    expect(finished.status).toBe("completed");
+    expect(finished.resultItemId).toBe("item-1");
+    expect(finished.warning).toContain("热门评论采集失败");
   });
 });

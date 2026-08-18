@@ -474,4 +474,146 @@ describe("addColumnIfMissing", () => {
     expect(row.warning).toBeNull();
     db.close();
   });
+
+  it("0014/0015：老任务获得默认策略并创建独立评论表", () => {
+    const db = new DatabaseAdapter(":memory:");
+    db.exec(`
+      CREATE TABLE import_tasks (
+        id TEXT PRIMARY KEY,
+        source_kind TEXT NOT NULL,
+        source_input TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
+    db.run(
+      "INSERT INTO import_tasks (id, source_kind, source_input, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      "task-auth", "url", "https://www.douyin.com/video/1", "旧任务", 1, 1,
+    );
+
+    runMigrations(db);
+
+    const task = db.get(
+      "SELECT capture_strategy, comment_limit FROM import_tasks WHERE id = ?",
+      "task-auth",
+    ) as { capture_strategy: string; comment_limit: number };
+    expect(task).toEqual({ capture_strategy: "standard", comment_limit: 0 });
+    expect(getTableDefinition(db, "source_comments")).toContain("source_comments");
+    db.close();
+  });
+
+  it("0016：来源评论表放行 LINUX DO 且保留既有评论", () => {
+    const db = createDb();
+    db.exec(`
+      DROP TABLE source_comments;
+      CREATE TABLE source_comments (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+        platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin')),
+        external_id TEXT NOT NULL,
+        author_name TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL DEFAULT '',
+        like_count INTEGER NOT NULL DEFAULT 0,
+        published_at INTEGER,
+        captured_at INTEGER NOT NULL,
+        UNIQUE(item_id, platform, external_id)
+      );
+    `);
+    db.run(
+      "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      "item-1", "测试", "正文", 1, 1,
+    );
+    db.run(
+      `INSERT INTO source_comments
+         (id, item_id, platform, external_id, content, captured_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      "comment-1", "item-1", "xiaohongshu", "external-1", "旧评论", 1,
+    );
+
+    runMigrations(db);
+
+    expect(getTableDefinition(db, "source_comments")).toContain("'linuxdo'");
+    expect(db.get("SELECT content FROM source_comments WHERE id = ?", "comment-1"))
+      .toEqual({ content: "旧评论" });
+    expect(() => db.run(
+      `INSERT INTO source_comments
+         (id, item_id, platform, external_id, content, captured_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      "comment-2", "item-1", "linuxdo", "external-2", "新楼层", 2,
+    )).not.toThrow();
+    db.close();
+  });
+
+  it("0017：已进网页桶的 Discourse 来源按新白名单重分类", () => {
+    const db = createDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      "item-appinn", "小众软件旧条目", "正文", 1, 1,
+    );
+    db.run(
+      "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      "item-linuxdo", "LINUX DO 旧条目", "正文", 1, 1,
+    );
+    db.run(
+      `INSERT INTO source_records
+         (id, item_id, source_type, source_uri, platform, captured_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      "source-appinn", "item-appinn", "url",
+      "https://meta.appinn.net/t/topic/89533", "web", 1,
+    );
+    db.run(
+      `INSERT INTO source_records
+         (id, item_id, source_type, source_uri, platform, captured_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      "source-linuxdo", "item-linuxdo", "url",
+      "https://linux.do/t/topic/2702071", "web", 1,
+    );
+    // 模拟 0016 已执行、0017 尚未执行的升级现场。
+    db.run(
+      "DELETE FROM schema_migrations WHERE name = ?",
+      "0017-source-platform-refresh",
+    );
+
+    runMigrations(db);
+
+    expect(
+      db.all(
+        "SELECT id, platform FROM source_records ORDER BY id",
+      ),
+    ).toEqual([
+      { id: "source-appinn", platform: "appinn" },
+      { id: "source-linuxdo", platform: "linuxdo" },
+    ]);
+    db.close();
+  });
+
+  it("0018：已进网页桶的 2Libra 来源按新白名单重分类", () => {
+    const db = createDb();
+    runMigrations(db);
+    db.run(
+      "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      "item-twolibra", "2Libra 旧条目", "正文", 1, 1,
+    );
+    db.run(
+      `INSERT INTO source_records
+         (id, item_id, source_type, source_uri, platform, captured_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      "source-twolibra", "item-twolibra", "url",
+      "https://2libra.com/post/health-consultation/bUSaOUc", "web", 1,
+    );
+    db.run(
+      "DELETE FROM schema_migrations WHERE name = ?",
+      "0018-source-platform-refresh",
+    );
+
+    runMigrations(db);
+
+    expect(
+      db.get("SELECT platform FROM source_records WHERE id = ?", "source-twolibra"),
+    ).toEqual({ platform: "twolibra" });
+    db.close();
+  });
 });

@@ -41,6 +41,7 @@ export type EndpointGroup = {
   apiProtocol: AIProtocol;
   apiKey: string;
   apiUrl: string;
+  enabled?: boolean;
   models: AIModelConfig[];
 };
 
@@ -52,6 +53,7 @@ export type EndpointDraft = {
   apiProtocol: AIProtocol;
   apiKey: string;
   apiUrl: string;
+  enabled?: boolean;
 };
 
 export type ScenarioDefinition = {
@@ -65,7 +67,10 @@ export type ScenarioDefinition = {
 
 export type ModelOption = {
   value: string;
-  label: string;
+  label: React.ReactNode;
+  triggerLabel?: React.ReactNode;
+  labelText?: string;
+  group?: string;
 };
 
 export type StatusCardData = {

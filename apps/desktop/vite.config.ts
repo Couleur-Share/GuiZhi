@@ -14,6 +14,10 @@ const mainExternalModules = new Set([
   "https-proxy-agent",
   "socks-proxy-agent",
   "undici",
+  // playwright-core 必须作为运行时依赖保留：打进 Rollup 会把内部懒加载的
+  // chromium-bidi require 提升到入口，导致应用启动时就去解析并不存在的可选模块。
+  // external 后仍只携带控制库，不下载或打包 Chromium。
+  "playwright-core",
   // linkedom 的可选依赖（未安装）：external 保留 require 调用，
   // 让 linkedom 内部 try/catch 正常回退到 canvas-shim
   "canvas",
@@ -89,6 +93,9 @@ export default defineConfig(async () => ({
           },
           build: {
             outDir: "out/main",
+            // vite-plugin-electron 默认保留历史 chunk；安装器会收进整个 out，
+            // 因此每次生产构建必须清空各自目录，避免携带已失效的浏览器依赖。
+            emptyOutDir: true,
             rollupOptions: {
               // Keep native/runtime-only main-process deps out of the bundle.
               external: (id) =>
@@ -109,6 +116,7 @@ export default defineConfig(async () => ({
           },
           build: {
             outDir: "out/preload",
+            emptyOutDir: true,
           },
         },
       },
@@ -124,6 +132,7 @@ export default defineConfig(async () => ({
   },
   build: {
     outDir: "out/renderer",
+    emptyOutDir: true,
     // Performance: Disable sourcemap in production to reduce bundle size
     // 性能：生产环境禁用 sourcemap 以减少打包体积
     sourcemap: process.env.NODE_ENV === "development",

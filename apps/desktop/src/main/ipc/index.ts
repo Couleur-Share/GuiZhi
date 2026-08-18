@@ -6,6 +6,7 @@ import { registerImageIPC } from "./image.ipc";
 import { registerAIIPC } from "./ai.ipc";
 import { registerKnowledgeIPC } from "./knowledge.ipc";
 import { registerImportIPC } from "./import.ipc";
+import { registerPlatformCaptureIPC } from "./platform-capture.ipc";
 import { registerWikiIPC } from "./wiki.ipc";
 import { registerMigrationIPC } from "./migration.ipc";
 import { registerBackupIPC } from "./backup.ipc";
@@ -42,6 +43,19 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.IMPORT_RETRY,
   IPC_CHANNELS.IMPORT_REMOVE,
   IPC_CHANNELS.IMPORT_CLEAR_FINISHED,
+  IPC_CHANNELS.IMPORT_QUEUE_STATE,
+  IPC_CHANNELS.IMPORT_PAUSE,
+  IPC_CHANNELS.IMPORT_RESUME,
+  IPC_CHANNELS.PLATFORM_CAPTURE_STATUS,
+  IPC_CHANNELS.PLATFORM_CAPTURE_LOGIN,
+  IPC_CHANNELS.PLATFORM_CAPTURE_CANCEL_LOGIN,
+  IPC_CHANNELS.PLATFORM_CAPTURE_LOGOUT,
+  IPC_CHANNELS.PLATFORM_CAPTURE_CLEAR_ALL,
+  IPC_CHANNELS.PLATFORM_CAPTURE_DISCOVER_CREATOR,
+  IPC_CHANNELS.PLATFORM_CAPTURE_SEARCH,
+  IPC_CHANNELS.PLATFORM_CAPTURE_CANCEL_DISCOVERY,
+  IPC_CHANNELS.PLATFORM_CAPTURE_LIST_COMMENTS,
+  IPC_CHANNELS.PLATFORM_CAPTURE_REFRESH_COMMENTS,
   IPC_CHANNELS.WIKI_CATALOG,
   IPC_CHANNELS.WIKI_GET_PAGE,
   IPC_CHANNELS.WIKI_APPLY_COMPILATION,
@@ -81,6 +95,7 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.SEMANTIC_CLEAR,
   IPC_CHANNELS.MEDIA_TRANSCRIBE,
   IPC_CHANNELS.MEDIA_SUMMARIZE,
+  IPC_CHANNELS.MEDIA_REFRESH_FORUM_DISCUSSION,
   IPC_CHANNELS.MEDIA_TEST_TRANSCRIPTION,
   IPC_CHANNELS.ILLUSTRATION_STYLES,
   IPC_CHANNELS.ILLUSTRATION_SAVE_STYLES,
@@ -141,6 +156,7 @@ export function registerAllIPC(
   registerIpcGroup("import", () =>
     registerImportIPC(db, options.broadcastImportChanged),
   );
+  registerIpcGroup("platform-capture", () => registerPlatformCaptureIPC(db));
   registerIpcGroup("wiki", () => registerWikiIPC(db));
   registerIpcGroup("migration", () => registerMigrationIPC(db));
   registerIpcGroup("backup", () => registerBackupIPC(db));

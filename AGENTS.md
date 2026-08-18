@@ -88,11 +88,11 @@ v0.6.0（2026-07）围绕抖音采集：抖音脱离 yt-dlp（见下），图文
 与 react-markdown 的 `urlTransform` 双双拦掉 `local-image://`（正文图是破图）。
 
 侧栏「平台」分区（知识库与标签之间）：按采集来源分组，抖音 / 哔哩哔哩 / 小红书 /
-YouTube / V2EX 各一行，外加网页与本地文件两个兜底桶——少了后两个，通用抓取与本地
+YouTube / V2EX / NGA / LINUX DO / 小众软件 / 2Libra 各一行，外加网页与本地文件两个兜底桶——少了后两个，通用抓取与本地
 导入的条目在这个分区里一条都点不到。判定收敛在
 `shared/utils/source-platforms.ts` 的 `resolveSourcePlatform`，采集落库
 （`import-service.ts` 写 `source_records.platform`）与老库回填（迁移
-`0009-source-platform`）共用它，且它内部直接复用连接器分流用的
+`0009-source-platform`，新增平台后由 `0017-source-platform-refresh` / `0018-source-platform-refresh` 重算）共用它，且它内部直接复用连接器分流用的
 `detectVideoPlatform` / `detectForumPlatform`：采集当时走了哪条抽取路径，事后回填
 就归到哪个平台，两边算不出不同的结果（B 站专栏页不是视频页，两边一致地落进网页桶）。
 该函数回传的是这两个检测函数的枚举值而非就地写死的字面量，新增平台时忘了加进
@@ -103,7 +103,7 @@ NULL」：留着老取值会在分区里多出几个用户认不出来的分组�
 重算不弄丢任何在用的数据。来源是 1:N（旧版迁移可能给同一条目带进多条记录），
 过滤用 EXISTS、计数用 `COUNT(DISTINCT item_id)`，换成 JOIN 会让条目在列表里重复
 出现、总数虚高。分区只列有条目的平台且按常量表的固定顺序排（不按数量），
-从不用抖音的人不必盯着五个 0 找自己那一行，采集一条也不会让侧栏重排。
+从不用某个平台的人不必盯着一排 0 找自己那一行，采集一条也不会让侧栏重排。
 平台是派生分组、不可增删改名，所以行上没有「更多」菜单；它与知识库、标签同为互斥的
 导航轴，四条轴的复位逻辑收在 store 的 `navigateTo` 里（此前三处各抄了一遍）。
 表格视图另有一列「来源」（默认显示，紧挨「类型」）：光有筛选轴不够，在「全部」
@@ -125,7 +125,8 @@ NULL」：留着老取值会在分区里多出几个用户认不出来的分组�
 着色分两类，分界不是好看不好看而是看不看得见：有彩色标准色的写品牌色（`text-[#…]`，
 刻意不走语义令牌——品牌色随主题漂移就不再是那个平台的颜色了），抖音（#000000）与
 V2EX（#1F1F1F）的标准色是近黑，写死会在深色主题下整个消失，改用 `text-foreground`
-跟着主题走。着色 class 与图标绑在一起由 `PlatformIcon` 拼，调用方只管尺寸：分散到
+跟着主题走。2Libra 的官方天平 mark 本身由五种标准色组成，颜色保留在 SVG 内，不由
+外层单色 class 覆盖。其余着色 class 与图标绑在一起由 `PlatformIcon` 拼，调用方只管尺寸：分散到
 各处自己拼的话，漏掉 colorClass 的表现是那一个平台悄悄退回黑白，不报错也没人发现。
 svg 的 viewBox 从 `0 0 24 24` 撑到 `-2 -2 28 28`，是给图形补出 lucide 那样的内边距——
 Simple Icons 是实心填充且铺满画布，与描边图标同尺寸摆在一起明显显大显重，同一列里
@@ -631,8 +632,18 @@ Markdown 只认单换行会把它和下一行正文渲染进同一段，页面�
 回复，不重新抓网页——原帖可能已删或又多了几十楼，条目自己那份才与用户看到的一致。
 回写走 `upsertForumSummarySection`，顺带清掉采集期留下的「未配置文本模型」
 「生成失败」注记，免得和新总结自相矛盾。
-没做通用论坛协议：Discourse 的 `/t/{id}.json` 在 linux.do 会被 Cloudflare
-挡成 403，逐站适配是唯一可行路径，`detectForumPlatform` 因此是白名单式判定。
+没做任意域名的通用论坛协议：`detectForumPlatform` 仍是白名单式判定。但白名单里的
+Discourse 站点共用 `import/discourse.ts`——楼层补拉、`raw` / `cooked` 回退、引用关系、
+退避重试和板块解析只有一份；`linuxdo.ts` 与 `appinn.ts` 只声明站点配置。LINUX DO
+被 Cloudflare 挡成 403 时降级到 Electron 会话，小众软件公开主题直接读
+`meta.appinn.net/t/topic/{id}.json`，不进入平台账号体系。标准匿名响应通常没有 `raw`，
+必须把 `cooked` 转成 Markdown；板块名不在主题详情里时用缓存的 `/site.json` 对
+`category_id`，这一步失败不阻断正文入库。
+
+2Libra 是独立的 Next.js 论坛，不套 Discourse 适配器。`import/twolibra.ts` 读取无需登录的
+`/api/posts/{shortId}` 主楼接口，再按 `/api/comments/list/flat` 分页抓全讨论；选 flat 是为了
+让楼中楼也按真实顺序逐条入库，并用 `reply_comment` 保留被回复上下文。链接只认
+`2libra.com/post/{nodeSlug}/{7位shortId}` 白名单形态，热榜等 `/post/hot/*` 路由不误判。
 
 论坛帖子采集（NGA）：`import/nga.ts` 走 `read.php?tid=&page=&lite=js`。
 首次请求会 403 并在正文下发 `guestJs=…`，带上该 cookie 即可读公开帖
@@ -1022,8 +1033,8 @@ dbx 的权限矩阵同理——归知只有两个只读工具，没有分级，�
   就在同一份 `__INITIAL_STATE__` 里但没有读。合集（多篇连载）也没有识别。
 - 图文采集的 OCR 按张调用视觉模型，默认上限 9 张（`OCR_IMAGE_LIMIT`），
  超出的图片只入库不识别。上限是硬编码常量，没有做成设置项。
-- 论坛采集认 V2EX 与 NGA。超长帖的总结按回复分块，上限 8 块（`MAX_CHUNKS`），
-  再长的部分不进总结素材。V2EX 回复完整入库；NGA 讨论区只留楼主回复，
+- 论坛采集认 V2EX、NGA、LINUX DO 与小众软件。超长帖的总结按回复分块，上限 8 块
+  （`MAX_CHUNKS`），再长的部分不进总结素材。V2EX 与两个 Discourse 站点回复完整入库；NGA 讨论区只留楼主回复，
   总结另用前 `NGA_SUMMARY_MAX_PAGES` 页采样（含他人提问），不镜像整帖。
   NGA 公开帖走 guestJs + `lite=js`，需登录版块仍采不到；附件图只处理主楼与
   楼主回复，上限 80 张（`NGA_IMAGE_LIMIT`），超出保留外链。详情页「重新生成

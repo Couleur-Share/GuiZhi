@@ -36,6 +36,8 @@ export interface ImportTaskStore {
       duplicateItemId: string | null;
       forceDuplicate: boolean;
       stageStats: ImportStageStat[] | null;
+      captureStrategy: ImportTask["captureStrategy"];
+      commentLimit: ImportTask["commentLimit"];
     }>,
   ): ImportTask | null;
   resetProcessingToPending(): number;
@@ -62,11 +64,15 @@ export interface ImportQueueOptions {
   store: ImportTaskStore;
   persistence: ImportPersistence;
   extract: (
-    kind: ImportTask["sourceKind"],
-    input: string,
+    task: ImportTask,
     signal: AbortSignal,
     onStage: (stage: ImportStage) => void,
   ) => Promise<ExtractedContent>;
+  captureComments?: (
+    task: ImportTask,
+    resultItemId: string,
+    signal: AbortSignal,
+  ) => Promise<void>;
   onTaskChanged: (task: ImportTask) => void;
   concurrency?: number;
 }
@@ -78,6 +84,7 @@ export class ImportQueue {
   private readonly persistence: ImportPersistence;
   private readonly extract: ImportQueueOptions["extract"];
   private readonly onTaskChanged: (task: ImportTask) => void;
+  private readonly captureComments?: ImportQueueOptions["captureComments"];
   private readonly concurrency: number;
 
   private readonly pendingIds: string[] = [];
@@ -90,6 +97,7 @@ export class ImportQueue {
     this.persistence = options.persistence;
     this.extract = options.extract;
     this.onTaskChanged = options.onTaskChanged;
+    this.captureComments = options.captureComments;
     this.concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_CONCURRENCY));
   }
 
@@ -126,6 +134,19 @@ export class ImportQueue {
       .listByStatus(["pending"])
       .sort((left, right) => left.createdAt - right.createdAt);
     for (const task of pending) {
+      // 启动恢复不能自行弹出可见浏览器。认证任务保留原策略，但停在明确的
+      // 可手动重试状态；只有用户再次点击重试才会启动归知内置平台会话。
+      if (task.captureStrategy === "authenticated") {
+        const queuedIndex = this.pendingIds.indexOf(task.id);
+        if (queuedIndex >= 0) this.pendingIds.splice(queuedIndex, 1);
+        const recovered = this.store.update(task.id, {
+          status: "failed",
+          stage: null,
+          error: "[login_required] 登录态任务已从中断中恢复，请手动重试",
+        });
+        if (recovered) this.onTaskChanged(recovered);
+        continue;
+      }
       if (!this.pendingIds.includes(task.id)) {
         this.pendingIds.push(task.id);
       }
@@ -168,7 +189,14 @@ export class ImportQueue {
   }
 
   /** 重试失败/取消的任务；`forceDuplicate` 用于「仍要创建副本」。 */
-  retry(id: string, options?: { forceDuplicate?: boolean }): ImportTask | null {
+  retry(
+    id: string,
+    options?: {
+      forceDuplicate?: boolean;
+      captureStrategy?: ImportTask["captureStrategy"];
+      commentLimit?: ImportTask["commentLimit"];
+    },
+  ): ImportTask | null {
     const existing = this.store.get(id);
     if (!existing) {
       return null;
@@ -186,6 +214,12 @@ export class ImportQueue {
       stageStats: null,
       ...(options?.forceDuplicate !== undefined
         ? { forceDuplicate: options.forceDuplicate }
+        : {}),
+      ...(options?.captureStrategy
+        ? { captureStrategy: options.captureStrategy }
+        : {}),
+      ...(options?.commentLimit !== undefined
+        ? { commentLimit: options.commentLimit }
         : {}),
     });
     if (task) {
@@ -270,8 +304,7 @@ export class ImportQueue {
     try {
       this.throwIfAborted(controller);
       const extracted = await this.extract(
-        task.sourceKind,
-        task.sourceInput,
+        task,
         controller.signal,
         (stage) => this.updateAndNotify(id, { stage }, recorder),
       );
@@ -335,13 +368,25 @@ export class ImportQueue {
         contentHash,
       });
 
+      let commentsWarning: string | null = null;
+      if (task.commentLimit > 0 && this.captureComments) {
+        this.updateAndNotify(id, { stage: "comments" }, recorder);
+        try {
+          await this.captureComments(task, resultItemId, controller.signal);
+        } catch (error) {
+          commentsWarning = `热门评论采集失败：${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
+
       this.updateAndNotify(
         id,
         {
           status: "completed",
           stage: null,
           // 入库了但内容有缺失时，「已完成」这三个字必须带上下文
-          warning: extracted.warningReason ?? null,
+          warning: [extracted.warningReason, commentsWarning]
+            .filter(Boolean)
+            .join("；") || null,
           resultItemId,
         },
         recorder,

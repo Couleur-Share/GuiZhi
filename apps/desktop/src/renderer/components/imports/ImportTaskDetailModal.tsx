@@ -7,10 +7,11 @@
  * 「复制诊断信息」——用户报「这批采集特别慢」时，双方手上得有数。
  */
 import { useEffect, useState } from "react";
-import { ClipboardCopyIcon, ExternalLinkIcon, RotateCcwIcon } from "lucide-react";
+import { ClipboardCopyIcon, ExternalLinkIcon, LogInIcon, RotateCcwIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask, KnowledgeItem } from "@guizhi/shared/types";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
+import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
 import { Modal } from "../ui/Modal";
 import {
   getSourcePlatformMeta,
@@ -25,6 +26,7 @@ import { buildImportTaskReport } from "./import-task-report";
 import {
   formatImportTaskError,
   formatImportTaskWarning,
+  getAuthenticatedRetryPlatform,
   getStageLabel,
   resolveTaskFolder,
   resolveTaskHost,
@@ -86,6 +88,23 @@ export function ImportTaskDetailModal({
         ? (task.duplicateItemId ?? null)
         : null;
   const canRetry = task.status === "failed" || task.status === "canceled";
+  const authenticatedRetryPlatform = getAuthenticatedRetryPlatform(task);
+
+  const retryAuthenticated = async () => {
+    if (!authenticatedRetryPlatform) return;
+    try {
+      const statuses = await window.api.platformCapture.getStatuses();
+      const status = statuses.find((entry) => entry.platform === authenticatedRetryPlatform);
+      if (!status?.available) throw new Error("归知内置登录窗口暂不可用");
+      if (!status.loggedIn) await window.api.platformCapture.login(authenticatedRetryPlatform);
+      await retryTask(task.id, { captureStrategy: "authenticated" });
+      onClose();
+    } catch (error) {
+      showToast(t("imports.authenticatedRetryFailed", "登录态重试未开始"), "error", {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   useEffect(() => {
     if (!isOpen || !openableItemId) {
@@ -147,11 +166,21 @@ export function ImportTaskDetailModal({
         window.electron?.updater?.getVersion?.().catch(() => undefined),
         window.electron?.updater?.getPlatform?.().catch(() => undefined),
       ]);
+      const captureStatuses = task.captureStrategy === "authenticated"
+        ? await window.api.platformCapture?.getStatuses?.().catch(() => [])
+        : [];
+      const capturePlatform = detectPlatformCapturePlatform(task.sourceInput);
+      const captureStatus = captureStatuses?.find(
+        (entry) => entry.platform === capturePlatform,
+      );
       const report = buildImportTaskReport(task, {
         translate: (key, fallback, options) =>
           t(key, fallback, options) as unknown as string,
         appVersion,
         platform,
+        captureBrowser: captureStatus?.browser
+          ? `${captureStatus.browser}${captureStatus.browserVersion ? ` ${captureStatus.browserVersion}` : ""}`
+          : undefined,
       });
       await copyTextToClipboard(report);
       showToast(
@@ -328,6 +357,16 @@ export function ImportTaskDetailModal({
               >
                 <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 {t("imports.retry", "重试")}
+              </button>
+            ) : null}
+            {authenticatedRetryPlatform ? (
+              <button
+                type="button"
+                onClick={() => void retryAuthenticated()}
+                className={`${ACTION_BASE} bg-primary text-primary-foreground hover:bg-primary/90`}
+              >
+                <LogInIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("imports.authenticatedRetry", "使用登录态重试")}
               </button>
             ) : null}
           </div>

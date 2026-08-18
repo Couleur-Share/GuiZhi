@@ -1,23 +1,18 @@
 <p align="center">
-  <img src="apps/desktop/src/assets/icon.png" width="120" alt="归知 GuiZhi" />
-</p>
-
-<h1 align="center">归知 GuiZhi</h1>
-
-<p align="center"><strong>让信息归于知识 —— 本地优先的 AI 个人知识库</strong></p>
-
-<p align="center">
-  <a href="https://github.com/Couleur-Share/GuiZhi/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Couleur-Share/GuiZhi?include_prereleases&style=for-the-badge&color=2ea043" /></a>
-  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-8250df?style=for-the-badge" /></a>
-  <a href="#下载安装"><img alt="Platform" src="https://img.shields.io/badge/Windows_·_macOS_·_Linux-1f6feb?style=for-the-badge" /></a>
+  <img src="docs/images/readme-hero.svg" width="1040" alt="归知 GuiZhi：本地优先的 AI 个人知识库" />
 </p>
 
 <p align="center">
-  <img alt="Electron" src="https://img.shields.io/badge/Electron_33-47848F?style=flat-square&logo=electron&logoColor=white" />
-  <img alt="React" src="https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black" />
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript_5-3178C6?style=flat-square&logo=typescript&logoColor=white" />
-  <img alt="Vite" src="https://img.shields.io/badge/Vite_6-646CFF?style=flat-square&logo=vite&logoColor=white" />
-  <img alt="SQLite" src="https://img.shields.io/badge/SQLite_FTS5-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+  <a href="https://github.com/Couleur-Share/GuiZhi/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Couleur-Share/GuiZhi?include_prereleases&style=flat-square&color=2ea043" /></a>
+  <a href="#下载安装"><img alt="Platform" src="https://img.shields.io/badge/Windows_·_macOS_·_Linux-1f6feb?style=flat-square" /></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-8250df?style=flat-square" /></a>
+</p>
+
+<p align="center">
+  <a href="#下载安装">下载安装</a> ·
+  <a href="#快速上手">快速上手</a> ·
+  <a href="#支持的平台与来源">支持平台</a> ·
+  <a href="./docs/README.md">完整文档</a>
 </p>
 
 ---
@@ -26,11 +21,23 @@
 SQLite，交给 AI 做摘要、打标签、编织成互相链接的 Wiki 页面网络，再用
 「关键词 + 语义」混合检索把它们找回来，并基于你自己的资料回答问题。
 
-不需要账号，不上传云端。只有你主动配置的模型调用会走网络，其余一切留在本地。
+不需要注册归知账号。知识库、索引与备份默认保存在本机；使用网页 / 平台采集、
+模型调用等在线能力时，才会按当前操作访问对应服务。
 
 <p align="center">
   <img src="docs/images/library-card.png" alt="归知知识库：卡片视图与常驻详情面板" width="900" />
 </p>
+
+## 支持的平台与来源
+
+<p align="center">
+  <img src="docs/images/readme-platforms.svg" alt="归知已适配的平台：抖音、哔哩哔哩、小红书、YouTube、V2EX、NGA、LINUX DO、小众软件、2Libra、网页与本地文件" width="100%" />
+</p>
+
+抖音、哔哩哔哩、小红书与 YouTube 走专用内容链路；V2EX、NGA、LINUX DO、
+小众软件和 2Libra 保留讨论结构；其余标准 URL 安全回落到通用网页抓取，本地文本、
+图片、音视频可直接导入。登录条件、评论范围和各平台降级策略见
+[采集平台说明](./docs/capture-platforms.md)。
 
 ## 下载安装
 
@@ -63,7 +70,7 @@ macOS 包仅做 ad-hoc 签名、未经 Apple 公证：若提示无法验证开�
 
 | 能力 | 要点 |
 | --- | --- |
-| 采集 | 链接 / 分享口令 / 本地文件；抖音·B 站·小红书·YouTube·V2EX·网页；导入队列可重试 |
+| 采集 | 9 个专用平台 + 网页 / 本地文件；链接与分享口令；导入队列可重试 |
 | 知识库 | 卡片 / 列表双视图；知识库·标签·平台分区；FTS5 + 可选语义检索；AI 交接稿 |
 | AI | 六条模型路由；问答带引用；摘要标签；OCR；转写；正文配图 |
 | Wiki | AI 增量编译互链页面 + 关系图谱 |
@@ -87,6 +94,14 @@ macOS 包仅做 ad-hoc 签名、未经 Apple 公证：若提示无法验证开�
 开发者约定见 [AGENTS.md](./AGENTS.md)；变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
 ## 从源码构建
+
+<p>
+  <img alt="Electron" src="https://img.shields.io/badge/Electron_33-47848F?style=flat-square&logo=electron&logoColor=white" />
+  <img alt="React" src="https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript_5-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="Vite" src="https://img.shields.io/badge/Vite_6-646CFF?style=flat-square&logo=vite&logoColor=white" />
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite_FTS5-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+</p>
 
 需要 Node.js ≥ 24、pnpm ≥ 11。
 

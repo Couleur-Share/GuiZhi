@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   PauseIcon,
   PlayIcon,
+  CompassIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -19,6 +20,10 @@ import { ImportsBulkBar } from "./ImportsBulkBar";
 import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
 import { ImportTaskDetailModal } from "./ImportTaskDetailModal";
 import { ImportTaskRow } from "./ImportTaskRow";
+import {
+  PlatformDiscoveryPanel,
+} from "./PlatformDiscoveryPanel";
+import { DISCOVERY_DRAFT_KEY } from "./platform-discovery-draft";
 
 function isRunning(task: ImportTask): boolean {
   return task.status === "pending" || task.status === "processing";
@@ -29,6 +34,15 @@ function isRunning(task: ImportTask): boolean {
  * 打开结果条目，重复任务支持「打开已有条目」与「仍要创建副本」。
  */
 export function ImportsWorkspace() {
+  const [view, setView] = useState<"tasks" | "discovery">(() =>
+    sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ? "discovery" : "tasks",
+  );
+  return view === "discovery"
+    ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
+    : <ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} />;
+}
+
+function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
   const { t } = useTranslation();
   const tasks = useImportStore((state) => state.tasks);
   const hasLoaded = useImportStore((state) => state.hasLoaded);
@@ -181,6 +195,14 @@ export function ImportsWorkspace() {
             })}
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={onOpenDiscovery}
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
+        >
+          <CompassIcon className="h-4 w-4" aria-hidden="true" />
+          {t("imports.platformDiscovery", "平台发现")}
+        </button>
         {queueState.pendingCount > 0 || queueState.paused ? (
           <button
             type="button"

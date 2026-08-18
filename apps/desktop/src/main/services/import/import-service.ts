@@ -1,9 +1,14 @@
 /**
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
  */
-import { KnowledgeItemDB, ImportTaskDB } from "@guizhi/db";
+import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB } from "@guizhi/db";
 import type Database from "../../database/sqlite";
-import type { ImportTask } from "@guizhi/shared/types";
+import {
+  DEFAULT_NETWORK_PROXY_SETTINGS,
+  type ImportTask,
+  type NetworkProxySettings,
+} from "@guizhi/shared/types";
+import { normalizeNetworkProxySettings } from "@guizhi/shared/utils/network-proxy";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import { extractContent } from "./connectors";
 import { assessImportReview } from "./review-assessment";
@@ -12,6 +17,14 @@ import {
   createSourceRecordId,
   type ImportPersistence,
 } from "./import-queue";
+import { getBrowserCaptureService } from "../platform-capture/browser-capture";
+import {
+  fetchAuthenticatedDouyin,
+  fetchAuthenticatedLinuxdoJson,
+  fetchAuthenticatedXiaohongshu,
+  platformFromAuthenticatedUrl,
+} from "../platform-capture/authenticated-platforms";
+import { captureSourceComments } from "../platform-capture/source-comments";
 
 function createPersistence(db: Database.Database): ImportPersistence {
   const items = new KnowledgeItemDB(db);
@@ -96,8 +109,7 @@ function readToolPathSetting(
   key: string,
 ): string | null {
   const row = db.get("SELECT value FROM settings WHERE key = ?", [key]) as
-    | { value: string }
-    | undefined;
+    { value: string } | undefined;
   if (!row) {
     return null;
   }
@@ -134,21 +146,74 @@ export function readTranscribeDiarizeSetting(db: Database.Database): boolean {
   }
 }
 
+export function readNetworkProxySetting(
+  db: Database.Database,
+): NetworkProxySettings {
+  const row = db.get("SELECT value FROM settings WHERE key = ?", [
+    "networkProxy",
+  ]) as { value: string } | undefined;
+  if (!row) return { ...DEFAULT_NETWORK_PROXY_SETTINGS };
+  try {
+    return normalizeNetworkProxySettings(JSON.parse(row.value));
+  } catch {
+    return { ...DEFAULT_NETWORK_PROXY_SETTINGS };
+  }
+}
+
 export function createImportService(
   db: Database.Database,
   broadcast: (task: ImportTask) => void,
 ): ImportService {
   const taskDb = new ImportTaskDB(db);
+  const commentDb = new SourceCommentDB(db);
+  const browserCapture = getBrowserCaptureService({
+    getNetworkProxy: () => readNetworkProxySetting(db),
+  });
   const queue = new ImportQueue({
     store: taskDb,
     persistence: createPersistence(db),
-    extract: (kind, input, signal, onStage) =>
-      extractContent(kind, input, signal, {
+    extract: (task, signal, onStage) => {
+      if (task.captureStrategy === "authenticated") {
+        onStage("browser-capture");
+      }
+      return extractContent(task.sourceKind, task.sourceInput, signal, {
+        captureStrategy: task.captureStrategy,
         getYtDlpPath: () => readYtDlpPathSetting(db),
         getFfmpegPath: () => readFfmpegPathSetting(db),
         getDiarize: () => readTranscribeDiarizeSetting(db),
+        fetchAuthenticatedDouyin: (url, requestSignal) =>
+          fetchAuthenticatedDouyin(browserCapture, url, requestSignal),
+        fetchAuthenticatedXiaohongshu: (url, requestSignal) =>
+          fetchAuthenticatedXiaohongshu(browserCapture, url, requestSignal),
+        fetchAuthenticatedLinuxdoJson: (url, requestSignal) =>
+          fetchAuthenticatedLinuxdoJson(browserCapture, url, requestSignal),
         onStage,
-      }),
+      });
+    },
+    captureComments: async (task, resultItemId, signal) => {
+      const platform = platformFromAuthenticatedUrl(task.sourceInput);
+      if (!platform || task.captureStrategy !== "authenticated") {
+        throw new Error("热门评论需要受支持平台的登录态采集");
+      }
+      // LINUX DO 的全部楼层已随论坛正文入库，不再重复写 source_comments。
+      if (platform === "linuxdo") {
+        return;
+      }
+      const comments = await captureSourceComments(
+        browserCapture,
+        platform,
+        task.sourceInput,
+        task.commentLimit,
+        signal,
+      );
+      commentDb.upsertMany(
+        comments.map((comment) => ({
+          ...comment,
+          itemId: resultItemId,
+          platform,
+        })),
+      );
+    },
     onTaskChanged: broadcast,
   });
   return { queue, taskDb };

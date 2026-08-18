@@ -2,6 +2,7 @@
  * 采集 / 导入管线类型。
  */
 import type { KnowledgeItemType } from "./knowledge";
+import type { CommentLimit, ImportCaptureStrategy } from "./platform-capture";
 
 export const IMPORT_SOURCE_KINDS = ["text", "file", "url"] as const;
 
@@ -55,6 +56,9 @@ export const IMPORT_STAGES = [
   "image-ocr",
   // ── 论坛帖子子阶段 ──
   "forum-replies",
+  // ── 登录态平台采集 ──
+  "browser-capture",
+  "comments",
 ] as const;
 
 export type ImportStage = (typeof IMPORT_STAGES)[number];
@@ -116,6 +120,10 @@ export interface ImportTask {
   refreshOfItemId?: string | null;
   /** 入库时要打上的标签（采集弹窗里选的） */
   tagNames?: string[];
+  /** standard 保持匿名轻量链路；authenticated 只在用户明确操作后使用。 */
+  captureStrategy: ImportCaptureStrategy;
+  /** 0 表示不采评论。 */
+  commentLimit: CommentLimit;
   /**
    * 各阶段的耗时与 AI 开销，按进入顺序排列；任务跑完前是已完成的那部分。
    *
@@ -144,4 +152,6 @@ export interface EnqueueImportInput {
   tagNames?: string[];
   /** 跳过去重强制创建副本（「仍要创建副本」） */
   forceDuplicate?: boolean;
+  captureStrategy?: ImportCaptureStrategy;
+  commentLimit?: CommentLimit;
 }

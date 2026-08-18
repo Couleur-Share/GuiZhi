@@ -26,16 +26,19 @@ under AGPL-3.0.
 
 界面中标识采集来源的平台 logo（抖音 / 哔哩哔哩 / 小红书 / YouTube / V2EX）
 取自 Simple Icons，路径数据内联在
-apps/desktop/src/renderer/components/ui/PlatformLogos.tsx。图标数据以
-CC0-1.0 发布，但商标本身归各平台所有，此处仅用于指称条目来自哪个平台，
-不表示任何关联或背书。NGA 条目在 Simple Icons 中不存在，对应 glyph 为
-归知自绘，同样仅用于指称来源。
+apps/desktop/src/renderer/components/ui/PlatformLogos.tsx 与
+docs/images/readme-platforms.svg。图标数据以 CC0-1.0 发布，但商标本身归各平台所有，
+此处仅用于指称条目来自哪个平台，不表示任何关联或背书。NGA、LINUX DO 与小众软件
+条目在 Simple Icons 中不存在，对应 glyph 为归知自绘；2Libra 使用其公开站点 favicon
+的天平图形。它们同样仅用于指称来源，不表示任何关联或背书。
 
 The platform logos used to label an item's capture source (Douyin, Bilibili,
 Xiaohongshu, YouTube, V2EX) come from Simple Icons, with the path data
-inlined in apps/desktop/src/renderer/components/ui/PlatformLogos.tsx. The
-icon data is released under CC0-1.0, but the trademarks remain the property
-of their respective owners and are used here solely to identify the source
-of a captured item, implying no affiliation or endorsement. The NGA glyph
-is an original mark (Simple Icons has no NGA entry), used for the same
-referential purpose.
+inlined in apps/desktop/src/renderer/components/ui/PlatformLogos.tsx and
+docs/images/readme-platforms.svg. The icon data is released under CC0-1.0,
+but the trademarks remain the property of their respective owners and are
+used here solely to identify the source of a captured item, implying no
+affiliation or endorsement. The NGA, LINUX DO and Appinn glyphs are original
+marks because Simple Icons has no matching entries; 2Libra uses the balance
+glyph from its public site favicon. They are used for the same referential
+purpose and imply no affiliation or endorsement.

@@ -77,6 +77,20 @@ CREATE TABLE IF NOT EXISTS source_records (
   captured_at INTEGER NOT NULL
 );
 
+-- 平台来源评论：辅助材料，不进入正文、FTS、embedding 或 Wiki。
+CREATE TABLE IF NOT EXISTS source_comments (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin','linuxdo')),
+  external_id TEXT NOT NULL,
+  author_name TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  like_count INTEGER NOT NULL DEFAULT 0,
+  published_at INTEGER,
+  captured_at INTEGER NOT NULL,
+  UNIQUE(item_id, platform, external_id)
+);
+
 -- Wiki 页面（ADR 0023：AI 编译的派生知识页；normalized_title 是链接锚点，禁止改名）
 CREATE TABLE IF NOT EXISTS wiki_pages (
   id TEXT PRIMARY KEY,
@@ -197,6 +211,10 @@ CREATE TABLE IF NOT EXISTS import_tasks (
   tag_names TEXT,
   -- 各阶段耗时与 AI 开销（JSON 数组，见 ImportStageStat）；重试时清空
   stage_stats TEXT,
+  capture_strategy TEXT NOT NULL DEFAULT 'standard'
+    CHECK(capture_strategy IN ('standard','authenticated')),
+  comment_limit INTEGER NOT NULL DEFAULT 0
+    CHECK(comment_limit IN (0,10,20,50)),
   force_duplicate INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -237,6 +255,8 @@ CREATE INDEX IF NOT EXISTS idx_sources_normalized ON source_records(normalized_u
 CREATE INDEX IF NOT EXISTS idx_sources_hash ON source_records(content_hash);
 -- 侧栏「平台」分区每次刷新都要按平台分组数一遍，且列表过滤走 platform 等值
 CREATE INDEX IF NOT EXISTS idx_sources_platform ON source_records(platform);
+CREATE INDEX IF NOT EXISTS idx_source_comments_item
+  ON source_comments(item_id, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_status ON import_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_created ON import_tasks(created_at DESC);
 -- getCatalog 是 Wiki 模块最高频的查询（编译时每个条目都要打一次），

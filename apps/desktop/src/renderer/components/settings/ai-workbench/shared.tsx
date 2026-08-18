@@ -1,6 +1,6 @@
 import { BrainIcon } from "lucide-react";
 
-import { Select } from "../../ui/Select";
+import { Select, type SelectOption } from "../../ui/Select";
 
 export function StatusCard({
   title,
@@ -55,7 +55,7 @@ export function ScenarioRow({
   desc: string;
   fallbackLabel: string;
   value: string;
-  options: Array<{ value: string; label: string }>;
+  options: SelectOption[];
   onChange: (value: string) => void;
   disabled: boolean;
 }) {

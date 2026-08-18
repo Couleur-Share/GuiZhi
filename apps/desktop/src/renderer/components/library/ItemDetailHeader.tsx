@@ -321,8 +321,11 @@ export function ItemDetailHeader({
           }
         }}
         readOnly={isTrashed}
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
         placeholder={t("library.titlePlaceholder", "标题")}
-        className="block w-full resize-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
+        className="block w-full resize-none border-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
       />
 
       {/* 动作区并进元信息行右侧：不新增一行高度，与 Wiki 页面详情同形态 */}

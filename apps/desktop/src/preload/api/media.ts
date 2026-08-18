@@ -47,6 +47,9 @@ export const mediaApi = {
   /** 基于文字稿生成结构化「视频/音频总结」并写入正文 */
   summarize: (itemId: string): Promise<MediaTranscribeResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.MEDIA_SUMMARIZE, itemId),
+  /** 重新抓取论坛逐楼讨论并替换条目中的「讨论」小节 */
+  refreshForumDiscussion: (itemId: string): Promise<MediaTranscribeResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.MEDIA_REFRESH_FORUM_DISCUSSION, itemId),
   /** 当前「语音转写」路由支持哪些可选能力（界面据此决定摆不摆入口） */
   capabilities: (): Promise<MediaCapabilities> =>
     ipcRenderer.invoke(IPC_CHANNELS.MEDIA_CAPABILITIES),
@@ -68,8 +71,7 @@ export const ytDlpApi = {
     ipcRenderer.invoke(IPC_CHANNELS.YTDLP_CHECK_UPDATE),
   install: (): Promise<YtDlpInstallResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.YTDLP_INSTALL),
-  remove: (): Promise<boolean> =>
-    ipcRenderer.invoke(IPC_CHANNELS.YTDLP_REMOVE),
+  remove: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.YTDLP_REMOVE),
   pickBinary: (): Promise<string | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.YTDLP_PICK_BINARY),
 };

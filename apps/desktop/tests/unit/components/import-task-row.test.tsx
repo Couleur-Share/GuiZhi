@@ -24,6 +24,9 @@ function makeTask(patch: Partial<ImportTask> = {}): ImportTask {
     duplicateItemId: null,
     collectionId: null,
     tagNames: [],
+    stageStats: null,
+    captureStrategy: "standard",
+    commentLimit: 0,
     createdAt: NOW - 600_000,
     updatedAt: NOW - 10_000,
     ...patch,
@@ -167,6 +170,45 @@ describe("导入任务行", () => {
     );
     expect(screen.getByLabelText("重试")).toBeInTheDocument();
     expect(screen.queryByLabelText("前往设置安装工具")).not.toBeInTheDocument();
+  });
+
+  it("只有匿名平台解析失败才显示登录态重试", () => {
+    renderRow(makeTask({
+      sourceInput: "https://www.xiaohongshu.com/explore/abc",
+      status: "failed",
+      stage: null,
+      error: "[structure_missing] 笔记页未返回数据",
+    }));
+    expect(screen.getByLabelText("使用登录态重试")).toBeInTheDocument();
+  });
+
+  it("作品删除与已认证任务不显示登录态重试", () => {
+    const { unmount } = render(
+      <ImportTaskRow
+        task={makeTask({
+          sourceInput: "https://www.douyin.com/video/123",
+          status: "failed",
+          stage: null,
+          error: "[note_unavailable] 作品已删除",
+        })}
+        now={NOW}
+        isChecked={false}
+        hasSelection={false}
+        onToggle={vi.fn()}
+        onOpenItem={vi.fn()}
+        onOpenDetail={vi.fn()}
+      />,
+    );
+    expect(screen.queryByLabelText("使用登录态重试")).not.toBeInTheDocument();
+    unmount();
+    renderRow(makeTask({
+      sourceInput: "https://www.douyin.com/video/123",
+      status: "failed",
+      stage: null,
+      error: "[structure_missing] 页面变化",
+      captureStrategy: "authenticated",
+    }));
+    expect(screen.queryByLabelText("使用登录态重试")).not.toBeInTheDocument();
   });
 });
 

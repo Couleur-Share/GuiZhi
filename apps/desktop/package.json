@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "main": "out/main/index.js",
@@ -43,6 +43,7 @@
     "test:e2e": "pnpm build && playwright test",
     "test:e2e:smoke": "pnpm build && playwright test smoke.spec.ts",
     "shot": "node scripts/screenshot.mjs",
+    "readme:assets": "node scripts/render-readme-assets.mjs",
     "test:release": "pnpm lint && pnpm typecheck && pnpm test:unit && pnpm build",
     "typecheck": "tsc --noEmit"
   },

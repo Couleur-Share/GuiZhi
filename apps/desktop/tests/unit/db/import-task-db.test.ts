@@ -28,6 +28,21 @@ describe("ImportTaskDB", () => {
     expect(task.status).toBe("pending");
     expect(task.displayName).toBe("第一行标题");
     expect(task.sourceKind).toBe("text");
+    expect(task.captureStrategy).toBe("standard");
+    expect(task.commentLimit).toBe(0);
+  });
+
+  it("认证策略与评论数量随任务持久化", () => {
+    const task = tasks.create({
+      kind: "url",
+      input: "https://www.douyin.com/video/123",
+      captureStrategy: "authenticated",
+      commentLimit: 20,
+    });
+    expect(tasks.get(task.id)).toMatchObject({
+      captureStrategy: "authenticated",
+      commentLimit: 20,
+    });
   });
 
   it("创建任务：文件取文件名做显示名", () => {

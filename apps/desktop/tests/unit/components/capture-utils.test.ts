@@ -144,6 +144,16 @@ https://example.com/c`;
         "看看这个 https://bbs.nga.cn/read.php?tid=37194262&fav=:x&rand=1",
       ),
     ).toMatchObject({ kind: "mixed", prefer: "urls" });
+    expect(
+      parseCaptureDraft(
+        "这个讨论挺有意思 https://meta.appinn.net/t/topic/89533",
+      ),
+    ).toMatchObject({ kind: "mixed", prefer: "urls" });
+    expect(
+      parseCaptureDraft(
+        "这个讨论也看看 https://2libra.com/post/health-consultation/bUSaOUc",
+      ),
+    ).toMatchObject({ kind: "mixed", prefer: "urls" });
   });
 
   it("小红书两种分享口令都默认采集链接", () => {

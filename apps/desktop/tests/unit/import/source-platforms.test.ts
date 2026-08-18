@@ -47,6 +47,15 @@ describe("resolveSourcePlatform", () => {
     expect(
       resolveSourcePlatform("url", "https://ngabbs.com/read.php?tid=123"),
     ).toBe("nga");
+    expect(
+      resolveSourcePlatform("url", "https://meta.appinn.net/t/topic/89533"),
+    ).toBe("appinn");
+    expect(
+      resolveSourcePlatform(
+        "url",
+        "https://2libra.com/post/health-consultation/bUSaOUc",
+      ),
+    ).toBe("twolibra");
   });
 
   it("认不出的链接归到网页兜底桶", () => {

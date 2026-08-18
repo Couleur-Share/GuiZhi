@@ -33,6 +33,7 @@ export interface CoreAIProviderConfig {
   apiKey: string;
   apiUrl: string;
   lastVerifiedAt?: string;
+  enabled?: boolean;
 }
 
 export interface CoreAIModelConfig {
@@ -47,6 +48,7 @@ export interface CoreAIModelConfig {
   isDefault?: boolean;
   lastVerifiedAt?: string;
   capabilities?: CoreAIModelCapabilities;
+  enabled?: boolean;
 }
 
 export interface CoreAIConfigFile {
@@ -64,6 +66,7 @@ export interface AddAIProviderInput {
   apiProtocol?: AIProtocol;
   apiKey: string;
   apiUrl: string;
+  enabled?: boolean;
 }
 
 export interface AddAIModelInput {
@@ -75,6 +78,7 @@ export interface AddAIModelInput {
   apiProtocol?: AIProtocol;
   apiKey?: string;
   apiUrl?: string;
+  enabled?: boolean;
 }
 
 export class AIConfigError extends Error {
@@ -175,6 +179,7 @@ function normalizeProviderConfig(
     apiKey: typeof provider.apiKey === "string" ? provider.apiKey.trim() : "",
     apiUrl: apiUrl.trim(),
     lastVerifiedAt: provider.lastVerifiedAt,
+    enabled: provider.enabled !== false,
   };
 }
 
@@ -195,7 +200,24 @@ function normalizeModelConfig(model: CoreAIModelConfig): CoreAIModelConfig {
     isDefault: model.isDefault === true,
     lastVerifiedAt: model.lastVerifiedAt,
     capabilities: normalizeCapabilities(model.capabilities),
+    enabled: model.enabled !== false,
   };
+}
+
+export function isCoreModelEnabled(
+  model: CoreAIModelConfig,
+  providers: CoreAIProviderConfig[] = [],
+): boolean {
+  if (model.enabled === false) {
+    return false;
+  }
+  if (model.providerId) {
+    const provider = providers.find((p) => p.id === model.providerId);
+    if (provider && provider.enabled === false) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function normalizeRoutes(

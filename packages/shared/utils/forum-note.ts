@@ -12,6 +12,8 @@ import { parseVideoMetaBlock } from "./video-meta";
 export const FORUM_SUMMARY_HEADING = "## 讨论总结";
 export const FORUM_BODY_HEADING = "## 正文";
 export const FORUM_REPLIES_HEADING = "## 讨论";
+export const FORUM_SUMMARY_STALE_NOTE =
+  "> 讨论内容已刷新，当前总结基于刷新前的楼层，请重新生成。";
 
 /**
  * 回复小节标题：`## 讨论（107 条）` 或 NGA 的
@@ -30,7 +32,8 @@ const REPLY_TO_LINE = /^>\s*回复\s*@(.+?)(?:（(\d+)\s*楼）)?：(.*)$/;
 /** 二级标题（`###` 不算——总结体内的小标题与楼层头用的就是三级） */
 const SECTION_HEADING_LINE = /^##\s/;
 /** 采集时留下的总结状态注记，重新生成成功后它们就过时了 */
-const SUMMARY_NOTE_LINE = /^>\s*(?:未配置文本模型|讨论总结生成失败)/;
+const SUMMARY_NOTE_LINE =
+  /^>\s*(?:未配置文本模型|讨论总结生成失败|讨论内容已刷新，当前总结基于刷新前的楼层)/;
 
 export interface ForumNoteSections {
   /** 讨论总结（不含小节标题）；未生成时为空 */
@@ -70,7 +73,10 @@ export function splitForumNoteSections(content: string): ForumNoteSections {
 
   for (const [order, marker] of markers.entries()) {
     const end = markers[order + 1]?.index ?? lines.length;
-    const text = lines.slice(marker.index + 1, end).join("\n").trim();
+    const text = lines
+      .slice(marker.index + 1, end)
+      .join("\n")
+      .trim();
     // 同名小节重复出现时按先后拼接，不覆盖
     sections[marker.kind] = sections[marker.kind]
       ? `${sections[marker.kind]}\n\n${text}`
@@ -231,9 +237,14 @@ function splitReplyToPrefix(raw: string): {
   const replyTo: ForumReplyEntry["replyTo"] = {
     author: match[1].trim(),
     snippet: normalizeForumSnippet(match[3] ?? ""),
-    ...(floorNum != null && Number.isFinite(floorNum) ? { floor: floorNum } : {}),
+    ...(floorNum != null && Number.isFinite(floorNum)
+      ? { floor: floorNum }
+      : {}),
   };
-  const rest = lines.slice(index + 1).join("\n").trim();
+  const rest = lines
+    .slice(index + 1)
+    .join("\n")
+    .trim();
   return { replyTo, content: rest };
 }
 
@@ -246,7 +257,9 @@ export function resolveReplyTargetFloor(
   replyTo: { author: string; floor?: number },
 ): number | null {
   if (replyTo.floor != null && Number.isFinite(replyTo.floor)) {
-    return replies.some((r) => r.floor === replyTo.floor) ? replyTo.floor : null;
+    return replies.some((r) => r.floor === replyTo.floor)
+      ? replyTo.floor
+      : null;
   }
   const author = replyTo.author.trim().toLowerCase();
   if (!author) {
@@ -270,7 +283,9 @@ export function filterForumReplies(
   if (!needle) {
     return replies;
   }
-  return replies.filter((reply) => forumReplySearchText(reply).includes(needle));
+  return replies.filter((reply) =>
+    forumReplySearchText(reply).includes(needle),
+  );
 }
 
 function forumReplySearchText(reply: ForumReplyEntry): string {
@@ -338,7 +353,65 @@ export function upsertForumSummarySection(
   ]);
 }
 
+/**
+ * 用最新抓到的逐楼内容替换「讨论」小节。
+ *
+ * 主楼与已有总结原样保留；已有总结会加一条过期提示，避免用户把旧总结
+ * 当成刚刷新后的结论。重新生成总结时 upsertForumSummarySection 会清掉提示。
+ */
+export function replaceForumRepliesSection(
+  content: string,
+  replies: ForumReplyEntry[],
+): string {
+  const lines = content.split("\n");
+  const replyBody = replies.map(formatForumReplyBlock).join("\n\n");
+  const sectionLines = [
+    `${FORUM_REPLIES_HEADING}（${replies.length} 条）`,
+    ...(replyBody ? ["", ...replyBody.split("\n")] : []),
+  ];
+
+  const startIdx = lines.findIndex((line) =>
+    REPLIES_HEADING_LINE.test(line.trim()),
+  );
+  let nextLines: string[];
+  if (startIdx >= 0) {
+    let endIdx = lines.length;
+    for (let i = startIdx + 1; i < lines.length; i++) {
+      if (SECTION_HEADING_LINE.test(lines[i].trim())) {
+        endIdx = i;
+        break;
+      }
+    }
+    nextLines = [
+      ...lines.slice(0, startIdx),
+      ...sectionLines,
+      "",
+      ...lines.slice(endIdx),
+    ];
+  } else {
+    nextLines = [...lines, "", ...sectionLines];
+  }
+
+  const hadSummary = Boolean(splitForumNoteSections(content).summary.trim());
+  if (hadSummary) {
+    const summaryIdx = nextLines.findIndex((line) =>
+      SUMMARY_HEADING_LINE.test(line.trim()),
+    );
+    const alreadyMarked = nextLines.some(
+      (line) => line.trim() === FORUM_SUMMARY_STALE_NOTE,
+    );
+    if (summaryIdx >= 0 && !alreadyMarked) {
+      nextLines.splice(summaryIdx + 1, 0, "", FORUM_SUMMARY_STALE_NOTE);
+    }
+  }
+
+  return joinBlocks(nextLines);
+}
+
 /** 删行与插入都会留下连续空行，统一折叠成段落间距 */
 function joinBlocks(lines: string[]): string {
-  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

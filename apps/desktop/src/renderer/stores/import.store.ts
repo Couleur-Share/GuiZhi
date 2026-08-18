@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   EnqueueImportInput,
+  ImportCaptureStrategy,
   ImportQueueState,
   ImportTask,
 } from "@guizhi/shared/types";
@@ -93,7 +94,14 @@ interface ImportState {
   toggleQueuePaused: () => Promise<void>;
   enqueue: (inputs: EnqueueImportInput[]) => Promise<ImportTask[]>;
   cancelTask: (id: string) => Promise<void>;
-  retryTask: (id: string, forceDuplicate?: boolean) => Promise<void>;
+  retryTask: (
+    id: string,
+    options?: boolean | {
+      forceDuplicate?: boolean;
+      captureStrategy?: ImportCaptureStrategy;
+      commentLimit?: 0 | 10 | 20 | 50;
+    },
+  ) => Promise<void>;
   /** 删除单条已结束的任务（失败任务不进「清理已完成」，需要单独的出口） */
   removeTask: (id: string) => Promise<void>;
   /** 批量：逐条走 IPC，结束后只刷新一次列表 */
@@ -291,11 +299,14 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     });
   },
 
-  retryTask: async (id, forceDuplicate) => {
+  retryTask: async (id, options) => {
     await runGuardedMutation("imports.actionRetry", "重试任务", async () => {
+      const retryOptions = typeof options === "boolean"
+        ? { forceDuplicate: options }
+        : options;
       await window.api.import.retry(
         id,
-        forceDuplicate !== undefined ? { forceDuplicate } : undefined,
+        retryOptions,
       );
       await get().fetchTasks();
     });

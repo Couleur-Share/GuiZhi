@@ -317,10 +317,15 @@ export function AISettingsPrototype() {
       Object.fromEntries(
         MODEL_ROUTE_DEFINITIONS.map((item) => [
           item.key,
-          resolveRouteModel(aiModels, settings.modelRouteDefaults, item.key),
+          resolveRouteModel(
+            aiModels,
+            settings.modelRouteDefaults,
+            item.key,
+            settings.aiProviders,
+          ),
         ]),
       ) as Record<AIModelRoute, AIModelConfig | null>,
-    [aiModels, settings.modelRouteDefaults],
+    [aiModels, settings.modelRouteDefaults, settings.aiProviders],
   );
 
   const endpointGroups = useMemo(() => {
@@ -336,6 +341,7 @@ export function AISettingsPrototype() {
         apiProtocol: providerConfig.apiProtocol,
         apiKey: providerConfig.apiKey,
         apiUrl: providerConfig.apiUrl,
+        enabled: providerConfig.enabled !== false,
         models: [],
       };
       return acc;
@@ -352,6 +358,7 @@ export function AISettingsPrototype() {
           apiProtocol: model.apiProtocol,
           apiKey: model.apiKey,
           apiUrl: model.apiUrl,
+          enabled: model.enabled !== false,
           models: [],
         };
       }
@@ -416,12 +423,13 @@ export function AISettingsPrototype() {
         value: getModelDisplayName(
           resolvedRouteModels[item.key],
           t("settings.aiWorkbenchNotConfigured"),
+          settings.aiProviders,
         ),
         detail: t(item.descKey),
         tone: resolvedRouteModels[item.key] ? "ready" : "warning",
         icon: item.icon,
       })),
-    [resolvedRouteModels, t],
+    [resolvedRouteModels, settings.aiProviders, t],
   );
 
   const fetchModelsForForm = async (form: ModelFormState) => {
@@ -774,6 +782,7 @@ export function AISettingsPrototype() {
       apiProtocol: group.apiProtocol,
       apiKey: group.apiKey || firstModel?.apiKey || "",
       apiUrl: group.apiUrl,
+      enabled: group.enabled !== false,
     });
     setShowEndpointForm(true);
   };
@@ -788,6 +797,7 @@ export function AISettingsPrototype() {
       apiProtocol: providerInfo?.recommendedProtocol || EMPTY_FORM.apiProtocol,
       apiKey: "",
       apiUrl: providerInfo?.defaultUrl || EMPTY_FORM.apiUrl,
+      enabled: true,
     });
     setShowEndpointForm(true);
   };
@@ -805,6 +815,7 @@ export function AISettingsPrototype() {
       apiProtocol: EndpointGroup["apiProtocol"];
       apiKey: string;
       apiUrl: string;
+      enabled?: boolean;
       lastVerifiedAt?: string;
     },
   ) => {
@@ -821,6 +832,10 @@ export function AISettingsPrototype() {
         apiProtocol: providerConfig.apiProtocol,
         apiKey: providerConfig.apiKey,
         apiUrl: providerConfig.apiUrl,
+        enabled:
+          providerConfig.enabled !== undefined
+            ? providerConfig.enabled
+            : model.enabled,
         // 凭据变了，上一次的验证结果不再作数，这个 undefined 要写进去
         lastVerifiedAt: providerConfig.lastVerifiedAt,
       });
@@ -831,6 +846,32 @@ export function AISettingsPrototype() {
       delete next[targetGroup.key];
       return next;
     });
+  };
+
+  const handleToggleEndpointEnabled = (
+    group: EndpointGroup,
+    enabled: boolean,
+  ) => {
+    const displayName = group.name || getEndpointDisplayName(group);
+    if (group.providerConfigId) {
+      settings.updateAiProvider(group.providerConfigId, { enabled });
+    } else {
+      for (const model of group.models) {
+        settings.updateAiModel(model.id, { enabled });
+      }
+    }
+    showToast(
+      enabled
+        ? t("settings.aiWorkbenchProviderEnabledToast", {
+            name: displayName,
+            defaultValue: `已启用供应商「${displayName}」`,
+          })
+        : t("settings.aiWorkbenchProviderDisabledToast", {
+            name: displayName,
+            defaultValue: `已停用供应商「${displayName}」`,
+          }),
+      "success",
+    );
   };
 
   const handleSaveEndpoint = () => {
@@ -846,6 +887,7 @@ export function AISettingsPrototype() {
       apiProtocol: endpointDraft.apiProtocol,
       apiKey: endpointDraft.apiKey.trim(),
       apiUrl: normalizeApiUrlInput(endpointDraft.apiUrl),
+      enabled: endpointDraft.enabled !== false,
       lastVerifiedAt: undefined,
     };
 
@@ -977,6 +1019,7 @@ export function AISettingsPrototype() {
 
       <ScenarioDefaultsSection
         aiModels={aiModels}
+        aiProviders={settings.aiProviders}
         modelRouteDefaults={settings.modelRouteDefaults}
         onRouteChange={(route, value) =>
           settings.setModelRouteDefault(route, value)
@@ -1034,6 +1077,7 @@ export function AISettingsPrototype() {
         onTestEndpoint={(group) => void handleTestEndpoint(group)}
         onEditEndpoint={openEditEndpoint}
         onDeleteEndpoint={(group) => setPendingDeleteEndpoint(group)}
+        onToggleEndpointEnabled={handleToggleEndpointEnabled}
         onUpdateEndpointCredentials={handleUpdateEndpointCredentials}
         onAddProvider={openAddEndpoint}
         onAddModel={openAddModel}

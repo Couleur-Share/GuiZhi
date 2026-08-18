@@ -78,6 +78,27 @@ export function getTableDefinition(
   return row?.sql ?? "";
 }
 
+/** 按当前连接器白名单重算派生的平台字段。 */
+function refreshSourcePlatforms(db: Database.Database): void {
+  if (!getTableDefinition(db, "source_records")) {
+    return;
+  }
+  const rows = db.all(
+    "SELECT id, source_type, source_uri FROM source_records",
+  ) as Array<{
+    id: string;
+    source_type: string;
+    source_uri: string | null;
+  }>;
+  for (const row of rows) {
+    db.run(
+      "UPDATE source_records SET platform = ? WHERE id = ?",
+      resolveSourcePlatform(row.source_type, row.source_uri),
+      row.id,
+    );
+  }
+}
+
 /**
  * knowledge_items 的完整定义。重建表时新旧结构必须逐字一致（除 CHECK 之外），
  * 所以这里与 schema.ts 的建表语句共用同一份列清单。
@@ -271,20 +292,7 @@ export const MIGRATIONS: Migration[] = [
         "CREATE INDEX IF NOT EXISTS idx_sources_platform ON source_records(platform)",
       );
 
-      const rows = db.all(
-        "SELECT id, source_type, source_uri FROM source_records",
-      ) as Array<{
-        id: string;
-        source_type: string;
-        source_uri: string | null;
-      }>;
-      for (const row of rows) {
-        db.run(
-          "UPDATE source_records SET platform = ? WHERE id = ?",
-          resolveSourcePlatform(row.source_type, row.source_uri),
-          row.id,
-        );
-      }
+      refreshSourcePlatforms(db);
     },
   },
   {
@@ -323,6 +331,94 @@ export const MIGRATIONS: Migration[] = [
       );
       addColumnIfMissing(db, "knowledge_items", "review_reasons", "TEXT");
     },
+  },
+  {
+    // 用户明确选择的登录态采集策略必须随任务跨重启保留。
+    name: "0014-import-authenticated-capture",
+    up: (db) => {
+      addColumnIfMissing(
+        db,
+        "import_tasks",
+        "capture_strategy",
+        "TEXT NOT NULL DEFAULT 'standard'",
+      );
+      addColumnIfMissing(
+        db,
+        "import_tasks",
+        "comment_limit",
+        "INTEGER NOT NULL DEFAULT 0",
+      );
+    },
+  },
+  {
+    // 评论是独立辅助材料，刻意不接进 knowledge_fts。
+    name: "0015-source-comments",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS source_comments (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+          platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin')),
+          external_id TEXT NOT NULL,
+          author_name TEXT NOT NULL DEFAULT '',
+          content TEXT NOT NULL DEFAULT '',
+          like_count INTEGER NOT NULL DEFAULT 0,
+          published_at INTEGER,
+          captured_at INTEGER NOT NULL,
+          UNIQUE(item_id, platform, external_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_source_comments_item
+          ON source_comments(item_id, captured_at DESC);
+      `);
+    },
+  },
+  {
+    // LINUX DO 楼层可作为来源评论补采；SQLite 无法原地修改 CHECK，需重建表。
+    name: "0016-source-comments-linuxdo",
+    up: (db) => {
+      const definition = getTableDefinition(db, "source_comments");
+      if (
+        !definition ||
+        !getTableDefinition(db, "knowledge_items") ||
+        definition.includes("'linuxdo'")
+      ) {
+        return;
+      }
+      db.exec(`
+        CREATE TABLE source_comments_migrate (
+          id TEXT PRIMARY KEY,
+          item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
+          platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin','linuxdo')),
+          external_id TEXT NOT NULL,
+          author_name TEXT NOT NULL DEFAULT '',
+          content TEXT NOT NULL DEFAULT '',
+          like_count INTEGER NOT NULL DEFAULT 0,
+          published_at INTEGER,
+          captured_at INTEGER NOT NULL,
+          UNIQUE(item_id, platform, external_id)
+        );
+        INSERT INTO source_comments_migrate
+          (id, item_id, platform, external_id, author_name, content,
+           like_count, published_at, captured_at)
+          SELECT id, item_id, platform, external_id, author_name, content,
+                 like_count, published_at, captured_at
+          FROM source_comments;
+        DROP TABLE source_comments;
+        ALTER TABLE source_comments_migrate RENAME TO source_comments;
+        CREATE INDEX IF NOT EXISTS idx_source_comments_item
+          ON source_comments(item_id, captured_at DESC);
+      `);
+    },
+  },
+  {
+    // 新增 LINUX DO / 小众软件连接器后，已执行 0009 的老库也要从网页桶重分类。
+    name: "0017-source-platform-refresh",
+    up: refreshSourcePlatforms,
+  },
+  {
+    // 2Libra 上线时 0017 可能已执行，需追加迁移把历史链接从网页桶重分类。
+    name: "0018-source-platform-refresh",
+    up: refreshSourcePlatforms,
   },
 ];
 

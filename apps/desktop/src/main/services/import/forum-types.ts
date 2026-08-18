@@ -1,5 +1,5 @@
 /**
- * 论坛帖子的跨平台公共形状。V2EX / NGA 抓取器都产出这一份，
+ * 论坛帖子的跨平台公共形状。V2EX / NGA / Discourse / 2Libra 抓取器都产出这一份，
  * forum-post 组装与讨论总结只认这些字段。
  */
 import type { ForumPlatform } from "@guizhi/shared/utils/forum-platforms";
@@ -37,8 +37,8 @@ export function asForumReplyTo(r: {
 
 /**
  * 讨论区入库策略。
- * - all：短帖（V2EX）逐楼全留
- * - op-only：长帖（NGA）正文只留楼主回复，避免镜像水楼
+ * - all：V2EX / Discourse / 2Libra 逐楼全留
+ * - op-only：NGA 长帖正文只留楼主回复，避免镜像水楼
  */
 export type ForumReplyRetention = "all" | "op-only";
 
@@ -57,7 +57,7 @@ export interface ForumThread {
   content: string;
   /**
    * 写入条目「## 讨论」的回复。
-   * NGA 为楼主回复；V2EX 为全部回复。
+   * NGA 为楼主回复；V2EX / Discourse / 2Libra 为全部回复。
    */
   replies: ForumReply[];
   /**

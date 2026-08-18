@@ -19,7 +19,10 @@ export function shouldUseDevServer(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   if (isE2EEnabled(env)) {
-    return false;
+    // Electron 33 + Playwright 在部分 Windows 图形环境里直接加载 file:// 构建
+    // 产物会得到 ERR_FAILED。只在调用方显式给出隔离 renderer URL 时改走
+    // loadURL()；普通 E2E 与正式启动路径保持不变。
+    return Boolean(env.GUIZHI_E2E_RENDERER_URL);
   }
   return env.NODE_ENV === "development" || !appIsPackaged;
 }

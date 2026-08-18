@@ -123,7 +123,10 @@ export function ImportsEmptyState() {
         />
         <SourceHint
           icon={<MessagesSquareIcon className="h-3.5 w-3.5" aria-hidden="true" />}
-          label={t("imports.sourceForum", "V2EX 帖子")}
+          label={t(
+            "imports.sourceForum",
+            "V2EX / NGA / LINUX DO / 小众软件论坛",
+          )}
         />
         <SourceHint
           icon={<ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />}

@@ -4,14 +4,17 @@
 
 | 类型 | 平台 | 能力概要 | 备注 |
 | --- | --- | --- | --- |
-| 视频 | 哔哩哔哩 | 元数据 + 音轨 → 转写 / 总结 / AI 标题 | 需 yt-dlp；认 `/video/` 与 `b23.tv` |
-| 视频 | YouTube | 同上 | 需 yt-dlp；认 `/watch`、`/shorts/`、`youtu.be` |
-| 视频 / 图文 | 抖音 | 视频转写总结；图文配图入库 + 逐图 OCR | **不走 yt-dlp**；分享页 SSR（`_ROUTER_DATA`）；可用分享口令整段粘贴；改版需跟修 |
-| 图文 / 视频 | 小红书 | 图文配图 + OCR；视频笔记同链路 | **不走 yt-dlp**；笔记页 SSR（`__INITIAL_STATE__`）；须用分享面板带 `xsec_token` 的链接；改版需跟修 |
-| 论坛 | **V2EX** | 正文 + 全部回复 + AI 讨论总结 | 走官方只读 API，无需登录 |
-| 论坛 | **NGA** | 正文（折叠/强调色/章节标题）+ 楼主回复卡片（带被回复上下文与楼层号）+ AI 讨论总结（采样）+ 附件图入库 | guestJs 握手；不镜像水楼；总结采样约 12 页；附件图上限 80；需登录版块采不到 |
-| 通用 | 网页 | Readability → Markdown | 无专用连接器的 URL 都落这里 |
-| 通用 | 本地文件 | 文本 / 图片 / 音视频拖入即入库 | 媒体资产化，详情页可预览播放 |
+| 视频 | <!-- source-platform:bilibili -->哔哩哔哩 | 元数据 + 音轨 → 转写 / 总结 / AI 标题 | 需 yt-dlp；认 `/video/` 与 `b23.tv` |
+| 视频 | <!-- source-platform:youtube -->YouTube | 元数据 + 音轨 → 转写 / 总结 / AI 标题 | 需 yt-dlp；认 `/watch`、`/shorts/`、`youtu.be` |
+| 视频 / 图文 | <!-- source-platform:douyin -->抖音 | 视频转写总结；图文配图入库 + 逐图 OCR；可选热门评论 | **不走 yt-dlp**；支持分享口令、公开 SSR 与内置登录采集；改版需跟修 |
+| 图文 / 视频 | <!-- source-platform:xiaohongshu -->小红书 | 图文配图 + OCR；视频笔记；可选热门评论 | **不走 yt-dlp**；公开链路须用带 `xsec_token` 的分享链接，也可使用内置登录采集；改版需跟修 |
+| 论坛 | <!-- source-platform:v2ex -->**V2EX** | 正文 + 全部回复 + AI 讨论总结 | 走官方只读 API，无需登录 |
+| 论坛 | <!-- source-platform:nga -->**NGA** | 正文 + 楼主回复卡片 + AI 讨论总结（采样）+ 附件图 | guestJs 握手；不镜像水楼；总结采样约 12 页；附件图上限 80；需登录版块采不到 |
+| 论坛 | <!-- source-platform:linuxdo -->**LINUX DO** | Discourse 正文 + 全部楼层 + AI 讨论总结 | 公开帖直取；遇登录或 Cloudflare 验证可切内置登录采集 |
+| 论坛 | <!-- source-platform:appinn -->**小众软件** | Discourse 正文 + 全部楼层 + AI 讨论总结 | 采集 `meta.appinn.net` 公开主题，无需登录 |
+| 论坛 | <!-- source-platform:twolibra -->**2Libra** | 正文 + 全部平铺评论 + 回复对象 / 楼层 + AI 讨论总结 | 走公开只读 API；分页失败时保留已取得内容并给出警告 |
+| 通用 | <!-- source-platform:web -->网页 | Readability → Markdown | 无专用连接器的标准 URL 都落这里 |
+| 通用 | <!-- source-platform:local -->本地文件 | 文本 / 图片 / 音视频拖入即入库 | 媒体资产化，详情页可预览播放 |
 
 ## 分享口令
 
@@ -21,11 +24,11 @@
 
 ## 未支持
 
-- 其它论坛（Discourse、linux.do、Reddit 等）— 会退回通用网页抓取，效果通常较差
-- NGA 需登录才能看的版块 / 帖子（公开帖经 guestJs 可采；平台 cookies 尚未实现）
-- 需要登录才能看的内容（平台 cookies 采集尚未实现）
+- 其它论坛（Reddit 等）— 会退回通用网页抓取，效果通常较差
+- NGA 需登录才能看的版块 / 帖子（公开帖经 guestJs 可采；NGA 尚未接入内置登录采集）
+- 除抖音、小红书、LINUX DO 外，需要登录才能看的平台内容尚未接入内置登录采集
 - 小红书地址栏手抠的无 `xsec_token` 链接（一律 404）
-- 抖音 / 小红书评论区（简介与正文之外的链接目前采不到）
+- 抖音 / 小红书只按任务配置采集热门评论（10 / 20 / 50 条），不是评论区完整镜像
 
 ## 排障：抖音 / 小红书突然采不了
 

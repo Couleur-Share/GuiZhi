@@ -25,6 +25,9 @@ export const SOURCE_PLATFORMS = [
   "youtube",
   "v2ex",
   "nga",
+  "linuxdo",
+  "appinn",
+  "twolibra",
   "web",
   "local",
 ] as const;

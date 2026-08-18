@@ -330,6 +330,7 @@ export default async function readmeLibraryShots({ win, app, shot, userDataDir }
   });
 
   await win.evaluate(() => {
+    window.localStorage.setItem("guizhi-setup-dismissed", "1");
     const key = "guizhi-settings";
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : { state: {}, version: 0 };

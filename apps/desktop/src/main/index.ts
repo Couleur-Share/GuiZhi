@@ -10,6 +10,7 @@ import {
   nativeImage,
   session,
   protocol,
+  screen,
 } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import path from "path";
@@ -65,6 +66,12 @@ import {
 } from "./services/backup";
 import { createTrayController } from "./tray-controller";
 import { dispatchTrayAppCommand } from "./tray-command-dispatcher";
+import {
+  attachWindowStatePersistence,
+  DEFAULT_WINDOW_BOUNDS,
+  MIN_WINDOW_BOUNDS,
+  readWindowLaunchState,
+} from "./window-state";
 
 let mainWindow: BrowserWindow | null = null;
 let minimizeToTray = false;
@@ -72,6 +79,8 @@ let minimizeToTray = false;
 // 数据库实例（模块级变量，供 createWindow 访问）
 let appDb: Database.Database | null = null;
 let isQuitting = false;
+let quitCleanupRunning = false;
+let quitCleanupComplete = false;
 // Close action: 'ask' = ask every time, 'minimize' = minimize to tray, 'exit' = exit directly
 // 关闭行为: 'ask' = 每次询问, 'minimize' = 最小化到托盘, 'exit' = 直接退出
 let closeAction: "ask" | "minimize" | "exit" = "ask";
@@ -179,7 +188,9 @@ configureRuntimePaths({
 const isDev = shouldUseDevServer(app.isPackaged);
 /** 渲染进程唯一允许停留的远程源；生产构建走 file://，这里为 null */
 const devServerUrl = isDev
-  ? process.env.VITE_DEV_SERVER_URL || "http://127.0.0.1:5173"
+  ? process.env.GUIZHI_E2E_RENDERER_URL ||
+    process.env.VITE_DEV_SERVER_URL ||
+    "http://127.0.0.1:5173"
   : null;
 /** 打包后的渲染产物目录；file:// 导航只允许停留在这里面 */
 const rendererDir = path.join(__dirname, "../renderer");
@@ -270,11 +281,23 @@ async function createWindow() {
       : path.join(process.resourcesPath, "icon.ico")
     : undefined;
 
+  // 自动化保持固定视口；真实启动首次最大化，之后恢复上次正常边界与最大化状态。
+  const manageWindowState = !shouldPlaceWindowOffscreen();
+  const windowStateFile = path.join(app.getPath("userData"), "window-state.json");
+  const launchState = manageWindowState
+    ? readWindowLaunchState(
+        windowStateFile,
+        screen.getAllDisplays().map((display) => display.workArea),
+      )
+    : {
+        bounds: DEFAULT_WINDOW_BOUNDS,
+        shouldMaximize: false,
+      };
+
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
+    ...launchState.bounds,
+    minWidth: MIN_WINDOW_BOUNDS.width,
+    minHeight: MIN_WINDOW_BOUNDS.height,
     webPreferences: {
       preload: path.join(__dirname, "../preload/index.js"),
       nodeIntegration: false,
@@ -294,6 +317,10 @@ async function createWindow() {
     // 不立即显示 - 等待 ready-to-show 事件检查 minimizeOnLaunch 设置
     show: false,
   });
+
+  if (manageWindowState) {
+    attachWindowStatePersistence(mainWindow, windowStateFile);
+  }
 
   // Handle window ready-to-show: check if we should minimize on launch
   mainWindow.once("ready-to-show", () => {
@@ -325,6 +352,10 @@ async function createWindow() {
 
     const shouldMinimize =
       osRequestedHidden || (appDb ? getMinimizeOnLaunchSetting(appDb) : false);
+
+    if (launchState.shouldMaximize) {
+      mainWindow?.maximize();
+    }
 
     if (!appDb && !osRequestedHidden) {
       mainWindow?.show();
@@ -919,6 +950,11 @@ ipcMain.handle(
 
 // 每个 webContents（主窗口、未来可能的子窗口）统一装上导航与开窗拦截
 app.on("web-contents-created", (_event, contents) => {
+  // 平台采集独立窗口运行在专用 partition 隔离会话中，由 electron-capture-runtime 自行管控网络与导航；
+  // 仅对主会话（即应用本体渲染层）应用本地导航与外链保护。
+  if (contents.session !== session.defaultSession) {
+    return;
+  }
   applyWebContentsSecurity(contents, windowSecurityOptions);
 });
 
@@ -1075,9 +1111,26 @@ app.on("window-all-closed", () => {
 
 // Cleanup before quitting
 // 应用退出前清理
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
   isQuitting = true;
-  closeDatabase();
+  if (quitCleanupComplete) {
+    closeDatabase();
+    return;
+  }
+  event.preventDefault();
+  if (quitCleanupRunning) return;
+  quitCleanupRunning = true;
+  void import("./services/platform-capture/browser-capture")
+    .then(({ closeBrowserCaptureService }) => Promise.race([
+      closeBrowserCaptureService(),
+      new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+    ]))
+    .catch(() => undefined)
+    .finally(() => {
+      closeDatabase();
+      quitCleanupComplete = true;
+      app.quit();
+    });
 });
 
 // Export main window reference (used by other modules)

@@ -127,4 +127,19 @@ describe("详情页的分类 chip", () => {
     ]);
     expect(countsCalls).toBeGreaterThan(0);
   });
+
+  it("标题输入框禁用拼写检查并不显示默认聚焦边框/选中框", () => {
+    render(
+      <ToastProvider>
+        <ItemDetailHeader item={makeItem()} isTrashed={false} />
+      </ToastProvider>,
+    );
+
+    const titleInput = screen.getByTestId("item-title-input");
+    expect(titleInput).toHaveAttribute("spellcheck", "false");
+    expect(titleInput.className).toContain("focus:outline-none");
+    expect(titleInput.className).toContain("focus:ring-0");
+    expect(titleInput.className).toContain("focus-visible:outline-none");
+    expect(titleInput.className).toContain("focus-visible:ring-0");
+  });
 });

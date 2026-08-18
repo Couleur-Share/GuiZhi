@@ -10,6 +10,8 @@ import type {
   ImportStageStat,
   ImportTask,
   ImportTaskStatus,
+  ImportCaptureStrategy,
+  CommentLimit,
   KnowledgeItemType,
 } from "@guizhi/shared/types";
 
@@ -29,6 +31,8 @@ interface TaskRow {
   refresh_of_item_id: string | null;
   tag_names: string | null;
   stage_stats: string | null;
+  capture_strategy: ImportCaptureStrategy;
+  comment_limit: CommentLimit;
   force_duplicate: number;
   created_at: number;
   updated_at: number;
@@ -106,6 +110,8 @@ function mapRow(row: TaskRow): ImportTask {
     refreshOfItemId: row.refresh_of_item_id,
     tagNames: parseTagNames(row.tag_names),
     stageStats: parseStageStats(row.stage_stats),
+    captureStrategy: row.capture_strategy ?? "standard",
+    commentLimit: row.comment_limit ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -132,8 +138,8 @@ export class ImportTaskDB {
     const id = randomUUID();
     this.db.run(
       `INSERT INTO import_tasks
-         (id, source_kind, source_input, display_name, status, collection_id, refresh_of_item_id, tag_names, force_duplicate, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`,
+         (id, source_kind, source_input, display_name, status, collection_id, refresh_of_item_id, tag_names, capture_strategy, comment_limit, force_duplicate, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
       id,
       input.kind,
       input.input,
@@ -141,6 +147,8 @@ export class ImportTaskDB {
       input.collectionId ?? null,
       input.refreshOfItemId ?? null,
       input.tagNames?.length ? JSON.stringify(input.tagNames) : null,
+      input.captureStrategy ?? "standard",
+      input.commentLimit ?? 0,
       input.forceDuplicate ? 1 : 0,
       now,
       now,
@@ -205,6 +213,8 @@ export class ImportTaskDB {
       forceDuplicate: boolean;
       /** 各阶段耗时与 AI 开销；传 null 清空（重试时用） */
       stageStats: ImportStageStat[] | null;
+      captureStrategy: ImportCaptureStrategy;
+      commentLimit: CommentLimit;
     }>,
   ): ImportTask | null {
     const existing = this.db.get(
@@ -217,7 +227,8 @@ export class ImportTaskDB {
     this.db.run(
       `UPDATE import_tasks SET
          status = ?, stage = ?, error = ?, warning = ?, display_name = ?, item_type = ?,
-         result_item_id = ?, duplicate_item_id = ?, stage_stats = ?, force_duplicate = ?,
+         result_item_id = ?, duplicate_item_id = ?, stage_stats = ?, capture_strategy = ?,
+         comment_limit = ?, force_duplicate = ?,
          updated_at = ?
        WHERE id = ?`,
       patch.status ?? existing.status,
@@ -237,6 +248,8 @@ export class ImportTaskDB {
           ? JSON.stringify(patch.stageStats)
           : null
         : existing.stage_stats,
+      patch.captureStrategy ?? existing.capture_strategy,
+      patch.commentLimit ?? existing.comment_limit,
       patch.forceDuplicate !== undefined
         ? patch.forceDuplicate
           ? 1

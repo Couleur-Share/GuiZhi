@@ -41,6 +41,8 @@ export { KnowledgeItemDB, makeSnippet } from "./knowledge";
 export { CollectionDB } from "./collection";
 export { TagDB } from "./tag";
 export { ImportTaskDB } from "./import-task";
+export { SourceCommentDB } from "./source-comment";
+export type { UpsertSourceCommentInput } from "./source-comment";
 export { WikiDB } from "./wiki";
 export { AskSessionDB } from "./ask-session";
 export { AIUsageDB, toLocalDay } from "./ai-usage";

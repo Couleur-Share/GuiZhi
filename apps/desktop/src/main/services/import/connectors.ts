@@ -7,10 +7,13 @@ import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 import type {
+  ImportCaptureStrategy,
   ImportSourceKind,
   ImportStage,
   KnowledgeItemType,
 } from "@guizhi/shared/types";
+import type { DouyinAweme } from "./douyin";
+import type { XiaohongshuNote } from "./xiaohongshu";
 import { fetchHtml } from "./safe-fetch";
 import {
   classifyMediaFile,
@@ -52,6 +55,19 @@ export interface ExtractedContent {
 
 /** 连接器运行环境（由 import-service 注入，避免连接器直接依赖 DB） */
 export interface ImportConnectorContext {
+  captureStrategy?: ImportCaptureStrategy;
+  fetchAuthenticatedDouyin?: (
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<DouyinAweme>;
+  fetchAuthenticatedXiaohongshu?: (
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<XiaohongshuNote>;
+  fetchAuthenticatedLinuxdoJson?: <T>(
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<T>;
   /** 设置里配置的 yt-dlp 路径（空表示查 PATH） */
   getYtDlpPath?: () => string | null;
   /** 设置里配置的 ffmpeg 路径（空表示托管版 / PATH） */
@@ -245,12 +261,18 @@ export async function extractContent(
             getFfmpegPath: context?.getFfmpegPath,
             getDiarize: context?.getDiarize,
             onStage: context?.onStage,
+            ...(context?.captureStrategy === "authenticated" && platform === "douyin"
+              ? { fetchDouyin: context.fetchAuthenticatedDouyin }
+              : {}),
+            ...(context?.captureStrategy === "authenticated" && platform === "xiaohongshu"
+              ? { fetchXiaohongshu: context.fetchAuthenticatedXiaohongshu }
+              : {}),
           },
           signal,
         );
       }
 
-      // 论坛帖子走平台接口取结构化的主楼与回复：通用抓取会把头像、
+      // 论坛帖子走白名单平台接口取结构化的主楼与回复：通用抓取会把头像、
       // 楼层号一并卷进正文，还抓不全回复（见 import/v2ex.ts）
       const { detectForumPlatform } = await import(
         "@guizhi/shared/utils/forum-platforms"
@@ -260,7 +282,10 @@ export async function extractContent(
         const { extractForumPost } = await import("./forum-post");
         return extractForumPost(
           forumTarget,
-          { onStage: context?.onStage },
+          {
+            onStage: context?.onStage,
+            fetchAuthenticatedJson: context?.fetchAuthenticatedLinuxdoJson,
+          },
           signal,
         );
       }

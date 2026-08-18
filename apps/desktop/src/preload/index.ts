@@ -4,6 +4,7 @@ import { aiApi } from "./api/ai";
 import { settingsApi } from "./api/settings";
 import { collectionApi, knowledgeApi, tagApi } from "./api/knowledge";
 import { importApi } from "./api/import";
+import { platformCaptureApi } from "./api/platform-capture";
 import { wikiApi } from "./api/wiki";
 import { migrationApi } from "./api/migration";
 import { backupApi } from "./api/backup";
@@ -55,6 +56,7 @@ const api = {
   collection: collectionApi,
   tag: tagApi,
   import: importApi,
+  platformCapture: platformCaptureApi,
   wiki: wikiApi,
   migration: migrationApi,
   backup: backupApi,

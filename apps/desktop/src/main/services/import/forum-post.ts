@@ -1,9 +1,9 @@
 /**
  * 论坛帖子的条目组装：元数据引用块 + 讨论总结 + 主楼正文 + 讨论区回复。
  *
- * V2EX 短帖把回复完整入库；NGA 长帖只保留楼主回复，另用采样素材做总结，
- * 避免镜像几千楼水帖。三个小节标题同时是详情页分段锚点，改动需同步
- * shared/utils/forum-note.ts。
+ * V2EX / Discourse / 2Libra 把回复完整入库；NGA 长帖只保留楼主回复，另用采样素材
+ * 做总结，避免镜像几千楼水帖。三个小节标题同时是详情页分段锚点，改动需
+ * 同步 shared/utils/forum-note.ts。
  */
 import type { ImportStage } from "@guizhi/shared/types";
 import type { ForumTarget } from "@guizhi/shared/utils/forum-platforms";
@@ -22,13 +22,19 @@ import {
   type ForumSummaryResult,
 } from "./forum-summary";
 import type { ForumReply, ForumThread } from "./forum-types";
+import { fetchAppinnThread } from "./appinn";
+import { fetchLinuxdoThread } from "./linuxdo";
 import { fetchNgaThread } from "./nga";
+import { fetchTwolibraThread } from "./twolibra";
 import { fetchV2exThread } from "./v2ex";
 import { resolveMediaSummaryConfig } from "../media/media-summary";
 
 const PLATFORM_LABELS: Record<ForumTarget["platform"], string> = {
   v2ex: "V2EX",
   nga: "NGA",
+  linuxdo: "LINUX DO",
+  appinn: "小众软件",
+  twolibra: "2Libra",
 };
 
 /** 失败原因写进正文时的截断长度 */
@@ -40,6 +46,11 @@ export interface ForumPostDeps {
     target: ForumTarget,
     signal?: AbortSignal,
   ) => Promise<ForumThread>;
+  /** LINUX DO Cloudflare 降级：经 Electron 会话拉 JSON */
+  fetchAuthenticatedJson?: <T>(
+    url: string,
+    signal?: AbortSignal,
+  ) => Promise<T>;
   /** 测试注入：总结模型解析（默认读 ai-config.json 的 mainText 路由） */
   getSummaryConfig?: () => AIClientConfig | null;
   /** 测试注入：讨论总结 */
@@ -53,6 +64,7 @@ export interface ForumPostDeps {
 
 async function fetchThreadByPlatform(
   target: ForumTarget,
+  deps: ForumPostDeps,
   signal?: AbortSignal,
 ): Promise<ForumThread> {
   switch (target.platform) {
@@ -60,6 +72,16 @@ async function fetchThreadByPlatform(
       return fetchV2exThread(target.topicId, {}, signal);
     case "nga":
       return fetchNgaThread(target.topicId, {}, signal);
+    case "linuxdo":
+      return fetchLinuxdoThread(
+        target.topicId,
+        { fetchAuthenticatedJson: deps.fetchAuthenticatedJson },
+        signal,
+      );
+    case "appinn":
+      return fetchAppinnThread(target.topicId, {}, signal);
+    case "twolibra":
+      return fetchTwolibraThread(target.topicId, {}, signal);
     default:
       throw new Error(
         `暂不支持的论坛: ${target.platform satisfies never}`,
@@ -209,8 +231,9 @@ export async function extractForumPost(
 
   let thread: ForumThread;
   try {
-    const fetchThread = deps.fetchThread ?? fetchThreadByPlatform;
-    thread = await fetchThread(target, signal);
+    thread = deps.fetchThread
+      ? await deps.fetchThread(target, signal)
+      : await fetchThreadByPlatform(target, deps, signal);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message === "已取消") {

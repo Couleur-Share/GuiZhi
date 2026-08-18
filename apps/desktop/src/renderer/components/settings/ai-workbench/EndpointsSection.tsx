@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import {
-  AlertCircleIcon,
   AudioLinesIcon,
   BrainIcon,
   CheckIcon,
-  CheckCircle2Icon,
   DatabaseIcon,
   EyeIcon,
   EyeOffIcon,
@@ -31,6 +29,7 @@ import { useTranslation } from "react-i18next";
 
 import { FUNASR_MODEL_ID, FUNASR_PROVIDER_ID } from "@guizhi/shared/constants";
 
+import { ToggleSwitch } from "../shared";
 import {
   hasModelCapability,
   isConfiguredModel,
@@ -45,14 +44,14 @@ import {
 } from "./helpers";
 import type { EndpointGroup, EndpointStatus, ModelFormState } from "./types";
 
-function getStatusToneClass(tone: EndpointStatus["tone"]): string {
+function getStatusDotClass(tone: EndpointStatus["tone"]): string {
   if (tone === "ready") {
-    return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+    return "bg-emerald-500 ring-emerald-500/15";
   }
   if (tone === "error") {
-    return "bg-red-500/10 text-red-600 dark:text-red-400";
+    return "bg-red-500 ring-red-500/15";
   }
-  return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+  return "bg-amber-500 ring-amber-500/15";
 }
 
 function maskApiKey(apiKey: string): string {
@@ -107,6 +106,7 @@ export function EndpointsSection({
   onTestEndpoint,
   onEditEndpoint,
   onDeleteEndpoint,
+  onToggleEndpointEnabled,
   onUpdateEndpointCredentials,
   onAddProvider,
   onAddModel,
@@ -126,6 +126,7 @@ export function EndpointsSection({
   onTestEndpoint: (group: EndpointGroup) => void;
   onEditEndpoint: (group: EndpointGroup) => void;
   onDeleteEndpoint: (group: EndpointGroup) => void;
+  onToggleEndpointEnabled: (group: EndpointGroup, enabled: boolean) => void;
   onUpdateEndpointCredentials: (
     group: EndpointGroup,
     credentials: { apiKey: string; apiUrl: string },
@@ -251,6 +252,16 @@ export function EndpointsSection({
   };
 
   const getEndpointStatus = (group: EndpointGroup): EndpointStatus => {
+    if (group.enabled === false) {
+      return {
+        tone: "warning",
+        label: t("settings.aiWorkbenchDisabled", "已停用"),
+        detail: t("settings.aiWorkbenchProviderDisabledDetail", {
+          count: group.models.length,
+          defaultValue: `已停用 · ${group.models.length} 个模型`,
+        }),
+      };
+    }
     const runtimeStatus = endpointStatuses[group.key];
     if (runtimeStatus) {
       return runtimeStatus;
@@ -362,7 +373,17 @@ export function EndpointsSection({
   }
 
   const endpointStatus = getEndpointStatus(selectedGroup);
+  const endpointStatusDetail =
+    selectedGroup.enabled === false
+      ? t("settings.aiWorkbenchModelCount", {
+          count: selectedGroup.models.length,
+        })
+      : endpointStatus.detail;
   const providerMetaLabel = getProtocolLabel(selectedGroup.apiProtocol);
+  const selectedEndpointHost = getEndpointHost(
+    selectedGroup.apiUrl,
+    providerMetaLabel,
+  );
   const firstModel = selectedGroup.models[0];
   // 内置本地转写引擎的条目只在安装时写入、卸载时移除，没有自愈路径：地址、
   // 密钥、模型全由安装程序填好，在这里改一个字或删一行，剩下的就是装着 3GB
@@ -428,6 +449,7 @@ export function EndpointsSection({
                   group.provider,
                   group.models,
                 );
+                const groupEnabled = group.enabled !== false;
                 const groupHost = getEndpointHost(
                   group.apiUrl,
                   getProtocolLabel(group.apiProtocol),
@@ -438,6 +460,9 @@ export function EndpointsSection({
                   group.providerConfigId === FUNASR_PROVIDER_ID
                     ? `${t("settings.aiWorkbenchBuiltin", "内置")} · ${groupHost}`
                     : groupHost;
+                const displayDetail = groupEnabled
+                  ? groupDetail
+                  : `${t("settings.aiWorkbenchDisabled", "已停用")} · ${groupDetail}`;
 
                 return (
                   <button
@@ -451,7 +476,7 @@ export function EndpointsSection({
                       selected
                         ? "border-border bg-background shadow-sm"
                         : "border-transparent hover:bg-background/70"
-                    }`}
+                    } ${groupEnabled ? "" : "opacity-60"}`}
                   >
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
                       {getCategoryIcon(category, 17)}
@@ -461,17 +486,19 @@ export function EndpointsSection({
                         {getEndpointDisplayName(group)}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
-                        {groupDetail}
+                        {displayDetail}
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-1.5">
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          status.tone === "ready"
-                            ? "bg-emerald-500"
-                            : status.tone === "error"
-                              ? "bg-red-500"
-                              : "bg-amber-500"
+                          !groupEnabled
+                            ? "bg-muted-foreground/40"
+                            : status.tone === "ready"
+                              ? "bg-emerald-500"
+                              : status.tone === "error"
+                                ? "bg-red-500"
+                                : "bg-amber-500"
                         }`}
                       />
                       <span className="min-w-5 rounded-full bg-muted px-1.5 py-0.5 text-center text-[10px] font-medium text-muted-foreground">
@@ -507,9 +534,12 @@ export function EndpointsSection({
             <div className="w-full">
               <h1 className="mb-4 text-lg font-semibold">{t("settings.ai")}</h1>
               <div className="overflow-hidden rounded-xl border border-border bg-card">
-                <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-primary">
+                <div
+                  data-testid="ai-endpoint-header"
+                  className="flex flex-col gap-3 border-b border-border px-4 py-3.5 md:flex-row md:items-center md:justify-between"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                       {getCategoryIcon(
                         getEndpointCategory(
                           selectedGroup.provider,
@@ -518,55 +548,79 @@ export function EndpointsSection({
                         20,
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="truncate text-base font-semibold">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <h4 className="truncate text-base font-semibold leading-tight">
                           {getEndpointDisplayName(selectedGroup)}
                         </h4>
                         {localEngineSelected ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                             <PackageIcon
                               aria-hidden="true"
                               className="h-3 w-3"
                             />
                             {t("settings.aiWorkbenchBuiltin", "内置")}
                           </span>
-                        ) : null}
-                        {/* 托管条目不摆协议徽章：用户既选不了也用不上这个信息，
-                            而 1024px 宽下多这一枚正好把右侧动作区挤到第二行 */}
-                        {localEngineSelected ? null : (
-                          <span className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        ) : (
+                          <span className="shrink-0 rounded-md border border-border/70 bg-muted/30 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                             {providerMetaLabel}
                           </span>
                         )}
+                      </div>
+                      <p className="mt-1.5 flex min-w-0 items-center gap-2 truncate text-xs text-muted-foreground">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${getStatusToneClass(endpointStatus.tone)}`}
-                        >
-                          {endpointStatus.tone === "ready" ? (
-                            <CheckCircle2Icon
-                              aria-hidden="true"
-                              className="h-3 w-3"
-                            />
-                          ) : (
-                            <AlertCircleIcon
-                              aria-hidden="true"
-                              className="h-3 w-3"
-                            />
-                          )}
-                          {endpointStatus.label}
+                          aria-hidden="true"
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ring-[3px] ${getStatusDotClass(endpointStatus.tone)}`}
+                        />
+                        <span className="shrink-0">{endpointStatus.label}</span>
+                        <span aria-hidden="true" className="text-border">
+                          ·
                         </span>
-                      </div>
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {endpointStatus.detail}
-                      </div>
+                        <span className="shrink-0">{endpointStatusDetail}</span>
+                        <span aria-hidden="true" className="text-border">
+                          ·
+                        </span>
+                        <span className="truncate">
+                          {selectedEndpointHost}
+                        </span>
+                      </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <div className="mr-0.5 flex h-8 items-center gap-2 rounded-lg border border-border/70 bg-muted/25 px-2.5">
+                      <span className="select-none text-[11px] font-medium text-muted-foreground">
+                        {t(
+                          "settings.aiWorkbenchRoutingParticipation",
+                          "参与路由",
+                        )}
+                      </span>
+                      <ToggleSwitch
+                        size="compact"
+                        checked={selectedGroup.enabled !== false}
+                        onChange={(checked) =>
+                          onToggleEndpointEnabled(selectedGroup, checked)
+                        }
+                        ariaLabel={
+                          selectedGroup.enabled !== false
+                            ? t(
+                                "settings.aiWorkbenchDisableProvider",
+                                "停用此供应商",
+                              )
+                            : t(
+                                "settings.aiWorkbenchEnableProvider",
+                                "启用此供应商",
+                              )
+                        }
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => onTestEndpoint(selectedGroup)}
-                      disabled={testingEndpointKey === selectedGroup.key}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted disabled:opacity-50"
+                      disabled={
+                        testingEndpointKey === selectedGroup.key ||
+                        selectedGroup.enabled === false
+                      }
+                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/70 bg-background/40 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {testingEndpointKey === selectedGroup.key ? (
                         <Loader2Icon
@@ -587,21 +641,21 @@ export function EndpointsSection({
                       title={
                         localEngineSelected
                           ? t("settings.aiWorkbenchLocalEngineReadOnly")
-                          : undefined
+                          : t("common.edit")
                       }
                     >
                       <button
                         type="button"
+                        aria-label={t("common.edit")}
                         onClick={() => onEditEndpoint(selectedGroup)}
                         disabled={localEngineSelected}
                         data-testid="ai-endpoint-edit"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/40 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <PencilIcon
                           aria-hidden="true"
                           className="h-3.5 w-3.5"
                         />
-                        {t("common.edit")}
                       </button>
                     </span>
                     <span
@@ -609,21 +663,21 @@ export function EndpointsSection({
                       title={
                         localEngineSelected
                           ? t("settings.aiWorkbenchLocalEngineLocked")
-                          : undefined
+                          : t("common.delete")
                       }
                     >
                       <button
                         type="button"
+                        aria-label={t("common.delete")}
                         onClick={() => onDeleteEndpoint(selectedGroup)}
                         disabled={localEngineSelected}
                         data-testid="ai-endpoint-delete"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-red-500 hover:bg-red-500/5 disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-60 disabled:hover:bg-transparent"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-background/40 text-muted-foreground transition-colors hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Trash2Icon
                           aria-hidden="true"
                           className="h-3.5 w-3.5"
                         />
-                        {t("common.delete")}
                       </button>
                     </span>
                   </div>

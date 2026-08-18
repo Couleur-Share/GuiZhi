@@ -118,6 +118,7 @@ export function normalizePersistedAIModels(value: unknown): AIModelConfig[] {
         apiUrl,
         model: model.model!.trim(),
         capabilities: normalizeAIModelCapabilities(model.capabilities),
+        enabled: model.enabled !== false,
       };
     });
 }
@@ -161,6 +162,7 @@ export function normalizePersistedAIProviders(
         ),
         apiKey: typeof provider.apiKey === "string" ? provider.apiKey : "",
         apiUrl,
+        enabled: provider.enabled !== false,
       };
     });
 }
@@ -253,6 +255,22 @@ export function normalizeAIModelDefaults(
       next.scenarioModelDefaults,
     );
   }
+}
+
+export function isModelActive(
+  model: AIModelConfig,
+  providers: AIProviderConfig[] = [],
+): boolean {
+  if (model.enabled === false) {
+    return false;
+  }
+  if (providers.length > 0) {
+    const provider = findMatchingAIProvider(providers, model);
+    if (provider && provider.enabled === false) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function findMatchingAIProvider(

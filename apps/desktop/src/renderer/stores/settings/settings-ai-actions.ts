@@ -76,6 +76,7 @@ function createAiProviderAddAction(context: SettingsActionContext) {
             ),
             apiKey: config.apiKey.trim(),
             apiUrl: config.apiUrl.trim(),
+            enabled: config.enabled !== false,
           },
         ],
       });
@@ -106,6 +107,10 @@ function buildUpdatedAiProvider(
     ),
     apiKey: (updates.apiKey ?? current.apiKey).trim(),
     apiUrl: apiUrl.trim(),
+    enabled:
+      updates.enabled === undefined
+        ? current.enabled !== false
+        : updates.enabled !== false,
   };
 }
 
@@ -226,6 +231,7 @@ function createAiModelAddAction(context: SettingsActionContext) {
         apiUrl: provider?.apiUrl ?? config.apiUrl,
         capabilities: normalizeAIModelCapabilities(config.capabilities),
         isDefault: currentModels.length === 0,
+        enabled: config.enabled !== false,
       };
       const partial: Partial<SettingsState> = {
         aiModels: [...currentModels, model],
@@ -253,6 +259,10 @@ function mergeAiModel(
     capabilities: normalizeAIModelCapabilities(
       updates.capabilities ?? current.capabilities,
     ),
+    enabled:
+      updates.enabled === undefined
+        ? current.enabled !== false
+        : updates.enabled !== false,
   };
 }
 

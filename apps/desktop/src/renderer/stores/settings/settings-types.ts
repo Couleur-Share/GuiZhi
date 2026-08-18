@@ -50,6 +50,7 @@ export interface AIModelConfig {
   isDefault?: boolean;
   lastVerifiedAt?: string;
   capabilities?: AIModelCapabilities;
+  enabled?: boolean;
 }
 
 export interface AIProviderConfig {
@@ -60,6 +61,7 @@ export interface AIProviderConfig {
   apiKey: string;
   apiUrl: string;
   lastVerifiedAt?: string;
+  enabled?: boolean;
 }
 
 export interface SettingsState {

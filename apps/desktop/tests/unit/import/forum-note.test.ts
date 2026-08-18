@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   filterForumReplies,
+  FORUM_SUMMARY_STALE_NOTE,
   formatForumReplyBlock,
   normalizeForumSnippet,
   parseForumReplies,
+  replaceForumRepliesSection,
   resolveReplyTargetFloor,
   splitForumNoteSections,
   upsertForumSummarySection,
@@ -140,7 +142,11 @@ describe("parseForumReplies", () => {
   });
 
   it("没有讨论段时返回空数组", () => {
-    expect(parseForumReplies("> 平台：V2EX · 作者：a · 0 条回复\n\n## 正文\n\n只有主楼")).toEqual([]);
+    expect(
+      parseForumReplies(
+        "> 平台：V2EX · 作者：a · 0 条回复\n\n## 正文\n\n只有主楼",
+      ),
+    ).toEqual([]);
   });
 
   it("认 NGA 楼主精选讨论标题与 ### 楼层头、回复上下文", () => {
@@ -260,18 +266,14 @@ describe("resolveReplyTargetFloor / 回复行楼层解析", () => {
   });
 
   it("优先按写明的楼层跳转；楼不在库里则 null", () => {
-    expect(
-      resolveReplyTargetFloor(replies, { author: "x", floor: 8 }),
-    ).toBe(8);
+    expect(resolveReplyTargetFloor(replies, { author: "x", floor: 8 })).toBe(8);
     expect(
       resolveReplyTargetFloor(replies, { author: "x", floor: 999 }),
     ).toBeNull();
   });
 
   it("无楼层时按作者唯一匹配；重名或不存在则 null", () => {
-    expect(
-      resolveReplyTargetFloor(replies, { author: "lyzlegend" }),
-    ).toBe(8);
+    expect(resolveReplyTargetFloor(replies, { author: "lyzlegend" })).toBe(8);
     expect(resolveReplyTargetFloor(replies, { author: "同名" })).toBeNull();
     expect(resolveReplyTargetFloor(replies, { author: "不存在" })).toBeNull();
   });
@@ -302,12 +304,12 @@ describe("filterForumReplies", () => {
 
   it("按楼层号、被回复作者、正文命中", () => {
     expect(filterForumReplies(sample, "6").map((r) => r.floor)).toEqual([6]);
-    expect(
-      filterForumReplies(sample, "牧云吹雪").map((r) => r.floor),
-    ).toEqual([6]);
-    expect(
-      filterForumReplies(sample, "渐进片").map((r) => r.floor),
-    ).toEqual([14]);
+    expect(filterForumReplies(sample, "牧云吹雪").map((r) => r.floor)).toEqual([
+      6,
+    ]);
+    expect(filterForumReplies(sample, "渐进片").map((r) => r.floor)).toEqual([
+      14,
+    ]);
   });
 
   it("无命中返回空数组", () => {
@@ -317,7 +319,10 @@ describe("filterForumReplies", () => {
 
 describe("upsertForumSummarySection", () => {
   it("已有总结小节时原位替换，不动主楼与讨论", () => {
-    const result = upsertForumSummarySection(FORUM_CONTENT, "### 新方案\n- 新要点");
+    const result = upsertForumSummarySection(
+      FORUM_CONTENT,
+      "### 新方案\n- 新要点",
+    );
 
     expect(result).toContain("### 新方案");
     expect(result).not.toContain("ZeroTier");
@@ -381,11 +386,56 @@ describe("upsertForumSummarySection", () => {
   it("反复重新生成不会累积空行或重复小节", () => {
     let content = FORUM_CONTENT;
     for (let round = 0; round < 3; round++) {
-      content = upsertForumSummarySection(content, `### 第 ${round} 版\n- 要点`);
+      content = upsertForumSummarySection(
+        content,
+        `### 第 ${round} 版\n- 要点`,
+      );
     }
 
     expect(content.match(/## 讨论总结/g)).toHaveLength(1);
     expect(content).not.toMatch(/\n{3,}/);
     expect(splitForumNoteSections(content).summary).toBe("### 第 2 版\n- 要点");
+  });
+
+  it("重新生成会清掉讨论刷新留下的总结过期提示", () => {
+    const stale = replaceForumRepliesSection(FORUM_CONTENT, [
+      { floor: 3, author: "new", content: "新回复" },
+    ]);
+    expect(stale).toContain(FORUM_SUMMARY_STALE_NOTE);
+
+    const result = upsertForumSummarySection(
+      stale,
+      "### 新总结\n- 覆盖最新楼层",
+    );
+    expect(result).not.toContain(FORUM_SUMMARY_STALE_NOTE);
+    expect(splitForumNoteSections(result).summary).toBe(
+      "### 新总结\n- 覆盖最新楼层",
+    );
+  });
+});
+
+describe("replaceForumRepliesSection", () => {
+  it("只替换讨论段，保留主楼并把已有总结标记为过期", () => {
+    const result = replaceForumRepliesSection(FORUM_CONTENT, [
+      { floor: 2, author: "onlychen", content: "更新后的二楼" },
+      { floor: 3, author: "new-user", content: "新增楼层" },
+    ]);
+    const sections = splitForumNoteSections(result);
+
+    expect(sections.body).toBe("家里的设备有群辉 nas。");
+    expect(sections.summary).toContain("**ZeroTier**");
+    expect(sections.summary).toContain(FORUM_SUMMARY_STALE_NOTE);
+    expect(sections.replies).not.toContain("zerotier 试试");
+    expect(sections.replies).toContain("### 2 楼 · onlychen");
+    expect(sections.replies).toContain("新增楼层");
+    expect(result).toContain("## 讨论（2 条）");
+  });
+
+  it("重复刷新不会累积过期提示", () => {
+    const replies = [{ floor: 2, author: "a", content: "最新回复" }];
+    const once = replaceForumRepliesSection(FORUM_CONTENT, replies);
+    const twice = replaceForumRepliesSection(once, replies);
+
+    expect(twice.match(/讨论内容已刷新/g)).toHaveLength(1);
   });
 });

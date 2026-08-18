@@ -11,6 +11,7 @@ import type {
   TranscriptFormatProgress,
 } from "@guizhi/shared/types";
 import { splitForumNoteSections } from "@guizhi/shared/utils/forum-note";
+import { detectForumPlatform } from "@guizhi/shared/utils/forum-platforms";
 import { extractLocalAssetRef } from "@guizhi/shared/utils/media-refs";
 import { hasMediaSummarySection } from "@guizhi/shared/utils/media-summary";
 import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
@@ -52,9 +53,7 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const applyServerItem = useKnowledgeStore((state) => state.applyServerItem);
-  const flushPendingSave = useKnowledgeStore(
-    (state) => state.flushPendingSave,
-  );
+  const flushPendingSave = useKnowledgeStore((state) => state.flushPendingSave);
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
@@ -139,48 +138,51 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
 
   const transcribe = useCallback(
     async (options?: { diarize?: boolean }) => {
-    if (isRunning) {
-      return;
-    }
-    setRunningAction(options?.diarize === true ? "diarize" : "transcribe");
-    setTranscribeProgress(null);
-    try {
-      // 主进程基于库中正文写回（清注记/总结/标题），先落盘本地编辑
-      await flushPendingSave();
-      const result = await window.api.media.transcribe(itemId, options);
-      if (result.success && result.item) {
-        applyServerItem(result.item);
-        // 要了分离却只出来一个说话人时不报「已生成」了事
-        if (result.warning) {
-          showToast(
-            t("library.transcribeOneSpeaker", "文字稿已生成，但只识别出一个说话人"),
-            "warning",
-            { detail: result.warning },
-          );
-        } else {
-          showToast(t("library.transcribeDone", "文字稿已生成"), "success");
-        }
-      } else if (result.notConfigured) {
-        showToast(
-          t(
-            "library.transcribeNotConfigured",
-            "尚未配置语音转写模型（audioText 路由）",
-          ),
-          "error",
-        );
-        requestSettingsSection("ai");
-      } else {
-        showToast(
-          t("library.transcribeFailed", "转写失败：{{message}}", {
-            message: result.error ?? "",
-          }),
-          "error",
-        );
+      if (isRunning) {
+        return;
       }
-    } finally {
-      setRunningAction(null);
+      setRunningAction(options?.diarize === true ? "diarize" : "transcribe");
       setTranscribeProgress(null);
-    }
+      try {
+        // 主进程基于库中正文写回（清注记/总结/标题），先落盘本地编辑
+        await flushPendingSave();
+        const result = await window.api.media.transcribe(itemId, options);
+        if (result.success && result.item) {
+          applyServerItem(result.item);
+          // 要了分离却只出来一个说话人时不报「已生成」了事
+          if (result.warning) {
+            showToast(
+              t(
+                "library.transcribeOneSpeaker",
+                "文字稿已生成，但只识别出一个说话人",
+              ),
+              "warning",
+              { detail: result.warning },
+            );
+          } else {
+            showToast(t("library.transcribeDone", "文字稿已生成"), "success");
+          }
+        } else if (result.notConfigured) {
+          showToast(
+            t(
+              "library.transcribeNotConfigured",
+              "尚未配置语音转写模型（audioText 路由）",
+            ),
+            "error",
+          );
+          requestSettingsSection("ai");
+        } else {
+          showToast(
+            t("library.transcribeFailed", "转写失败：{{message}}", {
+              message: result.error ?? "",
+            }),
+            "error",
+          );
+        }
+      } finally {
+        setRunningAction(null);
+        setTranscribeProgress(null);
+      }
     },
     [
       isRunning,
@@ -220,16 +222,17 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
           }
         } else if (result.notConfigured) {
           showToast(
-            t("library.transcriptFormatNotConfigured", "尚未配置可用的文本模型"),
+            t(
+              "library.transcriptFormatNotConfigured",
+              "尚未配置可用的文本模型",
+            ),
             "error",
           );
           requestSettingsSection("ai");
         } else {
-          showToast(
-            t("library.transcriptFormatFailed", "排版失败"),
-            "error",
-            { detail: result.error },
-          );
+          showToast(t("library.transcriptFormatFailed", "排版失败"), "error", {
+            detail: result.error,
+          });
         }
       } finally {
         setIsFormatting(false);
@@ -295,15 +298,11 @@ export interface MediaSummaryAction {
 }
 
 /** 基于文字稿生成结构化总结，写入正文的总结小节。 */
-export function useMediaSummaryAction(
-  item: KnowledgeItem,
-): MediaSummaryAction {
+export function useMediaSummaryAction(item: KnowledgeItem): MediaSummaryAction {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const applyServerItem = useKnowledgeStore((state) => state.applyServerItem);
-  const flushPendingSave = useKnowledgeStore(
-    (state) => state.flushPendingSave,
-  );
+  const flushPendingSave = useKnowledgeStore((state) => state.flushPendingSave);
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
@@ -356,9 +355,7 @@ export function useMediaSummaryAction(
   const isForum = item.itemType === "forum";
   const isAudio = item.itemType === "audio";
   // 论坛条目的素材是正文里的逐楼回复，音视频的是文字稿
-  const forumSections = isForum
-    ? splitForumNoteSections(item.content)
-    : null;
+  const forumSections = isForum ? splitForumNoteSections(item.content) : null;
   const hasSummary = isForum
     ? Boolean(forumSections?.summary)
     : hasMediaSummarySection(item.content);
@@ -383,5 +380,99 @@ export function useMediaSummaryAction(
     isRunning,
     label,
     summarize,
+  };
+}
+
+export interface ForumDiscussionRefreshAction {
+  available: boolean;
+  isRunning: boolean;
+  label: string;
+  refresh: () => Promise<void>;
+}
+
+/** 支持站点的讨论就是帖子楼层；刷新后直接替换正文中的讨论小节。 */
+export function useForumDiscussionRefreshAction(
+  item: KnowledgeItem,
+): ForumDiscussionRefreshAction {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const applyServerItem = useKnowledgeStore((state) => state.applyServerItem);
+  const flushPendingSave = useKnowledgeStore((state) => state.flushPendingSave);
+  const [isRunning, setIsRunning] = useState(false);
+  const itemId = item.id;
+
+  useEffect(() => {
+    setIsRunning(false);
+  }, [itemId]);
+
+  const target = item.sourceUri ? detectForumPlatform(item.sourceUri) : null;
+  const available =
+    item.itemType === "forum" &&
+    (target?.platform === "linuxdo" ||
+      target?.platform === "appinn" ||
+      target?.platform === "twolibra");
+  const hadSummary = Boolean(
+    item.itemType === "forum"
+      ? splitForumNoteSections(item.content).summary.trim()
+      : "",
+  );
+
+  const refresh = useCallback(async () => {
+    if (isRunning || !available) {
+      return;
+    }
+    setIsRunning(true);
+    try {
+      await flushPendingSave();
+      const result = await window.api.media.refreshForumDiscussion(itemId);
+      if (result.success && result.item) {
+        applyServerItem(result.item);
+        showToast(
+          hadSummary
+            ? t(
+                "library.forumDiscussionRefreshedSummaryStale",
+                "讨论已刷新，原讨论总结已标记为过期",
+              )
+            : t("library.forumDiscussionRefreshed", "讨论已刷新"),
+          "success",
+        );
+      } else {
+        showToast(
+          t(
+            "library.forumDiscussionRefreshFailed",
+            "刷新讨论失败：{{message}}",
+            {
+              message: result.error ?? "",
+            },
+          ),
+          "error",
+        );
+      }
+    } catch (error) {
+      showToast(
+        t("library.forumDiscussionRefreshFailed", "刷新讨论失败：{{message}}", {
+          message: error instanceof Error ? error.message : String(error),
+        }),
+        "error",
+      );
+    } finally {
+      setIsRunning(false);
+    }
+  }, [
+    isRunning,
+    available,
+    flushPendingSave,
+    itemId,
+    applyServerItem,
+    hadSummary,
+    showToast,
+    t,
+  ]);
+
+  return {
+    available,
+    isRunning,
+    label: t("library.forumDiscussionRefresh", "刷新讨论"),
+    refresh,
   };
 }

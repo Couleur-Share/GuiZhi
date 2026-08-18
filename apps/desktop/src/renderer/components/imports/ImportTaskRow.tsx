@@ -10,6 +10,7 @@ import {
   GlobeIcon,
   InfoIcon,
   Loader2Icon,
+  LogInIcon,
   RotateCcwIcon,
   SettingsIcon,
   TriangleAlertIcon,
@@ -19,6 +20,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { ImportTask } from "@guizhi/shared/types";
 import { useImportStore } from "../../stores/import.store";
+import { reportOperationError } from "../../stores/operation-error.store";
 import { useUIStore } from "../../stores/ui.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
 import { ImportStageSummary } from "./ImportStageSummary";
@@ -26,6 +28,7 @@ import {
   formatDuration,
   formatImportTaskError,
   formatImportTaskWarning,
+  getAuthenticatedRetryPlatform,
   getStageLabel,
   needsCaptureToolSetup,
   resolveTaskFolder,
@@ -294,6 +297,28 @@ export function ImportTaskRow({
   });
   // 显示名顶掉原始地址时，气泡才拿得出行里没有的东西
   const sourceTooltip = task.displayName ? task.sourceInput : undefined;
+  const authenticatedRetryPlatform = getAuthenticatedRetryPlatform(task);
+
+  const retryAuthenticated = async () => {
+    if (!authenticatedRetryPlatform) return;
+    try {
+      const statuses = await window.api.platformCapture.getStatuses();
+      const status = statuses.find((entry) => entry.platform === authenticatedRetryPlatform);
+      if (!status?.available) {
+        throw new Error("归知内置登录窗口暂不可用");
+      }
+      if (!status.loggedIn) {
+        await window.api.platformCapture.login(authenticatedRetryPlatform);
+      }
+      await retryTask(task.id, { captureStrategy: "authenticated" });
+    } catch (error) {
+      reportOperationError(
+        "imports.authenticatedRetry",
+        "使用登录态重试",
+        error,
+      );
+    }
+  };
 
   return (
     <div
@@ -385,6 +410,15 @@ export function ImportTaskRow({
             onClick={() => void retryTask(task.id)}
           >
             <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          </RowAction>
+        ) : null}
+
+        {authenticatedRetryPlatform ? (
+          <RowAction
+            label={t("imports.authenticatedRetry", "使用登录态重试")}
+            onClick={() => void retryAuthenticated()}
+          >
+            <LogInIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </RowAction>
         ) : null}
 

@@ -7,6 +7,7 @@ import { AiSummaryCard } from "./AiSummaryCard";
 import { AiOcrCard } from "./AiOcrCard";
 import { IllustrationCard } from "./IllustrationCard";
 import { MediaPreview } from "./MediaPreview";
+import { SourceCommentsCard } from "./SourceCommentsCard";
 
 /**
  * 条目详情：头部（标题 / 元信息 / 标签）+ 正文面板。
@@ -58,6 +59,7 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
             {/* 音视频条目由正文面板里的「总结」按钮承担总结职能 */}
             {!isMediaItem ? <AiSummaryCard item={item} /> : null}
             <IllustrationCard item={item} />
+            <SourceCommentsCard item={item} />
           </div>
         </div>
       ) : null}

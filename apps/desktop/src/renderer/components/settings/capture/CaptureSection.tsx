@@ -6,6 +6,7 @@ import { SettingItem, SettingSection, ToggleSwitch } from "../shared";
 import { BinaryEngineRow } from "./BinaryEngineRow";
 import { formatEngineVersion } from "./engine-version";
 import { FunasrEngineRow } from "./FunasrEngineRow";
+import { PlatformAccountRows } from "./PlatformAccountRows";
 
 /**
  * 采集区：三个可选外部引擎的安装与状态。
@@ -41,6 +42,7 @@ export function CaptureSection() {
 
   return (
     <SettingSection title={t("settings.captureSection", "采集")}>
+      <PlatformAccountRows />
       <BinaryEngineRow
         engineId="ytdlp"
         api={window.api.ytdlp}

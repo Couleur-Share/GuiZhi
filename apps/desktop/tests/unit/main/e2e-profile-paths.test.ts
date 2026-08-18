@@ -13,7 +13,10 @@ const { appMock } = vi.hoisted(() => ({
 }));
 vi.mock("electron", () => ({ app: appMock, session: { defaultSession: {} } }));
 
-import { configureE2ETestProfile } from "../../../src/main/testing/e2e";
+import {
+  configureE2ETestProfile,
+  shouldUseDevServer,
+} from "../../../src/main/testing/e2e";
 
 /**
  * `config/` 下那三份 JSON（ai-models / illustration-styles / mcp）走的是
@@ -50,5 +53,20 @@ describe("E2E 测试 profile 的路径隔离", () => {
     expect(configureE2ETestProfile({})).toBeNull();
 
     expect(getCoreConfigDir()).toBe(realConfigDir);
+  });
+});
+
+describe("E2E renderer 加载策略", () => {
+  it("默认仍走生产 loadFile 路径", () => {
+    expect(shouldUseDevServer(false, { GUIZHI_E2E: "1" })).toBe(false);
+  });
+
+  it("只有显式给出隔离 renderer URL 才允许改走 loadURL", () => {
+    expect(
+      shouldUseDevServer(false, {
+        GUIZHI_E2E: "1",
+        GUIZHI_E2E_RENDERER_URL: "http://127.0.0.1:4173",
+      }),
+    ).toBe(true);
   });
 });

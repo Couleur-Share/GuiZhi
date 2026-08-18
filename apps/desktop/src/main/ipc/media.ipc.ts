@@ -29,6 +29,7 @@ import type {
 } from "@guizhi/shared/types";
 import {
   parseForumReplies,
+  replaceForumRepliesSection,
   splitForumNoteSections,
   upsertForumSummarySection,
 } from "@guizhi/shared/utils/forum-note";
@@ -41,14 +42,24 @@ import {
 import { listSpeakers } from "@guizhi/shared/utils/speaker-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
+import {
+  detectForumPlatform,
+  type ForumTarget,
+} from "@guizhi/shared/utils/forum-platforms";
 import { KnowledgeItemDB } from "@guizhi/db";
 import Database from "../database/sqlite";
 import { logAppError } from "../diagnostic-log";
 import { getVideosDir } from "../runtime-paths";
 import {
   readFfmpegPathSetting,
+  readNetworkProxySetting,
   readYtDlpPathSetting,
 } from "../services/import/import-service";
+import { fetchAppinnThread } from "../services/import/appinn";
+import { fetchLinuxdoThread } from "../services/import/linuxdo";
+import { fetchTwolibraThread } from "../services/import/twolibra";
+import { fetchAuthenticatedLinuxdoJson } from "../services/platform-capture/authenticated-platforms";
+import { getBrowserCaptureService } from "../services/platform-capture/browser-capture";
 import {
   downloadDouyinMedia,
   fetchDouyinAweme,
@@ -221,14 +232,74 @@ async function applyMediaSummarySafely(
 /**
  * 重新生成论坛条目的讨论总结。
  *
- * 素材取自库里正文已存的逐楼回复，不重新抓网页：原帖可能已被删或又多了几十楼，
- * 用条目自己那份才与用户看到的内容一致，也省掉一次平台请求。
+ * 支持公开分页接口的站点会在生成前读取最新完整帖子，使总结覆盖主楼和全部楼层；
+ * 其他论坛仍使用条目里已经入库的讨论内容。
  */
+type RefreshableForumPlatform = "linuxdo" | "appinn" | "twolibra";
+
+function isRefreshableForumTarget(
+  target: ForumTarget | null,
+): target is ForumTarget & { platform: RefreshableForumPlatform } {
+  return (
+    target?.platform === "linuxdo" ||
+    target?.platform === "appinn" ||
+    target?.platform === "twolibra"
+  );
+}
+
+function refreshableForumLabel(platform: RefreshableForumPlatform): string {
+  if (platform === "linuxdo") return "LINUX DO";
+  return platform === "appinn" ? "小众软件论坛" : "2Libra";
+}
+
+async function fetchLatestForumThread(
+  db: Database.Database,
+  target: ForumTarget & { platform: RefreshableForumPlatform },
+) {
+  if (target.platform === "appinn") {
+    return fetchAppinnThread(target.topicId);
+  }
+  if (target.platform === "twolibra") {
+    return fetchTwolibraThread(target.topicId);
+  }
+  const browserCapture = getBrowserCaptureService({
+    getNetworkProxy: () => readNetworkProxySetting(db),
+  });
+  return fetchLinuxdoThread(target.topicId, {
+    fetchAuthenticatedJson: (url, signal) =>
+      fetchAuthenticatedLinuxdoJson(browserCapture, url, signal),
+  });
+}
+
 async function regenerateForumSummary(
+  db: Database.Database,
   items: KnowledgeItemDB,
   item: KnowledgeItem,
 ): Promise<MediaTranscribeResult> {
-  const replies = parseForumReplies(item.content);
+  let baseContent = item.content;
+  let body = splitForumNoteSections(item.content).body;
+  let replies = parseForumReplies(item.content);
+  const forumTarget = item.sourceUri
+    ? detectForumPlatform(item.sourceUri)
+    : null;
+  if (isRefreshableForumTarget(forumTarget)) {
+    try {
+      const thread = await fetchLatestForumThread(db, forumTarget);
+      body = thread.content;
+      replies = thread.replies;
+      baseContent = updateForumReplyCount(
+        replaceForumRepliesSection(item.content, thread.replies),
+        thread.replyCount,
+      );
+    } catch (error) {
+      return {
+        success: false,
+        error: `无法获取完整的${refreshableForumLabel(forumTarget.platform)}讨论：${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
+  }
   if (replies.length === 0) {
     return { success: false, error: "该条目没有可用于总结的讨论内容" };
   }
@@ -247,7 +318,7 @@ async function regenerateForumSummary(
       {
         title: item.title,
         // 只喂主楼，别把上一版总结和回复原文重复塞进提示词
-        content: splitForumNoteSections(item.content).body,
+        content: body,
         replies,
       },
       config,
@@ -255,7 +326,7 @@ async function regenerateForumSummary(
     if (!result) {
       return { success: false, error: "模型未返回有效的讨论总结" };
     }
-    const content = upsertForumSummarySection(item.content, result.summary);
+    const content = upsertForumSummarySection(baseContent, result.summary);
     const patch: { content: string; title?: string } = { content };
     // 标题仍是那个说不清内容的原标题时，顺手换成模型拟的
     if (result.title && result.title !== item.title) {
@@ -271,6 +342,52 @@ async function regenerateForumSummary(
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function updateForumReplyCount(content: string, replyCount: number): string {
+  return content.replace(
+    /^(>\s*平台：[^\n]*?·\s*)\d+\s*条回复(?=[ \t]*(?:（|$))/m,
+    (_line, prefix: string) => `${prefix}${replyCount} 条回复`,
+  );
+}
+
+/** 抓取支持站点的最新全楼层，替换讨论段并把旧总结标成过期。 */
+async function refreshForumDiscussion(
+  db: Database.Database,
+  items: KnowledgeItemDB,
+  item: KnowledgeItem,
+): Promise<MediaTranscribeResult> {
+  const target = item.sourceUri ? detectForumPlatform(item.sourceUri) : null;
+  if (item.itemType !== "forum" || !isRefreshableForumTarget(target)) {
+    return {
+      success: false,
+      error: "仅 LINUX DO、小众软件论坛与 2Libra 条目支持刷新讨论",
+    };
+  }
+
+  try {
+    const thread = await fetchLatestForumThread(db, target);
+    const content = updateForumReplyCount(
+      replaceForumRepliesSection(item.content, thread.replies),
+      thread.replyCount,
+    );
+    const updated = items.update(item.id, { content });
+    if (!updated) {
+      return { success: false, error: "刷新后的讨论写入失败" };
+    }
+    const platformLabel = refreshableForumLabel(target.platform);
+    console.log(
+      `[import] ${platformLabel}讨论刷新完成（item=${item.id}，${thread.replies.length} 层）`,
+    );
+    return { success: true, item: updated };
+  } catch (error) {
+    return {
+      success: false,
+      error: `刷新${refreshableForumLabel(target.platform)}讨论失败：${
+        error instanceof Error ? error.message : String(error)
+      }`,
     };
   }
 }
@@ -656,7 +773,7 @@ export function registerMediaIPC(db: Database.Database): void {
         return { success: false, error: "条目不存在" };
       }
       if (item.itemType === "forum") {
-        return await regenerateForumSummary(items, item);
+        return await regenerateForumSummary(db, items, item);
       }
       if (item.itemType !== "audio" && item.itemType !== "video") {
         return { success: false, error: "仅音频 / 视频条目支持内容总结" };
@@ -702,6 +819,18 @@ export function registerMediaIPC(db: Database.Database): void {
           error: error instanceof Error ? error.message : String(error),
         };
       }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.MEDIA_REFRESH_FORUM_DISCUSSION,
+    async (_event, itemId: string): Promise<MediaTranscribeResult> => {
+      const items = new KnowledgeItemDB(db);
+      const item = items.get(itemId);
+      if (!item) {
+        return { success: false, error: "条目不存在" };
+      }
+      return refreshForumDiscussion(db, items, item);
     },
   );
 

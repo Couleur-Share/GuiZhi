@@ -5,6 +5,7 @@ export * from "./app-command";
 export * from "./knowledge";
 export * from "./illustration";
 export * from "./import";
+export * from "./platform-capture";
 export * from "./wiki";
 export * from "./backup";
 export * from "./config-transfer";

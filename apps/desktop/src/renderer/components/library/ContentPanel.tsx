@@ -13,6 +13,7 @@ import {
   ImageIcon,
   Loader2Icon,
   MessagesSquareIcon,
+  RefreshCwIcon,
   RotateCcwIcon,
   ScanTextIcon,
   SearchIcon,
@@ -58,6 +59,7 @@ import {
 } from "./reading-memory";
 import { useMarkFindNavigation } from "./use-mark-find";
 import {
+  useForumDiscussionRefreshAction,
   useMediaSummaryAction,
   useTranscriptActions,
 } from "./use-media-actions";
@@ -207,6 +209,7 @@ export function ContentPanel({
   );
   const transcriptActions = useTranscriptActions(item);
   const summaryAction = useMediaSummaryAction(item);
+  const discussionRefreshAction = useForumDiscussionRefreshAction(item);
 
   const [tab, setTab] = useState<PanelTab>("body");
   const [isPreview, setIsPreview] = useState(editorMarkdownPreview);
@@ -585,11 +588,38 @@ export function ContentPanel({
 
             {activeTab !== "transcript" ? (
               <>
+                {!isTrashed &&
+                activeTab === "replies" &&
+                discussionRefreshAction.available ? (
+                  <button
+                    type="button"
+                    onClick={() => void discussionRefreshAction.refresh()}
+                    disabled={
+                      summaryAction.isRunning ||
+                      discussionRefreshAction.isRunning
+                    }
+                    className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground transition-colors hover:border-border hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {discussionRefreshAction.isRunning ? (
+                      <Loader2Icon
+                        className="h-3.5 w-3.5 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <RefreshCwIcon
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {discussionRefreshAction.label}
+                  </button>
+                ) : null}
                 {!isTrashed && summaryAction.available ? (
                   <ToolButton
                     onClick={() => void summaryAction.summarize()}
                     label={summaryAction.label}
                     busy={summaryAction.isRunning}
+                    disabled={discussionRefreshAction.isRunning}
                   >
                     <ScrollTextIcon
                       className="h-3.5 w-3.5"

@@ -111,7 +111,17 @@ module.exports = {
   extraMetadata: {
     main: "out/main/index.js",
   },
-  files: ["out/**/*"],
+  files: [
+    "out/**/*",
+    // 主进程将 playwright-core 保持为 external，避免 Rollup 提升其内部可选
+    // require；electron-builder 默认依赖收集会忽略 Playwright，因此显式只带
+    // 控制库。系统浏览器由 BrowserCaptureService 选择，不携带下载的浏览器。
+    {
+      from: "node_modules/playwright-core",
+      to: "node_modules/playwright-core",
+      filter: ["**/*", "!**/.local-browsers/**"],
+    },
+  ],
   extraResources,
   beforePack: () => {
     assertExtraResourcesExist();

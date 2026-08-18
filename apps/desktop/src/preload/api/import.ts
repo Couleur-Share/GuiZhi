@@ -17,7 +17,11 @@ export const importApi = {
     ipcRenderer.invoke(IPC_CHANNELS.IMPORT_CANCEL, id),
   retry: (
     id: string,
-    options?: { forceDuplicate?: boolean },
+    options?: {
+      forceDuplicate?: boolean;
+      captureStrategy?: ImportTask["captureStrategy"];
+      commentLimit?: ImportTask["commentLimit"];
+    },
   ): Promise<ImportTask | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.IMPORT_RETRY, id, options),
   remove: (id: string): Promise<boolean> =>

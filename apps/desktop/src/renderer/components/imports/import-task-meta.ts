@@ -1,6 +1,26 @@
 import type { ImportStage, ImportTask } from "@guizhi/shared/types";
 import type { PlatformParseErrorCode } from "@guizhi/shared/utils/platform-parse-error";
-import { splitPlatformParseErrorMessage } from "@guizhi/shared/utils/platform-parse-error";
+import { getPlatformParseCode, splitPlatformParseErrorMessage } from "@guizhi/shared/utils/platform-parse-error";
+import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
+
+const AUTHENTICATED_RETRY_CODES = new Set<PlatformParseErrorCode>([
+  "guest_denied",
+  "token_invalid",
+  "structure_missing",
+]);
+
+export function getAuthenticatedRetryPlatform(task: ImportTask) {
+  if (
+    task.status !== "failed" ||
+    task.sourceKind !== "url" ||
+    (task.captureStrategy ?? "standard") !== "standard" ||
+    !task.error ||
+    !AUTHENTICATED_RETRY_CODES.has(getPlatformParseCode(task.error) as PlatformParseErrorCode)
+  ) {
+    return null;
+  }
+  return detectPlatformCapturePlatform(task.sourceInput);
+}
 
 /**
  * 子阶段文案。视频链路会跑元数据 → 下载 → 转码 → 转写 → 排版 → 总结六步，
@@ -39,6 +59,11 @@ export const STAGE_LABELS: Record<
     key: "imports.stageForumReplies",
     fallback: "整理讨论区",
   },
+  "browser-capture": {
+    key: "imports.stageBrowserCapture",
+    fallback: "登录态采集",
+  },
+  comments: { key: "imports.stageComments", fallback: "采集热门评论" },
 };
 
 export function getStageLabel(stage: ImportStage | null | undefined): {

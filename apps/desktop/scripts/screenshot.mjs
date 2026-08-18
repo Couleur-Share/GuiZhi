@@ -6,6 +6,7 @@
  *
  *   node scripts/screenshot.mjs                       # 首页截一张
  *   node scripts/screenshot.mjs --steps my-steps.mjs  # 按脚本走到指定界面再截
+ *   node scripts/screenshot.mjs --data-db path/to/knowledge.db # 从数据库副本截图
  *   node scripts/screenshot.mjs --visible             # 让窗口正常显示（人工盯着看时用）
  *
  * steps 文件默认导出一个函数，拿到 Playwright 的窗口对象与 shot()：
@@ -17,6 +18,7 @@
  */
 import { _electron as electron } from "playwright";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -24,6 +26,7 @@ import { pathToFileURL } from "node:url";
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, "..");
 const MAIN_ENTRY = path.join(DESKTOP_ROOT, "out/main/index.js");
 const RENDERER_ENTRY = path.join(DESKTOP_ROOT, "out/renderer/index.html");
+const RENDERER_ROOT = path.dirname(RENDERER_ENTRY);
 /** 首屏就绪的判据：顶栏搜索框出现即说明渲染进程与数据库都通了 */
 const READY_TEST_ID = "topbar-search";
 const READY_TIMEOUT_MS = 30_000;
@@ -37,10 +40,78 @@ const DEFAULT_SHOT_OPTIONS = { animations: "disabled", caret: "hide" };
 /** 用法错误（参数写错、产物没构建）只打一句话就够，调用栈是纯噪音 */
 class UsageError extends Error {}
 
+const CONTENT_TYPES = new Map([
+  [".css", "text/css; charset=utf-8"],
+  [".html", "text/html; charset=utf-8"],
+  [".ico", "image/x-icon"],
+  [".js", "text/javascript; charset=utf-8"],
+  [".json", "application/json; charset=utf-8"],
+  [".png", "image/png"],
+  [".svg", "image/svg+xml"],
+  [".webp", "image/webp"],
+]);
+
+/**
+ * Electron 33 在部分 Windows 图形环境里直接加载构建产物的 file:// 会返回
+ * ERR_FAILED。截图期间只在回环地址提供 out/renderer，既绕过这个兼容问题，
+ * 又不需要启动会热更新、会改源码时间戳的 Vite dev server。
+ */
+async function startRendererServer() {
+  const server = http.createServer((request, response) => {
+    let relativePath;
+    try {
+      const pathname = decodeURIComponent(
+        new URL(request.url ?? "/", "http://127.0.0.1").pathname,
+      );
+      relativePath = pathname === "/" ? "index.html" : pathname.slice(1);
+    } catch {
+      response.writeHead(400).end("Bad request");
+      return;
+    }
+
+    const filePath = path.resolve(RENDERER_ROOT, relativePath);
+    if (
+      filePath !== RENDERER_ROOT &&
+      !filePath.startsWith(`${RENDERER_ROOT}${path.sep}`)
+    ) {
+      response.writeHead(403).end("Forbidden");
+      return;
+    }
+
+    fs.stat(filePath, (error, stat) => {
+      if (error || !stat.isFile()) {
+        response.writeHead(404).end("Not found");
+        return;
+      }
+      response.writeHead(200, {
+        "Cache-Control": "no-store",
+        "Content-Type":
+          CONTENT_TYPES.get(path.extname(filePath)) ?? "application/octet-stream",
+      });
+      fs.createReadStream(filePath).pipe(response);
+    });
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("无法确定离屏截图 renderer 服务端口");
+  }
+  return {
+    server,
+    url: `http://127.0.0.1:${address.port}`,
+  };
+}
+
 function parseArgs(argv) {
   const args = {
     out: path.join(DESKTOP_ROOT, ".tmp-shots"),
     steps: null,
+    dataDb: null,
     visible: false,
     staleOk: false,
   };
@@ -48,6 +119,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--out") args.out = path.resolve(argv[++i]);
     else if (arg === "--steps") args.steps = path.resolve(argv[++i]);
+    else if (arg === "--data-db") args.dataDb = path.resolve(argv[++i]);
     else if (arg === "--visible") args.visible = true;
     else if (arg === "--stale-ok") args.staleOk = true;
     else throw new UsageError(`未知参数：${arg}`);
@@ -128,27 +200,48 @@ async function main() {
   if (args.steps && typeof stepsFn !== "function") {
     throw new UsageError(`${args.steps} 需要默认导出一个函数`);
   }
+  if (args.dataDb && !fs.existsSync(args.dataDb)) {
+    throw new UsageError(`数据库不存在：${args.dataDb}`);
+  }
+  if (args.dataDb && fs.existsSync(`${args.dataDb}.lock`)) {
+    throw new UsageError("数据库正在使用，请先退出归知再从数据副本截图");
+  }
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-shot-"));
+  if (args.dataDb) {
+    const dataDir = path.join(userDataDir, "data");
+    fs.mkdirSync(dataDir, { recursive: true });
+    // 只复制知识库，不复制 AI Key、浏览器登录态与缓存；应用写入的也是临时副本。
+    fs.copyFileSync(args.dataDb, path.join(dataDir, "knowledge.db"));
+  }
   const taken = [];
   let failure = null;
-
-  const app = await electron.launch({
-    args: [MAIN_ENTRY],
-    env: {
-      ...process.env,
-      GUIZHI_E2E: "1",
-      GUIZHI_E2E_USER_DATA_DIR: userDataDir,
-      GUIZHI_WINDOW_MODE: args.visible ? "visible" : "offscreen",
-    },
-  });
+  const renderer = await startRendererServer();
+  let app = null;
 
   try {
+    app = await electron.launch({
+      // 离屏实例固定使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
+      // 也让不同机器上的截图栅格化结果更接近。
+      args: [
+        "--use-gl=angle",
+        "--use-angle=swiftshader",
+        "--disable-gpu-sandbox",
+        MAIN_ENTRY,
+      ],
+      env: {
+        ...process.env,
+        GUIZHI_E2E: "1",
+        GUIZHI_E2E_USER_DATA_DIR: userDataDir,
+        GUIZHI_E2E_RENDERER_URL: renderer.url,
+        GUIZHI_WINDOW_MODE: args.visible ? "visible" : "offscreen",
+      },
+    });
     const win = await app.firstWindow();
     await win.waitForLoadState("domcontentloaded");
     await win
       .getByTestId(READY_TEST_ID)
-      .waitFor({ state: "visible", timeout: READY_TIMEOUT_MS });
+      .waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
 
     const shot = async (name, options = {}) => {
       const file = path.join(args.out, `${name}.png`);
@@ -168,6 +261,7 @@ async function main() {
     failure = error;
     // 失败现场同样值得留一张：多数时候一眼就能看出是卡在哪个界面
     try {
+      if (!app) throw error;
       const win = await app.firstWindow();
       const file = path.join(args.out, "failure.png");
       await win.screenshot({ path: file, timeout: 10_000 });
@@ -176,7 +270,8 @@ async function main() {
       // 窗口已经没了就算了
     }
   } finally {
-    await app.close().catch(() => {});
+    await app?.close().catch(() => {});
+    await new Promise((resolve) => renderer.server.close(resolve));
     fs.rmSync(userDataDir, { recursive: true, force: true });
   }
 

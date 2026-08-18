@@ -6,7 +6,12 @@
  * 认不出来的链接一律返回 null，退回通用网页抓取。
  */
 
-export type ForumPlatform = "v2ex" | "nga";
+export type ForumPlatform =
+  | "v2ex"
+  | "nga"
+  | "linuxdo"
+  | "appinn"
+  | "twolibra";
 
 export interface ForumTarget {
   platform: ForumPlatform;
@@ -19,6 +24,15 @@ const V2EX_TOPIC_PATH = /^\/t\/(\d+)/;
 
 /** NGA 读帖页：/read.php?tid=37194262（可带 fav/rand 等噪音参数） */
 const NGA_READ_PATH = /\/read\.php$/i;
+
+/**
+ * LINUX DO（Discourse）帖子路径：
+ * /t/topic/2702071、/t/2702071、/t/some-slug/2702071、/t/slug/2702071/5
+ */
+const DISCOURSE_TOPIC_PATH = /^\/t\/(?:topic\/)?(?:[^/]+\/)?(\d+)/;
+
+/** 2Libra 帖子路径：/post/{nodeSlug}/{7 位 shortId} */
+const TWOLIBRA_POST_PATH = /^\/post\/([^/]+)\/([A-Za-z0-9_-]{7})\/?$/;
 
 function isNgaHostname(hostname: string): boolean {
   return (
@@ -34,6 +48,36 @@ function isNgaHostname(hostname: string): boolean {
 /** 规范来源链接：去掉 fav/rand 等一次性参数，保证同一帖去重稳定 */
 export function ngaCanonicalUrl(topicId: string): string {
   return `https://bbs.nga.cn/read.php?tid=${topicId}`;
+}
+
+function isLinuxDoHostname(hostname: string): boolean {
+  return hostname === "linux.do" || hostname.endsWith(".linux.do");
+}
+
+/** 规范来源链接：统一为 /t/topic/{id}，保证去重稳定 */
+export function linuxdoCanonicalUrl(topicId: string): string {
+  return `https://linux.do/t/topic/${topicId}`;
+}
+
+function isAppinnHostname(hostname: string): boolean {
+  return hostname === "meta.appinn.net";
+}
+
+/** 规范来源链接：丢掉 slug、楼层与查询串，保证同一帖去重稳定 */
+export function appinnCanonicalUrl(topicId: string): string {
+  return `https://meta.appinn.net/t/topic/${topicId}`;
+}
+
+function isTwolibraHostname(hostname: string): boolean {
+  return hostname === "2libra.com" || hostname === "www.2libra.com";
+}
+
+/** 2Libra 的节点 slug 是规范链接的一部分。 */
+export function twolibraCanonicalUrl(
+  nodeSlug: string,
+  topicId: string,
+): string {
+  return `https://2libra.com/post/${encodeURIComponent(nodeSlug)}/${encodeURIComponent(topicId)}`;
 }
 
 export function detectForumPlatform(url: string): ForumTarget | null {
@@ -59,6 +103,27 @@ export function detectForumPlatform(url: string): ForumTarget | null {
     const tid = searchParams.get("tid")?.trim() ?? "";
     if (/^\d+$/.test(tid)) {
       return { platform: "nga", topicId: tid };
+    }
+  }
+
+  if (isLinuxDoHostname(hostname)) {
+    const topicId = DISCOURSE_TOPIC_PATH.exec(pathname)?.[1];
+    if (topicId) {
+      return { platform: "linuxdo", topicId };
+    }
+  }
+
+  if (isAppinnHostname(hostname)) {
+    const topicId = DISCOURSE_TOPIC_PATH.exec(pathname)?.[1];
+    if (topicId) {
+      return { platform: "appinn", topicId };
+    }
+  }
+
+  if (isTwolibraHostname(hostname)) {
+    const match = TWOLIBRA_POST_PATH.exec(pathname);
+    if (match) {
+      return { platform: "twolibra", topicId: match[2] };
     }
   }
 

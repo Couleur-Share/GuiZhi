@@ -61,6 +61,7 @@ interface ToggleSwitchProps {
   defaultChecked?: boolean;
   disabled?: boolean;
   ariaLabel?: string;
+  size?: "default" | "compact";
 }
 
 export function ToggleSwitch({
@@ -69,10 +70,12 @@ export function ToggleSwitch({
   defaultChecked = false,
   disabled = false,
   ariaLabel,
+  size = "default",
 }: ToggleSwitchProps) {
   const [internalChecked, setInternalChecked] = useState(defaultChecked);
   const isControlled = checked !== undefined;
   const isChecked = isControlled ? checked : internalChecked;
+  const compact = size === "compact";
 
   const handleClick = () => {
     if (disabled) {
@@ -93,17 +96,29 @@ export function ToggleSwitch({
       aria-label={ariaLabel}
       onClick={handleClick}
       disabled={disabled}
-      className={`relative w-12 h-7 rounded-full transition-all duration-base flex-shrink-0 border-2 ${
+      className={`relative flex-shrink-0 rounded-full transition-all duration-base ${
+        compact ? "h-5 w-9 border" : "h-7 w-12 border-2"
+      } ${
         isChecked
           ? "bg-primary border-primary"
           : "bg-muted border-border dark:bg-primary/20 dark:border-primary/40"
       } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       <span
-        className={`absolute top-0.5 w-5 h-5 rounded-full transition-all duration-base ${
+        className={`absolute rounded-full transition-all duration-base ${
+          compact ? "top-px h-4 w-4" : "top-0.5 h-5 w-5"
+        } ${
           isChecked ? "bg-white" : "bg-muted-foreground/50 dark:bg-primary/60"
         }`}
-        style={{ left: isChecked ? "22px" : "2px" }}
+        style={{
+          left: compact
+            ? isChecked
+              ? "17px"
+              : "1px"
+            : isChecked
+              ? "22px"
+              : "2px",
+        }}
       />
     </button>
   );

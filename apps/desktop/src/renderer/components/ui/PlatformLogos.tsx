@@ -8,8 +8,8 @@ import type { ComponentType } from "react";
  * 为此引一个 3400 图标的依赖不划算，而且这里要按主题换色，包给的组件也帮不上忙。
  *
  * 抖音用 TikTok 的音符：字节这两个产品共用同一个符号，Simple Icons 也只收了
- * 一份（没有 douyin slug），不是拿相近的东西凑数。NGA 在 Simple Icons 里没有
- * 条目，对应 glyph 是自绘的。
+ * 一份（没有 douyin slug），不是拿相近的东西凑数。NGA 与小众软件在
+ * Simple Icons 里没有条目，对应 glyph 是自绘的。
  *
  * viewBox 从 `0 0 24 24` 撑到 `-2 -2 28 28`，是为了给图形留出 lucide 那样的
  * 内边距——Simple Icons 是实心填充且铺满画布，与描边图标同尺寸摆在一起会明显
@@ -114,6 +114,71 @@ export function NgaLogo({ className }: PlatformLogoProps) {
       aria-hidden="true"
     >
       <path d="M12 1.5c.4 0 .8.1 1.1.3l7.4 4.3c.7.4 1.1 1.1 1.1 1.9v8c0 .8-.4 1.5-1.1 1.9l-7.4 4.3c-.3.2-.7.3-1.1.3s-.8-.1-1.1-.3l-7.4-4.3C2.8 17.5 2.4 16.8 2.4 16V8c0-.8.4-1.5 1.1-1.9l7.4-4.3c.3-.2.7-.3 1.1-.3zm0 2.2L5.4 7.5v9l6.6 3.8 6.6-3.8v-9L12 3.7zm-3.2 4.1h2.1l2.3 4.2V7.8h2.1v8.4h-2.1l-2.3-4.2v4.2H8.8V7.8z" />
+    </svg>
+  );
+}
+
+/** LINUX DO（自绘指称 glyph，Simple Icons 无此条目） */
+export function LinuxdoLogo({ className }: PlatformLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="-2 -2 28 28"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path d="M12 2.5c3.2 0 5.8 2.4 6.2 5.5.9.3 1.6 1.2 1.6 2.3v1.2c0 .7-.3 1.3-.8 1.7.3.5.5 1.1.5 1.8v3.1c0 1.8-1.5 3.3-3.3 3.3H8.8c-1.8 0-3.3-1.5-3.3-3.3v-3.1c0-.7.2-1.3.5-1.8-.5-.4-.8-1-.8-1.7v-1.2c0-1.1.7-2 1.6-2.3.4-3.1 3-5.5 6.2-5.5zm-2.1 9.8c-.6 0-1 .4-1 1s.4 1 1 1 1-.4 1-1-.4-1-1-1zm4.2 0c-.6 0-1 .4-1 1s.4 1 1 1 1-.4 1-1-.4-1-1-1zm-2.1 3.2c-1.5 0-2.7.8-2.7 1.8h5.4c0-1-1.2-1.8-2.7-1.8z" />
+    </svg>
+  );
+}
+
+/** 小众软件（青蛙头像的单色小尺寸版本） */
+export function AppinnLogo({ className }: PlatformLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="-2 -2 28 28"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M7 2a3.5 3.5 0 0 0-3.33 4.58A6.48 6.48 0 0 0 2 10.92v3.33C2 18.53 6.03 22 11 22h2c4.97 0 9-3.47 9-7.75v-3.33a6.48 6.48 0 0 0-1.67-4.34A3.5 3.5 0 0 0 13.68 4H10.32A3.5 3.5 0 0 0 7 2Zm0 2.25a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5Zm10 0a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5ZM6.5 14.1a1 1 0 0 1 1.4.2c.89 1.18 2.22 1.7 4.1 1.7s3.21-.52 4.1-1.7a1 1 0 1 1 1.6 1.2c-1.31 1.75-3.24 2.5-5.7 2.5s-4.39-.75-5.7-2.5a1 1 0 0 1 .2-1.4Z"
+      />
+    </svg>
+  );
+}
+
+/** 2Libra 官方天平 mark（取自站点 favicon.svg，保留品牌原色） */
+export function TwolibraLogo({ className }: PlatformLogoProps) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 192 192"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M93.672 158c21.406 0 38.758-3.966 38.758-8.859 0-4.892-17.352-8.859-38.758-8.859s-38.757 3.967-38.757 8.859c0 4.893 17.352 8.859 38.757 8.859Z"
+        fill="#21AA6C"
+      />
+      <path d="M88.135 149.141h11.074l-3.322-66.442h-4.43l-3.322 66.442Z" fill="#BFC242" />
+      <path
+        d="M156.197 77.276H34.386a5.537 5.537 0 1 0 0 11.074h121.811a5.537 5.537 0 1 0 0-11.074Z"
+        fill="#758CF3"
+      />
+      <path
+        d="M57.641 38.519H39.924a6.644 6.644 0 0 0-6.645 6.644v17.718a6.644 6.644 0 0 0 6.645 6.644H57.64a6.644 6.644 0 0 0 6.645-6.644V45.163a6.644 6.644 0 0 0-6.645-6.644Z"
+        fill="#47A44A"
+      />
+      <path
+        d="M147.338 69.525c8.562 0 15.503-6.941 15.503-15.503s-6.941-15.503-15.503-15.503-15.503 6.941-15.503 15.503 6.941 15.503 15.503 15.503Z"
+        fill="#B62020"
+      />
     </svg>
   );
 }

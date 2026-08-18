@@ -1,4 +1,8 @@
-import type { AIModelConfig } from "../../../stores/settings.store";
+import type {
+  AIModelConfig,
+  AIProviderConfig,
+} from "../../../stores/settings.store";
+import { findMatchingAIProvider } from "../../../stores/settings/settings-ai";
 
 import { DEFAULT_MODEL_CAPABILITIES, PROVIDER_OPTIONS } from "./constants";
 import type { ModelFormState, ModelOption, ProviderOption } from "./types";
@@ -218,14 +222,47 @@ export function getEndpointHost(apiUrl: string, fallback: string): string {
   }
 }
 
+export function formatModelWithProvider(
+  modelName: string,
+  providerName?: string,
+): string {
+  const trimmedModel = modelName.trim();
+  const trimmedProvider = providerName?.trim();
+  if (
+    !trimmedProvider ||
+    trimmedProvider.toLowerCase() === "unknown" ||
+    trimmedModel.toLowerCase().includes(trimmedProvider.toLowerCase())
+  ) {
+    return trimmedModel;
+  }
+  return `${trimmedModel} (${trimmedProvider})`;
+}
+
+export function getModelProviderDisplayName(
+  model: AIModelConfig,
+  providers: AIProviderConfig[] = [],
+): string {
+  const matchedProvider = findMatchingAIProvider(providers, model);
+  if (matchedProvider) {
+    return getEndpointDisplayName(matchedProvider);
+  }
+  return getProviderLabel(model.provider);
+}
+
 export function getModelDisplayName(
   model: AIModelConfig | null | undefined,
   fallback: string,
+  providers?: AIProviderConfig[],
 ): string {
   if (!model) {
     return fallback;
   }
-  return model.name?.trim() || model.model;
+  const baseName = model.name?.trim() || model.model;
+  if (!providers || providers.length === 0) {
+    return baseName;
+  }
+  const providerName = getModelProviderDisplayName(model, providers);
+  return formatModelWithProvider(baseName, providerName);
 }
 
 export function buildEndpointGroupKey(model: AIModelConfig): string {
@@ -249,11 +286,22 @@ export function buildEndpointKey(input: {
   return `${input.provider}::${input.apiProtocol}::${input.apiUrl}`;
 }
 
-export function buildModelOptions(models: AIModelConfig[]): ModelOption[] {
-  return models.map((model) => ({
-    value: model.id,
-    label: model.name?.trim() || model.model,
-  }));
+export function buildModelOptions(
+  models: AIModelConfig[],
+  providers: AIProviderConfig[] = [],
+): ModelOption[] {
+  return models.map((model) => {
+    const baseName = model.name?.trim() || model.model;
+    const providerName = getModelProviderDisplayName(model, providers);
+    const triggerLabel = formatModelWithProvider(baseName, providerName);
+    return {
+      value: model.id,
+      label: baseName,
+      triggerLabel,
+      labelText: triggerLabel,
+      group: providerName,
+    };
+  });
 }
 
 export function inferModelAttributes(

@@ -1,9 +1,12 @@
 import { GlobeIcon, HardDriveIcon, CircleHelpIcon } from "lucide-react";
 import type { SourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import {
+  AppinnLogo,
   BilibiliLogo,
   DouyinLogo,
   NgaLogo,
+  LinuxdoLogo,
+  TwolibraLogo,
   V2exLogo,
   XiaohongshuLogo,
   YoutubeLogo,
@@ -21,12 +24,13 @@ export interface SourcePlatformMeta {
 /**
  * 侧栏「平台」分区与表格「来源」列的图标与名称。
  *
- * 六个专有平台用各自的品牌 logo（`ui/PlatformLogos.tsx`）而不是形态近似的通用
+ * 专有平台用各自的品牌 logo（`ui/PlatformLogos.tsx`）而不是形态近似的通用
  * 图标：音符、电视、书这类替身要先读懂旁边的文字才对得上号，等于没帮上忙，而
  * 这一列的全部用处就是不看文字也能扫出哪行是哪个平台。
  *
  * 着色分两类。有彩色标准色的用品牌色——这里刻意不走语义令牌，品牌色不是主题的
- * 一部分，随主题漂移就不再是那个平台的颜色了。抖音（#000000）与 V2EX（#1F1F1F）
+ * 一部分，随主题漂移就不再是那个平台的颜色了。2Libra 的官方 mark 自带五色填充，
+ * 由 SVG 内部保留；抖音（#000000）与 V2EX（#1F1F1F）
  * 的标准色是近黑，写死会在深色主题下整个消失，改用 `text-foreground` 跟着主题
  * 走：这两个 mark 本来给人的印象就是中性色，浅色下发黑、深色下发白都不违和。
  *
@@ -70,6 +74,25 @@ export const SOURCE_PLATFORM_META: Record<SourcePlatform, SourcePlatformMeta> =
       fallback: "NGA",
       Icon: NgaLogo,
       colorClass: "text-[#548C2F]",
+    },
+    linuxdo: {
+      labelKey: "library.platformLinuxdo",
+      fallback: "LINUX DO",
+      Icon: LinuxdoLogo,
+      colorClass: "text-[#EA8023]",
+    },
+    appinn: {
+      labelKey: "library.platformAppinn",
+      fallback: "小众软件",
+      Icon: AppinnLogo,
+      colorClass: "text-[#3AB54A]",
+    },
+    twolibra: {
+      labelKey: "library.platformTwolibra",
+      fallback: "2Libra",
+      Icon: TwolibraLogo,
+      // 官方 mark 自带五色填充，不由外层覆盖颜色。
+      colorClass: "text-current",
     },
     web: {
       labelKey: "library.platformWeb",

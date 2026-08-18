@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { Select } from "../../ui/Select";
 import { getCategoryIcon } from "../../ui/ModelIcons";
-import { PasswordInput } from "../shared";
+import { PasswordInput, ToggleSwitch } from "../shared";
 import { PROVIDER_OPTIONS } from "./constants";
 import { getProviderInfo } from "./helpers";
 import { Modal } from "../../ui/Modal";
@@ -275,6 +275,27 @@ export function EndpointFormModal({
               </div>
             ) : null}
           </div>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+          <div>
+            <div className="text-sm font-medium">
+              {t("settings.aiWorkbenchProviderStatus", "供应商状态")}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {endpointDraft.enabled !== false
+                ? t("settings.aiWorkbenchEnabled", "已启用")
+                : t("settings.aiWorkbenchDisabled", "已停用")}
+            </div>
+          </div>
+          <ToggleSwitch
+            checked={endpointDraft.enabled !== false}
+            onChange={(checked) =>
+              setEndpointDraft((prev) =>
+                prev ? { ...prev, enabled: checked } : prev,
+              )
+            }
+            ariaLabel={t("settings.aiWorkbenchProviderStatus", "供应商状态")}
+          />
         </div>
         <div className="flex justify-end gap-2 border-t border-border pt-4">
           <button

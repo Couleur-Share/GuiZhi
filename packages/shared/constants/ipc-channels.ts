@@ -46,6 +46,18 @@ export const IPC_CHANNELS = {
   /** 主进程 → 渲染进程：任务状态变更事件 */
   IMPORT_CHANGED: "import:changed",
 
+  // 登录态平台采集 / 平台发现
+  PLATFORM_CAPTURE_STATUS: "platformCapture:status",
+  PLATFORM_CAPTURE_LOGIN: "platformCapture:login",
+  PLATFORM_CAPTURE_CANCEL_LOGIN: "platformCapture:cancelLogin",
+  PLATFORM_CAPTURE_LOGOUT: "platformCapture:logout",
+  PLATFORM_CAPTURE_CLEAR_ALL: "platformCapture:clearAll",
+  PLATFORM_CAPTURE_DISCOVER_CREATOR: "platformCapture:discoverCreator",
+  PLATFORM_CAPTURE_SEARCH: "platformCapture:search",
+  PLATFORM_CAPTURE_CANCEL_DISCOVERY: "platformCapture:cancelDiscovery",
+  PLATFORM_CAPTURE_LIST_COMMENTS: "platformCapture:listComments",
+  PLATFORM_CAPTURE_REFRESH_COMMENTS: "platformCapture:refreshComments",
+
   // Wiki (ADR 0023)
   WIKI_CATALOG: "wiki:catalog",
   /** 各页面入链数：目录列的「被引用最多」排序与孤立页筛选 */
@@ -104,6 +116,8 @@ export const IPC_CHANNELS = {
   MEDIA_FORMAT_PROGRESS: "media:formatProgress",
   /** 基于文字稿生成结构化「视频/音频总结」并写入正文 */
   MEDIA_SUMMARIZE: "media:summarize",
+  /** 刷新支持站点的论坛条目逐楼讨论 */
+  MEDIA_REFRESH_FORUM_DISCUSSION: "media:refreshForumDiscussion",
   /** 转写模型连通性测试（静音样本真实请求） */
   MEDIA_TEST_TRANSCRIPTION: "media:testTranscription",
   /** 当前「语音转写」路由支持哪些可选能力（如区分说话人） */

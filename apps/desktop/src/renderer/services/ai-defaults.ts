@@ -2,11 +2,15 @@ import type {
   AIModelRoute,
   AIModelCapabilities,
   AIModelConfig,
+  AIProviderConfig,
   AIUsageScenario,
   ModelRouteDefaults,
   ScenarioModelDefaults,
 } from "../stores/settings.store";
-import { AI_SCENARIO_MODEL_ROUTE } from "../stores/settings.store";
+import {
+  AI_SCENARIO_MODEL_ROUTE,
+  isModelActive,
+} from "../stores/settings/settings-ai";
 import type { AIConfig } from "./ai";
 
 export function hasModelCapability(
@@ -37,8 +41,11 @@ export function hasModelCapability(
 export function getModelsByCapability(
   aiModels: AIModelConfig[],
   capability: keyof AIModelCapabilities,
+  aiProviders?: AIProviderConfig[],
 ): AIModelConfig[] {
-  return aiModels.filter((model) => hasModelCapability(model, capability));
+  return aiModels
+    .filter((model) => isModelActive(model, aiProviders))
+    .filter((model) => hasModelCapability(model, capability));
 }
 
 /**
@@ -50,27 +57,29 @@ export function getModelsByCapability(
 export function getRouteCandidateModels(
   aiModels: AIModelConfig[],
   route: AIModelRoute,
+  aiProviders?: AIProviderConfig[],
 ): AIModelConfig[] {
   if (route === "embedding") {
-    return getModelsByCapability(aiModels, "embedding");
+    return getModelsByCapability(aiModels, "embedding", aiProviders);
   }
   if (route === "visionText") {
-    return getModelsByCapability(aiModels, "vision");
+    return getModelsByCapability(aiModels, "vision", aiProviders);
   }
   if (route === "imageGen") {
-    return getModelsByCapability(aiModels, "imageGeneration");
+    return getModelsByCapability(aiModels, "imageGeneration", aiProviders);
   }
   if (route === "audioText") {
     const transcriptionModels = getModelsByCapability(
       aiModels,
       "audioTranscription",
+      aiProviders,
     );
     return [
       ...transcriptionModels,
-      ...getModelsByCapability(aiModels, "chat"),
+      ...getModelsByCapability(aiModels, "chat", aiProviders),
     ];
   }
-  return getModelsByCapability(aiModels, "chat");
+  return getModelsByCapability(aiModels, "chat", aiProviders);
 }
 
 function pickRouteModel(
@@ -100,9 +109,10 @@ export function resolveRouteModel(
   aiModels: AIModelConfig[],
   modelRouteDefaults: ModelRouteDefaults | undefined,
   route: AIModelRoute,
+  aiProviders?: AIProviderConfig[],
 ): AIModelConfig | null {
   return pickRouteModel(
-    getRouteCandidateModels(aiModels, route),
+    getRouteCandidateModels(aiModels, route, aiProviders),
     route,
     modelRouteDefaults?.[route],
   );
@@ -113,10 +123,11 @@ export function resolveScenarioModel(
   scenarioModelDefaults: ScenarioModelDefaults | undefined,
   scenario: AIUsageScenario,
   modelRouteDefaults?: ModelRouteDefaults,
+  aiProviders?: AIProviderConfig[],
 ): AIModelConfig | null {
   const route = AI_SCENARIO_MODEL_ROUTE[scenario];
   return pickRouteModel(
-    getRouteCandidateModels(aiModels, route),
+    getRouteCandidateModels(aiModels, route, aiProviders),
     route,
     modelRouteDefaults?.[route] ?? scenarioModelDefaults?.[scenario],
   );
@@ -138,6 +149,7 @@ export function isConfiguredModel(
 ): model is AIModelConfig {
   return Boolean(
     model &&
+    model.enabled !== false &&
     model.provider?.trim() &&
     model.apiKey?.trim() &&
     model.apiUrl?.trim() &&
@@ -147,6 +159,7 @@ export function isConfiguredModel(
 
 interface ResolveScenarioAIConfigOptions {
   aiModels: AIModelConfig[];
+  aiProviders?: AIProviderConfig[];
   scenarioModelDefaults: ScenarioModelDefaults | undefined;
   modelRouteDefaults?: ModelRouteDefaults;
   scenario: AIUsageScenario;
@@ -160,6 +173,7 @@ interface ResolveScenarioAIConfigOptions {
 
 export function resolveScenarioAIConfig({
   aiModels,
+  aiProviders,
   scenarioModelDefaults,
   modelRouteDefaults,
   scenario,
@@ -175,6 +189,7 @@ export function resolveScenarioAIConfig({
     scenarioModelDefaults,
     scenario,
     modelRouteDefaults,
+    aiProviders,
   );
 
   if (isConfiguredModel(selectedModel)) {
