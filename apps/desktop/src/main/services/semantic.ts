@@ -5,8 +5,8 @@
  * 渲染进程完成嵌入后原样回传，避免两端标准化算法漂移。
  *
  * 检索走进程内向量缓存（见 semantic-vector-cache），避免每次全表解码 BLOB。
- * 没有 ANN：精确全量扫描。触发 ANN 的门槛见 known-limitations /
- * semantic-vector-cache 文件头注释（chunks≥5万 或 缓存命中后中位>500ms）。
+ * 小库精确扫描；达到规模、内存或实测耗时阈值后尝试 HNSW 侧车，运行时不兼容
+ * 会自动保留精确扫描，不中断问答。
  */
 import { SemanticIndexDB } from "@guizhi/db";
 import type {
@@ -21,13 +21,14 @@ import {
   ensureSemanticVectorCache,
   getSemanticVectorCache,
 } from "./semantic-vector-cache";
+import { resolveSemanticSearchBackend } from "./semantic-search-backend";
+import { getDataDir } from "../runtime-paths";
+import path from "node:path";
 
 const SNIPPET_MAX_LENGTH = 160;
 /** 缓存命中后仍超过该耗时才记一条诊断（节流） */
 const SLOW_SEARCH_MS = 300;
 const SLOW_LOG_COOLDOWN_MS = 60_000;
-/** 打分循环每处理这么多向量让出一次事件循环 */
-const YIELD_EVERY_CHUNKS = 2_000;
 
 interface EligibleItemRow {
   id: string;
@@ -156,62 +157,15 @@ export function listPendingSemanticItems(
 let lastSearchMs: number | null = null;
 let lastScannedChunks: number | null = null;
 let lastSearchCacheHit: boolean | null = null;
+let lastBackend: "exact" | "hnsw" | null = null;
 let lastSlowLogAt = 0;
+const warmSearchSamples = new Map<string, number[]>();
 
-interface ScoredItem {
-  itemId: string;
-  chunkIndex: number;
-  score: number;
-}
-
-/**
- * 固定大小最小堆：全量精确打分后只保留前 k 个条目，避免再对全部条目 O(n log n) 排序。
- * k 由 IPC 限制在很小的范围，适合大库中的问答召回。
- */
-function selectTopItems(
-  entries: Iterable<[string, { chunkIndex: number; score: number }]>,
-  limit: number,
-): ScoredItem[] {
-  const heap: ScoredItem[] = [];
-  const isLowerPriority = (left: ScoredItem, right: ScoredItem) =>
-    left.score < right.score ||
-    (left.score === right.score && left.itemId > right.itemId);
-  const siftUp = (index: number) => {
-    let child = index;
-    while (child > 0) {
-      const parent = Math.floor((child - 1) / 2);
-      if (!isLowerPriority(heap[child], heap[parent])) break;
-      [heap[child], heap[parent]] = [heap[parent], heap[child]];
-      child = parent;
-    }
-  };
-  const siftDown = () => {
-    let parent = 0;
-    for (;;) {
-      const left = parent * 2 + 1;
-      const right = left + 1;
-      let smallest = parent;
-      if (left < heap.length && isLowerPriority(heap[left], heap[smallest])) smallest = left;
-      if (right < heap.length && isLowerPriority(heap[right], heap[smallest])) smallest = right;
-      if (smallest === parent) return;
-      [heap[parent], heap[smallest]] = [heap[smallest], heap[parent]];
-      parent = smallest;
-    }
-  };
-
-  for (const [itemId, best] of entries) {
-    const candidate = { itemId, ...best };
-    if (heap.length < limit) {
-      heap.push(candidate);
-      siftUp(heap.length - 1);
-    } else if (isLowerPriority(heap[0], candidate)) {
-      heap[0] = candidate;
-      siftDown();
-    }
-  }
-  return heap.sort(
-    (left, right) => right.score - left.score || left.itemId.localeCompare(right.itemId),
-  );
+function warmMedian(model: string): number | null {
+  const samples = warmSearchSamples.get(model);
+  if (!samples?.length) return null;
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
 }
 
 /**
@@ -239,19 +193,16 @@ export function getSemanticStatus(
     lastSearchMs,
     lastScannedChunks,
     lastSearchCacheHit,
+    ...(lastBackend ? { lastBackend } : {}),
   };
-}
-
-function yieldToEventLoop(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
 }
 
 /**
  * 余弦 top-k：向量均已 L2 归一化，点积即余弦相似度；
  * 条目分数取其分块最高分，返回按分数倒序的前 limit 个条目。
  *
- * 没有 ANN 索引，这里是全量扫描（可走内存缓存）。批间让出事件循环——
- * 连着算完会把主进程占满：所有 IPC 排队，卡住的不只是问答，而是整个界面。
+ * 后端由规模与实测耗时动态选择。精确扫描会分批让出事件循环；HNSW 侧车按
+ * 模型、维度与数据代际隔离，构建或加载失败时透明回退。
  */
 export async function searchSemanticByVector(
   db: Database.Database,
@@ -263,35 +214,16 @@ export async function searchSemanticByVector(
   const index = new SemanticIndexDB(db);
   const cacheHit = Boolean(getSemanticVectorCache(db, model));
   const cache = ensureSemanticVectorCache(db, index, model);
-  const bestByItem = new Map<
-    string,
-    { chunkIndex: number; score: number }
-  >();
-  const dims = queryVector.length;
   const chunkCount = cache.itemIds.length;
-  let scanned = 0;
-
-  if (cache.dims === dims && dims > 0) {
-    for (let i = 0; i < chunkCount; i++) {
-      const offset = i * dims;
-      let dot = 0;
-      for (let d = 0; d < dims; d++) {
-        dot += queryVector[d] * cache.vectors[offset + d];
-      }
-      const itemId = cache.itemIds[i];
-      const chunkIndex = cache.chunkIndexes[i];
-      const existing = bestByItem.get(itemId);
-      if (!existing || dot > existing.score) {
-        bestByItem.set(itemId, { chunkIndex, score: dot });
-      }
-      scanned++;
-      if (scanned % YIELD_EVERY_CHUNKS === 0) {
-        await yieldToEventLoop();
-      }
-    }
-  }
-
-  const top = selectTopItems(bestByItem, Math.max(1, limit));
+  const backend = await resolveSemanticSearchBackend({
+    cache,
+    model,
+    generation: index.generation(model),
+    rootDir: path.join(getDataDir(), "indexes", "semantic"),
+    warmMedianMs: warmMedian(model),
+  });
+  const top = await backend.search(queryVector, Math.max(1, limit));
+  const scanned = backend.name === "exact" ? chunkCount : Math.min(chunkCount, Math.max(limit * 8, 64));
 
   const snippets = new Map(
     index
@@ -318,6 +250,11 @@ export async function searchSemanticByVector(
   lastSearchMs = Date.now() - started;
   lastScannedChunks = scanned;
   lastSearchCacheHit = cacheHit;
+  lastBackend = backend.name;
+  if (cacheHit) {
+    const samples = [...(warmSearchSamples.get(model) ?? []), lastSearchMs].slice(-9);
+    warmSearchSamples.set(model, samples);
+  }
   if (
     lastSearchMs >= SLOW_SEARCH_MS &&
     Date.now() - lastSlowLogAt >= SLOW_LOG_COOLDOWN_MS
@@ -330,6 +267,7 @@ export async function searchSemanticByVector(
       lastSearchMs,
       lastScannedChunks: scanned,
       model,
+      backend: backend.name,
     });
   }
 
@@ -341,5 +279,7 @@ export function resetSemanticSearchTelemetryForTests(): void {
   lastSearchMs = null;
   lastScannedChunks = null;
   lastSearchCacheHit = null;
+  lastBackend = null;
   lastSlowLogAt = 0;
+  warmSearchSamples.clear();
 }

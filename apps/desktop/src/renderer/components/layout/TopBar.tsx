@@ -23,39 +23,18 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
   const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
   const appModule = useUIStore((state) => state.appModule);
-  const setAppModule = useUIStore((state) => state.setAppModule);
   const setKnowledgeSearch = useKnowledgeStore(
     (state) => state.setSearchQuery,
   );
   const runtimeCapabilities = getRuntimeCapabilities();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [focusRequested, setFocusRequested] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 搜索只作用于知识库。在问答/Wiki/导入页显示这个框，用户打了字却什么都不发生，
   // 而知识库的过滤条件已被悄悄改掉——切回去看到的是一个被过滤过的列表。
   const isSearchable = appModule === "library";
 
-  useEffect(() => {
-    const focusSearch = () => {
-      // 在别的模块按搜索快捷键，先切回知识库再聚焦，否则光标进了一个不起作用的框
-      setAppModule("library");
-      setFocusRequested(true);
-    };
-    window.addEventListener("shortcut:search", focusSearch);
-    return () => window.removeEventListener("shortcut:search", focusSearch);
-  }, [setAppModule]);
-
-  // 聚焦要等切换真正提交到 DOM：visibility: hidden 的元素不可聚焦，
-  // 在事件回调里紧接着 setAppModule 调 focus() 只会静默失败。
-  useEffect(() => {
-    if (!focusRequested || !isSearchable) {
-      return;
-    }
-    setFocusRequested(false);
-    searchInputRef.current?.focus();
-  }, [focusRequested, isSearchable]);
 
   // 防抖下发到知识库全文检索
   useEffect(() => {

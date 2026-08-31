@@ -39,7 +39,7 @@ interface SemanticState {
   consumeNotice: () => SemanticRunNotice | null;
   refreshStatus: () => Promise<void>;
   /** @param silent 后台调度用：不产生界面回执 */
-  runIndexing: (silent?: boolean) => Promise<void>;
+  runIndexing: (silent?: boolean) => Promise<SemanticRunNotice | null>;
   /** 防抖调度一轮后台索引（导入完成等场景调用） */
   scheduleIndexing: (delayMs?: number) => void;
 }
@@ -82,10 +82,12 @@ export const useSemanticStore = create<SemanticState>()((set, get) => ({
 
   runIndexing: async (silent = false) => {
     if (get().isIndexing || !window.api?.semantic) {
-      return;
+      return null;
     }
     set({ isIndexing: true, indexedThisRun: 0, notice: null });
+    let runNotice: SemanticRunNotice | null = null;
     const report = (notice: SemanticRunNotice) => {
+      runNotice = notice;
       if (!silent) {
         set({ notice });
       }
@@ -125,6 +127,7 @@ export const useSemanticStore = create<SemanticState>()((set, get) => ({
       set({ isIndexing: false });
       await get().refreshStatus();
     }
+    return runNotice;
   },
 
   scheduleIndexing: (delayMs = SCHEDULE_DEFAULT_DELAY_MS) => {

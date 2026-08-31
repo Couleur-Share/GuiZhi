@@ -104,6 +104,8 @@ interface KnowledgeState {
   total: number;
   page: number;
   pageSize: number;
+  /** 已访问页的起始 keyset 游标；第 1 页固定为 null。 */
+  pageCursors: Record<number, string | null>;
   isLoading: boolean;
   /** 列表读取失败的原因；为空表示读取正常（列表真的是空的） */
   loadError: string | null;
@@ -189,7 +191,11 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       sortBy: state.sortBy,
       sortOrder: state.sortOrder,
       limit: state.pageSize,
-      offset: (state.page - 1) * state.pageSize,
+      ...(state.page === 1
+        ? { cursor: null, offset: 0 }
+        : typeof state.pageCursors[state.page] === "string"
+          ? { cursor: state.pageCursors[state.page] }
+          : { offset: (state.page - 1) * state.pageSize }),
     };
   };
 
@@ -339,6 +345,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       ...(target.tagId !== undefined ? { tagId: target.tagId } : {}),
       ...(target.platform !== undefined ? { platform: target.platform } : {}),
       page: 1,
+      pageCursors: { 1: null },
       selectedId: null,
       selectedItem: null,
       selectionIds: [],
@@ -359,6 +366,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     total: 0,
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
+    pageCursors: { 1: null },
     isLoading: false,
     loadError: null,
     counts: null,
@@ -393,6 +401,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       set({
         searchQuery: query,
         page: 1,
+        pageCursors: { 1: null },
         selectionIds: [],
         selectionAnchorId: null,
       });
@@ -400,7 +409,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     setSort: (sortBy, sortOrder) => {
-      set({ sortBy, sortOrder, page: 1 });
+      set({ sortBy, sortOrder, page: 1, pageCursors: { 1: null } });
       void get().fetchList();
     },
 
@@ -411,7 +420,11 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
 
     setPageSize: (pageSize) => {
       // 换每页条数后停留在原页码会越过总页数，统一回到第一页
-      set({ pageSize: Math.max(1, pageSize), page: 1 });
+      set({
+        pageSize: Math.max(1, pageSize),
+        page: 1,
+        pageCursors: { 1: null },
+      });
       void get().fetchList();
     },
 
@@ -513,6 +526,13 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         set((current) => ({
           entries: result.entries,
           total: result.total,
+          pageCursors: result.nextCursor
+            ? { ...current.pageCursors, [current.page + 1]: result.nextCursor }
+            : Object.fromEntries(
+                Object.entries(current.pageCursors).filter(
+                  ([page]) => Number(page) <= current.page,
+                ),
+              ),
           // 清掉已不在当前页的选中项（被移出视图 / 删除 / 翻页）
           selectionIds: current.selectionIds.filter((id) =>
             result.entries.some((entry) => entry.id === id),

@@ -100,7 +100,7 @@ export function ColumnConfigMenu({
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {label}
                 </span>
-                <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   {t("library.columnConfigHint", "点击切换列的显示/隐藏")}
                 </p>
               </div>

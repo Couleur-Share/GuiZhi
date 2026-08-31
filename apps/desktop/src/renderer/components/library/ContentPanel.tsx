@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  lazy,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -42,13 +43,9 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useToast } from "../ui/Toast";
 import { ImageGallery } from "./ImageGallery";
-import {
-  ForumDiscussionView,
-  type ForumDiscussionHandle,
-} from "./ForumDiscussionView";
+import type { ForumDiscussionHandle } from "./ForumDiscussionView";
 import { defaultCatalogOpen, ForumFloorCatalog } from "./ForumFloorCatalog";
 import { highlightText } from "./highlight-text";
-import { MarkdownEditor } from "./MarkdownEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PanelFindBar } from "./PanelFindBar";
 import { ReviewRequiredNotice } from "./ReviewRequiredNotice";
@@ -63,6 +60,13 @@ import {
   useMediaSummaryAction,
   useTranscriptActions,
 } from "./use-media-actions";
+
+const ForumDiscussionView = lazy(() =>
+  import("./ForumDiscussionView").then((module) => ({ default: module.ForumDiscussionView })),
+);
+const MarkdownEditor = lazy(() =>
+  import("./MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })),
+);
 
 type PanelTab = ReadingPanelTab;
 

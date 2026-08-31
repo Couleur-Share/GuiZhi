@@ -65,6 +65,7 @@ export function SetupChecklistDialog({
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
+  const requestAiQuickSetup = useUIStore((state) => state.requestAiQuickSetup);
   const aiModels = useSettingsStore((state) => state.aiModels);
   const modelRouteDefaults = useSettingsStore(
     (state) => state.modelRouteDefaults,
@@ -136,6 +137,7 @@ export function SetupChecklistDialog({
   const coreReady = items.find((item) => item.id === "textModel")?.ready;
 
   const goConfigure = (id: SetupChecklistItemId) => {
+    if (id === "textModel" || id === "embedding") requestAiQuickSetup();
     requestSettingsSection(setupItemSettingsSection(id));
     onClose();
   };

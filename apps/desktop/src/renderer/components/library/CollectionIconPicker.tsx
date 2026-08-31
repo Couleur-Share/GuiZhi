@@ -97,7 +97,7 @@ export function CollectionIconPicker({
       >
         {COLLECTION_ICON_GROUPS.map((group) => (
           <div key={group.id} className="mb-2 last:mb-0">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t(group.labelKey, group.fallback)}
             </span>
             <div className="mt-1 flex flex-wrap gap-1">

@@ -36,7 +36,7 @@ import {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-0.5 break-words text-xs text-foreground">{children}</div>
     </div>
   );
@@ -266,7 +266,7 @@ export function ImportTaskDetailModal({
             <ImportStageBreakdown stats={stats} />
           ) : (
             // 加统计之前入库的老任务，以及排队时就被取消的任务
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {t("imports.noStageStats", "本次没有记录阶段耗时")}
             </p>
           )}
@@ -299,7 +299,7 @@ export function ImportTaskDetailModal({
             <div className="text-xs font-medium text-foreground">
               {t("imports.refreshComparison", "来源刷新待确认")}
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {t("imports.refreshComparisonHint", "刷新结果保留为未分类副本，原条目没有被覆盖。确认内容后再移动或删除副本。")}
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">

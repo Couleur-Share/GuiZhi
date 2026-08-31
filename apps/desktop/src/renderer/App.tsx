@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { Sidebar, TopBar, MainContent, TitleBar } from "./components/layout";
 import { useSettingsStore } from "./stores/settings.store";
 import { useUIStore } from "./stores/ui.store";
 import { useImportStore } from "./stores/import.store";
 import { useKnowledgeStore } from "./stores/knowledge.store";
+import { useInboxStore } from "./stores/inbox.store";
 import {
   getRenderedBackgroundImageBlur,
   getRenderedBackgroundImageOpacity,
@@ -15,6 +17,7 @@ import { BackgroundImageBackdrop } from "./components/ui/BackgroundImageBackdrop
 import { isWebRuntime } from "./runtime";
 import { waitForPersistHydration } from "./utils/persist-hydration";
 import { DesktopAppCommandBridge } from "./components/app/DesktopAppCommandBridge";
+import { GlobalCommandPalette } from "./components/app/GlobalCommandPalette";
 import { useToast } from "./components/ui/Toast";
 import { useOperationErrorToast } from "./hooks/useOperationErrorToast";
 import { useUpdaterStore } from "./stores/updater.store";
@@ -27,6 +30,9 @@ import {
   isCoreTextModelReady,
   SETUP_DISMISSED_KEY,
 } from "./services/setup-readiness";
+import { useBackgroundJobClient } from "./hooks/useBackgroundJobClient";
+import { useBackupSettingsSync } from "./hooks/useBackupSettingsSync";
+import { mergeSettingsState } from "./stores/settings/settings-persistence";
 
 const SettingsPage = lazy(() =>
   import("./components/settings/SettingsPage").then((m) => ({
@@ -66,6 +72,8 @@ type PageType = "home" | "settings";
 function App() {
   // store 里变更操作的失败统一在这里提示，调用点无需逐个 try/catch
   useOperationErrorToast();
+  useBackgroundJobClient();
+  useBackupSettingsSync();
   const applyTheme = useSettingsStore((state) => state.applyTheme);
   const inferUpdateChannel = useSettingsStore(
     (state) => state.inferUpdateChannel,
@@ -182,11 +190,24 @@ function App() {
     return () => window.api?.off?.("backup:autoStatus", handleAutoBackup);
   }, []);
 
+  // 系统通知点击：切到导入模块并让平台发现页消费目标视图。
+  useEffect(() => {
+    if (isWebRuntime()) return;
+    const openDiscoveryView = (viewId: string) => {
+      sessionStorage.setItem("guizhi-platform-discovery-open-view", viewId);
+      useUIStore.getState().setAppModule("imports");
+      window.dispatchEvent(new CustomEvent("discovery:open-view"));
+    };
+    window.api?.on?.(IPC_CHANNELS.DISCOVERY_OPEN_VIEW, openDiscoveryView);
+    return () => window.api?.off?.(IPC_CHANNELS.DISCOVERY_OPEN_VIEW, openDiscoveryView);
+  }, []);
+
   // 订阅导入任务变更（角标与任务页实时刷新）+ 初始加载
   useEffect(() => {
     const store = useImportStore.getState();
     const unsubscribe = store.subscribeChanges();
     void store.fetchTasks();
+    void useInboxStore.getState().refresh();
     return unsubscribe;
   }, []);
 
@@ -204,39 +225,6 @@ function App() {
     return () => {
       window.api?.off?.("menu:import", handleMenuImport);
       window.api?.off?.("menu:export", handleMenuExport);
-    };
-  }, []);
-
-  // Wiki 后台自动编译（ADR 0023）：开关开启时每 5 分钟增量编译一轮
-  useEffect(() => {
-    const WIKI_COMPILE_INTERVAL_MS = 5 * 60 * 1000;
-    const timer = setInterval(() => {
-      if (useSettingsStore.getState().wikiCompileEnabled) {
-        void import("./stores/wiki.store").then(({ runBackgroundWikiCompile }) =>
-          runBackgroundWikiCompile(),
-        );
-      }
-    }, WIKI_COMPILE_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 语义索引后台循环：embedding 模型配置后自动增量嵌入新内容（未配置时静默跳过）
-  useEffect(() => {
-    if (isWebRuntime()) {
-      return;
-    }
-    const SEMANTIC_INDEX_INTERVAL_MS = 5 * 60 * 1000;
-    const runBackgroundIndexing = () => {
-      // 静默：这一轮由定时器发起，用户没点过任何东西，不该收到回执 toast
-      void import("./stores/semantic.store").then(({ useSemanticStore }) =>
-        useSemanticStore.getState().runIndexing(true),
-      );
-    };
-    const initialTimer = setTimeout(runBackgroundIndexing, 60 * 1000);
-    const timer = setInterval(runBackgroundIndexing, SEMANTIC_INDEX_INTERVAL_MS);
-    return () => {
-      clearTimeout(initialTimer);
-      clearInterval(timer);
     };
   }, []);
 
@@ -687,6 +675,21 @@ function App() {
         return;
       }
 
+      const restoredRendererSettings =
+        await window.api.backup.consumeRestoredRendererSettings();
+      if (disposed) {
+        return;
+      }
+      if (restoredRendererSettings) {
+        useSettingsStore.setState(
+          mergeSettingsState(
+            restoredRendererSettings,
+            useSettingsStore.getState(),
+          ),
+        );
+        useSettingsStore.getState().applyTheme();
+      }
+
       // 首次设置清单：已 dismiss 跳过；核心模型已配则静默记下，避免打扰老用户
       if (localStorage.getItem(SETUP_DISMISSED_KEY)) {
         return;
@@ -744,6 +747,7 @@ function App() {
             onOpenUpdater={openUpdateDialog}
           />
         )}
+        <GlobalCommandPalette />
 
         <div className="flex flex-1 overflow-y-hidden overflow-x-visible">
           <Sidebar

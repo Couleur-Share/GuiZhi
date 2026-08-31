@@ -21,19 +21,21 @@
 
     /* Morandi theme colors - soft and elegant */
     /* 莫兰迪主题色 - 柔和淡雅 */
-    --primary: var(--theme-hue) var(--theme-saturation) 55%;
+    /* All six hues keep white button text above WCAG AA at this lightness. */
+    --primary: var(--theme-hue) var(--theme-saturation) 35%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 220 20% 25%;
     --muted: 220 14% 94%;
-    --muted-foreground: 220 12% 50%;
+    /* 40% keeps secondary text above WCAG AA on the 96% light canvas. */
+    --muted-foreground: 220 12% 40%;
     --accent: var(--theme-hue) calc(var(--theme-saturation) * 0.5) 94%;
     --accent-foreground: var(--theme-hue) var(--theme-saturation) 40%;
-    --destructive: 0 45% 55%;
+    --destructive: 0 60% 40%;
     --destructive-foreground: 0 0% 100%;
     --border: 220 13% 90%;
     --input: 220 13% 90%;
-    --ring: var(--theme-hue) var(--theme-saturation) 55%;
+    --ring: var(--theme-hue) var(--theme-saturation) 35%;
     --radius: 0.75rem;
 
     /* Sidebar - light mode */
@@ -138,8 +140,8 @@
     --popover-foreground: 220 15% 92%;
 
     /* Morandi theme colors */
-    --primary: var(--theme-hue) var(--theme-saturation) 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: var(--theme-hue) var(--theme-saturation) 68%;
+    --primary-foreground: 220 25% 7%;
     --secondary: 220 20% 12%;
     --secondary-foreground: 220 15% 92%;
     --muted: 220 20% 12%;
@@ -150,7 +152,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 220 20% 14%;
     --input: 220 20% 14%;
-    --ring: var(--theme-hue) var(--theme-saturation) 55%;
+    --ring: var(--theme-hue) var(--theme-saturation) 68%;
 
     /* Sidebar - unified dark look */
     /* 侧边栏 - 统一的深色外观 */

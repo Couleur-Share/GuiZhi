@@ -68,6 +68,7 @@
     "notifications": "Notifications",
     "languageAndRegion": "Language & Region",
     "network": "Network Settings",
+    "captureAndTranscription": "Capture & Transcription",
     "networkProxy": "Network Proxy",
     "networkMirrorSource": "App Updates",
     "networkProxyMode": "Proxy Mode",

@@ -57,7 +57,7 @@ function SectionHeading({
 }) {
   return (
     <div className="mb-1 mt-4 flex shrink-0 items-center justify-between gap-2 px-3">
-      <span className="truncate text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+      <span className="truncate text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/80">
         {label}
       </span>
       {action}
@@ -283,7 +283,7 @@ export function SidebarLibraryPanel() {
         }
       />
       {collections.length === 0 ? (
-        <p className="px-3 py-1 text-xs text-sidebar-foreground/40">
+        <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
           {t("library.noCollections", "还没有知识库")}
         </p>
       ) : (
@@ -305,7 +305,7 @@ export function SidebarLibraryPanel() {
       {/* 平台（采集来源，派生分组） */}
       <SectionHeading label={t("library.platforms", "平台")} />
       {activePlatforms.length === 0 ? (
-        <p className="px-3 py-1 text-xs text-sidebar-foreground/40">
+        <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
           {t("library.noPlatforms", "采集网页或视频后按来源分组")}
         </p>
       ) : (
@@ -347,7 +347,7 @@ export function SidebarLibraryPanel() {
         }
       />
       {visibleTags.length === 0 ? (
-        <p className="px-3 py-1 text-xs text-sidebar-foreground/40">
+        <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
           {t("library.noTags", "在条目详情中添加标签")}
         </p>
       ) : (

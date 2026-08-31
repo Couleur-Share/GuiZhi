@@ -20,10 +20,14 @@ import { ImportsBulkBar } from "./ImportsBulkBar";
 import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
 import { ImportTaskDetailModal } from "./ImportTaskDetailModal";
 import { ImportTaskRow } from "./ImportTaskRow";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import {
   PlatformDiscoveryPanel,
 } from "./PlatformDiscoveryPanel";
-import { DISCOVERY_DRAFT_KEY } from "./platform-discovery-draft";
+import {
+  DISCOVERY_DRAFT_KEY,
+  DISCOVERY_OPEN_VIEW_KEY,
+} from "./platform-discovery-draft";
 
 function isRunning(task: ImportTask): boolean {
   return task.status === "pending" || task.status === "processing";
@@ -35,8 +39,16 @@ function isRunning(task: ImportTask): boolean {
  */
 export function ImportsWorkspace() {
   const [view, setView] = useState<"tasks" | "discovery">(() =>
-    sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ? "discovery" : "tasks",
+    sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ||
+    sessionStorage.getItem(DISCOVERY_OPEN_VIEW_KEY)
+      ? "discovery"
+      : "tasks",
   );
+  useEffect(() => {
+    const openDiscovery = () => setView("discovery");
+    window.addEventListener("discovery:open-view", openDiscovery);
+    return () => window.removeEventListener("discovery:open-view", openDiscovery);
+  }, []);
   return view === "discovery"
     ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
     : <ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} />;
@@ -45,6 +57,9 @@ export function ImportsWorkspace() {
 function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
   const { t } = useTranslation();
   const tasks = useImportStore((state) => state.tasks);
+  const total = useImportStore((state) => state.total);
+  const nextCursor = useImportStore((state) => state.nextCursor);
+  const isLoadingMore = useImportStore((state) => state.isLoadingMore);
   const hasLoaded = useImportStore((state) => state.hasLoaded);
   const loadError = useImportStore((state) => state.loadError);
   const filter = useImportStore((state) => state.filter);
@@ -57,7 +72,11 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
   const clearSelection = useImportStore((state) => state.clearSelection);
   const fetchTasks = useImportStore((state) => state.fetchTasks);
   const retryTasks = useImportStore((state) => state.retryTasks);
-  const clearFinished = useImportStore((state) => state.clearFinished);
+  const loadMore = useImportStore((state) => state.loadMore);
+  const previewClearTerminal = useImportStore(
+    (state) => state.previewClearTerminal,
+  );
+  const clearTerminal = useImportStore((state) => state.clearTerminal);
   const queueState = useImportStore((state) => state.queueState);
   const toggleQueuePaused = useImportStore((state) => state.toggleQueuePaused);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
@@ -70,10 +89,20 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
   // 详情弹窗按 id 记而不是把整条任务存下来：任务还在跑时会不断有新状态推过来，
   // 存快照的话弹窗会停在打开那一刻，越看越不对
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [clearConfirm, setClearConfirm] = useState<{
+    scope: "filtered" | "all";
+    count: number;
+  } | null>(null);
 
   useEffect(() => {
-    void fetchTasks();
-  }, [fetchTasks]);
+    const timer = window.setTimeout(() => void fetchTasks(), 150);
+    return () => window.clearTimeout(timer);
+  }, [fetchTasks, query]);
+
+  const requestClear = async (scope: "filtered" | "all") => {
+    const count = await previewClearTerminal(scope);
+    setClearConfirm({ scope, count });
+  };
 
   const visible = useMemo(
     () => filterTasks(tasks, filter, query),
@@ -142,18 +171,18 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
         </h2>
         {/* 队列读出来之前不报数：否则会先写「共 0 条」再跳成真实条数 */}
         {hasLoaded ? (
-          <span className="truncate text-xs text-muted-foreground/70">
+          <span className="truncate text-xs text-muted-foreground">
             {queueState.paused
               ? t("imports.summaryPaused", "队列已暂停 · 等待 {{pending}}", {
                   pending: queueState.pendingCount,
                 })
               : activeCount > 0
               ? t("imports.summaryActive", "共 {{total}} 条 · 进行中 {{active}}", {
-                  total: tasks.length,
+                  total,
                   active: activeCount,
                 })
               : t("imports.summaryTotal", "共 {{total}} 条", {
-                  total: tasks.length,
+                  total,
                 })}
           </span>
         ) : null}
@@ -222,11 +251,18 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
         ) : null}
         <button
           type="button"
-          onClick={() => void clearFinished()}
+          onClick={() => void requestClear("filtered")}
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
         >
           <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-          {t("imports.clearFinished", "清理已完成")}
+          {t("imports.clearFiltered", "清理当前")}
+        </button>
+        <button
+          type="button"
+          onClick={() => void requestClear("all")}
+          className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          {t("imports.clearAllTerminal", "清理全部终态")}
         </button>
       </div>
 
@@ -268,6 +304,17 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
                 onOpenDetail={() => setDetailTaskId(task.id)}
               />
             ))}
+            {nextCursor ? (
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={isLoadingMore}
+                className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/60 disabled:opacity-50"
+              >
+                {isLoadingMore ? <Spinner size="xs" tone="muted" /> : null}
+                {t("imports.loadMoreHistory", "加载更早的任务")}
+              </button>
+            ) : null}
           </div>
         )}
       </div>
@@ -282,6 +329,34 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
           onAskAboutItem={askAboutItem}
         />
       ) : null}
+
+      <ConfirmDialog
+        isOpen={clearConfirm !== null}
+        onClose={() => setClearConfirm(null)}
+        onConfirm={() => {
+          if (!clearConfirm || clearConfirm.count === 0) {
+            setClearConfirm(null);
+            return;
+          }
+          void clearTerminal(clearConfirm.scope);
+          setClearConfirm(null);
+        }}
+        title={t("imports.clearConfirmTitle", "清理导入任务历史")}
+        message={t(
+          "imports.clearConfirmExact",
+          "将删除 {{count}} 条终态任务记录（完成、失败、取消或重复），不会删除已经入库的知识条目。",
+          { count: clearConfirm?.count ?? 0 },
+        )}
+        confirmText={
+          clearConfirm?.count
+            ? t("imports.clearCount", "删除 {{count}} 条", {
+                count: clearConfirm.count,
+              })
+            : t("common.close", "关闭")
+        }
+        cancelText={t("common.cancel", "取消")}
+        variant={clearConfirm?.count ? "destructive" : "default"}
+      />
     </div>
   );
 }

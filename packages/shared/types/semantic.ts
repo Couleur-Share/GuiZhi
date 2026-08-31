@@ -22,6 +22,8 @@ export interface SemanticIndexStatus {
   lastScannedChunks: number | null;
   /** 最近一次检索是否复用了进程内向量缓存；null 表示尚未检索过。 */
   lastSearchCacheHit: boolean | null;
+  /** 最近一次实际使用的检索后端；旧版本可不返回。 */
+  lastBackend?: "exact" | "hnsw" | null;
 }
 
 /** 待索引条目（内容随批下发，渲染进程直接分块嵌入） */

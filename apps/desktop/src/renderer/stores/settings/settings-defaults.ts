@@ -32,6 +32,7 @@ function createDefaultAppearanceValues() {
     wikiCompileEnabled: false,
     launchAtStartup: false,
     minimizeOnLaunch: true,
+    backgroundTasksEnabled: false,
     debugMode: false,
     closeAction: "ask",
     shortcutModes: { ...DEFAULT_SHORTCUT_MODES },

@@ -420,6 +420,120 @@ export const MIGRATIONS: Migration[] = [
     name: "0018-source-platform-refresh",
     up: refreshSourcePlatforms,
   },
+  {
+    name: "0019-import-task-query-indexes",
+    up: (db) => {
+      // 正常启动时 SCHEMA_TABLES 已先建好 import_tasks；保留这个守卫是为了
+      // 兼容只含部分历史表的恢复/迁移检查库，与其他列级迁移的幂等边界一致。
+      if (!getTableDefinition(db, "import_tasks")) {
+        return;
+      }
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_import_tasks_created_id
+          ON import_tasks(created_at DESC, id DESC);
+        CREATE INDEX IF NOT EXISTS idx_import_tasks_status_created_id
+          ON import_tasks(status, created_at DESC, id DESC);
+      `);
+    },
+  },
+  {
+    name: "0020-platform-discovery-workflows",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS platform_discovery_views (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin','linuxdo')),
+          mode TEXT NOT NULL CHECK(mode IN ('creator','keyword')),
+          query TEXT NOT NULL,
+          interval_minutes INTEGER NOT NULL DEFAULT 1440,
+          enabled INTEGER NOT NULL DEFAULT 0,
+          state TEXT NOT NULL DEFAULT 'ready'
+            CHECK(state IN ('ready','running','login_required','backoff','paused')),
+          last_run_at INTEGER,
+          next_run_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS platform_discovery_runs (
+          id TEXT PRIMARY KEY,
+          view_id TEXT NOT NULL REFERENCES platform_discovery_views(id) ON DELETE CASCADE,
+          state TEXT NOT NULL CHECK(state IN ('running','completed','failed','canceled')),
+          cursor TEXT,
+          pages_scanned INTEGER NOT NULL DEFAULT 0,
+          candidates_found INTEGER NOT NULL DEFAULT 0,
+          error TEXT,
+          started_at INTEGER NOT NULL,
+          finished_at INTEGER,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS platform_discovery_candidates (
+          view_id TEXT NOT NULL REFERENCES platform_discovery_views(id) ON DELETE CASCADE,
+          platform TEXT NOT NULL,
+          external_id TEXT NOT NULL,
+          item_json TEXT NOT NULL,
+          content_hash TEXT,
+          state TEXT NOT NULL DEFAULT 'new'
+            CHECK(state IN ('new','dismissed','imported')),
+          first_seen_at INTEGER NOT NULL,
+          last_seen_at INTEGER NOT NULL,
+          PRIMARY KEY (view_id, platform, external_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_views_due
+          ON platform_discovery_views(enabled, next_run_at);
+        CREATE INDEX IF NOT EXISTS idx_discovery_runs_view
+          ON platform_discovery_runs(view_id, started_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_discovery_candidates_state
+          ON platform_discovery_candidates(view_id, state, first_seen_at DESC);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_discovery_candidates_external
+          ON platform_discovery_candidates(platform, external_id);
+      `);
+    },
+  },
+  {
+    name: "0021-background-jobs",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS background_jobs (
+          id TEXT PRIMARY KEY,
+          kind TEXT NOT NULL
+            CHECK(kind IN ('backup','platform-discovery','wiki-compile','semantic-index')),
+          scope_id TEXT NOT NULL DEFAULT '',
+          state TEXT NOT NULL DEFAULT 'scheduled'
+            CHECK(state IN ('scheduled','running','retry_wait','paused','succeeded','failed')),
+          payload_json TEXT NOT NULL DEFAULT '{}',
+          interval_minutes INTEGER,
+          next_run_at INTEGER,
+          attempt INTEGER NOT NULL DEFAULT 0,
+          lease_owner TEXT,
+          lease_until INTEGER,
+          last_error TEXT,
+          last_success_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE(kind, scope_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_background_jobs_due
+          ON background_jobs(state, next_run_at);
+      `);
+    },
+  },
+  {
+    name: "0022-discovery-candidate-identity",
+    up: (db) => {
+      if (!getTableDefinition(db, "platform_discovery_candidates")) return;
+      // 早期开发库按 view_id 分隔同一平台内容；正式契约要求平台内容全局唯一。
+      db.exec(`
+        DELETE FROM platform_discovery_candidates
+        WHERE rowid NOT IN (
+          SELECT MAX(rowid) FROM platform_discovery_candidates
+          GROUP BY platform, external_id
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_discovery_candidates_external
+          ON platform_discovery_candidates(platform, external_id);
+      `);
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

@@ -129,7 +129,7 @@ export function ForumFloorCatalog({
           );
         })}
         {visible.length === 0 ? (
-          <li className="px-2 py-3 text-center text-[11px] text-muted-foreground/70">
+          <li className="px-2 py-3 text-center text-xs text-muted-foreground">
             {t("library.forumCatalogEmpty", "无匹配楼层")}
           </li>
         ) : null}

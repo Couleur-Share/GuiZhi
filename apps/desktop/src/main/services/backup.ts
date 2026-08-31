@@ -107,6 +107,9 @@ function toBackupFileInfo(
     kind,
     sizeBytes: stat.size,
     createdAt: parseBackupTimestamp(fileName) ?? Math.round(stat.mtimeMs),
+    format: "legacy-db",
+    encrypted: false,
+    validation: "unchecked",
   };
 }
 

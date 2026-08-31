@@ -10,6 +10,13 @@
       "$baseline": "122.95 KB after 2026-06-10 lazy loading of the built-in skill registry and embedded skill icons."
     },
     {
+      "name": "library workspace interaction shell",
+      "pattern": "assets/LibraryWorkspace-*.js",
+      "aggregation": "max",
+      "maxGzipBytes": 184320,
+      "$baseline": "15.75 KB after v0.20 interaction-level lazy loading; hard target stays below 180 KiB."
+    },
+    {
       "name": "markdown vendor",
       "pattern": "assets/markdown-vendor-*.js",
       "maxGzipBytes": 122880,

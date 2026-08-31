@@ -65,7 +65,7 @@ export function AiTagSuggest({
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("library.aiTagsSuggest", "AI 建议标签")}
         </span>
         <div className="flex items-center gap-0.5">

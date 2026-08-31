@@ -263,6 +263,17 @@ export class SemanticIndexDB {
     };
   }
 
+  /** ANN 侧车的代际指纹；新增、替换、删除任一分块都会变化。 */
+  generation(model: string): string {
+    const row = this.db.get(
+      `SELECT COUNT(*) AS count, COALESCE(MAX(updated_at),0) AS updated,
+              COALESCE(SUM(rowid),0) AS rowids, COALESCE(MAX(dims),0) AS dims
+       FROM knowledge_embeddings WHERE model=?`,
+      model,
+    ) as { count: number; updated: number; rowids: number; dims: number } | undefined;
+    return `${row?.dims ?? 0}-${row?.count ?? 0}-${row?.updated ?? 0}-${row?.rowids ?? 0}`;
+  }
+
   clearAll(): number {
     return this.db.run("DELETE FROM knowledge_embeddings").changes;
   }

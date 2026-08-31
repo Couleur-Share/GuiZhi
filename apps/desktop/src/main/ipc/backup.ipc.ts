@@ -9,12 +9,19 @@ import fs from "fs";
 import path from "path";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import type {
+  BackupPasswordChangeRequest,
+  BackupRepositoryInitResult,
+  BackupRepositoryStatus,
+  BackupRestorePreview,
   BackupCreateResult,
   BackupFileInfo,
   BackupRestoreResult,
   ExportAiHandoffRequest,
   ExportAiHandoffResult,
   ExportMarkdownResult,
+  PortableBackupExportResult,
+  RepositorySnapshotRequest,
+  RepositorySnapshotResult,
 } from "@guizhi/shared/types";
 import Database from "../database/sqlite";
 import { closeDatabase } from "../database";
@@ -27,11 +34,29 @@ import {
   listBackups,
   performRestoreSwap,
   validateBackupFile,
+  pruneBackupsOfKind,
 } from "../services/backup";
 import {
   exportKnowledgeToMarkdown,
   sanitizeFileName,
 } from "../services/export-markdown";
+import type { BackgroundJobRuntime } from "../services/background-jobs";
+import { previewRepositoryRestore } from "../services/backup-repository-preview";
+import {
+  getBackupRendererSettings,
+  getBackupRepository,
+  setBackupRendererSettings,
+} from "../services/backup-repository-runtime";
+import {
+  applyPreparedRepositoryRestore,
+  prepareRepositoryRestore,
+} from "../services/backup-repository-restore";
+import {
+  getConfigDir,
+  getDatabasePath,
+  getImagesDir,
+  getVideosDir,
+} from "../runtime-paths";
 
 const RESTORE_RELAUNCH_DELAY_MS = 800;
 
@@ -61,7 +86,85 @@ function findBackupByFileName(fileName: unknown): BackupFileInfo | null {
   );
 }
 
-export function registerBackupIPC(db: Database.Database): void {
+function readBooleanSetting(
+  db: Database.Database,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const row = db.get("SELECT value FROM settings WHERE key = ?", key) as
+    | { value: string }
+    | undefined;
+  if (!row) return fallback;
+  try {
+    return JSON.parse(row.value) === true;
+  } catch {
+    return row.value === "true";
+  }
+}
+
+function readNumberSetting(
+  db: Database.Database,
+  key: string,
+  fallback: number,
+): number {
+  const row = db.get("SELECT value FROM settings WHERE key = ?", key) as
+    | { value: string }
+    | undefined;
+  const value = row ? Number(JSON.parse(row.value)) : fallback;
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function syncRepositoryBackupJob(
+  db: Database.Database,
+  runtime: BackgroundJobRuntime,
+): void {
+  const repository = getBackupRepository();
+  const status = repository.status();
+  const intervalHours = Math.min(
+    Math.max(Math.round(readNumberSetting(db, "backupIntervalHours", 24)), 1),
+    168,
+  );
+  const enabled =
+    status.initialized &&
+    status.automaticAccessAvailable &&
+    readBooleanSetting(db, "backgroundTasksEnabled", false) &&
+    readBooleanSetting(db, "backupAutoEnabled", true);
+  const current = runtime
+    .list()
+    .find((job) => job.kind === "backup" && job.scopeId === "repository");
+  const preservedNextRunAt =
+    current?.state === "scheduled" || current?.state === "retry_wait"
+      ? current.nextRunAt
+      : null;
+  runtime.schedule("repository-auto-backup", {
+    kind: "backup",
+    scopeId: "repository",
+    intervalMinutes: intervalHours * 60,
+    nextRunAt:
+      preservedNextRunAt ?? Date.now() + intervalHours * 60 * 60_000,
+    enabled,
+  });
+}
+
+export function registerBackupIPC(
+  db: Database.Database,
+  backgroundJobs: BackgroundJobRuntime,
+): void {
+  const repository = getBackupRepository();
+  backgroundJobs.registerHandler("backup", async () => {
+    const result = repository.createSnapshot({
+      db,
+      appVersion: app.getVersion(),
+      kind: "auto",
+      request: { rendererSettings: getBackupRendererSettings() },
+    });
+    if (!result.success) throw new Error(result.error || "完整备份失败");
+    repository.pruneAutoSnapshots(
+      readNumberSetting(db, "backupKeepCount", 10),
+    );
+  });
+  syncRepositoryBackupJob(db, backgroundJobs);
+
   ipcMain.handle(IPC_CHANNELS.BACKUP_CREATE, (): BackupCreateResult => {
     try {
       const backup = createBackup(db, "manual");
@@ -78,6 +181,248 @@ export function registerBackupIPC(db: Database.Database): void {
   ipcMain.handle(IPC_CHANNELS.BACKUP_LIST, (): BackupFileInfo[] => {
     return listBackups();
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_STATUS,
+    (): BackupRepositoryStatus => repository.status(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_INIT,
+    (_event, password: string): BackupRepositoryInitResult => {
+      try {
+        const status = repository.initialize(password);
+        syncRepositoryBackupJob(db, backgroundJobs);
+        return { success: true, ...status };
+      } catch (error) {
+        return {
+          success: false,
+          ...repository.status(),
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_CHANGE_PASSWORD,
+    (_event, request: BackupPasswordChangeRequest) => {
+      try {
+        repository.changePassword(request.currentPassword, request.nextPassword);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_SYNC_RENDERER_SETTINGS,
+    (_event, settings: Record<string, unknown>) => {
+      if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+        return false;
+      }
+      setBackupRendererSettings(settings);
+      syncRepositoryBackupJob(db, backgroundJobs);
+      return true;
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_CREATE_SNAPSHOT,
+    (_event, request?: RepositorySnapshotRequest): RepositorySnapshotResult =>
+      repository.createSnapshot({
+        db,
+        appVersion: app.getVersion(),
+        kind: "manual",
+        request: {
+          ...request,
+          rendererSettings:
+            request?.rendererSettings ?? getBackupRendererSettings(),
+        },
+      }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_LIST,
+    (): BackupFileInfo[] => repository.listSnapshots(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_PREVIEW,
+    (
+      _event,
+      input: { snapshotId?: unknown; recoveryPassword?: unknown },
+    ): BackupRestorePreview =>
+      previewRepositoryRestore(
+        repository,
+        typeof input?.snapshotId === "string" ? input.snapshotId : "",
+        typeof input?.recoveryPassword === "string"
+          ? input.recoveryPassword
+          : undefined,
+      ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_DELETE,
+    (_event, snapshotId: string) => {
+      try {
+        return { success: true, removedObjects: repository.deleteSnapshot(snapshotId) };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_EXPORT_PORTABLE,
+    async (
+      event,
+      input: { snapshotId?: unknown; recoveryPassword?: unknown },
+    ): Promise<PortableBackupExportResult> => {
+      const snapshotId =
+        typeof input?.snapshotId === "string" ? input.snapshotId : "";
+      const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      const saveOptions = {
+        title: "导出归知便携备份",
+        defaultPath: resolveDefaultExportPath(
+          `GuiZhi-${formatExportTimestamp()}.guizhi-backup`,
+        ),
+        filters: [{ name: "GuiZhi Backup", extensions: ["guizhi-backup"] }],
+      };
+      const selected = owner
+        ? await dialog.showSaveDialog(owner, saveOptions)
+        : await dialog.showSaveDialog(saveOptions);
+      if (selected.canceled || !selected.filePath) {
+        return { success: false, canceled: true };
+      }
+      try {
+        await repository.exportPortable(
+          snapshotId,
+          selected.filePath,
+          typeof input?.recoveryPassword === "string"
+            ? input.recoveryPassword
+            : undefined,
+        );
+        return { success: true, filePath: selected.filePath };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_RESTORE,
+    (
+      _event,
+      input: { snapshotId?: unknown; recoveryPassword?: unknown },
+    ): BackupRestoreResult => {
+      const snapshotId =
+        typeof input?.snapshotId === "string" ? input.snapshotId : "";
+      const recoveryPassword =
+        typeof input?.recoveryPassword === "string"
+          ? input.recoveryPassword
+          : undefined;
+      if (countActiveImportTasks(db) > 0) {
+        return {
+          success: false,
+          error: "有导入任务正在进行，请等待完成或取消后再恢复",
+        };
+      }
+      const runningJobs = db.get(
+        "SELECT COUNT(*) AS count FROM background_jobs WHERE state = 'running'",
+      ) as { count: number };
+      if (runningJobs.count > 0) {
+        return {
+          success: false,
+          error: "有后台写任务正在执行，请等待本轮完成后再恢复",
+        };
+      }
+      const preview = previewRepositoryRestore(
+        repository,
+        snapshotId,
+        recoveryPassword,
+      );
+      if (!preview.success) {
+        return { success: false, error: preview.error || "恢复预检失败" };
+      }
+      const targets = {
+        databasePath: getDatabasePath(),
+        imagesDir: getImagesDir(),
+        videosDir: getVideosDir(),
+        configDir: getConfigDir(),
+      };
+      let prepared;
+      try {
+        prepared = prepareRepositoryRestore({
+          repository,
+          snapshotId,
+          recoveryPassword,
+          liveDb: db,
+          targets,
+          currentRendererSettings: getBackupRendererSettings(),
+        });
+        createBackup(db, "pre-restore");
+        pruneBackupsOfKind("pre-restore", 3);
+      } catch (error) {
+        return {
+          success: false,
+          error: `恢复准备失败：${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+
+      const scheduleRelaunch = (delayMs: number) => {
+        setTimeout(() => {
+          app.relaunch();
+          app.quit();
+        }, delayMs);
+      };
+      try {
+        backgroundJobs.stop();
+        closeDatabase();
+        applyPreparedRepositoryRestore(prepared, targets);
+      } catch (error) {
+        scheduleRelaunch(RESTORE_RELAUNCH_DELAY_MS * 3);
+        return {
+          success: false,
+          relaunching: true,
+          error: `恢复交换失败并已回滚：${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+      scheduleRelaunch(RESTORE_RELAUNCH_DELAY_MS);
+      return { success: true, relaunching: true };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_CONSUME_RENDERER_SETTINGS,
+    (): Record<string, unknown> | null => {
+      const pendingPath = path.join(
+        getConfigDir(),
+        "pending-renderer-settings.json",
+      );
+      if (!fs.existsSync(pendingPath)) return null;
+      try {
+        const parsed = JSON.parse(fs.readFileSync(pendingPath, "utf8")) as unknown;
+        fs.rmSync(pendingPath, { force: true });
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch (error) {
+        console.warn("[backup] 读取恢复后的 Renderer 设置失败:", error);
+        return null;
+      }
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.BACKUP_DELETE,

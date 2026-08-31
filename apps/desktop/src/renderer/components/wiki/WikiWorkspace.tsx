@@ -191,7 +191,7 @@ export function WikiWorkspace() {
           {t("nav.wiki", "Wiki")}
         </h2>
         {status ? (
-          <span className="truncate text-xs text-muted-foreground/70">
+          <span className="truncate text-xs text-muted-foreground">
             {t("wiki.statusLine", "{{pages}} 页 · 已编译 {{compiled}}/{{eligible}} 条", {
               pages: status.pageCount,
               compiled: status.compiledItemCount,
@@ -296,7 +296,7 @@ export function WikiWorkspace() {
           <p className="text-sm text-muted-foreground">
             {t("wiki.empty", "Wiki 还是空的")}
           </p>
-          <p className="max-w-md text-xs text-muted-foreground/70">
+          <p className="max-w-md text-xs text-muted-foreground">
             {t(
               "wiki.emptyHint",
               "AI 会把知识条目编译成互相链接的 Wiki 页面。点击「立即编译」开始，或在「设置 → 通用 → Wiki」里打开自动编译，让它在后台持续更新。",

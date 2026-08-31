@@ -482,8 +482,10 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   dismissNotice: () => set({ compileNotice: null }),
 }));
 
-/** 后台自动编译（App 定时器调用）：静默执行，不打扰当前视图。 */
-export async function runBackgroundWikiCompile(): Promise<void> {
+/** 后台自动编译：静默执行；统一调度器可要求把失败抛回以进入持久化退避。 */
+export async function runBackgroundWikiCompile(options?: {
+  rethrow?: boolean;
+}): Promise<void> {
   const store = useWikiStore.getState();
   if (store.isCompiling) {
     return;
@@ -507,6 +509,9 @@ export async function runBackgroundWikiCompile(): Promise<void> {
       action: "后台 Wiki 编译",
       message: error instanceof Error ? error.message : String(error),
     });
+    if (options?.rethrow) {
+      throw error;
+    }
   } finally {
     useWikiStore.setState({ isCompiling: false });
     // 仅当用户正停留在 Wiki 模块时刷新视图

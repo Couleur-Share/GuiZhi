@@ -4,6 +4,7 @@ import type {
   ImportCaptureStrategy,
   ImportQueueState,
   ImportTask,
+  ImportTaskListQuery,
 } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "./knowledge.store";
 import {
@@ -78,6 +79,10 @@ interface ImportState {
   loadError: string | null;
   /** 进行中任务数（rail 角标） */
   activeCount: number;
+  total: number;
+  counts: ImportCounts;
+  nextCursor: string | null;
+  isLoadingMore: boolean;
   /** 调度器状态和任务列表分开：暂停并不改变 pending 任务的持久化状态。 */
   queueState: ImportQueueState;
   filter: ImportFilter;
@@ -91,6 +96,7 @@ interface ImportState {
   selectVisible: () => void;
   clearSelection: () => void;
   fetchTasks: () => Promise<void>;
+  loadMore: () => Promise<void>;
   toggleQueuePaused: () => Promise<void>;
   enqueue: (inputs: EnqueueImportInput[]) => Promise<ImportTask[]>;
   cancelTask: (id: string) => Promise<void>;
@@ -109,6 +115,8 @@ interface ImportState {
   retryTasks: (ids: string[]) => Promise<void>;
   removeTasks: (ids: string[]) => Promise<void>;
   clearFinished: () => Promise<void>;
+  previewClearTerminal: (scope: "filtered" | "all") => Promise<number>;
+  clearTerminal: (scope: "filtered" | "all") => Promise<number>;
   /** 订阅主进程任务变更（App 挂载时调用一次） */
   subscribeChanges: () => () => void;
 }
@@ -132,6 +140,36 @@ function fallbackQueueState(tasks: ImportTask[]): ImportQueueState {
     runningCount: tasks.filter((task) => task.status === "processing").length,
     pendingCount: tasks.filter((task) => task.status === "pending").length,
     concurrency: 2,
+  };
+}
+
+function toServerStatus(filter: ImportFilter): ImportTaskListQuery["status"] {
+  if (filter === "degraded") return "completed";
+  if (filter === "active" || filter === "all") return "all";
+  return filter;
+}
+
+function mergeActiveFirst(active: ImportTask[], entries: ImportTask[]): ImportTask[] {
+  const seen = new Set<string>();
+  return [...active, ...entries].filter((task) => {
+    if (seen.has(task.id)) return false;
+    seen.add(task.id);
+    return true;
+  });
+}
+
+function countsFromResult(
+  counts: Record<ImportTask["status"], number>,
+  loaded: ImportTask[],
+): ImportCounts {
+  return {
+    all: Object.values(counts).reduce((sum, value) => sum + value, 0),
+    active: counts.pending + counts.processing,
+    completed: counts.completed,
+    degraded: loaded.filter(isDegradedTask).length,
+    duplicate: counts.duplicate,
+    failed: counts.failed,
+    canceled: counts.canceled,
   };
 }
 
@@ -208,12 +246,19 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   hasLoaded: false,
   loadError: null,
   activeCount: 0,
+  total: 0,
+  counts: countByFilter([]),
+  nextCursor: null,
+  isLoadingMore: false,
   queueState: { paused: false, runningCount: 0, pendingCount: 0, concurrency: 2 },
   filter: "all",
   query: "",
   selectionIds: [],
 
-  setFilter: (filter) => set({ filter, selectionIds: [] }),
+  setFilter: (filter) => {
+    set({ filter, selectionIds: [], nextCursor: null });
+    void get().fetchTasks();
+  },
   setQuery: (query) => set({ query }),
 
   toggleSelection: (id) =>
@@ -250,7 +295,30 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   fetchTasks: async () => {
     set({ loadError: null });
     try {
-      const tasks = await window.api.import.list();
+      const response = await window.api.import.list({
+        status: toServerStatus(get().filter),
+        query: get().query,
+        pageSize: 50,
+        cursor: null,
+      });
+      // v0.20 升级窗口内兼容尚未更新的 preload / 测试桩：无对象结果时按第一页处理。
+      const result = Array.isArray(response)
+        ? {
+            entries: response,
+            active: response.filter(isActive),
+            nextCursor: null,
+            total: response.length,
+            counts: Object.fromEntries(
+              (["pending", "processing", "completed", "failed", "canceled", "duplicate"] as const).map(
+                (status) => [
+                  status,
+                  response.filter((task) => task.status === status).length,
+                ],
+              ),
+            ) as Record<ImportTask["status"], number>,
+          }
+        : response;
+      const tasks = mergeActiveFirst(result.active, result.entries);
       // 老的测试桩和升级中的 preload 可能还没有这个方法；列表仍要能读出来。
       const queueState = window.api.import.getQueueState
         ? await window.api.import.getQueueState()
@@ -259,6 +327,9 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       set((state) => ({
         tasks,
         activeCount: countActive(tasks),
+        total: result.total,
+        counts: countsFromResult(result.counts, tasks),
+        nextCursor: result.nextCursor,
         queueState,
         // 清理/删除之后选中集合里可能留着已经不存在的 id
         selectionIds: state.selectionIds.filter((id) => alive.has(id)),
@@ -270,6 +341,37 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     } finally {
       // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
       set({ hasLoaded: true });
+    }
+  },
+
+  loadMore: async () => {
+    const cursor = get().nextCursor;
+    if (!cursor || get().isLoadingMore) return;
+    set({ isLoadingMore: true });
+    try {
+      const result = await window.api.import.list({
+        status: toServerStatus(get().filter),
+        query: get().query,
+        pageSize: 50,
+        cursor,
+      });
+      set((state) => {
+        const tasks = mergeActiveFirst(result.active, [
+          ...state.tasks.filter((task) => !isActive(task)),
+          ...result.entries,
+        ]);
+        return {
+          tasks,
+          activeCount: countActive(tasks),
+          counts: countsFromResult(result.counts, tasks),
+          total: result.total,
+          nextCursor: result.nextCursor,
+        };
+      });
+    } catch (error) {
+      reportOperationError("imports.actionLoadMore", "加载更多任务", error);
+    } finally {
+      set({ isLoadingMore: false });
     }
   },
 
@@ -354,6 +456,26 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     );
   },
 
+  previewClearTerminal: async (scope) => {
+    const result = await window.api.import.previewClearTerminal({
+      scope,
+      status: toServerStatus(get().filter),
+      query: get().query,
+    });
+    return result.count;
+  },
+
+  clearTerminal: async (scope) => {
+    const result = await window.api.import.clearTerminal({
+      scope,
+      status: toServerStatus(get().filter),
+      query: get().query,
+    });
+    set({ selectionIds: [] });
+    await get().fetchTasks();
+    return result.count;
+  },
+
   subscribeChanges: () => {
     const handleChanged = (task: ImportTask) => {
       set((state) => {
@@ -387,6 +509,15 @@ export const useImportStore = create<ImportState>()((set, get) => ({
         }
         void import("./semantic.store").then(({ useSemanticStore }) =>
           useSemanticStore.getState().scheduleIndexing(),
+        );
+      }
+      if (
+        task.status === "completed" ||
+        task.status === "failed" ||
+        task.status === "duplicate"
+      ) {
+        void import("./inbox.store").then(({ useInboxStore }) =>
+          useInboxStore.getState().refresh(),
         );
       }
     };

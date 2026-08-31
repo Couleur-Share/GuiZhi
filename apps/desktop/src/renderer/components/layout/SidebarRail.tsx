@@ -14,22 +14,22 @@ function SidebarRailItems({ controller }: SidebarRailProps) {
           key={item.key}
           onClick={item.onClick}
           aria-label={item.label}
-          className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-[11px] font-medium transition-colors titlebar-no-drag ${item.active ? "bg-primary text-white shadow-sm" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
+          className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-medium transition-colors titlebar-no-drag ${item.active ? "bg-primary/15 text-foreground shadow-sm" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
         >
           <span className="relative">
             <span
               aria-hidden="true"
-              className={`flex h-9 w-9 items-center justify-center rounded-2xl ${item.active ? "bg-white/10" : "bg-transparent"}`}
+              className={`flex h-9 w-9 items-center justify-center rounded-2xl ${item.active ? "bg-primary/10" : "bg-transparent"}`}
             >
               {item.icon}
             </span>
             {item.badge !== undefined ? (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-white shadow-sm ring-2 ring-sidebar-background">
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-xs font-semibold leading-none text-background shadow-sm ring-2 ring-sidebar-background">
                 {item.badge > 99 ? "99+" : item.badge}
               </span>
             ) : null}
           </span>
-          <span className="leading-none text-center text-[10px]">
+          <span className="text-center text-xs leading-none">
             {item.label}
           </span>
         </button>

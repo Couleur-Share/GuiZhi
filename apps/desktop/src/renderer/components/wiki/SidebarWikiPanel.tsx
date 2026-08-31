@@ -33,8 +33,8 @@ function FilterRow({
       aria-pressed={active}
       className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors duration-smooth ${
         active
-          ? "bg-primary/15 text-primary"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+          ? "bg-primary/15 text-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
       }`}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -46,10 +46,10 @@ function FilterRow({
         {label}
       </span>
       <span
-        className={`rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums ${
+        className={`rounded-full border px-1.5 py-0.5 text-xs tabular-nums ${
           active
-            ? "border-primary/20 bg-primary/10 text-primary/80"
-            : "border-white/5 bg-sidebar-accent/80 text-sidebar-foreground/50"
+            ? "border-primary/20 bg-primary/10 text-foreground"
+            : "border-sidebar-border bg-sidebar-accent/80 text-sidebar-foreground/80"
         }`}
       >
         {count}
@@ -150,7 +150,7 @@ export function SidebarWikiPanel() {
         groups.map((group) => (
           <div key={group.titleKey}>
             <div className="flex items-center gap-2 px-3 pb-1 pt-3 first:pt-0">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/50">
+              <span className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/80">
                 {t(group.titleKey, group.titleFallback)}
               </span>
               <div className="h-px flex-1 bg-sidebar-border/60" />
@@ -172,7 +172,7 @@ export function SidebarWikiPanel() {
       )}
 
       {viewMode === "catalog" && counts.orphan > 0 ? (
-        <p className="mt-auto px-3 pt-4 text-[11px] leading-relaxed text-sidebar-foreground/40">
+        <p className="mt-auto px-3 pt-4 text-xs leading-relaxed text-sidebar-foreground/75">
           {t(
             "wiki.panelOrphanHint",
             "孤立页没有被任何页面引用，通常是知识网络还没连上的边角。",

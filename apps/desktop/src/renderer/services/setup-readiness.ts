@@ -16,7 +16,7 @@ export type SetupChecklistItemId =
   | "ytdlp"
   | "embedding";
 
-export type SetupSettingsSection = "ai" | "general";
+export type SetupSettingsSection = "ai" | "capture";
 
 export interface SetupChecklistItem {
   id: SetupChecklistItemId;
@@ -124,5 +124,5 @@ export function setupItemSettingsSection(
   if (id === "textModel" || id === "embedding") {
     return "ai";
   }
-  return "general";
+  return "capture";
 }

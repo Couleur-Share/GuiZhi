@@ -46,13 +46,13 @@ export function SmartViewsSection() {
   return (
     <>
       <div className="mb-1 mt-4 flex items-center justify-between gap-2 px-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+        <span className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/80">
           智能视图
         </span>
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="rounded-lg p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-primary"
+          className="rounded-lg p-1 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-primary"
           aria-label="保存当前筛选为智能视图"
           title="保存当前筛选为智能视图"
         >

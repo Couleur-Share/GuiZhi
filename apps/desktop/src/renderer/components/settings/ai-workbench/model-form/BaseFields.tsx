@@ -375,7 +375,7 @@ export function BaseFields({
         <div className="mb-1 text-xs font-medium text-muted-foreground">
           {t("settings.aiWorkbenchModelCapabilities")}
         </div>
-        <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground/70">
+        <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
           {t(
             "settings.aiWorkbenchModelCapabilitiesHint",
             "普通对话模型无需勾选任何项，即可用于问答、摘要、排版等文本任务。",

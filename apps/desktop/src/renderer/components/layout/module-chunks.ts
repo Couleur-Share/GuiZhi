@@ -14,6 +14,10 @@ const MODULE_LOADERS = {
     workspace: () => import("../library/LibraryWorkspace"),
     panel: () => import("../library/SidebarLibraryPanel"),
   },
+  inbox: {
+    workspace: () => import("../inbox/InboxWorkspace"),
+    panel: () => import("../inbox/SidebarInboxPanel"),
+  },
   ask: {
     workspace: () => import("../ask/AskWorkspace"),
     panel: () => import("../ask/SidebarAskPanel"),
@@ -36,6 +40,11 @@ export const MODULE_WORKSPACES: Record<
     MODULE_LOADERS.library
       .workspace()
       .then((module) => ({ default: module.LibraryWorkspace })),
+  ),
+  inbox: lazy(() =>
+    MODULE_LOADERS.inbox
+      .workspace()
+      .then((module) => ({ default: module.InboxWorkspace })),
   ),
   ask: lazy(() =>
     MODULE_LOADERS.ask
@@ -62,6 +71,11 @@ export const MODULE_PANELS: Record<
     MODULE_LOADERS.library
       .panel()
       .then((module) => ({ default: module.SidebarLibraryPanel })),
+  ),
+  inbox: lazy(() =>
+    MODULE_LOADERS.inbox
+      .panel()
+      .then((module) => ({ default: module.SidebarInboxPanel })),
   ),
   ask: lazy(() =>
     MODULE_LOADERS.ask

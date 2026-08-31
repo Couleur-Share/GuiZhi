@@ -41,6 +41,7 @@ export type {
   AIModelConfig,
   AIModelRoute,
   AIProviderConfig,
+  AIQuickSetupInput,
   AIUsageScenario,
   ModelRouteDefaults,
   ScenarioModelDefaults,

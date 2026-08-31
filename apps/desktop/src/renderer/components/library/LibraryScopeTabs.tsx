@@ -14,8 +14,8 @@ interface ScopeTab {
 function CountBadge({ value, active }: { value: number; active: boolean }) {
   return (
     <span
-      className={`absolute right-1 top-1 min-w-[15px] rounded-full px-1 text-center text-[9px] font-medium leading-[15px] ${
-        active ? "bg-primary/20 text-primary" : "bg-foreground/10 text-foreground/60"
+      className={`absolute right-1 top-1 min-w-[15px] rounded-full px-1 text-center text-xs font-medium leading-[15px] ${
+        active ? "bg-primary/20 text-foreground" : "bg-foreground/10 text-foreground/80"
       }`}
     >
       {value > 99 ? "99+" : value}
@@ -72,12 +72,12 @@ export function LibraryScopeTabs() {
             aria-pressed={active}
             className={`relative flex flex-col items-center justify-center rounded-md py-2 transition-all duration-base ${
               active
-                ? "bg-primary/15 text-primary shadow-sm"
-                : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                ? "bg-primary/15 text-foreground shadow-sm"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
             }`}
           >
             {tab.icon}
-            <span className="max-w-full truncate px-0.5 text-[10px] font-medium leading-none">
+            <span className="max-w-full truncate px-0.5 text-xs font-medium leading-none">
               {tab.label}
             </span>
             {tab.count > 0 ? (

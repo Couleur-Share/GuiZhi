@@ -157,14 +157,14 @@ export function SidebarAskPanel() {
       </div>
 
       <div className="flex items-center gap-2 px-3 pb-1 pt-4">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/50">
+        <span className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/80">
           {t("ask.sessionList", "历史会话")}
         </span>
         <div className="h-px flex-1 bg-sidebar-border/60" />
       </div>
 
       {sessions.length === 0 ? (
-        <p className="px-3 py-1 text-xs text-sidebar-foreground/40">
+        <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
           {t("ask.sessionListEmpty", "提问后会话会保存在这里")}
         </p>
       ) : (
@@ -177,16 +177,16 @@ export function SidebarAskPanel() {
                 onClick={() => void switchSession(session.id)}
                 className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left transition-all duration-smooth ${
                   isActive
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    ? "bg-primary/15 text-foreground shadow-sm"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                 }`}
               >
                 <span className="w-full truncate pr-5 text-sm">
                   {session.title || t("ask.untitledSession", "新对话")}
                 </span>
                 <span
-                  className={`text-[10px] ${
-                    isActive ? "text-white/70" : "text-sidebar-foreground/40"
+                  className={`text-xs ${
+                    isActive ? "text-foreground/80" : "text-sidebar-foreground/80"
                   }`}
                 >
                   {formatItemTime(session.updatedAt)}
@@ -202,8 +202,8 @@ export function SidebarAskPanel() {
                 aria-label={t("ask.deleteSession", "删除会话")}
                 className={`absolute right-1.5 top-2 hidden h-5 w-5 items-center justify-center rounded transition-colors group-hover:flex ${
                   isActive
-                    ? "text-white/70 hover:bg-white/20 hover:text-white"
-                    : "text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-destructive"
+                    ? "text-foreground/80 hover:bg-primary/10 hover:text-foreground"
+                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-destructive"
                 }`}
               >
                 <XIcon className="h-3.5 w-3.5" aria-hidden="true" />

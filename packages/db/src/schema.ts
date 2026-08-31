@@ -219,6 +219,70 @@ CREATE TABLE IF NOT EXISTS import_tasks (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- 保存的平台发现视图。定时任务只发现候选，不自动入库。
+CREATE TABLE IF NOT EXISTS platform_discovery_views (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK(platform IN ('xiaohongshu','douyin','linuxdo')),
+  mode TEXT NOT NULL CHECK(mode IN ('creator','keyword')),
+  query TEXT NOT NULL,
+  interval_minutes INTEGER NOT NULL DEFAULT 1440,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  state TEXT NOT NULL DEFAULT 'ready'
+    CHECK(state IN ('ready','running','login_required','backoff','paused')),
+  last_run_at INTEGER,
+  next_run_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS platform_discovery_runs (
+  id TEXT PRIMARY KEY,
+  view_id TEXT NOT NULL REFERENCES platform_discovery_views(id) ON DELETE CASCADE,
+  state TEXT NOT NULL CHECK(state IN ('running','completed','failed','canceled')),
+  cursor TEXT,
+  pages_scanned INTEGER NOT NULL DEFAULT 0,
+  candidates_found INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER,
+  updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS platform_discovery_candidates (
+  view_id TEXT NOT NULL REFERENCES platform_discovery_views(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL,
+  external_id TEXT NOT NULL,
+  item_json TEXT NOT NULL,
+  content_hash TEXT,
+  state TEXT NOT NULL DEFAULT 'new'
+    CHECK(state IN ('new','dismissed','imported')),
+  first_seen_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL,
+  PRIMARY KEY (view_id, platform, external_id)
+);
+
+-- 主进程持有租约；Renderer 崩溃后 lease_until 到期即可重新领取。
+CREATE TABLE IF NOT EXISTS background_jobs (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL
+    CHECK(kind IN ('backup','platform-discovery','wiki-compile','semantic-index')),
+  scope_id TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'scheduled'
+    CHECK(state IN ('scheduled','running','retry_wait','paused','succeeded','failed')),
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  interval_minutes INTEGER,
+  next_run_at INTEGER,
+  attempt INTEGER NOT NULL DEFAULT 0,
+  lease_owner TEXT,
+  lease_until INTEGER,
+  last_error TEXT,
+  last_success_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE(kind, scope_id)
+);
 `;
 
 /**
@@ -259,6 +323,20 @@ CREATE INDEX IF NOT EXISTS idx_source_comments_item
   ON source_comments(item_id, captured_at DESC);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_status ON import_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_import_tasks_created ON import_tasks(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_import_tasks_created_id
+  ON import_tasks(created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_import_tasks_status_created_id
+  ON import_tasks(status, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_discovery_views_due
+  ON platform_discovery_views(enabled, next_run_at);
+CREATE INDEX IF NOT EXISTS idx_discovery_runs_view
+  ON platform_discovery_runs(view_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_discovery_candidates_state
+  ON platform_discovery_candidates(view_id, state, first_seen_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_discovery_candidates_external
+  ON platform_discovery_candidates(platform, external_id);
+CREATE INDEX IF NOT EXISTS idx_background_jobs_due
+  ON background_jobs(state, next_run_at);
 -- getCatalog 是 Wiki 模块最高频的查询（编译时每个条目都要打一次），
 -- 而 wiki_pages 原本只有主键和 normalized_title 两个索引
 CREATE INDEX IF NOT EXISTS idx_wiki_pages_updated ON wiki_pages(updated_at DESC);

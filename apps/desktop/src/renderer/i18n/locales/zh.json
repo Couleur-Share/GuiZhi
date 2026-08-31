@@ -68,6 +68,7 @@
     "notifications": "通知",
     "languageAndRegion": "语言与地区",
     "network": "网络设置",
+    "captureAndTranscription": "采集与转写",
     "networkProxy": "网络代理",
     "networkMirrorSource": "应用更新",
     "networkProxyMode": "代理模式",

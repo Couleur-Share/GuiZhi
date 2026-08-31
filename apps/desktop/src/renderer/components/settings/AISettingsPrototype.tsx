@@ -1,14 +1,12 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
-import { TestTubeIcon } from "lucide-react";
+import { SparklesIcon, TestTubeIcon } from "lucide-react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import {
   fetchAvailableModels,
   normalizeApiUrlInput,
-  testAIConnection,
-  type AIConfig,
   type FetchModelsResult,
   type ModelInfo,
 } from "../../services/ai";
@@ -17,10 +15,12 @@ import {
   resolveRouteModel,
   toAIConfig,
 } from "../../services/ai-defaults";
-import { embedTexts } from "../../services/knowledge-ai/embeddings";
+import {
+  runModelConnectionTest,
+  type ModelTestOutcome,
+} from "../../services/ai-connection-test";
 import {
   useSettingsStore,
-  type AIModelCapabilities,
   type AIModelConfig,
   type AIModelRoute,
 } from "../../stores/settings.store";
@@ -53,6 +53,12 @@ import type {
   ModelFormState,
   StatusCardData,
 } from "./ai-workbench/types";
+
+const AIQuickSetupWizard = lazy(() =>
+  import("./ai-quick-setup/AIQuickSetupWizard").then((module) => ({
+    default: module.AIQuickSetupWizard,
+  })),
+);
 
 function buildVerifiedEndpointStatus(
   group: EndpointGroup,
@@ -211,63 +217,6 @@ function formatModelTestSuccessToast(
   return `${modelName} ${t("settings.aiWorkbenchModelTestSuccess", "测试成功")} (${latency}ms)${extra ?? ""}`;
 }
 
-type ModelTestOutcome =
-  | { status: "success"; latency: number }
-  | { status: "failed"; message: string };
-
-/**
- * 按模型能力分流连接测试：转写模型经主进程用静音样本发真实转写请求，
- * 嵌入模型走 /embeddings，其余走对话补全。
- */
-async function runModelConnectionTest(
-  config: AIConfig,
-  capabilities: AIModelCapabilities | undefined,
-): Promise<ModelTestOutcome> {
-  if (capabilities?.audioTranscription === true) {
-    const result = await window.api.media.testTranscription({
-      apiUrl: config.apiUrl,
-      apiKey: config.apiKey,
-      model: config.model,
-    });
-    return result.success
-      ? { status: "success", latency: result.latency ?? 0 }
-      : { status: "failed", message: result.error || "" };
-  }
-
-  if (capabilities?.embedding === true) {
-    const startTime = Date.now();
-    try {
-      await embedTexts(config, ["ping"]);
-      return { status: "success", latency: Date.now() - startTime };
-    } catch (error) {
-      return {
-        status: "failed",
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  // 文生图模型走 /images/generations，拿 chat completions 去测只会撞
-  // model_not_supported
-  if (capabilities?.imageGeneration === true) {
-    const result = await window.api.illustration.testModel({
-      apiUrl: config.apiUrl,
-      apiKey: config.apiKey,
-      model: config.model,
-      apiProtocol: config.apiProtocol,
-      provider: config.provider,
-    });
-    return result.success
-      ? { status: "success", latency: result.latency ?? 0 }
-      : { status: "failed", message: result.error || "" };
-  }
-
-  const result = await testAIConnection(config);
-  return result.success
-    ? { status: "success", latency: result.latency ?? 0 }
-    : { status: "failed", message: result.error || "" };
-}
-
 function formatModelTestFailureToast(
   modelName: string,
   message: string,
@@ -284,6 +233,10 @@ export function AISettingsPrototype() {
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
+  const aiQuickSetupRequest = useUIStore((state) => state.aiQuickSetupRequest);
+  const consumeAiQuickSetupRequest = useUIStore(
+    (state) => state.consumeAiQuickSetupRequest,
+  );
 
   const [modelForm, setModelForm] = useState<ModelFormState>(EMPTY_FORM);
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -299,6 +252,7 @@ export function AISettingsPrototype() {
     null,
   );
   const [savingModel, setSavingModel] = useState(false);
+  const [showQuickSetup, setShowQuickSetup] = useState(false);
   const [pendingDeleteModel, setPendingDeleteModel] =
     useState<AIModelConfig | null>(null);
   const [pendingDeleteEndpoint, setPendingDeleteEndpoint] =
@@ -311,6 +265,12 @@ export function AISettingsPrototype() {
   >({});
 
   const aiModels = settings.aiModels;
+
+  useEffect(() => {
+    if (!aiQuickSetupRequest) return;
+    consumeAiQuickSetupRequest();
+    setShowQuickSetup(true);
+  }, [aiQuickSetupRequest, consumeAiQuickSetupRequest]);
 
   const resolvedRouteModels = useMemo(
     () =>
@@ -968,6 +928,14 @@ export function AISettingsPrototype() {
       <div className="flex flex-wrap items-center justify-end gap-3">
         <button
           type="button"
+          onClick={() => setShowQuickSetup(true)}
+          className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground"
+        >
+          <SparklesIcon className="h-4 w-4" aria-hidden="true" />
+          快速配置
+        </button>
+        <button
+          type="button"
           onClick={() => void handleTestDefaultModel()}
           disabled={testingDefault}
           className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-border bg-background px-4 text-sm font-medium leading-none shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
@@ -1086,7 +1054,7 @@ export function AISettingsPrototype() {
         onTestModel={(model) => void handleTestModel(model)}
         onEditModel={openEditModel}
         onDeleteModel={(model) => setPendingDeleteModel(model)}
-        onManageLocalEngine={() => requestSettingsSection("general")}
+        onManageLocalEngine={() => requestSettingsSection("capture")}
       />
 
       <ConfirmDialog
@@ -1143,6 +1111,15 @@ export function AISettingsPrototype() {
           onClose={closeEndpointForm}
           onSave={handleSaveEndpoint}
         />
+      ) : null}
+
+      {showQuickSetup ? (
+        <Suspense fallback={null}>
+          <AIQuickSetupWizard
+            isOpen={showQuickSetup}
+            onClose={() => setShowQuickSetup(false)}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

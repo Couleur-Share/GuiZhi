@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
@@ -12,8 +12,17 @@ import {
 } from "../../stores/ui.store";
 import { ColumnResizer } from "../ui/ColumnResizer";
 import { ItemList } from "./ItemList";
-import { ItemDetail } from "./ItemDetail";
-import { ItemTableView } from "./ItemTableView";
+
+const ItemDetail = lazy(() =>
+  import("./ItemDetail").then((module) => ({ default: module.ItemDetail })),
+);
+const ItemTableView = lazy(() =>
+  import("./ItemTableView").then((module) => ({ default: module.ItemTableView })),
+);
+
+function DetailFallback() {
+  return <div className="h-full animate-pulse bg-muted/20" aria-hidden="true" />;
+}
 
 /**
  * 知识库工作区（外层 App 已提供侧栏导航），按视图模式给出两种布局：
@@ -53,7 +62,9 @@ export function LibraryWorkspace() {
   if (viewMode === "list") {
     return (
       <div className="app-wallpaper-section flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-        <ItemTableView />
+        <Suspense fallback={<DetailFallback />}>
+          <ItemTableView />
+        </Suspense>
       </div>
     );
   }
@@ -81,7 +92,9 @@ export function LibraryWorkspace() {
         </div>
       </div>
       <div className="min-w-0 flex-1 app-wallpaper-section">
-        <ItemDetail />
+        <Suspense fallback={<DetailFallback />}>
+          <ItemDetail />
+        </Suspense>
       </div>
     </div>
   );

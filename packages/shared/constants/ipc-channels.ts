@@ -43,8 +43,26 @@ export const IPC_CHANNELS = {
   BACKUP_AUTO_STATUS: "backup:autoStatus",
   IMPORT_REMOVE: "import:remove",
   IMPORT_CLEAR_FINISHED: "import:clearFinished",
+  IMPORT_CLEAR_TERMINAL_PREVIEW: "import:clearTerminalPreview",
+  IMPORT_CLEAR_TERMINAL: "import:clearTerminal",
   /** 主进程 → 渲染进程：任务状态变更事件 */
   IMPORT_CHANGED: "import:changed",
+
+  // 统一处理中心
+  INBOX_LIST: "inbox:list",
+  INBOX_ORGANIZE: "inbox:organize",
+  INBOX_MARK_REVIEWED: "inbox:markReviewed",
+
+  // 持久化后台任务
+  BACKGROUND_JOB_LIST: "backgroundJob:list",
+  BACKGROUND_JOB_SYNC_RENDERER: "backgroundJob:syncRenderer",
+  BACKGROUND_JOB_COMPLETE: "backgroundJob:complete",
+  BACKGROUND_JOB_FAIL: "backgroundJob:fail",
+  BACKGROUND_JOB_RENEW: "backgroundJob:renew",
+  BACKGROUND_JOB_PAUSE: "backgroundJob:pause",
+  BACKGROUND_JOB_RESUME: "backgroundJob:resume",
+  /** 主进程 → 渲染进程：已领取、等待 Renderer 执行的任务 */
+  BACKGROUND_JOB_AVAILABLE: "backgroundJob:available",
 
   // 登录态平台采集 / 平台发现
   PLATFORM_CAPTURE_STATUS: "platformCapture:status",
@@ -57,6 +75,14 @@ export const IPC_CHANNELS = {
   PLATFORM_CAPTURE_CANCEL_DISCOVERY: "platformCapture:cancelDiscovery",
   PLATFORM_CAPTURE_LIST_COMMENTS: "platformCapture:listComments",
   PLATFORM_CAPTURE_REFRESH_COMMENTS: "platformCapture:refreshComments",
+  DISCOVERY_VIEW_LIST: "discoveryView:list",
+  DISCOVERY_VIEW_GET: "discoveryView:get",
+  DISCOVERY_VIEW_SAVE: "discoveryView:save",
+  DISCOVERY_VIEW_DELETE: "discoveryView:delete",
+  DISCOVERY_VIEW_RUN: "discoveryView:run",
+  DISCOVERY_VIEW_RESUME_LOGIN: "discoveryView:resumeLogin",
+  DISCOVERY_CANDIDATE_SET_STATE: "discoveryCandidate:setState",
+  DISCOVERY_OPEN_VIEW: "discovery:openView",
 
   // Wiki (ADR 0023)
   WIKI_CATALOG: "wiki:catalog",
@@ -85,6 +111,19 @@ export const IPC_CHANNELS = {
   BACKUP_LIST: "backup:list",
   BACKUP_DELETE: "backup:delete",
   BACKUP_RESTORE: "backup:restore",
+  BACKUP_REPOSITORY_STATUS: "backupRepository:status",
+  BACKUP_REPOSITORY_INIT: "backupRepository:init",
+  BACKUP_REPOSITORY_CHANGE_PASSWORD: "backupRepository:changePassword",
+  BACKUP_REPOSITORY_CREATE_SNAPSHOT: "backupRepository:createSnapshot",
+  BACKUP_REPOSITORY_LIST: "backupRepository:listSnapshots",
+  BACKUP_REPOSITORY_PREVIEW: "backupRepository:preview",
+  BACKUP_REPOSITORY_DELETE: "backupRepository:deleteSnapshot",
+  BACKUP_REPOSITORY_EXPORT_PORTABLE: "backupRepository:exportPortable",
+  BACKUP_REPOSITORY_RESTORE: "backupRepository:restore",
+  BACKUP_REPOSITORY_CONSUME_RENDERER_SETTINGS:
+    "backupRepository:consumeRendererSettings",
+  BACKUP_REPOSITORY_SYNC_RENDERER_SETTINGS:
+    "backupRepository:syncRendererSettings",
   EXPORT_MARKDOWN: "export:markdown",
   /** 单条目的「AI 交接稿」另存为 .md（内容由渲染进程序列化好后传入） */
   EXPORT_AI_HANDOFF: "export:aiHandoff",

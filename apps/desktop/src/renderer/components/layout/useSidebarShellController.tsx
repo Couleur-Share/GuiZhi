@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   DownloadIcon,
+  InboxIcon,
   LibraryBigIcon,
   MessagesSquareIcon,
   NetworkIcon,
@@ -9,11 +10,13 @@ import {
 import { useTranslation } from "react-i18next";
 import { useUIStore, type AppModule } from "../../stores/ui.store";
 import { useImportStore } from "../../stores/import.store";
+import { useInboxStore } from "../../stores/inbox.store";
 import { isWebRuntime } from "../../runtime";
 import type { SidebarLayout, PageType } from "./sidebar-controller-types";
 
 const APP_MODULES: readonly AppModule[] = [
   "library",
+  "inbox",
   "ask",
   "wiki",
   "imports",
@@ -84,6 +87,8 @@ function getRailItemLabel(
 ) {
   return module === "library"
     ? t("nav.library", "知识库")
+    : module === "inbox"
+      ? t("nav.inbox", "处理中心")
     : module === "ask"
       ? t("nav.ask", "AI 问答")
       : module === "wiki"
@@ -94,6 +99,8 @@ function getRailItemLabel(
 function getRailItemIcon(module: AppModule) {
   return module === "library" ? (
     <LibraryBigIcon className="h-5 w-5" />
+  ) : module === "inbox" ? (
+    <InboxIcon className="h-5 w-5" />
   ) : module === "ask" ? (
     <MessagesSquareIcon className="h-5 w-5" />
   ) : module === "wiki" ? (
@@ -110,6 +117,7 @@ function useSidebarRailItems(
 ) {
   const { t } = useTranslation();
   const activeImportCount = useImportStore((state) => state.activeCount);
+  const inboxCount = useInboxStore((state) => state.total);
   return useMemo(
     () =>
       APP_MODULES.map((module) => ({
@@ -118,7 +126,9 @@ function useSidebarRailItems(
         icon: getRailItemIcon(module),
         active: ui.appModule === module,
         badge:
-          module === "imports" && activeImportCount > 0
+          module === "inbox" && inboxCount > 0
+            ? inboxCount
+            : module === "imports" && activeImportCount > 0
             ? activeImportCount
             : undefined,
         onClick: () => {
@@ -126,7 +136,7 @@ function useSidebarRailItems(
           if (currentPage !== "home") onNavigate("home");
         },
       })),
-    [activeImportCount, currentPage, onNavigate, t, ui],
+    [activeImportCount, inboxCount, currentPage, onNavigate, t, ui],
   );
 }
 

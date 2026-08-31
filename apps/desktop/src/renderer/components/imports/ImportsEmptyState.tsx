@@ -155,7 +155,7 @@ export function ImportsEmptyState() {
         </button>
       </div>
 
-      <p className="text-[11px] text-muted-foreground/70">
+      <p className="text-xs text-muted-foreground">
         {t("imports.emptyHint", "按 {{shortcut}} 打开快速采集", {
           shortcut: captureShortcut,
         })}

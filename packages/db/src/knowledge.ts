@@ -49,6 +49,8 @@ interface ItemRow {
   deleted_at: number | null;
   created_at: number;
   updated_at: number;
+  sort_value?: string | number;
+  fts_rank?: number;
 }
 
 interface TagRow {
@@ -72,6 +74,7 @@ const SNIPPET_MAX_LENGTH = 160;
  * 余量不足就真的不剩几个字了。
  */
 const SNIPPET_SOURCE_LENGTH = 2000;
+const COUNT_CACHE_TTL_MS = 5_000;
 
 /** 排序字段白名单：调用方传入的键只能命中这里的固定 SQL 片段 */
 const SORT_COLUMNS: Record<KnowledgeSortField, string> = {
@@ -125,7 +128,52 @@ function buildOrderClause(
 ): string {
   const column = SORT_COLUMNS[sortBy ?? "updatedAt"] ?? SORT_COLUMNS.updatedAt;
   const direction = sortOrder === "asc" ? "ASC" : "DESC";
-  return `ORDER BY i.is_pinned DESC, ${column} ${direction}`;
+  return `ORDER BY i.is_pinned DESC, ${column} ${direction}, i.id ${direction}`;
+}
+
+interface KnowledgeListCursor {
+  fingerprint: string;
+  pinned?: number;
+  sortValue?: string | number;
+  rank?: number;
+  updatedAt: number;
+  id: string;
+}
+
+function queryFingerprint(query: KnowledgeItemQuery): string {
+  return JSON.stringify({
+    scope: query.scope,
+    collectionId: query.collectionId ?? null,
+    tagId: query.tagId ?? null,
+    platform: query.platform ?? null,
+    collectionScope: query.collectionScope
+      ? {
+          ids: [...query.collectionScope.ids].sort(),
+          includeUncategorized: query.collectionScope.includeUncategorized,
+        }
+      : null,
+    search: query.search?.trim() ?? "",
+    searchMode: query.searchMode ?? "phrase",
+    includeArchived: query.includeArchived === true,
+    sortBy: query.sortBy ?? "updatedAt",
+    sortOrder: query.sortOrder ?? "desc",
+  });
+}
+
+function encodeListCursor(cursor: KnowledgeListCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeListCursor(value: string, fingerprint: string): KnowledgeListCursor {
+  try {
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as KnowledgeListCursor;
+    if (!parsed || parsed.fingerprint !== fingerprint || typeof parsed.id !== "string") {
+      throw new Error("mismatch");
+    }
+    return parsed;
+  } catch {
+    throw new Error("知识列表游标无效或已过期");
+  }
 }
 
 function normalizeTagNames(names: readonly string[] | undefined): string[] {
@@ -259,6 +307,8 @@ function buildFacetCountSql(
 }
 
 export class KnowledgeItemDB {
+  private readonly countCache = new Map<string, { total: number; expiresAt: number }>();
+
   constructor(private readonly db: Database.Database) {}
 
   // ── 查询 ──────────────────────────────────────────────────────────────────
@@ -338,7 +388,7 @@ export class KnowledgeItemDB {
     // 不是「没有搜索」。把 null 当成后者会静默列出全库，
     // 而界面此时还显示着「按相关度排序」，用户以为这就是搜索结果。
     if (searchTerm && !matchQuery) {
-      return { entries: [], total: 0 };
+      return { entries: [], total: 0, nextCursor: null };
     }
 
     let joinClause = "";
@@ -352,19 +402,26 @@ export class KnowledgeItemDB {
         WHERE knowledge_fts MATCH ?
       ) f ON f.item_id = i.id`;
       // 搜索态下相关度优先，忽略调用方指定的排序
-      orderClause = "ORDER BY f.fts_rank ASC, i.updated_at DESC";
+      orderClause = "ORDER BY f.fts_rank ASC, i.updated_at DESC, i.id DESC";
       params.unshift(matchQuery);
     }
 
     const whereClause = `WHERE ${conditions.join(" AND ")}`;
     const limit = Math.max(1, Math.min(query.limit ?? LIST_DEFAULT_LIMIT, 500));
-    const offset = Math.max(0, query.offset ?? 0);
-
-    const totalRow = this.db.get(
-      `SELECT COUNT(*) AS count FROM knowledge_items i ${joinClause} ${whereClause}`,
-      ...params,
-    ) as { count: number } | undefined;
-    const total = totalRow?.count ?? 0;
+    const offset = query.cursor ? 0 : Math.max(0, query.offset ?? 0);
+    const fingerprint = queryFingerprint(query);
+    const cached = this.countCache.get(fingerprint);
+    let total: number;
+    if (cached && cached.expiresAt > Date.now()) {
+      total = cached.total;
+    } else {
+      const totalRow = this.db.get(
+        `SELECT COUNT(*) AS count FROM knowledge_items i ${joinClause} ${whereClause}`,
+        ...params,
+      ) as { count: number } | undefined;
+      total = totalRow?.count ?? 0;
+      this.countCache.set(fingerprint, { total, expiresAt: Date.now() + COUNT_CACHE_TTL_MS });
+    }
 
     // 平台筛选是「任一来源命中」，而列表列若仍一律拿最新来源，旧库中
     // 同一条目的多来源记录会出现“筛选抖音却显示网页”的自相矛盾。筛选态
@@ -378,17 +435,57 @@ export class KnowledgeItemDB {
           ORDER BY s.captured_at DESC LIMIT 1)`;
     const projectionParams = query.platform ? [query.platform] : [];
 
+    const cursor = query.cursor ? decodeListCursor(query.cursor, fingerprint) : null;
+    let pageWhereClause = whereClause;
+    const pageParams = [...params];
+    const sortBy = query.sortBy ?? "updatedAt";
+    const sortColumn = SORT_COLUMNS[sortBy];
+    const direction = query.sortOrder === "asc" ? "ASC" : "DESC";
+    const comparator = direction === "ASC" ? ">" : "<";
+    if (cursor) {
+      if (matchQuery) {
+        if (typeof cursor.rank !== "number") throw new Error("知识列表搜索游标无效");
+        pageWhereClause += ` AND (
+          f.fts_rank > ? OR (f.fts_rank = ? AND (
+            i.updated_at < ? OR (i.updated_at = ? AND i.id < ?)
+          ))
+        )`;
+        pageParams.push(cursor.rank, cursor.rank, cursor.updatedAt, cursor.updatedAt, cursor.id);
+      } else {
+        if (cursor.pinned == null || cursor.sortValue == null) {
+          throw new Error("知识列表排序游标无效");
+        }
+        pageWhereClause += ` AND (
+          i.is_pinned < ? OR (i.is_pinned = ? AND (
+            ${sortColumn} ${comparator} ? OR (${sortColumn} = ? AND i.id ${comparator} ?)
+          ))
+        )`;
+        pageParams.push(
+          cursor.pinned,
+          cursor.pinned,
+          cursor.sortValue,
+          cursor.sortValue,
+          cursor.id,
+        );
+      }
+    }
+
     const rows = this.db.all(
       `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
               i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at,
               substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content,
-              ${platformProjection} AS platform
-       FROM knowledge_items i ${joinClause} ${whereClause} ${orderClause} LIMIT ? OFFSET ?`,
+              ${platformProjection} AS platform,
+              ${matchQuery ? "f.fts_rank" : "NULL"} AS fts_rank,
+              ${sortColumn} AS sort_value
+       FROM knowledge_items i ${joinClause} ${pageWhereClause} ${orderClause} LIMIT ? OFFSET ?`,
       ...projectionParams,
-      ...params,
-      limit,
+      ...pageParams,
+      limit + 1,
       offset,
     ) as ItemRow[];
+
+    const hasMore = rows.length > limit;
+    if (hasMore) rows.pop();
 
     const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
     const entries: KnowledgeItemListEntry[] = rows.map((row) => ({
@@ -407,7 +504,27 @@ export class KnowledgeItemDB {
       tags: tagsByItem.get(row.id) ?? [],
     }));
 
-    return { entries, total };
+    const last = rows.at(-1);
+    const nextCursor = hasMore && last
+      ? encodeListCursor(
+          matchQuery
+            ? {
+                fingerprint,
+                rank: last.fts_rank,
+                updatedAt: last.updated_at,
+                id: last.id,
+              }
+            : {
+                fingerprint,
+                pinned: last.is_pinned,
+                sortValue: last.sort_value!,
+                updatedAt: last.updated_at,
+                id: last.id,
+              },
+        )
+      : null;
+
+    return { entries, total, nextCursor };
   }
 
   get(id: string): KnowledgeItem | null {
@@ -497,6 +614,7 @@ export class KnowledgeItemDB {
   // ── 写入 ──────────────────────────────────────────────────────────────────
 
   create(input: CreateKnowledgeItemInput): KnowledgeItem {
+    this.invalidateListCountCache();
     const now = Date.now();
     const id = randomUUID();
     const tagNames = normalizeTagNames(input.tagNames);
@@ -532,6 +650,7 @@ export class KnowledgeItemDB {
   }
 
   update(id: string, input: UpdateKnowledgeItemInput): KnowledgeItem | null {
+    this.invalidateListCountCache();
     const existing = this.db.get(
       "SELECT * FROM knowledge_items WHERE id = ?",
       id,
@@ -616,6 +735,7 @@ export class KnowledgeItemDB {
    * 每次还要重写一遍 FTS 行；中途失败没有回滚也没有提示。
    */
   bulkUpdate(ids: string[], input: BulkUpdateKnowledgeItemsInput): number {
+    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -648,6 +768,18 @@ export class KnowledgeItemDB {
       if (input.isPinned !== undefined) {
         assignments.push("is_pinned = ?");
         assignmentParams.push(input.isPinned ? 1 : 0);
+      }
+      if (input.reviewStatus !== undefined) {
+        assignments.push("review_status = ?");
+        assignmentParams.push(input.reviewStatus);
+      }
+      if (input.reviewReasons !== undefined) {
+        assignments.push("review_reasons = ?");
+        assignmentParams.push(
+          input.reviewReasons.length > 0
+            ? JSON.stringify(input.reviewReasons)
+            : null,
+        );
       }
       for (
         let start = 0;
@@ -693,6 +825,7 @@ export class KnowledgeItemDB {
   }
 
   setStatus(ids: string[], status: KnowledgeItemStatus): number {
+    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -713,6 +846,7 @@ export class KnowledgeItemDB {
   }
 
   moveToTrash(ids: string[]): number {
+    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -733,6 +867,7 @@ export class KnowledgeItemDB {
   }
 
   restore(ids: string[]): number {
+    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -752,6 +887,7 @@ export class KnowledgeItemDB {
   }
 
   deleteForever(ids: string[]): number {
+    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -778,6 +914,7 @@ export class KnowledgeItemDB {
   }
 
   emptyTrash(): number {
+    this.invalidateListCountCache();
     return this.deleteForever(this.listTrashedIds());
   }
 
@@ -833,6 +970,7 @@ export class KnowledgeItemDB {
    * 回收站范围内搜不到。全量重建对大库太贵，这里只补缺失的。
    */
   backfillMissingFtsRows(): number {
+    this.invalidateListCountCache();
     // 先把 rowid 映射补齐：映射表是后加的，老库里已有的索引行一条都没登记，
     // 不补的话写路径会一直走「按 item_id 全表扫」那条退路
     this.db.run(
@@ -865,6 +1003,7 @@ export class KnowledgeItemDB {
 
   /** 重建整个 FTS 索引（数据修复 / 迁移后使用）。 */
   rebuildFtsIndex(): number {
+    this.invalidateListCountCache();
     const rows = this.db.all("SELECT * FROM knowledge_items") as ItemRow[];
     const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
     const run = this.db.transaction(() => {
@@ -905,6 +1044,10 @@ export class KnowledgeItemDB {
       updatedAt: row.updated_at,
       tags,
     };
+  }
+
+  private invalidateListCountCache(): void {
+    this.countCache.clear();
   }
 
   private loadTagsFor(itemIds: string[]): Map<string, Tag[]> {

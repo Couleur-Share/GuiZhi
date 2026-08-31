@@ -62,9 +62,9 @@ import {
 import { applyNetworkProxySettings } from "./services/network-proxy";
 import {
   setAutoBackupNotifier,
-  startBackupScheduler,
 } from "./services/backup";
 import { createTrayController } from "./tray-controller";
+import { BackgroundJobRuntime } from "./services/background-jobs";
 import { dispatchTrayAppCommand } from "./tray-command-dispatcher";
 import {
   attachWindowStatePersistence,
@@ -78,6 +78,7 @@ let minimizeToTray = false;
 // Database instance (module-level for access in createWindow)
 // 数据库实例（模块级变量，供 createWindow 访问）
 let appDb: Database.Database | null = null;
+let backgroundJobRuntime: BackgroundJobRuntime | null = null;
 let isQuitting = false;
 let quitCleanupRunning = false;
 let quitCleanupComplete = false;
@@ -1045,6 +1046,10 @@ void app.whenReady().then(async () => {
       // ignore
     }
     appDb = db; // Save to module-level variable for createWindow access
+    backgroundJobRuntime = new BackgroundJobRuntime(db, {
+      sendRendererJob: (job) =>
+        sendToMainWindow(IPC_CHANNELS.BACKGROUND_JOB_AVAILABLE, job),
+    });
     registerAllIPC(
       db,
       (nextDb) => {
@@ -1053,6 +1058,31 @@ void app.whenReady().then(async () => {
       {
         broadcastImportChanged: (task) =>
           sendToMainWindow(IPC_CHANNELS.IMPORT_CHANGED, task),
+        backgroundJobs: backgroundJobRuntime,
+        discoveryOptions: {
+          notify: (view, count, loginRequired) => {
+            if (!Notification.isSupported()) return;
+            const notification = new Notification({
+              title: loginRequired
+                ? `${view.name} 需要重新登录`
+                : `${view.name} 发现了新内容`,
+              body: loginRequired
+                ? "登录状态已失效，定时发现已暂停。"
+                : `新增 ${count} 条候选，确认后才会导入知识库。`,
+            });
+            notification.on("click", () => {
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.show();
+                mainWindow.focus();
+                emitWindowVisibility(true);
+              } else {
+                void createWindow();
+              }
+              sendToMainWindow(IPC_CHANNELS.DISCOVERY_OPEN_VIEW, view.id);
+            });
+            notification.show();
+          },
+        },
       },
     );
 
@@ -1071,6 +1101,7 @@ void app.whenReady().then(async () => {
     // Create main window
     // 创建窗口
     await createWindow();
+    backgroundJobRuntime.start();
 
     // Init updater (production only)
     // 初始化更新器（仅在生产环境）
@@ -1083,7 +1114,6 @@ void app.whenReady().then(async () => {
       setAutoBackupNotifier((phase, message) =>
         sendToMainWindow(IPC_CHANNELS.BACKUP_AUTO_STATUS, phase, message),
       );
-      startBackupScheduler(db);
     }
 
     // macOS: show window when clicking Dock icon
@@ -1113,6 +1143,7 @@ app.on("window-all-closed", () => {
 // 应用退出前清理
 app.on("before-quit", (event) => {
   isQuitting = true;
+  backgroundJobRuntime?.stop();
   if (quitCleanupComplete) {
     closeDatabase();
     return;

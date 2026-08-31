@@ -134,7 +134,7 @@ describe("setup-readiness", () => {
   it("清单项 CTA 分区", () => {
     expect(setupItemSettingsSection("textModel")).toBe("ai");
     expect(setupItemSettingsSection("embedding")).toBe("ai");
-    expect(setupItemSettingsSection("transcription")).toBe("general");
-    expect(setupItemSettingsSection("ytdlp")).toBe("general");
+    expect(setupItemSettingsSection("transcription")).toBe("capture");
+    expect(setupItemSettingsSection("ytdlp")).toBe("capture");
   });
 });

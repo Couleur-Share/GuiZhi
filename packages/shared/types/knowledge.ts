@@ -171,6 +171,8 @@ export interface KnowledgeItemQuery {
   /** 默认 desc；search 非空时被相关度排序覆盖 */
   sortOrder?: KnowledgeSortOrder;
   limit?: number;
+  /** 不透明 keyset 游标；提供时优先于 offset。 */
+  cursor?: string | null;
   offset?: number;
 }
 
@@ -206,11 +208,15 @@ export interface BulkUpdateKnowledgeItemsInput {
   status?: KnowledgeItemStatus;
   addTagNames?: string[];
   removeTagNames?: string[];
+  reviewStatus?: KnowledgeReviewStatus;
+  reviewReasons?: string[];
 }
 
 export interface KnowledgeItemListResult {
   entries: KnowledgeItemListEntry[];
   total: number;
+  /** 当前页之后仍有数据时返回；下一页应优先使用它。 */
+  nextCursor?: string | null;
 }
 
 export interface CreateKnowledgeItemInput {

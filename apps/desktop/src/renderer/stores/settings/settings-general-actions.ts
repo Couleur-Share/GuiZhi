@@ -40,6 +40,7 @@ type GeneralActionKey =
   | "setWikiCompileEnabled"
   | "setLaunchAtStartup"
   | "setMinimizeOnLaunch"
+  | "setBackgroundTasksEnabled"
   | "setCloseAction"
   | "setDebugMode"
   | "setShortcutMode"
@@ -258,6 +259,29 @@ function createDesktopIntegrationActions(context: SettingsActionContext) {
       }
       void syncSettingsToMain({ minimizeOnLaunch });
     },
+    setBackgroundTasksEnabled: (backgroundTasksEnabled) => {
+      if (!backgroundTasksEnabled) {
+        setTouched({ backgroundTasksEnabled: false });
+        void syncSettingsToMain({ backgroundTasksEnabled: false });
+        return;
+      }
+      // 后台任务授权是一个产品级承诺：确保系统登录后隐藏启动、驻留托盘，
+      // 且关闭按钮不会意外终止调度。用户之后仍可分别修改这些偏好。
+      setTouched({
+        backgroundTasksEnabled: true,
+        launchAtStartup: true,
+        minimizeOnLaunch: true,
+        closeAction: "minimize",
+      });
+      window.electron?.setAutoLaunch?.(true, true);
+      window.electron?.setMinimizeToTray?.(true);
+      window.electron?.setCloseAction?.("minimize");
+      void syncSettingsToMain({
+        backgroundTasksEnabled: true,
+        launchAtStartup: true,
+        minimizeOnLaunch: true,
+      });
+    },
     setCloseAction: (action) => {
       const closeAction = normalizeCloseAction(action);
       setTouched({ closeAction });
@@ -270,6 +294,7 @@ function createDesktopIntegrationActions(context: SettingsActionContext) {
   } satisfies SettingsActionGroup<
     | "setLaunchAtStartup"
     | "setMinimizeOnLaunch"
+    | "setBackgroundTasksEnabled"
     | "setCloseAction"
     | "setDebugMode"
   >;

@@ -5,7 +5,7 @@
  * 采集标签要经过弹窗 → import_tasks 迁移列 → 队列 → 条目。
  */
 import { test, expect, _electron as electron } from "@playwright/test";
-import type { ElectronApplication } from "@playwright/test";
+import type { ElectronApplication, Page } from "@playwright/test";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -21,6 +21,19 @@ function launch(userDataDir: string): Promise<ElectronApplication> {
   });
 }
 
+async function dismissFirstRunSetup(page: Page): Promise<void> {
+  const setupLater = page.getByRole("button", { name: /稍后再说|maybe later/i });
+  if (
+    await setupLater
+      .waitFor({ state: "visible", timeout: 3_000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await setupLater.click();
+    await expect(setupLater).toBeHidden();
+  }
+}
+
 test("退出时未保存的编辑不会丢：关窗落盘，重启后还在", async () => {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-e2e-"));
   let app = await launch(userDataDir);
@@ -31,6 +44,7 @@ test("退出时未保存的编辑不会丢：关窗落盘，重启后还在", as
     await expect(window.getByTestId("topbar-search")).toBeVisible({
       timeout: 20_000,
     });
+    await dismissFirstRunSetup(window);
 
     // 先存一份基线，确保条目本身已经在库里
     await window.getByTestId("topbar-new").click();
@@ -83,6 +97,7 @@ test("键盘删除后可撤销：条目从回收站原样回到列表", async ()
     await expect(window.getByTestId("topbar-search")).toBeVisible({
       timeout: 20_000,
     });
+    await dismissFirstRunSetup(window);
 
     await window.getByTestId("topbar-new").click();
     await window.getByTestId("capture-blank-note").click();
@@ -125,6 +140,7 @@ test("采集时打的标签跟着走完队列，落在入库条目上", async ()
     await expect(window.getByTestId("topbar-search")).toBeVisible({
       timeout: 20_000,
     });
+    await dismissFirstRunSetup(window);
 
     await window.getByTestId("topbar-new").click();
     await window.getByTestId("capture-draft").fill("端到端采集正文");

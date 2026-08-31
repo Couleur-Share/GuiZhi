@@ -64,6 +64,18 @@ export interface AIProviderConfig {
   enabled?: boolean;
 }
 
+export interface AIQuickSetupInput {
+  provider: Omit<AIProviderConfig, "id">;
+  models: Array<{
+    name?: string;
+    model: string;
+    capabilities: AIModelCapabilities;
+    verified: boolean;
+  }>;
+  /** route 指向 models 数组下标，确保整套配置一次提交。 */
+  routes: Partial<Record<AIModelRoute, number>>;
+}
+
 export interface SettingsState {
   themeMode: ThemeMode;
   isDarkMode: boolean;
@@ -86,6 +98,8 @@ export interface SettingsState {
   wikiCompileEnabled: boolean;
   launchAtStartup: boolean;
   minimizeOnLaunch: boolean;
+  /** 用户已明确授权开机隐藏启动并在托盘执行持久化后台任务 */
+  backgroundTasksEnabled: boolean;
   debugMode: boolean;
   closeAction: "ask" | "minimize" | "exit";
   shortcutModes: Record<string, "global" | "local">;
@@ -134,6 +148,7 @@ export interface SettingsState {
   setWikiCompileEnabled: (enabled: boolean) => void;
   setLaunchAtStartup: (enabled: boolean) => void;
   setMinimizeOnLaunch: (enabled: boolean) => void;
+  setBackgroundTasksEnabled: (enabled: boolean) => void;
   setDebugMode: (enabled: boolean) => void;
   setEnableNotifications: (enabled: boolean) => void;
   setCloseAction: (action: "ask" | "minimize" | "exit") => void;
@@ -172,6 +187,7 @@ export interface SettingsState {
     modelId: string | null,
   ) => void;
   setModelRouteDefault: (route: AIModelRoute, modelId: string | null) => void;
+  applyAiQuickSetup: (input: AIQuickSetupInput) => Promise<void>;
   applyTheme: () => void;
   setNetworkProxy: (updates: Partial<NetworkProxySettings>) => void;
 }

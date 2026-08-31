@@ -4,6 +4,7 @@
  */
 import { randomUUID } from "crypto";
 import type Database from "./adapter";
+import { IMPORT_TASK_STATUSES } from "@guizhi/shared/types";
 import type {
   EnqueueImportInput,
   ImportStage,
@@ -11,6 +12,9 @@ import type {
   ImportTask,
   ImportTaskStatus,
   ImportCaptureStrategy,
+  ImportTaskListQuery,
+  ImportTaskListResult,
+  ImportTaskClearQuery,
   CommentLimit,
   KnowledgeItemType,
 } from "@guizhi/shared/types";
@@ -92,6 +96,58 @@ const CLEARABLE_STATUSES: ImportTaskStatus[] = [
   "canceled",
   "duplicate",
 ];
+
+const TERMINAL_STATUSES: ImportTaskStatus[] = [
+  "completed",
+  "failed",
+  "canceled",
+  "duplicate",
+];
+
+interface ImportCursor {
+  createdAt: number;
+  id: string;
+}
+
+function encodeCursor(cursor: ImportCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeCursor(value: string | null | undefined): ImportCursor | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<ImportCursor>;
+    return Number.isFinite(parsed.createdAt) && typeof parsed.id === "string"
+      ? { createdAt: Number(parsed.createdAt), id: parsed.id }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeListQuery(query?: ImportTaskListQuery): Required<
+  Pick<ImportTaskListQuery, "status" | "query" | "pageSize">
+> & { cursor: ImportCursor | null } {
+  const pageSize = Math.min(Math.max(Math.round(query?.pageSize ?? 50), 20), 100);
+  return {
+    status: query?.status ?? "all",
+    query: query?.query?.trim() ?? "",
+    pageSize,
+    cursor: decodeCursor(query?.cursor),
+  };
+}
+
+function buildSearchClause(keyword: string): { sql: string; params: string[] } {
+  if (!keyword) return { sql: "", params: [] };
+  const pattern = `%${keyword.toLowerCase()}%`;
+  return {
+    sql: ` AND (LOWER(display_name) LIKE ? OR LOWER(source_input) LIKE ?
+      OR LOWER(COALESCE(error, '')) LIKE ? OR LOWER(COALESCE(warning, '')) LIKE ?)`,
+    params: [pattern, pattern, pattern, pattern],
+  };
+}
 
 function mapRow(row: TaskRow): ImportTask {
   return {
@@ -183,6 +239,98 @@ export class ImportTaskDB {
       limit,
     ) as TaskRow[];
     return rows.map(mapRow);
+  }
+
+  listPage(query?: ImportTaskListQuery): ImportTaskListResult {
+    const normalized = normalizeListQuery(query);
+    const search = buildSearchClause(normalized.query);
+    const statusSql = normalized.status === "all" ? "" : " AND status = ?";
+    const statusParams =
+      normalized.status === "all" ? [] : [normalized.status];
+    const cursorSql = normalized.cursor
+      ? " AND (created_at < ? OR (created_at = ? AND id < ?))"
+      : "";
+    const cursorParams = normalized.cursor
+      ? [
+          normalized.cursor.createdAt,
+          normalized.cursor.createdAt,
+          normalized.cursor.id,
+        ]
+      : [];
+    const rows = this.db.all(
+      `SELECT * FROM import_tasks WHERE 1 = 1${search.sql}${statusSql}${cursorSql}
+       ORDER BY created_at DESC, id DESC LIMIT ?`,
+      ...search.params,
+      ...statusParams,
+      ...cursorParams,
+      normalized.pageSize + 1,
+    ) as TaskRow[];
+    const hasMore = rows.length > normalized.pageSize;
+    const pageRows = rows.slice(0, normalized.pageSize);
+    const tail = pageRows[pageRows.length - 1];
+
+    const activeRows = this.db.all(
+      `SELECT * FROM import_tasks WHERE status IN ('pending','processing')${search.sql}
+       ORDER BY created_at ASC, id ASC`,
+      ...search.params,
+    ) as TaskRow[];
+    const totalRow = this.db.get(
+      `SELECT COUNT(*) AS count FROM import_tasks WHERE 1 = 1${search.sql}${statusSql}`,
+      ...search.params,
+      ...statusParams,
+    ) as { count: number };
+    const countRows = this.db.all(
+      `SELECT status, COUNT(*) AS count FROM import_tasks WHERE 1 = 1${search.sql}
+       GROUP BY status`,
+      ...search.params,
+    ) as Array<{ status: ImportTaskStatus; count: number }>;
+    const counts = Object.fromEntries(
+      ([...IMPORT_TASK_STATUSES] as ImportTaskStatus[]).map((status) => [status, 0]),
+    ) as Record<ImportTaskStatus, number>;
+    for (const row of countRows) counts[row.status] = row.count;
+
+    return {
+      entries: pageRows.map(mapRow),
+      active: activeRows.map(mapRow),
+      nextCursor:
+        hasMore && tail
+          ? encodeCursor({ createdAt: tail.created_at, id: tail.id })
+          : null,
+      total: totalRow.count,
+      counts,
+    };
+  }
+
+  countTerminal(query: ImportTaskClearQuery): number {
+    const search = buildSearchClause(query.scope === "filtered" ? query.query?.trim() ?? "" : "");
+    const requestedStatus = query.scope === "filtered" ? query.status ?? "all" : "all";
+    const statuses =
+      requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
+        ? [requestedStatus]
+        : TERMINAL_STATUSES;
+    const placeholders = statuses.map(() => "?").join(",");
+    const row = this.db.get(
+      `SELECT COUNT(*) AS count FROM import_tasks
+       WHERE status IN (${placeholders})${search.sql}`,
+      ...statuses,
+      ...search.params,
+    ) as { count: number };
+    return row.count;
+  }
+
+  clearTerminal(query: ImportTaskClearQuery): number {
+    const search = buildSearchClause(query.scope === "filtered" ? query.query?.trim() ?? "" : "");
+    const requestedStatus = query.scope === "filtered" ? query.status ?? "all" : "all";
+    const statuses =
+      requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
+        ? [requestedStatus]
+        : TERMINAL_STATUSES;
+    const placeholders = statuses.map(() => "?").join(",");
+    return this.db.run(
+      `DELETE FROM import_tasks WHERE status IN (${placeholders})${search.sql}`,
+      ...statuses,
+      ...search.params,
+    ).changes;
   }
 
   listByStatus(statuses: ImportTaskStatus[]): ImportTask[] {

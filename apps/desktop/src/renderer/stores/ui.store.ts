@@ -4,11 +4,12 @@ import { persist } from "zustand/middleware";
 /**
  * 归知的顶层功能模块（对应侧栏 rail）：
  * - library：知识库（条目/集合/标签/回收站）
+ * - inbox：处理中心
  * - ask：AI 问答
  * - wiki：知识 Wiki
  * - imports：导入任务队列
  */
-export type AppModule = "library" | "ask" | "wiki" | "imports";
+export type AppModule = "library" | "inbox" | "ask" | "wiki" | "imports";
 
 /**
  * 知识库列表视图：
@@ -22,6 +23,7 @@ export type SettingsSectionId =
   | "appearance"
   | "data"
   | "network"
+  | "capture"
   | "ai"
   | "illustration"
   | "mcp"
@@ -58,7 +60,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function normalizeAppModule(value: unknown): AppModule {
-  return value === "ask" || value === "wiki" || value === "imports"
+  return value === "inbox" || value === "ask" || value === "wiki" || value === "imports"
     ? value
     : "library";
 }
@@ -94,6 +96,9 @@ interface UIState {
   setupChecklistRequest: boolean;
   requestSetupChecklist: () => void;
   consumeSetupChecklistRequest: () => boolean;
+  aiQuickSetupRequest: boolean;
+  requestAiQuickSetup: () => void;
+  consumeAiQuickSetupRequest: () => boolean;
 }
 
 export const useUIStore = create<UIState>()(
@@ -162,6 +167,13 @@ export const useUIStore = create<UIState>()(
       consumeSetupChecklistRequest: () => {
         const requested = get().setupChecklistRequest;
         set({ setupChecklistRequest: false });
+        return requested;
+      },
+      aiQuickSetupRequest: false,
+      requestAiQuickSetup: () => set({ aiQuickSetupRequest: true }),
+      consumeAiQuickSetupRequest: () => {
+        const requested = get().aiQuickSetupRequest;
+        set({ aiQuickSetupRequest: false });
         return requested;
       },
     }),

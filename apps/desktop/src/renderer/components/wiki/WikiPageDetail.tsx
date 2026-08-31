@@ -293,7 +293,7 @@ export function WikiPageDetail() {
           <WikiKindBadge kind={page.kind} />
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground/70">
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>
             {page.manualEditedAt
               ? t("wiki.manualEditedAt", "手动编辑于 {{time}}", {
@@ -368,7 +368,7 @@ export function WikiPageDetail() {
               rows={20}
               className="w-full resize-y rounded-xl border border-border bg-background/60 p-3 font-mono text-[13px] leading-relaxed text-foreground focus:border-primary/50 focus:outline-none"
             />
-            <p className="text-[11px] text-muted-foreground/70">
+            <p className="text-xs text-muted-foreground">
               {t(
                 "wiki.editPageHint",
                 "保存后这一页会被标记为手动编辑，后续编译不再覆盖它的正文。[[链接]] 仍然有效。",

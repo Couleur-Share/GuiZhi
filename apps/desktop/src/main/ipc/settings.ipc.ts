@@ -91,6 +91,7 @@ const PERSISTED_SETTINGS_KEYS = new Set<string>([
   "updateChannel",
   "launchAtStartup",
   "minimizeOnLaunch",
+  "backgroundTasksEnabled",
   "networkProxy",
   "backupAutoEnabled",
   "backupIntervalHours",

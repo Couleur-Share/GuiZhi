@@ -47,6 +47,8 @@ export { WikiDB } from "./wiki";
 export { AskSessionDB } from "./ask-session";
 export { AIUsageDB, toLocalDay } from "./ai-usage";
 export { SemanticIndexDB, vectorToBlob, blobToVector } from "./semantic";
+export { BackgroundJobDB } from "./background-job";
+export { DiscoveryDB, discoveryContentHash } from "./discovery";
 export type { SemanticChunkRecord, SemanticItemState } from "./semantic";
 export {
   migrateLegacyDatabase,

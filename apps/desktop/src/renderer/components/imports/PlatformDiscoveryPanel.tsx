@@ -24,7 +24,11 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { Select } from "../ui/Select";
 import { useToast } from "../ui/Toast";
-import { DISCOVERY_DRAFT_KEY } from "./platform-discovery-draft";
+import {
+  DISCOVERY_DRAFT_KEY,
+  DISCOVERY_OPEN_VIEW_KEY,
+} from "./platform-discovery-draft";
+import { SavedDiscoveryViewsPanel } from "./SavedDiscoveryViewsPanel";
 
 interface DiscoveryDraft {
   url?: string;
@@ -67,6 +71,11 @@ export function PlatformDiscoveryPanel({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const initial = useMemo(readDraft, []);
+  const initialSavedViewId = useMemo(() => {
+    const id = sessionStorage.getItem(DISCOVERY_OPEN_VIEW_KEY);
+    sessionStorage.removeItem(DISCOVERY_OPEN_VIEW_KEY);
+    return id;
+  }, []);
   const initialPlatform = initial.url
     ? (detectPlatformCapturePlatform(initial.url) ?? "xiaohongshu")
     : "xiaohongshu";
@@ -390,6 +399,13 @@ export function PlatformDiscoveryPanel({ onBack }: { onBack: () => void }) {
               </p>
             ) : null}
           </div>
+
+          <SavedDiscoveryViewsPanel
+            platform={effectivePlatform}
+            mode={mode}
+            query={query}
+            initialViewId={initialSavedViewId}
+          />
 
           {items.length > 0 ? (
             <>

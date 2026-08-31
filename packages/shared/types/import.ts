@@ -19,6 +19,35 @@ export const IMPORT_TASK_STATUSES = [
 
 export type ImportTaskStatus = (typeof IMPORT_TASK_STATUSES)[number];
 
+export interface ImportTaskListQuery {
+  status?: ImportTaskStatus | "all";
+  query?: string;
+  /** 20–100，默认 50 */
+  pageSize?: number;
+  cursor?: string | null;
+}
+
+export interface ImportTaskListResult {
+  entries: ImportTask[];
+  /** pending / processing 独立返回，Renderer 固定置顶并按 id 去重 */
+  active: ImportTask[];
+  nextCursor: string | null;
+  total: number;
+  /** 应用搜索条件但忽略当前状态筛选 */
+  counts: Record<ImportTaskStatus, number>;
+}
+
+export interface ImportTaskClearQuery {
+  scope: "filtered" | "all";
+  status?: ImportTaskStatus | "all";
+  query?: string;
+}
+
+export interface ImportTaskClearResult {
+  count: number;
+  preview: boolean;
+}
+
 /**
  * 主进程调度器的瞬时状态。
  *

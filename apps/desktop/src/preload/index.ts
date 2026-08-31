@@ -13,6 +13,8 @@ import { askSessionApi } from "./api/ask";
 import { semanticApi } from "./api/semantic";
 import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
 import { illustrationApi } from "./api/illustration";
+import { backgroundJobApi } from "./api/background-job";
+import { inboxApi } from "./api/inbox";
 import { logApi } from "./api/log";
 import { createBufferedSubscription } from "./app-command-subscription";
 import type {
@@ -75,6 +77,8 @@ const api = {
   semantic: semanticApi,
   media: mediaApi,
   illustration: illustrationApi,
+  backgroundJob: backgroundJobApi,
+  inbox: inboxApi,
   log: logApi,
   ytdlp: ytDlpApi,
   ffmpeg: ffmpegApi,
@@ -92,6 +96,8 @@ const api = {
       "window:visibility-changed",
       "import:changed",
       "backup:autoStatus",
+      IPC_CHANNELS.BACKGROUND_JOB_AVAILABLE,
+      IPC_CHANNELS.DISCOVERY_OPEN_VIEW,
       "menu:import",
       "menu:export",
       "ytdlp:downloadProgress",

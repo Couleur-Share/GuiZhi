@@ -17,6 +17,7 @@ import {
   KeyboardIcon,
   PlugIcon,
   WifiIcon,
+  RadioTowerIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type SettingsSectionId } from "../../stores/ui.store";
@@ -35,6 +36,7 @@ const SETTINGS_MENU = [
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
+  { id: "capture", labelKey: "settings.captureAndTranscription", icon: RadioTowerIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
   { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
   // 紧跟模型服务与正文配图：找 MCP 时的心理模型是「跟 AI 有关的设置」，
@@ -51,6 +53,7 @@ const loadShortcutsSettings = () => import("./ShortcutsSettings");
 const loadAboutSettings = () => import("./AboutSettings");
 const loadDataSettings = () => import("./DataSettings");
 const loadNetworkSettings = () => import("./NetworkSettings");
+const loadCaptureSettings = () => import("./CaptureSettings");
 const loadAISettings = () => import("./AISettingsPrototype");
 const loadIllustrationSettings = () => import("./IllustrationSettings");
 const loadMcpSettings = () => import("./mcp/McpSettings");
@@ -90,6 +93,9 @@ const NetworkSettings = lazy(() =>
     default: module.NetworkSettings,
   })),
 );
+const CaptureSettings = lazy(() =>
+  loadCaptureSettings().then((module) => ({ default: module.CaptureSettings })),
+);
 const AISettingsPrototype = lazy(() =>
   loadAISettings().then((module) => ({
     default: module.AISettingsPrototype,
@@ -119,6 +125,7 @@ export function prefetchSettingsSections(): void {
     loadAboutSettings,
     loadDataSettings,
     loadNetworkSettings,
+    loadCaptureSettings,
     loadAISettings,
     loadIllustrationSettings,
     loadMcpSettings,
@@ -177,6 +184,8 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <DataSettings />;
       case "network":
         return <NetworkSettings />;
+      case "capture":
+        return <CaptureSettings />;
       case "ai":
         return <AISettingsPrototype />;
       case "illustration":

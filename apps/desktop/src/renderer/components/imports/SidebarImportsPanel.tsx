@@ -10,11 +10,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import {
-  countByFilter,
-  useImportStore,
-  type ImportFilter,
-} from "../../stores/import.store";
+import { useImportStore, type ImportFilter } from "../../stores/import.store";
 import { useToast } from "../ui/Toast";
 
 function FilterRow({
@@ -37,8 +33,8 @@ function FilterRow({
       aria-pressed={active}
       className={`flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors duration-smooth ${
         active
-          ? "bg-primary/15 text-primary"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+          ? "bg-primary/15 text-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
       }`}
     >
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -50,10 +46,10 @@ function FilterRow({
         {label}
       </span>
       <span
-        className={`rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums ${
+        className={`rounded-full border px-1.5 py-0.5 text-xs tabular-nums ${
           active
-            ? "border-primary/20 bg-primary/10 text-primary/80"
-            : "border-white/5 bg-sidebar-accent/80 text-sidebar-foreground/50"
+            ? "border-primary/20 bg-primary/10 text-foreground"
+            : "border-sidebar-border bg-sidebar-accent/80 text-sidebar-foreground/80"
         }`}
       >
         {count}
@@ -69,12 +65,10 @@ function FilterRow({
 export function SidebarImportsPanel() {
   const { t } = useTranslation();
   const { showToast } = useToast();
-  const tasks = useImportStore((state) => state.tasks);
+  const counts = useImportStore((state) => state.counts);
   const filter = useImportStore((state) => state.filter);
   const setFilter = useImportStore((state) => state.setFilter);
   const enqueue = useImportStore((state) => state.enqueue);
-
-  const counts = countByFilter(tasks);
 
   const importFiles = async () => {
     const files = await window.api.import.selectFiles();
@@ -190,7 +184,7 @@ export function SidebarImportsPanel() {
       </div>
 
       <div className="flex items-center gap-2 px-3 pb-1 pt-4">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/50">
+        <span className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/80">
           {t("imports.panelOverview", "任务概览")}
         </span>
         <div className="h-px flex-1 bg-sidebar-border/60" />

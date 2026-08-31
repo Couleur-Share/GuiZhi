@@ -16,6 +16,10 @@ import { registerAskIPC } from "./ask.ipc";
 import { registerSemanticIPC } from "./semantic.ipc";
 import { registerMediaIPC } from "./media.ipc";
 import { registerIllustrationIPC } from "./illustration.ipc";
+import { registerBackgroundJobIPC } from "./background-job.ipc";
+import { registerInboxIPC } from "./inbox.ipc";
+import type { BackgroundJobRuntime } from "../services/background-jobs";
+import type { DiscoveryServiceOptions } from "../services/discovery/discovery-service";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 
 const REBINDABLE_DB_CHANNELS = [
@@ -43,6 +47,8 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.IMPORT_RETRY,
   IPC_CHANNELS.IMPORT_REMOVE,
   IPC_CHANNELS.IMPORT_CLEAR_FINISHED,
+  IPC_CHANNELS.IMPORT_CLEAR_TERMINAL_PREVIEW,
+  IPC_CHANNELS.IMPORT_CLEAR_TERMINAL,
   IPC_CHANNELS.IMPORT_QUEUE_STATE,
   IPC_CHANNELS.IMPORT_PAUSE,
   IPC_CHANNELS.IMPORT_RESUME,
@@ -56,6 +62,13 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.PLATFORM_CAPTURE_CANCEL_DISCOVERY,
   IPC_CHANNELS.PLATFORM_CAPTURE_LIST_COMMENTS,
   IPC_CHANNELS.PLATFORM_CAPTURE_REFRESH_COMMENTS,
+  IPC_CHANNELS.DISCOVERY_VIEW_LIST,
+  IPC_CHANNELS.DISCOVERY_VIEW_GET,
+  IPC_CHANNELS.DISCOVERY_VIEW_SAVE,
+  IPC_CHANNELS.DISCOVERY_VIEW_DELETE,
+  IPC_CHANNELS.DISCOVERY_VIEW_RUN,
+  IPC_CHANNELS.DISCOVERY_VIEW_RESUME_LOGIN,
+  IPC_CHANNELS.DISCOVERY_CANDIDATE_SET_STATE,
   IPC_CHANNELS.WIKI_CATALOG,
   IPC_CHANNELS.WIKI_GET_PAGE,
   IPC_CHANNELS.WIKI_APPLY_COMPILATION,
@@ -70,6 +83,17 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.BACKUP_LIST,
   IPC_CHANNELS.BACKUP_DELETE,
   IPC_CHANNELS.BACKUP_RESTORE,
+  IPC_CHANNELS.BACKUP_REPOSITORY_STATUS,
+  IPC_CHANNELS.BACKUP_REPOSITORY_INIT,
+  IPC_CHANNELS.BACKUP_REPOSITORY_CHANGE_PASSWORD,
+  IPC_CHANNELS.BACKUP_REPOSITORY_CREATE_SNAPSHOT,
+  IPC_CHANNELS.BACKUP_REPOSITORY_LIST,
+  IPC_CHANNELS.BACKUP_REPOSITORY_PREVIEW,
+  IPC_CHANNELS.BACKUP_REPOSITORY_DELETE,
+  IPC_CHANNELS.BACKUP_REPOSITORY_EXPORT_PORTABLE,
+  IPC_CHANNELS.BACKUP_REPOSITORY_RESTORE,
+  IPC_CHANNELS.BACKUP_REPOSITORY_CONSUME_RENDERER_SETTINGS,
+  IPC_CHANNELS.BACKUP_REPOSITORY_SYNC_RENDERER_SETTINGS,
   IPC_CHANNELS.EXPORT_MARKDOWN,
   IPC_CHANNELS.CONFIG_EXPORT,
   IPC_CHANNELS.CONFIG_READ,
@@ -120,6 +144,16 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.FUNASR_UNINSTALL,
   IPC_CHANNELS.SETTINGS_GET,
   IPC_CHANNELS.SETTINGS_SET,
+  IPC_CHANNELS.BACKGROUND_JOB_LIST,
+  IPC_CHANNELS.BACKGROUND_JOB_SYNC_RENDERER,
+  IPC_CHANNELS.BACKGROUND_JOB_COMPLETE,
+  IPC_CHANNELS.BACKGROUND_JOB_FAIL,
+  IPC_CHANNELS.BACKGROUND_JOB_RENEW,
+  IPC_CHANNELS.BACKGROUND_JOB_PAUSE,
+  IPC_CHANNELS.BACKGROUND_JOB_RESUME,
+  IPC_CHANNELS.INBOX_LIST,
+  IPC_CHANNELS.INBOX_ORGANIZE,
+  IPC_CHANNELS.INBOX_MARK_REVIEWED,
 ] as const;
 
 function resetAllRegisteredIpcHandlers(): void {
@@ -139,6 +173,8 @@ function registerIpcGroup(label: string, register: () => void): void {
 
 export interface RegisterAllIpcOptions {
   broadcastImportChanged: (task: ImportTask) => void;
+  backgroundJobs: BackgroundJobRuntime;
+  discoveryOptions?: DiscoveryServiceOptions;
 }
 
 /**
@@ -156,16 +192,27 @@ export function registerAllIPC(
   registerIpcGroup("import", () =>
     registerImportIPC(db, options.broadcastImportChanged),
   );
-  registerIpcGroup("platform-capture", () => registerPlatformCaptureIPC(db));
+  registerIpcGroup("platform-capture", () =>
+    registerPlatformCaptureIPC(db, {
+      backgroundJobs: options.backgroundJobs,
+      discoveryOptions: options.discoveryOptions,
+    }),
+  );
   registerIpcGroup("wiki", () => registerWikiIPC(db));
   registerIpcGroup("migration", () => registerMigrationIPC(db));
-  registerIpcGroup("backup", () => registerBackupIPC(db));
+  registerIpcGroup("backup", () =>
+    registerBackupIPC(db, options.backgroundJobs),
+  );
   registerIpcGroup("config-transfer", () => registerConfigTransferIPC());
   registerIpcGroup("mcp", () => registerMcpIPC());
   registerIpcGroup("ask", () => registerAskIPC(db));
   registerIpcGroup("semantic", () => registerSemanticIPC(db));
   registerIpcGroup("media", () => registerMediaIPC(db));
   registerIpcGroup("illustration", () => registerIllustrationIPC(db));
+  registerIpcGroup("background-jobs", () =>
+    registerBackgroundJobIPC(options.backgroundJobs),
+  );
+  registerIpcGroup("inbox", () => registerInboxIPC(db));
   registerIpcGroup("settings", () => registerSettingsIPC(db));
   registerIpcGroup("image", () => registerImageIPC());
   registerIpcGroup("ai", () => registerAIIPC(db));

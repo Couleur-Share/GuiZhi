@@ -27,6 +27,8 @@ export interface Settings {
   // Startup behavior — main process reads these to honor "minimize on launch"
   launchAtStartup?: boolean;
   minimizeOnLaunch?: boolean;
+  /** 已明确授权应用在隐藏窗口/托盘状态继续执行后台任务 */
+  backgroundTasksEnabled?: boolean;
   // Global desktop network proxy.
   networkProxy?: NetworkProxySettings;
   // 本地定时备份（主进程调度器读取）
@@ -62,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
   backgroundImageOpacity: 0.22,
   backgroundImageBlur: 14,
   updateChannel: "stable",
+  backgroundTasksEnabled: false,
   networkProxy: DEFAULT_NETWORK_PROXY_SETTINGS,
   backupAutoEnabled: true,
   backupIntervalHours: 24,

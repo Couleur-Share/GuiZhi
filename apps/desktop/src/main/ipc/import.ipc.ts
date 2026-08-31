@@ -5,6 +5,8 @@ import {
   isImportCaptureStrategy,
   type EnqueueImportInput,
   type ImportTask,
+  type ImportTaskClearQuery,
+  type ImportTaskListQuery,
 } from "@guizhi/shared/types";
 import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
 import type Database from "../database/sqlite";
@@ -59,7 +61,13 @@ export function registerImportIPC(
       return service!.queue.enqueue(safe);
     },
   );
-  ipcMain.handle(IPC_CHANNELS.IMPORT_LIST, () => service!.taskDb.list());
+  ipcMain.handle(
+    IPC_CHANNELS.IMPORT_LIST,
+    (_event, query?: ImportTaskListQuery) =>
+      query && typeof query === "object"
+        ? service!.taskDb.listPage(query)
+        : service!.taskDb.listPage().entries,
+  );
   ipcMain.handle(IPC_CHANNELS.IMPORT_QUEUE_STATE, () => service!.queue.getState());
   ipcMain.handle(IPC_CHANNELS.IMPORT_PAUSE, () => service!.queue.pause());
   ipcMain.handle(IPC_CHANNELS.IMPORT_RESUME, () => service!.queue.resume());
@@ -132,6 +140,20 @@ export function registerImportIPC(
   );
   ipcMain.handle(IPC_CHANNELS.IMPORT_CLEAR_FINISHED, () =>
     service!.taskDb.clearFinished(),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.IMPORT_CLEAR_TERMINAL_PREVIEW,
+    (_event, query: ImportTaskClearQuery) => ({
+      count: service!.taskDb.countTerminal(query),
+      preview: true,
+    }),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.IMPORT_CLEAR_TERMINAL,
+    (_event, query: ImportTaskClearQuery) => ({
+      count: service!.taskDb.clearTerminal(query),
+      preview: false,
+    }),
   );
 
   ipcMain.handle("dialog:selectImportFiles", async () => {

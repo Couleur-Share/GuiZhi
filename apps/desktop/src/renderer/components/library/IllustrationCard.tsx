@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
@@ -7,7 +7,10 @@ import {
   listIllustrations,
 } from "@guizhi/shared/utils/illustration-note";
 import { ACTION_CHIP } from "./detail-chips";
-import { IllustrationPanel } from "./IllustrationPanel";
+
+const IllustrationPanel = lazy(() =>
+  import("./IllustrationPanel").then((module) => ({ default: module.IllustrationPanel })),
+);
 
 /**
  * 正文配图入口。
@@ -50,11 +53,13 @@ export function IllustrationCard({ item }: { item: KnowledgeItem }) {
           : t("library.illustrationCreate", "生成正文配图")}
       </button>
       {isOpen ? (
-        <IllustrationPanel
-          item={item}
-          isOpen={isOpen}
-          onClose={() => setIsOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <IllustrationPanel
+            item={item}
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+          />
+        </Suspense>
       ) : null}
     </>
   );

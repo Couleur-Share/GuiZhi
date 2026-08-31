@@ -157,7 +157,7 @@ export function TagPickerPopover({
       </div>
 
       <div className="mt-3 border-t border-border/60 pt-2.5">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("library.tagsExisting", "选择已有标签")}
         </span>
         {unusedTags.length === 0 ? (

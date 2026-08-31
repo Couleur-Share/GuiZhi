@@ -17,6 +17,7 @@ import { Select } from "../ui/Select";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Spinner } from "../ui/Spinner";
 import { useToast } from "../ui/Toast";
+import { RepositoryBackupSection } from "./RepositoryBackupSection";
 
 type BusyAction = "create" | "restore" | "export" | null;
 
@@ -201,13 +202,13 @@ export function DataSettings() {
 
   return (
     <div className="space-y-6" data-testid="data-settings">
-      {/* 自动备份 */}
-      <SettingSection title={t("settings.backupAutoSection", "自动备份")}>
+      {/* 自动完整备份调度 */}
+      <SettingSection title={t("settings.backupAutoSection", "完整备份计划")}>
         <SettingItem
           label={t("settings.backupAuto", "定时自动备份")}
           description={t(
             "settings.backupAutoDesc",
-            "按设定间隔自动备份知识库到本地备份目录",
+            "按设定间隔把知识、引用媒体与配置写入加密去重仓库；需要先授权后台运行",
           )}
         >
           <ToggleSwitch
@@ -258,8 +259,10 @@ export function DataSettings() {
         </SettingItem>
       </SettingSection>
 
+      <RepositoryBackupSection />
+
       {/* 备份列表 */}
-      <SettingSection title={t("settings.backupSection", "本地备份")}>
+      <SettingSection title={t("settings.backupSection", "旧数据库快照（不含媒体与配置）")}>
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border/70">
           <button
             type="button"

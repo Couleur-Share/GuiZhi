@@ -74,6 +74,12 @@ importers:
       d3-force:
         specifier: ^3.0.0
         version: 3.0.0
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
+      hnswlib-wasm:
+        specifier: 0.8.2
+        version: 0.8.2
       http-proxy-agent:
         specifier: ^7.0.2
         version: 7.0.2
@@ -186,6 +192,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.22
         version: 10.5.4(postcss@8.5.6)
+      axe-core:
+        specifier: 4.10.2
+        version: 4.10.2
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.1
@@ -213,9 +222,6 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^5.0.0
         version: 5.2.0(eslint@9.39.5(jiti@1.21.7))
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
       hast-util-sanitize:
         specifier: ^5.0.0
         version: 5.0.2
@@ -1899,6 +1905,10 @@ packages:
   aws4@1.13.2:
     resolution: {integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==}
 
+  axe-core@4.10.2:
+    resolution: {integrity: sha512-RE3mdQ7P3FRSe7eqCWoeQ/Z9QXrtniSjp1wUjt5nRC3WIpz5rSCve6o3fsZ2aCpJtrZjSZgjwXAoTO5k4tEI0w==}
+    engines: {node: '>=4'}
+
   axios@1.13.2:
     resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
 
@@ -3027,6 +3037,9 @@ packages:
   highlight.js@11.8.0:
     resolution: {integrity: sha512-MedQhoqVdr0U6SSnWPzfiadUcDHfN/Wzq25AkXiQv9oiOO/sG0S7XkvpFIqWBl9Yq1UYyYOOVORs5UW2XlPyzg==}
     engines: {node: '>=12.0.0'}
+
+  hnswlib-wasm@0.8.2:
+    resolution: {integrity: sha512-qEgKETj4rMOYRA1esP0bxVosw9Wrz5S/HvjI2FBWOXG5rf5/Es4OoEWGVvztFihDNU5if61l6QGhW5ILtt+PqA==}
 
   hosted-git-info@4.1.0:
     resolution: {integrity: sha512-kyCuEOWjJqZuDbRHzL8V93NzQhwIB71oFWSyzVo+KPZI+pnQPPxucdkrOZvkLRnrf5URsQM+IJ09Dw29cRALIA==}
@@ -6803,6 +6816,8 @@ snapshots:
 
   aws4@1.13.2: {}
 
+  axe-core@4.10.2: {}
+
   axios@1.13.2:
     dependencies:
       follow-redirects: 1.15.11
@@ -8275,6 +8290,8 @@ snapshots:
       space-separated-tokens: 2.0.2
 
   highlight.js@11.8.0: {}
+
+  hnswlib-wasm@0.8.2: {}
 
   hosted-git-info@4.1.0:
     dependencies:

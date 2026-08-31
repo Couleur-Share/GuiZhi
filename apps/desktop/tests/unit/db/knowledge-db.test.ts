@@ -432,6 +432,54 @@ describe("KnowledgeItemDB", () => {
     expect(items.list({ scope: "all", platform: "bilibili" }).total).toBe(1);
   });
 
+  it("列表使用不重复的 keyset 游标连续翻页，并保持精确总数", () => {
+    const ids: string[] = [];
+    for (let index = 0; index < 13; index += 1) {
+      const created = items.create({ title: `游标条目 ${String(index).padStart(2, "0")}` });
+      ids.push(created.id);
+      db.run(
+        "UPDATE knowledge_items SET updated_at=?, is_pinned=? WHERE id=?",
+        10_000 + index,
+        index === 12 ? 1 : 0,
+        created.id,
+      );
+    }
+
+    const first = items.list({ scope: "all", limit: 5 });
+    const second = items.list({ scope: "all", limit: 5, cursor: first.nextCursor });
+    const third = items.list({ scope: "all", limit: 5, cursor: second.nextCursor });
+    const allIds = [...first.entries, ...second.entries, ...third.entries].map((entry) => entry.id);
+
+    expect(first.total).toBe(13);
+    expect(first.entries[0].id).toBe(ids[12]);
+    expect(new Set(allIds).size).toBe(13);
+    expect(third.nextCursor).toBeNull();
+  });
+
+  it("搜索结果也可用游标翻页，游标不能跨筛选复用", () => {
+    for (let index = 0; index < 9; index += 1) {
+      items.create({ title: `语义检索 ${index}`, content: "共同关键词" });
+    }
+    const first = items.list({ scope: "all", search: "共同关键词", limit: 4 });
+    const second = items.list({
+      scope: "all",
+      search: "共同关键词",
+      limit: 4,
+      cursor: first.nextCursor,
+    });
+    expect(new Set([...first.entries, ...second.entries].map((entry) => entry.id)).size).toBe(8);
+    expect(() =>
+      items.list({ scope: "all", search: "另一条件", limit: 4, cursor: first.nextCursor }),
+    ).toThrow("游标无效或已过期");
+  });
+
+  it("知识写操作立即使五秒计数缓存失效", () => {
+    items.create({ title: "第一条" });
+    expect(items.list({ scope: "all", limit: 1 }).total).toBe(1);
+    items.create({ title: "第二条" });
+    expect(items.list({ scope: "all", limit: 1 }).total).toBe(2);
+  });
+
   it("按平台筛选时来源列显示命中的来源，而非另一条更新的来源", () => {
     const item = items.create({ title: "多来源条目" });
     addSource(db, item.id, "url", "douyin");

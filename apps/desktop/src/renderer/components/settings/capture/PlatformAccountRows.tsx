@@ -180,7 +180,7 @@ export function PlatformAccountRows() {
         <button
           type="button"
           onClick={() => setConfirmClear(true)}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-destructive/40 px-3 text-xs text-destructive hover:bg-destructive/10"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-destructive/50 px-3 text-xs font-medium text-destructive hover:bg-destructive/10"
         >
           <Trash2Icon className="h-3.5 w-3.5" aria-hidden="true" />
           {t("common.clear", "清除")}

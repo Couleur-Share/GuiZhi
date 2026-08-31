@@ -214,4 +214,72 @@ describe("ImportTaskDB", () => {
     expect(tasks.listByStatus(["failed"])).toHaveLength(1);
     expect(tasks.listByStatus(["pending", "failed"])).toHaveLength(2);
   });
+
+  it("listPage 用 created_at + id 游标遍历全量历史且不重复", () => {
+    for (let index = 0; index < 125; index += 1) {
+      const task = tasks.create({ kind: "text", input: `任务 ${index}` });
+      db.run(
+        "UPDATE import_tasks SET created_at = ?, updated_at = ? WHERE id = ?",
+        10_000 - Math.floor(index / 2),
+        10_000 - index,
+        task.id,
+      );
+      if (index % 3 === 0) tasks.update(task.id, { status: "completed" });
+    }
+
+    const ids: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = tasks.listPage({ pageSize: 50, cursor });
+      ids.push(...page.entries.map((task) => task.id));
+      cursor = page.nextCursor;
+    } while (cursor);
+
+    expect(ids).toHaveLength(125);
+    expect(new Set(ids)).toHaveLength(125);
+  });
+
+  it("listPage 搜索覆盖标题、来源、错误和警告；counts 忽略状态筛选", () => {
+    const completed = tasks.create({ kind: "url", input: "https://example.com/source-key" });
+    tasks.update(completed.id, {
+      status: "completed",
+      displayName: "目标标题",
+      warning: "缺少 source-key 的文字稿",
+    });
+    const failed = tasks.create({ kind: "text", input: "普通输入" });
+    tasks.update(failed.id, { status: "failed", error: "source-key 网络失败" });
+    tasks.create({ kind: "text", input: "不匹配" });
+
+    const result = tasks.listPage({
+      status: "failed",
+      query: "source-key",
+      pageSize: 20,
+    });
+    expect(result.entries.map((task) => task.id)).toEqual([failed.id]);
+    expect(result.total).toBe(1);
+    expect(result.counts.failed).toBe(1);
+    expect(result.counts.completed).toBe(1);
+    expect(result.counts.pending).toBe(0);
+  });
+
+  it("active 独立返回，终态清理可预览当前筛选或清理全部", () => {
+    const pending = tasks.create({ kind: "text", input: "进行中" });
+    const completed = tasks.create({ kind: "text", input: "目标 已完成" });
+    const failed = tasks.create({ kind: "text", input: "目标 失败" });
+    const duplicate = tasks.create({ kind: "text", input: "其他 重复" });
+    tasks.update(completed.id, { status: "completed" });
+    tasks.update(failed.id, { status: "failed" });
+    tasks.update(duplicate.id, { status: "duplicate" });
+
+    expect(tasks.listPage().active.map((task) => task.id)).toContain(pending.id);
+    expect(
+      tasks.countTerminal({ scope: "filtered", status: "all", query: "目标" }),
+    ).toBe(2);
+    expect(
+      tasks.clearTerminal({ scope: "filtered", status: "failed", query: "目标" }),
+    ).toBe(1);
+    expect(tasks.get(failed.id)).toBeNull();
+    expect(tasks.clearTerminal({ scope: "all" })).toBe(2);
+    expect(tasks.get(pending.id)).not.toBeNull();
+  });
 });

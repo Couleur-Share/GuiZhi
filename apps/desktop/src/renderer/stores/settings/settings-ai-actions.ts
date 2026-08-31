@@ -29,7 +29,8 @@ type AIActionKey =
   | "deleteAiModel"
   | "setDefaultAiModel"
   | "setScenarioModelDefault"
-  | "setModelRouteDefault";
+  | "setModelRouteDefault"
+  | "applyAiQuickSetup";
 
 function createAiConnectionActions(context: SettingsActionContext) {
   const { commitAISettings } = context;
@@ -384,6 +385,70 @@ function createAiDefaultActions(context: SettingsActionContext) {
   };
 }
 
+function createAiQuickSetupAction(context: SettingsActionContext) {
+  const { get, setTouched } = context;
+  return {
+    applyAiQuickSetup: async (input) => {
+      const providerId = createAiProviderId();
+      const provider: AIProviderConfig = {
+        ...input.provider,
+        id: providerId,
+        name: input.provider.name?.trim() || undefined,
+        provider: input.provider.provider.trim(),
+        apiProtocol: normalizeAIProtocol(
+          input.provider.apiProtocol,
+          input.provider.provider,
+          input.provider.apiUrl,
+        ),
+        apiKey: input.provider.apiKey.trim(),
+        apiUrl: input.provider.apiUrl.trim(),
+        enabled: true,
+      };
+      const createdAt = Date.now();
+      const models = input.models.map(
+        (model, index): SettingsState["aiModels"][number] => ({
+          id: `model_${createdAt}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+          name: model.name?.trim() || undefined,
+          providerId,
+          provider: provider.provider,
+          apiProtocol: provider.apiProtocol,
+          apiKey: provider.apiKey,
+          apiUrl: provider.apiUrl,
+          model: model.model.trim(),
+          capabilities: normalizeAIModelCapabilities(model.capabilities),
+          isDefault: index === 0,
+          enabled: true,
+          lastVerifiedAt: model.verified ? new Date().toISOString() : undefined,
+        }),
+      );
+      const modelRouteDefaults = { ...get().modelRouteDefaults };
+      for (const [route, index] of Object.entries(input.routes)) {
+        const target = models[index];
+        if (target) modelRouteDefaults[route as AIModelRoute] = target.id;
+      }
+      const scenarioModelDefaults = { ...get().scenarioModelDefaults };
+      for (const [scenario, route] of Object.entries(AI_SCENARIO_MODEL_ROUTE)) {
+        const modelId = modelRouteDefaults[route];
+        if (modelId) scenarioModelDefaults[scenario as AIUsageScenario] = modelId;
+      }
+      const partial: Partial<SettingsState> = {
+        aiProviders: [...get().aiProviders, provider],
+        aiModels: [
+          ...get().aiModels.map((model) => ({ ...model, isDefault: false })),
+          ...models,
+        ],
+        modelRouteDefaults,
+        scenarioModelDefaults,
+      };
+      if (models[0]) applyChatModelToLegacyDefaults(partial, models[0]);
+      // 先让主进程以一次配置文件写入接受整套 Provider/模型/路由；失败时
+      // Renderer 不变，避免出现只保存了一半的向导结果。
+      await window.api.settings.set(partial as never);
+      setTouched(partial);
+    },
+  } satisfies SettingsActionGroup<"applyAiQuickSetup">;
+}
+
 export function createAISettingsActions(
   context: SettingsActionContext,
 ): SettingsActionGroup<AIActionKey> {
@@ -393,5 +458,6 @@ export function createAISettingsActions(
     createAiProviderActions(context),
     createAiModelActions(context),
     createAiDefaultActions(context),
+    createAiQuickSetupAction(context),
   );
 }

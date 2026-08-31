@@ -229,7 +229,7 @@ export function ImportStageBreakdown({ stats }: { stats: ImportStageStat[] }) {
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className="col-span-5 pl-4 text-left text-muted-foreground/70 transition-colors hover:text-muted-foreground"
+            className="col-span-5 pl-4 text-left text-muted-foreground transition-colors hover:text-foreground"
           >
             {t("imports.stageNegligible", "另有 {{count}} 个阶段不足 1 秒", {
               count: negligibleCount,

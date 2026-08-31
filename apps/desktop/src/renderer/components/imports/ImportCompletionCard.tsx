@@ -8,7 +8,7 @@ const ACTION_BASE =
 
 function Stat({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       {icon}
       {children}
     </span>
@@ -39,7 +39,7 @@ export function ImportCompletionCard({
       <div className="text-xs font-medium text-foreground">
         {t("imports.completionTitle", "内容已沉淀为知识条目")}
       </div>
-      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
         {t(
           "imports.completionHint",
           "已保存在本地，可继续阅读、检索、编辑和关联。",

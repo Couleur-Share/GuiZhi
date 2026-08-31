@@ -616,4 +616,29 @@ describe("addColumnIfMissing", () => {
     ).toEqual({ platform: "twolibra" });
     db.close();
   });
+
+  it("v0.20 增量迁移补齐任务查询、发现流程与后台任务结构", () => {
+    const db = createDb();
+    runMigrations(db);
+
+    const tables = db.all(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('platform_discovery_views','platform_discovery_runs','platform_discovery_candidates','background_jobs') ORDER BY name",
+    ) as Array<{ name: string }>;
+    expect(tables.map((row) => row.name)).toEqual([
+      "background_jobs",
+      "platform_discovery_candidates",
+      "platform_discovery_runs",
+      "platform_discovery_views",
+    ]);
+
+    const indexes = db.all(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_import_tasks_created_id','idx_import_tasks_status_created_id','idx_background_jobs_due') ORDER BY name",
+    ) as Array<{ name: string }>;
+    expect(indexes.map((row) => row.name)).toEqual([
+      "idx_background_jobs_due",
+      "idx_import_tasks_created_id",
+      "idx_import_tasks_status_created_id",
+    ]);
+    db.close();
+  });
 });

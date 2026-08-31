@@ -112,7 +112,7 @@ export function WikiCatalogList() {
         </div>
 
         <div className="flex items-center justify-between gap-2 px-0.5">
-          <span className="truncate text-[11px] text-muted-foreground/60">
+          <span className="truncate text-xs text-muted-foreground">
             {t("wiki.catalogCount", "{{count}} 页", { count: visible.length })}
           </span>
           {searchHitIds ? null : (
@@ -145,7 +145,7 @@ export function WikiCatalogList() {
             onRetry={() => void runSearch(searchQuery)}
           />
         ) : visible.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-muted-foreground/70">
+          <p className="px-2 py-6 text-center text-xs text-muted-foreground">
             {catalog.length === 0
               ? t("wiki.catalogEmpty", "还没有 Wiki 页面")
               : t("wiki.filterEmpty", "没有匹配的页面")}

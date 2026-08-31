@@ -352,7 +352,7 @@ export function ImportTaskRow({
             </p>
           )}
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
             <StatusBadge task={task} />
             {task.status === "completed" && task.resultItemId ? (
               <button
@@ -387,7 +387,7 @@ export function ImportTaskRow({
 
         <span
           title={timeTooltip}
-          className="mt-0.5 shrink-0 text-[11px] tabular-nums text-muted-foreground/70"
+          className="mt-0.5 shrink-0 text-xs tabular-nums text-muted-foreground"
         >
           {timeLabel}
         </span>

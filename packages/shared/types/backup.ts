@@ -15,6 +15,19 @@ export const BACKUP_KINDS = [
 
 export type BackupKind = (typeof BACKUP_KINDS)[number];
 
+export type BackupFormat =
+  | "repository-snapshot"
+  | "portable"
+  | "legacy-db";
+
+export interface BackupContentSummary {
+  itemCount: number;
+  assetCount: number;
+  configDomains: string[];
+  schemaVersion: number;
+  appVersion: string;
+}
+
 export interface BackupFileInfo {
   fileName: string;
   /** 绝对路径（仅展示用；恢复/删除按 fileName 走白名单目录） */
@@ -22,6 +35,58 @@ export interface BackupFileInfo {
   kind: BackupKind;
   sizeBytes: number;
   createdAt: number;
+  /** v0.20 起的新格式；未迁移的 .db 一律是 legacy-db */
+  format: BackupFormat;
+  encrypted: boolean;
+  validation: "unchecked" | "valid" | "invalid";
+  summary?: BackupContentSummary;
+}
+
+export interface BackupRepositoryStatus {
+  initialized: boolean;
+  automaticAccessAvailable: boolean;
+  keyStorageBackend: string | null;
+  warning?: string;
+}
+
+export interface BackupRepositoryInitResult extends BackupRepositoryStatus {
+  success: boolean;
+  error?: string;
+}
+
+export interface RepositorySnapshotRequest {
+  /** Renderer 持有的界面偏好；恢复时会排除机器绑定字段。 */
+  rendererSettings?: Record<string, unknown>;
+  recoveryPassword?: string;
+}
+
+export interface RepositorySnapshotResult {
+  success: boolean;
+  snapshot?: BackupFileInfo;
+  reusedObjects?: number;
+  createdObjects?: number;
+  error?: string;
+}
+
+export interface BackupRestorePreview {
+  success: boolean;
+  snapshot?: BackupFileInfo;
+  missingFiles: string[];
+  damagedFiles: string[];
+  warnings: string[];
+  error?: string;
+}
+
+export interface PortableBackupExportResult {
+  success: boolean;
+  canceled?: boolean;
+  filePath?: string;
+  error?: string;
+}
+
+export interface BackupPasswordChangeRequest {
+  currentPassword: string;
+  nextPassword: string;
 }
 
 export interface BackupCreateResult {

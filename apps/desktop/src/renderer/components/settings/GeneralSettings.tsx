@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
 import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Select } from "../ui/Select";
-import { CaptureSection } from "./capture/CaptureSection";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 const LANGUAGE_OPTIONS = [
   { value: "zh", label: "简体中文" },
@@ -12,10 +13,27 @@ const LANGUAGE_OPTIONS = [
 export function GeneralSettings() {
   const { t } = useTranslation();
   const settings = useSettingsStore();
+  const [confirmBackground, setConfirmBackground] = useState(false);
 
   return (
     <div className="space-y-6">
       <SettingSection title={t("settings.startup")}>
+        <SettingItem
+          label={t("settings.backgroundTasks", "后台任务")}
+          description={t(
+            "settings.backgroundTasksDesc",
+            "允许自动备份、定时发现、Wiki 与语义索引在开机隐藏启动和托盘驻留时继续运行。",
+          )}
+        >
+          <ToggleSwitch
+            ariaLabel={t("settings.backgroundTasks", "后台任务")}
+            checked={settings.backgroundTasksEnabled}
+            onChange={(enabled) => {
+              if (enabled) setConfirmBackground(true);
+              else settings.setBackgroundTasksEnabled(false);
+            }}
+          />
+        </SettingItem>
         <SettingItem
           label={t("settings.launchAtStartup")}
           description={t("settings.launchAtStartupDesc")}
@@ -60,6 +78,22 @@ export function GeneralSettings() {
         )}
       </SettingSection>
 
+      <ConfirmDialog
+        isOpen={confirmBackground}
+        onClose={() => setConfirmBackground(false)}
+        onConfirm={() => {
+          settings.setBackgroundTasksEnabled(true);
+          setConfirmBackground(false);
+        }}
+        title={t("settings.backgroundTasksConfirmTitle", "启用系统后台运行")}
+        message={t(
+          "settings.backgroundTasksConfirmMessage",
+          "归知将设置为开机启动、隐藏启动、最小化到托盘，并让关闭按钮默认驻留后台。你仍可从托盘菜单真正退出；退出后任务会停止。",
+        )}
+        confirmText={t("common.enable", "启用")}
+        cancelText={t("common.cancel", "取消")}
+      />
+
       <SettingSection title={t("settings.editor")}>
         <SettingItem
           label={t("settings.autoSave")}
@@ -82,8 +116,6 @@ export function GeneralSettings() {
           />
         </SettingItem>
       </SettingSection>
-
-      <CaptureSection />
 
       <SettingSection title={t("settings.wikiSection", "Wiki")}>
         <SettingItem
