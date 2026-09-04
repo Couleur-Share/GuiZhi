@@ -6,7 +6,56 @@ import {
 import {
   l2Normalize,
   parseEmbeddingsResponse,
+  resolveEmbeddingConfig,
 } from "../../../src/renderer/services/knowledge-ai/embeddings";
+import { useSettingsStore } from "../../../src/renderer/stores/settings.store";
+
+describe("resolveEmbeddingConfig", () => {
+  it("供应商禁用后不再调用其旗下 embedding 模型", () => {
+    const previous = useSettingsStore.getState();
+    const provider = {
+      id: "provider-disabled",
+      name: "已停用供应商",
+      provider: "custom",
+      apiProtocol: "openai" as const,
+      apiKey: "sk-provider",
+      apiUrl: "https://old.example.com/v1",
+      enabled: false,
+    };
+    const model = {
+      id: "embedding-disabled-provider",
+      providerId: provider.id,
+      provider: "custom",
+      apiProtocol: "openai" as const,
+      apiKey: "sk-model",
+      apiUrl: provider.apiUrl,
+      model: "text-embedding-3-small",
+      enabled: true,
+      capabilities: { chat: false, embedding: true },
+    };
+
+    try {
+      useSettingsStore.setState({
+        aiProviders: [provider],
+        aiModels: [model],
+        modelRouteDefaults: { embedding: model.id },
+      });
+      expect(resolveEmbeddingConfig()).toBeNull();
+
+      useSettingsStore.setState({ aiProviders: [{ ...provider, enabled: true }] });
+      expect(resolveEmbeddingConfig()).toMatchObject({
+        id: model.id,
+        model: model.model,
+      });
+    } finally {
+      useSettingsStore.setState({
+        aiProviders: previous.aiProviders,
+        aiModels: previous.aiModels,
+        modelRouteDefaults: previous.modelRouteDefaults,
+      });
+    }
+  });
+});
 
 describe("buildEmbeddingsEndpointFromBase", () => {
   it("openai：无版本段补 /v1/embeddings，有版本段直接拼", () => {

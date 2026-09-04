@@ -25,7 +25,7 @@ export const SidebarNavigationItem = memo(function SidebarNavigationItem({
         aria-label={label}
         // 展开时名称就写在图标右边，只有收起成图标条才需要气泡
         title={collapsed ? label : undefined}
-        className={`flex items-center rounded-lg transition-all duration-smooth relative group ${collapsed ? "h-10 w-10 justify-center" : "w-full justify-start gap-3 px-3 py-2"} ${active ? "bg-primary text-white shadow-sm" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
+        className={`flex items-center rounded-lg transition-all duration-smooth relative group ${collapsed ? "h-10 w-10 justify-center" : "w-full justify-start gap-3 px-3 py-2"} ${active ? "bg-primary text-primary-foreground shadow-sm" : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
       >
         <span
           aria-hidden="true"

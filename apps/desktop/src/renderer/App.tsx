@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
-import { Sidebar, TopBar, MainContent, TitleBar } from "./components/layout";
+import { Sidebar, TopBar, MainContent } from "./components/layout";
 import { useSettingsStore } from "./stores/settings.store";
 import { useUIStore } from "./stores/ui.store";
 import { useImportStore } from "./stores/import.store";
@@ -95,6 +95,8 @@ function App() {
   const pendingSettingsSection = useUIStore(
     (state) => state.pendingSettingsSection,
   );
+  const isFocusReadingMode = useUIStore((state) => state.isFocusReadingMode);
+  const appModule = useUIStore((state) => state.appModule);
   const [currentPage, setCurrentPage] = useState<PageType>("home");
   const isUpdateCheckInFlightRef = useRef(false);
   const isWindowVisibleRef = useRef(true);
@@ -738,9 +740,7 @@ function App() {
           hasBackgroundImage ? "app-wallpaper-shell" : ""
         }`}
       >
-        {/* Windows title bar */}
-        {/* Windows 标题栏 */}
-        {!webRuntime && <TitleBar />}
+        {/* Windows 窗口控制已并入 TopBar，不再单独占 32px 标题栏 */}
         {!webRuntime && (
           <DesktopAppCommandBridge
             onNavigate={setCurrentPage}
@@ -763,7 +763,8 @@ function App() {
             />
 
             <div className="flex min-h-0 flex-1 overflow-hidden">
-              {currentPage === "home" ? (
+              {currentPage === "home" &&
+              !(isFocusReadingMode && appModule === "library") ? (
                 <Sidebar
                   currentPage={currentPage}
                   onNavigate={setCurrentPage}

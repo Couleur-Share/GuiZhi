@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { AskSessionMeta } from "@guizhi/shared/types";
 import { useAskStore } from "../../stores/ask.store";
 import { useSemanticStore } from "../../stores/semantic.store";
+import { useUIStore } from "../../stores/ui.store";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useToast } from "../ui/Toast";
 import { formatItemTime } from "../library/type-meta";
@@ -20,6 +21,9 @@ function SemanticIndexCard() {
   const consumeNotice = useSemanticStore((state) => state.consumeNotice);
   const refreshStatus = useSemanticStore((state) => state.refreshStatus);
   const runIndexing = useSemanticStore((state) => state.runIndexing);
+  const requestSettingsSection = useUIStore(
+    (state) => state.requestSettingsSection,
+  );
 
   useEffect(() => {
     void refreshStatus();
@@ -57,10 +61,13 @@ function SemanticIndexCard() {
         }),
         "error",
       );
+    } else if (pending.kind === "not-configured") {
+      showToast(t("ask.notConfigured", "尚未配置 AI 服务"), "error");
+      requestSettingsSection("ai");
     } else {
       showToast(t("ask.semanticNothing", "没有需要索引的内容"), "info");
     }
-  }, [notice, consumeNotice, showToast, t]);
+  }, [notice, consumeNotice, requestSettingsSection, showToast, t]);
 
   if (!isConfigured || !status) {
     return null;

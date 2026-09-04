@@ -398,6 +398,69 @@ describe("平台登录态采集边界", () => {
     );
   });
 
+  it("研究取消信号会关闭正在导航的隐藏平台窗口", async () => {
+    const userData = tempDir();
+    const stateDir = path.join(userData, "browser-capture");
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(stateDir, "session-status.json"),
+      JSON.stringify({ version: 3, xiaohongshu: true }),
+    );
+
+    let rejectNavigation: ((error: Error) => void) | undefined;
+    const page = {
+      setDefaultNavigationTimeout: vi.fn(),
+      setDefaultTimeout: vi.fn(),
+      goto: vi.fn(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectNavigation = reject;
+          }),
+      ),
+      reload: vi.fn(),
+      url: vi.fn(() => "https://www.xiaohongshu.com/search_result"),
+      content: vi.fn(),
+      isClosed: vi.fn().mockReturnValue(false),
+      waitForTimeout: vi.fn(),
+      evaluate: vi.fn(),
+      scrollBy: vi.fn(),
+      startJsonCapture: vi.fn().mockReturnValue([]),
+      close: vi.fn(),
+      locator: vi.fn(),
+      getByRole: vi.fn(),
+      getByText: vi.fn(),
+    };
+    const context = {
+      page,
+      browserVersion: "126.0.0",
+      cookies: vi.fn().mockResolvedValue([
+        {
+          name: "web_session",
+          value: "member-session",
+          domain: ".xiaohongshu.com",
+          path: "/",
+        },
+      ]),
+      clearStorageData: vi.fn(),
+      close: vi.fn().mockImplementation(async () => {
+        rejectNavigation?.(new Error("browser has been closed"));
+      }),
+    };
+    createElectronCaptureContextMock.mockResolvedValue(context);
+    const service = new BrowserCaptureService({ userDataPath: userData });
+    const controller = new AbortController();
+    const pending = service.search(
+      { platform: "xiaohongshu", keyword: "本地知识库", limit: 20 },
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(page.goto).toHaveBeenCalled());
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ code: "canceled" });
+    expect(context.close).toHaveBeenCalled();
+  });
+
   it("从脱敏平台响应提取作品、游标卡片和热门评论", () => {
     const douyin = scanPlatformDiscoveryPayloads("douyin", [
       {
@@ -408,6 +471,7 @@ describe("平台登录态采集边界", () => {
             author: { nickname: "作者甲" },
             video: { cover: { url_list: ["https://img.example/cover.jpg"] } },
             create_time: 1_720_000_000,
+            statistics: { digg_count: 88, comment_count: 9 },
           },
         ],
       },
@@ -417,6 +481,10 @@ describe("平台登录态采集边界", () => {
       title: "测试视频",
       author: "作者甲",
       mediaType: "video",
+      snippet: "测试视频",
+      engagement: { likes: 88, comments: 9 },
+      dateConfidence: "high",
+      discoveryMethod: "captured-json",
     });
 
     const xhs = scanPlatformDiscoveryPayloads("xiaohongshu", [

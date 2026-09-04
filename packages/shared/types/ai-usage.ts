@@ -14,6 +14,7 @@
 export const AI_USAGE_SCENARIOS = [
   "qa",
   "wiki",
+  "research",
   "summary",
   "tagging",
   "ocr",

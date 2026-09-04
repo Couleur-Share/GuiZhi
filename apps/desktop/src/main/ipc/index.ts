@@ -18,6 +18,7 @@ import { registerMediaIPC } from "./media.ipc";
 import { registerIllustrationIPC } from "./illustration.ipc";
 import { registerBackgroundJobIPC } from "./background-job.ipc";
 import { registerInboxIPC } from "./inbox.ipc";
+import { registerResearchIPC } from "./research.ipc";
 import type { BackgroundJobRuntime } from "../services/background-jobs";
 import type { DiscoveryServiceOptions } from "../services/discovery/discovery-service";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
@@ -154,6 +155,20 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.INBOX_LIST,
   IPC_CHANNELS.INBOX_ORGANIZE,
   IPC_CHANNELS.INBOX_MARK_REVIEWED,
+  IPC_CHANNELS.INBOX_ACKNOWLEDGE_IMPORT_WARNING,
+  IPC_CHANNELS.INBOX_AI_CLASSIFICATION_SOURCES,
+  IPC_CHANNELS.INBOX_APPLY_AI_CLASSIFICATION,
+  IPC_CHANNELS.RESEARCH_LIST,
+  IPC_CHANNELS.RESEARCH_GET,
+  IPC_CHANNELS.RESEARCH_CREATE,
+  IPC_CHANNELS.RESEARCH_CANCEL,
+  IPC_CHANNELS.RESEARCH_DELETE,
+  IPC_CHANNELS.RESEARCH_CLONE,
+  IPC_CHANNELS.RESEARCH_BEGIN_REPORT,
+  IPC_CHANNELS.RESEARCH_SAVE_REPORT,
+  IPC_CHANNELS.RESEARCH_FAIL_REPORT,
+  IPC_CHANNELS.RESEARCH_ENQUEUE_CANDIDATES,
+  IPC_CHANNELS.RESEARCH_SAVE_TO_KNOWLEDGE,
 ] as const;
 
 function resetAllRegisteredIpcHandlers(): void {
@@ -213,6 +228,7 @@ export function registerAllIPC(
     registerBackgroundJobIPC(options.backgroundJobs),
   );
   registerIpcGroup("inbox", () => registerInboxIPC(db));
+  registerIpcGroup("research", () => registerResearchIPC(db));
   registerIpcGroup("settings", () => registerSettingsIPC(db));
   registerIpcGroup("image", () => registerImageIPC());
   registerIpcGroup("ai", () => registerAIIPC(db));

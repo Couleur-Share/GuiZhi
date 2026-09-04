@@ -181,6 +181,12 @@ function numeric(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function optionalMetric(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : undefined;
+}
+
 function indicatesLoginRequired(value: unknown, depth = 0): boolean {
   if (depth > 8 || value == null) return false;
   if (Array.isArray(value))
@@ -258,6 +264,8 @@ function platformItemFromHref(
     mediaType,
     publishedAt:
       publishedAt && Number.isFinite(publishedAt) ? publishedAt : undefined,
+    dateConfidence: publishedAt && Number.isFinite(publishedAt) ? "medium" : "low",
+    discoveryMethod: "browser-dom",
   };
 }
 
@@ -424,6 +432,8 @@ export function scanPlatformDiscoveryPayloads(
         record.video ?? record.video_info ?? record.videoInfo,
       );
       if (desc || images || hasVideo) {
+        const statistics = (record.statistics ?? record.stats ?? record.interact_info ?? record.interactInfo) as
+          Record<string, unknown> | undefined;
         const route =
           platform === "douyin" ? (hasVideo ? "video" : "note") : "explore";
         const timestamp = numeric(
@@ -452,9 +462,24 @@ export function scanPlatformDiscoveryPayloads(
               : undefined;
           })(),
           mediaType: hasVideo ? "video" : "image",
+          snippet: cleanText(record.desc ?? record.description ?? desc, 1000),
+          engagement: {
+            views: optionalMetric(statistics?.play_count ?? statistics?.view_count ?? record.play_count),
+            likes: optionalMetric(statistics?.digg_count ?? statistics?.liked_count ?? statistics?.like_count ?? record.liked_count),
+            comments: optionalMetric(statistics?.comment_count ?? record.comment_count),
+            shares: optionalMetric(statistics?.share_count ?? record.share_count),
+            collects: platform === "douyin"
+              ? optionalMetric(statistics?.collect_count ?? statistics?.collected_count ?? record.collected_count)
+              : undefined,
+            favorites: platform === "xiaohongshu"
+              ? optionalMetric(statistics?.collect_count ?? statistics?.collected_count ?? record.collected_count)
+              : optionalMetric(statistics?.favorite_count ?? record.favorite_count),
+          },
           publishedAt: timestamp
             ? timestamp * (timestamp < 10_000_000_000 ? 1000 : 1)
             : undefined,
+          dateConfidence: timestamp ? "high" : "low",
+          discoveryMethod: "captured-json",
         });
       }
     }
@@ -510,6 +535,7 @@ export class BrowserCaptureService {
     if (!this.activeController || (kind && this.activeKind !== kind))
       return false;
     this.activeController.abort();
+    void this.activeContext?.close().catch(() => undefined);
     return true;
   }
 
@@ -724,16 +750,11 @@ export class BrowserCaptureService {
     return this.discover(input.platform, input.url, input.cursor, input.limit);
   }
 
-  async search(input: SearchPlatformInput): Promise<PlatformDiscoveryPage> {
+  async search(input: SearchPlatformInput, signal?: AbortSignal): Promise<PlatformDiscoveryPage> {
     const keyword = cleanText(input.keyword, 100);
     if (!keyword) throw new Error("搜索关键词不能为空");
     this.requireKnownLogin(input.platform);
-    return this.discover(
-      input.platform,
-      platformSearchUrl(input.platform, keyword),
-      input.cursor,
-      input.limit,
-    );
+    return this.discover(input.platform, platformSearchUrl(input.platform, keyword), input.cursor, input.limit, signal);
   }
 
   async captureComments(
@@ -784,16 +805,12 @@ export class BrowserCaptureService {
     await this.activeContext?.close().catch(() => undefined);
   }
 
-  private async discover(
-    platform: PlatformCapturePlatform,
-    url: string,
-    cursor?: string | null,
-    requestedLimit?: number,
-  ): Promise<PlatformDiscoveryPage> {
+  private async discover(platform: PlatformCapturePlatform, url: string, cursor?: string | null, requestedLimit?: number, callerSignal?: AbortSignal): Promise<PlatformDiscoveryPage> {
     return this.runSerialized(
       platform,
       "discovery",
       async (context, signal) => {
+        this.throwIfAborted(signal, callerSignal);
         await this.requireLogin(context, platform);
         const page = await this.preparePage(context, platform);
         const payloads = this.captureJsonResponses(page, platform);
@@ -903,6 +920,8 @@ export class BrowserCaptureService {
           (items.length === limit && nextOffset < MAX_DISCOVERY_ITEMS);
         return { items, cursor: hasMore ? String(nextOffset) : null, hasMore };
       },
+      true,
+      callerSignal,
     );
   }
 
@@ -928,6 +947,11 @@ export class BrowserCaptureService {
       throw new PlatformCaptureError("canceled", "操作已取消");
     }
     const controller = new AbortController();
+    const onCallerAbort = () => {
+      controller.abort();
+      void this.activeContext?.close().catch(() => undefined);
+    };
+    callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
     this.activeController = controller;
     this.activeKind = kind;
     this.activePlatform = platform;
@@ -955,6 +979,9 @@ export class BrowserCaptureService {
       if (controller.signal.aborted)
         throw new PlatformCaptureError("canceled", "操作已取消");
       const message = error instanceof Error ? error.message : String(error);
+      if (/页面导航超时/i.test(message)) {
+        throw new PlatformCaptureError("platform_changed", "平台搜索页加载超时，请检查网络或代理后重试", { cause: error });
+      }
       if (/closed|Target page|browser has been closed/i.test(message)) {
         throw new PlatformCaptureError("browser_closed", "平台登录窗口已关闭", {
           cause: error,
@@ -973,6 +1000,7 @@ export class BrowserCaptureService {
         { cause: error },
       );
     } finally {
+      callerSignal?.removeEventListener("abort", onCallerAbort);
       await this.activeContext?.close().catch(() => undefined);
       this.activeContext = null;
       this.activeController = null;

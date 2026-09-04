@@ -48,7 +48,7 @@ export function ImageLightbox({
       carousel={{ finite: images.length <= 1 }}
       controller={{ closeOnBackdropClick: true }}
       styles={{
-        // Windows 无边框窗：TitleBar/TopBar 的 drag 区无视 z-index 吞指针事件。
+        // Windows 无边框窗：TopBar 的 drag 区无视 z-index 吞指针事件。
         // 关闭钮中心正好压在 TopBar 上沿（约 y=32），不标 no-drag 就点不中。
         root: NO_DRAG,
         container: {

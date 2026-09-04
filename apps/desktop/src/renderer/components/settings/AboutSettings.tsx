@@ -237,7 +237,7 @@ export function AboutSettings() {
               <button
                 type="button"
                 onClick={() => requestSetupChecklist()}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm text-white transition-colors hover:bg-primary/90"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 <ListChecksIcon aria-hidden="true" className="w-4 h-4" />
                 {t("setup.openFromAbout", "打开设置引导")}
@@ -265,7 +265,7 @@ export function AboutSettings() {
                   href="https://github.com/Couleur-Share/GuiZhi/releases/latest"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-8 px-4 rounded-lg bg-primary text-white text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-1.5"
+                  className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors inline-flex items-center gap-1.5"
                 >
                   <ArrowUpCircleIcon aria-hidden="true" className="w-4 h-4" />
                   {t("settings.newVersion", { version: latestVersion })}
@@ -280,7 +280,7 @@ export function AboutSettings() {
                   type="button"
                   onClick={checkWebUpdate}
                   disabled={updateState === "checking"}
-                  className="h-8 px-4 rounded-lg bg-primary text-white text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
+                  className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
                 >
                   <RefreshCwIcon
                     aria-hidden="true"
@@ -324,7 +324,7 @@ export function AboutSettings() {
                 onClick={() =>
                   window.dispatchEvent(new CustomEvent("open-update-dialog"))
                 }
-                className="h-8 px-4 rounded-lg bg-primary text-white text-sm hover:bg-primary/90 transition-colors"
+                className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
               >
                 {t("settings.checkUpdate")}
               </button>
@@ -461,7 +461,7 @@ export function AboutSettings() {
             <button
               type="button"
               onClick={confirmPreviewChannel}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               {t("settings.previewChannelConfirmEnable")}
             </button>

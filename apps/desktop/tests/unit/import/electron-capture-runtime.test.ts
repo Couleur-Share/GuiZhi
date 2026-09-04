@@ -259,4 +259,37 @@ describe("Electron 平台采集运行器", () => {
       { requestId: "request-1" },
     );
   });
+
+  it("大型 SPA 主框架完成导航后即可进入后续发现轮询", async () => {
+    const context = await createElectronCaptureContext({
+      platform: "xiaohongshu",
+      visible: false,
+      proxy: {
+        mode: "system",
+        protocol: "http",
+        host: "",
+        port: 7890,
+        username: "",
+        password: "",
+        bypass: "<local>",
+      },
+      isAllowedResourceUrl: () => true,
+      isAllowedNavigationUrl: () => true,
+      shouldBlockRequest: () => false,
+    });
+    const navigation = context.page.goto(
+      "https://www.xiaohongshu.com/search_result?keyword=test",
+    );
+
+    mocks.webContentsHandlers.get("did-navigate")?.(
+      {},
+      "https://www.xiaohongshu.com/search_result?keyword=test",
+    );
+
+    await expect(navigation).resolves.toBeUndefined();
+    expect(mocks.webContents.removeListener).toHaveBeenCalledWith(
+      "did-navigate",
+      expect.any(Function),
+    );
+  });
 });

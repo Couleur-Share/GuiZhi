@@ -14,6 +14,7 @@ const SCENARIO_LABELS: Record<
 > = {
   qa: { key: "settings.aiScenarioQa", fallback: "问答" },
   wiki: { key: "settings.aiScenarioWiki", fallback: "Wiki 编译" },
+  research: { key: "settings.aiScenarioResearch", fallback: "研究报告" },
   summary: { key: "settings.aiScenarioSummary", fallback: "摘要" },
   tagging: { key: "settings.aiScenarioTagging", fallback: "标签建议" },
   ocr: { key: "settings.aiScenarioOcr", fallback: "图片识别" },

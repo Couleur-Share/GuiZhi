@@ -26,6 +26,7 @@ export function resolveEmbeddingConfig(): AIConfig | null {
     state.aiModels,
     state.modelRouteDefaults,
     "embedding",
+    state.aiProviders,
   );
   return isConfiguredModel(model) ? toAIConfig(model) : null;
 }

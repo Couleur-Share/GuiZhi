@@ -303,6 +303,68 @@ export interface WikiCompileRoundResult {
   failures: WikiCompileFailure[];
 }
 
+interface PendingWikiCompilation {
+  item: WikiCompilableItem;
+  hash: string;
+  ingestion:
+    | {
+        contentHash: string;
+        failureCount: number;
+      }
+    | undefined;
+}
+
+/**
+ * 按编译器真正采用的指纹与退避规则列出本轮可执行的条目。
+ *
+ * 处理中心也必须复用这里，不能把 listCompilable（“具备编译资格”）的数量
+ * 当成“仍待编译”的数量，否则全部编译完成后仍会长期显示一张假待办卡。
+ */
+async function listPendingWikiCompilations(): Promise<
+  PendingWikiCompilation[]
+> {
+  const [items, ingestions] = await Promise.all([
+    window.api.wiki.listCompilable(),
+    window.api.wiki.listIngestions(),
+  ]);
+  const ingestionByItem = new Map(
+    ingestions.map((ingestion) => [ingestion.itemId, ingestion]),
+  );
+
+  // 指纹失效集：无指纹 / 素材变化 / 提示词版本升级
+  // 素材 trim 后哈希：与旧版 .NET ContentHasher 口径一致，迁移来的指纹保持有效
+  const now = Date.now();
+  const pending: PendingWikiCompilation[] = [];
+  for (const item of items) {
+    const hash = await sha256Hex(buildMaterial(item).trim());
+    const ingestion = ingestionByItem.get(item.id);
+    const isStale =
+      !ingestion ||
+      ingestion.contentHash !== hash ||
+      ingestion.promptVersion !== WIKI_COMPILE_PROMPT_VERSION;
+    if (!isStale) {
+      continue;
+    }
+    // 素材变了就重新给机会，否则遵守退避窗口与失败上限——
+    // 一条模型始终解析不出来的条目，此前会每轮白烧两次调用，永不停止
+    if (ingestion && ingestion.contentHash === hash) {
+      if (ingestion.failureCount >= WIKI_COMPILE_MAX_FAILURES) {
+        continue;
+      }
+      if (ingestion.nextAttemptAt !== null && ingestion.nextAttemptAt > now) {
+        continue;
+      }
+    }
+    pending.push({ item, hash, ingestion });
+  }
+  return pending;
+}
+
+/** 处理中心使用的精确待编译数，与立即执行共享同一判定。 */
+export async function countPendingWikiItems(): Promise<number> {
+  return (await listPendingWikiCompilations()).length;
+}
+
 /**
  * 单条目编译的结果：失败必须带原因，不能只回一个 false。
  *
@@ -324,40 +386,7 @@ export async function compilePendingItems(
   onProgress?: (message: string, current: number, total: number) => void,
   signal?: AbortSignal,
 ): Promise<WikiCompileRoundResult> {
-  const [items, ingestions] = await Promise.all([
-    window.api.wiki.listCompilable(),
-    window.api.wiki.listIngestions(),
-  ]);
-  const ingestionByItem = new Map(
-    ingestions.map((ingestion) => [ingestion.itemId, ingestion]),
-  );
-
-  // 指纹失效集：无指纹 / 素材变化 / 提示词版本升级
-  // 素材 trim 后哈希：与旧版 .NET ContentHasher 口径一致，迁移来的指纹保持有效
-  const now = Date.now();
-  const pending: { item: WikiCompilableItem; hash: string }[] = [];
-  for (const item of items) {
-    const hash = await sha256Hex(buildMaterial(item).trim());
-    const ingestion = ingestionByItem.get(item.id);
-    const isStale =
-      !ingestion ||
-      ingestion.contentHash !== hash ||
-      ingestion.promptVersion !== WIKI_COMPILE_PROMPT_VERSION;
-    if (!isStale) {
-      continue;
-    }
-    // 素材变了就重新给机会，否则遵守退避窗口与失败上限——
-    // 一条模型始终解析不出来的条目，此前会每轮白烧两次调用，永不停止
-    if (ingestion && ingestion.contentHash === hash) {
-      if (ingestion.failureCount >= WIKI_COMPILE_MAX_FAILURES) {
-        continue;
-      }
-      if (ingestion.nextAttemptAt !== null && ingestion.nextAttemptAt > now) {
-        continue;
-      }
-    }
-    pending.push({ item, hash });
-  }
+  const pending = await listPendingWikiCompilations();
 
   if (pending.length === 0) {
     return { compiled: 0, pending: 0, skipped: 0, failures: [] };
@@ -365,7 +394,7 @@ export async function compilePendingItems(
 
   let compiled = 0;
   const failures: WikiCompileFailure[] = [];
-  for (const { item, hash } of pending) {
+  for (const { item, hash, ingestion } of pending) {
     if (signal?.aborted) {
       break;
     }
@@ -378,7 +407,7 @@ export async function compilePendingItems(
         title: item.title,
         reason: outcome.reason ?? "未知原因",
       });
-      await recordFailure(item.id, hash, ingestionByItem.get(item.id));
+      await recordFailure(item.id, hash, ingestion);
     }
   }
   return {

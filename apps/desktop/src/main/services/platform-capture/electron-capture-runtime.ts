@@ -232,6 +232,13 @@ class ElectronPage implements ElectronCapturePage {
         cleanup();
         resolve();
       };
+      // 部分大型 SPA 会在主文档已提交、DOM 可执行后长期不触发 dom-ready。
+      // 发现链路后续本来就会轮询页面与接口响应，因此主框架完成导航即可继续。
+      const onNavigate = (_event: unknown, navigatedUrl: string) => {
+        if (!navigatedUrl || navigatedUrl === "about:blank") return;
+        cleanup();
+        resolve();
+      };
       const onFailure = (
         _event: unknown,
         code: number,
@@ -249,10 +256,12 @@ class ElectronPage implements ElectronCapturePage {
       };
       const cleanup = () => {
         contents.removeListener("dom-ready", onReady);
+        contents.removeListener("did-navigate", onNavigate);
         contents.removeListener("did-fail-load", onFailure);
         this.window.removeListener("closed", onClosed);
       };
       contents.once("dom-ready", onReady);
+      contents.on("did-navigate", onNavigate);
       contents.on("did-fail-load", onFailure);
       this.window.once("closed", onClosed);
     });

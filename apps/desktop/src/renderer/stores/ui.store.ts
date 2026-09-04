@@ -9,7 +9,7 @@ import { persist } from "zustand/middleware";
  * - wiki：知识 Wiki
  * - imports：导入任务队列
  */
-export type AppModule = "library" | "inbox" | "ask" | "wiki" | "imports";
+export type AppModule = "library" | "inbox" | "ask" | "wiki" | "research" | "imports";
 
 /**
  * 知识库列表视图：
@@ -60,7 +60,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function normalizeAppModule(value: unknown): AppModule {
-  return value === "inbox" || value === "ask" || value === "wiki" || value === "imports"
+  return value === "inbox" || value === "ask" || value === "wiki" || value === "research" || value === "imports"
     ? value
     : "library";
 }
@@ -85,6 +85,10 @@ interface UIState {
   resetColumnWidths: () => void;
   libraryViewMode: LibraryViewMode;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
+  /** 知识库专注阅读：隐藏列表与二级侧栏，正文居中限宽 */
+  isFocusReadingMode: boolean;
+  setFocusReadingMode: (enabled: boolean) => void;
+  toggleFocusReadingMode: () => void;
   pendingSettingsSection: SettingsSectionId | null;
   requestSettingsSection: (section: SettingsSectionId) => void;
   consumeSettingsSectionRequest: () => SettingsSectionId | null;
@@ -147,6 +151,10 @@ export const useUIStore = create<UIState>()(
       libraryViewMode: "card",
       setLibraryViewMode: (mode) =>
         set({ libraryViewMode: normalizeLibraryViewMode(mode) }),
+      isFocusReadingMode: false,
+      setFocusReadingMode: (enabled) => set({ isFocusReadingMode: enabled }),
+      toggleFocusReadingMode: () =>
+        set((state) => ({ isFocusReadingMode: !state.isFocusReadingMode })),
       pendingSettingsSection: null,
       requestSettingsSection: (section) =>
         set({ pendingSettingsSection: section }),

@@ -16,6 +16,7 @@ export const AI_SCENARIO_MODEL_ROUTE: Record<AIUsageScenario, AIModelRoute> = {
   tagging: "fastText",
   qa: "mainText",
   wiki: "mainText",
+  research: "mainText",
   transcription: "audioText",
   ocr: "visionText",
 };
@@ -183,6 +184,7 @@ function normalizeAIUsageScenario(value: unknown): AIUsageScenario | null {
     value === "tagging" ||
     value === "qa" ||
     value === "wiki" ||
+    value === "research" ||
     value === "transcription" ||
     value === "ocr"
     ? value

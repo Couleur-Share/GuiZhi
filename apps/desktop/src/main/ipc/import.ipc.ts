@@ -17,6 +17,11 @@ import {
 
 let service: ImportService | null = null;
 
+export function getRegisteredImportService(): ImportService {
+  if (!service) throw new Error("导入服务尚未初始化");
+  return service;
+}
+
 function validInput(value: unknown): value is EnqueueImportInput {
   if (!value || typeof value !== "object") return false;
   const input = value as EnqueueImportInput;

@@ -1,18 +1,95 @@
 import {
+  Children,
   forwardRef,
+  isValidElement,
   useMemo,
   useState,
   type ComponentProps,
   type ReactNode,
 } from "react";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { remarkGfmPlugins } from "../../utils/remark-gfm-plugins";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import "highlight.js/styles/github-dark.css";
 import { highlightReactChildren } from "./highlight-text";
 import { ImageLightbox, type LightboxImage } from "./ImageLightbox";
+
+function extractText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) {
+    return node.map(extractText).join("");
+  }
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return extractText(node.props.children);
+  }
+  return "";
+}
+
+function languageFromClassName(className: string | undefined): string | null {
+  const match = /language-([\w#+-]+)/.exec(className ?? "");
+  return match?.[1] ?? null;
+}
+
+function CodeBlock({
+  children,
+  className,
+}: {
+  children?: ReactNode;
+  className?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const codeChild = Children.toArray(children).find((child) =>
+    isValidElement<{ className?: string; children?: ReactNode }>(child),
+  );
+  const codeClassName = isValidElement<{ className?: string }>(codeChild)
+    ? codeChild.props.className
+    : className;
+  const language = languageFromClassName(codeClassName);
+  const source = extractText(children).replace(/\n$/, "");
+
+  const copy = async () => {
+    if (!source || copied) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(source);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* 剪贴板不可用时静默：按钮仍在，不打扰阅读 */
+    }
+  };
+
+  return (
+    <div className="group/code relative my-3">
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
+        {language ? (
+          <span className="rounded-md bg-background/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground backdrop-blur-sm">
+            {language}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void copy()}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover/code:opacity-100 focus-visible:opacity-100"
+          aria-label={copied ? "已复制" : "复制代码"}
+          title={copied ? "已复制" : "复制代码"}
+        >
+          {copied ? (
+            <CheckIcon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+          ) : (
+            <CopyIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      <pre className={className}>{children}</pre>
+    </div>
+  );
+}
 
 const LOCAL_ASSET_PROTOCOLS = ["local-image", "local-video"];
 
@@ -183,6 +260,9 @@ export function MarkdownBody({
           />
         );
       },
+      pre: ({ children, className }) => (
+        <CodeBlock className={className}>{children}</CodeBlock>
+      ),
     };
   }, [highlightQuery, localImages, onCitationClick]);
 
@@ -191,8 +271,8 @@ export function MarkdownBody({
       className={[
         "prose prose-sm dark:prose-invert max-w-none break-words",
         "prose-headings:text-foreground prose-p:text-foreground/90 prose-li:text-foreground/90",
-        "prose-pre:border prose-pre:border-border prose-pre:bg-background/80",
-        "prose-code:text-primary prose-a:text-primary",
+        "prose-pre:border prose-pre:border-border prose-pre:bg-muted",
+        "prose-code:text-foreground prose-a:text-primary",
         // 论坛主楼：章节标题居中，贴近泥潭排版习惯
         centeredHeadings
           ? "prose-headings:text-center prose-h2:mt-8 prose-h2:mb-4 prose-h3:mt-6"

@@ -53,3 +53,25 @@ export interface InboxOrganizeInput {
   collectionId?: string | null;
   addTagNames?: string[];
 }
+
+/** 主进程仅向 AI 暴露已选未分类条目的有界摘要。 */
+export interface InboxAiClassificationSource {
+  itemId: string;
+  title: string;
+  excerpt: string;
+}
+
+export interface InboxAiClassificationAssignment {
+  itemId: string;
+  collectionName: string;
+}
+
+export interface InboxAiClassificationApplyInput {
+  assignments: InboxAiClassificationAssignment[];
+}
+
+export interface InboxAiClassificationApplyResult {
+  classified: number;
+  skipped: number;
+  createdCollectionNames: string[];
+}

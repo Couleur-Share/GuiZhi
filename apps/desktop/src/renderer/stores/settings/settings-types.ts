@@ -14,6 +14,7 @@ export type AIUsageScenario =
   | "tagging"
   | "qa"
   | "wiki"
+  | "research"
   | "transcription"
   | "ocr";
 export type ScenarioModelDefaults = Partial<Record<AIUsageScenario, string>>;

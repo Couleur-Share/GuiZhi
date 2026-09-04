@@ -432,7 +432,7 @@ export function AppearanceSettings() {
                   type="button"
                   onClick={() => void handleSelectBackgroundImage()}
                   disabled={isPickingBackground}
-                  className="h-9 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   {hasBackgroundImage
                     ? t("settings.changeBackgroundImage", "Change image")

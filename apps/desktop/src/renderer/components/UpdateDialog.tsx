@@ -231,7 +231,7 @@ export function UpdateDialog({ isOpen, onClose, initialStatus }: UpdateDialogPro
   const isMacHomebrew = platform === 'darwin' && installSource === 'homebrew';
 
   const primaryButtonClass =
-    'inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50';
+    'inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50';
   const secondaryButtonClass =
     'inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background/80 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50';
   const mutedButtonClass =

@@ -194,6 +194,7 @@
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
+    outline: none;
     @apply ring-2 ring-primary/50 ring-offset-0;
   }
 }
@@ -215,6 +216,10 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/40;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ============================================================
@@ -285,6 +290,24 @@ input[type="search"]::-webkit-search-results-button,
 input[type="search"]::-webkit-search-results-decoration {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* 隐藏 Windows/Chromium 原生密码框小眼睛与清除叉，避免与应用自绘控件重叠 */
+input::-ms-clear,
+input::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 禁用图片默认的原生幽灵残影拖拽行为 */
+img {
+  -webkit-user-drag: none;
+}
+
+/* 触控设备点击去除原生灰色方块闪烁 */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* macOS-style title bar drag region */
@@ -965,11 +988,108 @@ body {
   padding: 0.75em 1em;
   border-radius: 0.5em;
   overflow-x: auto;
-  margin-bottom: 0.75em;
+  margin: 0;
+  margin-bottom: 0;
 }
 .prose pre code {
   background: transparent;
   padding: 0;
+  color: hsl(var(--foreground) / 0.92);
+}
+
+/*
+ * highlight.js 语法色：跟 Morandi 语义令牌走，浅色不再硬套 github-dark 纯黑底。
+ * 色相拉开关键字 / 字符串 / 注释，饱和度压低以免在玻璃面板上抢戏。
+ */
+.hljs {
+  color: hsl(var(--foreground) / 0.92);
+  background: transparent;
+}
+.hljs-comment,
+.hljs-quote {
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-addition {
+  color: hsl(var(--primary));
+}
+.hljs-number,
+.hljs-string,
+.hljs-meta .hljs-meta-string,
+.hljs-literal,
+.hljs-doctag,
+.hljs-regexp {
+  color: hsl(28 55% 42%);
+}
+.dark .hljs-number,
+.dark .hljs-string,
+.dark .hljs-meta .hljs-meta-string,
+.dark .hljs-literal,
+.dark .hljs-doctag,
+.dark .hljs-regexp {
+  color: hsl(32 55% 68%);
+}
+.hljs-title,
+.hljs-section,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: hsl(200 45% 38%);
+}
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-name,
+.dark .hljs-selector-id,
+.dark .hljs-selector-class {
+  color: hsl(200 50% 72%);
+}
+.hljs-attribute,
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-class .hljs-title,
+.hljs-type {
+  color: hsl(160 35% 36%);
+}
+.dark .hljs-attribute,
+.dark .hljs-attr,
+.dark .hljs-variable,
+.dark .hljs-template-variable,
+.dark .hljs-class .hljs-title,
+.dark .hljs-type {
+  color: hsl(160 40% 68%);
+}
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: hsl(280 30% 42%);
+}
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-link,
+.dark .hljs-meta,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-pseudo {
+  color: hsl(280 35% 72%);
+}
+.hljs-built_in,
+.hljs-deletion {
+  color: hsl(0 45% 42%);
+}
+.dark .hljs-built_in,
+.dark .hljs-deletion {
+  color: hsl(0 50% 72%);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
 }
 .prose blockquote {
   border-left: 3px solid hsl(var(--primary));

@@ -52,6 +52,9 @@ export const IPC_CHANNELS = {
   INBOX_LIST: "inbox:list",
   INBOX_ORGANIZE: "inbox:organize",
   INBOX_MARK_REVIEWED: "inbox:markReviewed",
+  INBOX_ACKNOWLEDGE_IMPORT_WARNING: "inbox:acknowledgeImportWarning",
+  INBOX_AI_CLASSIFICATION_SOURCES: "inbox:aiClassificationSources",
+  INBOX_APPLY_AI_CLASSIFICATION: "inbox:applyAiClassification",
 
   // 持久化后台任务
   BACKGROUND_JOB_LIST: "backgroundJob:list",
@@ -247,6 +250,20 @@ export const IPC_CHANNELS = {
   AI_USAGE_RECORD: "ai:usageRecord",
   AI_USAGE_SUMMARY: "ai:usageSummary",
   AI_USAGE_CLEAR: "ai:usageClear",
+
+  // 近期主题研究
+  RESEARCH_LIST: "research:list",
+  RESEARCH_GET: "research:get",
+  RESEARCH_CREATE: "research:create",
+  RESEARCH_CANCEL: "research:cancel",
+  RESEARCH_DELETE: "research:delete",
+  RESEARCH_CLONE: "research:clone",
+  RESEARCH_BEGIN_REPORT: "research:beginReport",
+  RESEARCH_SAVE_REPORT: "research:saveReport",
+  RESEARCH_FAIL_REPORT: "research:failReport",
+  RESEARCH_ENQUEUE_CANDIDATES: "research:enqueueCandidates",
+  RESEARCH_SAVE_TO_KNOWLEDGE: "research:saveToKnowledge",
+  RESEARCH_CHANGED: "research:changed",
 
   // Dialogs
   DIALOG_SELECT_IMAGE: "dialog:selectImage",

@@ -29,13 +29,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           // Variants
           // 变体
           {
-            'bg-primary text-white shadow-sm shadow-primary/25 hover:shadow-md hover:shadow-primary/30 hover:scale-[1.02] focus:ring-primary':
+            'bg-primary text-primary-foreground shadow-sm shadow-primary/25 hover:shadow-md hover:shadow-primary/30 hover:scale-[1.02] focus:ring-primary':
               variant === 'primary',
             'app-wallpaper-surface border border-border text-foreground hover:bg-accent focus:ring-border':
               variant === 'secondary',
             'bg-transparent text-foreground hover:bg-accent focus:ring-border':
               variant === 'ghost',
-            'bg-destructive text-white shadow-sm shadow-destructive/25 hover:shadow-md hover:shadow-destructive/30 focus:ring-destructive':
+            'bg-destructive text-destructive-foreground shadow-sm shadow-destructive/25 hover:shadow-md hover:shadow-destructive/30 focus:ring-destructive':
               variant === 'danger',
           },
           className

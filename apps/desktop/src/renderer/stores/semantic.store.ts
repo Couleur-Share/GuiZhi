@@ -13,7 +13,7 @@ import { runSemanticIndexing } from "../services/knowledge-ai/semantic-index";
  * 用户看到的都是「点了没反应」。手动触发的索引必须给出回执。
  */
 export interface SemanticRunNotice {
-  kind: "done" | "partial" | "failed" | "nothing";
+  kind: "done" | "partial" | "failed" | "nothing" | "not-configured";
   indexed: number;
   failed: number;
   message?: string;
@@ -97,7 +97,7 @@ export const useSemanticStore = create<SemanticState>()((set, get) => ({
         set({ indexedThisRun: indexed }),
       );
       if (result.skipped) {
-        report({ kind: "nothing", indexed: 0, failed: 0 });
+        report({ kind: "not-configured", indexed: 0, failed: 0 });
       } else if (result.failed > 0 && result.indexed === 0) {
         report({
           kind: "failed",

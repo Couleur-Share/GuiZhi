@@ -1,38 +1,75 @@
 import { SettingsIcon } from "lucide-react";
+import type { AppModule } from "../../stores/ui.store";
 import type { SidebarController } from "./sidebar-view-types";
 
 interface SidebarRailProps {
   controller: SidebarController;
 }
 
-function SidebarRailItems({ controller }: SidebarRailProps) {
+type RailNavItem = SidebarController["railNavItems"][number];
+
+/** 资产流转 / 智能探索 / 任务队列——组间细线分隔，避免六枚图标等权并列 */
+const RAIL_GROUPS: readonly (readonly AppModule[])[] = [
+  ["library", "inbox"],
+  ["ask", "wiki", "research"],
+  ["imports"],
+];
+
+function RailItemButton({ item }: { item: RailNavItem }) {
   return (
-    <div className="flex flex-1 flex-col gap-2">
-      {controller.railNavItems.map((item) => (
-        <button
-          type="button"
-          key={item.key}
-          onClick={item.onClick}
-          aria-label={item.label}
-          className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-medium transition-colors titlebar-no-drag ${item.active ? "bg-primary/15 text-foreground shadow-sm" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
+    <button
+      type="button"
+      onClick={item.onClick}
+      aria-label={item.label}
+      className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-medium transition-colors titlebar-no-drag ${item.active ? "bg-primary/15 text-foreground shadow-sm" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
+    >
+      <span className="relative">
+        <span
+          aria-hidden="true"
+          className={`flex h-9 w-9 items-center justify-center rounded-2xl ${item.active ? "bg-primary/10" : "bg-transparent"}`}
         >
-          <span className="relative">
-            <span
+          {item.icon}
+        </span>
+        {item.badge !== undefined ? (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-xs font-semibold leading-none text-background shadow-sm ring-2 ring-sidebar-background">
+            {item.badge > 99 ? "99+" : item.badge}
+          </span>
+        ) : item.busy ? (
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500 ring-2 ring-sidebar-background"
+          />
+        ) : null}
+      </span>
+      <span className="text-center text-xs leading-none">{item.label}</span>
+    </button>
+  );
+}
+
+function SidebarRailItems({ controller }: SidebarRailProps) {
+  const byKey = new Map(
+    controller.railNavItems.map((item) => [item.key, item] as const),
+  );
+  const groups = RAIL_GROUPS.map((keys) =>
+    keys
+      .map((key) => byKey.get(key))
+      .filter((item): item is RailNavItem => item != null),
+  ).filter((group) => group.length > 0);
+
+  return (
+    <div className="flex flex-1 flex-col gap-1">
+      {groups.map((group, groupIndex) => (
+        <div key={group.map((item) => item.key).join("-")} className="flex flex-col gap-2">
+          {groupIndex > 0 ? (
+            <div
               aria-hidden="true"
-              className={`flex h-9 w-9 items-center justify-center rounded-2xl ${item.active ? "bg-primary/10" : "bg-transparent"}`}
-            >
-              {item.icon}
-            </span>
-            {item.badge !== undefined ? (
-              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-xs font-semibold leading-none text-background shadow-sm ring-2 ring-sidebar-background">
-                {item.badge > 99 ? "99+" : item.badge}
-              </span>
-            ) : null}
-          </span>
-          <span className="text-center text-xs leading-none">
-            {item.label}
-          </span>
-        </button>
+              className="mx-3 my-1 h-px bg-sidebar-border/70"
+            />
+          ) : null}
+          {group.map((item) => (
+            <RailItemButton key={item.key} item={item} />
+          ))}
+        </div>
       ))}
     </div>
   );
@@ -63,7 +100,7 @@ function SidebarRailSettings({ controller }: SidebarRailProps) {
 export function SidebarRail({ controller }: SidebarRailProps) {
   return (
     <div
-      className={`flex ${controller.railWidthClass} shrink-0 select-none flex-col bg-sidebar-accent/25 ${controller.layout === "combined" && !controller.isCollapsed ? "border-r border-sidebar-border/60" : ""}`}
+      className={`flex ${controller.railWidthClass} shrink-0 select-none flex-col bg-sidebar-accent/25 titlebar-drag ${controller.layout === "combined" && !controller.isCollapsed ? "border-r border-sidebar-border/60" : ""}`}
     >
       {!controller.webRuntime &&
       controller.isMac &&

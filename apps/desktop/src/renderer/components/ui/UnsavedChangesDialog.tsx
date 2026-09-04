@@ -134,7 +134,7 @@ export function UnsavedChangesDialog({
             type="button"
             ref={saveButtonRef}
             onClick={onSave}
-            className="flex-1 h-10 px-4 rounded-lg bg-primary text-white text-sm font-medium transition-colors hover:bg-primary/90"
+            className="flex-1 h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-colors hover:bg-primary/90"
           >
             {t("common.save", "保存")}
           </button>

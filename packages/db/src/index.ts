@@ -49,6 +49,7 @@ export { AIUsageDB, toLocalDay } from "./ai-usage";
 export { SemanticIndexDB, vectorToBlob, blobToVector } from "./semantic";
 export { BackgroundJobDB } from "./background-job";
 export { DiscoveryDB, discoveryContentHash } from "./discovery";
+export { ResearchDB } from "./research";
 export type { SemanticChunkRecord, SemanticItemState } from "./semantic";
 export {
   migrateLegacyDatabase,

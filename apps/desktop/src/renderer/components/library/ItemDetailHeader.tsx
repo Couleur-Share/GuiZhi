@@ -6,6 +6,8 @@ import {
   ClockIcon,
   FolderIcon,
   HashIcon,
+  Maximize2Icon,
+  Minimize2Icon,
   MoreHorizontalIcon,
   PinIcon,
   RotateCcwIcon,
@@ -19,6 +21,7 @@ import type { KnowledgeItem } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useSettingsStore } from "../../stores/settings.store";
+import { useUIStore } from "../../stores/ui.store";
 import { ContextMenu } from "../ui/ContextMenu";
 import { AiHandoffButton } from "./AiHandoffButton";
 import { TagEditor } from "./TagEditor";
@@ -271,6 +274,10 @@ export function ItemDetailHeader({
   const toggleFavorite = useKnowledgeStore((state) => state.toggleFavorite);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const autoSave = useSettingsStore((state) => state.autoSave);
+  const isFocusReadingMode = useUIStore((state) => state.isFocusReadingMode);
+  const toggleFocusReadingMode = useUIStore(
+    (state) => state.toggleFocusReadingMode,
+  );
 
   // 长标题（AI 拟题偶尔较长、导入条目更是整句文案）单行输入框只能看到开头，
   // 这里让标题随内容增高，超过三行再滚动
@@ -393,6 +400,21 @@ export function ItemDetailHeader({
           ) : (
             <>
               <AiHandoffButton item={item} />
+              <ActionButton
+                onClick={() => toggleFocusReadingMode()}
+                title={
+                  isFocusReadingMode
+                    ? t("library.exitFocusReading", "退出专注阅读 (Esc)")
+                    : t("library.enterFocusReading", "专注阅读 (Alt+Z)")
+                }
+                active={isFocusReadingMode}
+              >
+                {isFocusReadingMode ? (
+                  <Minimize2Icon className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Maximize2Icon className="h-4 w-4" aria-hidden="true" />
+                )}
+              </ActionButton>
               <ActionButton
                 onClick={() => void toggleFavorite(item.id)}
                 title={

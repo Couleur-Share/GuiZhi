@@ -46,7 +46,9 @@ describe("semantic.store 索引回执", () => {
 
   it("手动轮次留下回执", async () => {
     await useSemanticStore.getState().runIndexing();
-    expect(useSemanticStore.getState().notice).toMatchObject({ kind: "nothing" });
+    expect(useSemanticStore.getState().notice).toMatchObject({
+      kind: "not-configured",
+    });
 
     runResult = { skipped: false, indexed: 3, failed: 0 };
     await useSemanticStore.getState().runIndexing();

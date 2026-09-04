@@ -534,6 +534,103 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    name: "0023-import-warning-acknowledgement",
+    up: (db) => {
+      addColumnIfMissing(
+        db,
+        "import_tasks",
+        "warning_acknowledged_at",
+        "INTEGER",
+      );
+    },
+  },
+  {
+    name: "0024-research-workflows",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS research_runs (
+          id TEXT PRIMARY KEY,
+          topic TEXT NOT NULL,
+          day_range INTEGER NOT NULL CHECK(day_range IN (7,14,30)),
+          range_from INTEGER NOT NULL,
+          range_to INTEGER NOT NULL,
+          depth TEXT NOT NULL CHECK(depth IN ('quick','deep')),
+          sources_json TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('collecting','ready','partial','failed','canceled')),
+          report_status TEXT NOT NULL DEFAULT 'none'
+            CHECK(report_status IN ('none','generating','ready','failed')),
+          report_markdown TEXT,
+          report_error TEXT,
+          report_prompt_version TEXT,
+          saved_item_id TEXT REFERENCES knowledge_items(id) ON DELETE SET NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          completed_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS research_source_runs (
+          run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+          source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+          status TEXT NOT NULL
+            CHECK(status IN ('pending','running','succeeded','partial','login_required','failed','canceled')),
+          method TEXT NOT NULL,
+          collected_count INTEGER NOT NULL DEFAULT 0,
+          error_code TEXT,
+          error TEXT,
+          started_at INTEGER,
+          finished_at INTEGER,
+          PRIMARY KEY (run_id, source)
+        );
+        CREATE TABLE IF NOT EXISTS research_clusters (
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          representative_candidate_id TEXT NOT NULL,
+          source_count INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS research_candidates (
+          id TEXT PRIMARY KEY,
+          run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+          source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+          external_id TEXT NOT NULL,
+          url TEXT NOT NULL,
+          normalized_url TEXT NOT NULL,
+          title TEXT NOT NULL,
+          author TEXT NOT NULL DEFAULT '',
+          snippet TEXT NOT NULL DEFAULT '',
+          published_at INTEGER,
+          date_confidence TEXT NOT NULL DEFAULT 'low'
+            CHECK(date_confidence IN ('high','medium','low')),
+          media_type TEXT NOT NULL CHECK(media_type IN ('image','video','article')),
+          engagement_json TEXT NOT NULL DEFAULT '{}',
+          discovery_method TEXT NOT NULL,
+          relevance_score INTEGER NOT NULL DEFAULT 0,
+          recency_score INTEGER NOT NULL DEFAULT 0,
+          engagement_score INTEGER NOT NULL DEFAULT 0,
+          overall_score INTEGER NOT NULL DEFAULT 0,
+          cluster_id TEXT REFERENCES research_clusters(id) ON DELETE SET NULL,
+          state TEXT NOT NULL DEFAULT 'available'
+            CHECK(state IN ('available','queued','imported','dismissed')),
+          import_task_id TEXT,
+          imported_item_id TEXT REFERENCES knowledge_items(id) ON DELETE SET NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          UNIQUE(run_id, source, external_id),
+          UNIQUE(run_id, normalized_url)
+        );
+        CREATE INDEX IF NOT EXISTS idx_research_runs_updated
+          ON research_runs(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_research_sources_run
+          ON research_source_runs(run_id, source);
+        CREATE INDEX IF NOT EXISTS idx_research_candidates_run_score
+          ON research_candidates(run_id, overall_score DESC);
+        CREATE INDEX IF NOT EXISTS idx_research_candidates_cluster
+          ON research_candidates(cluster_id, overall_score DESC);
+        CREATE INDEX IF NOT EXISTS idx_research_candidates_import_task
+          ON research_candidates(import_task_id);
+      `);
+    },
+  },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */
@@ -541,8 +638,7 @@ export const SCHEMA_VERSION = MIGRATIONS.length;
 
 export function getSchemaVersion(db: Database.Database): number {
   const row = db.get("PRAGMA user_version") as
-    | { user_version?: number }
-    | undefined;
+    { user_version?: number } | undefined;
   return row?.user_version ?? 0;
 }
 
@@ -609,9 +705,9 @@ export function runMigrations(db: Database.Database): string[] {
     )
   `);
 
-  const appliedRows = db.all(
-    "SELECT name FROM schema_migrations",
-  ) as { name: string }[];
+  const appliedRows = db.all("SELECT name FROM schema_migrations") as {
+    name: string;
+  }[];
   const applied = new Set(appliedRows.map((row) => row.name));
 
   const executed: string[] = [];

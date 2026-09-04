@@ -200,6 +200,8 @@ CREATE TABLE IF NOT EXISTS import_tasks (
   error TEXT,
   -- 已入库但内容有缺失的原因（转写失败等）；与 error 互不替代，见 ImportTask.warning
   warning TEXT,
+  -- 用户已在处理中心知悉该警告；原文仍保留供导入历史诊断
+  warning_acknowledged_at INTEGER,
   -- 抽取出的条目类型，用于列表图标；不加 CHECK，避免新增类型时又要重建表
   item_type TEXT,
   result_item_id TEXT,
@@ -261,6 +263,80 @@ CREATE TABLE IF NOT EXISTS platform_discovery_candidates (
   first_seen_at INTEGER NOT NULL,
   last_seen_at INTEGER NOT NULL,
   PRIMARY KEY (view_id, platform, external_id)
+);
+
+-- 手动触发的近期主题研究。候选与报告独立保存，只有用户确认后才进入知识库。
+CREATE TABLE IF NOT EXISTS research_runs (
+  id TEXT PRIMARY KEY,
+  topic TEXT NOT NULL,
+  day_range INTEGER NOT NULL CHECK(day_range IN (7,14,30)),
+  range_from INTEGER NOT NULL,
+  range_to INTEGER NOT NULL,
+  depth TEXT NOT NULL CHECK(depth IN ('quick','deep')),
+  sources_json TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('collecting','ready','partial','failed','canceled')),
+  report_status TEXT NOT NULL DEFAULT 'none'
+    CHECK(report_status IN ('none','generating','ready','failed')),
+  report_markdown TEXT,
+  report_error TEXT,
+  report_prompt_version TEXT,
+  saved_item_id TEXT REFERENCES knowledge_items(id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  completed_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS research_source_runs (
+  run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+  status TEXT NOT NULL
+    CHECK(status IN ('pending','running','succeeded','partial','login_required','failed','canceled')),
+  method TEXT NOT NULL,
+  collected_count INTEGER NOT NULL DEFAULT 0,
+  error_code TEXT,
+  error TEXT,
+  started_at INTEGER,
+  finished_at INTEGER,
+  PRIMARY KEY (run_id, source)
+);
+
+CREATE TABLE IF NOT EXISTS research_clusters (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  representative_candidate_id TEXT NOT NULL,
+  source_count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS research_candidates (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
+  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+  external_id TEXT NOT NULL,
+  url TEXT NOT NULL,
+  normalized_url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  snippet TEXT NOT NULL DEFAULT '',
+  published_at INTEGER,
+  date_confidence TEXT NOT NULL DEFAULT 'low'
+    CHECK(date_confidence IN ('high','medium','low')),
+  media_type TEXT NOT NULL CHECK(media_type IN ('image','video','article')),
+  engagement_json TEXT NOT NULL DEFAULT '{}',
+  discovery_method TEXT NOT NULL,
+  relevance_score INTEGER NOT NULL DEFAULT 0,
+  recency_score INTEGER NOT NULL DEFAULT 0,
+  engagement_score INTEGER NOT NULL DEFAULT 0,
+  overall_score INTEGER NOT NULL DEFAULT 0,
+  cluster_id TEXT REFERENCES research_clusters(id) ON DELETE SET NULL,
+  state TEXT NOT NULL DEFAULT 'available'
+    CHECK(state IN ('available','queued','imported','dismissed')),
+  import_task_id TEXT,
+  imported_item_id TEXT REFERENCES knowledge_items(id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE(run_id, source, external_id),
+  UNIQUE(run_id, normalized_url)
 );
 
 -- 主进程持有租约；Renderer 崩溃后 lease_until 到期即可重新领取。
@@ -335,6 +411,16 @@ CREATE INDEX IF NOT EXISTS idx_discovery_candidates_state
   ON platform_discovery_candidates(view_id, state, first_seen_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_discovery_candidates_external
   ON platform_discovery_candidates(platform, external_id);
+CREATE INDEX IF NOT EXISTS idx_research_runs_updated
+  ON research_runs(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_research_sources_run
+  ON research_source_runs(run_id, source);
+CREATE INDEX IF NOT EXISTS idx_research_candidates_run_score
+  ON research_candidates(run_id, overall_score DESC);
+CREATE INDEX IF NOT EXISTS idx_research_candidates_cluster
+  ON research_candidates(cluster_id, overall_score DESC);
+CREATE INDEX IF NOT EXISTS idx_research_candidates_import_task
+  ON research_candidates(import_task_id);
 CREATE INDEX IF NOT EXISTS idx_background_jobs_due
   ON background_jobs(state, next_run_at);
 -- getCatalog 是 Wiki 模块最高频的查询（编译时每个条目都要打一次），

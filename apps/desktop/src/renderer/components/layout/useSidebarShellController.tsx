@@ -6,6 +6,7 @@ import {
   LibraryBigIcon,
   MessagesSquareIcon,
   NetworkIcon,
+  ScanSearchIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type AppModule } from "../../stores/ui.store";
@@ -19,6 +20,7 @@ const APP_MODULES: readonly AppModule[] = [
   "inbox",
   "ask",
   "wiki",
+  "research",
   "imports",
 ];
 
@@ -93,6 +95,8 @@ function getRailItemLabel(
       ? t("nav.ask", "AI 问答")
       : module === "wiki"
         ? t("nav.wiki", "Wiki")
+        : module === "research"
+          ? t("nav.research", "研究")
         : t("nav.imports", "导入");
 }
 
@@ -105,6 +109,8 @@ function getRailItemIcon(module: AppModule) {
     <MessagesSquareIcon className="h-5 w-5" />
   ) : module === "wiki" ? (
     <NetworkIcon className="h-5 w-5" />
+  ) : module === "research" ? (
+    <ScanSearchIcon className="h-5 w-5" />
   ) : (
     <DownloadIcon className="h-5 w-5" />
   );
@@ -125,6 +131,7 @@ function useSidebarRailItems(
         label: getRailItemLabel(module, t),
         icon: getRailItemIcon(module),
         active: ui.appModule === module,
+        busy: module === "imports" && activeImportCount > 0,
         badge:
           module === "inbox" && inboxCount > 0
             ? inboxCount

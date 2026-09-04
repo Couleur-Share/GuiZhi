@@ -43,6 +43,18 @@ export interface PlatformSessionStatus {
 
 export type PlatformDiscoveryMediaType = "image" | "video" | "article";
 
+export type DiscoveryDateConfidence = "high" | "medium" | "low";
+
+export interface PlatformDiscoveryEngagement {
+  views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  collects?: number;
+  favorites?: number;
+  danmaku?: number;
+}
+
 export interface PlatformDiscoveryItem {
   platform: PlatformCapturePlatform;
   externalId: string;
@@ -52,6 +64,10 @@ export interface PlatformDiscoveryItem {
   coverUrl?: string;
   mediaType: PlatformDiscoveryMediaType;
   publishedAt?: number;
+  snippet?: string;
+  engagement?: PlatformDiscoveryEngagement;
+  dateConfidence?: DiscoveryDateConfidence;
+  discoveryMethod?: string;
   importedItemId?: string;
 }
 

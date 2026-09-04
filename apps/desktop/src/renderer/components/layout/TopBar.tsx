@@ -6,6 +6,7 @@ import { useUIStore } from "../../stores/ui.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { getRuntimeCapabilities } from "../../runtime";
 import { NewItemButton } from "./NewItemButton";
+import { WindowControls } from "./WindowControls";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -14,9 +15,13 @@ interface TopBarProps {
   onShowUpdateDialog?: () => void;
 }
 
+function openCommandPalette(): void {
+  window.dispatchEvent(new CustomEvent("shortcut:search"));
+}
+
 /**
- * 顶栏：搜索框（M1 接入知识搜索）、更新提示与新建入口。
- * 设置入口只在左侧 rail 底部提供；主题切换属于低频操作，只保留在外观设置里。
+ * 顶栏：常驻 Omni-Search、更新提示、新建入口与 Windows 窗口控制。
+ * 知识库模块下直接过滤条目；其余模块点击/聚焦唤起全局命令面板。
  */
 export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const { t } = useTranslation();
@@ -30,22 +35,18 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const isLibrarySearch = appModule === "library";
 
-  // 搜索只作用于知识库。在问答/Wiki/导入页显示这个框，用户打了字却什么都不发生，
-  // 而知识库的过滤条件已被悄悄改掉——切回去看到的是一个被过滤过的列表。
-  const isSearchable = appModule === "library";
-
-
-  // 防抖下发到知识库全文检索
+  // 防抖下发到知识库全文检索；离开知识库时不再改过滤条件
   useEffect(() => {
-    if (!isSearchable) {
+    if (!isLibrarySearch) {
       return;
     }
     const timer = setTimeout(() => {
       setKnowledgeSearch(searchQuery);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [isSearchable, searchQuery, setKnowledgeSearch]);
+  }, [isLibrarySearch, searchQuery, setKnowledgeSearch]);
 
   const updateVersion =
     updateAvailable?.status === "available"
@@ -55,13 +56,17 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
     ? t("settings.newVersion", { version: updateVersion })
     : t("settings.updateAvailable");
 
+  const searchPlaceholder = isLibrarySearch
+    ? t("header.search")
+    : t("header.omniSearch", "搜索知识、Wiki 或输入命令…");
+
   return (
     <header
-      className="h-12 app-wallpaper-toolbar border-b border-border flex items-center px-4 shrink-0"
+      className="flex h-12 shrink-0 select-none items-center border-b border-border app-wallpaper-toolbar pl-4"
       style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
     >
       <div
-        className="w-8 shrink-0"
+        className="w-8 shrink-0 titlebar-no-drag"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         <button
@@ -83,55 +88,79 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
         </button>
       </div>
 
-      {/* 搜索框 - 居中；只在知识库模块出现 */}
-      <div className="flex-1 flex justify-center px-3">
-        <div
-          className={`w-full max-w-lg relative flex items-center ${
-            isSearchable ? "" : "invisible"
-          }`}
-          aria-hidden={!isSearchable}
-        >
-          <div className="app-wallpaper-search absolute inset-0 rounded-lg border pointer-events-none" />
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none z-10" />
-          {/* 只过渡 box-shadow（焦点环）。transition-all 会把继承自外层的
-              visibility 一并纳入过渡：切到问答/Wiki 时外层已 invisible，
-              图标与玻璃底框立刻消失，输入框却要等过渡跑完才隐藏，
-              占位文字「搜索知识…」于是孤零零地多留一帧多。 */}
+      {/* 常驻 Omni-Search：全模块可见，避免切换时中央大面积空白跳动 */}
+      <div className="flex flex-1 justify-center px-3">
+        <div className="relative flex w-full max-w-lg items-center titlebar-no-drag">
+          <div className="app-wallpaper-search pointer-events-none absolute inset-0 rounded-lg border" />
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             ref={searchInputRef}
             type="text"
             data-testid="topbar-search"
-            placeholder={t("header.search")}
-            value={searchQuery}
-            tabIndex={isSearchable ? 0 : -1}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="relative z-10 w-full h-9 pl-9 pr-10 rounded-lg border border-transparent bg-transparent text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow duration-quick"
+            placeholder={searchPlaceholder}
+            value={isLibrarySearch ? searchQuery : ""}
+            readOnly={!isLibrarySearch}
+            onChange={(event) => {
+              if (isLibrarySearch) {
+                setSearchQuery(event.target.value);
+              }
+            }}
+            onFocus={() => {
+              if (!isLibrarySearch) {
+                searchInputRef.current?.blur();
+                openCommandPalette();
+              }
+            }}
+            onClick={() => {
+              if (!isLibrarySearch) {
+                openCommandPalette();
+              }
+            }}
+            onKeyDown={(event) => {
+              if (!isLibrarySearch && event.key !== "Tab") {
+                event.preventDefault();
+                openCommandPalette();
+              }
+            }}
+            className={`relative z-10 h-9 w-full rounded-lg border border-transparent bg-transparent pl-9 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow duration-quick ${
+              isLibrarySearch ? "pr-20" : "pr-16"
+            } ${isLibrarySearch ? "" : "cursor-pointer"}`}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           />
-          {searchQuery && (
-            <div
-              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 flex items-center gap-1"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            >
+          <div
+            className="absolute right-2 top-1/2 z-20 flex -translate-y-1/2 items-center gap-1"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
+            {isLibrarySearch && searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="p-1 rounded hover:bg-accent/60 transition-colors"
+                className="rounded p-1 transition-colors hover:bg-accent/60"
                 aria-label={t("header.clearSearch", "清除搜索")}
-                title={t("header.clearSearch", "清除搜索")}
               >
                 <XIcon
                   aria-hidden="true"
-                  className="w-3.5 h-3.5 text-muted-foreground"
+                  className="h-3.5 w-3.5 text-muted-foreground"
                 />
               </button>
-            </div>
-          )}
+            ) : null}
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="hidden rounded-md border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground sm:inline-flex"
+              title={t("header.openCommandPalette", "打开命令面板")}
+              aria-label={t("header.openCommandPalette", "打开命令面板")}
+            >
+              Ctrl+K
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 右侧操作按钮 */}
-      <div className="flex items-center gap-1 ml-4">
+      <div
+        className="ml-2 flex items-center gap-1 pr-1"
+        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+      >
         {runtimeCapabilities.appUpdate &&
           updateAvailable &&
           updateAvailable.status === "available" && (
@@ -139,19 +168,20 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
               <button
                 type="button"
                 onClick={onShowUpdateDialog}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+                className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
                 aria-label={t("settings.updateAvailable")}
               >
-                <DownloadIcon aria-hidden="true" className="w-4 h-4" />
+                <DownloadIcon aria-hidden="true" className="h-4 w-4" />
                 <span className="hidden sm:inline">{updateButtonLabel}</span>
               </button>
-              <div className="w-px h-5 bg-border mx-1" />
+              <div className="mx-1 h-5 w-px bg-border" />
             </>
           )}
 
         <NewItemButton />
       </div>
+
+      <WindowControls />
     </header>
   );
 }

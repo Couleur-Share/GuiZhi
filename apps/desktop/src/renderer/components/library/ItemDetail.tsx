@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
+import { useUIStore } from "../../stores/ui.store";
 import { ItemDetailHeader } from "./ItemDetailHeader";
 import { ContentPanel } from "./ContentPanel";
 import { AiSummaryCard } from "./AiSummaryCard";
@@ -14,6 +15,7 @@ import { SourceCommentsCard } from "./SourceCommentsCard";
  * 音视频的文字稿与总结入口都在正文面板的标签页里，不再挤占正文上方。
  * 编辑内容经 knowledge.store 防抖自动保存；Ctrl+S 立即保存。
  * onClose 仅由详情浮层（列表视图）传入，头部会多出一个关闭按钮。
+ * 专注阅读模式下整栏限宽居中，避免超宽视线跳行。
  */
 export function ItemDetail({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
@@ -21,6 +23,7 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
   const flushPendingSave = useKnowledgeStore(
     (state) => state.flushPendingSave,
   );
+  const isFocusReadingMode = useUIStore((state) => state.isFocusReadingMode);
 
   // Ctrl+S 立即保存
   useEffect(() => {
@@ -46,7 +49,11 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
   const isMediaItem = item.itemType === "audio" || item.itemType === "video";
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div
+      className={`flex h-full min-h-0 flex-col ${
+        isFocusReadingMode ? "mx-auto w-full max-w-4xl" : ""
+      }`}
+    >
       <ItemDetailHeader item={item} isTrashed={isTrashed} onClose={onClose} />
 
       {!isTrashed ? (

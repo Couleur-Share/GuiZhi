@@ -28,6 +28,7 @@ interface TaskRow {
   stage: ImportStage | null;
   error: string | null;
   warning: string | null;
+  warning_acknowledged_at: number | null;
   item_type: KnowledgeItemType | null;
   result_item_id: string | null;
   duplicate_item_id: string | null;
@@ -129,8 +130,13 @@ function decodeCursor(value: string | null | undefined): ImportCursor | null {
 
 function normalizeListQuery(query?: ImportTaskListQuery): Required<
   Pick<ImportTaskListQuery, "status" | "query" | "pageSize">
-> & { cursor: ImportCursor | null } {
-  const pageSize = Math.min(Math.max(Math.round(query?.pageSize ?? 50), 20), 100);
+> & {
+  cursor: ImportCursor | null;
+} {
+  const pageSize = Math.min(
+    Math.max(Math.round(query?.pageSize ?? 50), 20),
+    100,
+  );
   return {
     status: query?.status ?? "all",
     query: query?.query?.trim() ?? "",
@@ -217,10 +223,8 @@ export class ImportTaskDB {
   }
 
   get(id: string): ImportTask | null {
-    const row = this.db.get(
-      "SELECT * FROM import_tasks WHERE id = ?",
-      id,
-    ) as TaskRow | undefined;
+    const row = this.db.get("SELECT * FROM import_tasks WHERE id = ?", id) as
+      TaskRow | undefined;
     return row ? mapRow(row) : null;
   }
 
@@ -245,8 +249,7 @@ export class ImportTaskDB {
     const normalized = normalizeListQuery(query);
     const search = buildSearchClause(normalized.query);
     const statusSql = normalized.status === "all" ? "" : " AND status = ?";
-    const statusParams =
-      normalized.status === "all" ? [] : [normalized.status];
+    const statusParams = normalized.status === "all" ? [] : [normalized.status];
     const cursorSql = normalized.cursor
       ? " AND (created_at < ? OR (created_at = ? AND id < ?))"
       : "";
@@ -285,7 +288,10 @@ export class ImportTaskDB {
       ...search.params,
     ) as Array<{ status: ImportTaskStatus; count: number }>;
     const counts = Object.fromEntries(
-      ([...IMPORT_TASK_STATUSES] as ImportTaskStatus[]).map((status) => [status, 0]),
+      ([...IMPORT_TASK_STATUSES] as ImportTaskStatus[]).map((status) => [
+        status,
+        0,
+      ]),
     ) as Record<ImportTaskStatus, number>;
     for (const row of countRows) counts[row.status] = row.count;
 
@@ -302,8 +308,11 @@ export class ImportTaskDB {
   }
 
   countTerminal(query: ImportTaskClearQuery): number {
-    const search = buildSearchClause(query.scope === "filtered" ? query.query?.trim() ?? "" : "");
-    const requestedStatus = query.scope === "filtered" ? query.status ?? "all" : "all";
+    const search = buildSearchClause(
+      query.scope === "filtered" ? (query.query?.trim() ?? "") : "",
+    );
+    const requestedStatus =
+      query.scope === "filtered" ? (query.status ?? "all") : "all";
     const statuses =
       requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
         ? [requestedStatus]
@@ -319,8 +328,11 @@ export class ImportTaskDB {
   }
 
   clearTerminal(query: ImportTaskClearQuery): number {
-    const search = buildSearchClause(query.scope === "filtered" ? query.query?.trim() ?? "" : "");
-    const requestedStatus = query.scope === "filtered" ? query.status ?? "all" : "all";
+    const search = buildSearchClause(
+      query.scope === "filtered" ? (query.query?.trim() ?? "") : "",
+    );
+    const requestedStatus =
+      query.scope === "filtered" ? (query.status ?? "all") : "all";
     const statuses =
       requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
         ? [requestedStatus]
@@ -374,7 +386,8 @@ export class ImportTaskDB {
     }
     this.db.run(
       `UPDATE import_tasks SET
-         status = ?, stage = ?, error = ?, warning = ?, display_name = ?, item_type = ?,
+         status = ?, stage = ?, error = ?, warning = ?, warning_acknowledged_at = ?,
+         display_name = ?, item_type = ?,
          result_item_id = ?, duplicate_item_id = ?, stage_stats = ?, capture_strategy = ?,
          comment_limit = ?, force_duplicate = ?,
          updated_at = ?
@@ -383,6 +396,7 @@ export class ImportTaskDB {
       patch.stage !== undefined ? patch.stage : existing.stage,
       patch.error !== undefined ? patch.error : existing.error,
       patch.warning !== undefined ? patch.warning : existing.warning,
+      patch.warning !== undefined ? null : existing.warning_acknowledged_at,
       patch.displayName?.trim() || existing.display_name,
       patch.itemType !== undefined ? patch.itemType : existing.item_type,
       patch.resultItemId !== undefined
@@ -407,6 +421,25 @@ export class ImportTaskDB {
       id,
     );
     return this.get(id);
+  }
+
+  /**
+   * 已完成任务的 warning 是历史诊断，不应为了移出处理中心而删除。
+   * 只记录用户已知悉；任务以后写入新 warning 时 update() 会自动重置。
+   */
+  acknowledgeWarning(id: string): boolean {
+    const now = Date.now();
+    return (
+      this.db.run(
+        `UPDATE import_tasks
+         SET warning_acknowledged_at = ?, updated_at = ?
+         WHERE id = ? AND status = 'completed' AND warning IS NOT NULL
+           AND warning_acknowledged_at IS NULL`,
+        now,
+        now,
+        id,
+      ).changes > 0
+    );
   }
 
   /** 启动恢复：上次退出时仍在处理中的任务复位为待处理。 */

@@ -490,7 +490,12 @@ describe("addColumnIfMissing", () => {
     `);
     db.run(
       "INSERT INTO import_tasks (id, source_kind, source_input, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      "task-auth", "url", "https://www.douyin.com/video/1", "旧任务", 1, 1,
+      "task-auth",
+      "url",
+      "https://www.douyin.com/video/1",
+      "旧任务",
+      1,
+      1,
     );
 
     runMigrations(db);
@@ -500,7 +505,9 @@ describe("addColumnIfMissing", () => {
       "task-auth",
     ) as { capture_strategy: string; comment_limit: number };
     expect(task).toEqual({ capture_strategy: "standard", comment_limit: 0 });
-    expect(getTableDefinition(db, "source_comments")).toContain("source_comments");
+    expect(getTableDefinition(db, "source_comments")).toContain(
+      "source_comments",
+    );
     db.close();
   });
 
@@ -523,26 +530,43 @@ describe("addColumnIfMissing", () => {
     `);
     db.run(
       "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      "item-1", "测试", "正文", 1, 1,
+      "item-1",
+      "测试",
+      "正文",
+      1,
+      1,
     );
     db.run(
       `INSERT INTO source_comments
          (id, item_id, platform, external_id, content, captured_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      "comment-1", "item-1", "xiaohongshu", "external-1", "旧评论", 1,
+      "comment-1",
+      "item-1",
+      "xiaohongshu",
+      "external-1",
+      "旧评论",
+      1,
     );
 
     runMigrations(db);
 
     expect(getTableDefinition(db, "source_comments")).toContain("'linuxdo'");
-    expect(db.get("SELECT content FROM source_comments WHERE id = ?", "comment-1"))
-      .toEqual({ content: "旧评论" });
-    expect(() => db.run(
-      `INSERT INTO source_comments
+    expect(
+      db.get("SELECT content FROM source_comments WHERE id = ?", "comment-1"),
+    ).toEqual({ content: "旧评论" });
+    expect(() =>
+      db.run(
+        `INSERT INTO source_comments
          (id, item_id, platform, external_id, content, captured_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      "comment-2", "item-1", "linuxdo", "external-2", "新楼层", 2,
-    )).not.toThrow();
+        "comment-2",
+        "item-1",
+        "linuxdo",
+        "external-2",
+        "新楼层",
+        2,
+      ),
+    ).not.toThrow();
     db.close();
   });
 
@@ -551,25 +575,41 @@ describe("addColumnIfMissing", () => {
     runMigrations(db);
     db.run(
       "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      "item-appinn", "小众软件旧条目", "正文", 1, 1,
+      "item-appinn",
+      "小众软件旧条目",
+      "正文",
+      1,
+      1,
     );
     db.run(
       "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      "item-linuxdo", "LINUX DO 旧条目", "正文", 1, 1,
+      "item-linuxdo",
+      "LINUX DO 旧条目",
+      "正文",
+      1,
+      1,
     );
     db.run(
       `INSERT INTO source_records
          (id, item_id, source_type, source_uri, platform, captured_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      "source-appinn", "item-appinn", "url",
-      "https://meta.appinn.net/t/topic/89533", "web", 1,
+      "source-appinn",
+      "item-appinn",
+      "url",
+      "https://meta.appinn.net/t/topic/89533",
+      "web",
+      1,
     );
     db.run(
       `INSERT INTO source_records
          (id, item_id, source_type, source_uri, platform, captured_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      "source-linuxdo", "item-linuxdo", "url",
-      "https://linux.do/t/topic/2702071", "web", 1,
+      "source-linuxdo",
+      "item-linuxdo",
+      "url",
+      "https://linux.do/t/topic/2702071",
+      "web",
+      1,
     );
     // 模拟 0016 已执行、0017 尚未执行的升级现场。
     db.run(
@@ -580,9 +620,7 @@ describe("addColumnIfMissing", () => {
     runMigrations(db);
 
     expect(
-      db.all(
-        "SELECT id, platform FROM source_records ORDER BY id",
-      ),
+      db.all("SELECT id, platform FROM source_records ORDER BY id"),
     ).toEqual([
       { id: "source-appinn", platform: "appinn" },
       { id: "source-linuxdo", platform: "linuxdo" },
@@ -595,14 +633,22 @@ describe("addColumnIfMissing", () => {
     runMigrations(db);
     db.run(
       "INSERT INTO knowledge_items (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      "item-twolibra", "2Libra 旧条目", "正文", 1, 1,
+      "item-twolibra",
+      "2Libra 旧条目",
+      "正文",
+      1,
+      1,
     );
     db.run(
       `INSERT INTO source_records
          (id, item_id, source_type, source_uri, platform, captured_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      "source-twolibra", "item-twolibra", "url",
-      "https://2libra.com/post/health-consultation/bUSaOUc", "web", 1,
+      "source-twolibra",
+      "item-twolibra",
+      "url",
+      "https://2libra.com/post/health-consultation/bUSaOUc",
+      "web",
+      1,
     );
     db.run(
       "DELETE FROM schema_migrations WHERE name = ?",
@@ -612,7 +658,10 @@ describe("addColumnIfMissing", () => {
     runMigrations(db);
 
     expect(
-      db.get("SELECT platform FROM source_records WHERE id = ?", "source-twolibra"),
+      db.get(
+        "SELECT platform FROM source_records WHERE id = ?",
+        "source-twolibra",
+      ),
     ).toEqual({ platform: "twolibra" });
     db.close();
   });
@@ -639,6 +688,23 @@ describe("addColumnIfMissing", () => {
       "idx_import_tasks_created_id",
       "idx_import_tasks_status_created_id",
     ]);
+    db.close();
+  });
+
+  it("0023：老库导入任务补出警告已知悉时间", () => {
+    const db = createDb();
+    runMigrations(db);
+    db.exec("ALTER TABLE import_tasks DROP COLUMN warning_acknowledged_at");
+    db.run(
+      "DELETE FROM schema_migrations WHERE name = ?",
+      "0023-import-warning-acknowledgement",
+    );
+
+    expect(hasColumn(db, "import_tasks", "warning_acknowledged_at")).toBe(
+      false,
+    );
+    runMigrations(db);
+    expect(hasColumn(db, "import_tasks", "warning_acknowledged_at")).toBe(true);
     db.close();
   });
 });

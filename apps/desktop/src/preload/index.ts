@@ -16,6 +16,7 @@ import { illustrationApi } from "./api/illustration";
 import { backgroundJobApi } from "./api/background-job";
 import { inboxApi } from "./api/inbox";
 import { logApi } from "./api/log";
+import { researchApi } from "./api/research";
 import { createBufferedSubscription } from "./app-command-subscription";
 import type {
   AppCommand,
@@ -80,6 +81,7 @@ const api = {
   backgroundJob: backgroundJobApi,
   inbox: inboxApi,
   log: logApi,
+  research: researchApi,
   ytdlp: ytDlpApi,
   ffmpeg: ffmpegApi,
   funasr: funasrApi,
@@ -95,6 +97,7 @@ const api = {
       "window:fullscreen-changed",
       "window:visibility-changed",
       "import:changed",
+      IPC_CHANNELS.RESEARCH_CHANGED,
       "backup:autoStatus",
       IPC_CHANNELS.BACKGROUND_JOB_AVAILABLE,
       IPC_CHANNELS.DISCOVERY_OPEN_VIEW,

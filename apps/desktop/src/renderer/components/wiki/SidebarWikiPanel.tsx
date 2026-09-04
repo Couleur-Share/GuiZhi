@@ -148,8 +148,8 @@ export function SidebarWikiPanel() {
         </div>
       ) : (
         groups.map((group) => (
-          <div key={group.titleKey}>
-            <div className="flex items-center gap-2 px-3 pb-1 pt-3 first:pt-0">
+          <div key={group.titleKey} className="pt-2 first:pt-0">
+            <div className="flex items-center gap-2 px-3 pb-1">
               <span className="text-xs font-medium uppercase tracking-wide text-sidebar-foreground/80">
                 {t(group.titleKey, group.titleFallback)}
               </span>

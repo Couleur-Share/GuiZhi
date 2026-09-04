@@ -26,6 +26,10 @@ const MODULE_LOADERS = {
     workspace: () => import("../wiki/WikiWorkspace"),
     panel: () => import("../wiki/SidebarWikiPanel"),
   },
+  research: {
+    workspace: () => import("../research/ResearchWorkspace"),
+    panel: () => import("../research/SidebarResearchPanel"),
+  },
   imports: {
     workspace: () => import("../imports/ImportsWorkspace"),
     panel: () => import("../imports/SidebarImportsPanel"),
@@ -55,6 +59,11 @@ export const MODULE_WORKSPACES: Record<
     MODULE_LOADERS.wiki
       .workspace()
       .then((module) => ({ default: module.WikiWorkspace })),
+  ),
+  research: lazy(() =>
+    MODULE_LOADERS.research
+      .workspace()
+      .then((module) => ({ default: module.ResearchWorkspace })),
   ),
   imports: lazy(() =>
     MODULE_LOADERS.imports
@@ -86,6 +95,11 @@ export const MODULE_PANELS: Record<
     MODULE_LOADERS.wiki
       .panel()
       .then((module) => ({ default: module.SidebarWikiPanel })),
+  ),
+  research: lazy(() =>
+    MODULE_LOADERS.research
+      .panel()
+      .then((module) => ({ default: module.SidebarResearchPanel })),
   ),
   imports: lazy(() =>
     MODULE_LOADERS.imports

@@ -228,7 +228,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               aria-pressed={activeSection === item.id}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-quick ${
                 activeSection === item.id
-                  ? "bg-primary text-white shadow-sm"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-foreground/80 hover:bg-muted/70"
               }`}
             >

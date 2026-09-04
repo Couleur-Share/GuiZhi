@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WikiCatalogEntry, WikiCompilableItem } from "@guizhi/shared/types";
 import {
+  buildMaterial,
   buildLinkResolver,
   cleanWikiLinks,
   compilePendingItems,
+  countPendingWikiItems,
   normalizeWikiTitle,
   parseWikiResponse,
   rankCandidates,
   sanitizePages,
+  sha256Hex,
 } from "../../../src/renderer/services/knowledge-ai/wiki-compile";
+import { WIKI_COMPILE_PROMPT_VERSION } from "../../../src/renderer/services/knowledge-ai/prompts";
 import { preprocessWikiLinks } from "../../../src/renderer/components/wiki/WikiMarkdown";
 import { installWindowMocks } from "../../helpers/window";
 
@@ -171,6 +175,31 @@ describe("compilePendingItems", () => {
 
   beforeEach(() => {
     runScenarioChat.mockReset();
+  });
+
+  it("待编译计数与执行使用同一套指纹判定", async () => {
+    const item = compilableItem("a");
+    installWikiApi([item]);
+    vi.mocked(window.api.wiki.listIngestions).mockResolvedValue([
+      {
+        itemId: item.id,
+        contentHash: await sha256Hex(buildMaterial(item).trim()),
+        model: "test-model",
+        promptVersion: WIKI_COMPILE_PROMPT_VERSION,
+        failureCount: 0,
+        nextAttemptAt: null,
+        updatedAt: Date.now(),
+      },
+    ]);
+
+    expect(await countPendingWikiItems()).toBe(0);
+    expect(await compilePendingItems()).toEqual({
+      compiled: 0,
+      pending: 0,
+      skipped: 0,
+      failures: [],
+    });
+    expect(runScenarioChat).not.toHaveBeenCalled();
   });
 
   it("放宽单请求超时并把取消信号交给模型调用", async () => {
