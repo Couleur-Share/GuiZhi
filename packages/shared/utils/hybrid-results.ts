@@ -46,4 +46,3 @@ export function mergeHybridResults(
     })
     .filter((hit): hit is QaSearchHit => hit !== null);
 }
-
