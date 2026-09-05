@@ -3,7 +3,9 @@ on: workflow_dispatch
 permissions: { contents: read }
 jobs:
   sign:
-    runs-on: macos-15
+    # Apple 官方签名要求已登录 iCloud；GitHub 托管 macOS 无法满足。
+    # 仅在维护者配置的专用 Mac 上手动触发，不接收 PR 触发。
+    runs-on: [self-hosted, macOS, guizhi-shortcut-signing]
     steps:
       - uses: actions/checkout@v4
       - run: python3 deploy/capture/shortcut/generate.py

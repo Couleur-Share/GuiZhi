@@ -23,7 +23,7 @@
 
 - Android Chrome 实际安装 PWA、系统分享菜单和锁屏/后台后的恢复。
 - HarmonyOS 机型、系统和浏览器版本；若系统不支持 Web Share Target，使用粘贴入口，不能宣传所有鸿蒙版本均支持系统分享。
-- macOS 官方 `shortcuts sign` 执行、真实 iPhone 安装与提交。目前只交付无凭证的模板源文件和签名 CI 工作流，尚无已验收的可安装产物。
+- macOS 官方 `shortcuts sign` 执行、真实 iPhone 安装与提交。2026-09-06 的 GitHub 托管 macOS 尝试因未登录 iCloud 失败（Actions 33979224357），工作流现要求已登录 iCloud 的专用自托管 Mac。目前只交付无凭证的模板源文件和签名 CI 工作流，尚无已验收的可安装产物。
 - 至少七天邀请测试：记录机型、交付延迟、失败率、积压、限流、磁盘以及故障演练结果。测试未完成前不公开开放。
 - 异机加密备份目的地和密钥独立保管尚未配置；当前备份在同一 VPS，不能抵御整机丢失。
 
@@ -34,3 +34,7 @@
 - 桌面新增用例：`pnpm --filter @guizhi/desktop exec vitest run tests/unit/db/mobile-capture.test.ts tests/unit/main/mobile-capture-receiver.test.ts tests/unit/main/mobile-capture-transport.test.ts`
 - Docker：`deploy/capture/docker-verify.py`，必须使用专用测试容器和数据目录。
 - 部署/恢复：[运维说明](./mobile-capture-ops.md)。实际主机记录位于私有运维站的「归知手机收集」服务页。
+
+## v0.22.0 正式版发布验证
+
+发布快照额外通过 192 个桌面测试文件、1781 项单测、7 项 Relay 集成、3 项 PWA Playwright、桌面构建与包体预算、1 项离屏 Electron 冒烟。GitHub 手机收集门禁还验证了真实 Docker 重启持久化。桌面正式版不改变公共中转的邀请测试状态。

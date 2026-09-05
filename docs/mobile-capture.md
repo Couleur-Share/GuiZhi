@@ -60,9 +60,9 @@ PWA 用 Secure、HttpOnly、SameSite=Strict Cookie；变更接口核对 Origin �
 
 ## iPhone 交付边界
 
-`deploy/capture/shortcut/generate.py` 是可审阅的模板生成源，生成 XML plist 和 unsigned shortcut。`.github/workflows/capture-shortcut.yml` 用 macOS 的官方 `shortcuts sign --mode anyone` 生成安装产物；模板只包含占位配置，无用户凭证。参考 [Apple 签名说明](https://support.apple.com/en-gb/guide/shortcuts-mac/apd455c82f02/mac) 和 [开源格式参考](https://github.com/julian-englert/apple-shortcuts)。
+`deploy/capture/shortcut/generate.py` 是可审阅的模板生成源，生成 XML plist 和 unsigned shortcut。`.github/workflows/capture-shortcut.yml` 在已登录 iCloud、带 `guizhi-shortcut-signing` 标签的自托管 Mac 上，用官方 `shortcuts sign --mode anyone` 生成安装产物；模板只包含占位配置，无用户凭证。参考 [Apple 签名说明](https://support.apple.com/en-gb/guide/shortcuts-mac/apd455c82f02/mac) 和 [开源格式参考](https://github.com/julian-englert/apple-shortcuts)。
 
-签名成功与真机成功是两件事。当前 Windows 环境不能签名，当前可用真机仅安卓和鸿蒙，iPhone 安装、分享、失败提示与重新运行的幂等行为仍需验收；未验收前不对用户展示可安装下载链接。快捷指令模板每次运行生成新编号，网络结果不确定时应先查看近期记录，不能把整次重新运行视为原请求的自动重试。
+签名成功与真机成功是两件事。2026-09-06 实测 GitHub 托管 macOS 签名返回“必须登录 iCloud”，因此不能直接使用托管 runner 签名；应在自己的已登录 Mac 上执行同一命令或配置上述专用 runner。当前 Windows 环境不能签名，当前可用真机仅安卓和鸿蒙，iPhone 安装、分享、失败提示与重新运行的幂等行为仍需验收；未验收前不对用户展示可安装下载链接。快捷指令模板每次运行生成新编号，网络结果不确定时应先查看近期记录，不能把整次重新运行视为原请求的自动重试。
 
 ## 开放门槛
 
