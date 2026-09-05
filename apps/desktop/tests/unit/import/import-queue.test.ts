@@ -142,6 +142,7 @@ function createHarness(options?: {
     store,
     persistence: {
       findDuplicate: options?.findDuplicate ?? (() => null),
+      rememberSourceAccess: () => {},
       saveItem({ extracted }) {
         const id = `item-${savedItems.length + 1}`;
         savedItems.push(extracted.content);

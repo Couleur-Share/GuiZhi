@@ -13,6 +13,7 @@
  */
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import type Database from "./adapter";
+import { backfillSourceAccessUris } from "./source-access";
 
 export interface Migration {
   /** 唯一名称，写入 schema_migrations 后不可更改 */
@@ -629,6 +630,16 @@ export const MIGRATIONS: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_research_candidates_import_task
           ON research_candidates(import_task_id);
       `);
+    },
+  },
+  {
+    name: "0028-source-access-uri",
+    up(db) {
+      addColumnIfMissing(db, "source_records", "access_uri", "TEXT");
+      if (hasColumn(db, "source_records", "access_uri") &&
+          hasColumn(db, "import_tasks", "result_item_id")) {
+        backfillSourceAccessUris(db);
+      }
     },
   },
 ];

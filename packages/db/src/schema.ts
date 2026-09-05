@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS source_records (
   item_id TEXT NOT NULL REFERENCES knowledge_items(id) ON DELETE CASCADE,
   source_type TEXT NOT NULL,
   source_uri TEXT,
+  -- 原始分享入口，可带访问令牌；不参与去重，也不暴露给正文/导出。
+  access_uri TEXT,
   normalized_uri TEXT,
   content_hash TEXT,
   platform TEXT,

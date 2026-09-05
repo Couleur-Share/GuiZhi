@@ -49,12 +49,15 @@ export interface ImportPersistence {
     normalizedUri: string | null,
     contentHash: string,
   ): string | null;
+  /** 重复导入同一规范来源时保存新访问入口，清理任务历史也不会丢。 */
+  rememberSourceAccess(itemId: string, normalizedUri: string, accessUri: string): void;
   /** 入库并写来源记录，返回条目 id */
   saveItem(params: {
     extracted: ExtractedContent;
     collectionId: string | null;
     tagNames: string[];
     sourceKind: ImportTask["sourceKind"];
+    sourceInput: string;
     normalizedUri: string | null;
     contentHash: string;
   }): string;
@@ -347,6 +350,9 @@ export class ImportQueue {
           contentHash,
         );
         if (duplicateItemId) {
+          if (task.sourceKind === "url" && normalizedUri) {
+            this.persistence.rememberSourceAccess(duplicateItemId, normalizedUri, task.sourceInput);
+          }
           this.updateAndNotify(
             id,
             { status: "duplicate", stage: null, duplicateItemId },
@@ -364,6 +370,7 @@ export class ImportQueue {
         collectionId: task.collectionId ?? null,
         tagNames: task.tagNames ?? [],
         sourceKind: task.sourceKind,
+        sourceInput: task.sourceInput,
         normalizedUri,
         contentHash,
       });

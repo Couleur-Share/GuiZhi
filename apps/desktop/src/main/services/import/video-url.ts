@@ -441,8 +441,8 @@ interface MediaSource {
   ) => Promise<{ dir: string; filePath: string }>;
   /** 可选的平台字幕；只有 yt-dlp 平台实现，失败时由调用方转 ASR */
   downloadCaptions?: (signal?: AbortSignal) => Promise<PlatformCaption | null>;
-  /** 图文作品（抖音 / 小红书）：没有音轨，直接给出成品笔记条目 */
-  note?: ExtractedContent;
+  /** 图文作品仅在导入时下载配图并 OCR；重转写只需提示没有音轨。 */
+  note?: () => Promise<ExtractedContent>;
 }
 
 async function resolveDouyinSource(
@@ -463,11 +463,12 @@ async function resolveDouyinSource(
     return {
       metadata,
       downloadAudio: () => Promise.reject(new Error("图文作品没有音轨")),
-      note: await buildImageNoteEntry(
-        douyinImageNoteSource(aweme),
-        { ...deps.imageNote, onStage: deps.onStage },
-        signal,
-      ),
+      note: () =>
+        buildImageNoteEntry(
+          douyinImageNoteSource(aweme),
+          { ...deps.imageNote, onStage: deps.onStage },
+          signal,
+        ),
     };
   }
 
@@ -504,11 +505,12 @@ async function resolveXiaohongshuSource(
     return {
       metadata,
       downloadAudio: () => Promise.reject(new Error("图文笔记没有音轨")),
-      note: await buildImageNoteEntry(
-        xiaohongshuImageNoteSource(note),
-        { ...deps.imageNote, onStage: deps.onStage },
-        signal,
-      ),
+      note: () =>
+        buildImageNoteEntry(
+          xiaohongshuImageNoteSource(note),
+          { ...deps.imageNote, onStage: deps.onStage },
+          signal,
+        ),
     };
   }
 
@@ -562,6 +564,29 @@ function resolveMediaSource(
   }
 }
 
+/**
+ * 已有视频重新转写：复用首次导入的平台解析与下载，临时目录由调用方清理。
+ * B 站 / YouTube 已有条目元数据，直接下载音轨，避免多请求一次元数据。
+ */
+export async function downloadVideoAudio(
+  url: string,
+  platform: VideoPlatform,
+  deps: VideoUrlDeps,
+  signal?: AbortSignal,
+): Promise<{ dir: string; filePath: string }> {
+  const run = deps.run ?? runCommand;
+  if (platform === "bilibili" || platform === "youtube") {
+    return downloadBestAudio(
+      resolveYtDlpExecutable(deps.getYtDlpPath()),
+      url,
+      run,
+      signal,
+    );
+  }
+  const source = await resolveMediaSource(url, platform, deps, run, signal);
+  return source.downloadAudio(signal);
+}
+
 export async function extractVideoUrl(
   url: string,
   platform: VideoPlatform,
@@ -574,6 +599,9 @@ export async function extractVideoUrl(
   deps.onStage?.("video-metadata");
   try {
     source = await resolveMediaSource(url, platform, deps, run, signal);
+    if (source.note) {
+      return await source.note();
+    }
   } catch (error) {
     if (error instanceof Error && error.message === "已取消") {
       throw error;
@@ -597,9 +625,6 @@ export async function extractVideoUrl(
     };
   }
 
-  if (source.note) {
-    return source.note;
-  }
   const metadata = source.metadata;
 
   // 先试平台字幕。它已带时间轴与原始标点，且无需下载音频或耗费转写额度；

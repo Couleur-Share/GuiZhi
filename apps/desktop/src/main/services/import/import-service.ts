@@ -1,7 +1,7 @@
 /**
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
  */
-import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB } from "@guizhi/db";
+import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB, SourceAccessDB } from "@guizhi/db";
 import type Database from "../../database/sqlite";
 import {
   DEFAULT_NETWORK_PROXY_SETTINGS,
@@ -54,11 +54,16 @@ function createPersistence(db: Database.Database): ImportPersistence {
       return byHash?.item_id ?? null;
     },
 
+    rememberSourceAccess(itemId, normalizedUri, accessUri) {
+      new SourceAccessDB(db).remember(itemId, normalizedUri, accessUri);
+    },
+
     saveItem({
       extracted,
       collectionId,
       tagNames,
       sourceKind,
+      sourceInput,
       normalizedUri,
       contentHash,
     }) {
@@ -81,12 +86,13 @@ function createPersistence(db: Database.Database): ImportPersistence {
         itemId = created.id;
         db.run(
           `INSERT INTO source_records
-             (id, item_id, source_type, source_uri, normalized_uri, content_hash, platform, captured_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, item_id, source_type, source_uri, access_uri, normalized_uri, content_hash, platform, captured_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           createSourceRecordId(),
           created.id,
           sourceKind,
           extracted.sourceUri,
+          sourceKind === "url" ? sourceInput : null,
           normalizedUri,
           contentHash,
           resolveSourcePlatform(sourceKind, extracted.sourceUri),

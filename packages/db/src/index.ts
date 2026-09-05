@@ -42,6 +42,7 @@ export { CollectionDB } from "./collection";
 export { TagDB } from "./tag";
 export { ImportTaskDB } from "./import-task";
 export { SourceCommentDB } from "./source-comment";
+export { SourceAccessDB } from "./source-access";
 export type { UpsertSourceCommentInput } from "./source-comment";
 export { WikiDB } from "./wiki";
 export { AskSessionDB } from "./ask-session";

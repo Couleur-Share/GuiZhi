@@ -1,7 +1,7 @@
 import type { PlatformCapturePlatform } from "../types/platform-capture";
 
 const PLATFORM_DOMAINS: Record<PlatformCapturePlatform, readonly string[]> = {
-  xiaohongshu: ["xiaohongshu.com", "xhslink.com"],
+  xiaohongshu: ["xiaohongshu.com", "xhslink.com", "xhslink.cn"],
   douyin: ["douyin.com", "iesdouyin.com"],
   linuxdo: ["linux.do"],
 };

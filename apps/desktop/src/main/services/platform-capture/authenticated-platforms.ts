@@ -125,7 +125,7 @@ export function platformFromAuthenticatedUrl(
 ): PlatformCapturePlatform | null {
   try {
     const host = new URL(value).hostname.toLowerCase();
-    if (host === "xhslink.com" || host.endsWith(".xiaohongshu.com")) return "xiaohongshu";
+    if (host === "xhslink.com" || host === "xhslink.cn" || host.endsWith(".xiaohongshu.com")) return "xiaohongshu";
     if (host === "iesdouyin.com" || host.endsWith(".douyin.com")) return "douyin";
     if (host === "linux.do" || host.endsWith(".linux.do")) return "linuxdo";
   } catch {

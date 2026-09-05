@@ -41,7 +41,6 @@ import {
 } from "@guizhi/shared/utils/media-summary";
 import { listSpeakers } from "@guizhi/shared/utils/speaker-note";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
-import { detectVideoPlatform } from "@guizhi/shared/utils/video-platforms";
 import {
   detectForumPlatform,
   type ForumTarget,
@@ -61,15 +60,10 @@ import { fetchTwolibraThread } from "../services/import/twolibra";
 import { fetchAuthenticatedLinuxdoJson } from "../services/platform-capture/authenticated-platforms";
 import { getBrowserCaptureService } from "../services/platform-capture/browser-capture";
 import {
-  downloadDouyinMedia,
-  fetchDouyinAweme,
-} from "../services/import/douyin";
-import {
-  downloadBestAudio,
-  runCommand,
   upsertTranscriptionSourceNote,
   YtDlpNotFoundError,
 } from "../services/import/video-url";
+import { downloadItemVideoAudio } from "../services/media/video-retranscription";
 import { prepareAudioForTranscription } from "../services/media/audio-preprocess";
 import { rememberPickedBinaryPath } from "../services/picked-binary-paths";
 import { createStatusCache } from "../services/media/engine-status-cache";
@@ -115,7 +109,6 @@ import {
   installYtDlp,
   probeYtDlpVersion,
   removeManagedYtDlp,
-  resolveYtDlpExecutable,
 } from "../services/media/ytdlp-manager";
 
 export interface MediaTranscribeResult {
@@ -495,20 +488,6 @@ async function transcribeAndSave(
   }
 }
 
-/** 抖音条目重转写：分享页取到无水印地址后直接下载 */
-async function downloadDouyinAudio(
-  sourceUrl: string,
-): Promise<{ dir: string; filePath: string }> {
-  const aweme = await fetchDouyinAweme(sourceUrl);
-  if (aweme.kind === "note") {
-    throw new Error("该抖音作品是图文，没有可转写的音轨");
-  }
-  if (!aweme.playUrl) {
-    throw new Error("未能取到视频播放地址（抖音页面结构可能已变化）");
-  }
-  return downloadDouyinMedia(aweme.playUrl);
-}
-
 /** 在线视频条目：按来源链接重新下载音轨并转写（重新生成文字稿） */
 async function retranscribeOnlineVideo(
   db: Database.Database,
@@ -519,25 +498,11 @@ async function retranscribeOnlineVideo(
   diarize = false,
   report?: (payload: TranscribeProgress) => void,
 ): Promise<MediaTranscribeResult> {
-  const sourceUrl = item.sourceUri?.trim() ?? "";
-  const platform = detectVideoPlatform(sourceUrl);
-  if (!platform) {
-    return {
-      success: false,
-      error: "该条目没有本地媒体文件，来源链接也不是可解析的视频平台",
-    };
-  }
-
   let tempDir: string | null = null;
   try {
-    // 抖音不经 yt-dlp：分享页拿到无水印地址后直接下载（见 import/douyin.ts）
-    const audio = await (platform === "douyin"
-      ? downloadDouyinAudio(sourceUrl)
-      : downloadBestAudio(
-          resolveYtDlpExecutable(readYtDlpPathSetting(db)),
-          sourceUrl,
-          runCommand,
-        ));
+    const audio = await downloadItemVideoAudio(db, item, {
+      getYtDlpPath: () => readYtDlpPathSetting(db),
+    });
     tempDir = audio.dir;
     return await transcribeAndSave(
       items,
