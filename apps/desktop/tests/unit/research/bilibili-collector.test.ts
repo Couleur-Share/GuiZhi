@@ -60,7 +60,7 @@ describe("Bilibili research collector fixture", () => {
     });
   });
 
-  it("排除确定超出范围的候选，保留日期未知候选", () => {
+  it("保留窗口外及未知日期候选，覆盖统计分别记录", () => {
     const page = parseBilibiliSearchResponse(
       {
         code: 0,
@@ -73,8 +73,10 @@ describe("Bilibili research collector fixture", () => {
       },
       { rangeFrom: 1_000_000, rangeTo: 2_000_000 },
     );
-    expect(page.items.map((item) => item.externalId)).toEqual(["BVunknown"]);
-    expect(page.items[0].dateConfidence).toBe("low");
+    expect(page.items.map((item) => item.externalId)).toEqual(["BVold", "BVunknown"]);
+    expect(page.items[1].dateConfidence).toBe("low");
+    expect(page.inWindowCount).toBe(0);
+    expect(page.unknownDateCount).toBe(1);
   });
 
   it("使用 WBI 搜索入口，并在 HTTP 412 时补匿名访客 Cookie 重试", async () => {

@@ -1,0 +1,31 @@
+name: Mobile capture quality
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ['apps/capture-*/**', 'packages/shared/**', 'packages/db/**', 'apps/desktop/src/main/services/mobile-capture/**', 'apps/desktop/src/main/services/import/**', 'apps/desktop/src/main/ipc/mobile-capture.ipc.ts', 'apps/desktop/src/preload/api/mobile-capture.ts', 'apps/desktop/src/renderer/components/settings/MobileCaptureSettings.tsx', 'apps/desktop/tests/unit/**/mobile-capture*.test.ts', 'deploy/capture/**', '.github/workflows/capture-quality.yml', 'pnpm-lock.yaml']
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: npm install --global pnpm@11.1.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @guizhi/capture-relay test
+      - run: pnpm --filter @guizhi/capture-relay build && pnpm --filter @guizhi/capture-web build
+      - run: pnpm --filter @guizhi/capture-web exec playwright install --with-deps chromium
+      - run: pnpm --filter @guizhi/capture-web test:e2e
+      - run: docker build -f apps/capture-relay/Dockerfile -t guizhi-capture:ci .
+      - name: Verify Docker restart persistence
+        run: |
+          mkdir -p "$RUNNER_TEMP/capture-data"
+          sudo chown 1000:1000 "$RUNNER_TEMP/capture-data"
+          docker run -d --name capture-verify -p 127.0.0.1:48788:8787 -e CAPTURE_ORIGIN=https://capture.test -v "$RUNNER_TEMP/capture-data:/data" guizhi-capture:ci
+          python3 deploy/capture/docker-verify.py capture-verify
+      - if: always()
+        run: docker rm -f capture-verify || true

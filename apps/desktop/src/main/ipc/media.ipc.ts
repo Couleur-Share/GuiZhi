@@ -78,6 +78,8 @@ import {
 } from "../services/media/ffmpeg-manager";
 import {
   getFunasrStatus,
+  checkFunasrUpdate,
+  updateFunasr,
   installFunasr,
   uninstallFunasr,
 } from "../services/media/funasr-manager";
@@ -959,6 +961,26 @@ export function registerMediaIPC(db: Database.Database): void {
         getFunasrStatus,
         force === true,
       ),
+  );
+
+  ipcMain.handle(IPC_CHANNELS.FUNASR_CHECK_UPDATE, () => checkFunasrUpdate());
+
+  ipcMain.handle(
+    IPC_CHANNELS.FUNASR_UPDATE,
+    async (event, version: string): Promise<FunasrInstallResult> => {
+      try {
+        const result = await updateFunasr(version, (progress) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send(IPC_CHANNELS.FUNASR_INSTALL_PROGRESS, progress);
+          }
+        });
+        return { success: true, ...result };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      } finally {
+        funasrStatusCache.invalidate();
+      }
+    },
   );
 
   ipcMain.handle(

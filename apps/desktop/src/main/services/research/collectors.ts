@@ -37,6 +37,7 @@ export class BrowserResearchCollector implements ResearchCollector {
         limit: input.limit,
       },
       input.signal,
+      input.onProgress,
     );
     const items = page.items.map((item): ResearchCandidateInput => ({
       source: this.source,
@@ -44,14 +45,15 @@ export class BrowserResearchCollector implements ResearchCollector {
       url: item.url,
       title: item.title,
       author: item.author,
+      authorId: item.authorId,
       snippet: item.snippet,
       publishedAt: item.publishedAt,
       dateConfidence: item.dateConfidence ?? (item.publishedAt ? "medium" : "low"),
       mediaType: item.mediaType,
       engagement: item.engagement,
       discoveryMethod: item.discoveryMethod ?? "authenticated-browser",
-    })).filter((item) => inRange(item, input));
-    return { items, cursor: page.cursor, hasMore: page.hasMore };
+    }));
+    return { items, cursor: page.cursor, hasMore: page.hasMore, returnedCount: items.length, inWindowCount: items.filter((item) => item.publishedAt != null && item.dateConfidence !== "low" && inRange(item, input)).length, unknownDateCount: items.filter((item) => item.publishedAt == null || item.dateConfidence === "low").length };
   }
 }
 
@@ -93,6 +95,7 @@ function cleanText(value: unknown, max = 1000): string {
 }
 
 function numberValue(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
   const parsed = typeof value === "number" ? value : Number(String(value ?? "").replace(/,/g, ""));
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
@@ -192,6 +195,7 @@ export function parseBilibiliSearchResponse(
         url: `https://www.bilibili.com/video/${externalId}`,
         title: cleanText(row.title, 300) || `B 站视频 ${externalId}`,
         author: cleanText(row.author, 200),
+        authorId: row.mid == null ? undefined : String(row.mid),
         snippet: cleanText(row.description, 1200),
         publishedAt: publishedSeconds ? publishedSeconds * 1000 : undefined,
         dateConfidence: publishedSeconds ? "high" : "low",
@@ -205,10 +209,10 @@ export function parseBilibiliSearchResponse(
         },
         discoveryMethod: "public-api",
       };
-    }).filter((item): item is ResearchCandidateInput => item !== null && inRange(item, input));
+    }).filter((item): item is ResearchCandidateInput => item !== null);
     const numPages = Math.max(page, numberValue(response.data?.numPages) ?? page);
     return {
-      items,
+      items, returnedCount: rows.length, inWindowCount: items.filter((item) => item.publishedAt != null && inRange(item, input)).length, unknownDateCount: items.filter((item) => item.publishedAt == null).length,
       cursor: page < numPages ? String(page + 1) : null,
       hasMore: page < numPages,
     };

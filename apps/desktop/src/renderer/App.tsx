@@ -20,6 +20,7 @@ import { DesktopAppCommandBridge } from "./components/app/DesktopAppCommandBridg
 import { GlobalCommandPalette } from "./components/app/GlobalCommandPalette";
 import { useToast } from "./components/ui/Toast";
 import { useOperationErrorToast } from "./hooks/useOperationErrorToast";
+import { useResearchEvents } from "./hooks/useResearchEvents";
 import { useUpdaterStore } from "./stores/updater.store";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MS,
@@ -72,6 +73,7 @@ type PageType = "home" | "settings";
 function App() {
   // store 里变更操作的失败统一在这里提示，调用点无需逐个 try/catch
   useOperationErrorToast();
+  useResearchEvents();
   useBackgroundJobClient();
   useBackupSettingsSync();
   const applyTheme = useSettingsStore((state) => state.applyTheme);

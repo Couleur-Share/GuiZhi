@@ -1,3 +1,5 @@
+import { stopMobileCapture } from "./services/mobile-capture/lifecycle";
+import { shutdownResearch } from "./ipc/research.ipc";
 import {
   app,
   BrowserWindow,
@@ -219,6 +221,7 @@ const trayController = createTrayController({
     }),
   onQuit: () => {
     isQuitting = true;
+  stopMobileCapture();
     // 走窗口关闭路径而不是直接 app.quit()：渲染进程的 beforeunload 要在
     // before-quit 关掉数据库之前把未保存的编辑落盘。窗口销毁后
     // window-all-closed 会接着退出应用。
@@ -604,6 +607,7 @@ ipcMain.on(
       createTray();
     } else {
       isQuitting = true;
+  stopMobileCapture();
       mainWindow?.close();
     }
   },
@@ -807,6 +811,7 @@ async function applyDataPathChange(
       };
     }
 
+    stopMobileCapture(true);
     writeConfiguredDataPath(app.getPath("appData"), resolvedTargetPath);
     return {
       success: true,
@@ -821,6 +826,7 @@ async function applyDataPathChange(
       fs.mkdirSync(resolvedTargetPath, { recursive: true });
     }
 
+    stopMobileCapture(true);
     let migratedCount = 0;
     for (const item of DATA_PATH_MIGRATION_ITEMS) {
       const sourcePath = path.join(currentPath, item);
@@ -834,6 +840,7 @@ async function applyDataPathChange(
       }
     }
 
+    stopMobileCapture(true);
     writeConfiguredDataPath(app.getPath("appData"), resolvedTargetPath);
 
     return {
@@ -1143,6 +1150,7 @@ app.on("window-all-closed", () => {
 // 应用退出前清理
 app.on("before-quit", (event) => {
   isQuitting = true;
+  stopMobileCapture();
   backgroundJobRuntime?.stop();
   if (quitCleanupComplete) {
     closeDatabase();
@@ -1151,7 +1159,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (quitCleanupRunning) return;
   quitCleanupRunning = true;
-  void import("./services/platform-capture/browser-capture")
+  void shutdownResearch().then(() => import("./services/platform-capture/browser-capture"))
     .then(({ closeBrowserCaptureService }) => Promise.race([
       closeBrowserCaptureService(),
       new Promise<void>((resolve) => setTimeout(resolve, 5_000)),

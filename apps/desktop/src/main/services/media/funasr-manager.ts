@@ -44,6 +44,9 @@ import {
   stopFunasrService,
 } from "./funasr-service";
 
+import { updateWindowsFunasr } from "./funasr-update";
+export { checkFunasrUpdate } from "./funasr-update";
+
 // ── Windows Python 运行时 ──────────────────────────────────────────────────
 const PYTHON_RELEASE_TAG = "20260610";
 /** SHA256SUMS 里的行名用的是 `+` 而不是 URL 里的 %2B */
@@ -173,13 +176,14 @@ export function getPythonAssetName(): string {
 function runTool(
   executable: string,
   args: string[],
-  options?: { timeoutMs?: number; onOutput?: (line: string) => void },
+  options?: { timeoutMs?: number; onOutput?: (line: string) => void; env?: NodeJS.ProcessEnv },
 ): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, { windowsHide: true });
+    const child = spawn(executable, args, { windowsHide: true, env: options?.env });
     let stdout = "";
     let tail = "";
     let settled = false;
+    let timedOut = false;
 
     const finish = (action: () => void) => {
       if (!settled) {
@@ -190,10 +194,14 @@ function runTool(
     };
     const timer = setTimeout(
       () => {
-        child.kill();
-        finish(() =>
-          reject(new Error(`${path.basename(executable)} 执行超时`)),
-        );
+        timedOut = true;
+        // 等待 close 后才能回滚，避免 pip / 构建子进程继续写入恢复后的环境。
+        if (process.platform === "win32" && child.pid) {
+          const killer = spawn("taskkill", ["/T", "/F", "/PID", String(child.pid)], { windowsHide: true });
+          killer.on("error", () => child.kill());
+        } else {
+          child.kill();
+        }
       },
       options?.timeoutMs ?? TOOL_TIMEOUT_MS,
     );
@@ -220,7 +228,9 @@ function runTool(
     child.on("error", (error) => finish(() => reject(error)));
     child.on("close", (code) => {
       finish(() => {
-        if (code === 0) {
+        if (timedOut) {
+          reject(new Error(`${path.basename(executable)} 执行超时`));
+        } else if (code === 0) {
           resolve({ stdout });
         } else {
           reject(
@@ -344,6 +354,7 @@ export async function getFunasrStatus(options?: {
     dir: paths.root,
     version: readFunasrState(paths)?.funasrVersion,
     installSupported: isFunasrInstallSupported(platform, arch),
+    updateSupported: platform === "win32" && flavor === "python",
     installFlavor: flavor,
   };
 }
@@ -621,6 +632,20 @@ export async function installFunasr(
     return flavor === "gguf"
       ? await installDarwinGguf(onProgress)
       : await installWindowsPython(onProgress);
+  } finally {
+    operationInFlight = false;
+  }
+}
+
+/** 独立升级不重装 Python、不重下模型，也不改用户的语音路由。 */
+export async function updateFunasr(
+  version: string,
+  onProgress?: (progress: FunasrInstallProgress) => void,
+): Promise<{ version: string; warning?: string }> {
+  if (operationInFlight) throw new Error("已有安装 / 更新 / 卸载任务进行中");
+  operationInFlight = true;
+  try {
+    return await updateWindowsFunasr(version, runTool, onProgress);
   } finally {
     operationInFlight = false;
   }

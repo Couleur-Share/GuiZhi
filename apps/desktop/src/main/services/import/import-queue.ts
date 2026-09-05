@@ -157,6 +157,17 @@ export class ImportQueue {
     this.pump();
   }
 
+  /** 仅在调用方事务提交后调用；既有任务、运行中任务与已清理任务都不会重复调度。 */
+  schedulePersisted(ids: string[]): void {
+    for (const id of ids) {
+      const task = this.store.get(id);
+      if (!task || task.status !== "pending" || this.running.has(id) || this.pendingIds.includes(id)) continue;
+      this.pendingIds.push(id);
+      this.onTaskChanged(task);
+    }
+    this.pump();
+  }
+
   enqueue(inputs: EnqueueImportInput[]): ImportTask[] {
     const tasks: ImportTask[] = [];
     for (const input of inputs) {

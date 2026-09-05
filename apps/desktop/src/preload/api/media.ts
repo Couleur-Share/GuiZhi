@@ -92,6 +92,10 @@ export const ffmpegApi = {
 };
 
 export const funasrApi = {
+  checkUpdate: (): Promise<ToolUpdateCheck> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FUNASR_CHECK_UPDATE),
+  update: (version: string): Promise<FunasrInstallResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.FUNASR_UPDATE, version),
   /** force 为 true 时绕过主进程状态缓存，重新发起健康检查 */
   status: (force?: boolean): Promise<FunasrStatus> =>
     ipcRenderer.invoke(IPC_CHANNELS.FUNASR_STATUS, force),

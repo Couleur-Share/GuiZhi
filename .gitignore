@@ -131,3 +131,12 @@ packages/shared/types/index.js.map
 tmp-*
 # 抓下来对比发布 feed 的一次性产物
 /atom.txt
+
+# 手机收集的本地运行数据与凭证
+deploy/capture/.env
+deploy/capture/data/
+deploy/capture/backups/
+deploy/capture/secrets/
+**/.machine/
+apps/capture-web/test-results/
+apps/capture-web/playwright-report/

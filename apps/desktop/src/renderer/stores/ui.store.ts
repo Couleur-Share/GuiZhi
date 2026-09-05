@@ -18,7 +18,7 @@ export type AppModule = "library" | "inbox" | "ask" | "wiki" | "research" | "imp
  */
 export type LibraryViewMode = "card" | "list";
 
-export type SettingsSectionId =
+export type SettingsSectionId = "mobile-capture"
   | "general"
   | "appearance"
   | "data"

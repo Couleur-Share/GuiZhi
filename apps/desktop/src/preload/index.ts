@@ -1,3 +1,5 @@
+import { mobileCaptureApi } from "./api/mobile-capture";
+window.addEventListener("online", () => { void mobileCaptureApi.fetch().catch(() => undefined); });
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import { aiApi } from "./api/ai";
@@ -59,6 +61,7 @@ const api = {
   collection: collectionApi,
   tag: tagApi,
   import: importApi,
+  mobileCapture: mobileCaptureApi,
   platformCapture: platformCaptureApi,
   wiki: wikiApi,
   migration: migrationApi,

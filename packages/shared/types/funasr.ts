@@ -3,7 +3,7 @@
  * 安装 / 卸载 / 状态由主进程管理，渲染进程仅展示与触发。
  */
 
-export type FunasrInstallPhase = "runtime" | "deps" | "models";
+export type FunasrInstallPhase = "runtime" | "deps" | "models" | "prepare" | "backup" | "verify" | "rollback";
 
 /** python = Windows 全量；gguf = macOS arm64 轻量 */
 export type FunasrInstallFlavor = "python" | "gguf";
@@ -23,6 +23,8 @@ export interface FunasrStatus {
    * Windows 与 macOS Apple Silicon；其余平台请配置云端 audioText。
    */
   installSupported: boolean;
+  /** 独立更新目前仅支持 Windows Python 引擎 */
+  updateSupported?: boolean;
   /** 本机将装 / 已装的引擎形态（决定磁盘占用文案） */
   installFlavor?: FunasrInstallFlavor;
 }
@@ -39,6 +41,8 @@ export interface FunasrInstallResult {
   success: boolean;
   version?: string;
   error?: string;
+  /** 更新完成但有保留备份或清理失败，界面需展示原因和目录。 */
+  warning?: string;
 }
 
 export interface FunasrOperationResult {

@@ -1,3 +1,5 @@
+import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
+import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
 /**
  * Schema 迁移执行器。
  *
@@ -632,6 +634,9 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  { name: "0025-research-evidence", up: (db) => db.exec(RESEARCH_EVIDENCE_SCHEMA) },
+  { name: "0026-research-documents", up: (db) => db.exec(RESEARCH_DOCUMENT_SCHEMA) },
+  { name: "0027-research-series", up: (db) => db.exec(RESEARCH_SERIES_SCHEMA) },
   {
     name: "0028-source-access-uri",
     up(db) {
@@ -642,6 +647,7 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  { name: "0029-mobile-capture", up: db => db.exec(MOBILE_CAPTURE_SCHEMA) },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

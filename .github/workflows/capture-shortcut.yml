@@ -1,0 +1,15 @@
+name: Sign mobile capture shortcut
+on: workflow_dispatch
+permissions: { contents: read }
+jobs:
+  sign:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 deploy/capture/shortcut/generate.py
+      - name: Sign credential-free template using Apple
+        run: shortcuts sign --mode anyone --input deploy/capture/shortcut/Send-to-GuiZhi.unsigned.shortcut --output deploy/capture/shortcut/Send-to-GuiZhi.shortcut
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Send-to-GuiZhi-signed
+          path: deploy/capture/shortcut/Send-to-GuiZhi.shortcut

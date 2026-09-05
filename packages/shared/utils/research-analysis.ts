@@ -5,16 +5,17 @@ import type {
   ResearchSource,
 } from "../types";
 
-const CJK = /[\u3400-\u9fff]/;
 const LATIN_TOKEN = /[a-z0-9]+/g;
 
 export function researchTokens(value: string): Set<string> {
   const normalized = value.normalize("NFKC").toLowerCase();
   const result = new Set(normalized.match(LATIN_TOKEN) ?? []);
-  const cjk = [...normalized].filter((char) => CJK.test(char));
+  for (const run of normalized.match(/[\u3400-\u9fff]+/g) ?? []) {
+  const cjk = [...run];
   for (let index = 0; index < cjk.length; index += 1) {
     result.add(cjk[index]);
     if (index + 1 < cjk.length) result.add(`${cjk[index]}${cjk[index + 1]}`);
+  }
   }
   return result;
 }

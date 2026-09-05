@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   runExclusiveLocalTranscription,
+  runFunasrMaintenance,
+  ensureFunasrService,
   summarizeProcessLog,
 } from "../../../src/main/services/media/funasr-service";
 
@@ -84,5 +86,24 @@ describe("runExclusiveLocalTranscription", () => {
     await expect(
       runExclusiveLocalTranscription(() => Promise.resolve("ok")),
     ).resolves.toBe("ok");
+  });
+});
+
+
+describe("引擎更新与转写互斥", () => {
+  it("已有排队转写时拒绝维护", async () => {
+    let finish!: () => void;
+    const running = runExclusiveLocalTranscription(() => new Promise<void>((resolve) => { finish = resolve; }));
+    await expect(runFunasrMaintenance(async () => {})).rejects.toThrow("正在转写");
+    finish();
+    await running;
+  });
+  it("维护期间拒绝新转写和服务启动，失败后释放锁", async () => {
+    await expect(runFunasrMaintenance(async () => {
+      await expect(runExclusiveLocalTranscription(async () => {})).rejects.toThrow("正在更新");
+      await expect(ensureFunasrService()).rejects.toThrow("正在更新");
+      throw new Error("update failed");
+    })).rejects.toThrow("update failed");
+    await expect(runExclusiveLocalTranscription(async () => "ok")).resolves.toBe("ok");
   });
 });

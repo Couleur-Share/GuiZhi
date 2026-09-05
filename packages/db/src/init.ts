@@ -286,6 +286,8 @@ function ensureQueryPlannerStats(database: Database.Database): void {
  * behaviour into the database initialization process.
  */
 export interface InitDatabaseHooks {
+  /** Called under the database lease, before any schema creation or migration. */
+  beforeSchemaUpgrade?: (database: Database.Database) => void;
   /**
    * Recover a legacy lock without lease metadata. Only hosts with an external
    * single-instance guarantee may enable this; shared callers default to false.
@@ -343,6 +345,8 @@ export function initDatabase(
     // WAL 需要的共享内存 VFS，实测（2026-07）执行该 PRAGMA 既不报错也不生效，
     // 返回值仍是 delete。所以库跑在 rollback journal 下：写事务期间读被阻塞。
     // 谁要再加这一行，先确认 `PRAGMA journal_mode` 的返回值真的变了。
+
+    hooks?.beforeSchemaUpgrade?.(db);
 
     // Create tables only (indexes come after migrations)
     db.exec(SCHEMA_TABLES);

@@ -146,6 +146,7 @@ function queryFingerprint(query: KnowledgeItemQuery): string {
     collectionId: query.collectionId ?? null,
     tagId: query.tagId ?? null,
     platform: query.platform ?? null,
+    excludedItemIds: query.excludedItemIds,
     collectionScope: query.collectionScope
       ? {
           ids: [...query.collectionScope.ids].sort(),
@@ -345,6 +346,10 @@ export class KnowledgeItemDB {
         break;
     }
 
+    if (query.excludedItemIds?.length) {
+      conditions.push(`i.id NOT IN (${query.excludedItemIds.map(() => "?").join(",")})`);
+      params.push(...query.excludedItemIds);
+    }
     if (query.collectionId) {
       conditions.push("i.collection_id = ?");
       params.push(query.collectionId);

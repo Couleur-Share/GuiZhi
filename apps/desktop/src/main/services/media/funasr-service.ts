@@ -41,6 +41,24 @@ let detachLogging: (() => void) | null = null;
 let startingPromise: Promise<void> | null = null;
 /** 本地引擎转写的串行链（见 runExclusiveLocalTranscription） */
 let transcriptionChain: Promise<unknown> = Promise.resolve();
+let pendingTranscriptions = 0;
+let serviceStarts = 0;
+let maintenanceInFlight = false;
+
+/** 更新与转写 / 启动互斥；维护中的健康验收通过专用回调启动。 */
+export async function runFunasrMaintenance<T>(
+  task: (startService: () => Promise<void>) => Promise<T>,
+): Promise<T> {
+  if (maintenanceInFlight || pendingTranscriptions > 0 || serviceStarts > 0) {
+    throw new Error("本地引擎正在转写或启动，请完成后再更新");
+  }
+  maintenanceInFlight = true;
+  try {
+    return await task(() => ensureFunasrServiceInternal(DEFAULT_BOOT_TIMEOUT_MS));
+  } finally {
+    maintenanceInFlight = false;
+  }
+}
 /**
  * 服务最后一次报告「还在处理」的时刻。
  *
@@ -289,6 +307,16 @@ async function startOrAdopt(bootTimeoutMs: number): Promise<void> {
 export async function ensureFunasrService(
   bootTimeoutMs = DEFAULT_BOOT_TIMEOUT_MS,
 ): Promise<void> {
+  if (maintenanceInFlight) throw new Error("本地转写引擎正在更新，请稍后重试");
+  serviceStarts += 1;
+  try {
+    await ensureFunasrServiceInternal(bootTimeoutMs);
+  } finally {
+    serviceStarts -= 1;
+  }
+}
+
+async function ensureFunasrServiceInternal(bootTimeoutMs: number): Promise<void> {
   if (await probeFunasrHealth()) {
     return;
   }
@@ -314,7 +342,13 @@ export async function ensureFunasrService(
 export function runExclusiveLocalTranscription<T>(
   task: () => Promise<T>,
 ): Promise<T> {
-  const next = transcriptionChain.then(task, task);
+  if (maintenanceInFlight) {
+    return Promise.reject(new Error("本地转写引擎正在更新，请稍后重试"));
+  }
+  pendingTranscriptions += 1;
+  const next = transcriptionChain.then(task, task).finally(() => {
+    pendingTranscriptions -= 1;
+  });
   // 前一条的成败不该影响后一条排队，链条本身只用来定序
   transcriptionChain = next.then(
     () => undefined,

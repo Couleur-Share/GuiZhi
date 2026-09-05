@@ -20,7 +20,8 @@ export const LOGIN_FLOW_DOMAINS: Record<
   readonly string[]
 > = {
   xiaohongshu: ["xiaohongshu.com"],
-  douyin: ["douyin.com", "iesdouyin.com", "zijieapi.com", "snssdk.com"],
+  // 消费端搜索页的验证码 iframe；与创作者中心登录使用不同的验证入口。
+  douyin: ["douyin.com", "iesdouyin.com", "zijieapi.com", "snssdk.com", "rmc.bytedance.com"],
   linuxdo: [
     "linux.do",
     "cloudflare.com",
@@ -49,6 +50,13 @@ export const RESOURCE_DOMAINS: Record<
     "snssdk.com",
     // 创作者中心官方登录组件的前端资源，只放行实测必需的精确主机。
     "lf-ucenter-web.yhgfb-cn-static.com",
+    // 创作者中心 sdk-glue 1.0.0.62 的验证组件与设备安全脚本备用源。
+    // 扫码确认后可能继续校验；拦截它们会让官方验证流程无法完成。
+    "lf-rc1.yhgfb-cn-static.com",
+    "lf-rc2.yhgfb-cn-static.com",
+    "lf-headquarters-speed.yhgfb-cn-static.com",
+    // 创作者中心 checkWebId 使用的设备标识服务，保留精确主机边界。
+    "ttwid.bytedance.com",
   ],
   linuxdo: [
     "linux.do",

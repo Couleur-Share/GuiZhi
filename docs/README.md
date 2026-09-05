@@ -7,7 +7,9 @@
 | 文档 | 说明 |
 | --- | --- |
 | [快速上手](./getting-started.md) | 安装后五步走通主流程；快捷键 |
+| [手机收集](./mobile-capture.md) | 邀请绑定、手机分享、离线暂存与处理结果 |
 | [采集平台](./capture-platforms.md) | 支持的视频 / 图文 / 论坛与未支持边界 |
+| [近期研究](./research.md) / [English](./research.en.md) | 证据准入、有限精读、报告、比较与本地知识关联 |
 | [功能说明](./features.md) | 采集、知识库、AI、Wiki、本地工具链、界面 |
 | [模型路由](./ai-models.md) | 六条 AI 路由怎么配、各自干什么 |
 | [MCP 接入](./mcp.md) | 让 Cursor / Codex 直接搜本机知识库 |
@@ -19,6 +21,7 @@
 
 | 文档 | 说明 |
 | --- | --- |
+| [手机收集运维](./mobile-capture-ops.md) / [验证记录](./mobile-capture-validation.md) | 中转部署、备份恢复、已验证与待验收范围 |
 | [从源码构建](./building.md) | 依赖、常用命令、仓库结构 |
 | [AGENTS.md](../AGENTS.md) | 架构约定、里程碑与给 AI 助手的完整指南 |
 | [SQLite 与主进程](./sqlite-main-process.md) | 为何数据库留在主进程（实测结论） |

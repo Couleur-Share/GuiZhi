@@ -89,9 +89,37 @@ describe("平台登录态采集边界", () => {
       "https://notdouyinstatic.com/app.js",
       "https://lf-static.applogcdn.com/log.js",
       "https://lf3-short.ibytedapm.com/monitor.js",
-      "https://lf-rc1.yhgfb-cn-static.com/unknown.js",
+      "https://unverified.yhgfb-cn-static.com/unknown.js",
     ]) {
       expect(isAllowedBrowserResourceUrl("douyin", url)).toBe(false);
+    }
+  });
+
+  it("允许抖音官方登录校验依赖，同时保持资源与导航边界", () => {
+    // 来自创作者中心 sdk-glue 1.0.0.62 和 main.066c77ac.js 的依赖；
+    // 验证组件和设备标识服务不是可随意屏蔽的遥测请求。
+    const dependencies = [
+      ["https://lf-rc1.yhgfb-cn-static.com/obj/rc-verifycenter/sec_sdk_build/4.0.10/captcha/index.js", "script"],
+      ["https://lf-rc2.yhgfb-cn-static.com/obj/rc-verifycenter/sec_sdk_build/4.0.10/captcha/index.js", "script"],
+      ["https://lf-headquarters-speed.yhgfb-cn-static.com/obj/rc-client-security/web/stable/1.0.1.16/bdms.js", "script"],
+      ["https://ttwid.bytedance.com/ttwid/union/register/", "xhr"],
+      ["https://rmc.bytedance.com/verifycenter/captcha/v2", "subFrame"],
+    ] as const;
+    for (const [url, resourceType] of dependencies) {
+      expect(isAllowedBrowserResourceUrl("douyin", url), url).toBe(true);
+      expect(shouldBlockLoginPageRequest("douyin", url, resourceType), url).toBe(false);
+      expect(isAllowedPlatformUrl("douyin", url), url).toBe(false);
+    }
+    for (const url of [
+      "http://lf-rc1.yhgfb-cn-static.com/captcha/index.js",
+      "https://lf-rc1.yhgfb-cn-static.com.evil.test/captcha/index.js",
+      "https://unverified.yhgfb-cn-static.com/captcha/index.js",
+      "https://ttwid.bytedance.com.evil.test/ttwid/union/register/",
+      "https://unverified.bytedance.com/ttwid/union/register/",
+      "https://rmc.bytedance.com.evil.test/verifycenter/captcha/v2",
+      "http://rmc.bytedance.com/verifycenter/captcha/v2",
+    ]) {
+      expect(isAllowedBrowserResourceUrl("douyin", url), url).toBe(false);
     }
   });
 
@@ -398,7 +426,7 @@ describe("平台登录态采集边界", () => {
     );
   });
 
-  it("研究取消信号会关闭正在导航的隐藏平台窗口", async () => {
+  it.each(["search", "login"] as const)("研究取消信号会关闭正在导航的平台窗口（%s）", async (operation) => {
     const userData = tempDir();
     const stateDir = path.join(userData, "browser-capture");
     fs.mkdirSync(stateDir, { recursive: true });
@@ -449,7 +477,7 @@ describe("平台登录态采集边界", () => {
     createElectronCaptureContextMock.mockResolvedValue(context);
     const service = new BrowserCaptureService({ userDataPath: userData });
     const controller = new AbortController();
-    const pending = service.search(
+    const pending = operation === "login" ? service.login("douyin", false, undefined, "本地知识库", controller.signal) : service.search(
       { platform: "xiaohongshu", keyword: "本地知识库", limit: 20 },
       controller.signal,
     );
@@ -459,6 +487,14 @@ describe("平台登录态采集边界", () => {
 
     await expect(pending).rejects.toMatchObject({ code: "canceled" });
     expect(context.close).toHaveBeenCalled();
+  });
+
+  it("已取消的验证不会在浏览器队列轮到它时再打开窗口", async () => {
+    const service = new BrowserCaptureService({ userDataPath: tempDir() });
+    const controller = new AbortController();
+    controller.abort();
+    await expect(service.login("douyin", false, undefined, "本地知识库", controller.signal)).rejects.toMatchObject({ code: "canceled" });
+    expect(createElectronCaptureContextMock).not.toHaveBeenCalled();
   });
 
   it("从脱敏平台响应提取作品、游标卡片和热门评论", () => {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { installWindowMocks } from "../../helpers/window";
@@ -62,6 +62,8 @@ function installEngineMocks() {
       },
       funasr: {
         status: vi.fn().mockResolvedValue(FUNASR_INSTALLED),
+        checkUpdate: vi.fn().mockResolvedValue({ current: "1.3.29", latest: "1.3.30", updateAvailable: true }),
+        update: vi.fn().mockResolvedValue({ success: true, version: "1.3.30" }),
         install: vi.fn().mockResolvedValue({ success: true }),
         uninstall: vi.fn().mockResolvedValue({ success: true }),
       },
@@ -436,17 +438,13 @@ describe("采集区", () => {
     expect(window.api.ffmpeg.install).not.toHaveBeenCalled();
   });
 
-  /**
-   * 本地转写引擎没有「更新」这回事（pip 装出来的运行时），重装只是修复手段，
-   * 约 700MB / 数分钟，不该摆在主操作位上诱人误点。
-   */
-  it("本地转写引擎装好后主操作位为空，重新安装收进高级面板", async () => {
+  it("本地转写引擎装好后可检查更新，重新安装仍收进高级面板", async () => {
     const user = userEvent.setup();
     renderSection();
     await waitFor(() => expect(row("funasr").getByText("已就绪")).toBeInTheDocument());
 
     expect(row("funasr").queryByRole("button", { name: "重新安装" })).not.toBeInTheDocument();
-    expect(row("funasr").queryByRole("button", { name: "检查更新" })).not.toBeInTheDocument();
+    expect(row("funasr").getByRole("button", { name: "检查更新" })).toBeInTheDocument();
 
     await user.click(row("funasr").getByLabelText("高级选项"));
 
@@ -579,5 +577,101 @@ describe("采集区", () => {
 
     expect(window.api.ytdlp.status).toHaveBeenNthCalledWith(1, false);
     expect(window.api.ytdlp.status).toHaveBeenLastCalledWith(true);
+  });
+});
+
+
+describe("本地转写引擎更新", () => {
+  it("更新成功但备份保留时展示可展开的警告", async () => {
+    window.api.funasr.update.mockResolvedValue({ success: true, version: "1.3.30", warning: "备份清理未完成：tools/funasr/update-backup-ABC123" });
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(await row("funasr").findByRole("button", { name: "检查更新" }));
+    await user.click(await row("funasr").findByRole("button", { name: "更新到 v1.3.30" }));
+    expect(await screen.findByText("本地转写引擎已更新到 v1.3.30")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: /查看详情/ }));
+    expect(await screen.findByText("备份清理未完成：tools/funasr/update-backup-ABC123")).toBeInTheDocument();
+  });
+  it("先检查，再按展示版本更新，不调用重装", async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await waitFor(() => expect(row("funasr").getByText("已就绪")).toBeInTheDocument());
+    await user.click(row("funasr").getByRole("button", { name: "检查更新" }));
+    await user.click(await row("funasr").findByRole("button", { name: "更新到 v1.3.30" }));
+    await waitFor(() => expect(window.api.funasr.update).toHaveBeenCalledWith("1.3.30"));
+    expect(window.api.funasr.install).not.toHaveBeenCalled();
+    expect(await screen.findByText("本地转写引擎已更新到 v1.3.30")).toBeInTheDocument();
+  });
+  it("网络检查失败可重试，不能误报最新", async () => {
+    window.api.funasr.checkUpdate.mockRejectedValue(new Error("PyPI offline"));
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(await row("funasr").findByRole("button", { name: "检查更新" }));
+    expect(await screen.findByText("检查更新失败，请稍后重试")).toBeInTheDocument();
+    expect(row("funasr").queryByText("已是最新")).not.toBeInTheDocument();
+    expect(row("funasr").getByRole("button", { name: "检查更新" })).toBeEnabled();
+  });
+  it("更新失败显示错误并恢复可检查状态", async () => {
+    window.api.funasr.update.mockResolvedValue({ success: false, error: "已恢复原版本" });
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(await row("funasr").findByRole("button", { name: "检查更新" }));
+    await user.click(await row("funasr").findByRole("button", { name: "更新到 v1.3.30" }));
+    expect(await screen.findByText("本地转写引擎更新失败")).toBeInTheDocument();
+    expect(await row("funasr").findByRole("button", { name: "检查更新" })).toBeEnabled();
+  });
+  it("没有新版本时只显示已是最新", async () => {
+    window.api.funasr.checkUpdate.mockResolvedValue({ current: "1.3.29", latest: "1.3.29", updateAvailable: false });
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(await row("funasr").findByRole("button", { name: "检查更新" }));
+    expect(await row("funasr").findByText("已是最新")).toBeInTheDocument();
+    expect(window.api.funasr.update).not.toHaveBeenCalled();
+  });
+  it("GGUF 明确标注随应用适配更新，不给 pip 更新入口", async () => {
+    window.api.funasr.status.mockResolvedValue({ ...FUNASR_INSTALLED, installFlavor: "gguf", updateSupported: false });
+    renderSection();
+    expect(await row("funasr").findByText("随应用适配更新")).toBeInTheDocument();
+    expect(row("funasr").queryByRole("button", { name: "检查更新" })).not.toBeInTheDocument();
+  });
+});
+
+
+describe("本地转写引擎更新过程展示", () => {
+  it("保留版本、显示阶段，其他维护动作禁用但不转圈", async () => {
+    let finish!: (result: { success: boolean; version: string }) => void;
+    window.api.funasr.update.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(await row("funasr").findByRole("button", { name: "检查更新" }));
+    await user.click(await row("funasr").findByRole("button", { name: "更新到 v1.3.30" }));
+    const panel = await row("funasr").findByTestId("funasr-update-progress");
+    expect(row("funasr").queryByText("已就绪")).not.toBeInTheDocument();
+    expect(row("funasr").getByText(/v1.3.29 → v1.3.30/)).toBeInTheDocument();
+    expect(within(panel).getByText("正在确认更新版本")).toBeInTheDocument();
+    const progressHandler = window.api.on.mock.calls.find(([channel]) => channel === "funasr:installProgress")[1];
+    await act(() => progressHandler({ phase: "prepare", percent: null }));
+    expect(within(panel).getByRole("status")).toHaveTextContent("正在检查空间与历史备份");
+    expect(within(panel).getByText("准备").closest("li")).toHaveAttribute("aria-current", "step");
+    await act(() => progressHandler({ phase: "backup", percent: null }));
+    expect(within(panel).getByRole("status")).toHaveTextContent("备份当前引擎");
+    expect(within(panel).getByText(/这一步可能需要几分钟/)).toBeInTheDocument();
+    expect(within(panel).queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(within(panel).getByText("备份").closest("li")).toHaveAttribute("aria-current", "step");
+    await user.click(row("funasr").getByLabelText("高级选项"));
+    for (const name of ["重新检测", "重新安装", "卸载引擎"]) {
+      const button = row("funasr").getByRole("button", { name });
+      expect(button).toBeDisabled();
+      expect(button.querySelector(".animate-spin")).toBeNull();
+    }
+    await act(() => progressHandler({ phase: "deps", percent: null, detail: "Collecting funasr==1.3.30" }));
+    expect(within(panel).getByRole("status")).toHaveTextContent("正在下载并更新引擎");
+    expect(within(panel).getByText("Collecting funasr==1.3.30").closest("details")).not.toHaveAttribute("open");
+    expect(screen.queryByText(/约 700MB，需要几分钟/)).not.toBeInTheDocument();
+    await act(() => progressHandler({ phase: "rollback", percent: null }));
+    expect(within(panel).getByRole("status")).toHaveTextContent("恢复原版本");
+    expect(within(panel).queryByRole("list")).not.toBeInTheDocument();
+    await act(async () => finish({ success: true, version: "1.3.30" }));
+    await waitFor(() => expect(row("funasr").queryByTestId("funasr-update-progress")).not.toBeInTheDocument());
   });
 });

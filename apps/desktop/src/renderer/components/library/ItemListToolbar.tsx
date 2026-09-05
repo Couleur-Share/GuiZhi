@@ -5,7 +5,6 @@ import {
   LayoutGridIcon,
   ListIcon,
   Trash2Icon,
-  XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
@@ -13,10 +12,9 @@ import type {
   KnowledgeSortOrder,
 } from "@guizhi/shared/types";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
-import { useCollectionStore } from "../../stores/collection.store";
-import { useTagStore } from "../../stores/tag.store";
 import { useUIStore, type LibraryViewMode } from "../../stores/ui.store";
 import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
+import { LibraryFilterSummary } from "./LibraryFilterSummary";
 
 interface SortOption {
   labelKey: string;
@@ -101,18 +99,10 @@ export function ItemListToolbar({
   const sortBy = useKnowledgeStore((state) => state.sortBy);
   const sortOrder = useKnowledgeStore((state) => state.sortOrder);
   const setSort = useKnowledgeStore((state) => state.setSort);
-  const collectionId = useKnowledgeStore((state) => state.collectionId);
-  const tagId = useKnowledgeStore((state) => state.tagId);
-  const platform = useKnowledgeStore((state) => state.platform);
-  const selectCollection = useKnowledgeStore((state) => state.selectCollection);
-  const selectTag = useKnowledgeStore((state) => state.selectTag);
-  const selectPlatform = useKnowledgeStore((state) => state.selectPlatform);
-  const clearFacetFilters = useKnowledgeStore((state) => state.clearFacetFilters);
-  const collections = useCollectionStore((state) => state.collections);
-  const tags = useTagStore((state) => state.tags);
   const viewMode = useUIStore((state) => state.libraryViewMode);
   const setViewMode = useUIStore((state) => state.setLibraryViewMode);
 
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const sortButtonRef = useRef<HTMLButtonElement>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
     null,
@@ -126,12 +116,9 @@ export function ItemListToolbar({
   const sortLabel = isSearching
     ? t("library.sortRelevance", "相关度")
     : t(current.labelKey, current.fallback);
-  const collectionName = collections.find((item) => item.id === collectionId)?.name;
-  const tagName = tags.find((item) => item.id === tagId)?.name;
 
   const sortMenuItems: ContextMenuItem[] = SORT_OPTIONS.map((option) => {
-    const selected =
-      option.sortBy === sortBy && option.sortOrder === sortOrder;
+    const selected = option.sortBy === sortBy && option.sortOrder === sortOrder;
     return {
       label: t(option.labelKey, option.fallback),
       icon: selected ? (
@@ -144,51 +131,15 @@ export function ItemListToolbar({
   });
 
   return (
-    <div className="library-list-toolbar flex h-9 shrink-0 items-center gap-1 border-b border-border px-3">
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-        {collectionId ? (
-          <button
-            type="button"
-            onClick={() => selectCollection(collectionId)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/15"
-          >
-            <span className="max-w-24 truncate">{collectionName ?? t("library.collection", "知识库")}</span>
-            <XIcon className="h-3 w-3" aria-hidden="true" />
-          </button>
-        ) : null}
-        {tagId ? (
-          <button
-            type="button"
-            onClick={() => selectTag(tagId)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/15"
-          >
-            <span className="max-w-24 truncate">#{tagName ?? t("library.tag", "标签")}</span>
-            <XIcon className="h-3 w-3" aria-hidden="true" />
-          </button>
-        ) : null}
-        {platform ? (
-          <button
-            type="button"
-            onClick={() => selectPlatform(platform)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary hover:bg-primary/15"
-          >
-            <span className="max-w-24 truncate">{platform}</span>
-            <XIcon className="h-3 w-3" aria-hidden="true" />
-          </button>
-        ) : null}
-        {(collectionId || tagId || platform) ? (
-          <button
-            type="button"
-            onClick={clearFacetFilters}
-            className="shrink-0 px-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {t("common.clear", "清除")}
-          </button>
-        ) : null}
-      <span className="shrink-0 text-xs text-muted-foreground">
+    <div
+      ref={toolbarRef}
+      tabIndex={-1}
+      className="library-list-toolbar flex min-h-9 shrink-0 flex-wrap items-center gap-1 border-b border-border px-3 py-1 focus:outline-none"
+    >
+      <span className="mr-auto text-xs tabular-nums text-muted-foreground">
         {t("library.itemCount", "共 {{count}} 个", { count: total })}
       </span>
-      </div>
+      <LibraryFilterSummary fallbackFocusRef={toolbarRef} />
 
       {onEmptyTrash ? (
         <button

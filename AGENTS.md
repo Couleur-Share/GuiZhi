@@ -1220,3 +1220,5 @@ json）只走 HMR，都不打扰人；会触发重启的是 `src/main/**` 以及
  派生密钥、只加密机密字段；除它之外，导出一律不得携带机密：Markdown 导出只碰
  条目正文，`.db` 备份不含 AI 配置（Key 不在 SQLite 里），两者都不要为了「方便」
  破这条。日志同理，`scrubMessage` 只抹主目录，别把 Key 写进报错原文。
+
+手机收集桌面凭证例外：仅主进程 safeStorage 加密保存于 `.machine/mobile-capture.json`；不通过 IPC 返回，不加入备份、导出或目录迁移白名单。Linux basic_text 或安全存储不可用时仅保存在当前进程内存，禁止明文回落。

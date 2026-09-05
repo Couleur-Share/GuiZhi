@@ -6,6 +6,7 @@
  */
 
 export const IPC_CHANNELS = {
+  MOBILE_CAPTURE: "mobile-capture:invoke",
   // Knowledge items
   KNOWLEDGE_LIST: "knowledge:list",
   KNOWLEDGE_GET: "knowledge:get",
@@ -216,6 +217,8 @@ export const IPC_CHANNELS = {
   // 本地转写引擎（托管 funasr-server + SenseVoiceSmall）
   FUNASR_STATUS: "funasr:status",
   FUNASR_INSTALL: "funasr:install",
+  FUNASR_CHECK_UPDATE: "funasr:checkUpdate",
+  FUNASR_UPDATE: "funasr:update",
   FUNASR_UNINSTALL: "funasr:uninstall",
   /** 主进程 → 渲染进程：安装阶段进度 */
   FUNASR_INSTALL_PROGRESS: "funasr:installProgress",
@@ -252,12 +255,22 @@ export const IPC_CHANNELS = {
   AI_USAGE_CLEAR: "ai:usageClear",
 
   // 近期主题研究
+  RESEARCH_COMPARE: "research:compare",
+  RESEARCH_BASELINES: "research:baselines",
+  RESEARCH_SET_BASELINE: "research:setBaseline",
+  RESEARCH_GENERATE_REPORT: "research:generateReport",
+  RESEARCH_CANCEL_REPORT: "research:cancelReport",
+  RESEARCH_EVIDENCE: "research:evidence",
+  RESEARCH_RETRY_READING: "research:retryReading",
+  RESEARCH_RESUME: "research:resume",
+  RESEARCH_SAVE_EXCERPT: "research:saveExcerpt",
   RESEARCH_LIST: "research:list",
   RESEARCH_GET: "research:get",
   RESEARCH_CREATE: "research:create",
   RESEARCH_CANCEL: "research:cancel",
   RESEARCH_DELETE: "research:delete",
   RESEARCH_CLONE: "research:clone",
+  RESEARCH_VERIFY_AND_RETRY_SOURCE: "research:verifyAndRetrySource",
   RESEARCH_BEGIN_REPORT: "research:beginReport",
   RESEARCH_SAVE_REPORT: "research:saveReport",
   RESEARCH_FAIL_REPORT: "research:failReport",

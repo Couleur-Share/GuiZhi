@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/out
+**/dist
+**/test-results
+**/playwright-report
+**/*.log
+**/.env
+**/.machine
+deploy/capture/data
+deploy/capture/backups
+deploy/capture/secrets

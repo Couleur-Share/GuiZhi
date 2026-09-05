@@ -25,6 +25,9 @@ export const PLATFORM_CAPTURE_ERROR_CODES = [
   "login_timeout",
   "browser_closed",
   "platform_changed",
+  "navigation_timeout",
+  "network_error",
+  "verification_required",
   "canceled",
 ] as const;
 
@@ -61,6 +64,7 @@ export interface PlatformDiscoveryItem {
   url: string;
   title: string;
   author: string;
+  authorId?: string;
   coverUrl?: string;
   mediaType: PlatformDiscoveryMediaType;
   publishedAt?: number;

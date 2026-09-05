@@ -10,6 +10,8 @@ import type {
 } from "@guizhi/shared/types";
 import { isAllowedPlatformUrl } from "@guizhi/shared/utils/platform-capture";
 import { applyElectronSessionProxy } from "../network-proxy";
+import { showWindowOffscreen } from "../../testing/window-mode";
+import { matchesSearchRequest, type CaptureRequest, type SearchCaptureScope } from "./search-capture";
 
 const JSON_RESPONSE_LIMIT = 64;
 const JSON_RESPONSE_BYTES_LIMIT = 32 * 1024 * 1024;
@@ -71,7 +73,8 @@ export interface ElectronCapturePage {
     options?: { exact?: boolean },
   ): ElectronCaptureLocator;
   scrollBy(y: number): Promise<void>;
-  startJsonCapture(platform: PlatformCapturePlatform): unknown[];
+  startJsonCapture(platform: PlatformCapturePlatform, scope?: SearchCaptureScope): unknown[];
+  stopJsonCapture(): void;
   close(): Promise<void>;
 }
 
@@ -208,7 +211,9 @@ class ElectronPage implements ElectronCapturePage {
   private navigationTimeout = 45_000;
   private jsonPayloads: unknown[] | null = null;
   private capturedBytes = 0;
+  private searchRequests = new Map<string, CaptureRequest>();
   private debuggerAttached = false;
+  private detachJsonCapture?: () => void;
   private pendingResponses = new Map<
     string,
     { url: string; mimeType: string }
@@ -227,6 +232,7 @@ class ElectronPage implements ElectronCapturePage {
   async goto(url: string, options: { timeout?: number } = {}): Promise<void> {
     if (this.isClosed()) throw new Error("登录窗口已关闭");
     const contents = this.window.webContents;
+    let cleanup = () => {};
     const ready = new Promise<void>((resolve, reject) => {
       const onReady = () => {
         cleanup();
@@ -246,31 +252,35 @@ class ElectronPage implements ElectronCapturePage {
         _url: string,
         isMainFrame: boolean,
       ) => {
-        if (!isMainFrame || code === -3) return;
+        if (!isMainFrame) return;
         cleanup();
-        reject(new Error(`页面加载失败：${description}`));
+        reject(new Error(`页面加载失败：${description} (${code})`));
       };
       const onClosed = () => {
         cleanup();
         reject(new Error("Platform login window closed"));
       };
-      const cleanup = () => {
+      cleanup = () => {
         contents.removeListener("dom-ready", onReady);
         contents.removeListener("did-navigate", onNavigate);
         contents.removeListener("did-fail-load", onFailure);
         this.window.removeListener("closed", onClosed);
       };
-      contents.once("dom-ready", onReady);
+      // dom-ready 可能来自上一次仍在加载的页面，不能结束新的导航。
       contents.on("did-navigate", onNavigate);
       contents.on("did-fail-load", onFailure);
       this.window.once("closed", onClosed);
+      // loadURL 的拒绝必须传播，否则未发 did-fail-load 的失败只能等满超时。
+      void contents.loadURL(url).then(onReady, (error: unknown) => {
+        cleanup();
+        reject(new Error(`页面加载失败：${error instanceof Error ? error.message : String(error)}`, { cause: error }));
+      });
     });
-    void contents.loadURL(url).catch(() => undefined);
-    await withTimeout(
-      ready,
-      options.timeout ?? this.navigationTimeout,
-      "页面导航超时",
-    );
+    try {
+      await withTimeout(ready, options.timeout ?? this.navigationTimeout, "页面导航超时");
+    } finally {
+      cleanup();
+    }
   }
 
   async reload(options: { timeout?: number } = {}): Promise<void> {
@@ -343,9 +353,10 @@ class ElectronPage implements ElectronCapturePage {
     );
   }
 
-  startJsonCapture(platform: PlatformCapturePlatform): unknown[] {
+  startJsonCapture(platform: PlatformCapturePlatform, scope?: SearchCaptureScope): unknown[] {
     if (this.jsonPayloads) return this.jsonPayloads;
     this.jsonPayloads = [];
+    const payloads = this.jsonPayloads;
     const contents = this.window.webContents;
     try {
       contents.debugger.attach("1.3");
@@ -354,7 +365,15 @@ class ElectronPage implements ElectronCapturePage {
         maxTotalBufferSize: JSON_RESPONSE_BYTES_LIMIT,
         maxResourceBufferSize: SINGLE_JSON_RESPONSE_BYTES_LIMIT,
       });
-      contents.debugger.on("message", (_event, method, params) => {
+      const onMessage = (_event: Electron.Event, method: string, params: Record<string, unknown>) => {
+        if (this.jsonPayloads !== payloads) return;
+        if (scope && method === "Network.requestWillBeSent") {
+          const request = params.request as CaptureRequest | undefined;
+          const id = String(params.requestId);
+          this.searchRequests.delete(id);
+          if (request && matchesSearchRequest(platform, request, scope)) this.searchRequests.set(id, { url: request.url });
+          return;
+        }
         if (method === "Network.responseReceived") {
           const response = params.response as
             { url?: string; mimeType?: string } | undefined;
@@ -363,7 +382,8 @@ class ElectronPage implements ElectronCapturePage {
           if (
             url &&
             isAllowedPlatformUrl(platform, url) &&
-            /json|javascript/i.test(mimeType)
+            (!scope || this.searchRequests.has(String(params.requestId))) &&
+            (/json|javascript/i.test(mimeType) || ["XHR", "Fetch"].includes(String(params.type)))
           ) {
             this.pendingResponses.set(String(params.requestId), {
               url,
@@ -372,8 +392,14 @@ class ElectronPage implements ElectronCapturePage {
           }
           return;
         }
+        if (method === "Network.loadingFailed") {
+          this.pendingResponses.delete(String(params.requestId));
+          this.searchRequests.delete(String(params.requestId));
+          return;
+        }
         if (method !== "Network.loadingFinished") return;
         const requestId = String(params.requestId);
+        this.searchRequests.delete(requestId);
         const pending = this.pendingResponses.get(requestId);
         this.pendingResponses.delete(requestId);
         if (
@@ -386,7 +412,7 @@ class ElectronPage implements ElectronCapturePage {
           .sendCommand("Network.getResponseBody", { requestId })
           .then((result) => {
             if (
-              !this.jsonPayloads ||
+              this.jsonPayloads !== payloads ||
               this.jsonPayloads.length >= JSON_RESPONSE_LIMIT
             )
               return;
@@ -407,21 +433,32 @@ class ElectronPage implements ElectronCapturePage {
             }
           })
           .catch(() => undefined);
-      });
+      };
+      contents.debugger.on("message", onMessage);
+      this.detachJsonCapture = () => {
+        contents.debugger.removeListener("message", onMessage);
+        if (this.debuggerAttached && !contents.isDestroyed()) {
+          try { contents.debugger.detach(); } catch { /* 窗口已关闭。 */ }
+        }
+      };
     } catch {
       this.debuggerAttached = false;
     }
     return this.jsonPayloads;
   }
 
+  stopJsonCapture(): void {
+    this.detachJsonCapture?.();
+    this.detachJsonCapture = undefined;
+    this.debuggerAttached = false;
+    this.jsonPayloads = null;
+    this.capturedBytes = 0;
+    this.pendingResponses.clear();
+    this.searchRequests.clear();
+  }
+
   async close(): Promise<void> {
-    if (this.debuggerAttached && !this.window.webContents.isDestroyed()) {
-      try {
-        this.window.webContents.debugger.detach();
-      } catch {
-        /* 已关闭 */
-      }
-    }
+    this.stopJsonCapture();
     if (!this.window.isDestroyed()) this.window.destroy();
   }
 }
@@ -563,6 +600,7 @@ export async function createElectronCaptureContext(
     targetSession.removeListener("will-download", preventDownload);
   });
   if (input.visible) window.once("ready-to-show", () => window.show());
+  else showWindowOffscreen(window);
 
   return new ElectronContext(window, targetSession);
 }

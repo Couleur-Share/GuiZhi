@@ -1,3 +1,4 @@
+import { createBackup } from "../services/backup";
 /**
  * Desktop-specific database initialization.
  *
@@ -30,6 +31,11 @@ export function initDatabase(): DatabaseAdapter.Database {
   const hooks: InitDatabaseHooks = {
     // Main-process initialization runs only after Electron's single-instance gate.
     recoverUnregisteredLock: true,
+    beforeSchemaUpgrade: (database) => {
+      if (!database.get("SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_items'")) return;
+      const migrations = database.get("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'");
+      if (!migrations || !database.get("SELECT name FROM schema_migrations WHERE name LIKE '0027-%'")) createBackup(database, "pre-update");
+    },
   };
   const db = dbInit(dbPath, hooks);
 

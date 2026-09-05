@@ -1,3 +1,4 @@
+import { registerMobileCaptureIPC } from "./mobile-capture.ipc";
 import { ipcMain } from "electron";
 import Database from "../database/sqlite";
 import type { ImportTask } from "@guizhi/shared/types";
@@ -142,6 +143,8 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.FFMPEG_PICK_BINARY,
   IPC_CHANNELS.FUNASR_STATUS,
   IPC_CHANNELS.FUNASR_INSTALL,
+  IPC_CHANNELS.FUNASR_CHECK_UPDATE,
+  IPC_CHANNELS.FUNASR_UPDATE,
   IPC_CHANNELS.FUNASR_UNINSTALL,
   IPC_CHANNELS.SETTINGS_GET,
   IPC_CHANNELS.SETTINGS_SET,
@@ -207,6 +210,7 @@ export function registerAllIPC(
   registerIpcGroup("import", () =>
     registerImportIPC(db, options.broadcastImportChanged),
   );
+  registerIpcGroup("mobile-capture", () => registerMobileCaptureIPC(db));
   registerIpcGroup("platform-capture", () =>
     registerPlatformCaptureIPC(db, {
       backgroundJobs: options.backgroundJobs,

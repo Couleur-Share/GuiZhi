@@ -23,6 +23,7 @@ export type PlatformCaptionSource =
 
 export interface PlatformCaption {
   text: string;
+  cues?: Array<{ text: string; startMs: number; endMs: number }>;
   source: PlatformCaptionSource;
   /** yt-dlp 文件名里携带的语言标记，仅用于留痕，不作为语言承诺 */
   language?: string;
@@ -98,6 +99,7 @@ async function downloadCaptionSet(
     await run(
       executable,
       [
+        "--ignore-config",
         "--no-warnings",
         "--no-playlist",
         "--skip-download",
@@ -114,16 +116,16 @@ async function downloadCaptionSet(
       { timeoutMs: CAPTION_TIMEOUT_MS, signal },
     );
   } catch {
+    signal?.throwIfAborted();
     // 没有字幕、地区限制与单个平台接口变动都不该拦住 ASR 兜底。
     return null;
   }
 
   for (const fileName of preferredCaptionFiles(dir)) {
-    const text = parseCaptionText(
-      fs.readFileSync(path.join(dir, fileName), "utf8"),
-    );
+    const raw = fs.readFileSync(path.join(dir, fileName), "utf8");
+    const text = parseCaptionText(raw);
     if (text) {
-      return { text, source, language: captionLanguage(fileName) };
+      return { text, source, language: captionLanguage(fileName), cues: parseCaptionCues(raw) };
     }
   }
   return null;
@@ -154,7 +156,7 @@ export async function downloadPlatformCaptions(
     if (published) {
       return published;
     }
-    return downloadCaptionSet(
+    return await downloadCaptionSet(
       executable,
       url,
       dir,
@@ -166,4 +168,20 @@ export async function downloadPlatformCaptions(
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+export function parseCaptionCues(raw: string): Array<{ text: string; startMs: number; endMs: number }> {
+  const cues: Array<{ text: string; startMs: number; endMs: number }> = [];
+  const time = (value: string) => value.replace(",", ".").split(":").reduce((n, part) => n * 60 + Number(part), 0) * 1000;
+  for (const block of raw.replace(/\r/g, "").split(/\n\s*\n/)) {
+    const lines = block.split("\n");
+    const index = lines.findIndex((line) => line.includes("-->"));
+    if (index < 0) continue;
+    const match = /([\d:.,]+)\s*-->\s*([\d:.,]+)/.exec(lines[index]);
+    if (!match) continue;
+    const text = parseCaptionText(lines.slice(index + 1).join("\n"));
+    const startMs = time(match[1]), endMs = time(match[2]);
+    if (text && Number.isFinite(startMs) && endMs >= startMs) cues.push({ text, startMs, endMs });
+  }
+  return cues;
 }

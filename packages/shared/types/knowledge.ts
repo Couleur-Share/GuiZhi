@@ -141,6 +141,8 @@ export type KnowledgeSortField = (typeof KNOWLEDGE_SORT_FIELDS)[number];
 export type KnowledgeSortOrder = "asc" | "desc";
 
 export interface KnowledgeItemQuery {
+  /** Internal retrieval exclusion, applied before ranking and pagination. */
+  excludedItemIds?: string[];
   scope: KnowledgeScope;
   collectionId?: string;
   tagId?: string;

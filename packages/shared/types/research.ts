@@ -1,3 +1,4 @@
+import type { ResearchContext, ResearchDocument, ResearchQueryAttempt, ResearchEligibility, ResearchLocalEvidence, ResearchComparison, ResearchPassage } from "./research-workflow";
 import type {
   DiscoveryDateConfidence,
   PlatformDiscoveryEngagement,
@@ -36,6 +37,7 @@ export type ResearchCandidateState =
   | "dismissed";
 
 export interface ResearchRun {
+  context?: ResearchContext;
   id: string;
   topic: string;
   dayRange: ResearchDayRange;
@@ -66,6 +68,8 @@ export interface ResearchSourceRun {
   error: string | null;
   startedAt: number | null;
   finishedAt: number | null;
+  /** 运行期间通过变更事件回传；终态以持久化状态和数量为准。 */
+  progress?: string;
 }
 
 export interface ResearchCandidateInput {
@@ -74,6 +78,7 @@ export interface ResearchCandidateInput {
   url: string;
   title: string;
   author: string;
+  authorId?: string;
   snippet?: string;
   publishedAt?: number;
   dateConfidence?: DiscoveryDateConfidence;
@@ -95,6 +100,7 @@ export interface ResearchCandidate
   recencyScore: number;
   engagementScore: number;
   overallScore: number;
+  eligibility?: ResearchEligibility;
   clusterId: string | null;
   state: ResearchCandidateState;
   importTaskId: string | null;
@@ -117,9 +123,12 @@ export interface ResearchRunDetail {
   sources: ResearchSourceRun[];
   candidates: ResearchCandidate[];
   clusters: ResearchCluster[];
+  documents?: ResearchDocument[];
+  attempts?: ResearchQueryAttempt[];
 }
 
 export interface CreateResearchRunInput {
+  knowledgeScope?: ResearchContext["knowledgeScope"];
   topic: string;
   dayRange: ResearchDayRange;
   depth: ResearchDepth;
@@ -133,15 +142,25 @@ export interface ResearchSearchInput {
   cursor: string | null;
   limit: number;
   signal: AbortSignal;
+  onProgress?: (message: string) => void;
 }
 
 export interface ResearchPage {
+  returnedCount?: number;
+  inWindowCount?: number;
+  unknownDateCount?: number;
   items: ResearchCandidateInput[];
   cursor: string | null;
   hasMore: boolean;
 }
 
 export interface ResearchEvidenceItem {
+  capturedAt?: number;
+  completeness?: string;
+  passages?: ResearchPassage[];
+  eligibility?: ResearchEligibility;
+  urls?: string[];
+  excerptTruncated?: boolean;
   ref: string;
   candidateId: string;
   source: ResearchSource;
@@ -156,6 +175,13 @@ export interface ResearchEvidenceItem {
 }
 
 export interface ResearchEvidencePacket {
+  snapshotId?: string;
+  operationId?: string;
+  policyVersion?: string;
+  intent?: string;
+  attempts?: ResearchQueryAttempt[];
+  localItems?: ResearchLocalEvidence[];
+  comparison?: ResearchComparison;
   runId: string;
   topic: string;
   rangeFrom: number;

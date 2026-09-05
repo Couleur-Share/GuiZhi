@@ -1,3 +1,4 @@
+import { MobileCaptureDB } from "@guizhi/db/mobile-capture";
 /**
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
  */
@@ -220,7 +221,10 @@ export function createImportService(
         })),
       );
     },
-    onTaskChanged: broadcast,
+    onTaskChanged: task => {
+      new MobileCaptureDB(db).observe(task);
+      broadcast(task);
+    },
   });
   return { queue, taskDb };
 }

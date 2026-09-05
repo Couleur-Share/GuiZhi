@@ -1,3 +1,4 @@
+import { ResearchWorkflowDB } from "./research-workflow";
 import { randomUUID } from "node:crypto";
 import type Database from "./adapter";
 import type {
@@ -54,6 +55,7 @@ interface CandidateRow {
   normalized_url: string;
   title: string;
   author: string;
+  author_id?: string;
   snippet: string;
   published_at: number | null;
   date_confidence: ResearchCandidate["dateConfidence"];
@@ -140,6 +142,7 @@ function mapCandidate(row: CandidateRow): ResearchCandidate {
     normalizedUrl: row.normalized_url,
     title: row.title,
     author: row.author,
+    authorId: row.author_id,
     snippet: row.snippet,
     publishedAt: row.published_at,
     dateConfidence: row.date_confidence,
@@ -228,7 +231,7 @@ export class ResearchDB {
 
   get(id: string): ResearchRun | null {
     const row = this.db.get(`${RUN_SELECT} WHERE r.id=?`, id) as RunRow | undefined;
-    return row ? mapRun(row) : null;
+    return row ? { ...mapRun(row), context: new ResearchWorkflowDB(this.db).context(id) } : null;
   }
 
   getDetail(id: string): ResearchRunDetail | null {
@@ -246,6 +249,8 @@ export class ResearchDB {
         id,
       ) as SourceRow[]).map(mapSource),
       candidates,
+      attempts: new ResearchWorkflowDB(this.db).attempts(id),
+      documents: new ResearchWorkflowDB(this.db).documents(id),
       clusters: clusterRows.map((row): ResearchCluster => ({
         id: row.id,
         runId: row.run_id,
@@ -259,7 +264,7 @@ export class ResearchDB {
 
   listCandidates(runId: string): ResearchCandidate[] {
     return (this.db.all(
-      "SELECT * FROM research_candidates WHERE run_id=? ORDER BY overall_score DESC, created_at ASC",
+      "SELECT c.*,(SELECT author_id FROM research_authors a WHERE a.candidate_id=c.id) AS author_id FROM research_candidates c WHERE run_id=? ORDER BY overall_score DESC, created_at ASC",
       runId,
     ) as CandidateRow[]).map(mapCandidate);
   }
@@ -308,7 +313,7 @@ export class ResearchDB {
   ): boolean {
     const existing = this.db.get(
       `SELECT id FROM research_candidates
-       WHERE run_id=? AND (normalized_url=? OR (source=? AND external_id=?)) LIMIT 1`,
+       WHERE run_id=? AND (normalized_url=? OR (source=? AND external_id=? AND external_id<>'')) LIMIT 1`,
       runId,
       normalizedUrl,
       item.source,
@@ -337,6 +342,9 @@ export class ResearchDB {
       now,
       now,
     );
+    if (item.authorId) {
+      this.db.run("INSERT OR REPLACE INTO research_authors(candidate_id,author_id) SELECT id,? FROM research_candidates WHERE run_id=? AND normalized_url=?", item.authorId, runId, normalizedUrl);
+    }
     this.touch(runId, now);
     return true;
   }
@@ -377,6 +385,18 @@ export class ResearchDB {
       }
       this.touch(runId, now);
     })();
+  }
+
+  resumeRun(id: string, now = Date.now()): void {
+    this.db.run("UPDATE research_runs SET status='collecting',completed_at=NULL,updated_at=? WHERE id=?", now, id);
+  }
+
+  markReportOutdated(id: string, now = Date.now()): void {
+    this.db.run(
+      "UPDATE research_runs SET report_status='none',report_error='候选已补充，请重新生成报告以包含最新结果',updated_at=? WHERE id=?",
+      now,
+      id,
+    );
   }
 
   finishRun(id: string, status: ResearchRun["status"], now = Date.now()): void {

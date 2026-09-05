@@ -201,11 +201,15 @@ export class SemanticIndexDB {
     model: string,
     limit?: number,
     afterRowid = 0,
+    scope?: { collectionId?: string; excludedIds: string[] },
   ): SemanticVectorRecord[] {
     // 按 rowid 游标翻页，不用 LIMIT/OFFSET：OFFSET 要求 SQLite 先扫过
     // 并丢弃前 N 行连接结果，分批遍历全表就成了平方级。实测 6 万分块下
     // 偏移翻页 15.1s，游标翻页 1.1s。
     const params: unknown[] = [model, afterRowid];
+    let scopeClause = "";
+    if (scope?.collectionId) { scopeClause += " AND i.collection_id = ?"; params.push(scope.collectionId); }
+    if (scope?.excludedIds.length) { scopeClause += ` AND i.id NOT IN (${scope.excludedIds.map(() => "?").join(",")})`; params.push(...scope.excludedIds); }
     let pageClause = "";
     if (limit !== undefined) {
       pageClause = " LIMIT ?";
@@ -215,7 +219,7 @@ export class SemanticIndexDB {
       `SELECT e.rowid AS rowid, e.item_id, e.chunk_index, e.dims, e.vector
        FROM knowledge_embeddings e
        JOIN knowledge_items i ON i.id = e.item_id AND i.deleted_at IS NULL
-       WHERE e.model = ? AND e.rowid > ?
+       WHERE e.model = ? AND e.rowid > ?${scopeClause}
        ORDER BY e.rowid${pageClause}`,
       ...params,
     ) as Array<Omit<ChunkRow, "chunk_text" | "title"> & { rowid: number }>;

@@ -1,3 +1,4 @@
+import { stopMobileCapture } from "../services/mobile-capture/lifecycle";
 /**
  * 备份 / 恢复 / 导出 IPC。
  *
@@ -388,6 +389,7 @@ export function registerBackupIPC(
       };
       try {
         backgroundJobs.stop();
+        stopMobileCapture(true);
         closeDatabase();
         applyPreparedRepositoryRestore(prepared, targets);
       } catch (error) {
@@ -460,6 +462,7 @@ export function registerBackupIPC(
       };
 
       try {
+        stopMobileCapture(true);
         closeDatabase();
         performRestoreSwap({
           databasePath,

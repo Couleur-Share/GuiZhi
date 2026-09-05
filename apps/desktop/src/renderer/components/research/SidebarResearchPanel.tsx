@@ -2,6 +2,7 @@ import { PlusIcon, ScanSearchIcon } from "lucide-react";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useResearchStore } from "../../stores/research.store";
+import { RUN_STATUS_NAMES } from "./research-presentation";
 
 const STATUS_COLOR: Record<string, string> = {
   collecting: "bg-blue-500",
@@ -20,7 +21,6 @@ export function SidebarResearchPanel() {
 
   useEffect(() => {
     void refresh();
-    return useResearchStore.getState().subscribeChanges();
   }, [refresh]);
 
   return (
@@ -62,6 +62,7 @@ export function SidebarResearchPanel() {
               <span>{run.sources.length} {t("research.sources", "来源")} · {run.candidateCount} {t("research.items", "条")}</span>
               <span>{new Date(run.updatedAt).toLocaleDateString()}</span>
             </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">{RUN_STATUS_NAMES[run.status]}</p>
           </button>
         ))}
       </div>

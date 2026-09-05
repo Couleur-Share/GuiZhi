@@ -31,7 +31,9 @@ function item(source: ResearchSource, id: string): ResearchCandidateInput {
         ? `https://www.douyin.com/video/${id}`
         : `https://www.xiaohongshu.com/explore/${id}`,
     title: `本地 AI 知识库 ${id}`,
-    author: "作者",
+    author: `作者-${id}`,
+    publishedAt: Date.now() - 60_000,
+    dateConfidence: "high",
     mediaType: "video",
     discoveryMethod: "fixture",
   };
@@ -53,6 +55,47 @@ async function waitFor(check: () => boolean): Promise<void> {
 }
 
 describe("ResearchService", () => {
+  it("空结果来源不能把另一个失败来源掩盖为全部完成", async () => {
+    const db = createDb();
+    const service = new ResearchService(db, {
+      enqueueImports: () => [],
+      collectors: {
+        douyin: collector("douyin", async () => ({ items: [], cursor: null, hasMore: false })),
+        xiaohongshu: collector("xiaohongshu", async () => { throw new Error("[navigation_timeout] 页面加载超时"); }),
+      },
+    });
+    const run = service.createAndRun({ topic: "主题", dayRange: 7, depth: "quick", sources: ["douyin", "xiaohongshu"] });
+    await waitFor(() => service.getDetail(run.id)?.run.status !== "collecting");
+    expect(service.getDetail(run.id)?.run.status).toBe("partial");
+    db.close();
+  });
+
+  it("回传当前采集阶段，取消后迟到的响应不会写入候选", async () => {
+    const db = createDb();
+    let resolvePage!: (page: ResearchPage) => void;
+    const changed = vi.fn();
+    const empty = async () => ({ items: [], cursor: null, hasMore: false });
+    const service = new ResearchService(db, {
+      onChanged: changed, enqueueImports: () => [],
+      collectors: {
+        douyin: collector("douyin", async (input) => {
+          input.onProgress?.("正在等待首批结果");
+          return new Promise((resolve) => { resolvePage = resolve; });
+        }),
+        xiaohongshu: collector("xiaohongshu", empty),
+      },
+    });
+    const run = service.createAndRun({ topic: "主题", dayRange: 7, depth: "deep", sources: ["douyin"] });
+    expect(service.getDetail(run.id)?.sources[0].progress).toBe("第 1/3 页 · 正在等待首批结果");
+    service.cancel(run.id);
+    resolvePage({ items: [item("douyin", "late")], cursor: null, hasMore: false });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(service.getDetail(run.id)?.run.status).toBe("canceled");
+    expect(service.getDetail(run.id)?.candidates).toHaveLength(0);
+    expect(service.getDetail(run.id)?.sources[0].progress).toBeUndefined();
+    db.close();
+  });
+
   it("B 站与浏览器组并行，而两个登录平台严格串行", async () => {
     const db = createDb();
     const events: string[] = [];
@@ -153,10 +196,10 @@ describe("ResearchService", () => {
         runId: "run",
         normalizedUrl: `https://example.com/${source}-${index}`,
         snippet: "",
-        publishedAt: null,
-        dateConfidence: "low" as const,
+        publishedAt: Date.now() - 60_000,
+        dateConfidence: "high" as const,
         engagement: {},
-        relevanceScore: 0,
+        relevanceScore: 80,
         recencyScore: 0,
         engagementScore: 0,
         overallScore: 100 - index,

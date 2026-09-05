@@ -1,10 +1,14 @@
 import fs from "fs";
 import path from "path";
+import { readDiscoveryPage, waitForXhsSearch } from "./discovery-page";
+import { searchResponseRows } from "./search-capture";
+import { verifyDouyinSearch } from "./search-verification";
+import { PlatformCaptureError } from "./capture-error";
+export { PlatformCaptureError } from "./capture-error";
 import type { BrowserWindow } from "electron";
 import type {
   DiscoverCreatorInput,
   NetworkProxySettings,
-  PlatformCaptureErrorCode,
   PlatformCapturePlatform,
   PlatformDiscoveryItem,
   PlatformDiscoveryPage,
@@ -151,17 +155,6 @@ export interface CapturedComment {
   publishedAt: number | null;
 }
 
-export class PlatformCaptureError extends Error {
-  constructor(
-    readonly code: PlatformCaptureErrorCode,
-    message: string,
-    options?: { cause?: unknown },
-  ) {
-    super(`[${code}] ${message}`, options);
-    this.name = "PlatformCaptureError";
-  }
-}
-
 export interface BrowserCaptureServiceOptions {
   userDataPath?: string;
   getNetworkProxy?: () => NetworkProxySettings | null | undefined;
@@ -242,20 +235,22 @@ function platformItemFromHref(
   if (!isAllowedPlatformUrl(platform, resolved.href)) return null;
   const match =
     platform === "xiaohongshu"
-      ? /\/(?:explore|discovery\/item)\/([^/?#]+)/i.exec(resolved.pathname)
+      ? /\/(?:explore|discovery\/item|search_result)\/([^/?#]+)/i.exec(resolved.pathname)
       : /\/(?:video|note)\/([^/?#]+)/i.exec(resolved.pathname);
-  if (!match) return null;
+  const externalId = match?.[1] ?? (platform === "douyin" ? resolved.searchParams.get("modal_id") : null);
+  if (!externalId) return null;
+  if (!match) resolved = new URL(`https://www.douyin.com/video/${encodeURIComponent(externalId)}`);
   const mediaType =
     hasVideo || (platform === "douyin" && resolved.pathname.includes("/video/"))
       ? "video"
       : "image";
   return {
     platform,
-    externalId: match[1],
+    externalId,
     url: resolved.href,
     title:
       cleanText(title, 300) ||
-      `${platform === "xiaohongshu" ? "小红书" : "抖音"}作品 ${match[1]}`,
+      `${platform === "xiaohongshu" ? "小红书" : "抖音"}作品 ${externalId}`,
     author: cleanText(author, 200),
     coverUrl:
       coverUrl && isAllowedBrowserResourceUrl(platform, coverUrl)
@@ -397,6 +392,7 @@ export function scanPlatformDiscoveryPayloads(
   platform: PlatformCapturePlatform,
   payloads: unknown[],
   limit = MAX_DISCOVERY_ITEMS,
+  recursive = true,
 ): PlatformDiscoveryItem[] {
   const found = new Map<string, PlatformDiscoveryItem>();
   let visited = 0;
@@ -409,10 +405,14 @@ export function scanPlatformDiscoveryPayloads(
       return;
     }
     if (typeof value !== "object") return;
-    const record = value as Record<string, unknown>;
+    const wrapper = value as Record<string, unknown>;
+    const card = wrapper.note_card ?? wrapper.noteCard;
+    const record = platform === "xiaohongshu" && card && typeof card === "object"
+      ? { ...wrapper, ...card as Record<string, unknown>, note_id: wrapper.id ?? wrapper.note_id ?? (card as Record<string, unknown>).note_id ?? (card as Record<string, unknown>).noteId }
+      : wrapper;
     const rawId =
       platform === "douyin"
-        ? record.aweme_id
+        ? (record.aweme_id ?? record.awemeId)
         : (record.note_id ?? record.noteId);
     const externalId =
       typeof rawId === "string" || typeof rawId === "number"
@@ -424,6 +424,7 @@ export function scanPlatformDiscoveryPayloads(
       const desc = nestedText(record, [
         "title",
         "display_title",
+        "displayTitle",
         "desc",
         "description",
       ]);
@@ -437,7 +438,7 @@ export function scanPlatformDiscoveryPayloads(
         const route =
           platform === "douyin" ? (hasVideo ? "video" : "note") : "explore";
         const timestamp = numeric(
-          record.create_time ?? record.time ?? record.publish_time,
+          record.create_time ?? record.createTime ?? record.time ?? record.publish_time,
         );
         found.set(externalId, {
           platform,
@@ -445,10 +446,11 @@ export function scanPlatformDiscoveryPayloads(
           url:
             platform === "douyin"
               ? `https://www.douyin.com/${route}/${externalId}`
-              : `https://www.xiaohongshu.com/explore/${externalId}`,
+              : `https://www.xiaohongshu.com/explore/${externalId}${typeof (record.xsec_token ?? record.xsecToken) === "string" ? `?xsec_token=${encodeURIComponent(String(record.xsec_token ?? record.xsecToken))}&xsec_source=pc_search` : ""}`,
           title:
             cleanText(desc, 300) ||
             `${platform === "douyin" ? "抖音" : "小红书"}作品 ${externalId}`,
+          authorId: author && (author.uid ?? author.user_id ?? author.userId ?? author.sec_uid) != null ? String(author.uid ?? author.user_id ?? author.userId ?? author.sec_uid).slice(0, 200) : undefined,
           author: cleanText(
             nestedText(author, ["nickname", "nick_name", "name"]),
             200,
@@ -483,7 +485,7 @@ export function scanPlatformDiscoveryPayloads(
         });
       }
     }
-    for (const child of Object.values(record)) visit(child, depth + 1);
+    if (recursive) for (const child of Object.values(record)) visit(child, depth + 1);
   };
   for (const payload of payloads) visit(payload, 0);
   return [...found.values()].slice(0, limit);
@@ -551,12 +553,19 @@ export class BrowserCaptureService {
     platform: PlatformCapturePlatform,
     forceRelogin = false,
     parent?: BrowserWindow | null,
+    searchKeyword?: string,
+    callerSignal?: AbortSignal,
   ): Promise<PlatformSessionStatus> {
     await this.runSerialized(
       platform,
       "login",
       async (context, signal) => {
         const page = await this.preparePage(context, platform);
+        if (platform === "douyin" && cleanText(searchKeyword, 100)) {
+          await verifyDouyinSearch(page, cleanText(searchKeyword, 100), () => this.throwIfAborted(signal));
+          this.writeLoginState(platform, true);
+          return;
+        }
         await this.optimizeLoginPage(page, platform);
         if (forceRelogin) {
           // 必须在首次导航前清 Cookie，并让页面脚本运行前清空站点存储。
@@ -629,7 +638,7 @@ export class BrowserCaptureService {
         );
       },
       true,
-      undefined,
+      callerSignal,
       parent,
     );
     return this.getStatuses().find((status) => status.platform === platform)!;
@@ -677,7 +686,7 @@ export class BrowserCaptureService {
         this.throwIfAborted(signal, operationSignal);
         await this.requireLogin(context, platform);
         const page = await this.preparePage(context, platform);
-        const payloads = this.captureJsonResponses(page, platform);
+        const payloads = page.startJsonCapture(platform);
         await page.goto(url, {
           waitUntil: "domcontentloaded",
           timeout: NAVIGATION_TIMEOUT_MS,
@@ -750,11 +759,11 @@ export class BrowserCaptureService {
     return this.discover(input.platform, input.url, input.cursor, input.limit);
   }
 
-  async search(input: SearchPlatformInput, signal?: AbortSignal): Promise<PlatformDiscoveryPage> {
+  async search(input: SearchPlatformInput, signal?: AbortSignal, onProgress?: (message: string) => void): Promise<PlatformDiscoveryPage> {
     const keyword = cleanText(input.keyword, 100);
     if (!keyword) throw new Error("搜索关键词不能为空");
     this.requireKnownLogin(input.platform);
-    return this.discover(input.platform, platformSearchUrl(input.platform, keyword), input.cursor, input.limit, signal);
+    return this.discover(input.platform, platformSearchUrl(input.platform, keyword), input.cursor, input.limit, signal, onProgress, keyword);
   }
 
   async captureComments(
@@ -772,7 +781,7 @@ export class BrowserCaptureService {
         this.throwIfAborted(signal, operationSignal);
         await this.requireLogin(context, platform);
         const page = await this.preparePage(context, platform);
-        const payloads = this.captureJsonResponses(page, platform);
+        const payloads = page.startJsonCapture(platform);
         await page.goto(url, {
           waitUntil: "domcontentloaded",
           timeout: NAVIGATION_TIMEOUT_MS,
@@ -805,7 +814,7 @@ export class BrowserCaptureService {
     await this.activeContext?.close().catch(() => undefined);
   }
 
-  private async discover(platform: PlatformCapturePlatform, url: string, cursor?: string | null, requestedLimit?: number, callerSignal?: AbortSignal): Promise<PlatformDiscoveryPage> {
+  private async discover(platform: PlatformCapturePlatform, url: string, cursor?: string | null, requestedLimit?: number, callerSignal?: AbortSignal, onProgress?: (message: string) => void, searchKeyword?: string): Promise<PlatformDiscoveryPage> {
     return this.runSerialized(
       platform,
       "discovery",
@@ -813,12 +822,22 @@ export class BrowserCaptureService {
         this.throwIfAborted(signal, callerSignal);
         await this.requireLogin(context, platform);
         const page = await this.preparePage(context, platform);
-        const payloads = this.captureJsonResponses(page, platform);
-        await page.goto(url, {
+        const payloads = page.startJsonCapture(platform, searchKeyword ? { keyword: searchKeyword } : undefined);
+        onProgress?.("正在加载平台搜索页");
+        await page.goto(platform === "xiaohongshu" && searchKeyword ? platformLoginUrl(platform) : url, {
           waitUntil: "domcontentloaded",
           timeout: NAVIGATION_TIMEOUT_MS,
         });
         this.assertFinalUrl(platform, page.url());
+        if (platform === "xiaohongshu" && searchKeyword) {
+          onProgress?.("正在通过平台搜索框提交关键词");
+          const state = await waitForXhsSearch(page, searchKeyword, () => this.throwIfAborted(signal, callerSignal));
+          if (state === "login_required") {
+            this.writeLoginState(platform, false);
+            throw new PlatformCaptureError("login_required", "小红书要求登录后搜索，请检查登录 / 验证后重新采集");
+          }
+          if (state !== "submitted") throw new PlatformCaptureError("platform_changed", "未能找到小红书搜索框，请打开平台检查页面后重试");
+        }
         const offset = Math.max(0, Number.parseInt(cursor ?? "0", 10) || 0);
         const limit = Math.min(
           PAGE_SIZE,
@@ -829,44 +848,18 @@ export class BrowserCaptureService {
         const started = Date.now();
         let previousCount = -1;
         let noGrowthRounds = 0;
+        let confirmedEmpty = false;
         while (
           found.size < target &&
           Date.now() - started < DISCOVERY_TIMEOUT_MS
         ) {
           if (signal.aborted)
             throw new PlatformCaptureError("canceled", "已取消平台发现");
-          const cards = await page.evaluate(() => {
-            const anchors = Array.from(
-              document.querySelectorAll<HTMLAnchorElement>("a[href]"),
-            );
-            return anchors.slice(0, 800).map((anchor) => {
-              const image = anchor.querySelector<HTMLImageElement>("img");
-              const card =
-                anchor.closest<HTMLElement>(
-                  "article, li, [class*='card'], [class*='item']",
-                ) ?? anchor.parentElement;
-              const author = card?.querySelector<HTMLElement>(
-                "[class*='author'], [class*='user'], [class*='name']",
-              );
-              const time = card?.querySelector<HTMLTimeElement>("time");
-              const timestamp = time?.dateTime
-                ? Date.parse(time.dateTime)
-                : Number.NaN;
-              return {
-                href: anchor.href,
-                title:
-                  anchor.getAttribute("title") ||
-                  anchor.textContent ||
-                  image?.alt ||
-                  "",
-                coverUrl: image?.currentSrc || image?.src || "",
-                author: author?.textContent || "",
-                publishedAt: Number.isFinite(timestamp) ? timestamp : undefined,
-                hasVideo: Boolean(card?.querySelector("video")),
-              };
-            });
-          });
-          for (const card of cards) {
+          const snapshot = await page.evaluate(readDiscoveryPage, { searchOnly: Boolean(searchKeyword) });
+          const resultPages = searchKeyword ? payloads.map((payload) => searchResponseRows(platform, payload)).filter((rows) => rows !== null) : [];
+          confirmedEmpty = searchKeyword ? resultPages.length > 0 && resultPages.every((rows) => rows.length === 0) : snapshot.empty;
+          if (snapshot.verification) throw new PlatformCaptureError("verification_required", platform === "douyin" ? "抖音搜索页要求安全验证，请打开抖音搜索页完成验证" : "平台要求安全验证，请打开平台登录窗口完成验证后重试");
+          for (const card of searchKeyword ? [] : snapshot.cards) {
             const item = platformItemFromHref(
               platform,
               card.href,
@@ -880,12 +873,14 @@ export class BrowserCaptureService {
           }
           for (const item of scanPlatformDiscoveryPayloads(
             platform,
-            payloads,
+            searchKeyword ? resultPages.flat() : [...payloads, ...snapshot.payloads],
+            MAX_DISCOVERY_ITEMS,
+            !searchKeyword,
           )) {
             found.set(item.externalId, item);
           }
           if (
-            isLoginPage(page.url()) ||
+            (snapshot.loginRequired && found.size === 0) || isLoginPage(page.url()) ||
             payloads.some((payload) => indicatesLoginRequired(payload))
           ) {
             this.writeLoginState(platform, false);
@@ -897,7 +892,9 @@ export class BrowserCaptureService {
           noGrowthRounds =
             found.size === previousCount ? noGrowthRounds + 1 : 0;
           previousCount = found.size;
-          if (noGrowthRounds >= 5) break;
+          onProgress?.(found.size > 0 ? `正在读取搜索结果，已发现 ${found.size} 条` : "正在等待平台返回搜索结果");
+          // 初始空白不代表搜索结束：SPA 的首批响应可能晚于五秒。
+          if (confirmedEmpty || (found.size > 0 && noGrowthRounds >= 5)) break;
           if (found.size >= target || found.size >= MAX_DISCOVERY_ITEMS) break;
           await page.scrollBy(1200);
           await page.waitForTimeout(1000);
@@ -911,6 +908,10 @@ export class BrowserCaptureService {
             "login_required",
             "平台登录状态已失效，请重新登录",
           );
+        }
+        this.throwIfAborted(signal, callerSignal);
+        if (found.size === 0 && !confirmedEmpty) {
+          throw new PlatformCaptureError("platform_changed", "未能读取平台搜索结果，页面可能仍在加载或结构已变化；请打开平台检查登录与验证状态后重试");
         }
         const all = [...found.values()].slice(0, MAX_DISCOVERY_ITEMS);
         const items = all.slice(offset, offset + limit);
@@ -980,7 +981,10 @@ export class BrowserCaptureService {
         throw new PlatformCaptureError("canceled", "操作已取消");
       const message = error instanceof Error ? error.message : String(error);
       if (/页面导航超时/i.test(message)) {
-        throw new PlatformCaptureError("platform_changed", "平台搜索页加载超时，请检查网络或代理后重试", { cause: error });
+        throw new PlatformCaptureError("navigation_timeout", "平台搜索页加载超时，请检查网络或代理后重试", { cause: error });
+      }
+      if (/页面加载失败/i.test(message)) {
+        throw new PlatformCaptureError("network_error", message, { cause: error });
       }
       if (/closed|Target page|browser has been closed/i.test(message)) {
         throw new PlatformCaptureError("browser_closed", "平台登录窗口已关闭", {
@@ -1018,13 +1022,6 @@ export class BrowserCaptureService {
     page.setDefaultNavigationTimeout(NAVIGATION_TIMEOUT_MS);
     page.setDefaultTimeout(NAVIGATION_TIMEOUT_MS);
     return page;
-  }
-
-  private captureJsonResponses(
-    page: ElectronCapturePage,
-    platform: PlatformCapturePlatform,
-  ): unknown[] {
-    return page.startJsonCapture(platform);
   }
 
   private async hasLoginCookies(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CheckCircle2Icon,
   ChevronDownIcon,
@@ -63,6 +63,12 @@ export interface CaptureEngineRowProps {
   /** 一句话说明这个引擎干什么用 */
   purpose: string;
   state: EngineState;
+  /** 维护时覆盖就绪徽章，避免同时声称引擎可用。 */
+  activityLabel?: string;
+  /** 位于主行下、始终可见的任务进度。 */
+  activityContent?: ReactNode;
+  /** 禁用维护动作，与动作自身是否正在执行分开。 */
+  actionsDisabled?: boolean;
   /** 可选引擎未安装时不报警，只作中性提示 */
   optional?: boolean;
   /** 状态补充信息（版本 · 来源），拼在 purpose 之后 */
@@ -145,6 +151,9 @@ export function CaptureEngineRow({
   name,
   purpose,
   state,
+  activityLabel,
+  activityContent,
+  actionsDisabled = false,
   optional = false,
   detail,
   busyText,
@@ -181,7 +190,12 @@ export function CaptureEngineRow({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{name}</span>
-            <StatusBadge state={state} optional={optional} />
+            {activityLabel ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                <CircleDashedIcon className="h-3 w-3" aria-hidden="true" />
+                {activityLabel}
+              </span>
+            ) : <StatusBadge state={state} optional={optional} />}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {description}
@@ -231,6 +245,8 @@ export function CaptureEngineRow({
           </button>
         </div>
       </div>
+
+      {activityContent}
 
       {progressPercent != null ? (
         <div className="px-4 pb-3">
@@ -307,7 +323,7 @@ export function CaptureEngineRow({
             <button
               type="button"
               onClick={onRefresh}
-              disabled={isRefreshing}
+              disabled={isRefreshing || actionsDisabled}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-60"
             >
               <RefreshCwIcon
@@ -321,7 +337,7 @@ export function CaptureEngineRow({
                 <button
                   type="button"
                   onClick={reinstall.onClick}
-                  disabled={reinstall.busy}
+                  disabled={reinstall.busy || actionsDisabled}
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-60"
                 >
                   {reinstall.busy ? (
@@ -339,7 +355,7 @@ export function CaptureEngineRow({
                 <button
                   type="button"
                   onClick={() => setConfirmingRemove(true)}
-                  disabled={remove.busy}
+                  disabled={remove.busy || actionsDisabled}
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-60"
                 >
                   {remove.busy ? (

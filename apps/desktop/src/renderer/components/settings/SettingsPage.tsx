@@ -36,6 +36,7 @@ const SETTINGS_MENU = [
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
+  { id: "mobile-capture", labelKey: "settings.mobileCapture", icon: RadioTowerIcon },
   { id: "capture", labelKey: "settings.captureAndTranscription", icon: RadioTowerIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
   { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
@@ -56,6 +57,7 @@ const loadNetworkSettings = () => import("./NetworkSettings");
 const loadCaptureSettings = () => import("./CaptureSettings");
 const loadAISettings = () => import("./AISettingsPrototype");
 const loadIllustrationSettings = () => import("./IllustrationSettings");
+const MobileCaptureSettings = lazy(() => import("./MobileCaptureSettings").then(m => ({ default: m.MobileCaptureSettings })));
 const loadMcpSettings = () => import("./mcp/McpSettings");
 
 const GeneralSettings = lazy(() =>
@@ -184,6 +186,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <DataSettings />;
       case "network":
         return <NetworkSettings />;
+      case "mobile-capture": return <MobileCaptureSettings />;
       case "capture":
         return <CaptureSettings />;
       case "ai":

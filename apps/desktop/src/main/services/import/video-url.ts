@@ -127,6 +127,7 @@ export type RunCommand = (
 
 /** 默认命令执行器：spawn + 超时/取消 kill；找不到可执行文件抛 YtDlpNotFoundError */
 export const runCommand: RunCommand = (executable, args, options) => {
+  if (options.signal?.aborted) return Promise.reject(new Error("已取消"));
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, { windowsHide: true });
     let stdout = "";
@@ -141,14 +142,15 @@ export const runCommand: RunCommand = (executable, args, options) => {
       }
     };
 
+    let stopError: Error | undefined;
     const timeout = setTimeout(() => {
-      child.kill();
-      finish(() => reject(new Error("yt-dlp 执行超时")));
+      stopError = new Error("yt-dlp 执行超时");
+      child.kill("SIGKILL");
     }, options.timeoutMs);
 
     const abort = () => {
-      child.kill();
-      finish(() => reject(new Error("已取消")));
+      stopError = new Error("已取消");
+      child.kill("SIGKILL");
     };
     options.signal?.addEventListener("abort", abort, { once: true });
 
@@ -176,6 +178,7 @@ export const runCommand: RunCommand = (executable, args, options) => {
 
     child.on("close", (code) => {
       finish(() => {
+        if (stopError) { reject(stopError); return; }
         if (code === 0) {
           resolve({ stdout });
         } else {

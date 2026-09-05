@@ -21,3 +21,5 @@ export * from "./tool-update";
 export * from "./background-job";
 export * from "./inbox";
 export * from "./research";
+
+export * from "./research-workflow";

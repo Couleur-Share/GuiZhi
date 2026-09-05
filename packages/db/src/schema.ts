@@ -1,3 +1,5 @@
+import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
+import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
 /**
  * 数据库表结构定义。
  *
@@ -10,6 +12,10 @@
  * is a safe no-op for existing databases.
  */
 export const SCHEMA_TABLES = `
+${MOBILE_CAPTURE_SCHEMA}
+${RESEARCH_EVIDENCE_SCHEMA}
+${RESEARCH_DOCUMENT_SCHEMA}
+${RESEARCH_SERIES_SCHEMA}
 -- 设置表
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,

@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.21.1",
+  "version": "0.22.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "main": "out/main/index.js",
@@ -76,6 +76,7 @@
     "linkedom": "^0.18.13",
     "material-icon-theme": "^5.35.0",
     "node-sqlite3-wasm": "^0.8.0",
+    "qrcode": "1.5.4",
     "react-force-graph-2d": "^1.29.1",
     "rehype-raw": "^7.0.0",
     "smol-toml": "^1.7.0",
@@ -100,6 +101,7 @@
     "@types/adm-zip": "^0.5.8",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^24.0.0",
+    "@types/qrcode": "1.5.6",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/turndown": "^5.0.6",

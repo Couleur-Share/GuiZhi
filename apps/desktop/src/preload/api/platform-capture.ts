@@ -21,8 +21,9 @@ export const platformCaptureApi = {
   login: (
     platform: PlatformCapturePlatform,
     forceRelogin = false,
+    searchKeyword?: string,
   ): Promise<PlatformSessionStatus> =>
-    ipcRenderer.invoke(IPC_CHANNELS.PLATFORM_CAPTURE_LOGIN, { platform, forceRelogin }),
+    ipcRenderer.invoke(IPC_CHANNELS.PLATFORM_CAPTURE_LOGIN, { platform, forceRelogin, ...(searchKeyword ? { searchKeyword } : {}) }),
   cancelLogin: (platform: PlatformCapturePlatform): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.PLATFORM_CAPTURE_CANCEL_LOGIN, platform),
   logout: (platform: PlatformCapturePlatform): Promise<void> =>

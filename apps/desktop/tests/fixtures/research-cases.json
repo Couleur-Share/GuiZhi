@@ -1,0 +1,22 @@
+[
+  {"topic":"归知与 Obsidian 比较","intent":"comparison","text":"归知保存研究摘录，Obsidian 使用本地 Markdown 文件。","analysis":"材料分别介绍了归知的研究摘录与 Obsidian 的本地 Markdown 文件。"},
+  {"topic":"Notion 对比 Obsidian","intent":"comparison","text":"这份记录比较 Notion 与 Obsidian 的文件保存方式，没有测试同步速度。","analysis":"材料未测试两者同步速度，不能据此比较快慢。"},
+  {"topic":"Windows 11 离线知识库","intent":"overview","text":"Windows 11 上的知识库可以在断网时查看已保存正文。","analysis":"该材料提到断网查看已保存正文。"},
+  {"topic":"如何备份知识库","intent":"how_to","text":"知识库备份步骤：先关闭写入，再生成副本，最后验证副本可读。","analysis":"材料给出的步骤是停止写入、生成副本并验证可读性。"},
+  {"topic":"视频字幕教程","intent":"how_to","text":"视频字幕教程要求先检查发布者字幕；没有字幕时标记缺失。","analysis":"教程要求先检查发布者字幕，并明确标记字幕缺失。"},
+  {"topic":"本周知识库更新","intent":"recent","text":"本周知识库更新记录提到新增研究材料查看入口。","analysis":"本条更新记录提到研究材料查看入口。"},
+  {"topic":"不用云同步的笔记","intent":"overview","text":"这份笔记不用云同步，备份由用户手动复制到本地磁盘。","analysis":"材料描述的是不使用云同步、由用户手动复制备份的方式。"},
+  {"topic":"个人知识管理","intent":"overview","text":"个人知识管理实践把来源链接和摘录保存在同一条记录。","analysis":"材料将来源链接与摘录保存在同一记录。"},
+  {"topic":"中文全文检索","intent":"overview","text":"中文全文检索测试只覆盖短标题，没有测试长段落。","analysis":"这份测试材料没有覆盖长段落。"},
+  {"topic":"RAG 实践","intent":"overview","text":"RAG 实践记录使用关键词与向量结果融合，未评估所有模型。","analysis":"材料使用混合检索，但没有评估所有模型。"},
+  {"topic":"如何处理 PDF","intent":"how_to","text":"处理 PDF 时先检查是否存在文本层；本例未处理扫描图片。","analysis":"本例先检查文本层，未覆盖扫描图片。"},
+  {"topic":"论文管理","intent":"overview","text":"论文管理示例保留论文题目、出处和阅读摘录。","analysis":"该示例保留题目、出处和阅读摘录。"},
+  {"topic":"最近标签分类变化","intent":"recent","text":"最近标签分类记录新增来源标签，旧标签仍保留。","analysis":"这条记录提到新增来源标签并保留旧标签。"},
+  {"topic":"如何保存研究来源","intent":"how_to","text":"保存研究来源时，将摘录、链接和采集时间一并写入条目。","analysis":"材料要求一并保存摘录、链接和采集时间。"},
+  {"topic":"免费离线工具","intent":"overview","text":"这份免费离线工具清单没有给出许可证或长期费用信息。","analysis":"该清单不足以判断许可证和长期费用。"},
+  {"topic":"本地 AI 知识库","intent":"overview","text":"本地 AI 知识库记录说明数据在本地保存，模型调用仍可能联网。","analysis":"本地保存数据不代表模型调用也离线。"},
+  {"topic":"如何读取视频文案","intent":"how_to","text":"读取视频文案只取得简介，不能将它当成完整口播。","analysis":"这份材料只覆盖简介，不能作为完整口播使用。"},
+  {"topic":"近期本地搜索更新","intent":"recent","text":"近期本地搜索更新修复了范围过滤，没有新增向量索引。","analysis":"该记录介绍范围过滤修复，没有新增向量索引。"},
+  {"topic":"未发布产品的真实续航","intent":"overview","text":"热门美食推荐与旅行日记","insufficient":true},
+  {"topic":"本周离线工具评测","intent":"recent","text":"本周离线工具评测的日期尚未确认。","undated":true,"insufficient":true}
+]

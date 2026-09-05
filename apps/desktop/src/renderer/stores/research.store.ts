@@ -4,10 +4,6 @@ import type {
   ResearchRun,
   ResearchRunDetail,
 } from "@guizhi/shared/types";
-import {
-  generateResearchReport,
-  RESEARCH_REPORT_PROMPT_VERSION,
-} from "../services/knowledge-ai/research-report";
 
 interface ResearchState {
   runs: ResearchRun[];
@@ -20,16 +16,16 @@ interface ResearchState {
   select: (id: string | null) => Promise<void>;
   create: (input: CreateResearchRunInput) => Promise<ResearchRun>;
   cancel: () => Promise<void>;
-  clone: () => Promise<ResearchRun | null>;
+  clone: (replan?: boolean) => Promise<ResearchRun | null>;
   remove: () => Promise<void>;
   generateReport: () => Promise<void>;
   cancelReport: () => void;
   enqueueCandidates: (ids: string[]) => Promise<void>;
   saveToKnowledge: () => Promise<{ itemId: string; updated: boolean }>;
-  subscribeChanges: () => () => void;
+  subscribeChanges: (onCompleted?: (detail: ResearchRunDetail) => void) => () => void;
 }
 
-let reportController: AbortController | null = null;
+let eventRevision = 0;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -43,10 +39,14 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
   busy: false,
   error: null,
   refresh: async () => {
+    const revision = eventRevision;
     set({ loading: true, error: null });
     try {
       const runs = await window.api.research.list();
-      set({ runs, loading: false });
+      set((state) => ({
+        runs: revision === eventRevision ? runs : [...new Map([...runs, ...state.runs].map((run) => [run.id, run])).values()].sort((a, b) => b.updatedAt - a.updatedAt),
+        loading: false,
+      }));
     } catch (error) {
       set({ loading: false, error: message(error) });
     }
@@ -55,8 +55,11 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
     set({ selectedRunId: id, detail: null, loading: Boolean(id), error: null });
     if (!id) return;
     try {
-      set({ detail: await window.api.research.get(id), loading: false });
+      const detail = await window.api.research.get(id);
+      if (get().selectedRunId !== id) return;
+      set((state) => ({ detail: state.detail ?? detail, loading: false, error: detail ? null : "研究记录不存在" }));
     } catch (error) {
+      if (get().selectedRunId !== id) return;
       set({ loading: false, error: message(error) });
     }
   },
@@ -64,7 +67,7 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
     set({ busy: true, error: null });
     try {
       const run = await window.api.research.create(input);
-      set((state) => ({ runs: [run, ...state.runs], selectedRunId: run.id, busy: false }));
+      set((state) => ({ runs: [state.runs.find((item) => item.id === run.id) ?? run, ...state.runs.filter((item) => item.id !== run.id)], selectedRunId: run.id, busy: false }));
       await get().select(run.id);
       return run;
     } catch (error) {
@@ -77,10 +80,10 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
     if (!id) return;
     await window.api.research.cancel(id);
   },
-  clone: async () => {
+  clone: async (replan = false) => {
     const id = get().selectedRunId;
     if (!id) return null;
-    const run = await window.api.research.clone(id);
+    const run = await window.api.research.clone(id, replan);
     await get().refresh();
     await get().select(run.id);
     return run;
@@ -96,27 +99,16 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
     const id = get().selectedRunId;
     if (!id) return;
     set({ busy: true, error: null });
-    reportController?.abort();
-    reportController = new AbortController();
     try {
-      const packet = await window.api.research.beginReport(id);
-      const markdown = await generateResearchReport(packet, reportController.signal);
-      const detail = await window.api.research.saveReport(
-        id,
-        markdown,
-        RESEARCH_REPORT_PROMPT_VERSION,
-      );
-      set({ detail, busy: false });
-      await get().refresh();
-    } catch (error) {
-      await window.api.research.failReport(id, message(error)).catch(() => undefined);
-      set({ busy: false, error: message(error) });
-      throw error;
-    } finally {
-      reportController = null;
-    }
+      await window.api.research.generateReport(id);
+      if (get().selectedRunId === id) await get().select(id);
+      set({ busy: false });
+    } catch (error) { set({ busy: false, error: message(error) }); throw error; }
   },
-  cancelReport: () => reportController?.abort(),
+  cancelReport: () => {
+    const id = get().selectedRunId;
+    if (id) void window.api.research.cancelReport(id).catch((error) => set({ error: message(error) }));
+  },
   enqueueCandidates: async (ids) => {
     const runId = get().selectedRunId;
     if (!runId || ids.length === 0) return;
@@ -137,13 +129,16 @@ export const useResearchStore = create<ResearchState>((set, get) => ({
     await get().refresh();
     return result;
   },
-  subscribeChanges: () => {
+  subscribeChanges: (onCompleted) => {
     const handler = (detail: ResearchRunDetail) => {
+      eventRevision += 1;
+      const previous = get().runs.find((run) => run.id === detail.run.id);
       set((state) => ({
         detail: state.selectedRunId === detail.run.id ? detail : state.detail,
         runs: [detail.run, ...state.runs.filter((run) => run.id !== detail.run.id)]
           .sort((a, b) => b.updatedAt - a.updatedAt),
       }));
+      if (previous?.status === "collecting" && detail.run.status !== "collecting") onCompleted?.(detail);
     };
     window.api.on("research:changed", handler);
     return () => window.api.off("research:changed", handler);

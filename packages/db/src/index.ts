@@ -59,3 +59,5 @@ export {
 } from "./legacy-migration";
 export type { LegacyMigrationStats } from "./legacy-migration";
 export { segmentTextForFts, buildFtsMatchQuery } from "./fts";
+
+export { ResearchWorkflowDB } from "./research-workflow";

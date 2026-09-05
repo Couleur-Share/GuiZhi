@@ -44,143 +44,191 @@ export const BUILT_IN_ILLUSTRATION_STYLES: IllustrationStyle[] = [
   {
     id: "hand-note",
     name: "手绘笔记",
-    description: "白底手绘线稿 + 少量彩色手写批注，适合方法、流程与观点类长文",
+    description: "白底黑色手绘线稿，用一个动作讲清方法、判断与常见误区",
     group: "通用",
     visualDna:
-      "Pure white background. Minimalist black hand-drawn line art with slightly wobbly, " +
-      "uneven pen strokes — visibly drawn by hand, never vector-perfect. Generous empty space: " +
-      "the subject occupies roughly 40%-60% of the canvas and at least a third stays blank. " +
-      "A few short handwritten Chinese annotations sit beside what they describe — black for the " +
-      "main subject and its parts, orange for the main flow or path arrows, red only for problems " +
-      "and warnings, blue only for secondary notes or system state. The feel is a quick explanatory " +
-      "sketch on a blank sheet of paper: restrained, a little odd, clear at a glance.",
+      "Pure white background with lively black pen lines, slightly uneven and visibly hand-drawn. Use " +
+      "a heavier contour for the main subject and finer strokes for supporting objects. Build one " +
+      "compact scene around a clear physical action; silhouettes and contact between objects carry the " +
+      "explanation before any words are read. Keep roughly a third of the canvas as open background " +
+      "and leave comfortable margins. Use one muted orange accent on the decisive object or action; " +
+      "add red only when the supplied idea explicitly involves a warning. If labels are supplied, use " +
+      "neat, medium-weight Chinese handwriting beside the relevant object, with clear separation from " +
+      "the drawing. The result feels like a thoughtful sketch in a working notebook, readable at " +
+      "article-column size.",
     character: "",
     negative:
-      "No gradients, drop shadows, paper texture, grain or tinted background. No commercial vector " +
-      "illustration, no PPT infographic, no formal flowchart, no course slide, no cute mascot poster, " +
-      "no picture-book illustration, no photorealism, no user-interface screenshot.",
+      "No decorative arrows, rainbow annotations, tiny scribbles, paper ruling, paper grain, gradients " +
+      "or drop shadows. No slide layout, icon collection, mascot poster, photorealism or interface " +
+      "screenshot.",
     aspectRatio: "16:9",
     maxShots: 5,
-    maxLabels: 5,
+    maxLabels: 3,
   },
   {
     id: "ink-sketch",
     name: "淡墨速写",
-    description: "灰阶墨线与淡墨块，安静克制，适合随笔与概念性内容",
+    description: "白底浓淡墨色与疏朗留白，适合随笔、思考与抽象观点",
     group: "通用",
     visualDna:
-      "Plain white background with no paper texture. Grey-scale ink brush lines of varying weight, " +
-      "with a few soft washed ink tones for mass; no colour at all. Very sparse composition with wide " +
-      "breathing room and the subject sitting off-centre. A handful of short Chinese annotations " +
-      "written in the same ink, small and unobtrusive. Quiet and contemplative — closer to a margin " +
-      "sketch than to a diagram.",
+      "Clean white background. Draw the main subject in expressive charcoal-black ink contours with a " +
+      "few pale grey brush washes to establish volume. Reserve the darkest ink for the action or point " +
+      "of contact; supporting objects fade into lighter, simpler strokes. Use one off-centre cluster, " +
+      "an asymmetric balance and broad untouched space. Keep the key silhouette recognisable and the " +
+      "relationship physically readable, even when details are omitted. Convey restraint through " +
+      "selective marks and soft brush edges. If labels are supplied, set them in small but legible " +
+      "plain Chinese handwriting in dark ink, separated from the washes. A quiet contemporary " +
+      "editorial ink sketch, not a decorative landscape.",
     character: "",
     negative:
-      "No colour, no gradients, no drop shadows, no scanned-page or aged-paper look, no calligraphy " +
-      "seals or stamps, no framing border, no dense detail, no commercial illustration polish, " +
-      "no photorealism, no ruled axes or boxed layouts.",
+      "No colour, ornamental mountains or bamboo added as filler, calligraphy seals, aged-paper " +
+      "effects, dense cross-hatching, framing borders, photorealism or elaborate scenery.",
     aspectRatio: "16:9",
     maxShots: 4,
-    maxLabels: 4,
+    maxLabels: 2,
   },
   {
     id: "blueprint-dark",
     name: "深色蓝图",
-    description: "深靛蓝底 + 青白细线 + 一处琥珀高亮，适合系统、管线与网络链路",
+    description: "深靛蓝底青白线描，一处琥珀强调，适合机制、管线与系统瓶颈",
     group: "技术与系统",
     visualDna:
-      "Solid deep indigo background, flat and even. Everything is drawn in thin cyan-white " +
-      "technical pen lines with slightly uneven, hand-ruled strokes — precise but visibly drawn " +
-      "by hand, never vector-perfect. One warm amber accent marks the single most important path " +
-      "or object in the scene; nothing else carries colour. The breathing room is the dark " +
-      "background itself: at least a third of the canvas stays bare indigo and the subject sits " +
-      "in the middle band. Short Chinese annotations in the same cyan-white, small, tucked beside " +
-      "what they describe. The feel is an engineer's drawing done in white pen on dark paper: " +
-      "calm, exact, with exactly one bright thing worth looking at.",
+      "Solid deep indigo background, including all empty space. Draw recognisable physical components " +
+      "in crisp cyan-white technical pen lines: stronger outer contours and fewer, finer internal " +
+      "details. Arrange a single readable mechanism with visible contact points, openings or " +
+      "connections; the viewer should see what passes, blocks or changes. Use one restrained amber " +
+      "accent on the decisive component or segment. Keep at least a third of the frame bare indigo, " +
+      "with clear separation between parts. Lines must remain visible at article-column size. If " +
+      "labels are supplied, use clean upright Chinese lettering in cyan-white beside the relevant " +
+      "part. An engineer's conceptual cutaway sketch, with tangible objects rather than a network of " +
+      "labelled boxes.",
     character: "",
     negative:
-      "Never a white or light background — the empty space in this style is the dark indigo " +
-      "itself. No neon glow, bloom, lens flare or sci-fi HUD. No circuit-board traces, no grid or " +
-      "graph paper, no starfield, no gradient or vignette background. No 3D render, no glass or " +
-      "metal material, no dashboard, no code editor screenshot, no second accent colour.",
+      "No white background, graph-paper grid, dimension lines, blueprint title block, decorative " +
+      "circuitry, neon glow, HUD, starfield, gradient background, dashboard, code screenshot or " +
+      "metallic rendering.",
     aspectRatio: "16:9",
     maxShots: 5,
-    maxLabels: 6,
+    maxLabels: 4,
   },
   {
     id: "warm-life",
     name: "暖调生活",
-    description: "米白底 + 赭橙柔色块，物件画得有温度，适合健康、消费与日常决策",
+    description: "奶油底、陶土橙与鼠尾草绿，适合消费、习惯与日常选择",
     group: "生活与人物",
     visualDna:
-      "Warm off-white paper-cream background. Everyday objects drawn with a soft brown ink " +
-      "outline of even weight and filled with flat, muted warm washes — terracotta, mustard, " +
-      "sage green, dusty clay — three or four colours at most, with no shading inside a fill. " +
-      "Objects are drawn slightly larger than life and a little rounded, resting on a simple " +
-      "ground line rather than floating. Wide margins and at most four or five objects in the " +
-      "whole picture. Short Chinese annotations in soft brown handwriting beside the object they " +
-      "name. The feel is a spot illustration from a lifestyle magazine: warm, unhurried, plainly " +
-      "explanatory.",
+      "Warm cream background. Use softly irregular brown outlines and opaque flat gouache-like fills " +
+      "in terracotta, muted ochre and sage green. Give the main object a clear, substantial " +
+      "silhouette; simplify the supporting objects and keep their shapes familiar. Stage a small " +
+      "everyday scene around the supplied action, on one simple ground line or surface when needed. " +
+      "Warmth comes from rounded edges and balanced colours rather than decorative accessories. Leave " +
+      "broad cream margins and comfortable gaps. If labels are supplied, use legible warm-brown " +
+      "Chinese handwriting on clear background beside the object. A calm lifestyle editorial " +
+      "illustration with a tactile painted feel and no photographic lighting.",
     character: "",
     negative:
-      "No cold blue or grey palette, no clinical pure-white product shot, no glossy advertising " +
-      "render, no photorealism, no watercolour bleeding or paper grain texture, no cute mascot or " +
-      "big-headed cartoon character, no stock-illustration office people, no brand names or " +
-      "packaging logos.",
+      "No glossy product advertising, brand logos, elaborate packaging text, busy interior decoration, " +
+      "stock office characters, exaggerated mascot proportions, watery bleeding, heavy paper grain or " +
+      "photorealism.",
     aspectRatio: "16:9",
     maxShots: 5,
-    maxLabels: 5,
+    maxLabels: 3,
   },
   {
     id: "duo-figure",
     name: "双色小人",
-    description: "白底 + 两个简笔小人，靠姿态与距离说事，适合关系、情绪与沟通",
+    description: "珊瑚红与灰蓝简笔人物，用姿态和距离表现关系、情绪与沟通",
     group: "生活与人物",
     visualDna:
-      "Pure white background. One or two extremely simple hand-drawn figures carry the whole " +
-      "scene: round head, a few confident strokes for body and limbs, no facial features beyond " +
-      "a single short line for the mouth. The first figure is warm coral, the second — when the " +
-      "idea involves another person — is cool slate blue, so the two are told apart at a glance. " +
-      "Everything else (props, furniture, doorways) is a thin black outline with no fill. The " +
-      "meaning comes from posture, distance and which way each figure faces: turned away, leaning " +
-      "in, one of them behind something. Very sparse, at least half the canvas empty. Short " +
-      "Chinese annotations in black, small, beside the figure or object they describe.",
+      "Pure white background. Use spare hand-drawn human figures with rounded heads and simple, " +
+      "proportionate bodies. One coral figure carries the main action; when a second person is needed, " +
+      "use a slate-blue figure. Keep each figure's colour and visual role consistent. Express the idea " +
+      "through body direction, reach, distance and interaction with the specified props. Draw props in " +
+      "a lighter charcoal outline so they support the action without competing. Maintain an " +
+      "easy-to-read silhouette and generous open space around the gesture. If labels are supplied, use " +
+      "plain black Chinese handwriting beside the relevant figure or prop. The emotional tone is " +
+      "humane and understated.",
     character:
-      "A simple round-headed figure drawn in a few strokes, warm coral, with no facial features " +
-      "beyond a single mouth line. It performs the core action itself. When the idea is about a " +
-      "relationship, a second figure drawn the same way in cool slate blue appears, and the " +
-      "distance and body angle between the two carries the point.",
+      "A simple coral human figure with a round head, economical limbs and minimal facial detail " +
+      "performs the main action. Add a matching slate-blue figure only when the supplied scene " +
+      "requires another person. Preserve the same proportions and colours; their posture and " +
+      "interaction carry the meaning.",
     negative:
-      "No detailed faces or eyes, no comic-book styling, no big-headed mascot, no emoji-like " +
-      "expressions, no speech bubbles or thought clouds, no hearts or other emotion symbols, " +
-      "no crowd scenes, no gradients or drop shadows, no photorealism.",
+      "No detailed portraits, exaggerated facial expressions, emotion icons, speech bubbles, thought " +
+      "clouds, decorative hearts, crowd scenes, oversized mascot heads, dramatic spotlights or " +
+      "photorealism.",
     aspectRatio: "16:9",
     maxShots: 4,
-    maxLabels: 4,
+    maxLabels: 2,
   },
   {
     id: "iso-space",
     name: "等距场景",
-    description: "白底轻等距视角，画得清设备、房间与它们之间的连接，适合网络与部署",
+    description: "白底轻等距立体场景，适合设备摆位、空间关系与部署连接",
     group: "技术与系统",
     visualDna:
-      "Pure white background. A light isometric view at roughly 30 degrees with no vanishing " +
-      "point: objects, rooms and devices are simple solid volumes with clean black outlines and " +
-      "flat fills — two warm greys plus a single teal accent on whatever the sentence is really " +
-      "about. They are recognisable things seen from above-left, not icons: a router is a box " +
-      "with two antennas, a home is a plain shell with one wall removed. Connections are drawn as " +
-      "plain lines or tubes that visibly begin and end on an object. Generous empty white around " +
-      "the arrangement and at most five volumes in the picture. Short Chinese labels in black " +
-      "beside the volume they name.",
+      "Pure white background. Use a consistent light isometric view, roughly 30 degrees, with parallel " +
+      "edges and no vanishing point. Draw the specified objects as recognisable solid volumes with " +
+      "clean charcoal contours, flat warm-grey faces and one muted teal accent on the key object or " +
+      "connection. Show only the detail needed to understand position, containment or contact. A " +
+      "cutaway may reveal a relevant interior; keep every connection visibly attached to its intended " +
+      "endpoints and preserve the supplied direction. Group the scene on a compact footprint with " +
+      "generous blank margins. If labels are supplied, place upright dark Chinese lettering on the " +
+      "background beside each relevant volume. A precise illustrated miniature, readable without " +
+      "decorative technical detail.",
     character: "",
     negative:
-      "No 3D render, ray tracing, ambient occlusion or realistic materials. No perspective with a " +
-      "vanishing point, no floor grid or isometric tile pattern, no crowded isometric-city " +
-      "poster, no icon-pack clip art, no gradients, no drop shadows, no glow, no second accent " +
-      "colour, no brand logos on devices.",
+      "No glossy 3D rendering, ray tracing, realistic materials, floor grid, floating unconnected " +
+      "cables, crowded miniature city, icon-pack layout, gradients, glow or device logos.",
     aspectRatio: "16:9",
     maxShots: 5,
-    maxLabels: 6,
+    maxLabels: 4,
+  },
+  {
+    id: "paper-cut",
+    name: "剪纸层叠",
+    group: "创意与观点",
+    description: "米白底、纸片轮廓与浅层叠压，适合边界、筛选与积累类概念",
+    visualDna:
+      "Warm ivory background. Construct the specified objects from a few large, recognisable cut-paper " +
+      "silhouettes in muted teal, ochre and terracotta. Edges show a slight handmade irregularity; two " +
+      "or three shallow overlapping layers create depth, with only a delicate contact shadow where " +
+      "sheets actually overlap. Use overlap, an opening or a visible point of contact to express the " +
+      "supplied action, keeping foreground and background roles unambiguous. Keep one focal cluster, " +
+      "broad quiet margins and crisp separation of shapes at article-column size. The medium is matte " +
+      "coloured paper, not folded origami or a digital interface. If labels are supplied, use clean " +
+      "dark Chinese lettering on an uncluttered background area beside the relevant object.",
+    character: "",
+    negative:
+      "No intricate lace cutting, decorative confetti, tiled colour swatches, glossy plastic, deep " +
+      "cast shadows, photographic tabletop, craft tools, greeting-card border or decorative text.",
+    aspectRatio: "16:9",
+    maxShots: 4,
+    maxLabels: 2,
+  },
+  {
+    id: "editorial-collage",
+    name: "编辑拼贴",
+    group: "创意与观点",
+    description: "暖灰底、单色剪影与朱红强调，适合认知偏差、社会观察与评论",
+    visualDna:
+      "Flat warm light-grey background. Create a restrained editorial collage from monochrome " +
+      "illustrated cutouts of the specified subjects, with a very light halftone texture inside the " +
+      "cutouts only. Use one vermilion accent shape to focus attention on the decisive action or " +
+      "obstruction. Build a single coherent encounter between objects with deliberate overlap and one " +
+      "clearly dominant silhouette. A modest scale shift may clarify the supplied metaphor, but must " +
+      "not change factual quantities, ranking or relationships. Keep plenty of plain background and " +
+      "avoid a scrapbook layout. If labels are supplied, set them in clear upright dark Chinese " +
+      "lettering, separate from the cutouts. The tone is thoughtful, sharp and suitable for a " +
+      "long-form essay.",
+    character: "",
+    negative:
+      "No newspaper clippings, ransom-note lettering, torn text fragments, celebrity portraits, " +
+      "invented logos, decorative eyes or hands, busy mood-board arrangement, heavy distressing or " +
+      "sensational poster typography.",
+    aspectRatio: "16:9",
+    maxShots: 4,
+    maxLabels: 2,
   },
 ];
 

@@ -46,3 +46,7 @@ node apps/desktop/scripts/probe-platform-parsers.mjs
 ```
 
 本地工具（yt-dlp / ffmpeg / FunASR）的安装说明见 [功能说明 · 本地工具链](./features.md#本地工具链--应用内一键安装)。
+
+## 研究精读与完整导入
+
+上表描述完整导入。研究工作区只读取正文 / 文案、已有字幕和有限评论，不走资产化、音频下载、转写或 OCR；B 站不读取评论。材料默认留在研究记录中，主动保存摘录或完整导入后才进入知识库。详见 [近期研究](./research.md)。

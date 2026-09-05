@@ -289,6 +289,23 @@ describe("buildIllustrationImagePrompt", () => {
     expect(prompt).toContain("coordinate axes");
   });
 
+  it("未填标注时明确要求无字，不让风格里的批注要求补出文字", () => {
+    const prompt = buildIllustrationImagePrompt(STYLE, {
+      ...shot,
+      labels: ["", "  "],
+    });
+    expect(prompt).toContain("Draw no text, letters, numbers or pseudo-writing");
+    expect(prompt).not.toContain("Allowed Chinese labels only");
+  });
+
+  it("编辑后的标注去空去重再按上限传入，不给图像模型互相冲突的数量要求", () => {
+    const labels = ["  唯一甲  ", "", "唯一甲", "唯一乙", "超额丙"];
+    const prompt = buildIllustrationImagePrompt(STYLE, { ...shot, labels });
+    expect(prompt).toContain("唯一甲 / 唯一乙");
+    expect(prompt).not.toContain("超额丙");
+    expect(labels).toEqual(["  唯一甲  ", "", "唯一甲", "唯一乙", "超额丙"]);
+  });
+
   it("预设没有固定角色时不写角色段", () => {
     expect(buildIllustrationImagePrompt(STYLE, shot)).not.toContain(
       "Recurring character",
