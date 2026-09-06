@@ -8,12 +8,19 @@ import platform
 import shutil
 import subprocess
 import stat
+import sys
 import tarfile
 import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "crawl4ai"
+
+
+def verify_runtime(python):
+    # 英文 Windows 构建机默认 CP1252；自检日志固定 UTF-8，不依赖系统语言。
+    subprocess.run([str(python), "-s", "-c", "import crawl4ai,playwright;print('Crawl4AI 随包依赖可加载')"], check=True,
+                   env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "CRAWL4_AI_BASE_DIRECTORY": str(CONFIG / "downloads" / "build-cache"), "LITELLM_LOCAL_MODEL_COST_MAP": "True", "HF_HUB_OFFLINE": "1"})
 
 
 def download(record):
@@ -29,6 +36,8 @@ def download(record):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", choices=["win32-x64", "darwin-x64", "darwin-arm64", "linux-x64"], required=True)
     args = parser.parse_args()
@@ -68,8 +77,7 @@ def main():
             else:
                 archive.extract(member, browser)
                 if mode and host != "win32": target.chmod(mode)
-    subprocess.run([str(python), "-s", "-c", "import crawl4ai,playwright;print('Crawl4AI 随包依赖可加载')"], check=True,
-                   env={**os.environ, "CRAWL4_AI_BASE_DIRECTORY": str(CONFIG / "downloads" / "build-cache"), "LITELLM_LOCAL_MODEL_COST_MAP": "True", "HF_HUB_OFFLINE": "1"})
+    verify_runtime(python)
     licenses = []
     for metadata in site.glob("*.dist-info/METADATA"):
         content = metadata.read_text(encoding="utf-8", errors="replace")
