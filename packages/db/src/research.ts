@@ -14,6 +14,7 @@ import type {
 } from "@guizhi/shared/types";
 
 interface RunRow {
+  time_scope?: "recent" | "all";
   id: string;
   topic: string;
   day_range: ResearchRun["dayRange"];
@@ -97,6 +98,7 @@ function parseJson<T>(raw: string, fallback: T): T {
 
 function mapRun(row: RunRow): ResearchRun {
   return {
+    timeScope: row.time_scope ?? "recent",
     id: row.id,
     topic: row.topic,
     dayRange: row.day_range,
@@ -215,9 +217,10 @@ export class ResearchDB {
            VALUES (?,?, 'pending', ?, 0)`,
           id,
           source,
-          source === "bilibili" ? "public-api" : "authenticated-browser",
+          source === "web" ? "crawl4ai-public-web" : source === "bilibili" ? "public-api" : "authenticated-browser",
         );
       }
+      this.db.run("UPDATE research_runs SET time_scope=? WHERE id=?",input.timeScope ?? (input.sources.length === 1 && input.sources[0] === "web" ? "all" : "recent"),id);
     })();
     return this.get(id)!;
   }

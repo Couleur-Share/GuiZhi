@@ -59,6 +59,13 @@ describe("导入任务行", () => {
     installWindowMocks();
   });
 
+  it("手机来源标记与原有内容类型并存", () => {
+    renderRow(makeTask({ origin: "mobile" }));
+    expect(screen.getByText("手机提交")).toBeInTheDocument();
+    expect(screen.getByText("视频")).toBeInTheDocument();
+    expect(screen.queryByText("桌面提交")).not.toBeInTheDocument();
+  });
+
   it("进行中：显示子阶段、来源域名与已用时长", () => {
     renderRow(makeTask());
     expect(screen.getByText("语音转写")).toBeInTheDocument();

@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const crawlerPackage = require("./scripts/crawl4ai-package.cjs");
 
 // 与 src/utils/changelog.ts 的 VERSION_HEADING_SOURCE 保持一致
 const VERSION_HEADING = /^## \[?v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\]?/gm;
@@ -26,6 +27,10 @@ function readLatestChangelogSection() {
 }
 
 const extraResources = [
+  { from: "../../NOTICE", to: "NOTICE" },
+  { from: "../../LICENSE", to: "LICENSE" },
+  { from: "resources/crawl4ai", to: "crawl4ai" },
+  { from: "resources/crawl4ai-worker", to: "crawl4ai-worker", filter: ["*.py"] },
   {
     from: "resources/icon.ico",
     to: "icon.ico",
@@ -123,22 +128,29 @@ module.exports = {
     },
   ],
   extraResources,
-  beforePack: () => {
+  beforePack: (context) => {
     assertExtraResourcesExist();
+    const manifest = JSON.parse(fs.readFileSync(path.join(__dirname,"resources/crawl4ai/manifest.json"),"utf8"));
+    const arch = context.arch === 3 ? "arm64" : "x64";
+    const platform = context.electronPlatformName;
+    const target = `${platform}-${platform === "win32" ? "x64" : arch}`;
+    if (manifest.version !== "0.9.3" || manifest.target !== target) throw new Error(`网页组件架构不匹配：需要 ${target}`);
+    manifest.workerHashes=crawlerPackage.workerHashes(path.join(__dirname,"resources/crawl4ai-worker"));
+    fs.writeFileSync(path.join(__dirname,"resources/crawl4ai/manifest.json"),JSON.stringify(manifest,null,2));
   },
+  afterSign: crawlerPackage.afterSign,
   asarUnpack: ["**/*.node", "**/node-sqlite3-wasm/**"],
   asar: true,
   npmRebuild: false,
   nodeGypRebuild: false,
   mac: {
+    sign: crawlerPackage.signMac,
     target: [
       {
         target: "dmg",
-        arch: ["x64", "arm64"],
       },
       {
         target: "zip",
-        arch: ["x64", "arm64"],
       },
     ],
     artifactName: "${productName}-${version}-${arch}.${ext}",
@@ -153,7 +165,6 @@ module.exports = {
     target: [
       {
         target: "nsis",
-        arch: ["x64", "arm64"],
       },
     ],
     artifactName: "${productName}-Setup-${version}-${arch}.${ext}",

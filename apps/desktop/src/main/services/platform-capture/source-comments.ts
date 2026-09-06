@@ -14,7 +14,7 @@ export async function captureSourceComments(
   limit: number,
   signal?: AbortSignal,
 ): Promise<CapturedComment[]> {
-  if (platform === "linuxdo") {
+  if (platform !== "xiaohongshu" && platform !== "douyin") {
     throw new Error("LINUX DO 楼层请在条目的讨论页刷新");
   }
   return service.captureComments(platform, url, limit, signal);

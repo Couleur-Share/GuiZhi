@@ -1,6 +1,11 @@
 GuiZhi 归知
 Copyright (C) 2026 Couleur-Share
 
+This product includes software developed by UncleCode (https://x.com/unclecode)
+as part of the Crawl4AI project (https://github.com/unclecode/crawl4ai).
+Crawl4AI 0.9.3 is distributed under Apache-2.0 with attribution requirements.
+See config/crawl4ai/licenses/Crawl4AI-LICENSE.txt and the bundled dependency notices.
+
 本软件基于 PromptHub 改造而来：
 This software is based on PromptHub:
 

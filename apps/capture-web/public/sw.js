@@ -1,6 +1,6 @@
 const CACHE = "guizhi-capture-v1";
 // 离线壳与草稿相互独立；API 与配对请求永不缓存。
-self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(["/", "/icon.svg", "/manifest.webmanifest"]))));
+self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(["/", "/app-icon.png", "/manifest.webmanifest"]))));
 self.addEventListener("activate", event => event.waitUntil(Promise.all([self.clients.claim(), caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))])));
 function draft(input) {
   return new Promise((resolve, reject) => {

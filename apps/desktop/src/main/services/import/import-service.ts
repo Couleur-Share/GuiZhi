@@ -2,7 +2,8 @@ import { MobileCaptureDB } from "@guizhi/db/mobile-capture";
 /**
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
  */
-import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB, SourceAccessDB } from "@guizhi/db";
+import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB, SourceAccessDB, WebSourceDB } from "@guizhi/db";
+import { captureWebPage, getWebCaptureStatus } from "../web-capture/web-capture";
 import type Database from "../../database/sqlite";
 import {
   DEFAULT_NETWORK_PROXY_SETTINGS,
@@ -85,6 +86,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
           reviewReasons: review.reasons,
         });
         itemId = created.id;
+        if (extracted.webCapture) new WebSourceDB(db).initialize(itemId, extracted.webCapture);
         db.run(
           `INSERT INTO source_records
              (id, item_id, source_type, source_uri, access_uri, normalized_uri, content_hash, platform, captured_at)
@@ -180,10 +182,20 @@ export function createImportService(
     store: taskDb,
     persistence: createPersistence(db),
     extract: (task, signal, onStage) => {
+      let fallbackReason: string | undefined;
       if (task.captureStrategy === "authenticated") {
         onStage("browser-capture");
       }
       return extractContent(task.sourceKind, task.sourceInput, signal, {
+        webFallbackReason: () => fallbackReason,
+        captureWebpage: async (url, requestSignal) => {
+          onStage("web-preparing");
+          const status = await getWebCaptureStatus();
+          if (!status.available) { fallbackReason = `使用兼容网页采集：${status.reason}`; return null; }
+          const result = await captureWebPage({taskId:task.id,purpose:"import",url},requestSignal,onStage);
+          return {title:result.title,content:result.markdown,itemType:"webpage",sourceUri:result.finalUrl,
+            webCapture:result,degradedReason:result.error?.message,warningReason:result.warnings.join("；") || undefined};
+        },
         captureStrategy: task.captureStrategy,
         getYtDlpPath: () => readYtDlpPathSetting(db),
         getFfmpegPath: () => readFfmpegPathSetting(db),

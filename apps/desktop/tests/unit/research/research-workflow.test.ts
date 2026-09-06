@@ -20,6 +20,22 @@ const start = (service: ResearchService, depth: "quick" | "deep" = "deep") => se
 const settled = (service: ResearchService, id: string) => vi.waitFor(() => expect(service.getDetail(id)!.run.status).not.toBe("collecting"));
 
 describe("研究执行与快照", () => {
+  it.each([undefined, false, true])("评论偏好 %s 持久化，自动精读、重试和再次研究沿用", async (includeComments) => {
+    const read = vi.fn(async (c): Promise<ResearchDocument> => ({ id: "doc", candidateId: c.id, runId: c.runId, source: c.source, url: c.url, title: c.title, author: c.author, publishedAt: c.publishedAt, capturedAt: Date.now(), status: "ready", passages: [{ kind: "body", position: 0, text: "原文" }], contentHash: "hash", truncated: false }));
+    const { service } = fixture({ read });
+    const run = service.createAndRun({ topic: "本地知识库", depth: "deep", sources: ["bilibili"], dayRange: 7, includeComments });
+    await settled(service, run.id);
+    const detail = service.getDetail(run.id)!;
+    expect(service.workflow.context(run.id)?.includeComments).toBe(includeComments === true);
+    expect(read.mock.calls[0][2]).toEqual({ includeComments: includeComments === true });
+    service.retryReading(run.id, detail.candidates[0].id);
+    await vi.waitFor(() => expect(service.workflow.context(run.id)?.phase).toBe("idle"));
+    expect(read.mock.calls[1][2]).toEqual({ includeComments: includeComments === true });
+    const clone = service.cloneAndRun(run.id);
+    await settled(service, clone.id);
+    expect(service.getDetail(clone.id)?.run.context?.includeComments).toBe(includeComments === true);
+    expect(read.mock.calls[2][2]).toEqual({ includeComments: includeComments === true });
+  });
   it("三条查询共用三页预算并跨查询去重；快速模式不规划", async () => {
     const plan = vi.fn(async (): Promise<ResearchPlan> => ({ version: "v1", intent: "overview", entities: [], queries: ["本地知识库", "离线", "知识管理"] }));
     const { service, search } = fixture({ plan });

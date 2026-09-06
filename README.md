@@ -43,13 +43,11 @@ SQLite，交给 AI 做摘要、打标签、编织成互相链接的 Wiki 页面�
 
 前往 [Releases](https://github.com/Couleur-Share/GuiZhi/releases/latest) 下载对应安装包：
 
-| 平台 | 安装包 |
+| 本版平台 | 安装包 |
 | --- | --- |
-| Windows x64 | `GuiZhi-Setup-<版本>-x64.exe` |
-| Windows arm64 | `GuiZhi-Setup-<版本>-arm64.exe` |
-| macOS Apple Silicon | `GuiZhi-<版本>-arm64.dmg` |
-| macOS Intel | `GuiZhi-<版本>-x64.dmg` |
-| Linux x64 | `GuiZhi-<版本>-x64.AppImage` / `GuiZhi-<版本>-amd64.deb` |
+| Windows 11+ x64 | `GuiZhi-Setup-<版本>-x64.exe` |
+
+其他平台暂停更新；Windows ARM64、macOS 和 Linux 旧安装包可从 [v0.22.0 历史版本](https://github.com/Couleur-Share/GuiZhi/releases/tag/v0.22.0) 下载。
 
 安装包暂未做正式代码签名。Windows SmartScreen 弹提示时选择「更多信息 → 仍要运行」。
 macOS 包仅做 ad-hoc 签名、未经 Apple 公证：若提示无法验证开发者，到「系统设置 →

@@ -63,6 +63,7 @@ function numeric(value: unknown): number {
 }
 
 const ENGAGEMENT_WEIGHTS: Record<ResearchSource, Partial<Record<keyof PlatformDiscoveryEngagement, number>>> = {
+  web: {},
   xiaohongshu: { likes: 0.4, favorites: 0.4, comments: 0.2 },
   douyin: { likes: 0.4, comments: 0.2, shares: 0.2, views: 0.2 },
   bilibili: { views: 0.35, danmaku: 0.15, comments: 0.15, likes: 0.2, favorites: 0.15 },
@@ -109,6 +110,7 @@ export function analyzeResearchCandidates(
   rangeFrom: number,
   rangeTo: number,
   input: readonly ResearchCandidate[],
+  timeScope: "recent" | "all" = "recent",
 ): ResearchAnalysisResult {
   const queryTokens = researchTokens(topic);
   const candidates = input.map((candidate) => ({ ...candidate, engagement: { ...candidate.engagement } }));
@@ -132,6 +134,10 @@ export function analyzeResearchCandidates(
     candidate.overallScore = Math.max(0, Math.min(100, Math.round(
       candidate.relevanceScore * 0.45 + candidate.recencyScore * 0.25 + candidate.engagementScore * 0.3 - penalty,
     )));
+    if (candidate.source === "web") {
+      candidate.engagementScore = 0;
+      candidate.overallScore = Math.round(candidate.relevanceScore * 0.9 + Math.min(10,candidate.snippet.length / 100));
+    } else if (timeScope === "all") candidate.overallScore = Math.round(candidate.relevanceScore * 0.6 + candidate.engagementScore * 0.4);
   });
 
   const parents = candidates.map((_, index) => index);

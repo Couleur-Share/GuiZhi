@@ -20,6 +20,7 @@ import {
 import { useToast } from "../ui/Toast";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { useImportStore } from "../../stores/import.store";
+import { ImportOriginLabel } from "./ImportOrigin";
 import { ImportStageBreakdown } from "./ImportStageBreakdown";
 import { ImportCompletionCard } from "./ImportCompletionCard";
 import { buildImportTaskReport } from "./import-task-report";
@@ -227,6 +228,16 @@ export function ImportTaskDetailModal({
     >
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 grid grid-cols-2 gap-4">
+            <Field label={t("imports.originFilter", "提交来源")}>
+              <ImportOriginLabel origin={task.origin} />
+            </Field>
+            {task.origin === "mobile" && task.receivedAt != null ? (
+              <Field label={t("imports.receivedAt", "桌面接收时间")}>
+                {new Date(task.receivedAt).toLocaleString()}
+              </Field>
+            ) : null}
+          </div>
           <Field label={t("imports.reportStatus", "状态")}>
             {t(STATUS_LABELS[task.status].key, STATUS_LABELS[task.status].fallback)}
             {task.status === "processing" && task.stage

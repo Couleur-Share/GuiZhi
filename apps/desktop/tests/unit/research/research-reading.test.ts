@@ -15,12 +15,25 @@ vi.mock("../../../src/main/services/media/transcribe", () => ({ transcribeAudio:
 
 beforeEach(() => { vi.clearAllMocks(); mock.executable.mockReturnValue("installed-ytdlp"); });
 describe("只读取文字材料", () => {
+  it.each(["douyin", "xiaohongshu"] as const)("%s 默认及显式关闭时不请求评论、不产生评论缺失警告", async (source) => {
+    mock.note.mockResolvedValue({ title: "图文", kind: "image", author: "作者", description: "原文" });
+    const captureComments = vi.fn().mockRejectedValue(new Error("不应访问评论接口"));
+    const read = createResearchReader({ captureComments } as unknown as BrowserCaptureService, () => null);
+    const candidate = { ...researchFixture().candidates[1], source, url: source === "douyin" ? "https://www.douyin.com/video/123" : "https://www.xiaohongshu.com/explore/123" };
+    for (const options of [undefined, { includeComments: false }]) {
+      const doc = await read(candidate, new AbortController().signal, options);
+      expect(doc.passages.some(p => p.kind === "comment")).toBe(false);
+      expect(doc.warning).not.toContain("评论");
+      expect(doc.passages.some(p => p.text === "原文")).toBe(true);
+    }
+    expect(captureComments).not.toHaveBeenCalled();
+  });
   it("文案不能冒充口播；评论排序去重并限制作者，保存截断有标记", async () => {
     mock.note.mockResolvedValue({ title: "视频标题", kind: "video", author: "发布者", description: "正文".repeat(110000) });
     const captureComments = vi.fn(async () => [{ content: "观点甲", authorName: "同一作者", likeCount: 1 }, { content: "观点乙", authorName: "同一作者", likeCount: 10 }]);
     const read = createResearchReader({ captureComments } as unknown as BrowserCaptureService, () => null);
     const candidate = researchFixture().candidates[1]; candidate.url = "https://www.douyin.com/video/123";
-    const doc = await read(candidate, new AbortController().signal);
+    const doc = await read(candidate, new AbortController().signal, { includeComments: true });
     expect(doc.truncated).toBe(true);
     expect(doc.passages.reduce((n, p) => n + p.text.length, 0)).toBe(200000);
     expect(doc.passages.every((p) => p.kind === "description")).toBe(true);
@@ -28,21 +41,21 @@ describe("只读取文字材料", () => {
     expect(captureComments.mock.calls[0]).toHaveLength(4);
     expect(mock.run).not.toHaveBeenCalled(); expect(mock.forbidden).not.toHaveBeenCalled();
     mock.note.mockResolvedValue({ title: "图文", kind: "image", author: "作者", description: "正文" });
-    const short = await read(candidate, new AbortController().signal);
+    const short = await read(candidate, new AbortController().signal, { includeComments: true });
     expect(short.passages.filter((p) => p.kind === "comment").map((p) => p.text)).toEqual(["观点乙"]);
   });
   it("评论失败保留已经取得的正文", async () => {
     mock.note.mockResolvedValue({ title: "图文", kind: "image", author: "作者", description: "原文" });
     const read = createResearchReader({ captureComments: async () => { throw new Error("timeout"); } } as unknown as BrowserCaptureService, () => null);
     const candidate = researchFixture().candidates[1];
-    const doc = await read(candidate, new AbortController().signal);
+    const doc = await read(candidate, new AbortController().signal, { includeComments: true });
     expect(doc.status).toBe("partial"); expect(doc.warning).toContain("评论未完整"); expect(doc.passages.some((p) => p.text === "原文")).toBe(true);
   });
   it("缺失依赖不自动安装，也不下载或转写音频", async () => {
     mock.executable.mockImplementationOnce(() => { throw new Error("依赖不可用"); });
     const read = createResearchReader({} as BrowserCaptureService, () => null);
     const candidate = researchFixture().candidates[0]; candidate.url = "https://www.bilibili.com/video/BV123456";
-    const result = await read(candidate, new AbortController().signal);
+    const result = await read(candidate, new AbortController().signal, { includeComments: true });
     expect(result.status).toBe("failed"); expect(result.error).toContain("依赖"); expect(mock.forbidden).not.toHaveBeenCalled(); expect(mock.run).not.toHaveBeenCalled();
   });
   it("自动字幕等待完成再清理临时目录，禁止媒体下载参数", async () => {

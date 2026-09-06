@@ -5,9 +5,9 @@
  * 该接口对没有签名 cookie（`__ac_signature` / `ttwid` 等，由页面 JS 挑战
  * 生成）的请求一律返回空 body，于是报「Fresh cookies are needed」。
  *
- * 而 `iesdouyin.com` 的分享页在移动端 UA 下是服务端渲染的：作品信息全在
- * `window._ROUTER_DATA` 里，播放地址把 `playwm` 换成 `play` 就是无水印源，
- * 全程不需要任何 cookie。这里走的就是这条路。
+ * 优先读取移动分享页的 `window._ROUTER_DATA`。分享页不再提供作品数据时，
+ * 回退到离屏桌面页面，读取页面自身加载的目标作品详情，无需预先登录。
+ * 播放地址把 `playwm` 换成 `play`，继续复用既有下载和转写管线。
  *
  * 代价是依赖未公开的页面结构（历史上叫过 `RENDER_DATA` 且是 URL 编码的），
  * 抖音改版就要跟着修——解析失败会降级成可读原因，不会静默产出空条目。
@@ -52,6 +52,8 @@ export interface DouyinAweme {
 }
 
 export interface DouyinFetchDeps {
+  /** 分享页缺少数据时读取离屏页面自身的详情响应；测试可注入。 */
+  captureDetail?: (awemeId: string, signal?: AbortSignal) => Promise<string>;
   /** 测试注入：抓取分享页 */
   fetchPage?: (
     url: string,
@@ -217,14 +219,24 @@ export function parseDouyinRouterData(
     .map((page) => (page as { videoInfoRes?: RawVideoInfoRes })?.videoInfoRes)
     .find((candidate): candidate is RawVideoInfoRes => Boolean(candidate));
 
-  const item = info?.item_list?.[0];
+  const items = Array.isArray(info?.item_list) ? info.item_list : [];
+  const item =
+    items.find((candidate) => readString(candidate?.aweme_id) === awemeId) ??
+    (items.length === 1 && !readString(items[0]?.aweme_id)
+      ? items[0]
+      : undefined);
   if (!item) {
-    const filtered = info?.filter_list?.[0];
+    const filtered = Array.isArray(info?.filter_list)
+      ? info.filter_list[0]
+      : undefined;
     const reason =
       readString(filtered?.detail_msg) || readString(filtered?.notice);
-    throw new PlatformParseError(
-      "note_unavailable",
-      reason || "作品不存在或已被删除",
+    if (reason && items.length === 0) {
+      throw new PlatformParseError("note_unavailable", reason);
+    }
+    throwDouyinStructureMissing(
+      html,
+      "分享页未返回目标作品详情，无法判断作品是否可用",
     );
   }
 
@@ -282,7 +294,29 @@ export async function fetchDouyinAweme(
   }
 
   const page = await fetchPage(douyinShareUrl(awemeId), signal);
-  return parseDouyinRouterData(page.html, awemeId);
+  try {
+    return parseDouyinRouterData(page.html, awemeId);
+  } catch (error) {
+    if (
+      !(error instanceof PlatformParseError) ||
+      error.code !== "structure_missing"
+    )
+      throw error;
+    if (signal?.aborted) throw new Error("已取消", { cause: error });
+    const captureDetail =
+      deps.captureDetail ??
+      (async (id, requestSignal) => {
+        const { getBrowserCaptureService } =
+          await import("../platform-capture/browser-capture");
+        return getBrowserCaptureService().captureDouyinDetail(
+          id,
+          requestSignal,
+        );
+      });
+    const html = await captureDetail(awemeId, signal);
+    if (signal?.aborted) throw new Error("已取消", { cause: error });
+    return parseDouyinRouterData(html, awemeId);
+  }
 }
 
 /** 下载无水印视频到临时目录，供转码转写使用 */

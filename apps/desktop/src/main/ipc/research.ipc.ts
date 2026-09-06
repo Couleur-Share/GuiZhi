@@ -1,4 +1,6 @@
 import { createLocalResearchEvidence } from "../services/research/local-evidence";
+import { validateCrawlInput } from "@guizhi/shared/utils/web-scope";
+import { getWebCaptureStatus } from "../services/web-capture/web-capture";
 import { planResearch, writeResearchReport } from "../services/research/research-ai";
 import { createResearchReader } from "../services/research/read-research";
 import { readYtDlpPathSetting } from "../services/import/import-service";
@@ -22,10 +24,12 @@ function validCreateInput(value: unknown): value is CreateResearchRunInput {
   if (!value || typeof value !== "object") return false;
   const input = value as CreateResearchRunInput;
   return typeof input.topic === "string" && input.topic.trim().length > 0 && input.topic.trim().length <= 100
+    && (input.includeComments === undefined || typeof input.includeComments === "boolean")
     && isResearchDayRange(input.dayRange)
     && (input.depth === "quick" || input.depth === "deep")
     && Array.isArray(input.sources) && input.sources.length > 0
-    && input.sources.length <= 3 && input.sources.every(isResearchSource)
+    && input.sources.length <= 4 && input.sources.every(isResearchSource)
+    && (input.timeScope === undefined || input.timeScope === "all" || input.timeScope === "recent")
     && new Set(input.sources).size === input.sources.length
     && (input.knowledgeScope === undefined || (input.knowledgeScope != null && typeof input.knowledgeScope === "object" && (input.knowledgeScope.kind === "all" || (input.knowledgeScope.kind === "collection" && typeof input.knowledgeScope.collectionId === "string" && input.knowledgeScope.collectionId.length > 0))));
 }
@@ -52,8 +56,12 @@ export function registerResearchIPC(db: Database.Database): void {
   });
   ipcMain.handle(IPC_CHANNELS.RESEARCH_LIST, () => service!.list());
   ipcMain.handle(IPC_CHANNELS.RESEARCH_GET, (_event, runId: unknown) => service!.getDetail(id(runId)));
-  ipcMain.handle(IPC_CHANNELS.RESEARCH_CREATE, (_event, input: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.RESEARCH_CREATE, async (_event, input: unknown) => {
     if (!validCreateInput(input)) throw new Error("研究参数不合法");
+    if (input.sources.includes("web")) {
+      input.webSeeds=validateCrawlInput({purpose:"research",seeds:input.webSeeds!}).seeds;
+      const status=await getWebCaptureStatus();if(!status.available) throw new Error(status.reason);
+    }
     return service!.createAndRun({ ...input, topic: input.topic.trim(), sources: [...input.sources] });
   });
   ipcMain.handle(IPC_CHANNELS.RESEARCH_CANCEL, (_event, runId: unknown) => service!.cancel(id(runId)));

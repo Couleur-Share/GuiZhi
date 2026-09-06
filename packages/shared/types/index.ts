@@ -23,3 +23,4 @@ export * from "./inbox";
 export * from "./research";
 
 export * from "./research-workflow";
+export * from "./web-capture";

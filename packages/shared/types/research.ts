@@ -9,6 +9,7 @@ export const RESEARCH_SOURCES = [
   "xiaohongshu",
   "douyin",
   "bilibili",
+  "web",
 ] as const;
 export type ResearchSource = (typeof RESEARCH_SOURCES)[number];
 
@@ -37,6 +38,7 @@ export type ResearchCandidateState =
   | "dismissed";
 
 export interface ResearchRun {
+  timeScope?: "recent" | "all";
   context?: ResearchContext;
   id: string;
   topic: string;
@@ -128,6 +130,9 @@ export interface ResearchRunDetail {
 }
 
 export interface CreateResearchRunInput {
+  timeScope?: "recent" | "all";
+  webSeeds?: import("./web-capture").WebSeed[];
+  includeComments?: boolean;
   knowledgeScope?: ResearchContext["knowledgeScope"];
   topic: string;
   dayRange: ResearchDayRange;
@@ -175,6 +180,7 @@ export interface ResearchEvidenceItem {
 }
 
 export interface ResearchEvidencePacket {
+  timeScope?: "recent" | "all";
   snapshotId?: string;
   operationId?: string;
   policyVersion?: string;

@@ -7,7 +7,6 @@ import type {
   ResearchRun,
   ResearchComparison,
   ResearchRunDetail,
-  ResearchSource,
 } from "@guizhi/shared/types";
 
 export const researchApi = {
@@ -26,7 +25,7 @@ export const researchApi = {
   cancel: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CANCEL, id),
   delete: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_DELETE, id),
   clone: (id: string, replan = false): Promise<ResearchRun> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_CLONE, id, replan),
-  verifyAndRetrySource: (id: string, source: Exclude<ResearchSource, "bilibili">): Promise<ResearchRun> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_VERIFY_AND_RETRY_SOURCE, id, source),
+  verifyAndRetrySource: (id: string, source: "xiaohongshu" | "douyin"): Promise<ResearchRun> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_VERIFY_AND_RETRY_SOURCE, id, source),
   enqueueCandidates: (id: string, candidateIds: string[]): Promise<ImportTask[]> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_ENQUEUE_CANDIDATES, id, candidateIds),
   saveToKnowledge: (id: string): Promise<{ itemId: string; updated: boolean }> => ipcRenderer.invoke(IPC_CHANNELS.RESEARCH_SAVE_TO_KNOWLEDGE, id),
 };

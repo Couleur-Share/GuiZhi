@@ -14,7 +14,7 @@ import Database from "../database/sqlite";
 import { getDatabase } from "../database";
 import { getBackupsDir, getDatabasePath } from "../runtime-paths";
 import { logAppError } from "../diagnostic-log";
-import { getSchemaVersion, SCHEMA_VERSION } from "@guizhi/db";
+import { getSchemaVersion, MIGRATIONS, SCHEMA_VERSION } from "@guizhi/db";
 import type {
   BackupCreateResult,
   BackupFileInfo,
@@ -132,6 +132,20 @@ export function createBackup(
     throw error;
   }
   return toBackupFileInfo(backupsDir, fileName, kind);
+}
+
+/** 在任何待执行迁移之前保存原库；备份失败必须阻止结构升级。 */
+export function backupPendingSchemaUpgrade(
+  db: Database.Database,
+  backupsDir = getBackupsDir(),
+): BackupFileInfo | null {
+  if (!db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_items'")) return null;
+  const table = db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'");
+  const applied = new Set(table
+    ? (db.all("SELECT name FROM schema_migrations") as { name: string }[]).map((row) => row.name)
+    : []);
+  if (MIGRATIONS.every((migration) => applied.has(migration.name))) return null;
+  return createBackup(db, "pre-update", backupsDir);
 }
 
 /** 不抛错版本（升级前快照等“尽力而为”场景使用） */
@@ -336,7 +350,9 @@ export function countActiveImportTasks(db: Database.Database): number {
   const row = db.get(
     "SELECT COUNT(*) AS count FROM import_tasks WHERE status IN ('pending', 'processing')",
   ) as { count: number } | undefined;
-  return row?.count ?? 0;
+  if (!db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='crawl_jobs'")) return row?.count ?? 0;
+  const crawl = db.get("SELECT COUNT(*) AS count FROM crawl_jobs j WHERE j.status IN ('pending','running') OR EXISTS (SELECT 1 FROM crawl_pages p WHERE p.job_id=j.id AND p.status='running')") as {count:number} | undefined;
+  return (row?.count ?? 0) + (crawl?.count ?? 0);
 }
 
 // ── 自动备份调度 ────────────────────────────────────────────────────────────

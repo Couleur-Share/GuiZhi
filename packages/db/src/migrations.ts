@@ -1,4 +1,5 @@
 import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
+import { migrateWebCapture } from "./web-capture-schema";
 import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
 /**
  * Schema 迁移执行器。
@@ -648,6 +649,7 @@ export const MIGRATIONS: Migration[] = [
     },
   },
   { name: "0029-mobile-capture", up: db => db.exec(MOBILE_CAPTURE_SCHEMA) },
+  { name: "0030-web-capture", foreignKeysOff: true, up: migrateWebCapture },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

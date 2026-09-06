@@ -34,6 +34,7 @@ export const STAGE_LABELS: Record<
   ImportStage,
   { key: string; fallback: string }
 > = {
+  "web-preparing": { key: "imports.stageWebPreparing", fallback: "准备网页组件" },
   fetching: { key: "imports.stageFetching", fallback: "抓取中" },
   extracting: { key: "imports.stageExtracting", fallback: "解析中" },
   saving: { key: "imports.stageSaving", fallback: "入库中" },

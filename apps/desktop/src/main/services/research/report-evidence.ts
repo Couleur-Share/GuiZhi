@@ -23,13 +23,14 @@ export function selectPassages(passages: ResearchPassage[], topic: string, budge
 export function createEvidenceSnapshot(detail: ResearchRunDetail, localItems: ResearchLocalEvidence[] = []): ResearchSnapshot {
   const hashes = new Map((detail.documents ?? []).filter((d) => d.contentHash).map((d) => [d.candidateId, d.contentHash!]));
   const candidates = selectResearchEvidence(detail.candidates, detail.run, detail.run.context?.plan, hashes);
-  if (!candidates.some((c) => researchEligibility(c, detail.run, detail.run.context?.plan) === "recent")) throw new Error("本次未找到足够的近期有效证据");
+  if (!candidates.length || (detail.run.timeScope !== "all" && !candidates.some((c) => researchEligibility(c, detail.run, detail.run.context?.plan) === "recent"))) throw new Error("本次未找到足够的有效证据");
   const snapshotId = randomUUID();
   const operationId = randomUUID();
   const totalBudget = detail.run.depth === "quick" ? 12_000 : 32_000;
   const local = localItems.slice(0, 6).map((item, index) => ({ ...item, ref: `L${index + 1}`, excerpt: item.excerpt.slice(0, 1000) }));
   const perItem = Math.floor((totalBudget - local.reduce((n, item) => n + item.excerpt.length, 0)) / candidates.length);
   const packet: ResearchEvidencePacket = {
+    timeScope: detail.run.timeScope ?? "recent",
     runId: detail.run.id, topic: detail.run.topic, rangeFrom: detail.run.rangeFrom, rangeTo: detail.run.rangeTo,
     snapshotId, operationId, policyVersion: RESEARCH_POLICY.version, intent: detail.run.context?.plan?.intent ?? "overview",
     sourceRuns: detail.sources, attempts: detail.attempts ?? [], localItems: local,
@@ -43,9 +44,9 @@ export function createEvidenceSnapshot(detail: ResearchRunDetail, localItems: Re
         capturedAt: doc?.capturedAt ?? candidate.createdAt, completeness: doc?.warning || doc?.error,
         ref: `R${index + 1}`, candidateId: candidate.id, source: candidate.source, title: candidate.title, author: candidate.author,
         snippet: passages.map((p) => p.text).join("\n"), passages, publishedAt: candidate.publishedAt, dateConfidence: candidate.dateConfidence,
-        engagement: candidate.engagement, overallScore: candidate.overallScore, url: candidate.url,
+        engagement: candidate.engagement, overallScore: candidate.overallScore, url: doc?.url ?? candidate.url,
         eligibility: researchEligibility(candidate, detail.run, detail.run.context?.plan),
-        urls: detail.candidates.filter((c) => relatedIds.has(c.id)).map((c) => c.url),
+        urls: [...new Set([...(doc?.sourceUrls ?? []),...detail.candidates.filter((c) => relatedIds.has(c.id)).map((c) => c.url)])],
         excerptTruncated: Boolean(doc?.truncated) || passages.reduce((n, p) => n + p.text.length, 0) < original.reduce((n, p) => n + p.text.length, 0),
       };
     }),
@@ -73,7 +74,7 @@ export function validateReport(markdown: string, packet: ResearchEvidencePacket)
     const text = lines.join("\n");
     const blockRefs = [...text.matchAll(/\[([RL]\d+)]/g)].map((m) => m[1]);
     if (!blockRefs.length) throw new Error("报告存在未附引用的结论段，请重新生成");
-    if (!limitation && blockRefs.some((ref) => weak.has(ref))) throw new Error("日期未确认线索只能用于限制说明与待核实部分");
+    if (packet.timeScope !== "all" && !limitation && blockRefs.some((ref) => weak.has(ref))) throw new Error("日期未确认线索只能用于限制说明与待核实部分");
   }
 }
 
@@ -91,5 +92,5 @@ export function renderCompleteReport(markdown: string, packet: ResearchEvidenceP
     return `[${i.ref}]: <${safeUrl(i.url)}>\n\n**${i.ref} · ${literal(i.title)}** · ${literal(i.author)} · 采集 ${i.capturedAt ? date(i.capturedAt) : "未知"} · 发布 ${i.publishedAt != null ? date(i.publishedAt) : "未知"}（${i.dateConfidence}）\n\n${literal(i.completeness ?? "")}\n\n${passages}\n\n${(i.urls ?? []).map((url) => `[来源](<${safeUrl(url)}>)`).join(" · ")}`;
   });
   for (const item of packet.localItems ?? []) if (used.has(item.ref)) references.push(`[${item.ref}]: #research-evidence-${item.ref}\n\n**[${item.ref}] 本地知识 · ${literal(item.title)}**（版本 ${date(item.updatedAt)}）\n\n> ${literal(item.excerpt).replace(/\n/g, "\n> ")}`);
-  return `## 研究范围与覆盖\n\n${date(packet.rangeFrom)} 至 ${date(packet.rangeTo)}\n\n${sources}\n\n${attempts ? `查询尝试（跨查询可能重复）：\n\n${attempts}\n\n` : ""}${markdown.trim()}\n\n## 材料限制\n\n候选搜索与有限精读不代表平台完整覆盖。互动量不代表可信度；评论只代表作者观点。${caps.length ? `已达到采样上限：${caps.join("、")}。` : ""}${packet.items.some((i) => i.excerptTruncated) ? "部分材料仅选取摘录，未完整进入模型上下文。" : ""}\n\n## 引用来源\n\n${references.join("\n\n")}`;
+  return `## 研究范围与覆盖\n\n${packet.timeScope === "all" ? "不限时间（发布日期未知的资料保留原始标注）" : `${date(packet.rangeFrom)} 至 ${date(packet.rangeTo)}`}\n\n${sources}\n\n${attempts ? `查询尝试（跨查询可能重复）：\n\n${attempts}\n\n` : ""}${markdown.trim()}\n\n## 材料限制\n\n候选搜索与有限精读不代表平台完整覆盖。互动量不代表可信度；评论只代表作者观点。${caps.length ? `已达到采样上限：${caps.join("、")}。` : ""}${packet.items.some((i) => i.excerptTruncated) ? "部分材料仅选取摘录，未完整进入模型上下文。" : ""}\n\n## 引用来源\n\n${references.join("\n\n")}`;
 }

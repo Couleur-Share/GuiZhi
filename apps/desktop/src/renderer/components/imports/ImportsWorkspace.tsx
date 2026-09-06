@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { DocumentSitePanel } from "./DocumentSitePanel";
 import {
   PauseIcon,
   PlayIcon,
@@ -9,12 +10,14 @@ import {
   XIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { ImportTask, KnowledgeItem } from "@guizhi/shared/types";
+import type { ImportTask, ImportTaskClearQuery, KnowledgeItem } from "@guizhi/shared/types";
 import { filterTasks, useImportStore } from "../../stores/import.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useAskStore } from "../../stores/ask.store";
 import { useUIStore } from "../../stores/ui.store";
 import { LoadErrorState } from "../ui/LoadErrorState";
+import { ImportOriginFilter } from "./ImportOrigin";
+import { reportOperationError } from "../../stores/operation-error.store";
 import { Spinner } from "../ui/Spinner";
 import { ImportsBulkBar } from "./ImportsBulkBar";
 import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
@@ -38,7 +41,8 @@ function isRunning(task: ImportTask): boolean {
  * 打开结果条目，重复任务支持「打开已有条目」与「仍要创建副本」。
  */
 export function ImportsWorkspace() {
-  const [view, setView] = useState<"tasks" | "discovery">(() =>
+  const { t } = useTranslation();
+  const [view, setView] = useState<"tasks" | "discovery" | "documents">(() =>
     sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ||
     sessionStorage.getItem(DISCOVERY_OPEN_VIEW_KEY)
       ? "discovery"
@@ -49,9 +53,10 @@ export function ImportsWorkspace() {
     window.addEventListener("discovery:open-view", openDiscovery);
     return () => window.removeEventListener("discovery:open-view", openDiscovery);
   }, []);
+  if (view === "documents") return <DocumentSitePanel onBack={() => setView("tasks")} />;
   return view === "discovery"
     ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
-    : <ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} />;
+    : <div className="flex h-full flex-col"><button className="self-start m-3 rounded-lg border border-border px-3 py-1.5 text-sm" onClick={() => setView("documents")}>{t("webCapture.importSite", "导入文档站")}</button><div className="min-h-0 flex-1"><ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} /></div></div>;
 }
 
 function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
@@ -62,6 +67,8 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
   const isLoadingMore = useImportStore((state) => state.isLoadingMore);
   const hasLoaded = useImportStore((state) => state.hasLoaded);
   const loadError = useImportStore((state) => state.loadError);
+  const origin = useImportStore((state) => state.origin);
+  const setOrigin = useImportStore((state) => state.setOrigin);
   const filter = useImportStore((state) => state.filter);
   const setFilter = useImportStore((state) => state.setFilter);
   const query = useImportStore((state) => state.query);
@@ -90,7 +97,8 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
   // 存快照的话弹窗会停在打开那一刻，越看越不对
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   const [clearConfirm, setClearConfirm] = useState<{
-    scope: "filtered" | "all";
+    query: ImportTaskClearQuery;
+    label: string;
     count: number;
   } | null>(null);
 
@@ -100,23 +108,30 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
   }, [fetchTasks, query]);
 
   const requestClear = async (scope: "filtered" | "all") => {
-    const count = await previewClearTerminal(scope);
-    setClearConfirm({ scope, count });
+    const clearQuery: ImportTaskClearQuery = { scope, origin, status: filter, query };
+    const label = scope === "all" ? t("imports.originAll", "全部来源")
+      : `${origin === "mobile" ? t("imports.originMobile", "手机端") : origin === "desktop" ? t("imports.originDesktop", "桌面端") : t("imports.originAll", "全部来源")} · ${t("imports.currentFilter", "当前筛选")}`;
+    try {
+      const count = await previewClearTerminal(clearQuery);
+      setClearConfirm({ query: clearQuery, label, count });
+    } catch (error) {
+      reportOperationError("imports.clearPreviewFailed", "无法预览清理范围", error);
+    }
   };
 
   const visible = useMemo(
-    () => filterTasks(tasks, filter, query),
-    [tasks, filter, query],
+    () => filterTasks(tasks, filter, query, origin),
+    [tasks, filter, query, origin],
   );
   const selected = useMemo(
-    () => tasks.filter((task) => selectionIds.includes(task.id)),
-    [tasks, selectionIds],
+    () => visible.filter((task) => selectionIds.includes(task.id)),
+    [visible, selectionIds],
   );
   const detailTask = detailTaskId
     ? (tasks.find((task) => task.id === detailTaskId) ?? null)
     : null;
-  const activeCount = tasks.filter(isRunning).length;
-  const failedIds = tasks
+  const activeCount = filterTasks(tasks, "all", query, origin).filter(isRunning).length;
+  const failedIds = visible
     .filter((task) => task.status === "failed")
     .map((task) => task.id);
 
@@ -165,7 +180,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-5">
+      <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-2">
         <h2 className="shrink-0 text-sm font-semibold text-foreground">
           {t("imports.title", "导入任务")}
         </h2>
@@ -219,7 +234,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
             className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
           >
             <RotateCcwIcon className="h-4 w-4" aria-hidden="true" />
-            {t("imports.retryAllFailed", "重试失败 {{count}}", {
+            {t("imports.retryVisibleFailed", "重试当前失败 {{count}}", {
               count: failedIds.length,
             })}
           </button>
@@ -255,16 +270,18 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
           className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
         >
           <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-          {t("imports.clearFiltered", "清理当前")}
+          {t("imports.clearFilteredSource", "清理当前筛选")}
         </button>
         <button
           type="button"
           onClick={() => void requestClear("all")}
           className="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
         >
-          {t("imports.clearAllTerminal", "清理全部终态")}
+          {t("imports.clearAllSources", "清理所有来源终态")}
         </button>
       </div>
+
+      <ImportOriginFilter />
 
       {selected.length > 0 ? <ImportsBulkBar selected={selected} /> : null}
 
@@ -273,13 +290,14 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
           <div className="delayed-fade-in flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />
           </div>
-        ) : loadError && tasks.length === 0 ? (
+        ) : loadError ? (
           <LoadErrorState message={loadError} onRetry={() => void fetchTasks()} />
-        ) : tasks.length === 0 ? (
+        ) : tasks.length === 0 && origin === "all" && filter === "all" && !query.trim() ? (
           <ImportsEmptyState />
         ) : visible.length === 0 ? (
           <ImportsFilteredEmpty
             onReset={() => {
+              setOrigin("all");
               setFilter("all");
               setQuery("");
             }}
@@ -338,14 +356,14 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
             setClearConfirm(null);
             return;
           }
-          void clearTerminal(clearConfirm.scope);
+          void clearTerminal(clearConfirm.query);
           setClearConfirm(null);
         }}
         title={t("imports.clearConfirmTitle", "清理导入任务历史")}
         message={t(
-          "imports.clearConfirmExact",
-          "将删除 {{count}} 条终态任务记录（完成、失败、取消或重复），不会删除已经入库的知识条目。",
-          { count: clearConfirm?.count ?? 0 },
+          "imports.clearConfirmSource",
+          "范围：{{scope}}。将删除 {{count}} 条终态任务记录（完成、失败、取消或重复），不会删除已经入库的知识条目。",
+          { count: clearConfirm?.count ?? 0, scope: clearConfirm?.label ?? "" },
         )}
         confirmText={
           clearConfirm?.count

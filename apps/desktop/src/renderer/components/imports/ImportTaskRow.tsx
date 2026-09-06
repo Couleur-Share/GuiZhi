@@ -23,6 +23,7 @@ import { useImportStore } from "../../stores/import.store";
 import { reportOperationError } from "../../stores/operation-error.store";
 import { useUIStore } from "../../stores/ui.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
+import { ImportOriginLabel } from "./ImportOrigin";
 import { ImportStageSummary } from "./ImportStageSummary";
 import {
   formatDuration,
@@ -363,6 +364,7 @@ export function ImportTaskRow({
                 {t("imports.viewResult", "查看成果")}
               </button>
             ) : null}
+            <ImportOriginLabel origin={task.origin} />
             {host ? <span className="truncate">{host}</span> : null}
             {folder ? (
               <span className="max-w-[18rem] truncate">{folder}</span>

@@ -1,3 +1,4 @@
+import { WebResearchSeeds } from "./WebResearchSeeds";
 import { ResearchComparisonPanel } from "./ResearchComparisonPanel";
 import { ResearchEvidencePanel, ResearchCoverage } from "./ResearchEvidencePanel";
 import {
@@ -18,6 +19,7 @@ import type {
   ResearchDayRange,
   ResearchDepth,
   ResearchSource,
+  WebSeed,
 } from "@guizhi/shared/types";
 import { useResearchStore } from "../../stores/research.store";
 import { isAiConfiguredForScenario } from "../../services/knowledge-ai/ai-invoke";
@@ -42,13 +44,17 @@ function NewResearchForm() {
   const create = useResearchStore((state) => state.create);
   const busy = useResearchStore((state) => state.busy);
   const [linkKnowledge, setLinkKnowledge] = useState(false);
+  const [includeComments, setIncludeComments] = useState(false);
   const [knowledgeChoice, setKnowledgeChoice] = useState("");
   const [collections, setCollections] = useState<Collection[]>([]);
   useEffect(() => { void window.api.collection.list().then(setCollections).catch(() => setCollections([])); }, []);
   const [topic, setTopic] = useState("");
   const [dayRange, setDayRange] = useState<ResearchDayRange>(30);
+  const [timeChoice,setTimeChoice]=useState<string|null>(null);
+  const [webSeeds,setWebSeeds]=useState<WebSeed[]>([{url:"",mode:"page"}]);
   const [depth, setDepth] = useState<ResearchDepth>("quick");
   const [sources, setSources] = useState<ResearchSource[]>(["xiaohongshu", "douyin", "bilibili"]);
+  const timeScope=timeChoice === "all" || (timeChoice===null && sources.length===1 && sources[0]==="web") ? "all" : "recent";
   const [sessions, setSessions] = useState<PlatformSessionStatus[]>([]);
   const { showToast } = useToast();
 
@@ -60,7 +66,7 @@ function NewResearchForm() {
   const submit = async () => {
     if (!topic.trim() || sources.length === 0 || (linkKnowledge && !knowledgeChoice)) return;
     try {
-      await create({ topic: topic.trim(), dayRange, depth, sources, knowledgeScope: !linkKnowledge ? undefined : knowledgeChoice === "all" ? { kind: "all" } : { kind: "collection", collectionId: knowledgeChoice } });
+      await create({ topic: topic.trim(), dayRange, depth, sources, timeScope, webSeeds:sources.includes("web")?webSeeds:undefined, includeComments: includeComments && sources.some((source) => (source === "douyin" || source === "xiaohongshu")), knowledgeScope: !linkKnowledge ? undefined : knowledgeChoice === "all" ? { kind: "all" } : { kind: "collection", collectionId: knowledgeChoice } });
     } catch (error) {
       showToast(t("research.createFailed", "创建研究失败"), "error", { detail: error instanceof Error ? error.message : String(error) });
     }
@@ -73,11 +79,11 @@ function NewResearchForm() {
   };
 
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto p-8 app-wallpaper-section">
+    <div className="flex h-full items-start justify-center overflow-y-auto p-8 app-wallpaper-section">
       <div className="w-full max-w-2xl rounded-2xl border border-border app-wallpaper-panel-strong p-7 shadow-sm">
         <ScanSearchIcon className="mb-4 h-8 w-8 text-primary" />
-        <h1 className="text-xl font-semibold">{t("research.newTitle", "近期主题研究")}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{t("research.newDescription", "发现近期候选、确定性排序并聚合跨平台热点。报告只在你确认证据后手动生成。")}</p>
+        <h1 className="text-xl font-semibold">{timeScope === "all" ? t("research.allTimeTitle", "主题研究") : t("research.newTitle", "近期主题研究")}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{timeScope === "all" ? t("research.allTimeDescription", "按主题整理证据，不限制发布日期。报告只在你确认证据后手动生成。") : t("research.newDescription", "发现近期候选、确定性排序并聚合跨平台热点。报告只在你确认证据后手动生成。")}</p>
         <label className="mt-6 block text-sm font-medium">
           {t("research.topic", "研究主题")}
           <input value={topic} onChange={(event) => setTopic(event.target.value)} maxLength={100} placeholder={t("research.topicPlaceholder", "例如：本地 AI 知识库")} className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 outline-none focus:ring-2 focus:ring-primary/30" />
@@ -85,11 +91,11 @@ function NewResearchForm() {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="text-sm font-medium">{t("research.range", "时间范围")}
             <Select
-              value={String(dayRange)}
-              onChange={(value) => setDayRange(Number(value) as ResearchDayRange)}
+              value={timeScope === "all" ? "all" : String(dayRange)}
+              onChange={(value) => {setTimeChoice(value);if(value!=="all")setDayRange(Number(value) as ResearchDayRange);}}
               ariaLabel={t("research.range", "时间范围")}
               className="mt-2"
-              options={[7, 14, 30].map((days) => ({ value: String(days), label: t("research.lastDays", "最近 {{days}} 天", { days }) }))}
+              options={[{value:"all",label:t("research.allTime","不限时间")},...[7, 14, 30].map((days) => ({ value: String(days), label: t("research.lastDays", "最近 {{days}} 天", { days }) }))]}
             />
           </div>
           <div className="text-sm font-medium">{t("research.mode", "研究模式")}
@@ -108,18 +114,23 @@ function NewResearchForm() {
         <div className="mt-5">
           <p className="mb-2 text-sm font-medium">{t("research.sourceSelection", "来源")}</p>
           <div className="grid gap-2 sm:grid-cols-3">
-            {(["xiaohongshu", "douyin", "bilibili"] as const).map((source) => {
+            {(["xiaohongshu", "douyin", "bilibili", "web"] as const).map((source) => {
               const session = sessions.find((item) => item.platform === source);
               return <div key={source} className="rounded-xl border border-border p-3">
-                <Checkbox checked={sources.includes(source)} onChange={(checked) => toggleSource(source, checked)} label={SOURCE_NAMES[source]} />
-                {source !== "bilibili" ? <div className="mt-2 text-xs text-muted-foreground">
+                <Checkbox checked={sources.includes(source)} onChange={(checked) => toggleSource(source, checked)} label={source === "web" ? t("research.web", "网页") : SOURCE_NAMES[source]} />
+                {(source === "douyin" || source === "xiaohongshu") ? <div className="mt-2 text-xs text-muted-foreground">
                   {session?.loggedIn ? t("research.loggedIn", "已登录") : <button type="button" onClick={() => void login(source)} className="inline-flex items-center gap-1 text-primary hover:underline"><LogInIcon className="h-3 w-3" />{t("research.login", "登录")}</button>}
-                </div> : <div className="mt-2 text-xs text-muted-foreground">{t("research.publicApi", "公开接口")}</div>}
+                </div> : <div className="mt-2 text-xs text-muted-foreground">{source === "web" ? t("webCapture.entries", "指定网页入口（最多 10 个）") : t("research.publicApi", "公开接口")}</div>}
               </div>;
             })}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">{t("research.loginHint", "未登录的平台会显示为部分覆盖，不会阻塞其他来源。")}</p>
         </div>
+        {sources.includes("web") && <WebResearchSeeds value={webSeeds} onChange={setWebSeeds}/>}
+        {sources.some((source) => (source === "douyin" || source === "xiaohongshu")) ? <div className="mt-5 space-y-2">
+          <Checkbox checked={includeComments} onChange={setIncludeComments} label={t("research.includeComments", "精读时采集评论")} />
+          <p className="text-xs text-muted-foreground">{t("research.commentsHint", "仅适用于抖音、小红书，每条材料最多 20 条。需要使用体验、纠错或讨论观点时开启。")}</p>
+        </div> : null}
         <div className="mt-5 space-y-2">
           <Checkbox checked={linkKnowledge} onChange={setLinkKnowledge} label={t("research.linkKnowledge", "关联已有知识")} />
           {linkKnowledge ? <Select ariaLabel={t("research.knowledgeScope", "选择知识范围")} value={knowledgeChoice} onChange={setKnowledgeChoice} options={[{ value: "", label: t("research.chooseScope", "请选择知识范围") }, { value: "all", label: t("research.allKnowledge", "全部知识") }, ...collections.map((c) => ({ value: c.id, label: c.name }))]} /> : null}
@@ -134,7 +145,7 @@ function NewResearchForm() {
   );
 }
 
-function CandidateRow({ candidate, checked, onCheck, onOpenItem, onOpenTask }: { candidate: ResearchCandidate; checked: boolean; onCheck: (checked: boolean) => void; onOpenItem: (id: string) => void; onOpenTask: () => void }) {
+function CandidateRow({ candidate, timeScope, checked, onCheck, onOpenItem, onOpenTask }: { candidate: ResearchCandidate; timeScope?: "recent" | "all"; checked: boolean; onCheck: (checked: boolean) => void; onOpenItem: (id: string) => void; onOpenTask: () => void }) {
   const { t } = useTranslation();
   const { title, snippet } = candidateDisplayText(candidate);
   return <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 border-b border-border/70 px-4 py-3 last:border-0">
@@ -142,8 +153,8 @@ function CandidateRow({ candidate, checked, onCheck, onOpenItem, onOpenTask }: {
     <div className="min-w-0">
       <div className="flex items-start gap-2"><span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"><PlatformIcon platform={candidate.source} className="h-3.5 w-3.5" />{SOURCE_NAMES[candidate.source]}</span><a href={candidate.url} title={candidate.title} target="_blank" rel="noreferrer" className="line-clamp-2 break-words text-sm font-medium hover:text-primary hover:underline">{title}</a></div>
       <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{candidate.author || "未知作者"}{snippet ? ` · ${snippet}` : ""}</p>
-      <p className="mt-1 text-[11px] text-muted-foreground">日期：{candidate.publishedAt ? new Date(candidate.publishedAt).toLocaleDateString() : "未知"}（{{ high: "高置信", medium: "中置信", low: "低置信" }[candidate.dateConfidence]}） · 相关 {candidate.relevanceScore} · 时效 {candidate.recencyScore} · 互动 {candidate.engagementScore}</p>
-      {candidate.eligibility ? <p className="mt-1 text-xs text-muted-foreground">{t(`research.eligibility.${candidate.eligibility}`, candidate.eligibility)}</p> : null}
+      <p className="mt-1 text-[11px] text-muted-foreground">日期：{candidate.publishedAt ? new Date(candidate.publishedAt).toLocaleDateString() : "未知"}（{{ high: "高置信", medium: "中置信", low: "低置信" }[candidate.dateConfidence]}） · 相关 {candidate.relevanceScore}{candidate.source !== "web" && <>{timeScope !== "all" && <> · 时效 {candidate.recencyScore}</>} · 互动 {candidate.engagementScore}</>}</p>
+      {candidate.eligibility ? <p className="mt-1 text-xs text-muted-foreground">{timeScope === "all" && ["recent", "undated"].includes(candidate.eligibility) ? t("research.inScope", "符合证据条件（不限时间）") : t(`research.eligibility.${candidate.eligibility}`, candidate.eligibility)}</p> : null}
       {candidate.importedItemId ? <button type="button" onClick={() => onOpenItem(candidate.importedItemId!)} className="mt-1 text-xs text-primary hover:underline">打开已入库条目</button> : candidate.importTaskId ? <button type="button" onClick={onOpenTask} className="mt-1 block text-xs text-amber-600 hover:underline">查看导入任务</button> : null}
     </div>
     <div className="rounded-full border border-border px-2 py-1 text-sm font-semibold tabular-nums">{candidate.overallScore}</div>
@@ -198,7 +209,7 @@ function ResearchDetail() {
     useUIStore.getState().setAppModule("imports");
   };
   const makeReport = async () => {
-    if (detail.run.context && !detail.candidates.some((c) => c.eligibility === "recent")) { showToast(t("research.insufficient", "本次未找到足够的近期有效证据"), "warning"); return; }
+    if (detail.run.timeScope !== "all" && detail.run.context && !detail.candidates.some((c) => c.eligibility === "recent")) { showToast(t("research.insufficient", "本次未找到足够的近期有效证据"), "warning"); return; }
     if (!isAiConfiguredForScenario("research")) {
       showToast(t("research.aiMissing", "请先配置主文本模型"), "warning");
       requestSettings("ai");
@@ -215,7 +226,7 @@ function ResearchDetail() {
   return <div className="flex h-full min-h-0 flex-col app-wallpaper-section">
     <div className="border-b border-border px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 className="text-lg font-semibold">{detail.run.topic}</h1><p className="mt-1 text-xs text-muted-foreground">最近 {detail.run.dayRange} 天 · {detail.run.depth === "quick" ? "快速" : "深度"}</p></div>
+        <div><h1 className="text-lg font-semibold">{detail.run.topic}</h1><p className="mt-1 text-xs text-muted-foreground">{detail.run.timeScope === "all" ? t("research.allTime", "不限时间") : t("research.lastDays", "最近 {{days}} 天", {days:detail.run.dayRange})} · {detail.run.depth === "quick" ? "快速" : "深度"} · {detail.run.context?.includeComments === true ? t("research.commentsOn", "精读含评论") : t("research.commentsOff", "精读不采评论")}</p></div>
         <div className="flex flex-wrap gap-2">
           {detail.run.status === "collecting" ? <Button size="sm" variant="secondary" onClick={() => void runGuardedMutation("research.cancel", "取消研究", cancel)}><XIcon className="h-3.5 w-3.5" />取消</Button> : <Button size="sm" variant="secondary" onClick={() => void runGuardedMutation("research.rerun", "重新采集", async () => { await clone(); })}><RefreshCwIcon className="h-3.5 w-3.5" />{t("research.rerun", "重新研究")}</Button>}
           {detail.run.status !== "collecting" ? <>
@@ -253,7 +264,7 @@ function ResearchDetail() {
       })}</div> : null}
       {tab === "hot" && detail.clusters.length === 0 ? <p className="mb-4 text-sm text-muted-foreground">尚未发现跨平台共同热点，可切换「全部候选」查看各平台结果。</p> : null}
       <div className="overflow-hidden rounded-xl border border-border app-wallpaper-panel-strong">
-        {candidates.length === 0 ? <p className="px-4 py-8 text-sm text-muted-foreground">{sourceRun && sourceRun.collectedCount === 0 ? sourceDescription(sourceRun) : detail.run.status === "collecting" ? "正在采集，请稍候…" : "没有符合当前筛选的候选"}</p> : candidates.map((candidate) => <CandidateRow key={candidate.id} candidate={candidate} checked={selected.includes(candidate.id)} onCheck={(checked) => setSelected((current) => checked ? [...current, candidate.id] : current.filter((id) => id !== candidate.id))} onOpenItem={(id) => void openItem(id)} onOpenTask={() => openImportTask(candidate)} />)}
+        {candidates.length === 0 ? <p className="px-4 py-8 text-sm text-muted-foreground">{sourceRun && sourceRun.collectedCount === 0 ? sourceDescription(sourceRun) : detail.run.status === "collecting" ? "正在采集，请稍候…" : "没有符合当前筛选的候选"}</p> : candidates.map((candidate) => <CandidateRow key={candidate.id} timeScope={detail.run.timeScope} candidate={candidate} checked={selected.includes(candidate.id)} onCheck={(checked) => setSelected((current) => checked ? [...current, candidate.id] : current.filter((id) => id !== candidate.id))} onOpenItem={(id) => void openItem(id)} onOpenTask={() => openImportTask(candidate)} />)}
       </div>
     </div>}
     {tab !== "report" && selected.length > 0 ? <div className="flex items-center justify-between border-t border-border bg-background/90 px-5 py-3"><span className="text-sm">已选 {selected.length} 条</span><Button size="sm" disabled={busy} onClick={() => void enqueue(selected).then(() => { setSelected([]); showToast("已加入导入队列", "success"); }).catch((error) => showToast("加入队列失败", "error", { detail: error instanceof Error ? error.message : String(error) }))}><FileDownIcon className="h-4 w-4" />{t("research.fullImport", "完整导入原文")}</Button></div> : null}

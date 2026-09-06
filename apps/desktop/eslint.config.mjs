@@ -44,6 +44,7 @@ export default [
       "dist/**",
       "out/**",
       "node_modules/**",
+      "resources/crawl4ai/**",
       "coverage/**",
       "website/**",
       "src/renderer/out/**",

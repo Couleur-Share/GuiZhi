@@ -1,0 +1,65 @@
+{
+  "crawl4ai": "0.9.3",
+  "upstreamCommit": "4bcd5fa8a56000ce103dd499e8ecdff2439f3e9c",
+  "python": "3.12.14",
+  "pythonBuild": "20260901",
+  "windowsArm64Runtime": "win32-x64",
+  "targets": {
+    "win32-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "7c45c9622400d578709a9b2cddbe8124cc21d382409d9f13406d706d28e31b14"
+      },
+      "chromium": {
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/win64/chrome-win64.zip",
+        "sha256": "045621e45a9dd27002c7fc1d8e10fe9f5f71f4cadbf44ec6f397f56f0179725c",
+        "revision": "1234",
+        "version": "151.0.7922.34"
+      },
+      "pythonExecutable": "python/python.exe",
+      "browserExecutable": "chrome-win64/chrome.exe"
+    },
+    "darwin-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "65b195c9cedc1fef6767f044f9822069adbd1bd9204d424ece4628776fdc04bb"
+      },
+      "chromium": {
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/mac-x64/chrome-mac-x64.zip",
+        "sha256": "69bcc853db975a2380767e9ff36da17f1d7b782fbbe191a210f676d2d5967d3e",
+        "revision": "1234",
+        "version": "151.0.7922.34"
+      },
+      "pythonExecutable": "python/bin/python3.12",
+      "browserExecutable": "chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+    },
+    "darwin-arm64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "81a359f1cfadd4da11766534c5913791cea55f26e1bb902cacd2a531bb1e4b2b"
+      },
+      "chromium": {
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/mac-arm64/chrome-mac-arm64.zip",
+        "sha256": "01a23ef9501b2745e0c2944c2e583207e6f6132d8d91c3a87ff65b5079e438ef",
+        "revision": "1234",
+        "version": "151.0.7922.34"
+      },
+      "pythonExecutable": "python/bin/python3.12",
+      "browserExecutable": "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+    },
+    "linux-x64": {
+      "python": {
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260901/cpython-3.12.14%2B20260901-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "72748da13197c1fb161e3afeef20a6a385ff24f2165e6e2758e47008e7faba4c"
+      },
+      "chromium": {
+        "url": "https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip",
+        "sha256": "ae8736ac28bc69278551500f219fc749575648263c43ec5990749eff43b9fcf8",
+        "revision": "1234",
+        "version": "151.0.7922.34"
+      },
+      "pythonExecutable": "python/bin/python3.12",
+      "browserExecutable": "chrome-linux64/chrome"
+    }
+  }
+}

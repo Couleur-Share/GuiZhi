@@ -7,17 +7,18 @@ import { downloadPlatformCaptions } from "../import/video-captions";
 import { runCommand, parseYtDlpMetadata } from "../import/video-url";
 import { resolveYtDlpExecutable } from "../media/ytdlp-manager";
 
-export type ResearchReader = (candidate: ResearchCandidate, signal: AbortSignal) => Promise<ResearchDocument>;
+export type ResearchReader = (candidate: ResearchCandidate, signal: AbortSignal, options?: { includeComments?: boolean }) => Promise<ResearchDocument>;
 export function textPassages(text: string, kind: ResearchPassage["kind"]): ResearchPassage[] {
   return text.split(/\n\s*\n|\n/).flatMap((line) => line.match(/[\s\S]{1,2000}/g) ?? []).filter((s) => s.trim()).map((text, position) => ({ text: text.trim(), position, kind }));
 }
 
 export function createResearchReader(browser: BrowserCaptureService, toolPath: () => string | null): ResearchReader {
-  return async (candidate, signal) => {
+  return async (candidate, signal, options) => {
     const doc: ResearchDocument = { id: randomUUID(), runId: candidate.runId, candidateId: candidate.id, source: candidate.source, url: candidate.url, title: candidate.title, author: candidate.author, publishedAt: candidate.publishedAt, capturedAt: Date.now(), status: "reading", passages: [], contentHash: null, truncated: false };
     const warnings: string[] = [];
     try {
       signal.throwIfAborted();
+      if (candidate.source === "web") throw new Error("公开网页应从本轮网页快照读取");
       // Only platform candidates are accepted. Never pass arbitrary URLs/arguments to yt-dlp.
       const url = new URL(candidate.url);
       const allowed = candidate.source === "bilibili" ? /(^|\.)bilibili\.com$/ : candidate.source === "douyin" ? /(^|\.)douyin\.com$/ : /(^|\.)xiaohongshu\.com$/;
@@ -44,15 +45,17 @@ export function createResearchReader(browser: BrowserCaptureService, toolPath: (
         doc.title = note.title; doc.author = note.author;
         doc.passages = textPassages([note.title, note.description].filter(Boolean).join("\n\n"), note.kind === "video" ? "description" : "body");
         warnings.push(note.kind === "video" ? "仅取得视频文案，未读取口播" : "未识别配图中的文字");
-        try {
-          const comments = await browser.captureComments(candidate.source, candidate.url, 20, signal);
-          const authors = new Set<string>(); const texts = new Set<string>();
-          for (const comment of comments.slice(0, 20).sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0))) {
-            if (texts.has(comment.content) || (comment.authorName && authors.has(comment.authorName))) continue;
-            texts.add(comment.content); if (comment.authorName) authors.add(comment.authorName);
-            doc.passages.push({ kind: "comment", text: comment.content.slice(0, 5000), author: comment.authorName, externalId: comment.externalId, position: 0 });
-          }
-        } catch { signal.throwIfAborted(); warnings.push("评论未完整取得"); }
+        if (options?.includeComments === true) {
+          try {
+            const comments = await browser.captureComments(candidate.source, candidate.url, 20, signal);
+            const authors = new Set<string>(); const texts = new Set<string>();
+            for (const comment of comments.slice(0, 20).sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0))) {
+              if (texts.has(comment.content) || (comment.authorName && authors.has(comment.authorName))) continue;
+              texts.add(comment.content); if (comment.authorName) authors.add(comment.authorName);
+              doc.passages.push({ kind: "comment", text: comment.content.slice(0, 5000), author: comment.authorName, externalId: comment.externalId, position: 0 });
+            }
+          } catch { signal.throwIfAborted(); warnings.push("评论未完整取得"); }
+        }
       }
     } catch (error) {
       doc.error = signal.aborted ? "精读已中断" : error instanceof Error ? error.message : String(error);

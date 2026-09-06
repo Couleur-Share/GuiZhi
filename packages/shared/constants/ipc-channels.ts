@@ -307,6 +307,17 @@ export const IPC_CHANNELS = {
 
   // Data path
   DATA_PREVIEW_RECOVERY: "data:previewRecovery",
+  WEB_STATUS: "web:status",
+  WEB_REPAIR: "web:repair",
+  CRAWL_CREATE: "crawl:create",
+  CRAWL_LIST: "crawl:list",
+  CRAWL_GET: "crawl:get",
+  CRAWL_PAUSE: "crawl:pause",
+  CRAWL_RESUME: "crawl:resume",
+  CRAWL_CANCEL: "crawl:cancel",
+  CRAWL_RETRY: "crawl:retry",
+  WEB_VERSIONS: "web:versions",
+  WEB_ADOPT: "web:adopt",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

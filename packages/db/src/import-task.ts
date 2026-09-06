@@ -2,6 +2,7 @@
  * 导入任务 DAO。队列本体在主进程内存中调度，
  * 本表提供持久化与重启恢复能力。
  */
+import { TASK_SELECT, taskSearch, taskStatus, terminalFilter } from "./import-task-query";
 import { randomUUID } from "crypto";
 import type Database from "./adapter";
 import { IMPORT_TASK_STATUSES } from "@guizhi/shared/types";
@@ -20,6 +21,8 @@ import type {
 } from "@guizhi/shared/types";
 
 interface TaskRow {
+  submitted_from: ImportTask["origin"];
+  received_at: number | null;
   id: string;
   source_kind: ImportTask["sourceKind"];
   source_input: string;
@@ -98,13 +101,6 @@ const CLEARABLE_STATUSES: ImportTaskStatus[] = [
   "duplicate",
 ];
 
-const TERMINAL_STATUSES: ImportTaskStatus[] = [
-  "completed",
-  "failed",
-  "canceled",
-  "duplicate",
-];
-
 interface ImportCursor {
   createdAt: number;
   id: string;
@@ -129,7 +125,7 @@ function decodeCursor(value: string | null | undefined): ImportCursor | null {
 }
 
 function normalizeListQuery(query?: ImportTaskListQuery): Required<
-  Pick<ImportTaskListQuery, "status" | "query" | "pageSize">
+  Pick<ImportTaskListQuery, "status" | "query" | "pageSize" | "origin">
 > & {
   cursor: ImportCursor | null;
 } {
@@ -138,6 +134,7 @@ function normalizeListQuery(query?: ImportTaskListQuery): Required<
     100,
   );
   return {
+    origin: query?.origin ?? "all",
     status: query?.status ?? "all",
     query: query?.query?.trim() ?? "",
     pageSize,
@@ -145,19 +142,11 @@ function normalizeListQuery(query?: ImportTaskListQuery): Required<
   };
 }
 
-function buildSearchClause(keyword: string): { sql: string; params: string[] } {
-  if (!keyword) return { sql: "", params: [] };
-  const pattern = `%${keyword.toLowerCase()}%`;
-  return {
-    sql: ` AND (LOWER(display_name) LIKE ? OR LOWER(source_input) LIKE ?
-      OR LOWER(COALESCE(error, '')) LIKE ? OR LOWER(COALESCE(warning, '')) LIKE ?)`,
-    params: [pattern, pattern, pattern, pattern],
-  };
-}
-
 function mapRow(row: TaskRow): ImportTask {
   return {
     id: row.id,
+    origin: row.submitted_from ?? "desktop",
+    receivedAt: row.received_at ?? null,
     sourceKind: row.source_kind,
     sourceInput: row.source_input,
     displayName: row.display_name,
@@ -223,7 +212,7 @@ export class ImportTaskDB {
   }
 
   get(id: string): ImportTask | null {
-    const row = this.db.get("SELECT * FROM import_tasks WHERE id = ?", id) as
+    const row = this.db.get(`${TASK_SELECT} WHERE id = ?`, id) as
       TaskRow | undefined;
     return row ? mapRow(row) : null;
   }
@@ -239,7 +228,7 @@ export class ImportTaskDB {
 
   list(limit = 200): ImportTask[] {
     const rows = this.db.all(
-      "SELECT * FROM import_tasks ORDER BY created_at DESC LIMIT ?",
+      `${TASK_SELECT} ORDER BY created_at DESC LIMIT ?`,
       limit,
     ) as TaskRow[];
     return rows.map(mapRow);
@@ -247,9 +236,8 @@ export class ImportTaskDB {
 
   listPage(query?: ImportTaskListQuery): ImportTaskListResult {
     const normalized = normalizeListQuery(query);
-    const search = buildSearchClause(normalized.query);
-    const statusSql = normalized.status === "all" ? "" : " AND status = ?";
-    const statusParams = normalized.status === "all" ? [] : [normalized.status];
+    const search = taskSearch(normalized);
+    const { sql: statusSql, params: statusParams } = taskStatus(normalized.status);
     const cursorSql = normalized.cursor
       ? " AND (created_at < ? OR (created_at = ? AND id < ?))"
       : "";
@@ -261,7 +249,7 @@ export class ImportTaskDB {
         ]
       : [];
     const rows = this.db.all(
-      `SELECT * FROM import_tasks WHERE 1 = 1${search.sql}${statusSql}${cursorSql}
+      `${TASK_SELECT} WHERE 1 = 1${search.sql}${statusSql}${cursorSql}
        ORDER BY created_at DESC, id DESC LIMIT ?`,
       ...search.params,
       ...statusParams,
@@ -273,7 +261,7 @@ export class ImportTaskDB {
     const tail = pageRows[pageRows.length - 1];
 
     const activeRows = this.db.all(
-      `SELECT * FROM import_tasks WHERE status IN ('pending','processing')${search.sql}
+      `${TASK_SELECT} WHERE status IN ('pending','processing')${search.sql}
        ORDER BY created_at ASC, id ASC`,
       ...search.params,
     ) as TaskRow[];
@@ -304,45 +292,22 @@ export class ImportTaskDB {
           : null,
       total: totalRow.count,
       counts,
+      degradedCount: (this.db.get(
+        `SELECT COUNT(*) AS count FROM import_tasks WHERE status = 'completed'
+         AND COALESCE(warning, '') <> ''${search.sql}`, ...search.params,
+      ) as { count: number }).count,
     };
   }
 
   countTerminal(query: ImportTaskClearQuery): number {
-    const search = buildSearchClause(
-      query.scope === "filtered" ? (query.query?.trim() ?? "") : "",
-    );
-    const requestedStatus =
-      query.scope === "filtered" ? (query.status ?? "all") : "all";
-    const statuses =
-      requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
-        ? [requestedStatus]
-        : TERMINAL_STATUSES;
-    const placeholders = statuses.map(() => "?").join(",");
-    const row = this.db.get(
-      `SELECT COUNT(*) AS count FROM import_tasks
-       WHERE status IN (${placeholders})${search.sql}`,
-      ...statuses,
-      ...search.params,
-    ) as { count: number };
-    return row.count;
+    const filter = terminalFilter(query);
+    return (this.db.get(`SELECT COUNT(*) AS count FROM import_tasks WHERE ${filter.sql}`,
+      ...filter.params) as { count: number }).count;
   }
 
   clearTerminal(query: ImportTaskClearQuery): number {
-    const search = buildSearchClause(
-      query.scope === "filtered" ? (query.query?.trim() ?? "") : "",
-    );
-    const requestedStatus =
-      query.scope === "filtered" ? (query.status ?? "all") : "all";
-    const statuses =
-      requestedStatus !== "all" && TERMINAL_STATUSES.includes(requestedStatus)
-        ? [requestedStatus]
-        : TERMINAL_STATUSES;
-    const placeholders = statuses.map(() => "?").join(",");
-    return this.db.run(
-      `DELETE FROM import_tasks WHERE status IN (${placeholders})${search.sql}`,
-      ...statuses,
-      ...search.params,
-    ).changes;
+    const filter = terminalFilter(query);
+    return this.db.run(`DELETE FROM import_tasks WHERE ${filter.sql}`, ...filter.params).changes;
   }
 
   listByStatus(statuses: ImportTaskStatus[]): ImportTask[] {
@@ -351,7 +316,7 @@ export class ImportTaskDB {
     }
     const placeholders = statuses.map(() => "?").join(", ");
     const rows = this.db.all(
-      `SELECT * FROM import_tasks WHERE status IN (${placeholders}) ORDER BY created_at ASC`,
+      `${TASK_SELECT} WHERE status IN (${placeholders}) ORDER BY created_at ASC`,
       ...statuses,
     ) as TaskRow[];
     return rows.map(mapRow);
@@ -378,7 +343,7 @@ export class ImportTaskDB {
     }>,
   ): ImportTask | null {
     const existing = this.db.get(
-      "SELECT * FROM import_tasks WHERE id = ?",
+      `${TASK_SELECT} WHERE id = ?`,
       id,
     ) as TaskRow | undefined;
     if (!existing) {

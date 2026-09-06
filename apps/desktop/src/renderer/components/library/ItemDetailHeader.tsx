@@ -9,6 +9,7 @@ import {
   Maximize2Icon,
   Minimize2Icon,
   MoreHorizontalIcon,
+  MessageCircleIcon,
   PinIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -22,6 +23,7 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useUIStore } from "../../stores/ui.store";
+import { useSourceComments } from "./SourceCommentsContext";
 import { ContextMenu } from "../ui/ContextMenu";
 import { AiHandoffButton } from "./AiHandoffButton";
 import { TagEditor } from "./TagEditor";
@@ -99,6 +101,7 @@ function ActionButton({
  * 顺带把破坏性的删除挡在一次点击之后。
  */
 function MoreActionsButton({ item }: { item: KnowledgeItem }) {
+  const sourceComments = useSourceComments();
   const { t } = useTranslation();
   const setStatus = useKnowledgeStore((state) => state.setStatus);
   const togglePinned = useKnowledgeStore((state) => state.togglePinned);
@@ -139,6 +142,13 @@ function MoreActionsButton({ item }: { item: KnowledgeItem }) {
           ignoreRef={buttonRef}
           onClose={() => setAnchor(null)}
           items={[
+            ...(sourceComments?.supported ? [{
+              label: sourceComments.comments.length > 0
+                ? t("library.viewSourceComments", "查看来源评论")
+                : t("library.collectSourceComments", "采集评论"),
+              icon: <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />,
+              onClick: () => sourceComments.setOpen(true),
+            }] : []),
             {
               label: item.isPinned
                 ? t("library.unpin", "取消置顶")

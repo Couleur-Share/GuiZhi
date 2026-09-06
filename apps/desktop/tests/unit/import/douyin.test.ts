@@ -194,10 +194,10 @@ describe("parseDouyinRouterData", () => {
     ).toThrow("该作品已被作者删除");
   });
 
-  it("没有 filter_list 说明时给出兜底原因", () => {
+  it("没有平台明确原因时不宣称作品已删除", () => {
     expect(() =>
       parseDouyinRouterData(routerDataHtml({ item_list: [] }), AWEME_ID),
-    ).toThrow("作品不存在或已被删除");
+    ).toThrow("[structure_missing]");
   });
 
   it("页面不含 _ROUTER_DATA → 报改版，不产出空条目", () => {

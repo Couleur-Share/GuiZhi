@@ -19,8 +19,11 @@ export const IMPORT_TASK_STATUSES = [
 
 export type ImportTaskStatus = (typeof IMPORT_TASK_STATUSES)[number];
 
+export type ImportTaskOrigin = "desktop" | "mobile";
+
 export interface ImportTaskListQuery {
-  status?: ImportTaskStatus | "all";
+  origin?: ImportTaskOrigin | "all";
+  status?: ImportTaskStatus | "all" | "active" | "degraded";
   query?: string;
   /** 20–100，默认 50 */
   pageSize?: number;
@@ -33,13 +36,15 @@ export interface ImportTaskListResult {
   active: ImportTask[];
   nextCursor: string | null;
   total: number;
-  /** 应用搜索条件但忽略当前状态筛选 */
+  degradedCount?: number;
+  /** 应用搜索和来源条件，但忽略当前状态筛选 */
   counts: Record<ImportTaskStatus, number>;
 }
 
 export interface ImportTaskClearQuery {
+  origin?: ImportTaskOrigin | "all";
   scope: "filtered" | "all";
-  status?: ImportTaskStatus | "all";
+  status?: ImportTaskStatus | "all" | "active" | "degraded";
   query?: string;
 }
 
@@ -69,6 +74,7 @@ export interface ImportQueueState {
  * 只显示「抓取中」，用户无从判断是在正常工作还是卡死了。
  */
 export const IMPORT_STAGES = [
+  "web-preparing",
   "fetching",
   "extracting",
   "saving",
@@ -115,6 +121,10 @@ export interface ImportStageStat {
 }
 
 export interface ImportTask {
+  /** 提交入口；兼容旧版桥接时未提供则为桌面端。 */
+  origin?: ImportTaskOrigin;
+  /** 手机投递在桌面持久化接收的时间。 */
+  receivedAt?: number | null;
   id: string;
   sourceKind: ImportSourceKind;
   /** 原始输入：文本内容 / 文件绝对路径 / URL */

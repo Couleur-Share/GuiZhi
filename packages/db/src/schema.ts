@@ -1,4 +1,5 @@
 import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
+import { WEB_CAPTURE_SCHEMA } from "./web-capture-schema";
 import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
 /**
  * 数据库表结构定义。
@@ -13,6 +14,7 @@ import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCH
  */
 export const SCHEMA_TABLES = `
 ${MOBILE_CAPTURE_SCHEMA}
+${WEB_CAPTURE_SCHEMA}
 ${RESEARCH_EVIDENCE_SCHEMA}
 ${RESEARCH_DOCUMENT_SCHEMA}
 ${RESEARCH_SERIES_SCHEMA}
@@ -278,6 +280,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
   id TEXT PRIMARY KEY,
   topic TEXT NOT NULL,
   day_range INTEGER NOT NULL CHECK(day_range IN (7,14,30)),
+  time_scope TEXT NOT NULL DEFAULT 'recent' CHECK(time_scope IN ('recent','all')),
   range_from INTEGER NOT NULL,
   range_to INTEGER NOT NULL,
   depth TEXT NOT NULL CHECK(depth IN ('quick','deep')),
@@ -296,7 +299,7 @@ CREATE TABLE IF NOT EXISTS research_runs (
 
 CREATE TABLE IF NOT EXISTS research_source_runs (
   run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili','web')),
   status TEXT NOT NULL
     CHECK(status IN ('pending','running','succeeded','partial','login_required','failed','canceled')),
   method TEXT NOT NULL,
@@ -319,7 +322,7 @@ CREATE TABLE IF NOT EXISTS research_clusters (
 CREATE TABLE IF NOT EXISTS research_candidates (
   id TEXT PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE,
-  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili')),
+  source TEXT NOT NULL CHECK(source IN ('xiaohongshu','douyin','bilibili','web')),
   external_id TEXT NOT NULL,
   url TEXT NOT NULL,
   normalized_url TEXT NOT NULL,

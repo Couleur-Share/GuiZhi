@@ -20,6 +20,7 @@ import { registerIllustrationIPC } from "./illustration.ipc";
 import { registerBackgroundJobIPC } from "./background-job.ipc";
 import { registerInboxIPC } from "./inbox.ipc";
 import { registerResearchIPC } from "./research.ipc";
+import { registerWebCaptureIPC } from "./web-capture.ipc";
 import type { BackgroundJobRuntime } from "../services/background-jobs";
 import type { DiscoveryServiceOptions } from "../services/discovery/discovery-service";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
@@ -29,6 +30,10 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.KNOWLEDGE_GET,
   IPC_CHANNELS.KNOWLEDGE_CREATE,
   IPC_CHANNELS.KNOWLEDGE_UPDATE,
+  IPC_CHANNELS.WEB_STATUS, IPC_CHANNELS.WEB_REPAIR,
+  IPC_CHANNELS.CRAWL_CREATE, IPC_CHANNELS.CRAWL_LIST, IPC_CHANNELS.CRAWL_GET,
+  IPC_CHANNELS.CRAWL_PAUSE, IPC_CHANNELS.CRAWL_RESUME, IPC_CHANNELS.CRAWL_CANCEL,
+  IPC_CHANNELS.CRAWL_RETRY, IPC_CHANNELS.WEB_VERSIONS, IPC_CHANNELS.WEB_ADOPT,
   IPC_CHANNELS.KNOWLEDGE_SET_STATUS,
   IPC_CHANNELS.KNOWLEDGE_MOVE_TO_TRASH,
   IPC_CHANNELS.KNOWLEDGE_RESTORE,
@@ -233,6 +238,7 @@ export function registerAllIPC(
   );
   registerIpcGroup("inbox", () => registerInboxIPC(db));
   registerIpcGroup("research", () => registerResearchIPC(db));
+  registerIpcGroup("web-capture", () => registerWebCaptureIPC(db));
   registerIpcGroup("settings", () => registerSettingsIPC(db));
   registerIpcGroup("image", () => registerImageIPC());
   registerIpcGroup("ai", () => registerAIIPC(db));

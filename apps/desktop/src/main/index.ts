@@ -1,5 +1,6 @@
 import { stopMobileCapture } from "./services/mobile-capture/lifecycle";
 import { shutdownResearch } from "./ipc/research.ipc";
+import { closeWebCapture } from "./ipc/web-capture.ipc";
 import {
   app,
   BrowserWindow,
@@ -18,7 +19,7 @@ import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import path from "path";
 import fs from "fs";
 import Database from "./database/sqlite";
-import { initDatabase, closeDatabase } from "./database";
+import { initDatabase, closeDatabase, getDatabase } from "./database";
 import { registerAllIPC } from "./ipc";
 import { getMinimizeOnLaunchSetting } from "./settings/settings-readers";
 import { readLanguageSetting } from "./settings/language-setting";
@@ -64,6 +65,7 @@ import {
 import { applyNetworkProxySettings } from "./services/network-proxy";
 import {
   setAutoBackupNotifier,
+  countActiveImportTasks,
 } from "./services/backup";
 import { createTrayController } from "./tray-controller";
 import { BackgroundJobRuntime } from "./services/background-jobs";
@@ -803,6 +805,9 @@ async function applyDataPathChange(
   }
 
   const targetInspection = inspectDataPath(resolvedTargetPath);
+  if (countActiveImportTasks(getDatabase()) > 0) {
+    return {success:false,error:"有采集任务正在写入，请先暂停或取消任务再切换数据目录"};
+  }
   if (action === "switch") {
     if (!targetInspection.exists) {
       return {
@@ -1159,7 +1164,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (quitCleanupRunning) return;
   quitCleanupRunning = true;
-  void shutdownResearch().then(() => import("./services/platform-capture/browser-capture"))
+  void Promise.all([shutdownResearch(), closeWebCapture()]).then(() => import("./services/platform-capture/browser-capture"))
     .then(({ closeBrowserCaptureService }) => Promise.race([
       closeBrowserCaptureService(),
       new Promise<void>((resolve) => setTimeout(resolve, 5_000)),

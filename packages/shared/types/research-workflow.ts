@@ -10,6 +10,10 @@ export interface ResearchPlan {
   fallback?: string;
 }
 export interface ResearchContext {
+  webSeeds?: import("./web-capture").WebSeed[];
+  webCrawlJobId?: string;
+  /** 未设置时不读取评论；随研究记录保留。 */
+  includeComments?: boolean;
   seriesId: string;
   phase: "planning" | "searching" | "reading" | "idle";
   policyVersion: string;
@@ -50,6 +54,7 @@ export interface ResearchPassage {
   externalId?: string;
 }
 export interface ResearchDocument {
+  sourceUrls?: string[];
   id: string;
   runId: string;
   candidateId: string;

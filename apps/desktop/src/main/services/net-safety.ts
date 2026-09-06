@@ -107,6 +107,8 @@ export function isPrivateIPv6(address: string): boolean {
   return (
     // ULA (Unique Local Address)
     (firstHextet & 0xfe00) === 0xfc00 ||
+    // IPv6 组播不是可抓取的公网单播目标。
+    (firstHextet & 0xff00) === 0xff00 ||
     // Link-local
     (firstHextet & 0xffc0) === 0xfe80 ||
     // 6to4 relay

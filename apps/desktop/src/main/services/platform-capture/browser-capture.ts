@@ -3,6 +3,7 @@ import path from "path";
 import { readDiscoveryPage, waitForXhsSearch } from "./discovery-page";
 import { searchResponseRows } from "./search-capture";
 import { verifyDouyinSearch } from "./search-verification";
+import { captureDouyinDetailPage } from "./douyin-detail-capture";
 import { PlatformCaptureError } from "./capture-error";
 export { PlatformCaptureError } from "./capture-error";
 import type { BrowserWindow } from "electron";
@@ -670,7 +671,11 @@ export class BrowserCaptureService {
     }
     fs.rmSync(this.baseDir, { recursive: true, force: true });
   }
-
+  /** 标准导入的公开作品回退，共用串行队列、代理和取消机制，不要求已登录。 */
+  async captureDouyinDetail(awemeId: string, signal?: AbortSignal): Promise<string> {
+    if (!/^\d{6,}$/.test(awemeId)) throw new Error("无效的抖音作品 ID");
+    return this.runSerialized("douyin", "capture", (context, operationSignal) => captureDouyinDetailPage(context.page, awemeId, operationSignal), true, signal);
+  }
   async capturePage(
     platform: PlatformCapturePlatform,
     url: string,
@@ -714,7 +719,6 @@ export class BrowserCaptureService {
       signal,
     );
   }
-
   /** 用平台专用 Electron 会话拉取 JSON（LINUX DO 等需过 Cloudflare 的 Discourse 接口） */
   async fetchJsonViaSession<T>(
     platform: PlatformCapturePlatform,

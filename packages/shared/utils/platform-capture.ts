@@ -82,3 +82,9 @@ export function platformSearchUrl(
   }
   return `https://www.douyin.com/search/${encoded}`;
 }
+
+/** 独立来源评论只对抖音、小红书开放；论坛回复由讨论区维护。 */
+export function detectSourceCommentsPlatform(value: string): "xiaohongshu" | "douyin" | null {
+  const platform = detectPlatformCapturePlatform(value);
+  return platform === "xiaohongshu" || platform === "douyin" ? platform : null;
+}

@@ -21,6 +21,7 @@ import { SettingSection, SettingItem, ToggleSwitch } from "./shared";
 import { Modal } from "../ui/Modal";
 import { useToast } from "../ui/Toast";
 import appIconUrl from "../../../assets/icon.png";
+import softMemoIconUrl from "../../assets/softmemo.svg";
 import { isWebRuntime } from "../../runtime";
 import { copyTextToClipboard } from "../../utils/clipboard";
 
@@ -413,6 +414,38 @@ export function AboutSettings() {
             </div>
           </SettingSection>
 
+          <SettingSection title={t("settings.otherWorks")}>
+            <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <img
+                  src={softMemoIconUrl}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 shrink-0 rounded-xl"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium">
+                    {t("settings.softMemoName")}
+                  </h4>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t("settings.softMemoDescription")}
+                  </p>
+                </div>
+              </div>
+              <a
+                href="https://couleurapp.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("settings.visitSoftMemo")}
+                className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:self-center"
+              >
+                {t("settings.visitWebsite")}
+                <ExternalLinkIcon aria-hidden="true" className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </SettingSection>
+
           {!webRuntime ? (
             <SettingSection title={t("settings.developer")}>
               <SettingItem
@@ -431,6 +464,7 @@ export function AboutSettings() {
 
         <div className="px-4 py-4 text-sm text-muted-foreground text-center">
           <div>AGPL-3.0 License &copy; 2026 GuiZhi</div>
+          <p className="mt-2 text-xs">This product includes software developed by UncleCode (https://x.com/unclecode) as part of the Crawl4AI project (https://github.com/unclecode/crawl4ai).</p>
         </div>
       </div>
 

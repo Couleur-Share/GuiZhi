@@ -727,6 +727,10 @@ export class KnowledgeItemDB {
       }
 
       this.writeFts(id, next.title, next.content, tags);
+      // 用户或模型明确写入摘要后，网页更新留下的旧摘要提示已经处理。
+      if (input.summary !== undefined && this.db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='web_source_baselines'")) {
+        this.db.run("UPDATE web_source_baselines SET summary_stale=0 WHERE item_id=?", id);
+      }
     });
     run();
 

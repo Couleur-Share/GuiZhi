@@ -127,9 +127,9 @@ async function probeDouyin(url) {
     if (!item) {
       const reason =
         info?.filter_list?.[0]?.detail_msg ||
-        info?.filter_list?.[0]?.notice ||
-        "无 item_list";
-      return fail(label, "note_unavailable", String(reason));
+        info?.filter_list?.[0]?.notice;
+      return fail(label, reason ? "note_unavailable" : "structure_missing",
+        reason ? String(reason) : "分享页未提供作品详情，需要桌面页面回退采集；不能据此判定作品已删除");
     }
     const id = item.aweme_id || "(unknown)";
     const title = String(item.desc ?? "")

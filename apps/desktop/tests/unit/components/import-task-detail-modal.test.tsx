@@ -77,6 +77,14 @@ describe("导入任务详情弹窗", () => {
     installWindowMocks();
   });
 
+  it("手机任务详情显示提交入口和桌面接收时间", () => {
+    const receivedAt = 1800001234567;
+    renderModal(makeTask({ origin: "mobile", receivedAt }));
+    expect(screen.getByText("手机提交")).toBeInTheDocument();
+    expect(screen.getByText("桌面接收时间")).toBeInTheDocument();
+    expect(screen.getByText(new Date(receivedAt).toLocaleString())).toBeInTheDocument();
+  });
+
   it("副标题是品牌 logo 加平台名，不是一行域名", () => {
     renderModal(makeTask());
     // v.douyin.com 得先读懂才知道是抖音

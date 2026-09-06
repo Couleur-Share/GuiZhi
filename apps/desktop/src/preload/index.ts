@@ -19,6 +19,7 @@ import { backgroundJobApi } from "./api/background-job";
 import { inboxApi } from "./api/inbox";
 import { logApi } from "./api/log";
 import { researchApi } from "./api/research";
+import { webCaptureApi } from "./api/web-capture";
 import { createBufferedSubscription } from "./app-command-subscription";
 import type {
   AppCommand,
@@ -85,6 +86,7 @@ const api = {
   inbox: inboxApi,
   log: logApi,
   research: researchApi,
+  webCapture: webCaptureApi,
   ytdlp: ytDlpApi,
   ffmpeg: ffmpegApi,
   funasr: funasrApi,

@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -6,65 +5,30 @@ import {
   MessageCircleIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import type { KnowledgeItem, SourceComment } from "@guizhi/shared/types";
-import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
+import { useSourceComments } from "./SourceCommentsContext";
+import { LoadErrorState } from "../ui/LoadErrorState";
 import { useTranslation } from "react-i18next";
 import { Select } from "../ui/Select";
 
-export function SourceCommentsCard({ item }: { item: KnowledgeItem }) {
+export function SourceCommentsCard() {
   const { t } = useTranslation();
-  const platform = item.sourceUri
-    ? detectPlatformCapturePlatform(item.sourceUri)
-    : null;
-  const sourceCommentsPlatform =
-    platform === "xiaohongshu" || platform === "douyin" ? platform : null;
-  const [open, setOpen] = useState(false);
-  const [comments, setComments] = useState<SourceComment[]>([]);
-  const [limit, setLimit] = useState<10 | 20 | 50>(20);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setOpen(false);
-    setComments([]);
-    setError(null);
-  }, [item.id]);
-
-  useEffect(() => {
-    if (!open || !sourceCommentsPlatform) return;
-    void window.api.platformCapture
-      .listComments(item.id)
-      .then(setComments)
-      .catch((cause) =>
-        setError(cause instanceof Error ? cause.message : String(cause)),
-      );
-  }, [item.id, open, sourceCommentsPlatform]);
-
-  // LINUX DO 的楼层已经完整落在条目的「讨论」小节里；再存一份来源评论
-  // 会形成两个内容相同但刷新状态不同的入口。
-  if (!sourceCommentsPlatform) return null;
-
-  const refresh = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setComments(
-        await window.api.platformCapture.refreshComments({
-          itemId: item.id,
-          limit,
-        }),
-      );
-      setOpen(true);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      // 首次补采时卡片通常仍是折叠态；失败信息如果不展开，用户只会看到
-      // loading 一闪而过，像是按钮没有响应。
-      setOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const state = useSourceComments();
+  if (!state?.supported) return null;
+  const {
+    comments,
+    open,
+    setOpen,
+    limit,
+    setLimit,
+    loading,
+    reading,
+    error,
+    loadError,
+    attempted,
+    load,
+    refresh,
+  } = state;
+  if (!open && !comments.length && !loadError) return null;
   return (
     <div className="w-full overflow-hidden rounded-xl border border-border bg-background/55">
       <div className="flex min-h-9 items-center gap-2 px-3 py-2">
@@ -85,43 +49,56 @@ export function SourceCommentsCard({ item }: { item: KnowledgeItem }) {
             <span className="text-muted-foreground">{comments.length}</span>
           ) : null}
         </button>
-        <Select
-          value={String(limit)}
-          onChange={(value) => setLimit(Number(value) as 10 | 20 | 50)}
-          options={[
-            { value: "10", label: "10" },
-            { value: "20", label: "20" },
-            { value: "50", label: "50" },
-          ]}
-          className="w-20 shrink-0"
-          menuMinWidth={80}
-          triggerClassName="flex h-7 w-full cursor-pointer items-center justify-between gap-1 rounded-md bg-muted px-2 text-xs text-foreground transition-colors hover:bg-muted/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-        />
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => void refresh()}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
-        >
-          {loading ? (
-            <Loader2Icon className="h-3 w-3 animate-spin" />
-          ) : (
-            <RefreshCwIcon className="h-3 w-3" />
-          )}
-          {comments.length > 0
-            ? t("library.refreshComments", "刷新")
-            : t("library.captureComments", "补采")}
-        </button>
       </div>
 
-      {open ? (
+      {loadError ? (
+        <LoadErrorState message={loadError} onRetry={() => void load()} />
+      ) : null}
+      {open && !loadError ? (
         <div className="max-h-64 overflow-y-auto border-t border-border/60 px-3 py-2">
+          <div className="mb-2 flex items-center justify-end gap-2">
+            <Select
+              ariaLabel={t("library.commentCaptureLimit", "评论采集数量")}
+              value={String(limit)}
+              onChange={(value) => setLimit(Number(value) as 10 | 20 | 50)}
+              options={[
+                { value: "10", label: "10" },
+                { value: "20", label: "20" },
+                { value: "50", label: "50" },
+              ]}
+              className="w-20 shrink-0"
+              menuMinWidth={80}
+              triggerClassName="flex h-7 w-full cursor-pointer items-center justify-between gap-1 rounded-md bg-muted px-2 text-xs text-foreground transition-colors hover:bg-muted/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            />
+            <button
+              type="button"
+              disabled={loading || reading || !!loadError}
+              onClick={() => void refresh()}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border px-2 text-[11px] text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+            >
+              {loading ? (
+                <Loader2Icon className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="h-3 w-3" />
+              )}
+              {comments.length > 0
+                ? t("library.refreshComments", "刷新")
+                : t("library.collectSourceComments", "采集评论")}
+            </button>
+          </div>
           {error ? (
             <p className="mb-2 break-words text-xs text-destructive">{error}</p>
           ) : null}
-          {comments.length === 0 && !loading ? (
+          {reading || loading ? (
+            <p role="status" className="py-2 text-xs text-muted-foreground">
+              {t("common.loading", "加载中...")}
+            </p>
+          ) : null}
+          {comments.length === 0 && !loading && !reading && !error ? (
             <p className="py-4 text-center text-xs text-muted-foreground">
-              {t("library.noSourceComments", "还没有来源评论")}
+              {attempted
+                ? t("library.commentsLoadedEmpty", "未取得评论，可稍后重试")
+                : t("library.noSourceComments", "还没有来源评论")}
             </p>
           ) : (
             <div className="divide-y divide-border/60">

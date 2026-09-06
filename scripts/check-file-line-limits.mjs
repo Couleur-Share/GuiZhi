@@ -24,6 +24,7 @@ async function collectSourceFiles(directory) {
   for (const entry of entries) {
     if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
     const entryPath = path.join(directory, entry.name);
+    if (entryPath.replaceAll("\\", "/") === "apps/desktop/resources/crawl4ai") continue;
     if (entry.isDirectory()) {
       files.push(...(await collectSourceFiles(entryPath)));
     } else if (

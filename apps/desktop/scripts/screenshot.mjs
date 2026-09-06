@@ -16,12 +16,18 @@
  *     await shot("settings");
  *   };
  */
-import { _electron as electron } from "playwright";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+
+// 验收包可复用随包 Playwright 驱动，不要求干净机器安装 Node/pnpm。
+const { _electron: electron } = await import(
+  process.env.GUIZHI_SHOT_PLAYWRIGHT
+    ? pathToFileURL(path.resolve(process.env.GUIZHI_SHOT_PLAYWRIGHT)).href
+    : "playwright"
+);
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, "..");
 const MAIN_ENTRY = path.join(DESKTOP_ROOT, "out/main/index.js");
@@ -56,7 +62,7 @@ const CONTENT_TYPES = new Map([
  * ERR_FAILED。截图期间只在回环地址提供 out/renderer，既绕过这个兼容问题，
  * 又不需要启动会热更新、会改源码时间戳的 Vite dev server。
  */
-async function startRendererServer() {
+async function startRendererServer(rendererRoot = RENDERER_ROOT) {
   const server = http.createServer((request, response) => {
     let relativePath;
     try {
@@ -69,10 +75,10 @@ async function startRendererServer() {
       return;
     }
 
-    const filePath = path.resolve(RENDERER_ROOT, relativePath);
+    const filePath = path.resolve(rendererRoot, relativePath);
     if (
-      filePath !== RENDERER_ROOT &&
-      !filePath.startsWith(`${RENDERER_ROOT}${path.sep}`)
+      filePath !== rendererRoot &&
+      !filePath.startsWith(`${rendererRoot}${path.sep}`)
     ) {
       response.writeHead(403).end("Forbidden");
       return;
@@ -86,7 +92,8 @@ async function startRendererServer() {
       response.writeHead(200, {
         "Cache-Control": "no-store",
         "Content-Type":
-          CONTENT_TYPES.get(path.extname(filePath)) ?? "application/octet-stream",
+          CONTENT_TYPES.get(path.extname(filePath)) ??
+          "application/octet-stream",
       });
       fs.createReadStream(filePath).pipe(response);
     });
@@ -114,6 +121,9 @@ function parseArgs(argv) {
     dataDb: null,
     visible: false,
     staleOk: false,
+    executable: null,
+    rendererRoot: null,
+    keepProfile: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -122,6 +132,10 @@ function parseArgs(argv) {
     else if (arg === "--data-db") args.dataDb = path.resolve(argv[++i]);
     else if (arg === "--visible") args.visible = true;
     else if (arg === "--stale-ok") args.staleOk = true;
+    else if (arg === "--executable") args.executable = path.resolve(argv[++i]);
+    else if (arg === "--renderer-root")
+      args.rendererRoot = path.resolve(argv[++i]);
+    else if (arg === "--keep-profile") args.keepProfile = true;
     else throw new UsageError(`未知参数：${arg}`);
   }
   return args;
@@ -140,7 +154,8 @@ function latestSourceMtime(dir) {
       return;
     }
     for (const entry of entries) {
-      if (NON_SOURCE_DIRS.has(entry.name) || entry.name.startsWith(".")) continue;
+      if (NON_SOURCE_DIRS.has(entry.name) || entry.name.startsWith("."))
+        continue;
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
         walk(full);
@@ -191,7 +206,17 @@ function assertFreshBuild(staleOk) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertFreshBuild(args.staleOk);
+  if (args.executable) {
+    if (
+      !fs.existsSync(args.executable) ||
+      !fs.existsSync(
+        path.join(path.dirname(args.executable), "resources/app.asar"),
+      )
+    )
+      throw new UsageError("候选可执行文件或 app.asar 不存在");
+  } else {
+    assertFreshBuild(args.staleOk);
+  }
   fs.mkdirSync(args.out, { recursive: true });
 
   const stepsFn = args.steps
@@ -207,7 +232,9 @@ async function main() {
     throw new UsageError("数据库正在使用，请先退出归知再从数据副本截图");
   }
 
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-shot-"));
+  const userDataDir = fs.mkdtempSync(
+    path.join(args.keepProfile ? args.out : os.tmpdir(), "guizhi-shot-"),
+  );
   if (args.dataDb) {
     const dataDir = path.join(userDataDir, "data");
     fs.mkdirSync(dataDir, { recursive: true });
@@ -216,26 +243,34 @@ async function main() {
   }
   const taken = [];
   let failure = null;
-  const renderer = await startRendererServer();
+  const renderer =
+    args.executable && !args.rendererRoot
+      ? null
+      : await startRendererServer(args.rendererRoot || RENDERER_ROOT);
   let app = null;
+  let appClosed = false;
 
   try {
     app = await electron.launch({
+      ...(args.executable ? { executablePath: args.executable } : {}),
       // 离屏实例固定使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
       // 也让不同机器上的截图栅格化结果更接近。
       args: [
         "--use-gl=angle",
         "--use-angle=swiftshader",
         "--disable-gpu-sandbox",
-        MAIN_ENTRY,
+        ...(args.executable ? [] : [MAIN_ENTRY]),
       ],
       env: {
         ...process.env,
         GUIZHI_E2E: "1",
         GUIZHI_E2E_USER_DATA_DIR: userDataDir,
-        GUIZHI_E2E_RENDERER_URL: renderer.url,
+        GUIZHI_E2E_RENDERER_URL: renderer?.url || "",
         GUIZHI_WINDOW_MODE: args.visible ? "visible" : "offscreen",
       },
+    });
+    app.once("close", () => {
+      appClosed = true;
     });
     const win = await app.firstWindow();
     await win.waitForLoadState("domcontentloaded");
@@ -253,7 +288,7 @@ async function main() {
     if (stepsFn) {
       await stepsFn({ win, app, shot, outDir: args.out, userDataDir });
       // steps 一张都没截时兜一张，免得跑完只得到一个空目录
-      if (taken.length === 0) await shot("final");
+      if (taken.length === 0 && !win.isClosed()) await shot("final");
     } else {
       await shot("home");
     }
@@ -270,9 +305,22 @@ async function main() {
       // 窗口已经没了就算了
     }
   } finally {
-    await app?.close().catch(() => {});
-    await new Promise((resolve) => renderer.server.close(resolve));
-    fs.rmSync(userDataDir, { recursive: true, force: true });
+    // 步骤可能已完成真实重启，不能再次关闭已经退出的旧实例。
+    if (app && !appClosed) {
+      await app.close().catch(() => {});
+    }
+    if (renderer)
+      await new Promise((resolve) => renderer.server.close(resolve));
+    if (args.keepProfile) {
+      fs.writeFileSync(
+        path.join(args.out, "profile.json"),
+        JSON.stringify(
+          { userDataDir, executable: args.executable, failed: !!failure },
+          null,
+          2,
+        ),
+      );
+    } else fs.rmSync(userDataDir, { recursive: true, force: true });
   }
 
   for (const file of taken) {

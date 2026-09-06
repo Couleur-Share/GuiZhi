@@ -5,8 +5,11 @@ import path from "path";
 import DatabaseAdapter from "@guizhi/db/adapter";
 import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
 import { KnowledgeItemDB } from "@guizhi/db/knowledge";
+import { CrawlJobDB } from "@guizhi/db/crawl-job";
+import { MIGRATIONS } from "@guizhi/db/migrations";
 import {
   countActiveImportTasks,
+  backupPendingSchemaUpgrade,
   createBackup,
   deleteBackup,
   listBackups,
@@ -38,6 +41,38 @@ afterEach(() => {
 });
 
 describe("createBackup（VACUUM INTO 在线备份）", () => {
+  it("已含 0027 的旧库仍在 0030 前保存快照；全部迁移完成后不重复备份", () => {
+    const db = createFileDb("schema-upgrade.db");
+    try {
+      db.exec("CREATE TABLE schema_migrations(name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL); PRAGMA user_version=29");
+      for (const migration of MIGRATIONS.slice(0, -1)) db.run("INSERT INTO schema_migrations VALUES (?,?)", migration.name, 1);
+      const item = new KnowledgeItemDB(db).create({ title: "升级保护", content: "人工编辑" });
+      const backup = backupPendingSchemaUpgrade(db, backupsDir);
+      expect(backup?.kind).toBe("pre-update");
+      const probe = new DatabaseAdapter(backup!.path, { readOnly: true });
+      try {
+        expect(probe.get("PRAGMA user_version")).toEqual({ user_version: 29 });
+        expect(probe.get("SELECT content FROM knowledge_items WHERE id=?", item.id)).toEqual({ content: "人工编辑" });
+      } finally { probe.close(); }
+      db.run("INSERT INTO schema_migrations VALUES (?,?)", MIGRATIONS.at(-1)!.name, 1);
+      expect(backupPendingSchemaUpgrade(db, backupsDir)).toBeNull();
+      expect(listBackups(backupsDir)).toHaveLength(1);
+    } finally { db.close(); }
+  });
+
+  it("升级快照无法写入时抛错，不继续迁移", () => {
+    const db = createFileDb("snapshot-failure.db");
+    const blocked = path.join(workDir, "not-a-directory");
+    fs.writeFileSync(blocked, "保留文件");
+    try { expect(() => backupPendingSchemaUpgrade(db, blocked)).toThrow(); }
+    finally { db.close(); }
+  });
+
+  it("全新空库不产生无意义的升级备份", () => {
+    const db = new DatabaseAdapter(":memory:");
+    try { expect(backupPendingSchemaUpgrade(db, backupsDir)).toBeNull(); }
+    finally { db.close(); }
+  });
   it("对打开中的库生成可读的一致副本", () => {
     const db = createFileDb("knowledge.db");
     const items = new KnowledgeItemDB(db);
@@ -256,6 +291,17 @@ describe("performRestoreSwap", () => {
 });
 
 describe("自动备份调度与恢复守卫", () => {
+  it("网页批次及暂停中的页面阻止换库，备份队列恢复后等待继续",()=>{
+    const db=createFileDb("web-batch.db"),jobs=new CrawlJobDB(db);
+    const job=jobs.create({purpose:"documents",seeds:[{url:"https://example.com/docs/",mode:"directory"}]});
+    expect(countActiveImportTasks(db)).toBe(1);
+    jobs.setStatus(job.id,"paused");jobs.save({...jobs.pages(job.id)[0],status:"running"});
+    expect(countActiveImportTasks(db)).toBe(1);
+    jobs.setStatus(job.id,"running");const backup=createBackup(db,"manual",backupsDir);
+    const restored=new DatabaseAdapter(backup.path);const restoredJobs=new CrawlJobDB(restored);restoredJobs.recover();
+    expect(restoredJobs.get(job.id)?.status).toBe("interrupted");expect(restoredJobs.pages(job.id)[0].status).toBe("pending");
+    expect(restored.pragma("foreign_key_check")).toEqual([]);restored.close();db.close();
+  });
   it("maybeRunAutoBackup 首次到期执行并记录时间，未到期不重复", () => {
     const db = createFileDb("knowledge.db");
     // 默认设置（未写 settings）：启用、24 小时间隔、从未备份 → 应执行

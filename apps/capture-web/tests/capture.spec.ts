@@ -26,7 +26,7 @@ test("离线草稿、解析改判、中英文与深色布局", async ({ page, co
   await context.setOffline(true); await expect(page.getByText("当前离线，联网后请点击发送。")).toBeVisible();
   await expect(page.getByRole("button", { name: "发送到归知", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "切换主题" }).click(); await page.screenshot({ path: "test-results/capture-dark.png", fullPage: true });
-  await page.getByRole("button", { name: "Language" }).click(); await expect(page.getByRole("heading", { name: /Save it now/ })).toBeVisible();
+  await page.getByRole("button", { name: "Language" }).click(); await expect(page.getByRole("heading", { name: "Mobile capture" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 test("系统分享 POST 保留多条草稿", async ({ page }) => {

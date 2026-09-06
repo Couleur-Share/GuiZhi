@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { researchFixture } from "../../helpers/research";
 import { installWindowMocks } from "../../helpers/window";
 const { showToast } = vi.hoisted(() => ({ showToast: vi.fn() }));
@@ -7,13 +7,38 @@ vi.mock("../../../src/renderer/components/ui/Toast", () => ({ useToast: () => ({
 vi.mock("../../../src/renderer/components/library/MarkdownPreview", () => ({ MarkdownBody: () => null }));
 import { ResearchWorkspace } from "../../../src/renderer/components/research/ResearchWorkspace";
 import { useResearchStore } from "../../../src/renderer/stores/research.store";
+import { changeLanguage, i18nReady } from "../../../src/renderer/i18n";
 import { ResearchProgress } from "../../../src/renderer/components/research/ResearchProgress";
+
+beforeAll(async () => { await i18nReady; await changeLanguage("zh"); });
 
 beforeEach(() => {
   installWindowMocks();
   useResearchStore.setState({ selectedRunId: "run-1", detail: researchFixture(), busy: false, error: null });
 });
 describe("研究任务反馈与平台分类", () => {
+  it("新研究评论默认关闭，主动开启才传入；仅选 B 站时隐藏并关闭", async () => {
+    installWindowMocks({ api: { collection: { list: vi.fn().mockResolvedValue([]) }, platformCapture: { getStatuses: vi.fn().mockResolvedValue([]) } } });
+    const create = vi.fn().mockResolvedValue(undefined);
+    const original = useResearchStore.getState().create;
+    useResearchStore.setState({ selectedRunId: null, detail: null, create });
+    try {
+      await act(async () => { render(<ResearchWorkspace />); });
+      const toggle = screen.getByRole("checkbox", { name: "精读时采集评论" });
+      expect(toggle).not.toBeChecked();
+      fireEvent.change(screen.getByLabelText("研究主题"), { target: { value: "软件使用体验" } });
+      fireEvent.click(screen.getByRole("button", { name: "开始研究" }));
+      await waitFor(() => expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ includeComments: false })));
+      fireEvent.click(toggle);
+      fireEvent.click(screen.getByRole("button", { name: "开始研究" }));
+      await waitFor(() => expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ includeComments: true })));
+      fireEvent.click(screen.getByRole("checkbox", { name: "抖音" }));
+      fireEvent.click(screen.getByRole("checkbox", { name: "小红书" }));
+      expect(screen.queryByRole("checkbox", { name: "精读时采集评论" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "开始研究" }));
+      await waitFor(() => expect(create).toHaveBeenLastCalledWith(expect.objectContaining({ includeComments: false, sources: ["bilibili"] })));
+    } finally { act(() => { useResearchStore.setState({ create: original }); }); }
+  });
   it("综合列表带来源标识，固定标签可切换平台及查看失败原因", () => {
     render(<ResearchWorkspace />);
     expect(screen.getByRole("status")).toHaveTextContent("采集结束 · 部分平台异常");

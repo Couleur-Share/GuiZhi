@@ -26,6 +26,7 @@ export function candidateDisplayText(candidate: Pick<ResearchCandidate, "source"
 }
 
 export const SOURCE_NAMES: Record<ResearchSource, string> = {
+  web: "网页",
   xiaohongshu: "小红书", douyin: "抖音", bilibili: "哔哩哔哩",
 };
 export const RUN_STATUS_NAMES: Record<ResearchRunStatus, string> = {

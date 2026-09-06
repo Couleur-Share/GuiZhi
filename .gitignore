@@ -140,3 +140,7 @@ deploy/capture/secrets/
 **/.machine/
 apps/capture-web/test-results/
 apps/capture-web/playwright-report/
+apps/desktop/resources/crawl4ai/
+config/crawl4ai/downloads/
+artifacts/crawl4ai/
+apps/desktop/resources/crawl4ai-worker/__pycache__/

@@ -4,7 +4,7 @@ name: Desktop Build and Release
 #   gh release edit <tag> --draft=false --latest
 # 正式对外发布。
 #
-# 当前发布平台：Windows (x64 / arm64) + macOS (x64 / arm64，identity "-" ad-hoc) +
+# 当前发布仅 Windows x64；其他平台构建分支保留但不参与本版。
 # Linux (AppImage / deb)。有 Apple Developer ID 后再开 GUIZHI_MAC_RELEASE_SIGN
 # 走正式签名与公证；icon.iconset 仍待换成归知图案。
 
@@ -20,21 +20,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS：Intel runner 打 x64，Apple Silicon runner 打 arm64
-          - os: macos-15-intel
-            platform: mac
-            arch: x64
-          - os: macos-15
-            platform: mac
-            arch: arm64
           - os: windows-latest
             platform: win
-            arch: x64
-          - os: windows-latest
-            platform: win
-            arch: arm64
-          - os: ubuntu-latest
-            platform: linux
             arch: x64
 
     runs-on: ${{ matrix.os }}
@@ -82,6 +69,20 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Setup crawler build Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12.10"
+
+      - name: Build locked bundled crawler
+        shell: bash
+        run: python scripts/build-crawl4ai.py --target ${{ matrix.platform == 'win' && 'win32-x64' || matrix.platform == 'linux' && 'linux-x64' || matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64' }}
+
+      - name: Verify crawler offline fixtures
+        run: pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts
+        env:
+          GUIZHI_TEST_BUNDLED_CRAWLER: "1"
 
       - name: Clean previous build artifacts
         shell: bash
@@ -311,7 +312,7 @@ jobs:
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-build
           path: apps/desktop/upload_dist/*
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   release:
     needs: build
@@ -353,27 +354,16 @@ jobs:
         shell: bash
         run: |
           # 1. 组装 Release Notes
-          cat > release_notes.md <<EOF
-          ## 📦 下载安装
-
-          | 平台 | 下载 |
-          |------|------|
-          | Windows | [![Windows x64](https://img.shields.io/badge/Windows_x64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-x64.exe) [![Windows arm64](https://img.shields.io/badge/Windows_arm64-0078D6?style=for-the-badge&logo=windows&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-Setup-${VERSION}-arm64.exe) |
-          | macOS | [![macOS Apple Silicon](https://img.shields.io/badge/macOS_Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-arm64.dmg) [![macOS Intel](https://img.shields.io/badge/macOS_Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-x64.dmg) |
-          | Linux | [![Linux AppImage](https://img.shields.io/badge/Linux_AppImage-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-x64.AppImage) [![Linux deb](https://img.shields.io/badge/Linux_deb-FCC624?style=for-the-badge&logo=linux&logoColor=black)](${DOWNLOAD_BASE_URL}/GuiZhi-${VERSION}-amd64.deb) |
-
-          > macOS 安装包目前仅做 ad-hoc 签名、未经 Apple 公证。若系统提示无法验证开发者，请到「系统设置 → 隐私与安全性」选择仍要打开；若提示「已损坏」，在终端执行：
-          > \`\`\`
-          > xattr -dr com.apple.quarantine /Applications/GuiZhi.app
-          > \`\`\`
-
-          ---
-
-          ## 🔄 本次更新
-
-          详细更新日志见 [CHANGELOG](https://github.com/Couleur-Share/GuiZhi/blob/main/CHANGELOG.md)
-          EOF
-
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const version=JSON.parse(fs.readFileSync('package.json','utf8')).version;
+          if(process.env.GITHUB_REF_NAME !== `v${version}`) throw new Error('标签与版本不一致');
+          const text=fs.readFileSync('CHANGELOG.md','utf8');
+          const headings=[...text.matchAll(/^## v\d+\.\d+\.\d+.*$/gm)];
+          const body=text.slice(headings[0].index,headings[1]?.index).trim();
+          const url=`https://github.com/Couleur-Share/GuiZhi/releases/download/v${version}/GuiZhi-Setup-${version}-x64.exe`;
+          fs.writeFileSync('release_notes.md',`[下载 Windows x64 安装包](${url})\n\n${body}\n`);
+          NODE
           # 2. 确定性收集产物（多产物目录不盲目覆盖，防清单与二进制错配）
           echo "Collecting release assets..."
           mkdir -p release_assets
@@ -401,44 +391,15 @@ jobs:
           }
 
           copy_unique "GuiZhi-Setup-${VERSION}-x64.exe"
-          copy_unique "GuiZhi-Setup-${VERSION}-arm64.exe"
-          copy_unique "GuiZhi-${VERSION}-arm64.dmg"
-          copy_unique "GuiZhi-${VERSION}-arm64.dmg.blockmap"
-          copy_unique "GuiZhi-${VERSION}-arm64.zip"
-          copy_unique "GuiZhi-${VERSION}-arm64.zip.blockmap"
-          copy_unique "GuiZhi-${VERSION}-x64.dmg"
-          copy_unique "GuiZhi-${VERSION}-x64.dmg.blockmap"
-          copy_unique "GuiZhi-${VERSION}-x64.zip"
-          copy_unique "GuiZhi-${VERSION}-x64.zip.blockmap"
-          copy_unique "GuiZhi-${VERSION}-x64.AppImage"
-          copy_unique "GuiZhi-${VERSION}-amd64.deb"
           copy_unique "latest.yml"
           copy_unique "latest-x64.yml"
-          copy_unique "latest-arm64.yml"
-          copy_unique "latest-mac.yml"
-          copy_unique "latest-mac-x64.yml"
-          copy_unique "latest-mac-arm64.yml"
-          copy_unique "latest-linux.yml"
 
           echo "Files to upload (deduplicated):"
           ls -1 release_assets/
 
           # 3. 校正并校验更新清单哈希（错配即中止，防坏自动更新）
-          node apps/desktop/scripts/fix-manifest-hashes.js \
-            release_assets/latest.yml \
-            release_assets/latest-arm64.yml \
-            release_assets/latest-x64.yml \
-            release_assets/latest-mac.yml \
-            release_assets/latest-mac-arm64.yml \
-            release_assets/latest-mac-x64.yml
-
-          node apps/desktop/scripts/verify-update-manifest.js \
-            release_assets/latest.yml \
-            release_assets/latest-arm64.yml \
-            release_assets/latest-x64.yml \
-            release_assets/latest-mac.yml \
-            release_assets/latest-mac-arm64.yml \
-            release_assets/latest-mac-x64.yml
+          node apps/desktop/scripts/fix-manifest-hashes.js release_assets/latest.yml release_assets/latest-x64.yml
+          node apps/desktop/scripts/verify-update-manifest.js release_assets/latest.yml release_assets/latest-x64.yml
 
           # 4. 创建 / 更新 Draft Release（验证后手动 promote）
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
