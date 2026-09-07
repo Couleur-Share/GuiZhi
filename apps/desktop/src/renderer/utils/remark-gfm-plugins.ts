@@ -1,4 +1,5 @@
 import remarkGfm from "remark-gfm";
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly";
 import type { PluggableList } from "unified";
 
 /**
@@ -11,4 +12,6 @@ import type { PluggableList } from "unified";
  */
 export const remarkGfmPlugins: PluggableList = [
   [remarkGfm, { singleTilde: false }],
+  // 中文标点两侧的强调规则交给上游解析扩展，兼容列表及普通段落。
+  remarkCjkFriendly,
 ];

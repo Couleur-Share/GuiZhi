@@ -7,6 +7,8 @@ import type {
   CrawlPage,
   WebRuntimeStatus,
   WebSourceVersion,
+  WebSnapshotView,
+  ImportTask,
 } from "@guizhi/shared/types";
 export interface WebResponse<T> {
   ok: boolean;
@@ -18,6 +20,9 @@ const invoke = <T>(
   ...args: unknown[]
 ): Promise<WebResponse<T>> => ipcRenderer.invoke(channel, ...args);
 export const webCaptureApi = {
+  snapshot: (itemId: string, versionId?: string) => invoke<WebSnapshotView>(C.WEB_SNAPSHOT,itemId,versionId),
+  supplement: (ids: string[]) => invoke<ImportTask[]>(C.WEB_SNAPSHOT_ENQUEUE,ids),
+  exportHtml: (itemId: string, versionId: string) => invoke<{canceled?:boolean;path?:string;incomplete?:boolean}>(C.WEB_SNAPSHOT_EXPORT,itemId,versionId),
   status: () => invoke<WebRuntimeStatus>(C.WEB_STATUS),
   repair: () => invoke<void>(C.WEB_REPAIR),
   create: (input: CreateCrawlJobInput) => invoke<string>(C.CRAWL_CREATE, input),

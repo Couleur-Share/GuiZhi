@@ -250,7 +250,8 @@ export function MarkdownBody({
         ...props
       }: ComponentProps<"img"> & { node?: unknown }) => {
         if (!isLocalAsset(typeof src === "string" ? src : undefined)) {
-          return <img src={src} alt={alt ?? ""} {...props} />;
+          // 外部图片不发送知识库页面来源，避免泄露本地地址及触发公众号防盗链。
+          return <img src={src} alt={alt ?? ""} {...props} referrerPolicy="no-referrer" />;
         }
         const position = localImages.findIndex((image) => image.src === src);
         return (

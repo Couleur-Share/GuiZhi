@@ -1,3 +1,6 @@
+import { readSnapshot, snapshotSource, exportSnapshot } from "../services/web-capture/snapshot-service";
+import { getRegisteredImportService } from "./import.ipc";
+import { sanitizeSnapshot } from "../services/web-capture/snapshot-sanitize";
 import { ipcMain, shell } from "electron";
 import { IPC_CHANNELS as C } from "@guizhi/shared/constants/ipc-channels";
 import { KnowledgeItemDB, WebSourceDB, webContentHash } from "@guizhi/db";
@@ -36,6 +39,13 @@ export function getCrawlService(): CrawlService {
 export function registerWebCaptureIPC(db: Database.Database): void {
   void service?.close();
   service = new CrawlService(db);
+  ipcMain.handle(C.WEB_SNAPSHOT, (_e,itemId,versionId) => response(()=>readSnapshot(db,id(itemId),versionId === undefined ? undefined : id(versionId))));
+  ipcMain.handle(C.WEB_SNAPSHOT_EXPORT, (_e,itemId,versionId) => response(()=>exportSnapshot(db,id(itemId),id(versionId))));
+  ipcMain.handle(C.WEB_SNAPSHOT_ENQUEUE, (_e,ids:unknown) => response(()=>{
+    if (!Array.isArray(ids) || !ids.length || ids.length > 50) throw new Error("单次补采 1–50 篇文章");
+    const inputs = [...new Set(ids.map(id))].map(itemId=>({kind:"url" as const,input:snapshotSource(db,itemId),refreshOfItemId:itemId,forceDuplicate:true}));
+    return getRegisteredImportService().queue.enqueue(inputs);
+  }));
   ipcMain.handle(C.WEB_STATUS, () => response(getWebCaptureStatus));
   ipcMain.handle(C.WEB_REPAIR, () =>
     response(async () => {
@@ -92,7 +102,10 @@ export function registerWebCaptureIPC(db: Database.Database): void {
         item = new KnowledgeItemDB(db).get(itemId);
       if (!item) throw new Error("条目不存在");
       const source = new WebSourceDB(db);
-      const versions = source.versions(itemId),
+      const versions = source.versions(itemId).map(v=> {
+        if (v.snapshot) { try { v.snapshot = sanitizeSnapshot(v.snapshot); } catch { delete v.snapshot; } }
+        return v;
+      }),
         baseline = source.baseline(itemId);
       const latest = versions.find(
         (version) => version.kind === "remote" && version.complete,

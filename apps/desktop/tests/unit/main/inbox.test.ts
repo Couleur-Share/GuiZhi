@@ -84,9 +84,10 @@ describe("处理中心聚合", () => {
       unclassified: 1,
       "import-issue": 1,
       "discovery-candidate": 1,
-      "semantic-pending": 1,
+      "semantic-pending": 2,
       "wiki-pending": 0,
     });
+    expect(result.total).toBe(4);
     expect(result.items.map((item) => item.kind)).toEqual(
       expect.arrayContaining([
         "review-required",
@@ -99,6 +100,30 @@ describe("处理中心聚合", () => {
     expect(result.items.some((item) => item.kind === "wiki-pending")).toBe(
       false,
     );
+  });
+
+  it("关联同一内容的导入问题不重复增加总数", () => {
+    db.run(
+      "UPDATE import_tasks SET result_item_id = ? WHERE id = ?",
+      "unclassified-1",
+      "task-1",
+    );
+    expect(listInboxItems(db).total).toBe(3);
+  });
+
+  it("总数不受每组最多展示 100 条限制", () => {
+    for (let index = 0; index < 105; index++) {
+      db.run(
+        "INSERT INTO knowledge_items (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)",
+        `extra-${index}`,
+        "待归类",
+      );
+    }
+    const result = listInboxItems(db);
+    expect(
+      result.items.filter((item) => item.kind === "unclassified"),
+    ).toHaveLength(100);
+    expect(result.total).toBe(109);
   });
 
   it("批量归知识库、打标签并标记已复核", () => {

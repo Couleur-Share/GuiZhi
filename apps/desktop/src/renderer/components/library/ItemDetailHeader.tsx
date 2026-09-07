@@ -266,10 +266,16 @@ export function ItemDetailHeader({
   item,
   isTrashed,
   onClose,
+  compactReading = false,
+  toolsOpen = false,
+  onToggleTools,
 }: {
   item: KnowledgeItem;
   isTrashed: boolean;
   onClose?: () => void;
+  compactReading?: boolean;
+  toolsOpen?: boolean;
+  onToggleTools?: () => void;
 }) {
   const { t } = useTranslation();
   const isSaving = useKnowledgeStore((state) => state.isSaving);
@@ -323,7 +329,7 @@ export function ItemDetailHeader({
   }
 
   return (
-    <div className="shrink-0 border-b border-border/60 px-6 pb-3 pt-4">
+    <div className={`shrink-0 border-b border-border/60 px-6 ${compactReading ? "py-2" : "pb-3 pt-4"}`}>
       {/* 标题独占整行：与动作区同排时，窄详情栏里长标题会被挤成三行还看不全 */}
       <textarea
         ref={titleRef}
@@ -348,11 +354,14 @@ export function ItemDetailHeader({
       {/* 动作区并进元信息行右侧：不新增一行高度，与 Wiki 页面详情同形态 */}
       <div className="mt-2.5 flex items-start gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {!compactReading || toolsOpen ? <>
           <MetaChip icon={typeMeta.icon}>
             {t(typeMeta.labelKey, typeMeta.fallback)}
           </MetaChip>
           <CollectionChip item={item} disabled={isTrashed} />
+          </> : null}
           <SourceChip item={item} />
+          {compactReading ? <button type="button" aria-expanded={toolsOpen} onClick={onToggleTools} className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">{toolsOpen ? "收起文章工具" : "文章信息与工具"}</button> : null}
           {/* 置顶与归档改由菜单切换，状态就得由 chip 说出来——原先只靠按钮
               的高亮底色与两个长得极像的归档图标区分，本就看不出来 */}
           {item.isPinned ? (
@@ -369,14 +378,14 @@ export function ItemDetailHeader({
               {t("library.archivedBadge", "已归档")}
             </MetaChip>
           ) : null}
-          <MetaChip
+          {!compactReading || toolsOpen || isDirty || isSaving || saveError ? <MetaChip
             icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
             tone={saveTone}
             title={saveError ?? undefined}
           >
             {saveLabel}
-          </MetaChip>
-          {wordCount > 0 ? (
+          </MetaChip> : null}
+          {wordCount > 0 && (!compactReading || toolsOpen) ? (
             <MetaChip
               icon={<HashIcon className="h-3.5 w-3.5" aria-hidden="true" />}
             >
@@ -456,7 +465,7 @@ export function ItemDetailHeader({
         </div>
       </div>
 
-      {!isTrashed ? (
+      {!isTrashed && (!compactReading || toolsOpen) ? (
         <TagEditor
           item={item}
           onChange={(tagNames) => updateSelected({ tagNames })}

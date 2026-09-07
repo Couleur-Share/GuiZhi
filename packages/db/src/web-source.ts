@@ -42,6 +42,22 @@ export class WebSourceDB {
       JSON.stringify(version),
       version.capturedAt,
     );
+    for (const asset of version.snapshot?.assets ?? []) {
+      if (!/^wechat-[a-f0-9]{64}\.(png|jpg|gif|webp)$/.test(asset.fileName)) throw new Error("快照资源名称无效");
+      this.db.run("INSERT OR IGNORE INTO web_snapshot_assets VALUES (?,?)", version.id, asset.fileName);
+    }
+  }
+  /** 补采仅添加来源版本，不覆盖用户正文。 */
+  attach(itemId: string, result: WebCaptureResult): void {
+    const item = new KnowledgeItemDB(this.db).get(itemId);
+    if (!item || item.deletedAt) throw new Error("条目不存在或已删除");
+    const latest = this.versions(itemId).find(v => v.kind === "remote");
+    if (latest?.snapshot?.hash === result.snapshot?.hash && latest?.contentHash === webContentHash(result.markdown) && latest?.title === result.title) return;
+    const version = this.remote(itemId, result);
+    this.db.transaction(() => {
+      this.save(version);
+      if (!this.baseline(itemId)) this.setBaseline(itemId, version, item.content, item.title, false);
+    })();
   }
   private remote(itemId: string, result: WebCaptureResult): WebSourceVersion {
     return {
@@ -55,6 +71,7 @@ export class WebSourceDB {
       engineVersion: result.engineVersion,
       complete: result.complete && !result.truncated && !result.error,
       kind: "remote",
+      snapshot: result.snapshot,
     };
   }
   private setBaseline(
@@ -101,7 +118,8 @@ export class WebSourceDB {
       );
       if (
         previousRemote?.contentHash === version.contentHash &&
-        previousRemote.title === version.title
+        previousRemote.title === version.title &&
+        previousRemote.snapshot?.hash === version.snapshot?.hash
       ) {
         this.db.run(
           "UPDATE web_source_baselines SET checked_at=? WHERE item_id=?",
@@ -113,7 +131,7 @@ export class WebSourceDB {
           : ("pending-version" as const);
       }
       this.save(version);
-      if (!baseline || webContentHash(item.content) !== baseline.content_hash)
+      if (version.snapshot || !baseline || webContentHash(item.content) !== baseline.content_hash)
         return "pending-version" as const;
       this.snapshot(itemId, item.title, item.content, version.sourceUrl);
       const title = item.title === baseline.title ? version.title : item.title;

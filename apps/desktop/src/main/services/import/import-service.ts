@@ -1,3 +1,7 @@
+import { normalizeUrl } from "./url-normalize";
+import { releaseSnapshotAssets } from "../web-capture/snapshot-assets";
+import { cleanupOrphanAssets } from "../asset-cleanup";
+import { isWechatUrl } from "../web-capture/wechat";
 import { MobileCaptureDB } from "@guizhi/db/mobile-capture";
 /**
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
@@ -60,6 +64,10 @@ function createPersistence(db: Database.Database): ImportPersistence {
       new SourceAccessDB(db).remember(itemId, normalizedUri, accessUri);
     },
 
+    disposeExtracted(extracted) {
+      const assets = extracted.webCapture?.snapshot?.assets;
+      if (assets) { releaseSnapshotAssets(assets); cleanupOrphanAssets(items, assets.map(a=>a.fileName)); }
+    },
     saveItem({
       extracted,
       collectionId,
@@ -68,7 +76,14 @@ function createPersistence(db: Database.Database): ImportPersistence {
       sourceInput,
       normalizedUri,
       contentHash,
+      refreshOfItemId,
     }) {
+      if (refreshOfItemId && extracted.webCapture?.snapshot && isWechatUrl(sourceInput)) {
+        const original = db.get("SELECT source_uri FROM source_records WHERE item_id=? ORDER BY captured_at DESC LIMIT 1",refreshOfItemId) as {source_uri:string};
+        if (!original || normalizeUrl(original.source_uri) !== normalizeUrl(sourceInput)) throw new Error("补采来源与原条目不一致");
+        new WebSourceDB(db).attach(refreshOfItemId, extracted.webCapture);
+        return refreshOfItemId;
+      }
       let itemId = "";
       const review = assessImportReview(extracted, sourceKind);
       const run = db.transaction(() => {

@@ -1,4 +1,4 @@
-import { GlobeIcon, HardDriveIcon, CircleHelpIcon } from "lucide-react";
+import { GlobeIcon, HardDriveIcon, CircleHelpIcon, MessagesSquareIcon } from "lucide-react";
 import type { SourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import {
   AppinnLogo,
@@ -94,6 +94,7 @@ export const SOURCE_PLATFORM_META: Record<SourcePlatform, SourcePlatformMeta> =
       // 官方 mark 自带五色填充，不由外层覆盖颜色。
       colorClass: "text-current",
     },
+    wechat: { labelKey: "library.platformWechat", fallback: "微信公众号", Icon: MessagesSquareIcon, colorClass: "text-green-600 dark:text-green-400" },
     web: {
       labelKey: "library.platformWeb",
       fallback: "网页",

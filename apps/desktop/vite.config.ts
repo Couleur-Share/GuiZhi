@@ -18,6 +18,8 @@ const mainExternalModules = new Set([
   // chromium-bidi require 提升到入口，导致应用启动时就去解析并不存在的可选模块。
   // external 后仍只携带控制库，不下载或打包 Chromium。
   "playwright-core",
+  "@resvg/resvg-js",
+  "css-tree",
   // linkedom 的可选依赖（未安装）：external 保留 require 调用，
   // 让 linkedom 内部 try/catch 正常回退到 canvas-shim
   "canvas",

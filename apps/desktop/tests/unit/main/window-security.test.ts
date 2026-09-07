@@ -64,10 +64,10 @@ describe("isInternalRendererUrl", () => {
 describe("buildContentSecurityPolicy", () => {
   it("生产不允许内联脚本与 eval", () => {
     const csp = buildContentSecurityPolicy(null);
-    expect(csp).toContain("script-src 'self';");
+    expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/=]+';/);
     expect(csp).not.toContain("unsafe-eval");
     expect(csp).toContain("object-src 'none'");
-    expect(csp).toContain("frame-src 'none'");
+    expect(csp).toContain("frame-src 'self'");
   });
 
   it("开发放开 HMR 需要的内联脚本与 websocket", () => {

@@ -108,14 +108,20 @@
     </g>
 
     <text x="56" y="474" class="group">通用来源</text>
-    <g data-platform="web" transform="translate(56 490)" filter="url(#shadow)">
-      <rect width="560" height="92" rx="20" fill="url(#card)" stroke="#2a3445"/>
+    <g data-platform="wechat" transform="translate(56 490)" filter="url(#shadow)">
+      <rect width="368" height="92" rx="20" fill="url(#card)" stroke="#2a3445"/>
+      <circle cx="47" cy="46" r="25" fill="#1b5639"/>
+      <text x="47" y="53" text-anchor="middle" fill="#68d891" font-size="22">文</text>
+      <text x="94" y="40" class="name">微信公众号</text><text x="94" y="64" class="cap">原文排版 · 离线图文</text>
+    </g>
+    <g data-platform="web" transform="translate(456 490)" filter="url(#shadow)">
+      <rect width="368" height="92" rx="20" fill="url(#card)" stroke="#2a3445"/>
       <rect x="18" y="17" width="58" height="58" rx="17" fill="#202a38"/>
       <use href="#web" x="31" y="30" width="32" height="32" color="#9aa8ba"/>
-      <text x="94" y="40" class="name">网页</text><text x="94" y="64" class="cap">Readability 抽取正文 → Markdown</text>
+      <text x="94" y="40" class="name">网页</text><text x="94" y="64" class="cap">网页正文 → Markdown</text>
     </g>
-    <g data-platform="local" transform="translate(664 490)" filter="url(#shadow)">
-      <rect width="560" height="92" rx="20" fill="url(#card)" stroke="#2a3445"/>
+    <g data-platform="local" transform="translate(856 490)" filter="url(#shadow)">
+      <rect width="368" height="92" rx="20" fill="url(#card)" stroke="#2a3445"/>
       <rect x="18" y="17" width="58" height="58" rx="17" fill="#202a38"/>
       <use href="#local" x="31" y="30" width="32" height="32" color="#9aa8ba"/>
       <text x="94" y="40" class="name">本地文件</text><text x="94" y="64" class="cap">文本 · 图片 · 音频 · 视频</text>

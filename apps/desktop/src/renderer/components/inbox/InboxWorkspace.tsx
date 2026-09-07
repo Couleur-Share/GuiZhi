@@ -31,6 +31,7 @@ export function InboxWorkspace() {
   const items = useInboxStore((state) => state.items);
   const filter = useInboxStore((state) => state.filter);
   const total = useInboxStore((state) => state.total);
+  const counts = useInboxStore((state) => state.counts);
   const selectionIds = useInboxStore((state) => state.selectionIds);
   const toggleSelection = useInboxStore((state) => state.toggleSelection);
   const setSelection = useInboxStore((state) => state.setSelection);
@@ -303,7 +304,13 @@ export function InboxWorkspace() {
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-5">
         <h2 className="text-sm font-semibold text-foreground">处理中心</h2>
-        <span className="text-xs text-muted-foreground">{total} 项待处理</span>
+        <span className="text-xs text-muted-foreground">
+          {filter === "wiki-pending"
+            ? `${counts[filter]} 条内容待编译`
+            : filter === "semantic-pending"
+              ? `${counts[filter]} 条内容待索引`
+              : `${filter === "all" ? total : counts[filter]} 条内容待处理`}
+        </span>
         {selectableVisibleIds.length > 0 ? (
           <Checkbox
             checked={allVisibleSelected}
@@ -420,7 +427,9 @@ export function InboxWorkspace() {
                         {semantic ? "语义索引待更新" : "Wiki 待编译"}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.count} 条内容等待处理；这里以聚合卡显示。
+                        {item.count} 条内容
+                        {semantic ? "待建立语义索引" : "待编译为 Wiki"}
+                        ；不计入待处理内容数。
                       </p>
                     </div>
                     <button

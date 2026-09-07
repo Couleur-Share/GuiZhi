@@ -54,7 +54,7 @@ describe("inbox.store Wiki 待编译计数", () => {
               },
             ],
             counts: { ...EMPTY_COUNTS, "wiki-pending": 1 },
-            total: 1,
+            total: 0,
           }),
         },
       },
@@ -77,8 +77,35 @@ describe("inbox.store Wiki 待编译计数", () => {
           count: 3,
         },
       ],
-      counts: { "wiki-pending": 1 },
-      total: 1,
+      counts: { "wiki-pending": 3 },
+      total: 0,
+    });
+  });
+
+  it("3 条待整理内容加 Wiki 和语义任务仍计为 3 条", async () => {
+    wikiPending = 3;
+    installWindowMocks({
+      api: {
+        inbox: {
+          list: vi.fn().mockResolvedValue({
+            items: [
+              {
+                kind: "semantic-pending",
+                id: "aggregate:semantic",
+                count: 3,
+                createdAt: 1,
+              },
+            ],
+            counts: { ...EMPTY_COUNTS, unclassified: 3, "semantic-pending": 3 },
+            total: 3,
+          }),
+        },
+      },
+    });
+    await useInboxStore.getState().refresh();
+    expect(useInboxStore.getState()).toMatchObject({
+      total: 3,
+      counts: { unclassified: 3, "wiki-pending": 3, "semantic-pending": 3 },
     });
   });
 

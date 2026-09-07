@@ -207,9 +207,7 @@ async function extractWebpage(
 
   let article: { title?: string | null; content?: string | null } | null;
   try {
-    article = new Readability(document as unknown as Document, {
-      charThreshold: 100,
-    }).parse();
+    article = new Readability(document as unknown as Document, { charThreshold: 100 }).parse();
   } catch {
     article = null;
   }
@@ -293,6 +291,13 @@ export async function extractContent(
         );
       }
 
+      // 公众号正文已在 HTML 中，直接读取可避免页面脚本、统计请求耗尽浏览器预算。
+      if (new URL(url).hostname === "mp.weixin.qq.com") {
+        const { captureWechat } = await import("../web-capture/wechat");
+        const result = await captureWechat(url, "import-wechat", signal);
+        return { title:result.title, content:result.markdown, itemType:"webpage", sourceUri:result.finalUrl,
+          webCapture:result, warningReason:result.warnings.join("；") || undefined };
+      }
       if (context?.captureWebpage) {
         const captured = await context.captureWebpage(url, signal);
         if (captured) return captured;

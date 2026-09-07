@@ -8,6 +8,7 @@
  * 恢复流程（backup.ipc.ts 编排）：校验备份文件 → 关闭数据库 →
  * 当前库先存 pre-restore 快照 → 文件覆盖 → 应用重启。
  */
+import { sanitizeSnapshot } from "./web-capture/snapshot-sanitize";
 import fs from "fs";
 import path from "path";
 import Database from "../database/sqlite";
@@ -269,6 +270,12 @@ export function validateBackupFile(filePath: string): {
       }
     }
 
+    if (probe.get("SELECT name FROM sqlite_master WHERE type='table' AND name='web_source_versions'")) {
+      for (const row of probe.all("SELECT payload FROM web_source_versions") as {payload:string}[]) {
+        const version = JSON.parse(row.payload);
+        if (version.snapshot) sanitizeSnapshot(version.snapshot);
+      }
+    }
     // 来自更新版本的备份可能带着本版本读不懂的结构，恢复后只会更难排查。
     // 反向（旧备份）没问题：恢复后迁移执行器会把结构补齐。
     const backupVersion = getSchemaVersion(probe);

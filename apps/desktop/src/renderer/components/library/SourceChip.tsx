@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { KnowledgeItem } from "@guizhi/shared/types";
 import { parseVideoMetaBlock } from "@guizhi/shared/utils/video-meta";
 import { CHIP_MUTED } from "./detail-chips";
+import { supplementWechatSelection } from "./WebSnapshotPane";
 import { useImportStore } from "../../stores/import.store";
 
 function resolveSafeSourceUrl(
@@ -34,7 +35,7 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
   const sourceUrl = resolveSafeSourceUrl(item.sourceUri);
 
   const facts = [meta?.platform, meta?.author, meta?.duration].filter(Boolean);
-  const label = facts.length > 0 ? facts.join(" · ") : sourceUrl?.hostname;
+  const label = sourceUrl?.hostname === "mp.weixin.qq.com" ? t("library.platformWechat", "微信公众号") : facts.length > 0 ? facts.join(" · ") : sourceUrl?.hostname;
   if (!label) {
     return null;
   }
@@ -88,7 +89,7 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
         title={t("library.refreshSource", "重新采集并待确认")}
         aria-label={t("library.refreshSource", "重新采集并待确认")}
         onClick={() =>
-          void enqueue([
+          sourceUrl.hostname === "mp.weixin.qq.com" ? void supplementWechatSelection([item.id]) : void enqueue([
             {
               kind: "url",
               input: sourceUrl.href,

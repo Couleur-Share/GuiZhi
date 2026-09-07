@@ -943,6 +943,11 @@ export class KnowledgeItemDB {
         refs.add(ref);
       }
     }
+    for (const row of this.db.all(`SELECT payload FROM web_source_versions WHERE item_id IN (${placeholders})`, ...ids) as {payload:string}[]) {
+      const version = JSON.parse(row.payload);
+      for (const ref of extractAllLocalAssetRefs(version.markdown ?? "")) refs.add(ref);
+      for (const asset of version.snapshot?.assets ?? []) refs.add(asset.fileName);
+    }
     return [...refs];
   }
 
@@ -968,6 +973,15 @@ export class KnowledgeItemDB {
       for (const ref of extractAllLocalAssetRefs(row.content)) {
         referenced.add(ref);
       }
+    }
+    for (const row of this.db.all("SELECT payload FROM web_source_versions") as {payload:string}[]) {
+      const version = JSON.parse(row.payload);
+      for (const ref of extractAllLocalAssetRefs(version.markdown ?? "")) referenced.add(ref);
+      for (const asset of version.snapshot?.assets ?? []) referenced.add(asset.fileName);
+    }
+    for (const row of this.db.all("SELECT payload FROM crawl_pages") as {payload:string}[]) {
+      const result = JSON.parse(row.payload).result;
+      for (const asset of result?.snapshot?.assets ?? []) referenced.add(asset.fileName);
     }
     return referenced;
   }

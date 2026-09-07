@@ -13,6 +13,7 @@
 | 论坛 | <!-- source-platform:linuxdo -->**LINUX DO** | Discourse 正文 + 全部楼层 + AI 讨论总结 | 公开帖直取；遇登录或 Cloudflare 验证可切内置登录采集 |
 | 论坛 | <!-- source-platform:appinn -->**小众软件** | Discourse 正文 + 全部楼层 + AI 讨论总结 | 采集 `meta.appinn.net` 公开主题，无需登录 |
 | 论坛 | <!-- source-platform:twolibra -->**2Libra** | 正文 + 全部平铺评论 + 回复对象 / 楼层 + AI 讨论总结 | 走公开只读 API；分页失败时保留已取得内容并给出警告 |
+| 图文 | <!-- source-platform:wechat -->微信公众号 | HTML 原文排版快照 + Markdown + 本地图片 | 精确识别 mp.weixin.qq.com；旧文章可手动补采；音视频保留原文入口 |
 | 通用 | <!-- source-platform:web -->网页 | 内置 Crawl4AI + 独立 Chromium → Markdown | 无专用连接器的标准 URL；不支持系统或组件不可用时带原因回退 Readability |
 | 通用 | <!-- source-platform:local -->本地文件 | 文本 / 图片 / 音视频拖入即入库 | 媒体资产化，详情页可预览播放 |
 
@@ -59,3 +60,5 @@ node apps/desktop/scripts/probe-platform-parsers.mjs
 ## 研究精读与完整导入
 
 上表描述完整导入。研究工作区只读取正文 / 文案、已有字幕；手动开启后读取有限评论，不走资产化、音频下载、转写或 OCR；B 站不读取评论。材料默认留在研究记录中，主动保存摘录或完整导入后才进入知识库。详见 [近期研究](./research.md)。
+
+微信公众号的阅读、补采、离线导出及支持范围见 [微信公众号原文排版](wechat-snapshots.md)。

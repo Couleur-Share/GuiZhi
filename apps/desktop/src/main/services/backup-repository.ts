@@ -485,6 +485,20 @@ export class BackupRepository {
         extractLocalAssetRefs(row.content, "local-image").forEach((name) => images.add(name));
         extractLocalAssetRefs(row.content, "local-video").forEach((name) => videos.add(name));
       }
+      for (const row of snapshotDb.all("SELECT payload FROM web_source_versions") as {payload:string}[]) {
+        const version = JSON.parse(row.payload);
+        extractLocalAssetRefs(version.markdown ?? "", "local-image").forEach(name => images.add(name));
+        for (const asset of version.snapshot?.assets ?? []) {
+          if (!/^wechat-[a-f0-9]{64}\.(png|jpg|gif|webp)$/.test(asset.fileName)) throw new Error("快照资源路径无效");
+          images.add(asset.fileName);
+        }
+      }
+      for (const row of snapshotDb.all("SELECT payload FROM crawl_pages") as {payload:string}[]) {
+        for (const asset of JSON.parse(row.payload).result?.snapshot?.assets ?? []) {
+          if (!/^wechat-[a-f0-9]{64}\.(png|jpg|gif|webp)$/.test(asset.fileName)) throw new Error("快照资源路径无效");
+          images.add(asset.fileName);
+        }
+      }
       const assets = [
         ...[...images].map((name) => ({
           name,

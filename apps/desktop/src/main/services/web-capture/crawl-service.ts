@@ -1,3 +1,5 @@
+import { releaseSnapshotAssets } from "./snapshot-assets";
+import { cleanupOrphanAssets } from "../asset-cleanup";
 import { randomUUID } from "node:crypto";
 import { parseHTML } from "linkedom";
 import {
@@ -131,8 +133,9 @@ export class CrawlService {
           continue;
         }
         this.jobs.save({ ...page, status: "running" });
+        let result: WebCaptureResult | undefined;
         try {
-          const result = await captureWebPage(
+          result = await captureWebPage(
             {
               taskId: page.id,
               purpose: job.input.purpose,
@@ -203,6 +206,11 @@ export class CrawlService {
               : "failed",
             error: error instanceof Error ? error.message : "网页采集失败",
           });
+        } finally {
+          if (result?.snapshot) {
+            releaseSnapshotAssets(result.snapshot.assets);
+            cleanupOrphanAssets(new KnowledgeItemDB(this.db), result.snapshot.assets.map(a => a.fileName));
+          }
         }
       }
       if (!controller.signal.aborted) this.jobs.setStatus(id, "completed");

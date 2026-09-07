@@ -46,6 +46,8 @@ import { ImageGallery } from "./ImageGallery";
 import type { ForumDiscussionHandle } from "./ForumDiscussionView";
 import { defaultCatalogOpen, ForumFloorCatalog } from "./ForumFloorCatalog";
 import { highlightText } from "./highlight-text";
+import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
+import { WebSnapshotPane } from "./WebSnapshotPane";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { PanelFindBar } from "./PanelFindBar";
 import { ReviewRequiredNotice } from "./ReviewRequiredNotice";
@@ -217,15 +219,20 @@ export function ContentPanel({
 
   const [tab, setTab] = useState<PanelTab>("body");
   const [isPreview, setIsPreview] = useState(editorMarkdownPreview);
+  const [snapshotToolbar, setSnapshotToolbar] = useState<HTMLDivElement | null>(null);
+  const isWechatPreview = resolveSourcePlatform("url", item.sourceUri) === "wechat" && (isTrashed || isPreview);
+  const [snapshotOriginal, setSnapshotOriginal] = useState(true);
   const [findQuery, setFindQuery] = useState("");
   const [isFindOpen, setIsFindOpen] = useState(false);
+  // 记住输入词，但关闭查找后两种公众号排版均停止高亮及定位。
+  const snapshotFindQuery = isFindOpen ? findQuery : "";
   const [findActiveIndex, setFindActiveIndex] = useState(0);
   const [findMatchCount, setFindMatchCount] = useState(0);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogActiveFloor, setCatalogActiveFloor] = useState<number | null>(
     null,
   );
-  const lastViewItemIdRef = useRef<string | null>(null);
+  const [viewItemId, setViewItemId] = useState<string | null>(null);
   const restoredRef = useRef(false);
 
   const summaryScrollRef = useRef<HTMLDivElement>(null);
@@ -295,12 +302,10 @@ export function ContentPanel({
 
   const onPaneScroll = useDebouncedScrollSave(item.id, activeTab, getScrollTop);
 
-  // 切换条目：恢复记忆或默认视图
-  useEffect(() => {
-    if (lastViewItemIdRef.current === item.id) {
-      return;
-    }
-    lastViewItemIdRef.current = item.id;
+  // 切换条目时在提交画面前恢复阅读状态，避免先显示正文再跳到记忆标签。
+  // 条目 ID 限定更新条件；React 会丢弃本轮输出并立即用新状态重渲染。
+  if (viewItemId !== item.id) {
+    setViewItemId(item.id);
     restoredRef.current = false;
     const preview = editorMarkdownPreview && Boolean(item.content.trim());
     setIsPreview(preview);
@@ -337,13 +342,7 @@ export function ContentPanel({
       setTab(preferSummary ? "summary" : "body");
       setCatalogOpen(defaultCatalogOpen(replyCount));
     }
-  }, [
-    item.id,
-    item.content,
-    item.itemType,
-    editorMarkdownPreview,
-    showTranscriptTab,
-  ]);
+  }
 
   // 恢复滚动位置（等 pane 挂好）
   useLayoutEffect(() => {
@@ -377,7 +376,8 @@ export function ContentPanel({
       }
       restoredRef.current = true;
     };
-    requestAnimationFrame(apply);
+    const frame = requestAnimationFrame(apply);
+    return () => cancelAnimationFrame(frame);
   }, [activeTab, item.id]);
 
   useEffect(() => {
@@ -423,10 +423,10 @@ export function ContentPanel({
 
   useMarkFindNavigation({
     containerRef: markContainerRef,
-    query: activeTab === "replies" ? "" : findQuery,
+    query: activeTab === "replies" ? "" : isWechatPreview ? snapshotFindQuery : findQuery,
     activeIndex: findActiveIndex,
     onMatchCountChange:
-      activeTab === "replies" ? noopMatchCount : setFindMatchCount,
+      activeTab === "replies" || (isWechatPreview && snapshotOriginal) ? noopMatchCount : setFindMatchCount,
     contentKey: `${item.id}:${activeTab}:${markContentKey.length}`,
   });
 
@@ -518,6 +518,7 @@ export function ContentPanel({
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border app-wallpaper-panel">
         <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/60 px-2">
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {isWechatPreview ? <div ref={setSnapshotToolbar} className="flex min-w-0 items-center" /> : <>
             {showForumSummaryTab ? (
               <TabButton
                 active={activeTab === "summary"}
@@ -578,6 +579,7 @@ export function ContentPanel({
                 ) : null}
               </TabButton>
             ) : null}
+            </>}
           </div>
 
           <div className="ml-1 flex shrink-0 items-center gap-1">
@@ -799,11 +801,13 @@ export function ContentPanel({
               ) : null}
             </div>
           ) : isTrashed || isPreview ? (
-            <MarkdownPreview
-              ref={bodyScrollRef}
-              content={isTrashed ? item.content : previewContent}
-              highlightQuery={findQuery}
-            />
+            resolveSourcePlatform("url", item.sourceUri) === "wechat" ? (
+              <WebSnapshotPane key={item.id} item={item} toolbarTarget={snapshotToolbar} forceSimple={false} findQuery={snapshotFindQuery} findIndex={findActiveIndex} onFindCount={setFindMatchCount} onOriginalChange={setSnapshotOriginal} onFindOpen={() => setIsFindOpen(true)}>
+                <MarkdownPreview ref={bodyScrollRef} content={isTrashed ? item.content : previewContent} highlightQuery={snapshotFindQuery} />
+              </WebSnapshotPane>
+            ) : (
+              <MarkdownPreview ref={bodyScrollRef} content={isTrashed ? item.content : previewContent} highlightQuery={findQuery} />
+            )
           ) : (
             <MarkdownEditor
               docId={item.id}

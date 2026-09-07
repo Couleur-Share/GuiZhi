@@ -6,6 +6,7 @@
  * `%APPDATA%/GuiZhi` 里，用户无从得知。
  */
 import fs from "fs";
+import { leasedSnapshotAssets } from "./web-capture/snapshot-assets";
 import path from "path";
 import type { KnowledgeItemDB } from "@guizhi/db";
 import { isSafeAssetFileName } from "@guizhi/shared/utils/media-refs";
@@ -49,6 +50,7 @@ export function cleanupOrphanAssets(
   const directories = [getImagesDir(), getVideosDir()];
   // 引用集合一次取全：逐个资产查一遍等于 N 次全表扫描
   const referenced = items.listReferencedAssets();
+  for (const name of leasedSnapshotAssets()) referenced.add(name);
   let removed = 0;
 
   for (const fileName of candidates) {

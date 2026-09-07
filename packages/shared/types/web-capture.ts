@@ -32,7 +32,21 @@ export interface WebCaptureRequest {
   url: string;
   scope?: WebScope;
 }
+export interface WebSnapshotAsset { fileName: string; sourceUrl: string; sha256: string; bytes: number; }
+export interface WebSnapshot {
+  formatVersion: 1; policyVersion: 1; adapterVersion: string;
+  html: string; css: string; hash: string;
+  account: string; author: string; publishedAt: number | null; cover?: string;
+  assets: WebSnapshotAsset[];
+  failures: { url: string; reason: string }[];
+  warnings: string[];
+}
+export interface WebSnapshotView {
+  version: WebSourceVersion | null; edited: boolean; pending: boolean;
+  document?: string; instanceId?: string; error?: string;
+}
 export interface WebCaptureResult {
+  snapshot?: WebSnapshot;
   taskId: string;
   entryUrl: string;
   finalUrl: string;
@@ -105,6 +119,7 @@ export interface CrawlPage {
   result?: WebCaptureResult;
 }
 export interface WebSourceVersion {
+  snapshot?: WebSnapshot;
   id: string;
   itemId: string;
   sourceUrl: string;

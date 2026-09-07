@@ -1,3 +1,4 @@
+import { isWechatUrl, captureWechat } from "./wechat";
 import type {
   ImportStage,
   WebCaptureRequest,
@@ -21,6 +22,7 @@ export async function captureWebPage(
   signal?: AbortSignal,
   stage?: (stage: ImportStage) => void,
 ): Promise<WebCaptureResult> {
+  if (isWechatUrl(request.url)) return captureWechat(request.url,request.taskId,signal);
   const status = await getWebCaptureStatus();
   if (!status.available) throw new Error(status.reason ?? "网页组件不可用");
   const url = canonicalWebUrl(request.url),

@@ -175,13 +175,30 @@ export function listInboxItems(db: Database.Database): InboxListResult {
       db,
       "SELECT COUNT(*) AS count FROM platform_discovery_candidates WHERE state = 'new'",
     ),
-    "semantic-pending": semanticPending > 0 ? 1 : 0,
+    "semantic-pending": semanticPending,
     "wiki-pending": 0,
   };
   return {
     items,
     counts,
-    total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+    // 按内容身份去重；全量查询不受分组列表上限影响，后台任务不计入。
+    total: scalarCount(
+      db,
+      `SELECT COUNT(*) AS count FROM (
+        SELECT 'item:' || id AS identity FROM knowledge_items
+        WHERE deleted_at IS NULL AND status = 'active'
+          AND (review_status = 'needs_review' OR collection_id IS NULL)
+        UNION
+        SELECT CASE WHEN COALESCE(result_item_id, duplicate_item_id) IS NOT NULL
+          THEN 'item:' || COALESCE(result_item_id, duplicate_item_id)
+          ELSE 'import:' || id END FROM import_tasks
+        WHERE status IN ('failed','duplicate')
+          OR (warning IS NOT NULL AND warning_acknowledged_at IS NULL)
+        UNION
+        SELECT 'candidate:' || platform || ':' || external_id
+        FROM platform_discovery_candidates WHERE state = 'new'
+      )`,
+    ),
   };
 }
 

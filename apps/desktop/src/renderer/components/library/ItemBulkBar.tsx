@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
 import { useToast } from "../ui/Toast";
+import { supplementWechatSelection } from "./WebSnapshotPane";
 import { BulkTagPopover } from "./BulkTagPopover";
 
 function BulkAction({
@@ -65,6 +66,8 @@ export function ItemBulkBar({
   const { showUndoToast } = useToast();
   const scope = useKnowledgeStore((state) => state.scope);
   const selectionIds = useKnowledgeStore((state) => state.selectionIds);
+  const entries = useKnowledgeStore((state) => state.entries);
+  const wechatIds = selectionIds.filter(id=>entries.some(entry=>entry.id===id&&entry.platform==="wechat"));
   const clearSelection = useKnowledgeStore((state) => state.clearSelection);
   const setStatus = useKnowledgeStore((state) => state.setStatus);
   const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
@@ -188,6 +191,7 @@ export function ItemBulkBar({
         </>
       )}
 
+      {scope !== "trash" && wechatIds.length > 0 ? <BulkAction wide={wide} label="补采公众号原文（进度见导入任务）" onClick={()=>void supplementWechatSelection(wechatIds)}><RotateCcwIcon className="h-4 w-4" aria-hidden="true" /></BulkAction> : null}
       {moveAnchor ? (
         <ContextMenu
           x={moveAnchor.x}

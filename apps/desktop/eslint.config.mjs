@@ -43,6 +43,7 @@ export default [
     ignores: [
       "dist/**",
       "out/**",
+      ".tmp-*/**",
       "node_modules/**",
       "resources/crawl4ai/**",
       "coverage/**",

@@ -86,7 +86,7 @@ export const useInboxStore = create<InboxState>()((set, get) => ({
       ];
       const counts = {
         ...result.counts,
-        "wiki-pending": wikiPending > 0 ? 1 : 0,
+        "wiki-pending": wikiPending,
       };
       const alive = new Set(
         items.flatMap((item) => ("itemId" in item ? [item.itemId] : [])),
@@ -94,7 +94,7 @@ export const useInboxStore = create<InboxState>()((set, get) => ({
       set((state) => ({
         items,
         counts,
-        total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+        total: result.total,
         selectionIds: state.selectionIds.filter((id) => alive.has(id)),
       }));
     } catch (error) {

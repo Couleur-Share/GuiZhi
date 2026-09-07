@@ -44,7 +44,9 @@ export type InboxItemKind = InboxItem["kind"];
 
 export interface InboxListResult {
   items: InboxItem[];
+  /** 各分组涉及的数量；后台任务按内容条数统计。 */
   counts: Record<InboxItemKind, number>;
+  /** 需人工处理的内容去重总数，不含 Wiki 编译、语义索引。 */
   total: number;
 }
 

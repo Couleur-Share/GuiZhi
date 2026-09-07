@@ -1,5 +1,5 @@
 import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
-import { migrateWebCapture } from "./web-capture-schema";
+import { migrateWebCapture, WEB_SNAPSHOT_SCHEMA } from "./web-capture-schema";
 import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
 /**
  * Schema 迁移执行器。
@@ -650,6 +650,13 @@ export const MIGRATIONS: Migration[] = [
   },
   { name: "0029-mobile-capture", up: db => db.exec(MOBILE_CAPTURE_SCHEMA) },
   { name: "0030-web-capture", foreignKeysOff: true, up: migrateWebCapture },
+  { name: "0031-wechat-snapshots", up(db) {
+    db.exec(WEB_SNAPSHOT_SCHEMA);
+    if (!getTableDefinition(db, "source_records")) return;
+    for (const row of db.all("SELECT id,source_uri FROM source_records WHERE source_type='url'") as {id:string;source_uri:string}[]) {
+      if (resolveSourcePlatform("url",row.source_uri)==="wechat") db.run("UPDATE source_records SET platform='wechat' WHERE id=?",row.id);
+    }
+  } },
 ];
 
 /** 当前代码期望的 schema 版本（= 迁移条数），写入 PRAGMA user_version */

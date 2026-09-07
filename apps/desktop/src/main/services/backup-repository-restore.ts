@@ -1,3 +1,4 @@
+import { sanitizeSnapshot } from "./web-capture/snapshot-sanitize";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -91,6 +92,12 @@ function copyMachineSettings(
         );
       } else {
         staged.run("DELETE FROM settings WHERE key = ?", key);
+      }
+    }
+    if (staged.get("SELECT name FROM sqlite_master WHERE type='table' AND name='web_source_versions'")) {
+      for (const row of staged.all("SELECT payload FROM web_source_versions") as {payload:string}[]) {
+        const version = JSON.parse(row.payload);
+        if (version.snapshot) sanitizeSnapshot(version.snapshot);
       }
     }
     const check = staged.pragma("quick_check") as Array<Record<string, unknown>>;

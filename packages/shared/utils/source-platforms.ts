@@ -28,6 +28,7 @@ export const SOURCE_PLATFORMS = [
   "linuxdo",
   "appinn",
   "twolibra",
+  "wechat",
   "web",
   "local",
 ] as const;
@@ -67,6 +68,7 @@ export function resolveSourcePlatform(
 
   // 直接回传两个检测函数的枚举值而不是就地写死：新增平台时若忘了加进
   // SOURCE_PLATFORMS，这里的返回类型立刻编译不过
+  if (new URL(sourceUri).hostname === "mp.weixin.qq.com") return "wechat";
   const video = detectVideoPlatform(sourceUri);
   if (video) {
     return video;

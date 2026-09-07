@@ -1,3 +1,6 @@
+import { WebSourceDB } from "@guizhi/db";
+import { createHash } from "node:crypto";
+import type { WebCaptureResult } from "@guizhi/shared/types";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -359,4 +362,21 @@ describe("备份对象 AES-256-GCM", () => {
     encrypted[encrypted.length - 1] ^= 1;
     expect(() => decryptBuffer(encrypted, key)).toThrow();
   });
+});
+
+
+it("公众号历史快照资源随备份恢复，已编辑正文不再引用图片也不会丢失", () => {
+  const data=Buffer.from("历史图片"), sha256=createHash("sha256").update(data).digest("hex"), fileName=`wechat-${sha256}.png`;
+  const capture:WebCaptureResult={taskId:"capture",entryUrl:"https://mp.weixin.qq.com/s/test",finalUrl:"https://mp.weixin.qq.com/s/test",title:"历史",author:"",publishedAt:null,dateConfidence:"unknown",markdown:"原文",links:[],paragraphs:[],contentHash:"",capturedAt:1,engineVersion:"wechat-html/1",complete:true,truncated:false,warnings:[],snapshot:{formatVersion:1,policyVersion:1,adapterVersion:"wechat-html/1",html:`<img src="local-image://${fileName}">`,css:"p{color:red}",hash:"test",account:"",author:"",publishedAt:null,assets:[{fileName,sourceUrl:"https://mmbiz.qpic.cn/test",sha256,bytes:data.length}],failures:[],warnings:[]}};
+  new WebSourceDB(db).initialize("item-1",capture);
+  db.run("UPDATE knowledge_items SET content='人工编辑正文',deleted_at=123 WHERE id='item-1'");
+  fs.writeFileSync(path.join(workDir,"data/assets/images",fileName),data);
+  const repository=createRepository();repository.initialize("correct horse battery");
+  const saved=repository.createSnapshot({db,appVersion:"test",request:{}});
+  expect(saved.success).toBe(true);
+  const targets={databasePath:path.join(workDir,"data/knowledge.db"),imagesDir:path.join(workDir,"data/assets/images"),videosDir:path.join(workDir,"data/assets/videos"),configDir:path.join(workDir,"config")};
+  const prepared=prepareRepositoryRestore({repository,snapshotId:saved.snapshot.fileName,liveDb:db,targets});
+  expect(fs.readFileSync(path.join(prepared.imagesDir,fileName))).toEqual(data);
+  const restored=new DatabaseAdapter(prepared.databasePath);
+  try {expect(new WebSourceDB(restored).versions("item-1")[0].snapshot.html).toContain(fileName);expect(restored.get("SELECT content,deleted_at FROM knowledge_items WHERE id='item-1'")).toEqual({content:"人工编辑正文",deleted_at:123});}finally{restored.close();}
 });

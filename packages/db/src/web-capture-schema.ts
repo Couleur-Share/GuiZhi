@@ -1,5 +1,12 @@
 import type Database from "./adapter";
 
+export const WEB_SNAPSHOT_SCHEMA = `
+CREATE TABLE IF NOT EXISTS web_snapshot_assets (
+ version_id TEXT NOT NULL REFERENCES web_source_versions(id) ON DELETE CASCADE,
+ file_name TEXT NOT NULL, PRIMARY KEY(version_id,file_name)
+);
+CREATE INDEX IF NOT EXISTS idx_web_snapshot_asset ON web_snapshot_assets(file_name);
+`;
 export const WEB_CAPTURE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS crawl_jobs (
  id TEXT PRIMARY KEY, payload TEXT NOT NULL, status TEXT NOT NULL,

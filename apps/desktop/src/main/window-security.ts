@@ -9,6 +9,7 @@
  *   一旦主窗口被导航到远程页面，对方就拿到完整的 IPC 能力
  * - 权限处理器：Electron 默认放行多数权限请求，本地知识库一个都不需要
  */
+import { SNAPSHOT_BRIDGE_HASH } from "./services/web-capture/snapshot-bridge";
 import { shell } from "electron";
 import type { Session, WebContents } from "electron";
 import path from "path";
@@ -76,7 +77,7 @@ export function buildContentSecurityPolicy(
   const isDev = devServerUrl !== null;
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'unsafe-eval'"
-    : "'self'";
+    : `'self' 'sha256-${SNAPSHOT_BRIDGE_HASH}'`;
   const connectSrc = isDev ? `'self' ${devServerUrl} ws: wss: data:` : "'self' data:";
 
   return [
@@ -88,7 +89,7 @@ export function buildContentSecurityPolicy(
     "font-src 'self' data:",
     `connect-src ${connectSrc}`,
     "object-src 'none'",
-    "frame-src 'none'",
+    "frame-src 'self'",
     "worker-src 'self' blob:",
     "base-uri 'self'",
     "form-action 'none'",
@@ -125,6 +126,7 @@ export function applyWebContentsSecurity(
 
   // 子框架导航同样不允许把窗口带走
   contents.on("will-frame-navigate", (event) => {
+    if (!event.isMainFrame && event.url === "about:srcdoc") return;
     if (
       isInternalRendererUrl(event.url, options.devServerUrl, options.rendererDir)
     ) {

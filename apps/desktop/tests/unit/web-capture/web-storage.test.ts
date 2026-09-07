@@ -177,9 +177,9 @@ describe("网页版本与持久队列", () => {
     db.exec(
       "CREATE TABLE schema_migrations(name TEXT PRIMARY KEY,applied_at INTEGER NOT NULL)",
     );
-    for (const migration of MIGRATIONS.slice(0, -1))
+    for (const migration of MIGRATIONS.filter(m => m.name < "0030-web-capture"))
       db.run("INSERT INTO schema_migrations VALUES (?,?)", migration.name, 1);
-    expect(runMigrations(db)).toEqual(["0030-web-capture"]);
+    expect(runMigrations(db)).toEqual(["0030-web-capture", "0031-wechat-snapshots"]);
     expect(db.get("SELECT * FROM research_candidates WHERE id='old-candidate'")).toEqual(beforeCandidate);
     expect(db.get("SELECT collected_count FROM research_source_runs WHERE run_id='old'")).toEqual({collected_count:1});
     expect(db.all("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name IN ('research_candidates','research_source_runs') ORDER BY name")).toEqual(beforeIndexes);

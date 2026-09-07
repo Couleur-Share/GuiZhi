@@ -316,6 +316,9 @@ export const IPC_CHANNELS = {
   CRAWL_RESUME: "crawl:resume",
   CRAWL_CANCEL: "crawl:cancel",
   CRAWL_RETRY: "crawl:retry",
+  WEB_SNAPSHOT: "web:snapshot",
+  WEB_SNAPSHOT_ENQUEUE: "web:snapshot-enqueue",
+  WEB_SNAPSHOT_EXPORT: "web:snapshot-export",
   WEB_VERSIONS: "web:versions",
   WEB_ADOPT: "web:adopt",
 } as const;

@@ -110,7 +110,9 @@ export async function webRuntimeStatus(
   } catch {
     return {
       ...status,
-      reason: "随包网页组件缺失或清单无效；请重新安装当前归知版本修复组件",
+      reason: app.isPackaged
+        ? "随包网页组件缺失或清单无效；请重新安装当前归知版本修复组件"
+        : "开发环境网页组件缺失或清单无效；请在仓库根目录运行 python scripts/build-crawl4ai.py --target " + target,
       repairRequired: true,
     };
   }

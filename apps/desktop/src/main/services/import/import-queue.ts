@@ -60,7 +60,9 @@ export interface ImportPersistence {
     sourceInput: string;
     normalizedUri: string | null;
     contentHash: string;
+    refreshOfItemId?: string;
   }): string;
+  disposeExtracted?(extracted: ExtractedContent): void;
 }
 
 export interface ImportQueueOptions {
@@ -315,9 +317,10 @@ export class ImportQueue {
       recorder,
     );
 
+    let extracted: ExtractedContent | undefined;
     try {
       this.throwIfAborted(controller);
-      const extracted = await this.extract(
+      extracted = await this.extract(
         task,
         controller.signal,
         (stage) => this.updateAndNotify(id, { stage }, recorder),
@@ -384,6 +387,7 @@ export class ImportQueue {
         sourceInput: task.sourceInput,
         normalizedUri,
         contentHash,
+        refreshOfItemId: task.refreshOfItemId,
       });
 
       let commentsWarning: string | null = null;
@@ -424,7 +428,7 @@ export class ImportQueue {
         { status: "failed", stage: null, error: message },
         recorder,
       );
-    }
+    } finally { if (extracted) this.persistence.disposeExtracted?.(extracted); }
   }
 
   private throwIfAborted(controller: AbortController): void {
