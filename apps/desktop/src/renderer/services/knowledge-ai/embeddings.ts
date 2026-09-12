@@ -8,6 +8,7 @@ import {
   resolveAIProtocol,
   resolveProtocolBase,
 } from "@guizhi/shared/utils/ai-protocol";
+import { withCancellation } from "../ai-transport";
 import { useSettingsStore } from "../../stores/settings.store";
 import {
   isConfiguredModel,
@@ -42,6 +43,7 @@ import { l2Normalize, parseEmbeddingsResponse } from "@guizhi/shared/utils/embed
 export async function embedTexts(
   config: AIConfig,
   texts: string[],
+  signal?: AbortSignal,
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
@@ -55,13 +57,14 @@ export async function embedTexts(
 
   let response;
   try {
-    response = await window.api.ai.request({
+    response = await withCancellation(window.api.ai, signal, requestId => window.api.ai.request({
+      requestId,
       method: "POST",
       url: endpoint,
       headers: buildHeadersForProtocol(protocol, config.apiKey),
       body: JSON.stringify({ model: config.model, input: texts }),
       timeoutMs: EMBEDDINGS_TIMEOUT_MS,
-    });
+    }));
   } catch (error) {
     recordAiUsage({ scenario: "embedding", model: config.model, failed: true });
     throw error;

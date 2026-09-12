@@ -25,6 +25,7 @@ import {
 import { ILLUSTRATION_ASSET_PREFIX } from "@guizhi/shared/utils/illustration-note";
 import type {
   AIProtocol,
+  AIUsageScenarioId,
   IllustrationAspectRatio,
 } from "@guizhi/shared/types";
 import { fetchWithNetworkProxy } from "../network-proxy";
@@ -231,7 +232,7 @@ export function parseGeminiImageResponse(raw: string): ImageGenPayload {
 }
 
 /** 少数中转站无视 response_format 仍回 URL；下载走采集链路那套 SSRF 防护 */
-async function downloadGeneratedImage(url: string): Promise<GeneratedImage> {
+async function downloadGeneratedImage(url: string, signal?: AbortSignal): Promise<GeneratedImage> {
   const matched = /\.(png|jpe?g|webp)(?:$|[?#])/i.exec(url);
   const extension = matched
     ? `.${matched[1].toLowerCase().replace("jpeg", "jpg")}`
@@ -240,6 +241,7 @@ async function downloadGeneratedImage(url: string): Promise<GeneratedImage> {
     maxBytes: MEDIA_SIZE_LIMITS.image,
     fileName: `image${extension}`,
     accept: "image/*",
+    signal,
   });
   try {
     return { data: await fs.readFile(downloaded.filePath), extension };
@@ -314,13 +316,25 @@ function resolveEndpoint(
 }
 
 export interface GenerateImageOptions {
+  scenario?: AIUsageScenarioId;
   signal?: AbortSignal;
+  /** 单次请求上限；默认正文配图仍为 240 秒，连接测试固定 90 秒。 */
+  timeoutMs?: number;
+  /** 每次 HTTP 尝试前同步记账；失败必须阻止发送，不参与网络重试。 */
+  onRequest?: () => void;
   /** 连接测试：最小尺寸 + 最低质量档，只验证这条链路通不通 */
   probe?: boolean;
   /** 测试注入：退避间隔 */
   retryDelaysMs?: number[];
   /** 测试注入：底层 fetch */
   fetchImpl?: typeof fetchWithNetworkProxy;
+}
+
+export function resolveImageRequestTimeout(options?: GenerateImageOptions): number {
+  if (options?.probe) return IMAGE_PROBE_TIMEOUT_MS;
+  const value = options?.timeoutMs ?? IMAGE_GEN_TIMEOUT_MS;
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 480_000) throw new Error("文生图请求超时上限必须在 1–480000 毫秒之间");
+  return value;
 }
 
 /** 单次尝试的失败；retryable 决定要不要换一次上游重发 */
@@ -429,7 +443,7 @@ async function requestImage(
   probe: boolean,
   options?: GenerateImageOptions,
 ): Promise<GeneratedImage> {
-  const timeoutMs = probe ? IMAGE_PROBE_TIMEOUT_MS : IMAGE_GEN_TIMEOUT_MS;
+  const timeoutMs = resolveImageRequestTimeout({ ...options, probe });
   const timeoutSignal = AbortSignal.timeout(timeoutMs);
   const send = options?.fetchImpl ?? fetchWithNetworkProxy;
 
@@ -464,7 +478,7 @@ async function requestImage(
 
   const payload = endpoint.parse(text);
   return payload.kind === "url"
-    ? await downloadGeneratedImage(payload.url)
+    ? await downloadGeneratedImage(payload.url, options?.signal)
     : decodeBase64Image(payload);
 }
 
@@ -483,11 +497,16 @@ export async function generateImage(
   const deadline = Date.now() + RETRY_TIME_BUDGET_MS;
 
   for (let attempt = 0; ; attempt++) {
+    if (options?.onRequest) {
+      resolveImageRequestTimeout(options);
+      options.signal?.throwIfAborted();
+      options.onRequest();
+    }
     try {
       const image = await requestImage(endpoint, probe, options);
       // 按「一张图」记而不是按「一次 HTTP」记：重试只发生在 5xx / 429 上，
       // 那些请求没出图也不计费，按尝试次数记会凭空放大账单
-      recordMainAiUsage({ scenario: "illustration", model: config.model });
+      recordMainAiUsage({ scenario: options?.scenario ?? "illustration", model: config.model });
       return image;
     } catch (error) {
       // 用户点的停止不是失败，也不该被写成「已自动重试 N 次」
@@ -499,7 +518,7 @@ export async function generateImage(
       const exhausted = attempt >= delays.length || Date.now() >= deadline;
       if (!retryable || exhausted) {
         recordMainAiUsage({
-          scenario: "illustration",
+          scenario: options?.scenario ?? "illustration",
           model: config.model,
           failed: true,
         });

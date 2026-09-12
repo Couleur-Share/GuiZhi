@@ -129,6 +129,7 @@ function createHarness(options?: {
   ) => Promise<ExtractedContent>;
   findDuplicate?: ImportPersistence["findDuplicate"];
   concurrency?: number;
+  resolveSource?: (raw: string, signal: AbortSignal) => Promise<string | null>;
   captureComments?: (
     task: ImportTask,
     resultItemId: string,
@@ -153,6 +154,7 @@ function createHarness(options?: {
       options?.extract
         ? options.extract(task.sourceKind, task.sourceInput, signal, onStage)
         : Promise.resolve(fakeExtracted(task.sourceInput)),
+    resolveSource: options?.resolveSource,
     captureComments: options?.captureComments,
     onTaskChanged: (task) => events.push(task),
     concurrency: options?.concurrency,
@@ -161,6 +163,17 @@ function createHarness(options?: {
 }
 
 describe("ImportQueue", () => {
+  it("并发短链别名解析为同一来源时，只运行一次提取，副本仍可单独创建", async () => {
+    let extracts = 0;
+    const harness = createHarness({ concurrency: 2, resolveSource: async () => 'https://example.com/canonical',
+      findDuplicate: uri => uri && harness.savedItems.length ? 'item-1' : null,
+      extract: async () => { extracts++; await new Promise(resolve => setTimeout(resolve, 20)); return { ...fakeExtracted('同一内容'), sourceUri: 'https://example.com/canonical' }; } });
+    harness.queue.enqueue([{kind:'url',input:'https://example.com/short-a'},{kind:'url',input:'https://example.com/short-b'}]);
+    await harness.queue.drain();
+    expect(extracts).toBe(1); expect(harness.store.list().map(t => t.status).sort()).toEqual(['completed','duplicate']);
+    harness.queue.enqueue([{kind:'url',input:'https://example.com/canonical',forceDuplicate:true}]); await harness.queue.drain();
+    expect(extracts).toBe(2); expect(harness.savedItems).toHaveLength(2);
+  });
   it("任务成功走完：pending → processing → completed 且写入条目", async () => {
     const harness = createHarness();
     const [task] = harness.queue.enqueue([{ kind: "text", input: "第一条" }]);
@@ -247,10 +260,11 @@ describe("ImportQueue", () => {
     expect(finished.itemType).toBe("forum");
   });
 
-  it("重复任务同样拿得到标题：回写发生在去重判定之前", async () => {
+  it("已知重复来源在提取前结束，不重复执行重任务", async () => {
+    const extracted = vi.fn();
     const harness = createHarness({
       findDuplicate: () => "existing-item",
-      extract: async () => ({
+      extract: async () => (extracted(), {
         title: "已经采过的那篇",
         content: "正文",
         itemType: "webpage",
@@ -264,8 +278,9 @@ describe("ImportQueue", () => {
 
     const finished = harness.store.get(task.id)!;
     expect(finished.status).toBe("duplicate");
-    expect(finished.displayName).toBe("已经采过的那篇");
-    expect(finished.itemType).toBe("webpage");
+    expect(finished.displayName).toBe("https://example.com/a");
+    expect(extracted).not.toHaveBeenCalled();
+    expect(harness.savedItems).toHaveLength(0);
   });
 
   it("入库但内容有缺失：任务仍标 completed，降级原因写在 warning 上", async () => {

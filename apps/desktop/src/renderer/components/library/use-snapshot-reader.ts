@@ -13,7 +13,7 @@ export function useSnapshotReader(frame:RefObject<HTMLIFrameElement>,scroll:RefO
   useEffect(()=>{if(!enabled)return;const host=scroll.current,iframe=frame.current;if(!host||!iframe)return;const observer=new ResizeObserver(()=>setWideRail((host.clientWidth-iframe.getBoundingClientRect().width)/2>=64));observer.observe(host);observer.observe(iframe);return()=>observer.disconnect();},[enabled,frame,scroll]);
   const rowsRef=useRef<Row[]>([]),position=useRef<Position|null>(null),ready=useRef(false);
   useEffect(()=>{
-    rowsRef.current=[];setRows([]);ready.current=false;
+    rowsRef.current=[];setRows([]);setProgress(0);setActive(null);setCatalogOpen(false);ready.current=false;
     const saved=read()[memoryKey];position.current=valid(saved)?saved:null;
     if(!enabled)return;
     let timer:ReturnType<typeof setTimeout>|undefined,restoreFrame=0;
@@ -28,7 +28,7 @@ export function useSnapshotReader(frame:RefObject<HTMLIFrameElement>,scroll:RefO
       if(host.scrollTop===0)position.current={index:0,text:"",fraction:0,updatedAt:Date.now()};
       else if(row)position.current={index:row.index,text:row.text,fraction:Math.max(0,Math.min(100,(top-row.top)/Math.max(1,row.height))),updatedAt:Date.now()};
       setActive([...list].reverse().find(row=>row.heading&&row.top<=top+64)?.index??null);
-      setProgress(Math.round(100*host.scrollTop/Math.max(1,host.scrollHeight-host.clientHeight)));
+      setProgress(Math.max(0,Math.min(100,Math.round(100*host.scrollTop/Math.max(1,host.scrollHeight-host.clientHeight)))));
       clearTimeout(timer);timer=setTimeout(persist,180);
     };
     const receive=(event:MessageEvent)=>{

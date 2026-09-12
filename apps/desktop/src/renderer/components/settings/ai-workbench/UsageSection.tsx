@@ -31,6 +31,7 @@ const SCENARIO_LABELS: Record<
     key: "settings.aiScenarioIllustration",
     fallback: "正文配图",
   },
+  themedReading: { key: "settings.aiScenarioThemedReading", fallback: "AI 主题阅读页" },
 };
 
 function formatCount(value: number): string {

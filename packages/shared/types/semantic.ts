@@ -23,6 +23,7 @@ export interface SemanticIndexStatus {
   /** 最近一次检索是否复用了进程内向量缓存；null 表示尚未检索过。 */
   lastSearchCacheHit: boolean | null;
   /** 最近一次实际使用的检索后端；旧版本可不返回。 */
+  fallbackReason?: string;
   lastBackend?: "exact" | "hnsw" | null;
 }
 
@@ -50,6 +51,8 @@ export interface ApplySemanticEmbeddingsInput {
 }
 
 export interface SemanticSearchHit {
+  reviewStatus?: "clear" | "needs_review";
+  reviewReasons?: string[];
   itemId: string;
   title: string;
   /** 命中分块的文本节选 */

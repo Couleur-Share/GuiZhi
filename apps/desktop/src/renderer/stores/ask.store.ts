@@ -1,3 +1,7 @@
+import { onConversationEvidenceCleared, sanitizeCachedMessages, sanitizeCachedTarget } from "./conversation-evidence";
+import { runGuardedMutation } from "./operation-error.store";
+import { queueConversationSave } from "./conversation-persistence";
+import { useArticleAskStore } from "./article-ask.store";
 import { create } from "zustand";
 import type { AskSessionMeta } from "@guizhi/shared/types";
 import {
@@ -12,6 +16,8 @@ import { AiNotConfiguredError } from "../services/knowledge-ai/ai-invoke";
 export type AskErrorKind = "not-configured" | "no-source" | "generic";
 
 export interface AskMessage {
+  evidenceSources?: QaSourceRef[];
+  warnings?: string[];
   id: string;
   question: string;
   answer: string;
@@ -28,6 +34,13 @@ export interface AskMessage {
 }
 
 interface AskState {
+  loadError: string | null;
+  retryLoad: () => Promise<void>;
+  saveError: string | null;
+  persist: () => Promise<boolean>;
+  articleSession: AskSessionMeta | null;
+  adoptArticleSession: (session: AskSessionMeta) => void;
+  refreshSessions: () => Promise<void>;
   sessions: AskSessionMeta[];
   activeSessionId: string | null;
   messages: AskMessage[];
@@ -41,7 +54,7 @@ interface AskState {
   hasLoaded: boolean;
   /** 加载会话列表并恢复上次活跃会话（AskWorkspace / 侧栏挂载时调用） */
   initialize: () => Promise<void>;
-  newSession: () => void;
+  newSession: () => Promise<void>;
   switchSession: (id: string) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   ask: (question: string) => Promise<void>;
@@ -57,6 +70,8 @@ const SESSION_TITLE_MAX_LENGTH = 30;
 
 let abortController: AbortController | null = null;
 let initialized = false;
+let sessionGeneration = 0;
+let failedSessionId: string | null = null;
 
 function createMessageId(): string {
   return `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -84,25 +99,26 @@ function parseStoredMessages(messagesJson: string): AskMessage[] {
   try {
     parsed = JSON.parse(messagesJson);
   } catch {
-    return [];
+    throw new Error("问答记录格式损坏，请恢复备份或重试读取");
   }
   if (!Array.isArray(parsed)) {
-    return [];
+    throw new Error("问答记录格式损坏");
   }
   const messages: AskMessage[] = [];
   for (const candidate of parsed) {
     if (!candidate || typeof candidate !== "object") {
-      continue;
+      throw new Error("问答消息格式损坏");
     }
     const message = candidate as AskMessage;
     if (typeof message.question !== "string") {
-      continue;
+      throw new Error("问答消息格式损坏");
     }
     messages.push({
       id: typeof message.id === "string" ? message.id : createMessageId(),
       question: message.question,
       answer: typeof message.answer === "string" ? message.answer : "",
       sources: Array.isArray(message.sources) ? message.sources : [],
+      evidenceSources: Array.isArray(message.evidenceSources) ? message.evidenceSources : undefined,
       steps: Array.isArray(message.steps) ? message.steps : [],
       status: message.status === "done" ? "done" : "error",
       ...(message.status === "running"
@@ -113,10 +129,10 @@ function parseStoredMessages(messagesJson: string): AskMessage[] {
           }),
       model: message.model,
       usedFallback: message.usedFallback,
-      truncated: message.truncated,
+      truncated: message.truncated, warnings: message.warnings,
     });
   }
-  return messages;
+  return sanitizeCachedMessages(messages);
 }
 
 function buildSessionTitle(messages: AskMessage[]): string {
@@ -126,17 +142,19 @@ function buildSessionTitle(messages: AskMessage[]): string {
 
 export const useAskStore = create<AskState>()((set, get) => {
   /** 有消息才落盘；空会话不进数据库 */
-  const persistActiveSession = async (): Promise<void> => {
+  const persistActiveSession = async (): Promise<boolean> => {
+    if (get().articleSession) return useArticleAskStore.getState().persist();
     const { activeSessionId, messages } = get();
     if (!activeSessionId || messages.length === 0 || !window.api?.askSession) {
-      return;
+      return true;
     }
     try {
-      const saved = await window.api.askSession.save({
+      const input = {
         id: activeSessionId,
         title: buildSessionTitle(messages),
         messagesJson: JSON.stringify(messages),
-      });
+      };
+      const saved = await queueConversationSave(activeSessionId, () => window.api.askSession.save(input));
       set((state) => {
         const meta: AskSessionMeta = {
           id: saved.id,
@@ -145,14 +163,23 @@ export const useAskStore = create<AskState>()((set, get) => {
           updatedAt: saved.updatedAt,
         };
         const rest = state.sessions.filter((s) => s.id !== saved.id);
-        return { sessions: [meta, ...rest] };
+        return { sessions: [meta, ...rest], saveError: null };
       });
+      window.dispatchEvent(new Event("article-ask-saved"));
+      return true;
     } catch (error) {
+      set({ saveError: error instanceof Error ? error.message : String(error) });
       console.error("保存问答会话失败:", error);
+      return false;
     }
   };
 
   return {
+    loadError: null, saveError: null, persist: persistActiveSession,
+    retryLoad: async () => { if (failedSessionId) await get().switchSession(failedSessionId); else { initialized = false; await get().initialize(); } },
+    articleSession: null,
+    adoptArticleSession: session => { rememberActiveSession(session.id); set({ activeSessionId: session.id, articleSession: session, messages: [], isRunning: false }); },
+    refreshSessions: async () => { try { set({ sessions: await window.api.askSession.list() }); } catch (e) { void window.api.log.appError({ scope: "ask", action: "刷新历史", message: String(e) }); } },
     sessions: [],
     activeSessionId: null,
     messages: [],
@@ -169,26 +196,30 @@ export const useAskStore = create<AskState>()((set, get) => {
         return;
       }
       initialized = true;
+      set({ loadError: null });
       try {
-        const sessions = await window.api.askSession.list();
+        const sessions = window.api.askSession.query ? (await window.api.askSession.query({ limit: 50 })).entries : await window.api.askSession.list();
         let activeSessionId: string | null = null;
         let messages: AskMessage[] = [];
+        let articleSession: AskSessionMeta | null = null;
 
         const remembered = localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
-        if (remembered && sessions.some((s) => s.id === remembered)) {
+        if (remembered) {
           const record = await window.api.askSession.get(remembered);
           if (record) {
             activeSessionId = record.id;
-            messages = parseStoredMessages(record.messagesJson);
+            if (record.scope === "article") articleSession = record;
+            else messages = parseStoredMessages(record.messagesJson);
           }
         }
         if (!activeSessionId) {
           activeSessionId = createSessionId();
           rememberActiveSession(activeSessionId);
         }
-        set({ sessions, activeSessionId, messages });
+        set({ sessions, activeSessionId, messages, articleSession });
       } catch (error) {
         initialized = false;
+        set({ loadError: error instanceof Error ? error.message : String(error) });
         console.error("加载问答会话失败:", error);
       } finally {
         // 失败也要放行：否则界面会一直停在加载态，用户连空态引导都看不到
@@ -196,7 +227,11 @@ export const useAskStore = create<AskState>()((set, get) => {
       }
     },
 
-    newSession: () => {
+    newSession: async () => {
+      const generation = ++sessionGeneration;
+      get().stop(); useArticleAskStore.getState().stop();
+      if (!(await persistActiveSession()) || generation !== sessionGeneration) return;
+      if (get().articleSession) { useArticleAskStore.getState().stop(); set({ articleSession: null, activeSessionId: null }); }
       if (get().isRunning) {
         abortController?.abort();
       }
@@ -206,48 +241,52 @@ export const useAskStore = create<AskState>()((set, get) => {
       }
       const activeSessionId = createSessionId();
       rememberActiveSession(activeSessionId);
-      set({ activeSessionId, messages: [], isRunning: false });
+      set({ activeSessionId, messages: [], isRunning: false, loadError: null });
     },
 
     switchSession: async (id) => {
       if (id === get().activeSessionId) {
         return;
       }
-      if (get().isRunning) {
-        abortController?.abort();
-      }
-      await persistActiveSession();
+      const generation = ++sessionGeneration;
+      get().stop(); useArticleAskStore.getState().stop();
+      if (!(await persistActiveSession()) || generation !== sessionGeneration) return;
+      set({ loadError: null });
       try {
         const record = await window.api.askSession.get(id);
-        if (!record) {
-          return;
-        }
+        if (generation !== sessionGeneration) return;
+        if (!record) throw new Error("会话不存在或已被删除");
+        // 先完整解析再切换，包括记忆的会话 ID；损坏记录不能变成可覆盖的空会话。
+        const messages = record.scope === "article" ? [] : parseStoredMessages(record.messagesJson);
+        failedSessionId = null;
         rememberActiveSession(record.id);
         set({
           activeSessionId: record.id,
-          messages: parseStoredMessages(record.messagesJson),
+          articleSession: record.scope === "article" ? record : null,
+          messages,
           isRunning: false,
         });
       } catch (error) {
+        if (generation !== sessionGeneration) return;
+        failedSessionId = id;
+        set({ loadError: error instanceof Error ? error.message : String(error) });
         console.error("切换问答会话失败:", error);
       }
     },
 
     deleteSession: async (id) => {
-      try {
-        await window.api.askSession.delete(id);
-      } catch (error) {
-        console.error("删除问答会话失败:", error);
-        return;
-      }
-      set((state) => ({
-        sessions: state.sessions.filter((s) => s.id !== id),
-      }));
+      const article = useArticleAskStore.getState();
+      if (article.sessionId === id) { article.stop(); if (!(await article.persist())) return; }
+      if (get().activeSessionId === id) { get().stop(); if (!(await persistActiveSession())) return; }
+      const ok = await queueConversationSave(id, () => runGuardedMutation('ask.delete', '删除会话', async () => { await window.api.askSession.delete(id); }));
+      if (!ok) return;
+      if (useArticleAskStore.getState().sessionId === id) useArticleAskStore.setState({ sessionId: null, itemId: null, messages: [] });
+      set(state => ({ sessions: state.sessions.filter(session => session.id !== id) }));
       if (get().activeSessionId === id) {
-        const activeSessionId = createSessionId();
-        rememberActiveSession(activeSessionId);
-        set({ activeSessionId, messages: [], isRunning: false });
+        const activeSessionId = createSessionId(); rememberActiveSession(activeSessionId);
+        set({ activeSessionId, messages: [], isRunning: false, articleSession: null });
       }
+      window.dispatchEvent(new Event('article-ask-saved'));
     },
 
     ask: async (question) => {
@@ -278,21 +317,29 @@ export const useAskStore = create<AskState>()((set, get) => {
         isRunning: true,
       }));
 
+      const run = new AbortController(), sessionId = get().activeSessionId;
+      abortController = run;
       const patchMessage = (patch: Partial<AskMessage>) => {
+        if (abortController !== run || run.signal.aborted || get().activeSessionId !== sessionId) return;
         set((state) => ({
           messages: state.messages.map((candidate) =>
-            candidate.id === id ? { ...candidate, ...patch } : candidate,
+            candidate.id === id ? { ...candidate, ...sanitizeCachedMessages([patch])[0] } : candidate,
           ),
         }));
       };
 
-      abortController = new AbortController();
+      if (!(await persistActiveSession())) { get().stop(); return; }
       try {
         const answer = await askKnowledgeBase(
           trimmed,
           history,
-          createQaDeps(),
+          createQaDeps({ onEvidence: sources => {
+            const previous = get().messages.find(m => m.id === id)?.evidenceSources ?? [];
+            const all = [...new Map([...previous, ...sources].map(source => [`${source.kind}:${source.refId}:${source.evidence?.fingerprint}`, source])).values()];
+            patchMessage({ evidenceSources: all, sources }); void persistActiveSession();
+          }, onWarning: warning => patchMessage({ warnings: [...new Set([...(get().messages.find(m => m.id === id)?.warnings ?? []), warning])] }) }),
           (step) => {
+            if (abortController !== run || run.signal.aborted || get().activeSessionId !== sessionId) return;
             set((state) => ({
               messages: state.messages.map((candidate) =>
                 candidate.id === id
@@ -301,7 +348,7 @@ export const useAskStore = create<AskState>()((set, get) => {
               ),
             }));
           },
-          abortController.signal,
+          run.signal,
           // 回调给的是到目前为止的全量文本，直接覆盖即可
           (text) => patchMessage({ answer: text }),
         );
@@ -319,7 +366,7 @@ export const useAskStore = create<AskState>()((set, get) => {
         } else if (error instanceof AiNotConfiguredError) {
           patchMessage({ status: "error", errorKind: "not-configured" });
         } else if (error instanceof QaNoSourceError) {
-          patchMessage({ status: "error", errorKind: "no-source" });
+          patchMessage({ status: "error", errorKind: "no-source", answer: "" });
         } else {
           patchMessage({
             status: "error",
@@ -328,9 +375,11 @@ export const useAskStore = create<AskState>()((set, get) => {
           });
         }
       } finally {
-        abortController = null;
-        set({ isRunning: false });
-        void persistActiveSession();
+        if (abortController === run && get().activeSessionId === sessionId) {
+          abortController = null;
+          set({ isRunning: false });
+          await persistActiveSession();
+        }
       }
     },
 
@@ -351,31 +400,25 @@ export const useAskStore = create<AskState>()((set, get) => {
       await get().ask(question);
     },
 
-    removeMessage: (messageId) => {
-      const remaining = get().messages.filter(
-        (message) => message.id !== messageId,
-      );
+    removeMessage: async (messageId) => {
+      if (get().isRunning) return;
+      const previous = get().messages, remaining = previous.filter(message => message.id !== messageId);
+      if (!remaining.length) { const id = get().activeSessionId; if (id) await get().deleteSession(id); return; }
       set({ messages: remaining });
-      if (remaining.length > 0) {
-        void persistActiveSession();
-        return;
-      }
-      // 删空了就把会话记录一并清掉：persistActiveSession 对空会话直接跳过，
-      // 只 set 状态的话数据库里会留着删除前的那份内容
-      const sessionId = get().activeSessionId;
-      if (!sessionId) {
-        return;
-      }
-      set((state) => ({
-        sessions: state.sessions.filter((session) => session.id !== sessionId),
-      }));
-      void window.api?.askSession
-        ?.delete(sessionId)
-        .catch((error: unknown) => console.error("删除问答会话失败:", error));
+      if (!(await persistActiveSession()) && get().messages === remaining) set({ messages: previous });
     },
 
     stop: () => {
-      abortController?.abort();
+      const active = abortController;
+      if (!active) return;
+      abortController = null; active.abort();
+      set(state => ({ isRunning: false, messages: state.messages.map(m => m.status === "running" ? { ...m, status: "error", error: "已停止", errorKind: "generic" } : m) }));
+      void persistActiveSession();
     },
   };
 });
+
+onConversationEvidenceCleared(() => useAskStore.setState(state => ({
+  messages: sanitizeCachedMessages(state.messages),
+  articleSession: state.articleSession ? { ...state.articleSession, target: sanitizeCachedTarget(state.articleSession.target) } : null,
+})));

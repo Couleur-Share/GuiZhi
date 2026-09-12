@@ -420,6 +420,7 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   },
 
   compileNow: async () => {
+    if (window.api.wiki.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
     if (get().isCompiling) {
       return;
     }
@@ -467,10 +468,12 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   },
 
   cancelCompile: () => {
+    if (window.api.wiki.compiler) window.dispatchEvent(new Event("wiki-compile-preview"));
     compileAbort?.abort();
   },
 
   rebuildAll: async () => {
+    if (window.api.wiki.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
     if (get().isCompiling) {
       return;
     }

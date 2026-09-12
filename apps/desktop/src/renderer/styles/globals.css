@@ -860,6 +860,35 @@ body {
 
 /* Markdown rendering styles */
 /* Markdown 渲染样式 */
+/* 文章正文沿用全局字体设置，长文限宽；聊天与其他 Markdown 不受影响。 */
+.article-prose > .prose {
+  font-size: 1.0625rem;
+  line-height: 1.9;
+}
+.article-prose > .prose > :first-child {
+  margin-top: 0;
+}
+.article-prose > .prose h1,
+.article-prose > .prose h2,
+.article-prose > .prose h3 {
+  line-height: 1.45;
+  scroll-margin-top: 1.5rem;
+}
+.article-prose > .prose h2 {
+  margin-top: 2.25em;
+  margin-bottom: 0.85em;
+}
+.article-prose > .prose p {
+  margin-bottom: 1.2em;
+}
+.article-prose > .prose img {
+  max-height: min(65vh, 36rem);
+  margin-inline: auto;
+}
+.article-prose-scroll {
+  scrollbar-gutter: stable;
+}
+
 .prose {
   color: hsl(var(--foreground));
   line-height: 1.6;

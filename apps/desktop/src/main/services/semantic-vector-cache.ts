@@ -18,6 +18,7 @@ export interface SemanticVectorCache {
   chunkIndexes: number[];
 }
 
+const revisions = new WeakMap<object, number>();
 const cachesByDb = new WeakMap<object, Map<string, SemanticVectorCache>>();
 
 export function invalidateSemanticVectorCache(
@@ -27,6 +28,7 @@ export function invalidateSemanticVectorCache(
   if (!db) {
     return;
   }
+  revisions.set(db, (revisions.get(db) ?? 0) + 1);
   const byModel = cachesByDb.get(db);
   if (!byModel) {
     return;
@@ -46,11 +48,12 @@ export function getSemanticVectorCache(
 }
 
 /** 游标全量加载并写入缓存；维度不一致的分块跳过 */
-export function buildSemanticVectorCache(
+function* iterateSemanticVectorCache(
   db: object,
   index: SemanticIndexDB,
   model: string,
-): SemanticVectorCache {
+): Generator<void, SemanticVectorCache> {
+  const revision = revisions.get(db) ?? 0;
   const itemIds: string[] = [];
   const chunkIndexes: number[] = [];
   const parts: Float32Array[] = [];
@@ -78,6 +81,7 @@ export function buildSemanticVectorCache(
       chunkIndexes.push(chunk.chunkIndex);
       parts.push(chunk.vector);
     }
+    yield;
     if (batch.length < pageSize) {
       break;
     }
@@ -100,8 +104,33 @@ export function buildSemanticVectorCache(
     byModel = new Map();
     cachesByDb.set(db, byModel);
   }
-  byModel.set(model, cache);
+  if ((revisions.get(db) ?? 0) === revision) byModel.set(model, cache);
   return cache;
+}
+
+/** 同步适配器保留给既有调用；交互搜索使用分批让出主进程的异步入口。 */
+export function buildSemanticVectorCache(db: object, index: SemanticIndexDB, model: string): SemanticVectorCache {
+  const iterator = iterateSemanticVectorCache(db, index, model);
+  for (;;) { const step = iterator.next(); if (step.done) return step.value; }
+}
+const building = new WeakMap<object, Map<string, Promise<SemanticVectorCache>>>();
+export async function ensureSemanticVectorCacheAsync(db: object, index: SemanticIndexDB, model: string): Promise<SemanticVectorCache> {
+  const cached = getSemanticVectorCache(db, model); if (cached) return cached;
+  let pending = building.get(db); if (!pending) { pending = new Map(); building.set(db, pending); }
+  const existing = pending.get(model); if (existing !== undefined) return existing;
+  const work = (async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const revision = revisions.get(db) ?? 0, iterator = iterateSemanticVectorCache(db, index, model);
+      for (;;) {
+        const step = iterator.next();
+        if (step.done) { if ((revisions.get(db) ?? 0) === revision) return step.value; break; }
+        await new Promise<void>(resolve => setImmediate(resolve));
+      }
+    }
+    throw new Error('索引正在变化，请稍后重试语义检索');
+  })();
+  pending.set(model, work);
+  try { return await work; } finally { pending.delete(model); }
 }
 
 export function ensureSemanticVectorCache(

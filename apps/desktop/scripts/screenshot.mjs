@@ -2,7 +2,8 @@
  * 界面截图：拉起真实 Electron、截图、退出，全程不抢焦点也不占屏幕。
  *
  * 窗口走 GUIZHI_WINDOW_MODE=offscreen（挪到所有显示器之外、不进任务栏、不激活），
- * 所以可以在用户正干活时随便跑。数据目录是一次性临时目录，碰不到用户的库。
+ * 普通截图先在系统临时目录复制当前源码并构建，不覆盖开发目录的产物。
+ * 数据目录同样是一次性临时目录，碰不到用户的库。
  *
  *   node scripts/screenshot.mjs                       # 首页截一张
  *   node scripts/screenshot.mjs --steps my-steps.mjs  # 按脚本走到指定界面再截
@@ -206,6 +207,18 @@ function assertFreshBuild(staleOk) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (!args.executable) {
+    const { isValidationSnapshot } = await import(
+      "../../../scripts/desktop-validation-snapshot.mjs"
+    );
+    if (!isValidationSnapshot(DESKTOP_ROOT)) {
+      const { runIsolatedDesktop } = await import(
+        "../../../scripts/isolated-desktop.mjs"
+      );
+      process.exitCode = await runIsolatedDesktop("shot", process.argv.slice(2));
+      return;
+    }
+  }
   if (args.executable) {
     if (
       !fs.existsSync(args.executable) ||
@@ -235,6 +248,26 @@ async function main() {
   const userDataDir = fs.mkdtempSync(
     path.join(args.keepProfile ? args.out : os.tmpdir(), "guizhi-shot-"),
   );
+  if (
+    process.env.GUIZHI_GRAPHICS_VALIDATION === "1" &&
+    process.env.GUIZHI_READING_BENCH_SEARCH
+  ) {
+    // 仅显式真实验收复用同机的加密上下文；不复制用户配置、Cookie 或数据库。
+    // Electron 必须在启动前读取此字段，启动后再复制无法解开原 profile 的密文。
+    const sourceProfile = path.dirname(
+      path.dirname(path.resolve(process.env.GUIZHI_READING_BENCH_SEARCH)),
+    );
+    const state = JSON.parse(
+      fs.readFileSync(path.join(sourceProfile, "Local State"), "utf8"),
+    );
+    if (state.os_crypt) {
+      fs.writeFileSync(
+        path.join(userDataDir, "Local State"),
+        JSON.stringify({ os_crypt: state.os_crypt }),
+        { mode: 0o600, flag: "wx" },
+      );
+    }
+  }
   if (args.dataDb) {
     const dataDir = path.join(userDataDir, "data");
     fs.mkdirSync(dataDir, { recursive: true });
@@ -252,6 +285,7 @@ async function main() {
 
   try {
     app = await electron.launch({
+      cwd: DESKTOP_ROOT,
       ...(args.executable ? { executablePath: args.executable } : {}),
       // 离屏实例固定使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
       // 也让不同机器上的截图栅格化结果更接近。
@@ -281,12 +315,30 @@ async function main() {
     const shot = async (name, options = {}) => {
       const file = path.join(args.out, `${name}.png`);
       await win.screenshot({ path: file, ...DEFAULT_SHOT_OPTIONS, ...options });
+      // Playwright 只截宿主页面；原生阅读子视图需要单独捕获后按内容坐标合成。
+      const composed=await app.evaluate(async({BrowserWindow,nativeImage},basePng)=>{
+        const parent=BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().startsWith('http'));
+        if(!parent)return null;
+        const base=nativeImage.createFromBuffer(Buffer.from(basePng,'base64')),size=base.getSize(),pixels=base.toBitmap();let count=0;
+        const scale=size.width/parent.getContentSize()[0];
+        for(const child of parent.contentView.children){
+          if(!child.webContents||!child.webContents.getURL().startsWith('guizhi-reading:'))continue;
+          const bounds=child.getBounds(),b=Object.fromEntries(Object.entries(bounds).map(([k,v])=>[k,Math.round(v*scale)]));
+          if(b.x<0||b.y<0||b.x+b.width>size.width||b.y+b.height>size.height)continue;
+          const bitmap=(await child.webContents.capturePage()).resize({width:b.width,height:b.height}).toBitmap();
+          for(let y=0;y<b.height;y++)bitmap.copy(pixels,((b.y+y)*size.width+b.x)*4,y*b.width*4,(y+1)*b.width*4);count++;
+        }
+        return count?nativeImage.createFromBitmap(pixels,size).toPNG().toString('base64'):null;
+      },(await fs.promises.readFile(file)).toString('base64'));
+      if(composed)await fs.promises.writeFile(file,Buffer.from(composed,'base64'));
       taken.push(file);
       return file;
     };
 
     if (stepsFn) {
-      await stepsFn({ win, app, shot, outDir: args.out, userDataDir });
+      await stepsFn({
+        win, app, shot, outDir: args.out, userDataDir, mainEntry: MAIN_ENTRY,
+      });
       // steps 一张都没截时兜一张，免得跑完只得到一个空目录
       if (taken.length === 0 && !win.isClosed()) await shot("final");
     } else {

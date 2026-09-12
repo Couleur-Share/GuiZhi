@@ -481,3 +481,8 @@ function decodeTextBody(
     return body.toString("utf8");
   }
 }
+
+/** 仅解析重定向地址；响应头到达即释放正文，复用每跳 SSRF 校验。 */
+export async function resolveRedirectUrl(rawUrl: string, signal?: AbortSignal): Promise<string> {
+  return requestFollowingRedirects(rawUrl, { signal }, async (response, finalUrl) => { response.destroy(); return finalUrl; });
+}

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 // pnpm shot --steps <本文件绝对路径> --keep-profile；始终使用截图工具独立数据目录。
-export default async function ({ win, app, shot, outDir, userDataDir, readingOnly = false }) {
+export default async function ({ win, app, shot, outDir, userDataDir, mainEntry, readingOnly = false }) {
   const record = (name, value) =>
     fs.writeFileSync(path.join(outDir, name), JSON.stringify(value, null, 2));
   const poll = async (action, ready, timeout = 200000) => {
@@ -395,7 +395,7 @@ export default async function ({ win, app, shot, outDir, userDataDir, readingOnl
       "--use-gl=angle",
       "--use-angle=swiftshader",
       "--disable-gpu-sandbox",
-      path.resolve("out/main/index.js"),
+      mainEntry || path.resolve("out/main/index.js"),
     ],
     env: {
       ...process.env,

@@ -1,3 +1,4 @@
+import { ReadingSearchSettings } from "../themed-reading/ReadingSearchSettings";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 
 import { SparklesIcon, TestTubeIcon } from "lucide-react";
@@ -994,6 +995,7 @@ export function AISettingsPrototype() {
         }
       />
 
+      <ReadingSearchSettings />
       <UsageSection />
     </div>
   );

@@ -57,6 +57,11 @@ export function createWindowApiMock(overrides?: DeepPartial<MockRecord>) {
         // 详情页挂载时就会问一次能力，缺了它组件测试会直接炸
         capabilities: vi.fn().mockResolvedValue({ diarization: false }),
       },
+      themedReading: {
+        getState: vi.fn().mockResolvedValue({ success: true, state: { hasPage: false } }),
+        get: vi.fn().mockResolvedValue({ success: true, page: null, task: null, models: null, search: { configured: false } }),
+        onProgress: vi.fn().mockReturnValue(() => {}),
+      },
       on: vi.fn(),
       off: vi.fn(),
     },

@@ -1,10 +1,11 @@
+import { WikiCompileDialog } from "./components/wiki/WikiCompileDialog";
+import { SaveBeforeClose } from "./components/app/SaveBeforeClose";
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { Sidebar, TopBar, MainContent } from "./components/layout";
 import { useSettingsStore } from "./stores/settings.store";
 import { useUIStore } from "./stores/ui.store";
 import { useImportStore } from "./stores/import.store";
-import { useKnowledgeStore } from "./stores/knowledge.store";
 import { useInboxStore } from "./stores/inbox.store";
 import {
   getRenderedBackgroundImageBlur,
@@ -149,26 +150,6 @@ function App() {
     return () => window.removeEventListener("shortcut:newItem", handleNewItem);
   }, []);
 
-  // 退出前落盘未保存的编辑。
-  // beforeunload 里发出的 IPC 来不及在窗口销毁前完成，所以先取消这一次关闭，
-  // 等落盘结束再关一次；flushing 标志保证保存一直失败时不会卡住退出。
-  useEffect(() => {
-    let flushing = false;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (flushing || !useKnowledgeStore.getState().hasUnsavedChanges) {
-        return;
-      }
-      event.preventDefault();
-      event.returnValue = "";
-      flushing = true;
-      void useKnowledgeStore
-        .getState()
-        .flushPendingSave()
-        .finally(() => window.close());
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, []);
 
   // 自动备份期间主进程是冻住的（VACUUM INTO 同步执行在主线程）。
   // 定时器静默触发，用户正在打字时界面会毫无征兆地卡几秒——至少说明发生了什么。
@@ -744,10 +725,11 @@ function App() {
       >
         {/* Windows 窗口控制已并入 TopBar，不再单独占 32px 标题栏 */}
         {!webRuntime && (
+          <><SaveBeforeClose /><WikiCompileDialog />
           <DesktopAppCommandBridge
             onNavigate={setCurrentPage}
             onOpenUpdater={openUpdateDialog}
-          />
+          /></>
         )}
         <GlobalCommandPalette />
 

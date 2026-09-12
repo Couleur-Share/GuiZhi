@@ -1,3 +1,5 @@
+import { READING_RECONSTRUCTION_SCRIPT_HASH } from "./services/themed-reading/reconstruction-document";
+import { COMPOSITION_SCRIPT_HASH } from "./services/themed-reading/composition-script";
 /**
  * 渲染进程的运行时安全边界。
  *
@@ -9,6 +11,7 @@
  *   一旦主窗口被导航到远程页面，对方就拿到完整的 IPC 能力
  * - 权限处理器：Electron 默认放行多数权限请求，本地知识库一个都不需要
  */
+import { THEMED_READING_BRIDGE_HASH } from "./services/themed-reading/theme-bridge";
 import { SNAPSHOT_BRIDGE_HASH } from "./services/web-capture/snapshot-bridge";
 import { shell } from "electron";
 import type { Session, WebContents } from "electron";
@@ -77,7 +80,7 @@ export function buildContentSecurityPolicy(
   const isDev = devServerUrl !== null;
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'unsafe-eval'"
-    : `'self' 'sha256-${SNAPSHOT_BRIDGE_HASH}'`;
+    : `'self' 'sha256-${SNAPSHOT_BRIDGE_HASH}' 'sha256-${THEMED_READING_BRIDGE_HASH}' 'sha256-${READING_RECONSTRUCTION_SCRIPT_HASH}' 'sha256-${COMPOSITION_SCRIPT_HASH}'`;
   const connectSrc = isDev ? `'self' ${devServerUrl} ws: wss: data:` : "'self' data:";
 
   return [

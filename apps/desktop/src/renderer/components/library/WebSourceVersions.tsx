@@ -52,7 +52,7 @@ export function WebSourceVersions({ item }: { item: KnowledgeItem }) {
       "webCapture.adopt",
       t("webCapture.adoptVersion", "采用原文版本"),
       async () => {
-        await useKnowledgeStore.getState().flushPendingSave();
+        if (!(await useKnowledgeStore.getState().flushPendingSave())) return;
         if (useKnowledgeStore.getState().hasUnsavedChanges)
           throw new Error(
             t(
@@ -148,6 +148,11 @@ export function WebSourceVersions({ item }: { item: KnowledgeItem }) {
                   </div>
                 </div>
                 {version.snapshot ? <div className="h-[32rem]"><WebSnapshotPane item={item} versionId={version.id} forceSimple={false}><pre className="h-full overflow-auto whitespace-pre-wrap text-xs">{version.markdown}</pre></WebSnapshotPane></div> : null}
+                {version.snapshot && !item.deletedAt ? <button type="button" className="rounded-md border border-border px-3 py-1 text-sm" onClick={() => {
+                  const target = { itemId: item.id, view: "snapshot", versionId: version.id };
+                  window.dispatchEvent(new CustomEvent("article-ask-navigate", { detail: target }));
+                  window.dispatchEvent(new CustomEvent("article-ask-open", { detail: target }));
+                }}>{t("articleAsk.askVersion", "围绕此版本提问")}</button> : null}
                 <button
                   disabled={!version.complete || !!item.deletedAt}
                   className="rounded-md border border-border px-3 py-1 text-sm disabled:opacity-50"

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask } from "@guizhi/shared/types";
+import { RefreshCwIcon } from "lucide-react";
 import { useImportStore } from "../../stores/import.store";
 import { reportOperationError } from "../../stores/operation-error.store";
 import { useUIStore } from "../../stores/ui.store";
@@ -455,6 +456,7 @@ export function ImportTaskRow({
           </RowAction>
         ) : null}
 
+        {task.status === "duplicate" && task.duplicateItemId ? <RowAction label="更新来源（保留编辑正文）" onClick={() => void useImportStore.getState().enqueue([{ kind: task.sourceKind, input: task.sourceInput, refreshOfItemId: task.duplicateItemId!, forceDuplicate: true }])}><RefreshCwIcon className="h-3.5 w-3.5" /></RowAction> : null}
         {task.status === "duplicate" ? (
           <RowAction
             label={t("imports.createCopy", "仍要创建副本")}

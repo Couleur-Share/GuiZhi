@@ -1,4 +1,5 @@
 import type { AIProtocol } from "@guizhi/shared/types";
+import { readChatStream } from "./ai-stream-result";
 import {
   buildChatEndpointFromBase,
   buildHeadersForProtocol,
@@ -87,6 +88,11 @@ export async function chatCompletion(
     signal?: AbortSignal;
     /** 请求超时，默认 60 秒 */
     timeoutMs?: number;
+    /** 长 HTML 设计使用流式传输，避免等待完整响应触发代理首字节超时。 */
+    stream?: boolean;
+    /** 仅报告已接收的正文长度，不暴露模型内容。 */
+    onProgress?: (receivedChars: number) => void;
+    onDelta?: (text: string) => void;
   },
 ): Promise<AIChatResult> {
   if (!config.apiKey) {
@@ -104,7 +110,7 @@ export async function chatCompletion(
     resolveProtocolBase(config.apiUrl, protocol),
   );
   const headers = buildHeadersForProtocol(protocol, config.apiKey, {
-    accept: "application/json",
+    accept: options?.stream ? "text/event-stream" : "application/json",
   });
 
   const isGemini = protocol === "gemini";
@@ -121,14 +127,14 @@ export async function chatCompletion(
             role: message.role === "assistant" ? "assistant" : "user",
             content: message.content,
           })),
-        stream: false,
+        stream: options?.stream ?? false,
       }
     : {
         model,
         messages,
         temperature: options?.temperature ?? 0.3,
         max_tokens: options?.maxTokens ?? 4096,
-        stream: false,
+        stream: options?.stream ?? false,
       };
 
   if (!isAnthropic && options?.responseFormat) {
@@ -193,6 +199,7 @@ export async function chatCompletion(
       }
     }
 
+    if (options?.stream && response.headers.get("content-type")?.includes("text/event-stream")) return await readChatStream(response, protocol, options.onProgress, options.onDelta);
     const json = (await response.json()) as {
       choices?: { message?: { content?: string }; finish_reason?: string }[];
       content?: Array<{ type?: string; text?: string }>;

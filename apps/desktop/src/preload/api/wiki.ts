@@ -1,3 +1,5 @@
+import type { WikiCompileJob, WikiCompilePreview, WikiCompileWork, WikiContributions } from "@guizhi/shared/types/wiki-compiler";
+import type { WikiCompilerCommand } from "@guizhi/shared/types/wiki-compiler";
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type {
@@ -14,6 +16,7 @@ import type {
 } from "@guizhi/shared/types";
 
 export const wikiApi = {
+  compiler: (input: WikiCompilerCommand): Promise<{ ok: boolean; error?: string; preview?: WikiCompilePreview; job?: WikiCompileJob; work?: WikiCompileWork; jobs?: WikiCompileJob[]; suggestion?: { draft: WikiContributions[number]; model: string; sourceIds: string[]; reason: string; token: string } }> => ipcRenderer.invoke(IPC_CHANNELS.WIKI_COMPILER, input),
   catalog: (): Promise<WikiCatalogEntry[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.WIKI_CATALOG),
   backlinkCounts: (): Promise<WikiBacklinkCounts> =>

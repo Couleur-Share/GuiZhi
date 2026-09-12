@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { Checkbox } from "../ui/Checkbox";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -243,25 +244,29 @@ export function ItemConfirmDialog({
   const { t } = useTranslation();
   const deleteForever = useKnowledgeStore((store) => store.deleteForever);
   const emptyTrash = useKnowledgeStore((store) => store.emptyTrash);
+  const [clearEvidence, setClearEvidence] = useState(false), [busy, setBusy] = useState(false);
+  useEffect(() => setClearEvidence(false), [state]);
+  const confirm = async () => {
+    if (!state || busy) return;
+    setBusy(true);
+    try {
+      const ok = state.kind === "delete-forever" ? await deleteForever(state.ids, { clearEvidence }) : await emptyTrash({ clearEvidence });
+      if (ok) onClose();
+    } finally { setBusy(false); }
+  };
 
   return (
     <ConfirmDialog
       isOpen={state !== null}
       onClose={onClose}
-      onConfirm={() => {
-        if (state?.kind === "delete-forever") {
-          void deleteForever(state.ids);
-        } else if (state?.kind === "empty-trash") {
-          void emptyTrash();
-        }
-        onClose();
-      }}
+      onConfirm={() => void confirm()}
+      isLoading={busy}
       title={
         state?.kind === "empty-trash"
           ? t("library.emptyTrash", "清空回收站")
           : t("library.deleteForever", "彻底删除")
       }
-      message={
+      message={<div className="space-y-3 text-left"><p>{
         state?.kind === "empty-trash"
           ? t(
               "library.emptyTrashConfirm",
@@ -277,7 +282,7 @@ export function ItemConfirmDialog({
                 "library.deleteForeverConfirm",
                 "该条目将被永久删除，无法恢复。",
               )
-      }
+      }</p><p>历史回答默认保留当时的引用片段。以下选项仅清除相关证据与链接，回答文本保持原样。</p><Checkbox checked={clearEvidence} onChange={setClearEvidence} label="同时清除历史问答中的相关证据" disabled={busy} /></div>}
       confirmText={t("common.confirm", "确认")}
       cancelText={t("common.cancel", "取消")}
       variant="destructive"

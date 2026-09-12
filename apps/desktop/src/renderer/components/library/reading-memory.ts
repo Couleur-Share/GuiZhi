@@ -16,6 +16,8 @@ export interface ContentReadingMemory {
   scrollTopByTab: Partial<Record<ReadingPanelTab, number>>;
   repliesQuery?: string;
   catalogOpen?: boolean;
+  /** 正文与讨论总结分别记住标准 / AI 主题视图。 */
+  themedBySource?: Partial<Record<"body" | "summary", boolean>>;
   /** 用于淘汰最旧条目 */
   updatedAt: number;
 }
@@ -78,11 +80,18 @@ function normalizeEntry(value: unknown): ContentReadingMemory | null {
       typeof raw.repliesQuery === "string" ? raw.repliesQuery : undefined,
     catalogOpen:
       typeof raw.catalogOpen === "boolean" ? raw.catalogOpen : undefined,
+    themedBySource: normalizeThemedViews(raw.themedBySource),
     updatedAt:
       typeof raw.updatedAt === "number" && Number.isFinite(raw.updatedAt)
         ? raw.updatedAt
         : Date.now(),
   };
+}
+
+function normalizeThemedViews(value: unknown): ContentReadingMemory["themedBySource"] {
+  if (!value || typeof value !== "object") return {};
+  const raw = value as Record<string, unknown>;
+  return Object.fromEntries(["body", "summary"].filter((key) => typeof raw[key] === "boolean").map((key) => [key, raw[key]]));
 }
 
 function writeStore(store: Store): void {
@@ -138,5 +147,6 @@ export function patchContentReadingMemory(
         : prev?.repliesQuery,
     catalogOpen:
       patch.catalogOpen !== undefined ? patch.catalogOpen : prev?.catalogOpen,
+    themedBySource: { ...prev?.themedBySource, ...patch.themedBySource },
   });
 }

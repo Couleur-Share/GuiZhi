@@ -67,6 +67,8 @@ export interface WikiSearchHit {
 
 /** 页面来源条目引用（页面 → 原文跳转） */
 export interface WikiSourceRef {
+  reviewStatus?: "clear" | "needs_review";
+  reviewReasons?: string[];
   itemId: string;
   title: string;
 }

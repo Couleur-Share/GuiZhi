@@ -1,3 +1,4 @@
+import { trackCancellableRequest as trackRequest, cancelTrackedRequest } from "../services/request-cancellation";
 import { ipcMain } from "electron";
 import * as dns from "dns/promises";
 import * as nodeNet from "net";
@@ -94,23 +95,7 @@ async function requestToResponse(response: Response): Promise<AITransportRespons
   };
 }
 
-/** 在途请求：requestId → controller，供渲染进程按 id 中断 */
-const inflightRequests = new Map<string, AbortController>();
 
-function trackRequest(
-  requestId: string | undefined,
-  controller: AbortController,
-): () => void {
-  if (!requestId) {
-    return () => {};
-  }
-  inflightRequests.set(requestId, controller);
-  return () => {
-    if (inflightRequests.get(requestId) === controller) {
-      inflightRequests.delete(requestId);
-    }
-  };
-}
 
 interface StartedRequest {
   response: Response;
@@ -157,7 +142,7 @@ export function registerAIIPC(db: Database.Database): void {
     if (typeof requestId !== "string") {
       return;
     }
-    inflightRequests.get(requestId)?.abort(new Error("已取消"));
+    cancelTrackedRequest(requestId);
   });
 
   ipcMain.handle(

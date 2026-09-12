@@ -7,6 +7,7 @@
  * 因此不会污染正常检索，同时让回收站范围内的搜索可用），
  * 索引仅在彻底删除时移除。
  */
+import { listThemedReadingAssetFiles } from "./themed-reading";
 import { randomUUID } from "crypto";
 import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
@@ -234,7 +235,7 @@ interface FacetCountSql {
  */
 function buildFacetCountSql(
   query: KnowledgeFacetCountsQuery,
-  omit: FacetGroup,
+  omit: FacetGroup | null,
 ): FacetCountSql {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -292,7 +293,7 @@ function buildFacetCountSql(
 
   const joinClause = matchQuery
     ? `JOIN (
-        SELECT item_id FROM knowledge_fts
+        SELECT item_id, bm25(knowledge_fts,0,10,1,5) AS fts_rank FROM knowledge_fts
         WHERE knowledge_fts MATCH ?
       ) f ON f.item_id = i.id`
     : "";
@@ -313,6 +314,19 @@ export class KnowledgeItemDB {
   constructor(private readonly db: Database.Database) {}
 
   // ── 查询 ──────────────────────────────────────────────────────────────────
+
+  /** 在主进程单次查询冻结全部符合筛选的顺序，不传输正文。 */
+  freezeIds(query: KnowledgeItemQuery): string[] {
+    const sql = buildFacetCountSql(query, null), conditions: string[] = [], params: unknown[] = [];
+    if (query.excludedItemIds?.length) { conditions.push(`i.id NOT IN (${query.excludedItemIds.map(() => "?").join(",")})`); params.push(...query.excludedItemIds); }
+    if (query.collectionScope) {
+      const ids = query.collectionScope.ids, parts = ids.length ? [`i.collection_id IN (${ids.map(() => "?").join(",")})`] : [];
+      params.push(...ids); if (query.collectionScope.includeUncategorized) parts.push("i.collection_id IS NULL");
+      conditions.push(parts.length ? `(${parts.join(" OR ")})` : "0");
+    }
+    const order = sql.joinClause ? "ORDER BY f.fts_rank ASC,i.updated_at DESC,i.id DESC" : buildOrderClause(query.sortBy, query.sortOrder);
+    return (this.db.all(`SELECT i.id FROM knowledge_items i ${sql.joinClause} ${sql.whereClause}${conditions.length ? " AND " + conditions.join(" AND ") : ""} ${order}`, ...sql.params, ...params) as { id: string }[]).map(row => row.id);
+  }
 
   list(query: KnowledgeItemQuery): KnowledgeItemListResult {
     const conditions: string[] = [];
@@ -477,7 +491,7 @@ export class KnowledgeItemDB {
 
     const rows = this.db.all(
       `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
-              i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at,
+              i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at, i.review_status, i.review_reasons,
               substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content,
               ${platformProjection} AS platform,
               ${matchQuery ? "f.fts_rank" : "NULL"} AS fts_rank,
@@ -497,6 +511,7 @@ export class KnowledgeItemDB {
       id: row.id,
       title: row.title,
       snippet: makeSnippet(row.content),
+      reviewStatus: row.review_status ?? "clear", reviewReasons: parseReviewReasons(row.review_reasons),
       itemType: row.item_type,
       status: row.status,
       collectionId: row.collection_id,
@@ -934,7 +949,8 @@ export class KnowledgeItemDB {
     }
     const placeholders = ids.map(() => "?").join(", ");
     const rows = this.db.all(
-      `SELECT content FROM knowledge_items WHERE id IN (${placeholders})`,
+      `SELECT content FROM knowledge_items WHERE id IN (${placeholders}) UNION ALL SELECT content FROM source_capture_revisions WHERE item_id IN (${placeholders})`,
+      ...ids,
       ...ids,
     ) as Array<{ content: string }>;
     const refs = new Set<string>();
@@ -948,6 +964,7 @@ export class KnowledgeItemDB {
       for (const ref of extractAllLocalAssetRefs(version.markdown ?? "")) refs.add(ref);
       for (const asset of version.snapshot?.assets ?? []) refs.add(asset.fileName);
     }
+    for (const name of listThemedReadingAssetFiles(this.db, ids)) refs.add(name);
     return [...refs];
   }
 
@@ -966,6 +983,8 @@ export class KnowledgeItemDB {
   listReferencedAssets(): Set<string> {
     const rows = this.db.all(
       `SELECT content FROM knowledge_items
+       WHERE content LIKE '%local-image://%' OR content LIKE '%local-video://%'
+       UNION ALL SELECT content FROM source_capture_revisions
        WHERE content LIKE '%local-image://%' OR content LIKE '%local-video://%'`,
     ) as Array<{ content: string }>;
     const referenced = new Set<string>();
@@ -983,6 +1002,7 @@ export class KnowledgeItemDB {
       const result = JSON.parse(row.payload).result;
       for (const asset of result?.snapshot?.assets ?? []) referenced.add(asset.fileName);
     }
+    for (const name of listThemedReadingAssetFiles(this.db)) referenced.add(name);
     return referenced;
   }
 

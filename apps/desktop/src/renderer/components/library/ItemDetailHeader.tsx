@@ -5,11 +5,11 @@ import {
   ChevronDownIcon,
   ClockIcon,
   FolderIcon,
-  HashIcon,
   Maximize2Icon,
   Minimize2Icon,
   MoreHorizontalIcon,
   MessageCircleIcon,
+  SlidersHorizontalIcon,
   PinIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -25,14 +25,9 @@ import { useSettingsStore } from "../../stores/settings.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useSourceComments } from "./SourceCommentsContext";
 import { ContextMenu } from "../ui/ContextMenu";
-import { AiHandoffButton } from "./AiHandoffButton";
-import { TagEditor } from "./TagEditor";
 import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
-import { formatItemTime, getItemTypeMeta } from "./type-meta";
-
-/** 标题最多撑到三行（text-xl / leading-snug 约 28px 一行），再长就内部滚动 */
-const TITLE_MAX_HEIGHT_PX = 84;
+import { formatItemTime } from "./type-meta";
 
 /** 「更多」菜单右对齐到按钮：动作区贴着面板右缘，从左缘展开必然开到窗口外再被回弹 */
 const MORE_MENU_WIDTH_PX = 160;
@@ -100,7 +95,13 @@ function ActionButton({
  * 五个一字排开时窄详情栏里一行标题只剩七八个字、chip 也会碎成四行。
  * 顺带把破坏性的删除挡在一次点击之后。
  */
-function MoreActionsButton({ item }: { item: KnowledgeItem }) {
+function MoreActionsButton({
+  item,
+  onOpenTools,
+}: {
+  item: KnowledgeItem;
+  onOpenTools?: () => void;
+}) {
   const sourceComments = useSourceComments();
   const { t } = useTranslation();
   const setStatus = useKnowledgeStore((state) => state.setStatus);
@@ -142,13 +143,26 @@ function MoreActionsButton({ item }: { item: KnowledgeItem }) {
           ignoreRef={buttonRef}
           onClose={() => setAnchor(null)}
           items={[
-            ...(sourceComments?.supported ? [{
-              label: sourceComments.comments.length > 0
-                ? t("library.viewSourceComments", "查看来源评论")
-                : t("library.collectSourceComments", "采集评论"),
-              icon: <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />,
-              onClick: () => sourceComments.setOpen(true),
-            }] : []),
+            ...(sourceComments?.supported
+              ? [
+                  {
+                    label:
+                      sourceComments.comments.length > 0
+                        ? t("library.viewSourceComments", "查看来源评论")
+                        : t("library.collectSourceComments", "采集评论"),
+                    icon: (
+                      <MessageCircleIcon
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                    ),
+                    onClick: () => {
+                      sourceComments.setOpen(true);
+                      onOpenTools?.();
+                    },
+                  },
+                ]
+              : []),
             {
               label: item.isPinned
                 ? t("library.unpin", "取消置顶")
@@ -266,14 +280,16 @@ export function ItemDetailHeader({
   item,
   isTrashed,
   onClose,
-  compactReading = false,
+  askOpen = false,
+  onToggleAsk,
   toolsOpen = false,
   onToggleTools,
 }: {
   item: KnowledgeItem;
   isTrashed: boolean;
   onClose?: () => void;
-  compactReading?: boolean;
+  askOpen?: boolean;
+  onToggleAsk?: () => void;
   toolsOpen?: boolean;
   onToggleTools?: () => void;
 }) {
@@ -284,9 +300,7 @@ export function ItemDetailHeader({
   );
   const saveError = useKnowledgeStore((state) => state.saveError);
   const updateSelected = useKnowledgeStore((state) => state.updateSelected);
-  const flushPendingSave = useKnowledgeStore(
-    (state) => state.flushPendingSave,
-  );
+  const flushPendingSave = useKnowledgeStore((state) => state.flushPendingSave);
   const toggleFavorite = useKnowledgeStore((state) => state.toggleFavorite);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const autoSave = useSettingsStore((state) => state.autoSave);
@@ -303,13 +317,29 @@ export function ItemDetailHeader({
     if (!node) {
       return;
     }
-    node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight, TITLE_MAX_HEIGHT_PX)}px`;
-    node.style.overflowY =
-      node.scrollHeight > TITLE_MAX_HEIGHT_PX ? "auto" : "hidden";
+    const resize = () => {
+      const style = getComputedStyle(node);
+      const limit =
+        (parseFloat(style.lineHeight) || 28) * 3 +
+        (parseFloat(style.paddingTop) || 0) +
+        (parseFloat(style.paddingBottom) || 0);
+      node.style.height = "auto";
+      node.style.height = `${Math.min(node.scrollHeight, limit)}px`;
+      node.style.overflowY = node.scrollHeight > limit ? "auto" : "hidden";
+    };
+    resize();
+    // 侧栏展开和窗口缩放也会让标题换行，只监听宽度以免高度更新触发循环。
+    if (typeof ResizeObserver === "undefined") return;
+    let width = node.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (width === node.clientWidth) return;
+      width = node.clientWidth;
+      resize();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
   }, [item.title]);
 
-  const typeMeta = getItemTypeMeta(item.itemType);
   // 保存失败与 autoSave 无关：改动已退回待保存队列，此时必须提示未落盘
   const isDirty = hasUnsavedChanges && (!autoSave || saveError !== null);
   const wordCount = item.content.trim().length;
@@ -329,7 +359,7 @@ export function ItemDetailHeader({
   }
 
   return (
-    <div className={`shrink-0 border-b border-border/60 px-6 ${compactReading ? "py-2" : "pb-3 pt-4"}`}>
+    <header className="shrink-0 px-6 pb-3 pt-5" data-testid="article-header">
       {/* 标题独占整行：与动作区同排时，窄详情栏里长标题会被挤成三行还看不全 */}
       <textarea
         ref={titleRef}
@@ -347,21 +377,21 @@ export function ItemDetailHeader({
         spellCheck={false}
         autoCorrect="off"
         autoCapitalize="off"
+        aria-label={t("library.titlePlaceholder", "标题")}
         placeholder={t("library.titlePlaceholder", "标题")}
-        className="block w-full resize-none border-none bg-transparent pt-0.5 text-xl font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
+        className="block w-full resize-none border-none bg-transparent rounded-sm pt-0.5 text-[1.375rem] font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
       />
 
       {/* 动作区并进元信息行右侧：不新增一行高度，与 Wiki 页面详情同形态 */}
       <div className="mt-2.5 flex items-start gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-          {!compactReading || toolsOpen ? <>
-          <MetaChip icon={typeMeta.icon}>
-            {t(typeMeta.labelKey, typeMeta.fallback)}
-          </MetaChip>
           <CollectionChip item={item} disabled={isTrashed} />
-          </> : null}
           <SourceChip item={item} />
-          {compactReading ? <button type="button" aria-expanded={toolsOpen} onClick={onToggleTools} className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">{toolsOpen ? "收起文章工具" : "文章信息与工具"}</button> : null}
+          {wordCount > 0 ? (
+            <span className="px-1 text-xs text-muted-foreground">
+              {t("library.wordCount", "{{count}} 字", { count: wordCount })}
+            </span>
+          ) : null}
           {/* 置顶与归档改由菜单切换，状态就得由 chip 说出来——原先只靠按钮
               的高亮底色与两个长得极像的归档图标区分，本就看不出来 */}
           {item.isPinned ? (
@@ -378,18 +408,13 @@ export function ItemDetailHeader({
               {t("library.archivedBadge", "已归档")}
             </MetaChip>
           ) : null}
-          {!compactReading || toolsOpen || isDirty || isSaving || saveError ? <MetaChip
-            icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
-            tone={saveTone}
-            title={saveError ?? undefined}
-          >
-            {saveLabel}
-          </MetaChip> : null}
-          {wordCount > 0 && (!compactReading || toolsOpen) ? (
+          {isDirty || isSaving || saveError ? (
             <MetaChip
-              icon={<HashIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+              icon={<ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+              tone={saveTone}
+              title={saveError ?? undefined}
             >
-              {t("library.wordCount", "{{count}} 字", { count: wordCount })}
+              {saveLabel}
             </MetaChip>
           ) : null}
           {isDirty && !isTrashed ? (
@@ -418,7 +443,26 @@ export function ItemDetailHeader({
             </button>
           ) : (
             <>
-              <AiHandoffButton item={item} />
+              {onToggleAsk ? <button type="button" onClick={onToggleAsk} aria-expanded={askOpen} className="mr-2 rounded-lg border border-border px-2 py-1.5 text-xs text-foreground hover:bg-accent">{t("articleAsk.title", "围绕本文提问")}</button> : null}
+              {onToggleTools ? (
+                <button
+                  type="button"
+                  onClick={onToggleTools}
+                  aria-controls="article-tools-panel"
+                  aria-expanded={toolsOpen}
+                  className={`${ACTION_BUTTON_BASE} ${ACTION_BUTTON_IDLE}`}
+                  aria-label={t("articleReader.tools", "文章信息与工具")}
+                  title={t(
+                    "articleReader.toolsHint",
+                    "标签、配图、内容处理与来源版本",
+                  )}
+                >
+                  <SlidersHorizontalIcon
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                </button>
+              ) : null}
               <ActionButton
                 onClick={() => toggleFocusReadingMode()}
                 title={
@@ -448,7 +492,7 @@ export function ItemDetailHeader({
                   aria-hidden="true"
                 />
               </ActionButton>
-              <MoreActionsButton item={item} />
+              <MoreActionsButton item={item} onOpenTools={onToggleTools} />
             </>
           )}
           {onClose ? (
@@ -464,13 +508,6 @@ export function ItemDetailHeader({
           ) : null}
         </div>
       </div>
-
-      {!isTrashed && (!compactReading || toolsOpen) ? (
-        <TagEditor
-          item={item}
-          onChange={(tagNames) => updateSelected({ tagNames })}
-        />
-      ) : null}
-    </div>
+    </header>
   );
 }

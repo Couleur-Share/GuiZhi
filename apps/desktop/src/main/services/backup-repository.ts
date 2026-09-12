@@ -1,3 +1,5 @@
+import { inspectThemedReadingBackup, verifyThemedReadingBackupAssets } from "./backup-repository-themed-reading";
+import { retainAssetFiles } from "./asset-cleanup";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
@@ -476,7 +478,7 @@ export class BackupRepository {
         count: number;
       };
       itemCount = count.count;
-      const contents = snapshotDb.all("SELECT content FROM knowledge_items") as Array<{
+      const contents = snapshotDb.all("SELECT content FROM knowledge_items UNION ALL SELECT content FROM source_capture_revisions") as Array<{
         content: string;
       }>;
       const images = new Set<string>();
@@ -499,6 +501,8 @@ export class BackupRepository {
           images.add(asset.fileName);
         }
       }
+      const themedAssets = inspectThemedReadingBackup(snapshotDb);
+      for (const asset of themedAssets) images.add(asset.fileName);
       const assets = [
         ...[...images].map((name) => ({
           name,
@@ -511,11 +515,17 @@ export class BackupRepository {
           filePath: path.join(this.paths.videosDir, name),
         })),
       ];
-      for (const { name, folder, filePath } of assets) {
-        if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
-          throw new Error(`引用媒体不存在，完整备份已中止: ${name}`);
+      const releaseAssets = retainAssetFiles(assets.map(asset => asset.name));
+      try {
+        verifyThemedReadingBackupAssets(themedAssets, this.paths.imagesDir);
+        for (const { name, folder, filePath } of assets) {
+          if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+            throw new Error(`引用媒体不存在，完整备份已中止: ${name}`);
+          }
+          add(`data/assets/${folder}/${name}`, "media", fs.readFileSync(filePath));
         }
-        add(`data/assets/${folder}/${name}`, "media", fs.readFileSync(filePath));
+      } finally {
+        releaseAssets();
       }
     } finally {
       snapshotDb.close();

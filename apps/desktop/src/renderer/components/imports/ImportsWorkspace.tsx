@@ -164,10 +164,11 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
     await selectItem(itemId);
   };
 
-  const askAboutItem = (item: KnowledgeItem) => {
+  const askAboutItem = async (item: KnowledgeItem) => {
     // 这是围绕一条新导入内容开始的讨论，不该污染用户刚刚浏览的历史会话。
     // 仅当当前会话已有消息时 newSession 才会实际换 ID；空白会话直接复用。
-    newAskSession();
+    await newAskSession();
+    if (useAskStore.getState().saveError) return;
     // 当前问答引擎会从全库检索，标题是把召回收窄到这条导入结果的稳定锚点；
     // 只预填不发送，用户能先改成自己的问题，也不会因误点消耗模型调用。
     requestAskDraft(

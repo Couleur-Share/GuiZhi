@@ -13,7 +13,47 @@ import {
   openAiImageSize,
   parseGeminiImageResponse,
   parseOpenAIImageResponse,
+  resolveImageRequestTimeout,
 } from "../../../src/main/services/illustration/image-gen";
+
+describe("生图超时边界", () => {
+  it("默认正文配图仍为四分钟，主题可独立延长到八分钟，连接测试仍为九十秒", () => {
+    expect(resolveImageRequestTimeout()).toBe(240_000);
+    expect(resolveImageRequestTimeout({timeoutMs: 480_000})).toBe(480_000);
+    expect(resolveImageRequestTimeout({probe: true, timeoutMs: 480_000})).toBe(90_000);
+  });
+  it.each([0, -1, 480_001, NaN, Infinity, 1.5])("拒绝无效等待上限 %s", value => {
+    expect(() => resolveImageRequestTimeout({timeoutMs: value})).toThrow("超时上限");
+  });
+  it("显式超时实际传给单次请求信号，不改变默认重试政策", async () => {
+    const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(new AbortController().signal);
+    const send = vi.fn().mockResolvedValue(new Response(JSON.stringify({data:[{b64_json:"iVBORw0KGgo="}]}), {status:200}));
+    try {
+      await generateImage("测试", "16:9", {apiUrl:"https://model.example", apiKey:"fixture-only", model:"gpt-image-2"}, {timeoutMs:480_000, retryDelaysMs:[], fetchImpl:send});
+      expect(timeout).toHaveBeenCalledWith(480_000);
+      expect(send).toHaveBeenCalledOnce();
+    } finally { vi.restoreAllMocks(); }
+  });
+});
+
+describe("主题请求计数边界", () => {
+  const config = {apiUrl: "https://model.example", apiKey: "fixture-only", model: "gpt-image-2"};
+  it("计数回调失败直接阻止 HTTP，不能被网络重试吞掉", async () => {
+    const fetchImpl = vi.fn(), onRequest = vi.fn(() => { throw new Error("用量未能持久化"); });
+    await expect(generateImage("测试", "16:9", config, {fetchImpl, onRequest, retryDelaysMs: [0, 0]})).rejects.toThrow("用量未能持久化");
+    expect(onRequest).toHaveBeenCalledOnce();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it("发送前已取消不计请求，发送后取消保留一次请求且不会重发", async () => {
+    const controller = new AbortController(), onRequest = vi.fn();
+    const fetchImpl = vi.fn(() => { controller.abort(new Error("已取消")); throw new Error("已取消"); });
+    await expect(generateImage("测试", "16:9", config, {fetchImpl, onRequest, signal: controller.signal, retryDelaysMs: [0, 0]})).rejects.toThrow("已取消");
+    expect(onRequest).toHaveBeenCalledOnce(); expect(fetchImpl).toHaveBeenCalledOnce();
+    onRequest.mockClear(); fetchImpl.mockClear();
+    await expect(generateImage("测试", "16:9", config, {fetchImpl, onRequest, signal: controller.signal})).rejects.toThrow("已取消");
+    expect(onRequest).not.toHaveBeenCalled(); expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
 
 describe("生图端点拼接", () => {
   it("OpenAI 基址补 /v1/images/generations", () => {

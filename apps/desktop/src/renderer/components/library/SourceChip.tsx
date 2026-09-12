@@ -35,7 +35,12 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
   const sourceUrl = resolveSafeSourceUrl(item.sourceUri);
 
   const facts = [meta?.platform, meta?.author, meta?.duration].filter(Boolean);
-  const label = sourceUrl?.hostname === "mp.weixin.qq.com" ? t("library.platformWechat", "微信公众号") : facts.length > 0 ? facts.join(" · ") : sourceUrl?.hostname;
+  const label =
+    sourceUrl?.hostname === "mp.weixin.qq.com"
+      ? t("library.platformWechat", "微信公众号")
+      : facts.length > 0
+        ? facts.join(" · ")
+        : sourceUrl?.hostname;
   if (!label) {
     return null;
   }
@@ -84,30 +89,37 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
       >
         {body}
       </a>
-      <button
-        type="button"
-        title={t("library.refreshSource", "重新采集并待确认")}
-        aria-label={t("library.refreshSource", "重新采集并待确认")}
-        onClick={() =>
-          sourceUrl.hostname === "mp.weixin.qq.com" ? void supplementWechatSelection([item.id]) : void enqueue([
-            {
-              kind: "url",
-              input: sourceUrl.href,
-              // 刷新结果故意进“未分类”：它既不能覆盖原条目，也不该悄悄混回
-              // 已整理的知识库。用户从待整理范围逐项对比后再决定归档位置。
-              collectionId: null,
-              refreshOfItemId: item.id,
-              tagNames: [...item.tags.map((tag) => tag.name), "待确认来源更新"],
-              // URI 去重会把“来源内容后来更新了”的情况误判成旧条目；这里刻意
-              // 创建副本，保住原文和用户手改，待用户在导入队列确认后再决定替换。
-              forceDuplicate: true,
-            },
-          ])
-        }
-        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
-        <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+      {item.deletedAt == null ? (
+        <button
+          type="button"
+          title={t("library.refreshSource", "重新采集并待确认")}
+          aria-label={t("library.refreshSource", "重新采集并待确认")}
+          onClick={() =>
+            sourceUrl.hostname === "mp.weixin.qq.com"
+              ? void supplementWechatSelection([item.id])
+              : void enqueue([
+                  {
+                    kind: "url",
+                    input: sourceUrl.href,
+                    // 刷新结果故意进“未分类”：它既不能覆盖原条目，也不该悄悄混回
+                    // 已整理的知识库。用户从待整理范围逐项对比后再决定归档位置。
+                    collectionId: null,
+                    refreshOfItemId: item.id,
+                    tagNames: [
+                      ...item.tags.map((tag) => tag.name),
+                      "待确认来源更新",
+                    ],
+                    // URI 去重会把“来源内容后来更新了”的情况误判成旧条目；这里刻意
+                    // 创建副本，保住原文和用户手改，待用户在导入队列确认后再决定替换。
+                    forceDuplicate: true,
+                  },
+                ])
+          }
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <RefreshCwIcon className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      ) : null}
     </span>
   );
 }

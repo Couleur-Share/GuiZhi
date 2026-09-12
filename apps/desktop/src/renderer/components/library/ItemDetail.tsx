@@ -1,16 +1,15 @@
+import { LoadErrorState } from "../ui/LoadErrorState";
+import { DraftConflictNotice } from "./DraftConflictNotice";
 import { useEffect, useState } from "react";
-import { WebSourceVersions } from "./WebSourceVersions";
 import { useTranslation } from "react-i18next";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { ItemDetailHeader } from "./ItemDetailHeader";
 import { ContentPanel } from "./ContentPanel";
-import { AiSummaryCard } from "./AiSummaryCard";
-import { AiOcrCard } from "./AiOcrCard";
-import { IllustrationCard } from "./IllustrationCard";
-import { MediaPreview } from "./MediaPreview";
+import { ArticleAskReader } from "../ask/ArticleAskReader";
+import { SourceCaptureRevisions } from "./SourceCaptureRevisions";
+import { ArticleToolsPanel } from "./ArticleToolsPanel";
 import { SourceCommentsProvider } from "./SourceCommentsContext";
-import { SourceCommentsCard } from "./SourceCommentsCard";
 
 /**
  * 条目详情：头部（标题 / 元信息 / 标签）+ 正文面板。
@@ -21,12 +20,27 @@ import { SourceCommentsCard } from "./SourceCommentsCard";
  */
 export function ItemDetail({ onClose }: { onClose?: () => void }) {
   const { t } = useTranslation();
+  const detailLoading = useKnowledgeStore(s => s.detailLoading);
+  const detailError = useKnowledgeStore(s => s.detailError);
+  const selectedId = useKnowledgeStore(s => s.selectedId);
   const item = useKnowledgeStore((state) => state.selectedItem);
   const flushPendingSave = useKnowledgeStore((state) => state.flushPendingSave);
   const [toolsItemId, setToolsItemId] = useState<string | null>(null);
+  const [askItemId, setAskItemId] = useState<string | null>(null);
   const isFocusReadingMode = useUIStore((state) => state.isFocusReadingMode);
 
-  useEffect(()=>{if(isFocusReadingMode)setToolsItemId(null);},[isFocusReadingMode]);
+  useEffect(() => {
+    if (isFocusReadingMode) setToolsItemId(null);
+  }, [isFocusReadingMode]);
+
+  useEffect(() => {
+    const openArticleAsk = (event: Event) => {
+      if ((event as CustomEvent).detail?.itemId !== item?.id || item?.deletedAt != null) return;
+      setToolsItemId(null); setAskItemId(item.id);
+    };
+    window.addEventListener("article-ask-open", openArticleAsk);
+    return () => window.removeEventListener("article-ask-open", openArticleAsk);
+  }, [item?.id, item?.deletedAt]);
 
   // Ctrl+S 立即保存
   useEffect(() => {
@@ -40,7 +54,9 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [flushPendingSave]);
 
-  if (!item) {
+  if (detailError) return <LoadErrorState message={detailError} onRetry={() => void useKnowledgeStore.getState().selectItem(selectedId)} />;
+  if (detailLoading) return <div role="status" className="p-6 text-sm text-muted-foreground">正在加载条目…</div>;
+  if (!item || item.id !== selectedId) {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted-foreground">
         {t("library.noSelection", "在左侧选择一个条目，或新建一个开始记录")}
@@ -49,39 +65,44 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
   }
 
   const isTrashed = item.deletedAt != null;
-  const compactReading = item.itemType === "webpage";
   const toolsOpen = toolsItemId === item.id;
-  const isMediaItem = item.itemType === "audio" || item.itemType === "video";
 
   return (
     <div
-      className={`flex h-full min-h-0 flex-col ${
-        isFocusReadingMode ? "mx-auto w-full max-w-4xl" : ""
+      data-testid="article-detail"
+      className={`relative flex h-full min-h-0 flex-col ${
+        isFocusReadingMode && askItemId !== item.id ? "mx-auto w-full max-w-4xl" : ""
       }`}
     >
       <SourceCommentsProvider
         key={`${item.id}:${item.sourceUri}:${isTrashed}`}
         item={item}
       >
-        <ItemDetailHeader item={item} isTrashed={isTrashed} onClose={onClose} compactReading={compactReading} toolsOpen={toolsOpen} onToggleTools={()=>setToolsItemId(toolsOpen ? null : item.id)} />
+        <DraftConflictNotice />
+      <SourceCaptureRevisions itemId={item.id} />
+        <ItemDetailHeader
+          item={item}
+          isTrashed={isTrashed}
+          onClose={onClose}
+          toolsOpen={toolsOpen}
+          onToggleTools={() => { setAskItemId(null); setToolsItemId(toolsOpen ? null : item.id); }}
+          askOpen={askItemId === item.id}
+          onToggleAsk={() => { setToolsItemId(null); setAskItemId(askItemId === item.id ? null : item.id); }}
+        />
 
-        {!isTrashed && (!compactReading || toolsOpen) ? (
-          // 卡片全部不适用时（如在线视频条目）整块折叠，避免留一条空白带
-          <div className="max-h-[35vh] shrink-0 overflow-auto space-y-2.5 border-b border-border/60 px-6 py-3 empty:hidden">
-            <MediaPreview item={item} />
-            {/* 轻动作并排成一行；摘要生成后卡片自己占满整行 */}
-            <div className="flex flex-wrap items-center gap-2 empty:hidden">
-              {item.itemType === "image" ? <AiOcrCard item={item} /> : null}
-              {item.itemType === "webpage" ? <WebSourceVersions item={item} /> : null}
-              {/* 音视频条目由正文面板里的「总结」按钮承担总结职能 */}
-              {!isMediaItem ? <AiSummaryCard item={item} /> : null}
-              <IllustrationCard item={item} />
-              <SourceCommentsCard />
-            </div>
-          </div>
+        {!isTrashed ? (
+          <ArticleToolsPanel
+            isOpen={toolsOpen}
+            key={item.id}
+            item={item}
+            onClose={() => setToolsItemId(null)}
+          />
         ) : null}
 
-        <ContentPanel item={item} isTrashed={isTrashed} />
+        <ArticleAskReader key={`ask:${item.id}`} itemId={item.id} open={askItemId === item.id && !isTrashed}
+          onOpen={() => { if (!isTrashed) { setToolsItemId(null); setAskItemId(item.id); } }} onClose={() => setAskItemId(null)}>
+          <ContentPanel item={item} isTrashed={isTrashed} />
+        </ArticleAskReader>
       </SourceCommentsProvider>
     </div>
   );

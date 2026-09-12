@@ -13,7 +13,8 @@ import type {
 } from "@guizhi/shared/types";
 import type { ExtractedContent } from "./connectors";
 import { runWithAiCallSink } from "../ai-call-context";
-import { normalizeUrl } from "./url-normalize";
+import { abortable } from "@guizhi/shared/utils/abortable";
+import { sourceIdentity } from "./source-identity";
 import { computeContentHash } from "./content-hash";
 import { ImportStageStatsRecorder } from "./stage-stats";
 
@@ -44,6 +45,7 @@ export interface ImportTaskStore {
 }
 
 export interface ImportPersistence {
+  getDuplicateMeta?(id: string): { title: string; itemType: ImportTask["itemType"] } | null;
   /** 按规范化 URI 或内容哈希查找既有条目 id（去重判定） */
   findDuplicate(
     normalizedUri: string | null,
@@ -68,6 +70,7 @@ export interface ImportPersistence {
 export interface ImportQueueOptions {
   store: ImportTaskStore;
   persistence: ImportPersistence;
+  resolveSource?: (raw: string, signal: AbortSignal) => Promise<string | null>;
   extract: (
     task: ImportTask,
     signal: AbortSignal,
@@ -92,6 +95,8 @@ export class ImportQueue {
   private readonly captureComments?: ImportQueueOptions["captureComments"];
   private readonly concurrency: number;
 
+  private readonly resolveSource?: ImportQueueOptions["resolveSource"];
+  private readonly sourceRuns = new Map<string, Promise<void>>();
   private readonly pendingIds: string[] = [];
   private readonly running = new Map<string, AbortController>();
   /** 暂停只阻止新任务起跑；已在进行的下载/转写不强杀，避免浪费已花的时间和费用。 */
@@ -99,6 +104,7 @@ export class ImportQueue {
 
   constructor(options: ImportQueueOptions) {
     this.store = options.store;
+    this.resolveSource = options.resolveSource;
     this.persistence = options.persistence;
     this.extract = options.extract;
     this.onTaskChanged = options.onTaskChanged;
@@ -176,6 +182,12 @@ export class ImportQueue {
       const value = input.input?.trim();
       if (!value) {
         continue;
+      }
+      const identity = input.kind === "url" && !input.forceDuplicate && !input.refreshOfItemId ? sourceIdentity(value) : null;
+      const existing = identity ? this.store.listByStatus(["pending", "processing"]).find(task => !task.refreshOfItemId && !this.store.isForceDuplicate(task.id) && sourceIdentity(task.sourceInput) === identity) : null;
+      if (existing) {
+        const shared = this.store.update(existing.id, { warning: "相同来源已在队列中，已合并到现有任务" }) ?? existing;
+        tasks.push(shared); this.onTaskChanged(shared); continue;
       }
       const task = this.store.create({ ...input, input: value });
       tasks.push(task);
@@ -318,8 +330,26 @@ export class ImportQueue {
     );
 
     let extracted: ExtractedContent | undefined;
+    let releaseSource: (() => void) | undefined, sourceKey: string | null = null;
     try {
       this.throwIfAborted(controller);
+      if (task.sourceKind === "url" && !this.store.isForceDuplicate(id) && !task.refreshOfItemId) {
+        sourceKey = this.resolveSource ? await this.resolveSource(task.sourceInput, controller.signal) : sourceIdentity(task.sourceInput);
+        this.throwIfAborted(controller);
+        if (sourceKey) {
+          while (this.sourceRuns.has(sourceKey)) {
+            this.updateAndNotify(id, { warning: "相同来源正在处理，等待已有任务结果" }, recorder);
+            await abortable(this.sourceRuns.get(sourceKey)!, controller.signal); this.throwIfAborted(controller);
+          }
+          const duplicateItemId = this.persistence.findDuplicate(sourceKey, "");
+          if (duplicateItemId) {
+            this.persistence.rememberSourceAccess(duplicateItemId, sourceKey, task.sourceInput);
+            const meta = this.persistence.getDuplicateMeta?.(duplicateItemId);
+            this.updateAndNotify(id, { status: "duplicate", stage: null, duplicateItemId, ...(meta ? { displayName: meta.title, itemType: meta.itemType } : {}) }, recorder); return;
+          }
+          this.sourceRuns.set(sourceKey, new Promise<void>(resolve => { releaseSource = resolve; }));
+        }
+      }
       extracted = await this.extract(
         task,
         controller.signal,
@@ -352,13 +382,13 @@ export class ImportQueue {
 
       const normalizedUri =
         task.sourceKind === "url" && extracted.sourceUri
-          ? normalizeUrl(extracted.sourceUri)
+          ? sourceIdentity(extracted.sourceUri)
           : null;
       const contentHash = computeContentHash(
         extracted.content || extracted.title,
       );
 
-      if (!this.store.isForceDuplicate(id)) {
+      if (!this.store.isForceDuplicate(id) && !task.refreshOfItemId) {
         const duplicateItemId = this.persistence.findDuplicate(
           normalizedUri,
           contentHash,
@@ -428,7 +458,10 @@ export class ImportQueue {
         { status: "failed", stage: null, error: message },
         recorder,
       );
-    } finally { if (extracted) this.persistence.disposeExtracted?.(extracted); }
+    } finally {
+      if (releaseSource) { this.sourceRuns.delete(sourceKey!); releaseSource(); }
+      if (extracted) this.persistence.disposeExtracted?.(extracted);
+    }
   }
 
   private throwIfAborted(controller: AbortController): void {

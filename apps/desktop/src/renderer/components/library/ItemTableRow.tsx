@@ -1,11 +1,9 @@
 import { type ReactNode } from "react";
 import {
-  ArchiveIcon,
-  ArchiveRestoreIcon,
+  MoreHorizontalIcon,
   PinIcon,
   RotateCcwIcon,
   StarIcon,
-  Trash2Icon,
   XCircleIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -84,10 +82,7 @@ export function ItemTableRow({
 }) {
   const { t } = useTranslation();
   const scope = useKnowledgeStore((state) => state.scope);
-  const setStatus = useKnowledgeStore((state) => state.setStatus);
   const toggleFavorite = useKnowledgeStore((state) => state.toggleFavorite);
-  const togglePinned = useKnowledgeStore((state) => state.togglePinned);
-  const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const collectionName = useCollectionStore(
     (state) =>
@@ -152,7 +147,7 @@ export function ItemTableRow({
                   event.stopPropagation();
                   onOpen();
                 }}
-                className="min-w-0 truncate text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
+                className="min-w-0 line-clamp-2 break-words text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
               >
                 {title}
               </button>
@@ -320,42 +315,7 @@ export function ItemTableRow({
                       aria-hidden="true"
                     />
                   </RowAction>
-                  <RowAction
-                    active={entry.isPinned}
-                    onClick={() => void togglePinned(entry.id)}
-                    label={
-                      entry.isPinned
-                        ? t("library.unpin", "取消置顶")
-                        : t("library.pin", "置顶")
-                    }
-                  >
-                    <PinIcon className="h-4 w-4" aria-hidden="true" />
-                  </RowAction>
-                  {entry.status === "archived" ? (
-                    <RowAction
-                      onClick={() => void setStatus([entry.id], "active")}
-                      label={t("library.unarchive", "取消归档")}
-                    >
-                      <ArchiveRestoreIcon
-                        className="h-4 w-4"
-                        aria-hidden="true"
-                      />
-                    </RowAction>
-                  ) : (
-                    <RowAction
-                      onClick={() => void setStatus([entry.id], "archived")}
-                      label={t("library.archive", "归档")}
-                    >
-                      <ArchiveIcon className="h-4 w-4" aria-hidden="true" />
-                    </RowAction>
-                  )}
-                  <RowAction
-                    destructive
-                    onClick={() => void moveToTrash([entry.id])}
-                    label={t("library.moveToTrash", "移到回收站")}
-                  >
-                    <Trash2Icon className="h-4 w-4" aria-hidden="true" />
-                  </RowAction>
+                  <button type="button" aria-label="更多操作" className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent" onClick={event => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); onContextMenu({ preventDefault() {}, clientX: rect.left, clientY: rect.bottom } as React.MouseEvent); }}><MoreHorizontalIcon className="h-4 w-4" /></button>
                 </>
               )}
             </div>

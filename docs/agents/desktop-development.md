@@ -57,6 +57,8 @@ pnpm typecheck           # TS 全量检查
 pnpm test:unit           # vitest 单测
 pnpm lint                # eslint + 文件行数门禁
 pnpm shot                # 界面截图（窗口在屏幕外，不打扰用户）
+pnpm build:isolated      # 在当前源码副本中构建，不覆盖开发目录产物
+pnpm test:e2e:smoke      # 根目录入口自动隔离构建与 E2E
 pnpm electron:build:win  # Windows 打包
 ```
 
@@ -64,7 +66,7 @@ pnpm electron:build:win  # Windows 打包
 
 改了 UI 想看效果时走 `pnpm shot`（`apps/desktop/scripts/screenshot.mjs`），
 不要手写一次性的启动脚本，也不要让用户自己去开应用截图。它拉起真实 Electron、
-截图、退出，全程约 5 秒，窗口不出现在屏幕上也不抢焦点——这些脚本经常在用户
+截图、退出，窗口不出现在屏幕上也不抢焦点——这些脚本经常在用户
 正干活时被跑起来，弹出来的窗口会把用户手上的东西整个顶掉。数据目录是一次性
 临时目录，碰不到用户的库，也不与用户正开着的归知抢单实例门（`GUIZHI_E2E=1`
 本来就绕过它）。默认截首屏；`--steps <file>` 传一个默认导出
@@ -112,29 +114,45 @@ electron-deck 为了截图走的是同一套（`setPosition(-3000, -3000)` +
 并存，抢注 `Alt+Shift+P` 会把用户那个夺走，而注册失败只打一条 warn，两边都
 发现不了。
 
-脚本带产物陈旧检测：源码比 `out/` 新时直接拒跑并提示先 build。少了这一步，
-改完忘了构建就会截到上一版界面，而截图看着完全正常——这种「改动像是没生效」
-最难自查（与 `src/mcp/` 那条债同源）。确认无所谓时用 `--stale-ok` 跳过。
+### 验证实例与开发实例完全分开
 
-### 改主进程文件时把编辑攒成一次
+`pnpm shot` 默认经 `scripts/isolated-desktop.mjs` 创建系统临时目录中的源码副本，
+包含 Git 跟踪文件的当前内容，以及未忽略的新源码；已删除文件不会复活，不会 stash、
+reset 或覆盖原工作区。副本中构建 main、preload、renderer、MCP，随后启动真实
+Electron。每次验证使用不同目录，结束后清理；多次验证不会共用 `out/`。
 
-`electron:dev` 常年挂在用户的终端里，而 `vite-plugin-electron` 的 main 入口走的是
-默认 `onstart`——**每一次落盘都会杀掉整个 Electron 再开一个新窗口**，抢焦点，连的
-还是用户的正式数据目录。preload 只刷新渲染进程，`src/renderer/**`（含 i18n 的
-json）只走 HMR，都不打扰人；会触发重启的是 `src/main/**` 以及它 import 的
-`packages/{shared,db,core}`。
+依赖包通过目录链接复用现有安装，不运行 install/rebuild。`node_modules` 自身和
+Vite 缓存目录各自独立，`@guizhi/*` 指向副本内源码。环境文件不复制，也不继承开发
+服务 URL、用户数据目录和 Electron 的 Node 模式。截图仍使用临时 userData、随机
+回环端口与屏幕外窗口。原目录的产物不参与验证，`--stale-ok` 不会省略隔离构建。
+代价是每次截图都需等待一次完整构建；构建失败则退出，不回退到旧产物。
 
-所以改这些路径下的文件要先把整个文件的改动想清楚再一次写完，别对着同一个文件连发
-十几次小编辑。实测过一次代价：给导入任务加阶段统计那回，20 次分散的写入换来
-`startup.log` 里三分钟 20 次重启（21:03 四次、21:04 九次、21:05 七次），光
-`import-queue.ts` 就占了 7 次；按「每个文件一次」算本该只有 6 次。用户当时正开着
-应用，看到的就是窗口疯狂开合。
+根目录 `pnpm test:e2e` / `pnpm test:e2e:smoke` 使用同一入口；测试报告保留在
+`apps/desktop/.tmp-e2e-*`。仅检查能否构建时用 `pnpm build:isolated`，其临时产物
+验证后即删除，不用于打包。子包的 build/e2e 和打包命令仍会原地写入产物，只能在
+没有用户开发实例的独立工作副本中运行。
 
-这与上面那套离屏截图**不是一回事，别混为一谈**：`GUIZHI_WINDOW_MODE` 管的是「我主动
-拉起一个实例」，而这里是「用户自己的 dev server 被我的文件改动驱动」，那个环境变量
-对它不生效。排查时也别看错日志——截图实例的 `userData` 被重定向到临时目录
-（`configureE2ETestProfile`），`getLogsDir()` 跟着走，所以它的启动记录压根不会出现在
-用户的 `startup.log` 里；那里面出现的每一条都是真实启动。
+截图 `--steps`、`--data-db`、`--out` 的相对路径仍按调用目录解析；步骤脚本读取
+原有 fixture 的路径保持兼容，Electron 的 cwd 则明确指向源码副本。步骤回调新增
+`mainEntry`：需要重启验证应用时必须使用这个绝对入口，不得再拼原目录的 `out/`。
+`--executable` 验收指定安装包时直接使用候选程序，仍隔离数据和窗口，不做源码构建。
+fixture 脚本自身的外部读写仍由脚本负责，不能借步骤脚本操作用户实例或用户库。
+
+### 并行写代码必须隔离源码
+
+离屏只控制新拉起的验证窗口，无法阻止用户的 Vite 响应源码变化。main 和其导入的
+`packages/{shared,db,core}` 变动会使开发 Electron 重启；preload 会刷新页面，
+renderer 的 HMR 也可能改变用户正在操作的界面。修改 Vite 配置或依赖同样可能重启服务。
+
+开始编辑前先检查当前目录是否有开发服务。用户一边使用开发版、代理一边工作时，
+代理必须在独立 worktree 或工作副本里编辑和验证，保留原目录所有未提交改动；
+任务依赖未提交功能时，工作副本也要包含这些改动，不能只从 HEAD 验证。
+验证结束先交付可审阅差异，等用户切换版本时再回写原目录。不要把“每个文件一次写完”
+当作隔离，也不要为了采用新流程而主动重启用户已经运行的服务。
+
+清理只针对本次创建的进程和临时目录。禁止按 `electron.exe` / `node.exe` 名称批量
+结束进程，也不要停止、复用用户的 Vite 服务。截图实例的日志在临时 userData 中；
+用户 `startup.log` 新增的启动记录不能解释成离屏验证启动。
 
 ## 编码约定
 

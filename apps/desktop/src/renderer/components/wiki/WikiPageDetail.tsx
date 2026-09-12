@@ -1,3 +1,4 @@
+import { WikiUpdateSuggestion } from "./WikiUpdateSuggestion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenIcon,
@@ -393,6 +394,8 @@ export function WikiPageDetail() {
           </div>
         )}
 
+        <WikiUpdateSuggestion pageId={page.id} promptVersion={page.promptVersion} updatedAt={page.updatedAt} />
+        {sources.some(source => source.reviewStatus === "needs_review") ? <p role="status" className="my-3 text-sm text-muted-foreground">此页包含待复核来源，相关结论可能受内容缺失影响。</p> : null}
         {sources.length > 0 ? (
           <div className="mt-6 border-t border-border/60 pt-4">
             <RelatedChips

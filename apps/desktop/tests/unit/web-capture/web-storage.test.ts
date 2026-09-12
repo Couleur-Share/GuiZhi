@@ -179,7 +179,7 @@ describe("网页版本与持久队列", () => {
     );
     for (const migration of MIGRATIONS.filter(m => m.name < "0030-web-capture"))
       db.run("INSERT INTO schema_migrations VALUES (?,?)", migration.name, 1);
-    expect(runMigrations(db)).toEqual(["0030-web-capture", "0031-wechat-snapshots"]);
+    expect(runMigrations(db)).toEqual(["0030-web-capture", "0031-wechat-snapshots", "0032-themed-reading", "article-ask-sessions", "0034-ask-evidence-snapshots", "0035-wiki-fulltext-compiler", "0036-ask-history-search", "0037-source-capture-revisions", "0038-knowledge-batch-results", "0039-wiki-checkpoint-source-cleanup"]);
     expect(db.get("SELECT * FROM research_candidates WHERE id='old-candidate'")).toEqual(beforeCandidate);
     expect(db.get("SELECT collected_count FROM research_source_runs WHERE run_id='old'")).toEqual({collected_count:1});
     expect(db.all("SELECT name,sql FROM sqlite_master WHERE type='index' AND tbl_name IN ('research_candidates','research_source_runs') ORDER BY name")).toEqual(beforeIndexes);

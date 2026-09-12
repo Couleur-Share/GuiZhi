@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { WikiCatalogEntry, WikiPageDetail } from "@guizhi/shared/types";
 import {
   askKnowledgeBase,
@@ -51,6 +51,18 @@ function createScriptedDeps(script: string[]): QaDeps & {
 }
 
 describe("askKnowledgeBase - Agent 循环", () => {
+  it("未读到证据时不流出模型猜测；读取的实际片段在最终回答前形成检查点", async () => {
+    const noSource = createScriptedDeps(['{"action":"answer","text":"没有依据的猜测"}']);
+    noSource.searchItems = async () => [];
+    const stream = vi.fn(), original = noSource.chat;
+    noSource.chat = async (messages, options) => { options.onDelta?.('{"action":"answer","text":"没有依据的猜测"}'); return original(messages, options); };
+    await expect(askKnowledgeBase('无资料问题', undefined, noSource, undefined, undefined, stream)).rejects.toBeInstanceOf(QaNoSourceError);
+    expect(stream).not.toHaveBeenCalled();
+    const deps = createScriptedDeps(['{"action":"search","query":"架构"}','{"action":"read","target":1}','{"action":"answer","text":"回答 [1]"}']);
+    const evidence = vi.fn(); deps.onEvidence = evidence;
+    await askKnowledgeBase('架构', undefined, deps);
+    expect(evidence).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ refId: 'item-a', evidence: expect.objectContaining({ text: expect.stringContaining('Electron') }) })]));
+  });
   it("search → read → answer 完整路径，引用对齐", async () => {
     const deps = createScriptedDeps([
       '{"action":"search","query":"架构"}',
@@ -236,8 +248,8 @@ describe("askKnowledgeBase - Agent 循环", () => {
 
     const answer = await askKnowledgeBase("知识管理是什么？", undefined, deps);
     expect(answer.usedFallback).toBe(false);
-    expect(answer.sources).toEqual([
-      { ordinal: 1, kind: "wiki", refId: "wiki-1", title: "知识管理" },
+    expect(answer.sources).toMatchObject([
+      { ordinal: 1, kind: "wiki", refId: "wiki-1", title: "知识管理", evidence: { version: 1, text: "总览正文，见 [[采集工作流]]。" } },
     ]);
 
     // 阅读轨迹注册了出链页面与来源条目（[1] wiki + [2..n] 搜索命中的条目 + 关联资源）

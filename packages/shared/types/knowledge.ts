@@ -101,6 +101,8 @@ export interface KnowledgeItem {
 
 /** 列表轻量投影（不含完整正文） */
 export interface KnowledgeItemListEntry {
+  reviewStatus?: KnowledgeReviewStatus;
+  reviewReasons?: string[];
   id: string;
   title: string;
   /** 正文前段纯文本摘要 */

@@ -1,3 +1,4 @@
+import { inspectThemedReadingBackup, verifyThemedReadingBackupAssets } from "./backup-repository-themed-reading";
 import { sanitizeSnapshot } from "./web-capture/snapshot-sanitize";
 import fs from "node:fs";
 import path from "node:path";
@@ -77,6 +78,7 @@ function mergeRendererSettings(
 function copyMachineSettings(
   liveDb: Database.Database,
   stagedDatabasePath: string,
+  stagedImagesDir: string,
 ): void {
   const staged = new Database(stagedDatabasePath);
   try {
@@ -100,6 +102,7 @@ function copyMachineSettings(
         if (version.snapshot) sanitizeSnapshot(version.snapshot);
       }
     }
+    verifyThemedReadingBackupAssets(inspectThemedReadingBackup(staged), stagedImagesDir);
     const check = staged.pragma("quick_check") as Array<Record<string, unknown>>;
     if (check.length !== 1 || Object.values(check[0])[0] !== "ok") {
       throw new Error("恢复数据库 quick_check 未通过");
@@ -178,7 +181,7 @@ export function prepareRepositoryRestore(options: {
     fs.mkdirSync(stagedImagesDir, { recursive: true });
     fs.mkdirSync(stagedVideosDir, { recursive: true });
     fs.mkdirSync(stagedConfigDir, { recursive: true });
-    copyMachineSettings(liveDb, stagedDatabasePath);
+    copyMachineSettings(liveDb, stagedDatabasePath, stagedImagesDir);
     return {
       stageDir,
       databasePath: stagedDatabasePath,

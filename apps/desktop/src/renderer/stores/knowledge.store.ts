@@ -1,3 +1,5 @@
+import type { SaveKnowledgeDraftResult } from "@guizhi/shared/types/knowledge-draft";
+import { mergeDraftTags } from "@guizhi/shared/types/knowledge-draft";
 import { create } from "zustand";
 import type {
   BulkUpdateKnowledgeItemsInput,
@@ -54,12 +56,18 @@ export interface LibraryFacetFilters {
  */
 const pendingPatches = new Map<string, EditablePatch>();
 /** 每个条目最近一次落盘的 Promise，切条目前要等它真正结束 */
-const inflightSaves = new Map<string, Promise<void>>();
+const inflightSaves = new Map<string, Promise<boolean>>();
+const savingPatches = new Map<string, EditablePatch>();
+const draftBases = new Map<string, EditablePatch>();
+let flushRun: Promise<boolean> | null = null;
+let detailRequestSeq = 0;
+const fieldsOf = (item: KnowledgeItem): EditablePatch => ({ title: item.title, content: item.content, tagNames: item.tags.map(tag => tag.name) });
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 仅用于测试：清空跨用例残留的待保存队列 */
 export function __resetPendingSaves(): void {
   pendingPatches.clear();
+  savingPatches.clear(); draftBases.clear(); flushRun = null; detailRequestSeq++;
   inflightSaves.clear();
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -114,6 +122,10 @@ interface KnowledgeState {
   // ── 详情 ──
   selectedId: string | null;
   selectedItem: KnowledgeItem | null;
+  detailLoading: boolean;
+  detailError: string | null;
+  saveConflict: { itemId: string; result: SaveKnowledgeDraftResult } | null;
+  resolveSaveConflict: (choice: "local" | "server") => Promise<boolean>;
   isSaving: boolean;
   /** 有未落盘的编辑（autoSave 关闭时由保存按钮 / Ctrl+S 落盘） */
   hasUnsavedChanges: boolean;
@@ -157,12 +169,12 @@ interface KnowledgeState {
   refreshCounts: () => Promise<void>;
   refreshAll: () => Promise<void>;
 
-  selectItem: (id: string | null) => Promise<void>;
+  selectItem: (id: string | null) => Promise<boolean>;
   createItem: (input?: CreateKnowledgeItemInput) => Promise<KnowledgeItem>;
   /** 本地即时更新选中条目并防抖持久化 */
   updateSelected: (patch: EditablePatch) => void;
   /** 立即落盘（Ctrl+S / 切换条目 / 关闭前） */
-  flushPendingSave: () => Promise<void>;
+  flushPendingSave: () => Promise<boolean>;
 
   /** 外部（AI 服务等）直接持久化后的条目写回同步 */
   applyServerItem: (item: KnowledgeItem) => void;
@@ -175,8 +187,8 @@ interface KnowledgeState {
   /** 返回是否移动成功；调用方据此决定要不要弹撤销提示 */
   moveToTrash: (ids: string[]) => Promise<boolean>;
   restoreItems: (ids: string[]) => Promise<void>;
-  deleteForever: (ids: string[]) => Promise<void>;
-  emptyTrash: () => Promise<void>;
+  deleteForever: (ids: string[], options?: { clearEvidence?: boolean }) => Promise<boolean>;
+  emptyTrash: (options?: { clearEvidence?: boolean }) => Promise<boolean>;
 }
 
 export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
@@ -224,6 +236,14 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     saveTimer = setTimeout(() => {
       void get().flushPendingSave();
     }, AUTO_SAVE_DEBOUNCE_MS);
+  };
+
+  const mergeServerItem = (item: KnowledgeItem): KnowledgeItem => {
+    const patch = { ...savingPatches.get(item.id), ...pendingPatches.get(item.id) };
+    const base = draftBases.get(item.id);
+    return { ...item, ...("title" in patch ? { title: patch.title } : {}),
+      ...("content" in patch ? { content: patch.content } : {}),
+      ...(patch.tagNames ? { tags: reconcileOptimisticTags(item.tags, mergeDraftTags(base?.tagNames ?? [], patch.tagNames, item.tags.map(tag => tag.name))) } : {}) };
   };
 
   const applyItemToList = (item: KnowledgeItem) => {
@@ -274,7 +294,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (updated) {
         applyItemToList(updated);
         if (get().selectedId === id) {
-          set({ selectedItem: updated });
+          set({ selectedItem: mergeServerItem(updated) });
         }
       }
       await get().refreshAll();
@@ -286,47 +306,45 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
   };
 
   /** 落盘单个条目的待存改动；失败只退回它自己那一桶。 */
-  const persistPatch = async (itemId: string): Promise<void> => {
+  const persistPatch = async (itemId: string): Promise<boolean> => {
     const patch = pendingPatches.get(itemId);
     pendingPatches.delete(itemId);
-    if (!patch || Object.keys(patch).length === 0) {
-      return;
-    }
+    if (!patch || !Object.keys(patch).length) return true;
+    savingPatches.set(itemId, patch);
     set({ isSaving: true, saveError: null });
     try {
-      const updated = await window.api.knowledge.update(itemId, patch);
-      if (!updated) {
-        throw new Error("条目不存在或已被删除");
+      // 老运行时和测试替身保留 update 兼容；桌面始终经事务草稿接口保存。
+      const result: SaveKnowledgeDraftResult = window.api.knowledge.saveDraft
+        ? await window.api.knowledge.saveDraft({ id: itemId, requestId: crypto.randomUUID(), base: draftBases.get(itemId) ?? {}, patch })
+        : { ok: true, item: await window.api.knowledge.update(itemId, patch) };
+      if (!result.ok || !result.item) {
+        if (result.conflicts?.length) set({ saveConflict: { itemId, result } });
+        throw new Error(result.error || "条目不存在或已被删除");
       }
+      const updated = result.item;
+      const later = pendingPatches.get(itemId), previousBase = draftBases.get(itemId) ?? {};
+      const nextBase = fieldsOf(updated);
+      if (later) {
+        if (later.tagNames) later.tagNames = mergeDraftTags(patch.tagNames ?? previousBase.tagNames ?? [], later.tagNames, updated.tags.map(t => t.name));
+        for (const field of ["title", "content"] as const) {
+          if (later[field] !== undefined && patch[field] === undefined) nextBase[field] = previousBase[field];
+        }
+      }
+      draftBases.set(itemId, nextBase);
+      savingPatches.delete(itemId);
       applyItemToList(updated);
-      if (get().selectedId === updated.id) {
-        // 保留用户可能仍在输入的本地内容，仅同步服务器权威字段
-        set((state) => ({
-          selectedItem: state.selectedItem
-            ? {
-                ...state.selectedItem,
-                updatedAt: updated.updatedAt,
-                tags: updated.tags,
-              }
-            : updated,
-        }));
-      }
-      // 标签增删会改侧栏的标签列表与按标签计数；标题与正文不会，
-      // 不必让每次防抖落盘都多打这两次查询。
-      // 列表要重取是因为详情页新建的标签是 update 在 DAO 里顺手建出来的，
-      // 不经 tagStore.createTag 那条自带刷新的路径。
-      if (patch.tagNames) {
-        await useTagStore.getState().fetchTags();
-        await get().refreshCounts();
-      }
+      if (get().selectedId === itemId) set({ selectedItem: mergeServerItem(updated) });
+      if (get().saveConflict?.itemId === itemId) set({ saveConflict: null });
+      if (patch.tagNames) { await useTagStore.getState().fetchTags(); await get().refreshCounts(); }
+      return true;
     } catch (error) {
-      // 退回本条目自己的桶；await 期间对同一条目的新输入优先
       pendingPatches.set(itemId, { ...patch, ...pendingPatches.get(itemId) });
-      set({
-        saveError: error instanceof Error ? error.message : String(error),
-      });
+      set({ saveError: error instanceof Error ? error.message : String(error) });
       console.error("保存条目失败:", error);
+      return false;
     } finally {
+      savingPatches.delete(itemId);
+      if (!pendingPatches.has(itemId)) draftBases.delete(itemId);
       set({ isSaving: false, hasUnsavedChanges: pendingPatches.size > 0 });
     }
   };
@@ -335,8 +353,9 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
    * 更新筛选条件。范围与三个 facet 是正交的：例如“收藏的抖音条目”与
    * “工作库里的某标签”都是重度用户每天会用到的查询，不能再互相清空。
    */
-  const updateFilters = (target: Partial<LibraryFacetFilters>) => {
-    void get().flushPendingSave();
+  const updateFilters = async (target: Partial<LibraryFacetFilters>) => {
+    if ((pendingPatches.size || flushRun !== null) && !(await get().flushPendingSave())) return;
+    detailRequestSeq++;
     set({
       ...(target.scope !== undefined ? { scope: target.scope } : {}),
       ...(target.collectionId !== undefined
@@ -372,6 +391,25 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     counts: null,
     selectedId: null,
     selectedItem: null,
+    detailLoading: false, detailError: null, saveConflict: null,
+    resolveSaveConflict: async choice => {
+      const conflict = get().saveConflict;
+      if (!conflict?.result.item) return false;
+      const item = conflict.result.item;
+      const pending = pendingPatches.get(item.id);
+      // 冲突确认只改变正文选择；标签必须先按旧基线重放增删，再采用新基线。
+      if (pending?.tagNames) pending.tagNames = mergeDraftTags(draftBases.get(item.id)?.tagNames ?? [], pending.tagNames, item.tags.map(tag => tag.name));
+      draftBases.set(item.id, fieldsOf(item));
+      if (choice === "server") {
+        const remaining = { ...pendingPatches.get(item.id) };
+        for (const field of conflict.result.conflicts ?? []) delete remaining[field];
+        if (Object.keys(remaining).length) pendingPatches.set(item.id, remaining);
+        else { pendingPatches.delete(item.id); draftBases.delete(item.id); }
+      }
+      set({ saveConflict: null, saveError: null, hasUnsavedChanges: pendingPatches.size > 0,
+        ...(get().selectedId === item.id ? { selectedItem: mergeServerItem(item) } : {}) });
+      return get().flushPendingSave();
+    },
     isSaving: false,
     hasUnsavedChanges: false,
     saveError: null,
@@ -476,6 +514,12 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     bulkUpdate: async (ids, patch) => {
+      if (window.api.knowledge.selection) {
+        const { useLibraryWorkflowStore } = await import("./library-workflow.store");
+        await useLibraryWorkflowStore.getState().execute(ids, { kind: "update", patch });
+        if (patch.addTagNames?.length) await useTagStore.getState().fetchTags();
+        return;
+      }
       if (ids.length === 0) {
         return;
       }
@@ -533,10 +577,8 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
                   ([page]) => Number(page) <= current.page,
                 ),
               ),
-          // 清掉已不在当前页的选中项（被移出视图 / 删除 / 翻页）
-          selectionIds: current.selectionIds.filter((id) =>
-            result.entries.some((entry) => entry.id === id),
-          ),
+          // 翻页保留冻结的 ID；筛选变化才清空。
+          selectionIds: current.selectionIds,
         }));
       } catch (error) {
         console.error("加载知识条目列表失败:", error);
@@ -573,28 +615,29 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     selectItem: async (id) => {
-      await get().flushPendingSave();
-      if (!id) {
-        set({ selectedId: null, selectedItem: null });
-        return;
-      }
-      set({ selectedId: id });
+      const seq = ++detailRequestSeq;
+      if (!(await get().flushPendingSave()) || seq !== detailRequestSeq) return false;
+      set({ selectedId: id, selectedItem: null, detailLoading: Boolean(id), detailError: null });
+      if (!id) return true;
       try {
         const item = await window.api.knowledge.get(id);
-        // 异步返回时用户可能已切换选择
-        if (get().selectedId === id) {
-          set({ selectedItem: item });
-        }
+        if (seq !== detailRequestSeq) return false;
+        if (!item) throw new Error("条目不存在或已被删除");
+        set({ selectedItem: mergeServerItem(item), detailLoading: false });
+        return true;
       } catch (error) {
+        if (seq === detailRequestSeq) set({ detailLoading: false, detailError: describeLoadError(error) });
         console.error("加载条目详情失败:", error);
+        return false;
       }
     },
 
     createItem: async (input) => {
-      await get().flushPendingSave();
+      const seq = ++detailRequestSeq;
+      if (!(await get().flushPendingSave())) throw new Error("请先保存当前草稿");
       const created = await window.api.knowledge.create(input ?? {});
       await get().refreshAll();
-      set({ selectedId: created.id, selectedItem: created });
+      if (seq === detailRequestSeq && await get().flushPendingSave() && seq === detailRequestSeq) set({ selectedId: created.id, selectedItem: created, detailLoading: false, detailError: null });
       return created;
     },
 
@@ -603,6 +646,8 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (!current) {
         return;
       }
+      if (get().selectedId !== current.id) return;
+      if (!draftBases.has(current.id)) draftBases.set(current.id, fieldsOf(current));
       const next: KnowledgeItem = {
         ...current,
         title: patch.title !== undefined ? patch.title : current.title,
@@ -621,40 +666,35 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     flushPendingSave: async () => {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      // 先等在途落盘收尾：它可能失败并把改动退回桶里，那一份也要一起处理
-      await Promise.allSettled([...inflightSaves.values()]);
-
-      const itemIds = [...pendingPatches.keys()];
-      if (itemIds.length === 0) {
-        set({ hasUnsavedChanges: false });
-        return;
-      }
-
-      const runs = itemIds.map((itemId) => {
-        const run = persistPatch(itemId);
-        inflightSaves.set(itemId, run);
-        void run.finally(() => {
-          if (inflightSaves.get(itemId) === run) {
-            inflightSaves.delete(itemId);
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      if (flushRun !== null) return flushRun;
+      const run = async (): Promise<boolean> => {
+        // 顺序清空各桶；在途期间的新输入留在下一次循环，失败不自动无限重试。
+        while (pendingPatches.size) {
+          const ids = [...pendingPatches.keys()];
+          for (const id of ids) {
+            const saving = persistPatch(id); inflightSaves.set(id, saving);
+            const ok = await saving; inflightSaves.delete(id);
+            if (!ok) return false;
           }
-        });
-        return run;
-      });
-      await Promise.allSettled(runs);
+        }
+        set({ hasUnsavedChanges: false }); return true;
+      };
+      flushRun = run();
+      try { return await flushRun; } finally { flushRun = null; }
     },
 
     applyServerItem: (item) => {
       applyItemToList(item);
       if (get().selectedId === item.id) {
-        set({ selectedItem: item });
+        set({ selectedItem: mergeServerItem(item) });
       }
     },
 
     setItemTags: async (id, tagNames) => {
+      if (get().selectedItem?.id === id && get().selectedId === id) {
+        get().updateSelected({ tagNames }); await get().flushPendingSave(); return;
+      }
       await runGuardedMutation(
         "library.actionSetTags",
         "更新标签",
@@ -665,7 +705,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
           }
           applyItemToList(updated);
           if (get().selectedId === id) {
-            set({ selectedItem: updated });
+            set({ selectedItem: mergeServerItem(updated) });
           }
           // 可能新建了标签，侧栏的标签列表与计数都要跟上
           await useTagStore.getState().fetchTags();
@@ -675,6 +715,10 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     setStatus: async (ids, status) => {
+      if (window.api.knowledge.selection) {
+        const { useLibraryWorkflowStore } = await import("./library-workflow.store");
+        await useLibraryWorkflowStore.getState().execute(ids, { kind: "status", status }); return;
+      }
       await runGuardedMutation(
         "library.actionSetStatus",
         "更新状态",
@@ -703,20 +747,30 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
 
     // 返回是否真的移动成功：调用方据此决定要不要弹「已移到回收站」的撤销提示，
     // 否则删失败了还会弹一句成功文案，用户以为删掉了
-    moveToTrash: async (ids) =>
-      runGuardedMutation(
+    moveToTrash: async (ids) => {
+      if (window.api.knowledge.selection) {
+        const { useLibraryWorkflowStore } = await import("./library-workflow.store");
+        return useLibraryWorkflowStore.getState().execute(ids, { kind: "trash" });
+      }
+      return runGuardedMutation(
         "library.actionMoveToTrash",
         "移到回收站",
         async () => {
+          if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
           await window.api.knowledge.moveToTrash(ids);
           if (ids.includes(get().selectedId ?? "")) {
             set({ selectedId: null, selectedItem: null });
           }
           await get().refreshAll();
         },
-      ),
+      );
+    },
 
     restoreItems: async (ids) => {
+      if (window.api.knowledge.selection) {
+        const { useLibraryWorkflowStore } = await import("./library-workflow.store");
+        await useLibraryWorkflowStore.getState().execute(ids, { kind: "restore" }); return;
+      }
       await runGuardedMutation(
         "library.actionRestore",
         "恢复条目",
@@ -730,12 +784,17 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       );
     },
 
-    deleteForever: async (ids) => {
-      await runGuardedMutation(
+    deleteForever: async (ids, options) => {
+      if (window.api.knowledge.selection) {
+        const { useLibraryWorkflowStore } = await import("./library-workflow.store");
+        return useLibraryWorkflowStore.getState().execute(ids, { kind: "delete", clearEvidence: options?.clearEvidence });
+      }
+      return runGuardedMutation(
         "library.actionDeleteForever",
         "彻底删除",
         async () => {
-          await window.api.knowledge.deleteForever(ids);
+          if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
+          await window.api.knowledge.deleteForever(ids, options);
           if (ids.includes(get().selectedId ?? "")) {
             set({ selectedId: null, selectedItem: null });
           }
@@ -744,12 +803,18 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       );
     },
 
-    emptyTrash: async () => {
-      await runGuardedMutation(
+    emptyTrash: async (options) => {
+      if (window.api.knowledge.selection) {
+        const result = await window.api.knowledge.selection({ action: "freeze", query: { scope: "trash" } });
+        if (!result.ok || !result.ids) return runGuardedMutation("library.emptyTrash", "清空回收站", async () => { throw new Error(result.error || "读取回收站失败"); });
+        return get().deleteForever(result.ids, options);
+      }
+      return runGuardedMutation(
         "library.actionEmptyTrash",
         "清空回收站",
         async () => {
-          await window.api.knowledge.emptyTrash();
+          if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
+          await window.api.knowledge.emptyTrash(options);
           set({ selectedId: null, selectedItem: null });
           await get().refreshAll();
         },

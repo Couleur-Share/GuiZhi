@@ -1,3 +1,5 @@
+import { LoadErrorState } from "../ui/LoadErrorState";
+import { GlobalArticleConversation } from "./GlobalArticleConversation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowDownIcon, SendIcon, SquareIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -18,6 +20,9 @@ const ASK_INPUT_MAX_HEIGHT_PX = 136;
  */
 export function AskWorkspace() {
   const { t } = useTranslation();
+  const loadError = useAskStore(s => s.loadError);
+  const saveError = useAskStore(s => s.saveError);
+  const articleSession = useAskStore((state) => state.articleSession);
   const messages = useAskStore((state) => state.messages);
   const hasLoaded = useAskStore((state) => state.hasLoaded);
   const isRunning = useAskStore((state) => state.isRunning);
@@ -120,6 +125,9 @@ export function AskWorkspace() {
     inputRef.current?.focus();
   };
 
+  if (loadError) return <LoadErrorState message={loadError} onRetry={() => void useAskStore.getState().retryLoad()} />;
+  if (articleSession?.target) return <GlobalArticleConversation session={articleSession} />;
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-5">
@@ -139,6 +147,7 @@ export function AskWorkspace() {
           onScroll={handleScroll}
           className="h-full overflow-y-auto px-5 py-4"
         >
+          {saveError ? <div role="alert" className="p-3 text-sm text-destructive">回答尚未保存：{saveError} <button onClick={() => void useAskStore.getState().persist()}>重试保存</button></div> : null}
           {!hasLoaded ? (
             // 上次会话读出来之前不画空态：有历史记录的用户否则会先看到一整屏
             // 引导，再被消息列表整块换掉

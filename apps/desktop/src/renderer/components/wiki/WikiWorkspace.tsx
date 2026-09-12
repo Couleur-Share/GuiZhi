@@ -263,7 +263,7 @@ export function WikiWorkspace() {
                 {catalog.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setShowRebuildConfirm(true)}
+                    onClick={() => window.api.wiki.compiler ? window.dispatchEvent(new Event("wiki-compile-preview")) : setShowRebuildConfirm(true)}
                     title={t("wiki.rebuild", "全量重建")}
                     aria-label={t("wiki.rebuild", "全量重建")}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"

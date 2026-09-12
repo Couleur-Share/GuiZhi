@@ -264,7 +264,7 @@ export function useIllustrations(item: KnowledgeItem): IllustrationController {
     setProgress(null);
     try {
       // 主进程按库里那份正文切块编号，先把未保存的编辑落盘
-      await flushPendingSave();
+      if (!(await flushPendingSave())) return;
       const result = await window.api.illustration.plan(
         itemId,
         styleId,
@@ -341,7 +341,7 @@ export function useIllustrations(item: KnowledgeItem): IllustrationController {
     setIsGenerating(true);
     setProgress(null);
     try {
-      await flushPendingSave();
+      if (!(await flushPendingSave())) return;
       const result = await window.api.illustration.generate(
         itemId,
         styleId,
@@ -405,7 +405,7 @@ export function useIllustrations(item: KnowledgeItem): IllustrationController {
       }
       setBusyAsset(assetFileName);
       try {
-        await flushPendingSave();
+        if (!(await flushPendingSave())) return;
         const result = await window.api.illustration.regenerate(
           itemId,
           styleId,
@@ -444,7 +444,7 @@ export function useIllustrations(item: KnowledgeItem): IllustrationController {
       }
       setBusyAsset(assetFileName);
       try {
-        await flushPendingSave();
+        if (!(await flushPendingSave())) return;
         const result = await window.api.illustration.remove(
           itemId,
           assetFileName,
@@ -477,7 +477,7 @@ export function useIllustrations(item: KnowledgeItem): IllustrationController {
     }
     setIsClearing(true);
     try {
-      await flushPendingSave();
+      if (!(await flushPendingSave())) return;
       const result = await window.api.illustration.clear(itemId);
       applyResult(result);
       if (result.success) {

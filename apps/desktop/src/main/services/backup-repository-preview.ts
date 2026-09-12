@@ -1,3 +1,4 @@
+import { inspectThemedReadingBackup } from "./backup-repository-themed-reading";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -49,6 +50,12 @@ export function previewRepositoryRestore(
           const quickCheck = probe.pragma("quick_check") as Array<Record<string, unknown>>;
           if (quickCheck.length !== 1 || Object.values(quickCheck[0])[0] !== "ok") {
             damagedFiles.push("data/knowledge.db");
+          }
+          for (const asset of inspectThemedReadingBackup(probe)) {
+            const logicalPath = `data/assets/images/${asset.fileName}`;
+            const entry = manifest.entries.find(candidate => candidate.logicalPath === logicalPath && candidate.category === "media");
+            if (!entry) missingFiles.push(logicalPath);
+            else if ((asset.sha256 && entry.sha256 !== asset.sha256) || (asset.bytes !== undefined && entry.sizeBytes !== asset.bytes)) damagedFiles.push(logicalPath);
           }
           const schemaVersion = getSchemaVersion(probe);
           if (schemaVersion > SCHEMA_VERSION) {

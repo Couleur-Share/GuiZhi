@@ -63,3 +63,4 @@ export { segmentTextForFts, buildFtsMatchQuery } from "./fts";
 export { ResearchWorkflowDB } from "./research-workflow";
 export { CrawlJobDB } from "./crawl-job";
 export { WebSourceDB, webContentHash } from "./web-source";
+export { ThemedReadingDB } from "./themed-reading";

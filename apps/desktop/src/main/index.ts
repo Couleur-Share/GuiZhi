@@ -1,3 +1,5 @@
+import { hasActiveThemedReading, shutdownThemedReading } from "./services/themed-reading/runtime";
+import { closeReadingViews } from "./services/themed-reading/v3-views";
 import { stopMobileCapture } from "./services/mobile-capture/lifecycle";
 import { shutdownResearch } from "./ipc/research.ipc";
 import { closeWebCapture } from "./ipc/web-capture.ipc";
@@ -146,6 +148,7 @@ export function emitWindowVisibility(isVisible: boolean) {
 // Register privileged schemes (must be called before app is ready)
 // 注册特权协议（必须在 app ready 之前调用）
 protocol.registerSchemesAsPrivileged([
+  { scheme: "guizhi-reading", privileges: { secure: true, standard: true, supportFetchAPI: true } },
   {
     scheme: "local-image",
     privileges: {
@@ -804,6 +807,7 @@ async function applyDataPathChange(
     };
   }
 
+  if (hasActiveThemedReading()) return { success: false, error: "主题排版正在执行，请先停止任务再切换数据目录" };
   const targetInspection = inspectDataPath(resolvedTargetPath);
   if (countActiveImportTasks(getDatabase()) > 0) {
     return {success:false,error:"有采集任务正在写入，请先暂停或取消任务再切换数据目录"};
@@ -973,7 +977,18 @@ app.on("web-contents-created", (_event, contents) => {
 
 // App startup
 // 应用启动
+declare const __GUIZHI_GRAPHICS_VALIDATION__: boolean;
 void app.whenReady().then(async () => {
+  // 仅隔离构建包含验收入口，正式构建会删除整个分支和测试模块。
+  if (__GUIZHI_GRAPHICS_VALIDATION__ && isE2E) {
+    const v3fixture=await import("../../scripts/reading-v3-fixture");
+    (globalThis as any).readingV3Fixture=v3fixture.readingV3Fixture;
+    const benchmark=await import("../../scripts/reading-v3-benchmark");
+    (globalThis as any).readingV3Benchmark=benchmark.readingV3Benchmark;
+    const fixture = await import("../../scripts/reading-graphics-fixture");
+    (globalThis as unknown as { readingGraphicsFixture: typeof fixture.createGraphicsFixtures }).readingGraphicsFixture = fixture.createGraphicsFixtures;
+    (globalThis as unknown as { readingGraphicsLiveFixture: typeof fixture.createLiveGraphicsFixture }).readingGraphicsLiveFixture = fixture.createLiveGraphicsFixture;
+  }
   try {
     // A second packaged instance on Windows may still reach whenReady() before quit
     // if we only call app.quit() after failing the single-instance lock.
@@ -1154,6 +1169,7 @@ app.on("window-all-closed", () => {
 // Cleanup before quitting
 // 应用退出前清理
 app.on("before-quit", (event) => {
+  closeReadingViews();
   isQuitting = true;
   stopMobileCapture();
   backgroundJobRuntime?.stop();
@@ -1164,7 +1180,7 @@ app.on("before-quit", (event) => {
   event.preventDefault();
   if (quitCleanupRunning) return;
   quitCleanupRunning = true;
-  void Promise.all([shutdownResearch(), closeWebCapture()]).then(() => import("./services/platform-capture/browser-capture"))
+  void Promise.all([shutdownResearch(), closeWebCapture(), shutdownThemedReading()]).then(() => import("./services/platform-capture/browser-capture"))
     .then(({ closeBrowserCaptureService }) => Promise.race([
       closeBrowserCaptureService(),
       new Promise<void>((resolve) => setTimeout(resolve, 5_000)),

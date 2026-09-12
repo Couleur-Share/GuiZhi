@@ -1,3 +1,6 @@
+import { Button } from "../ui/Button";
+import { LibraryBatchResults } from "./LibraryWorkflow";
+import { useLibraryWorkflowStore } from "../../stores/library-workflow.store";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { KnowledgeItemListEntry } from "@guizhi/shared/types";
@@ -32,12 +35,10 @@ export function ItemTableView() {
   const fetchList = useKnowledgeStore((state) => state.fetchList);
   const scope = useKnowledgeStore((state) => state.scope);
   const selectedId = useKnowledgeStore((state) => state.selectedId);
-  const selectItem = useKnowledgeStore((state) => state.selectItem);
   const selectionIds = useKnowledgeStore((state) => state.selectionIds);
   const toggleSelection = useKnowledgeStore((state) => state.toggleSelection);
   const rangeSelectTo = useKnowledgeStore((state) => state.rangeSelectTo);
   const setSelection = useKnowledgeStore((state) => state.setSelection);
-  const clearSelection = useKnowledgeStore((state) => state.clearSelection);
   const setItemTags = useKnowledgeStore((state) => state.setItemTags);
 
   const { visibleColumns, columns, toggleColumn, resizeColumn, resetColumns } =
@@ -89,11 +90,7 @@ export function ItemTableView() {
   };
 
   const openDetail = (id: string) => {
-    if (selectionIds.length > 0) {
-      clearSelection();
-    }
-    void selectItem(id);
-    setDetailOpen(true);
+    void useLibraryWorkflowStore.getState().beginReview(id).then(ok => { if (ok) setDetailOpen(true); });
   };
 
   const handleRowClick = (
@@ -112,8 +109,7 @@ export function ItemTableView() {
   };
 
   const handleKeyboardOpen = useCallback((id: string) => {
-    void useKnowledgeStore.getState().selectItem(id);
-    setDetailOpen(true);
+    void useLibraryWorkflowStore.getState().beginReview(id).then(ok => { if (ok) setDetailOpen(true); });
   }, []);
 
   // 回收站里 Delete 的语义是彻底删除，走确认弹窗；其余范围直接删并给撤销
@@ -165,11 +161,14 @@ export function ItemTableView() {
         />
       )}
 
+      <LibraryBatchResults />
       <div
         data-testid="item-table"
         className="min-h-0 flex-1 overflow-auto px-4 py-3"
       >
-        <div className="mb-2 flex items-center justify-end">
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={togglePageSelection}>本页</Button>
+          <Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>全部符合筛选</Button>
           <ColumnConfigMenu
             columns={columns}
             onToggle={toggleColumn}

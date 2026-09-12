@@ -7,6 +7,9 @@ import { ContextMenu } from "../ui/ContextMenu";
 import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
+import { LibraryBatchResults } from "./LibraryWorkflow";
+import { Button } from "../ui/Button";
+import { useLibraryWorkflowStore } from "../../stores/library-workflow.store";
 import { ItemBulkBar } from "./ItemBulkBar";
 import { ItemConfirmDialog, useItemMenus } from "./item-menus";
 import { ItemListToolbar } from "./ItemListToolbar";
@@ -181,6 +184,8 @@ export function ItemList() {
         />
       )}
 
+      <LibraryBatchResults />
+      <div className="flex px-2"><Button size="sm" variant="ghost" onClick={() => useKnowledgeStore.getState().setSelection([...new Set([...selectionIds,...entries.map(e => e.id)])])}>本页</Button><Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>全部符合筛选</Button></div>
       <div
         ref={scrollRef}
         data-testid="item-list"

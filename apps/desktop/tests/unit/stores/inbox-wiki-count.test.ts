@@ -73,7 +73,7 @@ describe("inbox.store Wiki 待编译计数", () => {
       items: [
         {
           kind: "wiki-pending",
-          id: "aggregate:wiki",
+          id: "aggregate:wiki-pending",
           count: 3,
         },
       ],
@@ -105,7 +105,7 @@ describe("inbox.store Wiki 待编译计数", () => {
     await useInboxStore.getState().refresh();
     expect(useInboxStore.getState()).toMatchObject({
       total: 3,
-      counts: { unclassified: 3, "wiki-pending": 3, "semantic-pending": 3 },
+      counts: { unclassified: 3, "wiki-pending": 3, "semantic-pending": 0 },
     });
   });
 

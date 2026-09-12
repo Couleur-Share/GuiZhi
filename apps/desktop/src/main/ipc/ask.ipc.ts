@@ -9,8 +9,10 @@ import Database from "../database/sqlite";
 
 export function registerAskIPC(db: Database.Database): void {
   const sessions = new AskSessionDB(db);
+  ipcMain.handle(IPC_CHANNELS.ASK_SESSION_QUERY, (_e, input) => sessions.query(input ?? {}));
+  ipcMain.handle(IPC_CHANNELS.ASK_SESSION_META, (_e, id, patch) => sessions.updateMeta(id, patch ?? {}));
 
-  ipcMain.handle(IPC_CHANNELS.ASK_SESSION_LIST, () => sessions.list());
+  ipcMain.handle(IPC_CHANNELS.ASK_SESSION_LIST, (_event, filter) => sessions.list(100, filter));
 
   ipcMain.handle(IPC_CHANNELS.ASK_SESSION_GET, (_event, id: string) =>
     sessions.get(id),

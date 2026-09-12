@@ -80,7 +80,10 @@ function CodeBlock({
           title={copied ? "已复制" : "复制代码"}
         >
           {copied ? (
-            <CheckIcon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            <CheckIcon
+              className="h-3.5 w-3.5 text-primary"
+              aria-hidden="true"
+            />
           ) : (
             <CopyIcon className="h-3.5 w-3.5" aria-hidden="true" />
           )}
@@ -109,11 +112,7 @@ const FORUM_COLOR_CLASSES = [
 
 const sanitizeSchema = {
   ...defaultSchema,
-  tagNames: [
-    ...(defaultSchema.tagNames ?? []),
-    "details",
-    "summary",
-  ],
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
   attributes: {
     ...defaultSchema.attributes,
     span: [
@@ -217,7 +216,16 @@ export function MarkdownBody({
         ...props
       }: ComponentProps<"a"> & { children?: ReactNode; node?: unknown }) => {
         const researchRef = extractText(children).replace(/[[\]]/g, "");
-        if (onResearchCitationClick && /^[RL]\d+$/.test(researchRef)) return <button type="button" onClick={() => onResearchCitationClick(researchRef)} className="mx-0.5 inline rounded bg-primary/10 px-1 text-primary hover:bg-primary/20">{mark(children)}</button>;
+        if (onResearchCitationClick && /^[RL]\d+$/.test(researchRef))
+          return (
+            <button
+              type="button"
+              onClick={() => onResearchCitationClick(researchRef)}
+              className="mx-0.5 inline rounded bg-primary/10 px-1 text-primary hover:bg-primary/20"
+            >
+              {mark(children)}
+            </button>
+          );
         if (onCitationClick && href?.startsWith(CITATION_HREF_PREFIX)) {
           const ordinal = Number(href.slice(CITATION_HREF_PREFIX.length));
           if (Number.isFinite(ordinal)) {
@@ -238,7 +246,12 @@ export function MarkdownBody({
         }
         // 外链经系统浏览器打开（Electron 的 setWindowOpenHandler 已接管 target=_blank）
         return (
-          <a {...props} href={safeHref} target="_blank" rel="noopener noreferrer">
+          <a
+            {...props}
+            href={safeHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             {mark(children)}
           </a>
         );
@@ -251,7 +264,14 @@ export function MarkdownBody({
       }: ComponentProps<"img"> & { node?: unknown }) => {
         if (!isLocalAsset(typeof src === "string" ? src : undefined)) {
           // 外部图片不发送知识库页面来源，避免泄露本地地址及触发公众号防盗链。
-          return <img src={src} alt={alt ?? ""} {...props} referrerPolicy="no-referrer" />;
+          return (
+            <img
+              src={src}
+              alt={alt ?? ""}
+              {...props}
+              referrerPolicy="no-referrer"
+            />
+          );
         }
         const position = localImages.findIndex((image) => image.src === src);
         return (
@@ -323,12 +343,17 @@ export const MarkdownPreview = forwardRef<
   ref,
 ) {
   return (
-    <div ref={ref} className="h-full overflow-y-auto px-6 py-4">
-      <MarkdownBody
-        content={content}
-        centeredHeadings={centeredHeadings}
-        highlightQuery={highlightQuery}
-      />
+    <div
+      ref={ref}
+      className="article-prose-scroll h-full overflow-y-auto px-6 py-7 sm:px-10 sm:py-9"
+    >
+      <div className="article-prose mx-auto w-full max-w-[48rem]">
+        <MarkdownBody
+          content={content}
+          centeredHeadings={centeredHeadings}
+          highlightQuery={highlightQuery}
+        />
+      </div>
     </div>
   );
 });

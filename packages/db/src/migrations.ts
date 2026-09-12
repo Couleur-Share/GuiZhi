@@ -1,3 +1,9 @@
+import { KNOWLEDGE_BATCH_SCHEMA } from "./knowledge-batch-log";
+import { SOURCE_REVISIONS_SCHEMA } from "./source-revisions";
+import { migrateAskHistory } from "./ask-history";
+import { WIKI_COMPILER_SCHEMA, WIKI_INVALIDATION_TRIGGERS } from "./wiki-compiler-schema";
+import { ASK_EVIDENCE_SCHEMA } from "./ask-evidence";
+import { THEMED_READING_SCHEMA } from "./themed-reading-schema";
 import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
 import { migrateWebCapture, WEB_SNAPSHOT_SCHEMA } from "./web-capture-schema";
 import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
@@ -656,6 +662,28 @@ export const MIGRATIONS: Migration[] = [
     for (const row of db.all("SELECT id,source_uri FROM source_records WHERE source_type='url'") as {id:string;source_uri:string}[]) {
       if (resolveSourcePlatform("url",row.source_uri)==="wechat") db.run("UPDATE source_records SET platform='wechat' WHERE id=?",row.id);
     }
+  } },
+  { name: "0032-themed-reading", up: db => db.exec(THEMED_READING_SCHEMA) },
+  {
+    name: "article-ask-sessions",
+    up(db) {
+      addColumnIfMissing(db, "ask_sessions", "scope", "TEXT NOT NULL DEFAULT 'knowledge'");
+      addColumnIfMissing(db, "ask_sessions", "item_id", "TEXT");
+      addColumnIfMissing(db, "ask_sessions", "article_title", "TEXT");
+      addColumnIfMissing(db, "ask_sessions", "options_json", "TEXT NOT NULL DEFAULT '{}'");
+      if (hasColumn(db, "ask_sessions", "scope")) db.exec("CREATE INDEX IF NOT EXISTS idx_ask_sessions_article ON ask_sessions(scope,item_id,updated_at DESC)");
+    },
+  },
+  { name: "0034-ask-evidence-snapshots", up: db => db.exec(ASK_EVIDENCE_SCHEMA) },
+  { name: "0035-wiki-fulltext-compiler", up: db => { db.exec(WIKI_COMPILER_SCHEMA); if (getTableDefinition(db, "knowledge_items")) db.exec(WIKI_INVALIDATION_TRIGGERS); } },
+  { name: "0036-ask-history-search", up: migrateAskHistory },
+  { name: "0037-source-capture-revisions", up: db => db.exec(SOURCE_REVISIONS_SCHEMA) },
+  { name: "0038-knowledge-batch-results", up: db => db.exec(KNOWLEDGE_BATCH_SCHEMA) },
+  { name: "0039-wiki-checkpoint-source-cleanup", up: db => {
+    if (!getTableDefinition(db, "knowledge_items")) return;
+    db.exec(`CREATE TRIGGER IF NOT EXISTS wiki_checkpoint_source_deleted AFTER DELETE ON knowledge_items
+      BEGIN DELETE FROM wiki_compile_blocks WHERE item_id=OLD.id; DELETE FROM wiki_compile_items WHERE item_id=OLD.id; UPDATE wiki_compile_jobs SET status='cancelled',error='编译来源已彻底删除' WHERE status IN ('running','paused','interrupted') AND NOT EXISTS(SELECT 1 FROM wiki_compile_items i WHERE i.job_id=wiki_compile_jobs.id); END;`);
+    db.exec('DELETE FROM wiki_compile_blocks WHERE item_id NOT IN (SELECT id FROM knowledge_items); DELETE FROM wiki_compile_items WHERE item_id NOT IN (SELECT id FROM knowledge_items)');
   } },
 ];
 

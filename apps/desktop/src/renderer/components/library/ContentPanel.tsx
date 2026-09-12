@@ -1,3 +1,4 @@
+import type { ArticleTarget } from "@guizhi/shared/types/article-ask";
 import {
   useCallback,
   useEffect,
@@ -49,6 +50,8 @@ import { highlightText } from "./highlight-text";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
 import { WebSnapshotPane } from "./WebSnapshotPane";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { ReconstructionReader } from "../themed-reading/ReconstructionReader";
+import { useThemedReadingMode } from "../themed-reading/use-themed-reading-mode";
 import { PanelFindBar } from "./PanelFindBar";
 import { ReviewRequiredNotice } from "./ReviewRequiredNotice";
 import {
@@ -64,10 +67,14 @@ import {
 } from "./use-media-actions";
 
 const ForumDiscussionView = lazy(() =>
-  import("./ForumDiscussionView").then((module) => ({ default: module.ForumDiscussionView })),
+  import("./ForumDiscussionView").then((module) => ({
+    default: module.ForumDiscussionView,
+  })),
 );
 const MarkdownEditor = lazy(() =>
-  import("./MarkdownEditor").then((module) => ({ default: module.MarkdownEditor })),
+  import("./MarkdownEditor").then((module) => ({
+    default: module.MarkdownEditor,
+  })),
 );
 
 type PanelTab = ReadingPanelTab;
@@ -92,9 +99,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors ${
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-xs font-medium transition-colors ${
         active
-          ? "bg-primary/15 text-primary"
+          ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
       }`}
     >
@@ -123,7 +130,7 @@ function ToolButton({
       disabled={disabled || busy}
       title={label}
       aria-label={label}
-      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
     >
       {busy ? (
         <Loader2Icon className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -219,8 +226,17 @@ export function ContentPanel({
 
   const [tab, setTab] = useState<PanelTab>("body");
   const [isPreview, setIsPreview] = useState(editorMarkdownPreview);
-  const [snapshotToolbar, setSnapshotToolbar] = useState<HTMLDivElement | null>(null);
-  const isWechatPreview = resolveSourcePlatform("url", item.sourceUri) === "wechat" && (isTrashed || isPreview);
+  const [readerToolbar, setReaderToolbar] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const [snapshotToolbar, setSnapshotToolbar] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const [snapshotView, setSnapshotView] = useState(false);
+  const [askSnapshotVersion, setAskSnapshotVersion] = useState<string | undefined>();
+  const isWechatSource =
+    resolveSourcePlatform("url", item.sourceUri) === "wechat";
+  const isWechatPreview = isWechatSource && snapshotView;
   const [snapshotOriginal, setSnapshotOriginal] = useState(true);
   const [findQuery, setFindQuery] = useState("");
   const [isFindOpen, setIsFindOpen] = useState(false);
@@ -250,16 +266,12 @@ export function ContentPanel({
       transcriptActions.transcript.length > 0);
 
   const sections =
-    item.itemType === "image" && !isTrashed && isPreview
-      ? splitImageNoteSections(item.content)
-      : null;
+    item.itemType === "image" ? splitImageNoteSections(item.content) : null;
   const showImagesTab = sections !== null;
   const showRecognizedTab = Boolean(sections?.recognized);
 
   const forumSections =
-    item.itemType === "forum" && !isTrashed && isPreview
-      ? splitForumNoteSections(item.content)
-      : null;
+    item.itemType === "forum" ? splitForumNoteSections(item.content) : null;
   const showForumSummaryTab = Boolean(forumSections?.summary);
   const showRepliesTab = Boolean(forumSections?.replies);
 
@@ -272,6 +284,20 @@ export function ContentPanel({
     replies: showRepliesTab,
   };
   const activeTab: PanelTab = availableTabs[tab] ? tab : "body";
+  const themed = useThemedReadingMode(item.id, activeTab, !snapshotView);
+  const selectThemedForAsk = themed.select;
+  useEffect(() => {
+    const navigate = (event: Event) => {
+      const target = (event as CustomEvent<ArticleTarget>).detail;
+      if (target?.itemId !== item.id) return;
+      setSnapshotView(target.view === "snapshot");
+      setAskSnapshotVersion(target.view === "snapshot" ? target.versionId : undefined);
+      setTab(target.view === "snapshot" ? "body" : target.view === "themed" ? target.sourceKind ?? "body" : target.view);
+      selectThemedForAsk(target.view === "themed");
+    };
+    window.addEventListener("article-ask-navigate", navigate);
+    return () => window.removeEventListener("article-ask-navigate", navigate);
+  }, [item.id, selectThemedForAsk]);
 
   const replies = useMemo(
     () =>
@@ -282,6 +308,7 @@ export function ContentPanel({
   );
 
   const getScrollTop = useCallback((): number | null => {
+    if (themed.active) return null;
     if (activeTab === "summary") {
       return summaryScrollRef.current?.scrollTop ?? null;
     }
@@ -298,7 +325,7 @@ export function ContentPanel({
       return discussionRef.current?.getScrollElement()?.scrollTop ?? null;
     }
     return null;
-  }, [activeTab]);
+  }, [activeTab, themed.active]);
 
   const onPaneScroll = useDebouncedScrollSave(item.id, activeTab, getScrollTop);
 
@@ -306,6 +333,7 @@ export function ContentPanel({
   // 条目 ID 限定更新条件；React 会丢弃本轮输出并立即用新状态重渲染。
   if (viewItemId !== item.id) {
     setViewItemId(item.id);
+    setSnapshotView(false);
     restoredRef.current = false;
     const preview = editorMarkdownPreview && Boolean(item.content.trim());
     setIsPreview(preview);
@@ -316,9 +344,7 @@ export function ContentPanel({
 
     const memory = loadContentReadingMemory(item.id);
     const forum =
-      item.itemType === "forum" && preview
-        ? splitForumNoteSections(item.content)
-        : null;
+      item.itemType === "forum" ? splitForumNoteSections(item.content) : null;
     const replyCount = forum?.replies
       ? parseForumReplySection(forum.replies).length
       : 0;
@@ -338,7 +364,7 @@ export function ContentPanel({
       setCatalogOpen(memory.catalogOpen ?? defaultCatalogOpen(replyCount));
     } else {
       const preferSummary =
-        preview && item.itemType === "forum" && Boolean(forum?.summary);
+        item.itemType === "forum" && Boolean(forum?.summary);
       setTab(preferSummary ? "summary" : "body");
       setCatalogOpen(defaultCatalogOpen(replyCount));
     }
@@ -346,7 +372,7 @@ export function ContentPanel({
 
   // 恢复滚动位置（等 pane 挂好）
   useLayoutEffect(() => {
-    if (restoredRef.current) {
+    if (restoredRef.current || themed.active) {
       return;
     }
     const memory = loadContentReadingMemory(item.id);
@@ -378,7 +404,7 @@ export function ContentPanel({
     };
     const frame = requestAnimationFrame(apply);
     return () => cancelAnimationFrame(frame);
-  }, [activeTab, item.id]);
+  }, [activeTab, item.id, themed.active]);
 
   useEffect(() => {
     patchContentReadingMemory(item.id, { tab: activeTab });
@@ -423,16 +449,24 @@ export function ContentPanel({
 
   useMarkFindNavigation({
     containerRef: markContainerRef,
-    query: activeTab === "replies" ? "" : isWechatPreview ? snapshotFindQuery : findQuery,
+    query:
+      themed.active || activeTab === "replies"
+        ? ""
+        : isWechatPreview
+          ? snapshotFindQuery
+          : findQuery,
     activeIndex: findActiveIndex,
     onMatchCountChange:
-      activeTab === "replies" || (isWechatPreview && snapshotOriginal) ? noopMatchCount : setFindMatchCount,
+      themed.active ||
+      activeTab === "replies" ||
+      (isWechatPreview && snapshotOriginal)
+        ? noopMatchCount
+        : setFindMatchCount,
     contentKey: `${item.id}:${activeTab}:${markContentKey.length}`,
   });
 
   const showFindBar =
-    isPreview &&
-    !isTrashed &&
+    ((isPreview && !isTrashed) || themed.available || isWechatPreview) &&
     FINDABLE_TABS.includes(activeTab) &&
     (activeTab !== "transcript" || Boolean(transcriptActions.transcript)) &&
     (activeTab !== "replies" || showRepliesTab) &&
@@ -514,75 +548,106 @@ export function ContentPanel({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border app-wallpaper-panel">
-        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {isWechatPreview ? <div ref={setSnapshotToolbar} className="flex min-w-0 items-center" /> : <>
-            {showForumSummaryTab ? (
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="article-content">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-panel">
+        <div
+          className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-y border-border/50 px-6 py-1.5"
+          data-testid="article-toolbar"
+        >
+          <div className="flex min-w-0 max-w-full flex-[1_0_auto] items-center gap-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {isWechatSource ? (
               <TabButton
-                active={activeTab === "summary"}
-                onClick={() => changeTab("summary")}
+                active={snapshotView}
+                onClick={() => {
+                  setSnapshotView(!snapshotView);
+                  setFindActiveIndex(0);
+                  setFindMatchCount(0);
+                }}
               >
-                <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
-                {t("library.forumSummarySection", "讨论总结")}
+                {snapshotView ? "返回阅读" : "网页快照"}
               </TabButton>
             ) : null}
-            <TabButton
-              active={activeTab === "body"}
-              onClick={() => changeTab("body")}
-            >
-              {sections
-                ? t("library.captionSection", "文案")
-                : t("library.bodySection", "正文")}
-            </TabButton>
-            {showRepliesTab ? (
-              <TabButton
-                active={activeTab === "replies"}
-                onClick={() => changeTab("replies")}
-              >
-                <MessagesSquareIcon className="h-3 w-3" aria-hidden="true" />
-                {t("library.forumRepliesSection", "讨论")}
-              </TabButton>
-            ) : null}
-            {showImagesTab ? (
-              <TabButton
-                active={activeTab === "images"}
-                onClick={() => changeTab("images")}
-              >
-                <ImageIcon className="h-3 w-3" aria-hidden="true" />
-                {t("library.imagesSection", "图片")}
-              </TabButton>
-            ) : null}
-            {showRecognizedTab ? (
-              <TabButton
-                active={activeTab === "recognized"}
-                onClick={() => changeTab("recognized")}
-              >
-                <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
-                {t("library.recognizedSection", "图中文字")}
-              </TabButton>
-            ) : null}
-            {showTranscriptTab ? (
-              <TabButton
-                active={activeTab === "transcript"}
-                onClick={() => changeTab("transcript")}
-              >
-                <AudioLinesIcon className="h-3 w-3" aria-hidden="true" />
-                {t("library.transcript", "文字稿")}
-                {transcriptActions.transcript ? (
-                  <span className="text-[10px] opacity-60">
-                    {t("library.transcriptLength", "{{count}} 字", {
-                      count: transcriptActions.transcript.length,
-                    })}
-                  </span>
+            {isWechatPreview && !themed.active ? (
+              <div
+                ref={setSnapshotToolbar}
+                className="flex min-w-0 items-center"
+              />
+            ) : (
+              <>
+                {showForumSummaryTab ? (
+                  <TabButton
+                    active={activeTab === "summary"}
+                    onClick={() => changeTab("summary")}
+                  >
+                    <ScrollTextIcon className="h-3 w-3" aria-hidden="true" />
+                    {t("library.forumSummarySection", "讨论总结")}
+                  </TabButton>
                 ) : null}
-              </TabButton>
-            ) : null}
-            </>}
+                <TabButton
+                  active={activeTab === "body"}
+                  onClick={() => changeTab("body")}
+                >
+                  {sections
+                    ? t("library.captionSection", "文案")
+                    : t("library.bodySection", "正文")}
+                </TabButton>
+                {showRepliesTab ? (
+                  <TabButton
+                    active={activeTab === "replies"}
+                    onClick={() => changeTab("replies")}
+                  >
+                    <MessagesSquareIcon
+                      className="h-3 w-3"
+                      aria-hidden="true"
+                    />
+                    {t("library.forumRepliesSection", "讨论")}
+                  </TabButton>
+                ) : null}
+                {showImagesTab ? (
+                  <TabButton
+                    active={activeTab === "images"}
+                    onClick={() => changeTab("images")}
+                  >
+                    <ImageIcon className="h-3 w-3" aria-hidden="true" />
+                    {t("library.imagesSection", "图片")}
+                  </TabButton>
+                ) : null}
+                {showRecognizedTab ? (
+                  <TabButton
+                    active={activeTab === "recognized"}
+                    onClick={() => changeTab("recognized")}
+                  >
+                    <ScanTextIcon className="h-3 w-3" aria-hidden="true" />
+                    {t("library.recognizedSection", "图中文字")}
+                  </TabButton>
+                ) : null}
+                {showTranscriptTab ? (
+                  <TabButton
+                    active={activeTab === "transcript"}
+                    onClick={() => changeTab("transcript")}
+                  >
+                    <AudioLinesIcon className="h-3 w-3" aria-hidden="true" />
+                    {t("library.transcript", "文字稿")}
+                    {transcriptActions.transcript ? (
+                      <span className="text-[10px] opacity-60">
+                        {t("library.transcriptLength", "{{count}} 字", {
+                          count: transcriptActions.transcript.length,
+                        })}
+                      </span>
+                    ) : null}
+                  </TabButton>
+                ) : null}
+              </>
+            )}
           </div>
 
-          <div className="ml-1 flex shrink-0 items-center gap-1">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-1">
+            {themed.available && !isWechatPreview ? (
+              <div
+                ref={setReaderToolbar}
+                className="flex min-w-0 flex-wrap items-center gap-1"
+              />
+            ) : null}
             {showFindBar ? (
               <ToolButton
                 onClick={() => setIsFindOpen(true)}
@@ -633,7 +698,7 @@ export function ContentPanel({
                     />
                   </ToolButton>
                 ) : null}
-                {!isTrashed ? (
+                {!isTrashed && !themed.available ? (
                   <button
                     type="button"
                     onClick={() => setIsPreview(!isPreview)}
@@ -727,8 +792,48 @@ export function ContentPanel({
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1" onScrollCapture={onPaneScroll}>
-          {activeTab === "transcript" ? (
+        <div className="min-h-0 flex-1" onScrollCapture={onPaneScroll} data-article-reader
+          data-article-editing={themed.editing || (!themed.available && !isPreview && activeTab === "body") ? "true" : "false"}
+          data-article-target={JSON.stringify({ itemId: item.id, view: snapshotView && snapshotOriginal ? "snapshot" : themed.active ? "themed" : activeTab === "images" ? "body" : activeTab, sourceKind: themed.sourceKind })}>
+          {isWechatPreview ? (
+            <WebSnapshotPane
+              versionId={askSnapshotVersion}
+              key={item.id}
+              item={item}
+              toolbarTarget={snapshotToolbar}
+              forceSimple={false}
+              findQuery={snapshotFindQuery}
+              findIndex={findActiveIndex}
+              onFindCount={setFindMatchCount}
+              onOriginalChange={setSnapshotOriginal}
+              onFindOpen={() => setIsFindOpen(true)}
+            >
+              <MarkdownPreview
+                ref={bodyScrollRef}
+                content={previewContent}
+                highlightQuery={snapshotFindQuery}
+              />
+            </WebSnapshotPane>
+          ) : themed.available ? (
+            <ReconstructionReader
+              toolbarTarget={readerToolbar}
+              key={`${item.id}:${themed.sourceKind}`}
+              item={item}
+              mode={themed}
+              scrollRef={
+                activeTab === "summary" ? summaryScrollRef : bodyScrollRef
+              }
+              findQuery={snapshotFindQuery}
+              findIndex={findActiveIndex}
+              onFindCount={setFindMatchCount}
+              onFindOpen={() => setIsFindOpen(true)}
+              onModeChange={() => {
+                restoredRef.current = false;
+                setFindActiveIndex(0);
+                setFindMatchCount(0);
+              }}
+            />
+          ) : activeTab === "transcript" ? (
             <TranscriptPane
               actions={transcriptActions}
               scrollRef={transcriptScrollRef}
@@ -802,11 +907,30 @@ export function ContentPanel({
             </div>
           ) : isTrashed || isPreview ? (
             resolveSourcePlatform("url", item.sourceUri) === "wechat" ? (
-              <WebSnapshotPane key={item.id} item={item} toolbarTarget={snapshotToolbar} forceSimple={false} findQuery={snapshotFindQuery} findIndex={findActiveIndex} onFindCount={setFindMatchCount} onOriginalChange={setSnapshotOriginal} onFindOpen={() => setIsFindOpen(true)}>
-                <MarkdownPreview ref={bodyScrollRef} content={isTrashed ? item.content : previewContent} highlightQuery={snapshotFindQuery} />
+              <WebSnapshotPane
+              versionId={askSnapshotVersion}
+                key={item.id}
+                item={item}
+                toolbarTarget={snapshotToolbar}
+                forceSimple={false}
+                findQuery={snapshotFindQuery}
+                findIndex={findActiveIndex}
+                onFindCount={setFindMatchCount}
+                onOriginalChange={setSnapshotOriginal}
+                onFindOpen={() => setIsFindOpen(true)}
+              >
+                <MarkdownPreview
+                  ref={bodyScrollRef}
+                  content={isTrashed ? item.content : previewContent}
+                  highlightQuery={snapshotFindQuery}
+                />
               </WebSnapshotPane>
             ) : (
-              <MarkdownPreview ref={bodyScrollRef} content={isTrashed ? item.content : previewContent} highlightQuery={findQuery} />
+              <MarkdownPreview
+                ref={bodyScrollRef}
+                content={isTrashed ? item.content : previewContent}
+                highlightQuery={findQuery}
+              />
             )
           ) : (
             <MarkdownEditor
@@ -950,7 +1074,7 @@ function TranscriptPane({
             : t("library.transcriptFormatting", "正在排版…")}
         </p>
       ) : null}
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
+      <p className="mx-auto max-w-[48rem] whitespace-pre-wrap text-base leading-8 text-foreground/90">
         {highlightQuery?.trim()
           ? highlightText(actions.transcript, highlightQuery)
           : actions.transcript}

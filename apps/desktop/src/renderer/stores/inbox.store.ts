@@ -19,7 +19,10 @@ const EMPTY_COUNTS: InboxListResult["counts"] = {
   "wiki-pending": 0,
 };
 
+let refreshGeneration = 0;
 interface InboxState {
+  wikiCandidates: { ready: number; review: number; waiting: number; upgrade: number } | null;
+  sectionErrors: { wiki?: string; semantic?: string };
   items: InboxItem[];
   counts: InboxListResult["counts"];
   total: number;
@@ -47,6 +50,8 @@ interface InboxState {
 
 export const useInboxStore = create<InboxState>()((set, get) => ({
   items: [],
+  wikiCandidates: null,
+  sectionErrors: {},
   counts: { ...EMPTY_COUNTS },
   total: 0,
   filter: "all",
@@ -63,45 +68,45 @@ export const useInboxStore = create<InboxState>()((set, get) => ({
   setSelection: (itemIds) => set({ selectionIds: [...new Set(itemIds)] }),
   clearSelection: () => set({ selectionIds: [] }),
   refresh: async () => {
-    set({ isLoading: true, loadError: null });
-    try {
-      const [result, wikiPending] = await Promise.all([
-        window.api.inbox.list(),
-        import("../services/knowledge-ai/wiki-compile").then(
-          ({ countPendingWikiItems }) => countPendingWikiItems(),
-        ),
-      ]);
-      const wikiItem: InboxItem | null =
-        wikiPending > 0
-          ? {
-              kind: "wiki-pending",
-              id: "aggregate:wiki",
-              count: wikiPending,
-              createdAt: Date.now(),
-            }
-          : null;
-      const items = [
-        ...(wikiItem ? [wikiItem] : []),
-        ...result.items.filter((item) => item.kind !== "wiki-pending"),
-      ];
-      const counts = {
-        ...result.counts,
-        "wiki-pending": wikiPending,
-      };
-      const alive = new Set(
-        items.flatMap((item) => ("itemId" in item ? [item.itemId] : [])),
-      );
-      set((state) => ({
-        items,
-        counts,
-        total: result.total,
-        selectionIds: state.selectionIds.filter((id) => alive.has(id)),
-      }));
-    } catch (error) {
-      set({ loadError: describeLoadError(error) });
-    } finally {
-      set({ isLoading: false });
-    }
+    const generation = ++refreshGeneration;
+    set({ isLoading: true, loadError: null, sectionErrors: {} });
+    const aggregate = (kind: "wiki-pending" | "semantic-pending", count: number) => {
+      if (generation !== refreshGeneration) return;
+      set(s => ({ items: [...s.items.filter(item => item.kind !== kind), ...(count ? [{ kind, id: `aggregate:${kind}`, count, createdAt: Date.now() }] : [])], counts: { ...s.counts, [kind]: count } }));
+    };
+    await Promise.allSettled([
+      (async () => {
+        try {
+          const result = await window.api.inbox.list();
+          if (generation !== refreshGeneration) return;
+          const entries = result.items.filter(item => !["wiki-pending", "semantic-pending"].includes(item.kind));
+          const alive = new Set(entries.flatMap(item => "itemId" in item ? [item.itemId] : []));
+          set(s => ({ items: [...entries, ...s.items.filter(item => ["wiki-pending", "semantic-pending"].includes(item.kind))],
+            counts: { ...result.counts, "wiki-pending": s.counts["wiki-pending"], "semantic-pending": s.counts["semantic-pending"] },
+            total: result.total, selectionIds: s.selectionIds.filter(id => alive.has(id)) }));
+        } catch (e) { if (generation === refreshGeneration) set({ loadError: describeLoadError(e) }); }
+        finally { if (generation === refreshGeneration) set({ isLoading: false }); }
+      })(),
+      (async () => {
+        try {
+          if (window.api?.wiki?.compiler) {
+            const { wikiPreview } = await import("../services/knowledge-ai/wiki-v2");
+            const preview = await wikiPreview();
+            if (generation === refreshGeneration) set({ wikiCandidates: preview.counts });
+            aggregate("wiki-pending", preview.counts.ready); return;
+          }
+          const { countPendingWikiItems } = await import("../services/knowledge-ai/wiki-compile"); aggregate("wiki-pending", await countPendingWikiItems()); }
+        catch (e) { aggregate("wiki-pending", 0); if (generation === refreshGeneration) set(s => ({ sectionErrors: { ...s.sectionErrors, wiki: describeLoadError(e) } })); }
+      })(),
+      (async () => {
+        try {
+          const { resolveEmbeddingConfig } = await import("../services/knowledge-ai/embeddings");
+          const config = resolveEmbeddingConfig();
+          const status = config ? await window.api.semantic.status(config.model) : null;
+          aggregate("semantic-pending", status ? Math.max(0, status.eligibleItems - status.indexedItems) : 0);
+        } catch (e) { aggregate("semantic-pending", 0); if (generation === refreshGeneration) set(s => ({ sectionErrors: { ...s.sectionErrors, semantic: describeLoadError(e) } })); }
+      })(),
+    ]);
   },
   organize: async (input) => {
     const itemIds = get().selectionIds;

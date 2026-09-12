@@ -362,6 +362,7 @@ async function listPendingWikiCompilations(): Promise<
 
 /** 处理中心使用的精确待编译数，与立即执行共享同一判定。 */
 export async function countPendingWikiItems(): Promise<number> {
+  if (window.api.wiki.compiler) return (await (await import("./wiki-v2")).wikiPreview()).counts.ready;
   return (await listPendingWikiCompilations()).length;
 }
 
@@ -386,6 +387,7 @@ export async function compilePendingItems(
   onProgress?: (message: string, current: number, total: number) => void,
   signal?: AbortSignal,
 ): Promise<WikiCompileRoundResult> {
+  if (window.api.wiki.compiler) return (await import("./wiki-v2")).compileReadyWiki(onProgress, signal);
   const pending = await listPendingWikiCompilations();
 
   if (pending.length === 0) {

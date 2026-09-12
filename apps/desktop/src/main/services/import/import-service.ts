@@ -1,3 +1,5 @@
+import { saveSourceRevision } from "@guizhi/db/source-revisions";
+import { sourceIdentity, resolveSourceIdentity } from "./source-identity";
 import { normalizeUrl } from "./url-normalize";
 import { releaseSnapshotAssets } from "../web-capture/snapshot-assets";
 import { cleanupOrphanAssets } from "../asset-cleanup";
@@ -50,6 +52,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
           return byUri.item_id;
         }
       }
+      if (!contentHash) return null;
       const byHash = db.get(
         `SELECT s.item_id AS item_id FROM source_records s
          JOIN knowledge_items i ON i.id = s.item_id
@@ -60,6 +63,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
       return byHash?.item_id ?? null;
     },
 
+    getDuplicateMeta(id) { const item = new KnowledgeItemDB(db).get(id); return item ? { title: item.title, itemType: item.itemType } : null; },
     rememberSourceAccess(itemId, normalizedUri, accessUri) {
       new SourceAccessDB(db).remember(itemId, normalizedUri, accessUri);
     },
@@ -82,6 +86,17 @@ function createPersistence(db: Database.Database): ImportPersistence {
         const original = db.get("SELECT source_uri FROM source_records WHERE item_id=? ORDER BY captured_at DESC LIMIT 1",refreshOfItemId) as {source_uri:string};
         if (!original || normalizeUrl(original.source_uri) !== normalizeUrl(sourceInput)) throw new Error("补采来源与原条目不一致");
         new WebSourceDB(db).attach(refreshOfItemId, extracted.webCapture);
+        return refreshOfItemId;
+      }
+      if (refreshOfItemId) {
+        const original = items.get(refreshOfItemId);
+        if (!original || original.deletedAt != null) throw new Error("来源条目不存在或已移入回收站");
+        if (!original.sourceUri || sourceIdentity(original.sourceUri) !== sourceIdentity(extracted.sourceUri || sourceInput)) throw new Error("更新来源与原条目不一致");
+        const review = assessImportReview(extracted, sourceKind);
+        db.transaction(() => {
+          saveSourceRevision(db, refreshOfItemId, { title: extracted.title, content: extracted.content, transcript: extracted.transcript, reasons: review.reasons });
+          new SourceAccessDB(db).remember(refreshOfItemId, normalizedUri || sourceInput, sourceInput);
+        })();
         return refreshOfItemId;
       }
       let itemId = "";
@@ -196,6 +211,7 @@ export function createImportService(
   const queue = new ImportQueue({
     store: taskDb,
     persistence: createPersistence(db),
+    resolveSource: resolveSourceIdentity,
     extract: (task, signal, onStage) => {
       let fallbackReason: string | undefined;
       if (task.captureStrategy === "authenticated") {

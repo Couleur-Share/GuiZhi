@@ -1,12 +1,15 @@
 /**
  * 语义索引 IPC：状态 / 待索引批次 / 向量落库 / 余弦检索。
  */
+import { computeContentHash } from "../services/import/content-hash";
+import { trackCancellableRequest } from "../services/request-cancellation";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import type { ApplySemanticEmbeddingsInput } from "@guizhi/shared/types";
 import { SemanticIndexDB } from "@guizhi/db";
 import Database from "../database/sqlite";
 import {
+  buildSemanticSourceText,
   getSemanticStatus,
   listPendingSemanticItems,
   searchSemanticByVector,
@@ -66,6 +69,9 @@ export function registerSemanticIPC(db: Database.Database): void {
         throw new Error("semantic:applyEmbeddings 载荷不合法");
       }
       try {
+        // 嵌入耗时期间原文可能已编辑；旧结果不能抬高索引时间戳并永久隐藏待办。
+        const current = db.get("SELECT title,content,transcript FROM knowledge_items WHERE id=? AND deleted_at IS NULL", input.itemId) as { title: string; content: string; transcript: string | null } | undefined;
+        if (!current || computeContentHash(buildSemanticSourceText(current.title, current.content, current.transcript)) !== input.contentHash) return false;
         semantic.replaceItemChunks({
           itemId: input.itemId,
           contentHash: input.contentHash,
@@ -93,7 +99,7 @@ export function registerSemanticIPC(db: Database.Database): void {
     IPC_CHANNELS.SEMANTIC_SEARCH,
     (
       _event,
-      params: { model?: unknown; vector?: unknown; limit?: unknown },
+      params: { model?: unknown; vector?: unknown; limit?: unknown; requestId?: string },
     ) => {
       const model = typeof params?.model === "string" ? params.model : "";
       const vector = Array.isArray(params?.vector)
@@ -106,7 +112,8 @@ export function registerSemanticIPC(db: Database.Database): void {
         Math.max(1, Number(params?.limit) || 5),
         SEARCH_LIMIT_MAX,
       );
-      return searchSemanticByVector(db, model, new Float32Array(vector), limit);
+      const controller = new AbortController(), release = trackCancellableRequest(params.requestId, controller);
+      return searchSemanticByVector(db, model, new Float32Array(vector), limit, controller.signal).finally(release);
     },
   );
 

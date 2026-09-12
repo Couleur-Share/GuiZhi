@@ -24,3 +24,4 @@ export * from "./research";
 
 export * from "./research-workflow";
 export * from "./web-capture";
+export * from "./themed-reading";

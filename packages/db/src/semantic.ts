@@ -27,6 +27,8 @@ export interface SemanticVectorRecord {
 
 /** 命中分块的展示信息（只为最终 top-k 取） */
 export interface SemanticChunkSnippet {
+  reviewStatus?: "clear" | "needs_review";
+  reviewReasons?: string[];
   itemId: string;
   chunkIndex: number;
   chunkText: string;
@@ -241,17 +243,17 @@ export class SemanticIndexDB {
     const placeholders = keys.map(() => "(?, ?)").join(", ");
     const params = keys.flatMap((key) => [key.itemId, key.chunkIndex]);
     const rows = this.db.all(
-      `SELECT e.item_id, e.chunk_index, e.chunk_text, i.title AS title
+      `SELECT e.item_id, e.chunk_index, e.chunk_text, i.title AS title,i.review_status,i.review_reasons
        FROM knowledge_embeddings e
        JOIN knowledge_items i ON i.id = e.item_id
-       WHERE (e.item_id, e.chunk_index) IN (VALUES ${placeholders})`,
+       WHERE i.deleted_at IS NULL AND (e.item_id, e.chunk_index) IN (VALUES ${placeholders})`,
       ...params,
-    ) as Array<Pick<ChunkRow, "item_id" | "chunk_index" | "chunk_text" | "title">>;
+    ) as Array<Pick<ChunkRow, "item_id" | "chunk_index" | "chunk_text" | "title"> & { review_status: "clear" | "needs_review"; review_reasons: string }>;
     return rows.map((row) => ({
       itemId: row.item_id,
       chunkIndex: row.chunk_index,
       chunkText: row.chunk_text,
-      title: row.title,
+      title: row.title, reviewStatus: row.review_status, reviewReasons: JSON.parse(row.review_reasons || "[]"),
     }));
   }
 

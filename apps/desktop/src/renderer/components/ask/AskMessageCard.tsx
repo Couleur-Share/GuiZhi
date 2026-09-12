@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { EvidenceExcerpt } from "./EvidenceExcerpt";
+import { useState } from "react";
 import {
   BookOpenIcon,
   CheckIcon,
@@ -16,8 +17,7 @@ import { useTranslation } from "react-i18next";
 import { useAskStore, type AskMessage } from "../../stores/ask.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
-import { MarkdownBody } from "../library/MarkdownPreview";
-import { linkifyCitations } from "./qa-citations";
+import { AnswerBody } from "./AnswerBody";
 import type { QaSourceRef } from "../../services/knowledge-ai/qa";
 
 /** 打开某条引用来源（Wiki 页面或知识条目） */
@@ -140,7 +140,7 @@ function SourceList({
                 aria-hidden="true"
               />
             )}
-            <span className="min-w-0 truncate">{source.title}</span>
+            <span className="min-w-0 truncate">{source.title}{source.evidence?.reviewStatus === "needs_review" ? " · 待复核" : ""}</span>
           </button>
         ))}
       </div>
@@ -252,18 +252,17 @@ function MessageActions({ message }: { message: AskMessage }) {
 export function AskMessageCard({ message }: { message: AskMessage }) {
   const { t } = useTranslation();
   const openSource = useOpenSource();
+  const [sourceChoice, setSourceChoice] = useState<{ list: 'sources' | 'evidenceSources'; index: number } | null>(null);
+  const source = sourceChoice ? message[sourceChoice.list]?.[sourceChoice.index] : null;
+  const setSource = (value: QaSourceRef | null) => {
+    const list = value && message.sources.includes(value) ? 'sources' : 'evidenceSources';
+    setSourceChoice(value ? { list, index: message[list]?.indexOf(value) ?? -1 } : null);
+  };
   const [highlighted, setHighlighted] = useState<number | null>(null);
 
-  const validOrdinals = useMemo(
-    () => new Set(message.sources.map((source) => source.ordinal)),
-    [message.sources],
-  );
-  const body = useMemo(
-    () => linkifyCitations(message.answer, validOrdinals),
-    [message.answer, validOrdinals],
-  );
 
   const focusCitation = (ordinal: number) => {
+    setSource(message.sources.find(s => s.ordinal === ordinal) ?? null);
     setHighlighted(ordinal);
     window.setTimeout(() => setHighlighted(null), 2000);
   };
@@ -280,12 +279,14 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
 
       <div className="rounded-2xl rounded-bl-md border border-border/70 bg-background/60 px-4 py-3">
         <AgentSteps steps={message.steps} running={isRunning} />
+        {message.warnings?.map(warning => <p key={warning} role="status" className="mb-2 text-xs text-muted-foreground">{warning}</p>)}
 
         {message.status === "error" ? (
           <MessageError message={message} />
-        ) : message.answer ? (
+        ) : null}
+        {message.answer ? (
           <>
-            <MarkdownBody content={body} onCitationClick={focusCitation} />
+            <AnswerBody answer={message.answer} ordinals={message.sources.map(s => s.ordinal)} onCitation={focusCitation} />
             {message.truncated ? (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
                 <TriangleAlertIcon
@@ -310,10 +311,12 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
           <SourceList
             sources={message.sources}
             highlighted={highlighted}
-            onOpen={(source) => void openSource(source)}
+            onOpen={setSource}
           />
         ) : null}
 
+        {message.evidenceSources?.length ? <details className="my-2 text-xs text-muted-foreground"><summary className="cursor-pointer">本次读取的全部证据（{message.evidenceSources.length}）</summary><div className="flex flex-wrap gap-2 py-2">{message.evidenceSources.map((entry, index) => <button key={index} className="rounded border border-border px-2 py-1 text-left" onClick={() => setSource(entry)}>{entry.title}</button>)}</div></details> : null}
+        {source ? <EvidenceExcerpt evidence={source.evidence} cleared={source.cleared} onCurrent={() => void openSource(source)} onClose={() => setSource(null)} /> : null}
         {!isRunning ? (
           <div className="mt-1 flex flex-wrap items-center gap-x-2">
             {/* 走了兜底管线 = Agent 协议没跑通，回答质量与检索深度都会差一档，

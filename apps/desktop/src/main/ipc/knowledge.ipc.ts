@@ -1,8 +1,15 @@
+import { freezeKnowledgeSelection, readKnowledgeBatch } from "@guizhi/db/knowledge-batch-log";
+import { listSourceRevisions } from "@guizhi/db/source-revisions";
+import type { KnowledgeSelectionCommand } from "@guizhi/shared/types/knowledge-batch";
+import { executeKnowledgeBatch } from "../services/knowledge-batch";
+import { clearAskEvidence } from "@guizhi/db/ask-evidence";
+import { saveKnowledgeDraft } from "@guizhi/db/knowledge-draft";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { CollectionDB, KnowledgeItemDB, TagDB } from "@guizhi/db";
 import type Database from "../database/sqlite";
 import { cleanupOrphanAssets } from "../services/asset-cleanup";
+import { cancelThemedReadingForItems } from "../services/themed-reading/runtime";
 import type {
   BulkUpdateKnowledgeItemsInput,
   CreateCollectionInput,
@@ -32,6 +39,21 @@ export function registerKnowledgeIPC(db: Database.Database): void {
   const items = new KnowledgeItemDB(db);
   const collections = new CollectionDB(db);
   const tags = new TagDB(db);
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_SELECTION, async (_event, input: KnowledgeSelectionCommand) => {
+    try {
+      if (input.action === "source-versions") return { ok: true, versions: listSourceRevisions(db, input.id) };
+      if (input.action === "freeze") { const ids = items.freezeIds(input.query); return { ok: true, ids, selectionId: freezeKnowledgeSelection(db, ids) }; }
+      if (input.action === "results") return { ok: true, ...readKnowledgeBatch(db, input.runId) };
+      if (input.action === "execute") {
+        if (["trash", "delete"].includes(input.command.kind)) cancelThemedReadingForItems(input.ids);
+        const results = await executeKnowledgeBatch(db, input.ids, input.command, input.runId);
+        return { ok: true, results };
+      }
+      return { ok: false, error: "批量命令无效" };
+    } catch (e) { return { ok: false, error: e instanceof Error ? e.message : String(e) }; }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_SAVE_DRAFT, (_event, input) => saveKnowledgeDraft(db, input));
 
   // ── 条目 ──────────────────────────────────────────────────────────────────
   ipcMain.handle(
@@ -60,27 +82,37 @@ export function registerKnowledgeIPC(db: Database.Database): void {
     (_event, ids: unknown, status: KnowledgeItemStatus) =>
       items.setStatus(normalizeIds(ids), status),
   );
-  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_MOVE_TO_TRASH, (_event, ids: unknown) =>
-    items.moveToTrash(normalizeIds(ids)),
-  );
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_MOVE_TO_TRASH, (_event, ids: unknown) => {
+    const targets = normalizeIds(ids);
+    cancelThemedReadingForItems(targets);
+    return items.moveToTrash(targets);
+  });
   ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_RESTORE, (_event, ids: unknown) =>
     items.restore(normalizeIds(ids)),
   );
   // 彻底删除要连带清理磁盘资产：先取引用（此时正文还在），删完再回收
   ipcMain.handle(
     IPC_CHANNELS.KNOWLEDGE_DELETE_FOREVER,
-    (_event, ids: unknown) => {
+    (_event, ids: unknown, options?: { clearEvidence?: boolean }) => {
       const targetIds = normalizeIds(ids);
+      cancelThemedReadingForItems(targetIds);
       const assetRefs = items.listAssetRefs(targetIds);
-      const changed = items.deleteForever(targetIds);
+      const changed = db.transaction(() => {
+        if (options?.clearEvidence === true) clearAskEvidence(db, targetIds);
+        return items.deleteForever(targetIds);
+      })();
       cleanupOrphanAssets(items, assetRefs);
       return changed;
     },
   );
-  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH, () => {
+  ipcMain.handle(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH, (_event, options?: { clearEvidence?: boolean }) => {
     const trashedIds = items.listTrashedIds();
+    cancelThemedReadingForItems(trashedIds);
     const assetRefs = items.listAssetRefs(trashedIds);
-    const changed = items.emptyTrash();
+    const changed = db.transaction(() => {
+      if (options?.clearEvidence === true) clearAskEvidence(db, trashedIds);
+      return items.emptyTrash();
+    })();
     cleanupOrphanAssets(items, assetRefs);
     return changed;
   });

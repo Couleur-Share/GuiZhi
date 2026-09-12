@@ -20,6 +20,7 @@ export const semanticApi = {
   search: (params: {
     model: string;
     vector: number[];
+    requestId?: string;
     limit?: number;
   }): Promise<SemanticSearchHit[]> =>
     ipcRenderer.invoke(IPC_CHANNELS.SEMANTIC_SEARCH, params),

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -21,12 +22,15 @@ import { Spinner } from "../ui/Spinner";
 import { LoadErrorState } from "../ui/LoadErrorState";
 import { useToast } from "../ui/Toast";
 import { Checkbox } from "../ui/Checkbox";
+import { ThemedReadingTasks } from "../themed-reading/ThemedReadingTasks";
 
 function knowledgeItemId(item: InboxItem): string | null {
   return "itemId" in item ? item.itemId : null;
 }
 
 export function InboxWorkspace() {
+  const { t } = useTranslation();
+  const [showThemeTasks, setShowThemeTasks] = useState(false);
   const { showToast } = useToast();
   const items = useInboxStore((state) => state.items);
   const filter = useInboxStore((state) => state.filter);
@@ -45,6 +49,8 @@ export function InboxWorkspace() {
   const smartClassify = useInboxStore((state) => state.smartClassify);
   const isLoading = useInboxStore((state) => state.isLoading);
   const loadError = useInboxStore((state) => state.loadError);
+  const wikiCandidates = useInboxStore(s => s.wikiCandidates);
+  const sectionErrors = useInboxStore(s => s.sectionErrors);
   const collections = useCollectionStore((state) => state.collections);
   const fetchCollections = useCollectionStore(
     (state) => state.fetchCollections,
@@ -168,6 +174,7 @@ export function InboxWorkspace() {
   };
 
   const runWiki = async () => {
+    if (window.api?.wiki?.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
     setRunningKind("wiki-pending");
     try {
       const { useWikiStore } = await import("../../stores/wiki.store");
@@ -300,10 +307,12 @@ export function InboxWorkspace() {
     }
   };
 
+  if (showThemeTasks) return <ThemedReadingTasks onBack={() => setShowThemeTasks(false)} />;
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-5">
         <h2 className="text-sm font-semibold text-foreground">处理中心</h2>
+        <button type="button" onClick={() => setShowThemeTasks(true)} className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent">{t("themedReading.tasks", "主题页任务")}</button>
         <span className="text-xs text-muted-foreground">
           {filter === "wiki-pending"
             ? `${counts[filter]} 条内容待编译`
@@ -396,6 +405,8 @@ export function InboxWorkspace() {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {wikiCandidates ? <div className="m-3 rounded-lg border border-border p-3 text-sm">Wiki：可执行 {wikiCandidates.ready} · 需复核 {wikiCandidates.review} · 等待重试/继续 {wikiCandidates.waiting} · 待选择升级 {wikiCandidates.upgrade} <button className="text-primary underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>查看范围和任务</button></div> : null}
+        {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="m-3 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? "Wiki" : "语义索引"}状态读取失败：{error} <button className="text-primary underline" onClick={() => void refresh()}>重试</button></div>)}
         {isLoading && items.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />

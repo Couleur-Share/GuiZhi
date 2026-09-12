@@ -66,7 +66,7 @@ export async function runSemanticIndexing(
         continue;
       }
       try {
-        const vectors = await embedTexts(config, chunks);
+        const vectors = await embedTexts(config, chunks, signal);
         const applied = await window.api.semantic.applyEmbeddings({
           itemId: item.id,
           contentHash: item.contentHash,
@@ -83,7 +83,7 @@ export async function runSemanticIndexing(
           onProgress?.(indexed);
         } else {
           failed++;
-          lastError = "向量落库失败（条目可能已被删除）";
+          lastError = "向量未保存：资料可能已修改或删除，请重新索引最新内容";
         }
       } catch (error) {
         failed++;

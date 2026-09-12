@@ -6,11 +6,18 @@
  */
 
 export const IPC_CHANNELS = {
+  READING_GRAPHICS_JOB: "readingGraphics:job",
+  READING_GRAPHICS_RESULT: "readingGraphics:result",
+  ARTICLE_ASK_CONTEXT: "articleAsk:context",
+  ARTICLE_ASK_SEARCH: "articleAsk:search",
+  ARTICLE_ASK_CANCEL: "articleAsk:cancelSearch",
   MOBILE_CAPTURE: "mobile-capture:invoke",
   // Knowledge items
   KNOWLEDGE_LIST: "knowledge:list",
   KNOWLEDGE_GET: "knowledge:get",
   KNOWLEDGE_CREATE: "knowledge:create",
+  KNOWLEDGE_SELECTION: "knowledge:selection",
+  KNOWLEDGE_SAVE_DRAFT: "knowledge:saveDraft",
   KNOWLEDGE_UPDATE: "knowledge:update",
   KNOWLEDGE_BULK_UPDATE: "knowledge:bulkUpdate",
   KNOWLEDGE_SET_STATUS: "knowledge:setStatus",
@@ -89,6 +96,7 @@ export const IPC_CHANNELS = {
   DISCOVERY_OPEN_VIEW: "discovery:openView",
 
   // Wiki (ADR 0023)
+  WIKI_COMPILER: "wiki:compiler",
   WIKI_CATALOG: "wiki:catalog",
   /** 各页面入链数：目录列的「被引用最多」排序与孤立页筛选 */
   WIKI_BACKLINK_COUNTS: "wiki:backlinkCounts",
@@ -146,6 +154,8 @@ export const IPC_CHANNELS = {
   CONFIG_APPLY: "config:apply",
 
   // Ask sessions (AI 问答会话持久化)
+  ASK_SESSION_QUERY: "askSession:query",
+  ASK_SESSION_META: "askSession:meta",
   ASK_SESSION_LIST: "ask:listSessions",
   ASK_SESSION_GET: "ask:getSession",
   ASK_SESSION_SAVE: "ask:saveSession",
@@ -168,6 +178,29 @@ export const IPC_CHANNELS = {
   /** 主进程 → 渲染进程：转写进行中的已用时长与停滞时长 */
   MEDIA_TRANSCRIBE_PROGRESS: "media:transcribeProgress",
 
+  // AI 主题阅读页：持久任务与独立产物。
+  THEMED_READING_STATE: "themedReading:state",
+  THEMED_READING_PREVIEW: "themedReading:preview",
+  THEMED_READING_VIEW_CREATE: "themedReading:viewCreate",
+  THEMED_READING_VIEW_UPDATE: "themedReading:viewUpdate",
+  THEMED_READING_VIEW_COMMAND: "themedReading:viewCommand",
+  THEMED_READING_VIEW_DESTROY: "themedReading:viewDestroy",
+  THEMED_READING_VIEW_EVENT: "themedReading:viewEvent",
+  READING_VIEW_BRIDGE: "readingView:bridge",
+  READING_VIEW_COMMAND: "readingView:command",
+  THEMED_READING_REFERENCES: "themedReading:references",
+  THEMED_READING_SEARCH_CONFIG: "themedReading:searchConfig",
+  THEMED_READING_OFFLINE: "themedReading:continueOffline",
+  THEMED_READING_GET: "themedReading:get",
+  THEMED_READING_GENERATE: "themedReading:generate",
+  THEMED_READING_CANCEL: "themedReading:cancel",
+  THEMED_READING_RESUME: "themedReading:resume",
+  THEMED_READING_REGENERATE_ASSET: "themedReading:regenerateAsset",
+  THEMED_READING_RESTORE_PREVIOUS: "themedReading:restorePrevious",
+  THEMED_READING_REMOVE: "themedReading:remove",
+  THEMED_READING_EXPORT: "themedReading:exportHtml",
+  THEMED_READING_LIST_TASKS: "themedReading:listTasks",
+  THEMED_READING_PROGRESS: "themedReading:progress",
   // 正文配图（AI 文生图）
   /** 可用的插画风格预设 */
   ILLUSTRATION_STYLES: "illustration:styles",

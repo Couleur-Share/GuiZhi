@@ -81,7 +81,7 @@ export function WebSnapshotPane({
       .then((result) => {
         if (canceled) return;
         if (!result.ok || result.data?.error) {
-          setError(result.error || result.data?.error || "读取原文失败");
+          setError(result.error || result.data?.error || "读取网页快照失败");
           return;
         }
         setView(result.data!);
@@ -171,7 +171,7 @@ export function WebSnapshotPane({
             (task) => task.status !== "completed",
           );
           showToast(
-            failures.length ? "原文补采未完成" : "原文版本已保存",
+            failures.length ? "网页补采未完成" : "网页快照版本已保存",
             failures.length ? "error" : "success",
             {
               detail: matched
@@ -200,7 +200,7 @@ export function WebSnapshotPane({
     setBusy(true);
     const ok = await runGuardedMutation(
       "webSnapshot.supplement",
-      "补采公众号原文",
+      "补采公众号网页",
       async () => {
         const result = await window.api.webCapture.supplement([item.id]);
         if (!result.ok) throw new Error(result.error);
@@ -213,7 +213,7 @@ export function WebSnapshotPane({
     let exported: { canceled?: boolean; path?: string; incomplete?: boolean };
     const ok = await runGuardedMutation(
       "webSnapshot.export",
-      "导出原文 HTML",
+      "导出网页快照 HTML",
       async () => {
         const result = await window.api.webCapture.exportHtml(
           item.id,
@@ -225,7 +225,7 @@ export function WebSnapshotPane({
     );
     if (ok && !exported?.canceled)
       showToast(
-        exported?.incomplete ? "已导出，部分资源有缺失" : "原文 HTML 已导出",
+        exported?.incomplete ? "已导出，部分资源有缺失" : "网页快照 HTML 已导出",
         exported?.incomplete ? "warning" : "success",
       );
   };
@@ -233,10 +233,10 @@ export function WebSnapshotPane({
   const toolbar = (
 <div className="flex shrink-0 items-center gap-1.5">
         <span data-testid="snapshot-reading-mode" className="px-2 text-xs text-muted-foreground">
-          {original ? "原文排版" : view?.edited && !versionId ? "正文已编辑" : "标准排版"}
+          {original ? "网页快照" : view?.edited && !versionId ? "正文已编辑" : "标准排版"}
         </span>
         {!original && view?.document ? (
-          <button className={button} onClick={() => setMode("original")} disabled={forceSimple}>查看原文快照</button>
+          <button className={button} onClick={() => setMode("original")} disabled={forceSimple}>查看网页快照</button>
         ) : original && view?.edited && !versionId ? (
           <button className={button} onClick={() => setMode("simple")}>返回编辑后正文</button>
         ) : null}
@@ -245,14 +245,14 @@ export function WebSnapshotPane({
           <Select
             className="w-32"
             triggerClassName="flex h-7 w-full items-center gap-1 rounded-lg bg-muted px-2 text-xs text-left focus-visible:ring-2 focus-visible:ring-primary"
-            ariaLabel="原文阅读宽度"
+            ariaLabel="网页快照宽度"
             value={width}
             onChange={(value) => {
               setWidth(value);
               localStorage.setItem("wechat-reader-width", value);
             }}
             options={[
-              { value: "original", label: "原文宽度" },
+              { value: "original", label: "网页宽度" },
               { value: "fluid", label: "自适应宽度" },
               { value: "wide", label: "铺满宽度" },
             ]}
@@ -270,8 +270,8 @@ export function WebSnapshotPane({
       {toolbarTarget ? createPortal(toolbar, toolbarTarget) : <div className="border-b border-border p-2">{toolbar}</div>}
       {menu ? <ContextMenu ignoreRef={menuTrigger} x={menu.x} y={menu.y} onClose={()=>setMenu(null)} items={[
         ...(original ? [{label:view?.edited && !versionId ? "查看编辑后正文" : "切换到标准排版",onClick:()=>setMode("simple")}] : []),
-        ...(!item.deletedAt ? [{label:snapshot?.failures.length ? "重试缺失资源" : "补采 / 更新原文",disabled:busy,onClick:()=>void supplement()}] : []),
-        ...(snapshot ? [{label:"导出原文 HTML",onClick:()=>void exportHtml()}] : []),
+        ...(!item.deletedAt ? [{label:snapshot?.failures.length ? "重试缺失资源" : "补采 / 更新网页快照",disabled:busy,onClick:()=>void supplement()}] : []),
+        ...(snapshot ? [{label:"导出网页快照 HTML",onClick:()=>void exportHtml()}] : []),
         ...(busy ? [{label:"取消补采",onClick:()=>void runGuardedMutation("webSnapshot.cancel","取消补采",async()=>{for(const id of tasks)if(!await window.api.import.cancel(id))throw new Error("任务已结束或无法取消");})}] : []),
       ]}/> : null}
       {error ? (
@@ -283,12 +283,12 @@ export function WebSnapshotPane({
         </div>
       ) : null}
       {!view && !error ? (
-        <p className="p-3 text-sm text-muted-foreground">正在读取原文…</p>
+        <p className="p-3 text-sm text-muted-foreground">正在读取网页快照…</p>
       ) : null}
       {view && !snapshot ? (
         <p className="p-3 text-sm text-muted-foreground">
-          尚未保存原文排版，当前显示标准排版。
-          {!item.deletedAt ? <button className={`${button} ml-2`} disabled={busy} onClick={() => void supplement()}>补采原文排版</button> : null}
+          尚未保存网页快照，当前显示标准排版。
+          {!item.deletedAt ? <button className={`${button} ml-2`} disabled={busy} onClick={() => void supplement()}>补采网页快照</button> : null}
         </p>
       ) : null}
       {view?.edited ? (
@@ -298,7 +298,7 @@ export function WebSnapshotPane({
       ) : null}
       {view?.pending ? (
         <p className="px-3 py-1 text-xs text-muted-foreground">
-          有新来源版本，请在“原文版本”中比较并采用。
+          有新来源版本，请在“网页快照版本”中比较并采用。
         </p>
       ) : null}
       {snapshot?.failures.length || snapshot?.warnings.length ? (
@@ -316,6 +316,8 @@ export function WebSnapshotPane({
           className="h-full min-h-0 overflow-auto bg-muted/30 p-3"
         >
           <iframe
+            data-article-instance={view?.instanceId}
+            data-article-target={JSON.stringify({ itemId: item.id, view: "snapshot", versionId: view?.version?.id })}
             ref={frame}
             onLoad={sendFind}
             aria-label="微信公众号原文快照"
@@ -353,9 +355,9 @@ export async function supplementWechatSelection(
 ): Promise<boolean> {
   return runGuardedMutation(
     "webSnapshot.supplement",
-    "批量补采公众号原文",
+    "批量补采公众号网页",
     async () => {
-      await useKnowledgeStore.getState().flushPendingSave();
+      if (!(await useKnowledgeStore.getState().flushPendingSave())) return;
       if (useKnowledgeStore.getState().hasUnsavedChanges)
         throw new Error("当前编辑尚未保存");
       for (let i = 0; i < ids.length; i += 50) {

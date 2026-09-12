@@ -1,3 +1,4 @@
+import { hasActiveThemedReading, retireIdleThemedReading } from "../services/themed-reading/runtime";
 import { stopMobileCapture } from "../services/mobile-capture/lifecycle";
 /**
  * 备份 / 恢复 / 导出 IPC。
@@ -333,6 +334,7 @@ export function registerBackupIPC(
         typeof input?.recoveryPassword === "string"
           ? input.recoveryPassword
           : undefined;
+      if (hasActiveThemedReading()) return { success: false, error: "主题排版正在执行，请先停止任务再恢复备份" };
       if (countActiveImportTasks(db) > 0) {
         return {
           success: false,
@@ -390,6 +392,7 @@ export function registerBackupIPC(
       try {
         backgroundJobs.stop();
         stopMobileCapture(true);
+        retireIdleThemedReading();
         closeDatabase();
         applyPreparedRepositoryRestore(prepared, targets);
       } catch (error) {
@@ -441,6 +444,7 @@ export function registerBackupIPC(
         return { success: false, error: "找不到指定的备份文件" };
       }
 
+      if (hasActiveThemedReading()) return { success: false, error: "主题排版正在执行，请先停止任务再恢复备份" };
       if (countActiveImportTasks(db) > 0) {
         return {
           success: false,
@@ -463,6 +467,7 @@ export function registerBackupIPC(
 
       try {
         stopMobileCapture(true);
+        retireIdleThemedReading();
         closeDatabase();
         performRestoreSwap({
           databasePath,

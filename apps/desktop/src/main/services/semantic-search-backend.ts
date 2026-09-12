@@ -1,3 +1,4 @@
+import { getSemanticWorker, resetSemanticWorkers } from "./semantic-worker-client";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,7 +12,8 @@ export interface ScoredSemanticChunk {
 
 export interface SemanticSearchBackend {
   readonly name: "exact" | "hnsw";
-  search(query: Float32Array, limit: number): Promise<ScoredSemanticChunk[]>;
+  fallbackReason?: string;
+  search(query: Float32Array, limit: number, signal?: AbortSignal): Promise<ScoredSemanticChunk[]>;
 }
 
 export interface SemanticBackendThresholds {
@@ -79,9 +81,11 @@ function topItems(
 
 export class ExactSemanticSearchBackend implements SemanticSearchBackend {
   readonly name = "exact" as const;
+  fallbackReason?: string;
   constructor(private readonly cache: SemanticVectorCache) {}
 
-  async search(query: Float32Array, limit: number): Promise<ScoredSemanticChunk[]> {
+  async search(query: Float32Array, limit: number, signal?: AbortSignal): Promise<ScoredSemanticChunk[]> {
+    signal?.throwIfAborted();
     const best = new Map<string, { chunkIndex: number; score: number }>();
     const dims = query.length;
     if (dims === 0 || this.cache.dims !== dims) return [];
@@ -96,6 +100,7 @@ export class ExactSemanticSearchBackend implements SemanticSearchBackend {
       }
       if ((index + 1) % YIELD_EVERY_CHUNKS === 0) {
         await new Promise<void>((resolve) => setImmediate(resolve));
+        signal?.throwIfAborted();
       }
     }
     return topItems(best, Math.max(1, limit));
@@ -109,6 +114,7 @@ interface HnswIndex {
   setEfSearch(value: number): void;
   writeIndex(filename: string): Promise<boolean>;
   readIndex(filename: string, maxElements: number): Promise<boolean>;
+  delete?(): void;
 }
 
 interface HnswRuntime {
@@ -146,11 +152,12 @@ export class HnswSemanticSearchBackend implements SemanticSearchBackend {
     rootDir: string;
   }): Promise<HnswSemanticSearchBackend> {
     const packagePath = "hnswlib-wasm/dist/hnswlib.js";
-    const module = (await import(/* @vite-ignore */ packagePath)) as {
-      loadHnswlib: () => Promise<HnswRuntime>;
-    };
-    const runtime = await module.loadHnswlib();
-    if (!runtime.FS) throw new Error("hnswlib-wasm 未暴露可持久化文件系统");
+    let runtime: HnswRuntime;
+    try {
+      const module = (await import(/* @vite-ignore */ packagePath)) as { loadHnswlib: () => Promise<HnswRuntime> };
+      runtime = await module.loadHnswlib();
+      if (!runtime.FS) throw new Error("未暴露可持久化文件系统");
+    } catch (error) { throw new Error(`HNSW_RUNTIME: ${String(error)}`, { cause: error }); }
     const modelHash = createHash("sha256")
       .update(`${input.model}\0${input.cache.dims}`)
       .digest("hex")
@@ -164,16 +171,25 @@ export class HnswSemanticSearchBackend implements SemanticSearchBackend {
     let labels: SidecarMetadata["labels"];
 
     if (fs.existsSync(indexPath) && fs.existsSync(metadataPath)) {
+      try {
       const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as SidecarMetadata;
       if (
         metadata.version !== 1 ||
         metadata.model !== input.model ||
         metadata.dims !== input.cache.dims ||
-        metadata.generation !== input.generation
+        metadata.generation !== input.generation ||
+        !Array.isArray(metadata.labels) || metadata.labels.length !== input.cache.itemIds.length ||
+        metadata.labels.some((label, i) => label.itemId !== input.cache.itemIds[i] || label.chunkIndex !== input.cache.chunkIndexes[i])
       ) throw new Error("HNSW 侧车元数据不匹配");
       runtime.FS.writeFile(virtualName, fs.readFileSync(indexPath));
-      await index.readIndex(virtualName, Math.max(metadata.labels.length + 1, 1));
+      if (!(await index.readIndex(virtualName, Math.max(metadata.labels.length + 1, 1)))) throw new Error("HNSW 侧车读取失败");
       labels = metadata.labels;
+      } catch {
+        index.delete?.();
+        try { runtime.FS.unlink(virtualName); } catch { /* 损坏侧车可能尚未进入虚拟文件系统 */ }
+        for (const file of [indexPath, metadataPath]) if (fs.existsSync(file)) fs.unlinkSync(file);
+        return HnswSemanticSearchBackend.create(input);
+      }
     } else {
       const count = input.cache.itemIds.length;
       index.initIndex(Math.max(count + 1, 1), 32, 240, 100);
@@ -191,7 +207,7 @@ export class HnswSemanticSearchBackend implements SemanticSearchBackend {
         });
       }
       fs.mkdirSync(dir, { recursive: true });
-      await index.writeIndex(virtualName);
+      if (!(await index.writeIndex(virtualName))) throw new Error("HNSW 侧车写入失败");
       const metadata: SidecarMetadata = {
         version: 1,
         model: input.model,
@@ -227,43 +243,36 @@ export class HnswSemanticSearchBackend implements SemanticSearchBackend {
 }
 
 const incompatiblePlatforms = new Set<string>();
-const hnswByKey = new Map<string, Promise<HnswSemanticSearchBackend>>();
+const warnedGroups = new Set<string>();
 
 export async function resolveSemanticSearchBackend(input: {
-  cache: SemanticVectorCache;
-  model: string;
-  generation: string;
-  rootDir: string;
-  warmMedianMs: number | null;
+  cache: SemanticVectorCache; model: string; generation: string; rootDir: string; warmMedianMs: number | null;
 }): Promise<SemanticSearchBackend> {
   const platformKey = `${process.platform}-${process.arch}`;
-  if (
-    incompatiblePlatforms.has(platformKey) ||
-    !shouldUseHnsw({
-      chunkCount: input.cache.itemIds.length,
-      vectorBytes: input.cache.vectors.byteLength,
-      warmMedianMs: input.warmMedianMs,
-    })
-  ) return new ExactSemanticSearchBackend(input.cache);
-
-  const key = `${input.model}\0${input.cache.dims}\0${input.generation}`;
+  const exact = new ExactSemanticSearchBackend(input.cache);
+  if (incompatiblePlatforms.has(platformKey)) { exact.fallbackReason = "当前运行时不兼容加速索引，已使用精确检索"; return exact; }
+  if (!shouldUseHnsw({
+    chunkCount: input.cache.itemIds.length, vectorBytes: input.cache.vectors.byteLength, warmMedianMs: input.warmMedianMs,
+  })) return exact;
   try {
-    let backend: Promise<HnswSemanticSearchBackend>;
-    if (hnswByKey.has(key)) {
-      backend = hnswByKey.get(key)!;
-    } else {
-      backend = HnswSemanticSearchBackend.create(input);
-      hnswByKey.set(key, backend);
-    }
-    return await backend;
+    const backend = await getSemanticWorker(input);
+    let failed = false;
+    return { get name() { return failed ? 'exact' : 'hnsw'; }, get fallbackReason() { return failed ? '加速索引查询失败，已使用精确检索' : undefined; }, search: async (query, limit, signal) => {
+      try { return await backend.search(query, limit); }
+      catch (error) { signal?.throwIfAborted(); failed = true; backend.retire(); console.warn('[semantic] 索引查询失败，保留精确扫描:', error); return exact.search(query, limit, signal); }
+    } };
   } catch (error) {
-    incompatiblePlatforms.add(platformKey);
-    console.warn(`[semantic] ${platformKey} 的 hnswlib-wasm 不可用，保留精确扫描:`, error);
-    return new ExactSemanticSearchBackend(input.cache);
+    if ((error as { incompatible?: boolean }).incompatible) incompatiblePlatforms.add(platformKey);
+    const group = `${input.rootDir}\0${input.model}`;
+    if (!warnedGroups.has(group)) {
+      warnedGroups.add(group);
+      console.warn(`[semantic] ${platformKey} 的 HNSW 工作线程不可用，保留精确扫描:`, error);
+    }
+    exact.fallbackReason = "加速索引暂不可用，已使用精确检索";
+    return exact;
   }
 }
 
 export function resetSemanticBackendCompatibilityForTests(): void {
-  incompatiblePlatforms.clear();
-  hnswByKey.clear();
+  incompatiblePlatforms.clear(); warnedGroups.clear(); resetSemanticWorkers();
 }

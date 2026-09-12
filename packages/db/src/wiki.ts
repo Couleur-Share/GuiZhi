@@ -2,6 +2,7 @@
  * Wiki DAO（ADR 0023）：页面 / 链接 / 来源 / 编译指纹四表。
  * 编译结果经 upsertCompilation 单事务落库；页面身份是 normalized_title。
  */
+import { flushWikiInvalidations } from "./wiki-publish";
 import { randomUUID } from "crypto";
 import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
@@ -119,6 +120,7 @@ export class WikiDB {
   constructor(private readonly db: Database.Database) {}
 
   getCatalog(): WikiCatalogEntry[] {
+    flushWikiInvalidations(this.db);
     const rows = this.db.all(
       `SELECT ${CATALOG_COLUMNS} FROM wiki_pages ORDER BY updated_at DESC`,
     ) as CatalogRow[];
@@ -145,6 +147,7 @@ export class WikiDB {
   }
 
   getPage(id: string): WikiPageDetail | null {
+    flushWikiInvalidations(this.db);
     const row = this.db.get("SELECT * FROM wiki_pages WHERE id = ?", id) as
       | PageRow
       | undefined;
@@ -165,15 +168,15 @@ export class WikiDB {
 
     // 来源条目：软删除（回收站）中的不展示
     const sourceRows = this.db.all(
-      `SELECT i.id AS item_id, i.title AS title
+      `SELECT i.id AS item_id, i.title AS title, i.review_status, i.review_reasons
        FROM wiki_page_sources s
        JOIN knowledge_items i ON i.id = s.item_id
        WHERE s.page_id = ? AND i.deleted_at IS NULL
        ORDER BY s.created_at ASC`,
       id,
-    ) as { item_id: string; title: string }[];
+    ) as { item_id: string; title: string; review_status: "clear" | "needs_review"; review_reasons: string }[];
     const sources: WikiSourceRef[] = sourceRows.map((source) => ({
-      itemId: source.item_id,
+      itemId: source.item_id, reviewStatus: source.review_status, reviewReasons: JSON.parse(source.review_reasons || "[]"),
       title: source.title || "无标题",
     }));
 
@@ -243,7 +246,7 @@ export class WikiDB {
   /** 可编译条目：未删除且正文非空（含归档——归档 ≠ 移出知识） */
   listCompilableItems(): WikiCompilableItem[] {
     const rows = this.db.all(
-      "SELECT id, title, content FROM knowledge_items WHERE deleted_at IS NULL AND content != ''",
+      "SELECT id, title, content FROM knowledge_items WHERE deleted_at IS NULL AND review_status != 'needs_review' AND content != ''",
     ) as { id: string; title: string; content: string }[];
     return rows.map((row) => ({
       id: row.id,
@@ -293,7 +296,7 @@ export class WikiDB {
     const eligibleItemCount =
       (
         this.db.get(
-          "SELECT COUNT(*) AS c FROM knowledge_items WHERE deleted_at IS NULL AND content != ''",
+          "SELECT COUNT(*) AS c FROM knowledge_items WHERE deleted_at IS NULL AND review_status != 'needs_review' AND content != ''",
         ) as { c: number } | undefined
       )?.c ?? 0;
     return { pageCount, compiledItemCount, eligibleItemCount };
@@ -305,6 +308,8 @@ export class WikiDB {
    * 替换出链、补来源引用、刷新指纹。
    */
   applyCompilation(input: WikiApplyCompilationInput): void {
+    const source = this.db.get("SELECT review_status,deleted_at FROM knowledge_items WHERE id=?", input.itemId) as { review_status: string; deleted_at: number | null } | undefined;
+    if (!source || source.deleted_at !== null || source.review_status === "needs_review") throw new Error("来源已删除或需要复核，暂不能自动编译");
     const now = Date.now();
     const run = this.db.transaction(() => {
       const pageIdByNormalized = new Map<string, string>();
@@ -548,13 +553,14 @@ export class WikiDB {
       this.saveRevision(revision.page_id, now);
       this.db.run(
         `UPDATE wiki_pages SET
-           title = ?, kind = ?, summary = ?, body = ?, aliases_json = ?, updated_at = ?
+           title = ?, kind = ?, summary = ?, body = ?, aliases_json = ?, updated_at = ?, manual_edited_at = ?
          WHERE id = ?`,
         revision.title,
         revision.kind,
         revision.summary,
         revision.body,
         revision.aliases_json,
+        now,
         now,
         revision.page_id,
       );
@@ -638,6 +644,13 @@ export class WikiDB {
   /** 清空 Wiki 四表（全量重建的第一步） */
   clearAll(): void {
     const run = this.db.transaction(() => {
+      this.db.run("DELETE FROM wiki_compile_blocks");
+      this.db.run("DELETE FROM wiki_compile_items");
+      this.db.run("DELETE FROM wiki_compile_jobs");
+      this.db.run("DELETE FROM wiki_block_cache");
+      this.db.run("DELETE FROM wiki_contributions");
+      this.db.run("DELETE FROM wiki_page_suggestions");
+      this.db.run("DELETE FROM wiki_invalidated_pages");
       this.db.run("DELETE FROM wiki_page_links");
       this.db.run("DELETE FROM wiki_page_sources");
       this.db.run("DELETE FROM wiki_ingestions");
@@ -657,6 +670,7 @@ export class WikiDB {
    * （问答检索的实际入口，用户不会按标题原文提问）。
    */
   searchPages(query: string, limit: number): WikiSearchHit[] {
+    flushWikiInvalidations(this.db);
     const matchQuery = buildFtsMatchQuery(query, "recall");
     if (!matchQuery) {
       return [];

@@ -8,6 +8,7 @@
  * 小库精确扫描；达到规模、内存或实测耗时阈值后尝试 HNSW 侧车，运行时不兼容
  * 会自动保留精确扫描，不中断问答。
  */
+import { abortable } from "@guizhi/shared/utils/abortable";
 import { SemanticIndexDB } from "@guizhi/db";
 import type {
   PendingSemanticItem,
@@ -18,7 +19,7 @@ import Database from "../database/sqlite";
 import { logAppError } from "../diagnostic-log";
 import { computeContentHash } from "./import/content-hash";
 import {
-  ensureSemanticVectorCache,
+  ensureSemanticVectorCacheAsync,
   getSemanticVectorCache,
 } from "./semantic-vector-cache";
 import { resolveSemanticSearchBackend } from "./semantic-search-backend";
@@ -157,6 +158,7 @@ export function listPendingSemanticItems(
 let lastSearchMs: number | null = null;
 let lastScannedChunks: number | null = null;
 let lastSearchCacheHit: boolean | null = null;
+let fallbackReason: string | undefined;
 let lastBackend: "exact" | "hnsw" | null = null;
 let lastSlowLogAt = 0;
 const warmSearchSamples = new Map<string, number[]>();
@@ -193,7 +195,7 @@ export function getSemanticStatus(
     lastSearchMs,
     lastScannedChunks,
     lastSearchCacheHit,
-    ...(lastBackend ? { lastBackend } : {}),
+    ...(lastBackend ? { lastBackend } : {}), fallbackReason,
   };
 }
 
@@ -209,20 +211,22 @@ export async function searchSemanticByVector(
   model: string,
   queryVector: Float32Array,
   limit: number,
+  signal?: AbortSignal,
 ): Promise<SemanticSearchHit[]> {
   const started = Date.now();
   const index = new SemanticIndexDB(db);
   const cacheHit = Boolean(getSemanticVectorCache(db, model));
-  const cache = ensureSemanticVectorCache(db, index, model);
+  signal?.throwIfAborted();
+  const cache = await abortable(ensureSemanticVectorCacheAsync(db, index, model), signal);
   const chunkCount = cache.itemIds.length;
-  const backend = await resolveSemanticSearchBackend({
+  const backend = await abortable(resolveSemanticSearchBackend({
     cache,
     model,
     generation: index.generation(model),
     rootDir: path.join(getDataDir(), "indexes", "semantic"),
     warmMedianMs: warmMedian(model),
-  });
-  const top = await backend.search(queryVector, Math.max(1, limit));
+  }), signal);
+  const top = await abortable(backend.search(queryVector, Math.max(1, limit), signal), signal);
   const scanned = backend.name === "exact" ? chunkCount : Math.min(chunkCount, Math.max(limit * 8, 64));
 
   const snippets = new Map(
@@ -233,12 +237,12 @@ export async function searchSemanticByVector(
       .map((row) => [`${row.itemId}:${row.chunkIndex}`, row]),
   );
 
-  const hits = top.map(({ itemId, chunkIndex, score }) => {
+  const hits = top.filter(({ itemId, chunkIndex }) => snippets.has(`${itemId}:${chunkIndex}`)).map(({ itemId, chunkIndex, score }) => {
     const row = snippets.get(`${itemId}:${chunkIndex}`);
     const snippet = (row?.chunkText ?? "").replace(/\s+/g, " ").trim();
     return {
       itemId,
-      title: row?.title ?? "",
+      title: row?.title ?? "", reviewStatus: row?.reviewStatus, reviewReasons: row?.reviewReasons,
       snippet:
         snippet.length > SNIPPET_MAX_LENGTH
           ? `${snippet.slice(0, SNIPPET_MAX_LENGTH)}…`
@@ -250,7 +254,7 @@ export async function searchSemanticByVector(
   lastSearchMs = Date.now() - started;
   lastScannedChunks = scanned;
   lastSearchCacheHit = cacheHit;
-  lastBackend = backend.name;
+  lastBackend = backend.name; fallbackReason = backend.fallbackReason;
   if (cacheHit) {
     const samples = [...(warmSearchSamples.get(model) ?? []), lastSearchMs].slice(-9);
     warmSearchSamples.set(model, samples);

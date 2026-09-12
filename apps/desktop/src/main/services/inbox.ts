@@ -38,8 +38,8 @@ function scalarCount(db: Database.Database, sql: string): number {
 
 /**
  * 统一聚合需要人工判断的条目；语义仅生成一张聚合卡。
- * Wiki 的精确待编译数依赖渲染进程编译器的素材指纹、提示词版本和退避规则，
- * 由 inbox.store 在结果返回后补入，主进程不能用“可编译条目数”冒充。
+ * Wiki 的精确候选由主进程全文编译器按素材指纹、版本和退避规则判定，
+ * inbox.store 独立加载各分区，单一区域失败不能遮住其他待办。
  */
 export function listInboxItems(db: Database.Database): InboxListResult {
   const items: InboxItem[] = [];

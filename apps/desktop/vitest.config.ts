@@ -1,8 +1,10 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
 import path from "path";
+import { readingLibrariesPlugin } from "./scripts/reading-libraries-plugin.mjs";
 
 export default defineConfig({
+  plugins: [readingLibrariesPlugin()],
   test: {
     globals: true,
     environment: "jsdom",

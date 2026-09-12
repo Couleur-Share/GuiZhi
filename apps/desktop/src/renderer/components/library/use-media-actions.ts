@@ -145,7 +145,7 @@ export function useTranscriptActions(item: KnowledgeItem): TranscriptActions {
       setTranscribeProgress(null);
       try {
         // 主进程基于库中正文写回（清注记/总结/标题），先落盘本地编辑
-        await flushPendingSave();
+        if (!(await flushPendingSave())) return;
         const result = await window.api.media.transcribe(itemId, options);
         if (result.success && result.item) {
           applyServerItem(result.item);
@@ -320,7 +320,7 @@ export function useMediaSummaryAction(item: KnowledgeItem): MediaSummaryAction {
     setIsRunning(true);
     try {
       // 主进程基于库中正文生成并写回，先把未保存的本地编辑落盘
-      await flushPendingSave();
+      if (!(await flushPendingSave())) return;
       const result = await window.api.media.summarize(itemId);
       if (result.success && result.item) {
         applyServerItem(result.item);
@@ -423,7 +423,7 @@ export function useForumDiscussionRefreshAction(
     }
     setIsRunning(true);
     try {
-      await flushPendingSave();
+      if (!(await flushPendingSave())) return;
       const result = await window.api.media.refreshForumDiscussion(itemId);
       if (result.success && result.item) {
         applyServerItem(result.item);

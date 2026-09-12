@@ -1,3 +1,4 @@
+import { inspectThemedReadingBackup } from "./backup-repository-themed-reading";
 /**
  * 本地备份服务。
  *
@@ -285,6 +286,7 @@ export function validateBackupFile(filePath: string): {
         error: `备份来自更新版本的归知（数据结构 v${backupVersion}，当前支持 v${SCHEMA_VERSION}），请先升级应用`,
       };
     }
+    inspectThemedReadingBackup(probe);
     return { ok: true };
   } catch (error) {
     return {

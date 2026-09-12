@@ -24,7 +24,7 @@ export function isAiConfiguredForScenario(scenario: AIUsageScenario): boolean {
   return resolveConfig(scenario) !== null;
 }
 
-function resolveConfig(scenario: AIUsageScenario) {
+export function resolveConfig(scenario: AIUsageScenario) {
   const state = useSettingsStore.getState();
   return resolveScenarioAIConfig({
     aiModels: state.aiModels,

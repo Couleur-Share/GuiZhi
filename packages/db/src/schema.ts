@@ -1,3 +1,9 @@
+import { KNOWLEDGE_BATCH_SCHEMA } from "./knowledge-batch-log";
+import { SOURCE_REVISIONS_SCHEMA } from "./source-revisions";
+import { ASK_HISTORY_SCHEMA, ASK_HISTORY_TRIGGERS } from "./ask-history";
+import { WIKI_COMPILER_SCHEMA, WIKI_INVALIDATION_TRIGGERS } from "./wiki-compiler-schema";
+import { ASK_EVIDENCE_SCHEMA } from "./ask-evidence";
+import { THEMED_READING_SCHEMA } from "./themed-reading-schema";
 import { MOBILE_CAPTURE_SCHEMA } from "./mobile-capture-schema";
 import { WEB_CAPTURE_SCHEMA, WEB_SNAPSHOT_SCHEMA } from "./web-capture-schema";
 import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCHEMA } from "./research-workflow-schema";
@@ -13,7 +19,13 @@ import { RESEARCH_EVIDENCE_SCHEMA, RESEARCH_DOCUMENT_SCHEMA, RESEARCH_SERIES_SCH
  * is a safe no-op for existing databases.
  */
 export const SCHEMA_TABLES = `
+${SOURCE_REVISIONS_SCHEMA}
+${KNOWLEDGE_BATCH_SCHEMA}
+${ASK_HISTORY_SCHEMA}
+${ASK_EVIDENCE_SCHEMA}
+${WIKI_COMPILER_SCHEMA}
 ${MOBILE_CAPTURE_SCHEMA}
+${THEMED_READING_SCHEMA}
 ${WEB_CAPTURE_SCHEMA}
 ${WEB_SNAPSHOT_SCHEMA}
 ${RESEARCH_EVIDENCE_SCHEMA}
@@ -192,6 +204,10 @@ CREATE TABLE IF NOT EXISTS knowledge_embeddings (
 
 -- AI 问答会话（消息体由渲染进程序列化为 JSON，DB 层不解析）
 CREATE TABLE IF NOT EXISTS ask_sessions (
+    scope TEXT NOT NULL DEFAULT 'knowledge',
+    item_id TEXT,
+    article_title TEXT,
+    options_json TEXT NOT NULL DEFAULT '{}',
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL DEFAULT '',
   messages_json TEXT NOT NULL DEFAULT '[]',
@@ -380,6 +396,8 @@ CREATE TABLE IF NOT EXISTS background_jobs (
  * 中文按字分词预处理，无法用纯 SQL 触发器实现）。
  */
 export const SCHEMA_INDEXES = `
+${WIKI_INVALIDATION_TRIGGERS}
+${ASK_HISTORY_TRIGGERS}
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_name_lower ON tags(LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_collections_sort ON collections(sort_order);
 CREATE INDEX IF NOT EXISTS idx_items_status ON knowledge_items(status);

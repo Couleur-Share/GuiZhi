@@ -1,3 +1,4 @@
+import { registerThemedReadingIPC } from "./themed-reading.ipc";
 import { registerMobileCaptureIPC } from "./mobile-capture.ipc";
 import { ipcMain } from "electron";
 import Database from "../database/sqlite";
@@ -13,6 +14,7 @@ import { registerMigrationIPC } from "./migration.ipc";
 import { registerBackupIPC } from "./backup.ipc";
 import { registerConfigTransferIPC } from "./config-transfer.ipc";
 import { registerMcpIPC } from "./mcp.ipc";
+import { registerArticleAskIPC } from "./article-ask.ipc";
 import { registerAskIPC } from "./ask.ipc";
 import { registerSemanticIPC } from "./semantic.ipc";
 import { registerMediaIPC } from "./media.ipc";
@@ -26,6 +28,9 @@ import type { DiscoveryServiceOptions } from "../services/discovery/discovery-se
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 
 const REBINDABLE_DB_CHANNELS = [
+  IPC_CHANNELS.ARTICLE_ASK_CONTEXT, IPC_CHANNELS.ARTICLE_ASK_SEARCH, IPC_CHANNELS.ARTICLE_ASK_CANCEL,
+  ...Object.entries(IPC_CHANNELS).filter(([key]) => key.startsWith("THEMED_READING_") && key !== "THEMED_READING_PROGRESS").map(([, value]) => value),
+  IPC_CHANNELS.KNOWLEDGE_SELECTION, IPC_CHANNELS.KNOWLEDGE_SAVE_DRAFT, IPC_CHANNELS.WIKI_COMPILER,
   IPC_CHANNELS.KNOWLEDGE_LIST,
   IPC_CHANNELS.KNOWLEDGE_GET,
   IPC_CHANNELS.KNOWLEDGE_CREATE,
@@ -109,6 +114,7 @@ const REBINDABLE_DB_CHANNELS = [
   IPC_CHANNELS.MCP_GET_SCOPE,
   IPC_CHANNELS.MCP_SET_SCOPE,
   IPC_CHANNELS.MCP_INSTALL,
+  IPC_CHANNELS.ASK_SESSION_QUERY, IPC_CHANNELS.ASK_SESSION_META,
   IPC_CHANNELS.ASK_SESSION_LIST,
   IPC_CHANNELS.ASK_SESSION_GET,
   IPC_CHANNELS.ASK_SESSION_SAVE,
@@ -230,8 +236,10 @@ export function registerAllIPC(
   registerIpcGroup("config-transfer", () => registerConfigTransferIPC());
   registerIpcGroup("mcp", () => registerMcpIPC());
   registerIpcGroup("ask", () => registerAskIPC(db));
+  registerIpcGroup("articleAsk", () => registerArticleAskIPC(db));
   registerIpcGroup("semantic", () => registerSemanticIPC(db));
   registerIpcGroup("media", () => registerMediaIPC(db));
+  registerIpcGroup("themed-reading", () => registerThemedReadingIPC(db));
   registerIpcGroup("illustration", () => registerIllustrationIPC(db));
   registerIpcGroup("background-jobs", () =>
     registerBackgroundJobIPC(options.backgroundJobs),

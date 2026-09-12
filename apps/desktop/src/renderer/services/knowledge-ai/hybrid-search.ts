@@ -2,8 +2,11 @@
  * 混合检索：FTS 关键词 + embedding 语义，RRF（Reciprocal Rank Fusion）融合。
  * embedding 未配置或调用失败时静默退化为纯 FTS（保持既有行为）。
  */
+import { withCancellation } from "../ai-transport";
+import { abortable } from "@guizhi/shared/utils/abortable";
 import type { QaSearchHit } from "./qa";
-import { embedTexts, resolveEmbeddingConfig } from "./embeddings";
+import { queryVector } from "./query-vectors";
+import { resolveEmbeddingConfig } from "./embeddings";
 
 import { mergeHybridResults } from "@guizhi/shared/utils/hybrid-results";
 export { mergeHybridResults } from "@guizhi/shared/utils/hybrid-results";
@@ -20,7 +23,7 @@ async function searchByFts(query: string, limit: number): Promise<QaSearchHit[]>
     limit,
   });
   return result.entries.map((entry) => ({
-    id: entry.id,
+    id: entry.id, reviewStatus: entry.reviewStatus, reviewReasons: entry.reviewReasons,
     title: entry.title || "无标题",
     snippet: entry.snippet ?? "",
   }));
@@ -29,46 +32,39 @@ async function searchByFts(query: string, limit: number): Promise<QaSearchHit[]>
 async function searchBySemantic(
   query: string,
   limit: number,
+  options: { signal?: AbortSignal; onWarning?: (message: string) => void },
 ): Promise<QaSearchHit[]> {
   const config = resolveEmbeddingConfig();
-  if (!config) {
-    return [];
-  }
+  if (!config) return [];
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  options.signal?.addEventListener("abort", cancel, { once: true });
+  const timer = setTimeout(cancel, 3000);
   try {
-    const [vector] = await embedTexts(config, [query]);
-    const hits = await window.api.semantic.search({
-      model: config.model,
-      vector,
-      limit,
-    });
-    return hits
-      .filter((hit) => hit.score >= SEMANTIC_MIN_SCORE)
-      .map((hit) => ({
-        id: hit.itemId,
-        title: hit.title || "无标题",
-        snippet: hit.snippet,
-        // 命中的正是这一段，阅读时据此定位窗口
-        matchText: hit.snippet,
-      }));
+    options.signal?.throwIfAborted();
+    const vector = await queryVector(config, query, controller.signal);
+    const hits = await abortable(withCancellation(window.api.ai, controller.signal, requestId => window.api.semantic.search({ model: config.model, vector, limit, requestId })), controller.signal);
+    options.signal?.throwIfAborted();
+    return hits.filter(hit => hit.score >= SEMANTIC_MIN_SCORE).map(hit => ({ id: hit.itemId, reviewStatus: hit.reviewStatus, reviewReasons: hit.reviewReasons, title: hit.title || "无标题", snippet: hit.snippet, matchText: hit.snippet }));
   } catch (error) {
-    // 语义检索是增强路径：失败不影响问答（FTS 兜底）
-    console.warn(
-      "[semantic] 语义检索失败，退化为关键词检索:",
-      error instanceof Error ? error.message : error,
-    );
+    options.signal?.throwIfAborted();
+    options.onWarning?.(controller.signal.aborted ? "语义检索等待超过 3 秒，本次使用本地关键词结果。" : "语义检索暂不可用，本次使用本地关键词结果。");
     return [];
-  }
+  } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", cancel); }
 }
 
 /** QA 检索入口：两路并发，RRF 融合 */
 export async function hybridSearchItems(
   query: string,
   limit: number,
+  options: { signal?: AbortSignal; onWarning?: (message: string) => void } = {},
 ): Promise<QaSearchHit[]> {
-  const [ftsHits, semanticHits] = await Promise.all([
+  options.signal?.throwIfAborted();
+  const [ftsHits, semanticHits] = await abortable(Promise.all([
     searchByFts(query, limit),
-    searchBySemantic(query, limit),
-  ]);
+    searchBySemantic(query, limit, options),
+  ]), options.signal);
+  options.signal?.throwIfAborted();
   if (semanticHits.length === 0) {
     return ftsHits;
   }

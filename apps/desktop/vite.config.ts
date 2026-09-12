@@ -1,3 +1,4 @@
+import { readingLibrariesPlugin } from "./scripts/reading-libraries-plugin.mjs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
@@ -76,6 +77,9 @@ export default defineConfig(async () => ({
   plugins: [
     react(),
     electron([
+      { entry: "src/main/services/semantic-worker.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/semantic-worker", emptyOutDir: true, rollupOptions: { external: ["hnswlib-wasm", "hnswlib-wasm/dist/hnswlib.js"] } } } },
+      { entry: "src/preload/reading-view.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-view-preload", emptyOutDir: true } } },
+      { entry: "src/preload/reading-graphics.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-graphics-preload", emptyOutDir: true } } },
       {
         entry: "src/main/index.ts",
         onstart(args) {
@@ -90,9 +94,9 @@ export default defineConfig(async () => ({
           args.startup(["."]);
         },
         vite: {
-          resolve: {
-            alias: aliases,
-          },
+          plugins: [readingLibrariesPlugin()],
+          define: { __GUIZHI_GRAPHICS_VALIDATION__: JSON.stringify(process.env.GUIZHI_GRAPHICS_VALIDATION === "1") },
+          resolve: { alias: aliases },
           build: {
             outDir: "out/main",
             // vite-plugin-electron 默认保留历史 chunk；安装器会收进整个 out，

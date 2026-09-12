@@ -1,5 +1,6 @@
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { Modal } from "../ui/Modal";
+import { ReviewNavigation } from "./LibraryWorkflow";
 import { ItemDetail } from "./ItemDetail";
 
 /**
@@ -14,17 +15,15 @@ export function ItemDetailModal({
   onClose: () => void;
 }) {
   const selectedId = useKnowledgeStore((state) => state.selectedId);
-  const item = useKnowledgeStore((state) => state.selectedItem);
   const flushPendingSave = useKnowledgeStore(
     (state) => state.flushPendingSave,
   );
 
   // 详情异步加载，加载完成前不开浮层，避免闪一下上一条的内容
-  const isReady = item !== null && item.id === selectedId;
+  const isReady = Boolean(selectedId);
 
-  const handleClose = () => {
-    void flushPendingSave();
-    onClose();
+  const handleClose = async () => {
+    if (await flushPendingSave()) onClose();
   };
 
   return (
@@ -32,9 +31,10 @@ export function ItemDetailModal({
       isOpen={isOpen && isReady}
       onClose={handleClose}
       size="fullscreen"
-      contentClassName="overflow-hidden"
+      contentClassName="flex flex-col overflow-hidden"
     >
-      <ItemDetail onClose={handleClose} />
+      <ReviewNavigation />
+      <div className="min-h-0 flex-1"><ItemDetail onClose={handleClose} /></div>
     </Modal>
   );
 }

@@ -6,6 +6,8 @@
  * 依赖以接口注入，便于单测用假实现驱动循环逻辑。
  * Wiki 页面检索随 M4 加入（当前 search 仅覆盖知识条目）。
  */
+import type { EvidenceSnapshot } from "@guizhi/shared/types/evidence";
+import { captureEvidence, evidenceText, qualityNotice } from "@guizhi/shared/utils/evidence";
 import type {
   WikiCatalogEntry,
   WikiPageDetail,
@@ -32,6 +34,8 @@ export type { QaTurn };
 export type QaSourceKind = "item" | "wiki";
 
 export interface QaSourceRef {
+  evidence?: EvidenceSnapshot;
+  cleared?: boolean;
   ordinal: number;
   kind: QaSourceKind;
   /** 条目 id 或 Wiki 页面 id（按 kind 区分） */
@@ -50,6 +54,8 @@ export interface QaAnswer {
 }
 
 export interface QaSearchHit {
+  reviewStatus?: "clear" | "needs_review";
+  reviewReasons?: string[];
   id: string;
   title: string;
   snippet: string;
@@ -63,12 +69,16 @@ export interface QaSearchHit {
 }
 
 export interface QaItemContent {
+  reviewStatus?: "clear" | "needs_review";
+  reviewReasons?: string[];
+  updatedAt?: number;
   title: string;
   content: string;
   transcript?: string | null;
 }
 
 export interface QaDeps {
+  onEvidence?: (sources: QaSourceRef[]) => void;
   /** 已绑定 qa 场景配置的对话调用 */
   chat: (
     messages: { role: "system" | "user"; content: string }[],
@@ -82,7 +92,7 @@ export interface QaDeps {
     },
   ) => Promise<{ content: string; model: string; finishReason?: string }>;
   /** 知识库全文检索（含归档，排除回收站） */
-  searchItems: (query: string, limit: number) => Promise<QaSearchHit[]>;
+  searchItems: (query: string, limit: number, signal?: AbortSignal) => Promise<QaSearchHit[]>;
   /** 读取条目全文 */
   readItem: (id: string) => Promise<QaItemContent | null>;
   /** Wiki 目录（出链解析用；未提供时循环退化为纯条目检索） */
@@ -203,6 +213,7 @@ export function extractCitedOrdinals(
 }
 
 interface AgentResource {
+  evidence?: EvidenceSnapshot;
   ordinal: number;
   kind: QaSourceKind;
   refId: string;
@@ -497,7 +508,7 @@ async function askByAgentLoop(
         temperature: QA_TEMPERATURE,
         maxTokens: QA_MAX_TOKENS,
         signal,
-        onDelta: onAnswerText
+        onDelta: onAnswerText && resources.some(resource => resource.read)
           ? (chunk) => {
               const text = pushAnswerChunk(answerStream, chunk);
               if (text) {
@@ -559,6 +570,7 @@ async function askByAgentLoop(
             kind: resource.kind,
             refId: resource.refId,
             title: resource.title,
+            evidence: resource.evidence,
           })),
           model: generation.model,
           usedFallback: false,
@@ -588,7 +600,7 @@ async function askByAgentLoop(
           );
         }
 
-        const hits = await deps.searchItems(action.query, SEARCH_ITEM_LIMIT);
+        const hits = await deps.searchItems(action.query, SEARCH_ITEM_LIMIT, signal);
         for (const hit of hits) {
           const resource = getOrAddResource(
             resources,
@@ -640,6 +652,7 @@ async function askByAgentLoop(
             ? await readItemResource(deps, resource)
             : await readWikiResource(deps, resource, catalog, resources);
         transcript.push(entry);
+        deps.onEvidence?.(resources.filter(resource => resource.read).map(({ ordinal, kind, refId, title, evidence }) => ({ ordinal, kind, refId, title, evidence })));
         break;
       }
     }
@@ -652,7 +665,7 @@ async function readItemResource(
   resource: AgentResource,
 ): Promise<string> {
   const item = await deps.readItem(resource.refId);
-  if (!item || !item.content.trim()) {
+  if (!item || !(item.content.trim() || item.transcript?.trim())) {
     return `[工具] [${resource.ordinal}]《${resource.title}》不存在或内容为空。`;
   }
   resource.read = true;
@@ -661,7 +674,8 @@ async function readItemResource(
     ITEM_READ_LIMIT,
     resource.matchText,
   );
-  return `[工具] [${resource.ordinal}]《${item.title}》内容：\n${body}`;
+  resource.evidence = await captureEvidence({ kind: "item", sourceId: resource.refId, title: item.title, text: body, sourceVersion: item.updatedAt?.toString(), reviewStatus: item.reviewStatus, reviewReasons: item.reviewReasons });
+  return `[工具] [${resource.ordinal}]《${item.title}》${qualityNotice(item)}内容：\n${resource.evidence.text}`;
 }
 
 /**
@@ -682,9 +696,13 @@ async function readWikiResource(
   }
 
   resource.read = true;
+  const reviewSources = detail.sources.filter(source => source.reviewStatus === "needs_review");
+  resource.evidence = await captureEvidence({ kind: "wiki", sourceId: resource.refId, sourceItemIds: detail.sources.map(s => s.itemId), title: detail.page.title,
+    text: truncateText(detail.page.body, WIKI_READ_LIMIT), sourceVersion: detail.page.updatedAt.toString(),
+    reviewStatus: reviewSources.length ? "needs_review" : "clear", reviewReasons: reviewSources.map(s => `待复核来源：${s.title}`) });
   const parts: string[] = [
     `[工具] [${resource.ordinal}]《${detail.page.title}》页面内容：`,
-    truncateText(detail.page.body, WIKI_READ_LIMIT),
+    qualityNotice(resource.evidence), resource.evidence.text,
   ];
 
   // 出链：从正文 [[目标|显示]] 解析并按目录定位
@@ -728,6 +746,7 @@ async function askSingleShot(
   const hits = await deps.searchItems(
     buildRetrievalText(question, history),
     RETRIEVAL_LIMIT,
+    signal,
   );
   throwIfAborted(signal);
   if (hits.length === 0) {
@@ -744,17 +763,18 @@ async function askSingleShot(
       break;
     }
     const item = await deps.readItem(hit.id);
-    if (!item || !item.content.trim()) {
+    if (!item || !(item.content.trim() || item.transcript?.trim())) {
       continue;
     }
-    const content = extractReadWindow(
+    const content = evidenceText(extractReadWindow(
       buildItemText(item),
       Math.min(PER_SOURCE_CONTENT_LIMIT, budgetRemaining),
       hit.matchText,
-    );
+    ));
     budgetRemaining -= content.length;
-    contextBlocks.push(`[${ordinal}] 《${item.title}》\n${content}`);
-    sources.push({ ordinal, kind: "item", refId: hit.id, title: item.title });
+    contextBlocks.push(`[${ordinal}] 《${item.title}》${qualityNotice(item)}\n${content}`);
+    sources.push({ ordinal, kind: "item", refId: hit.id, title: item.title,
+      evidence: await captureEvidence({ kind: "item", sourceId: hit.id, title: item.title, text: content, sourceVersion: item.updatedAt?.toString(), reviewStatus: item.reviewStatus, reviewReasons: item.reviewReasons }) });
     ordinal++;
   }
   throwIfAborted(signal);
@@ -763,6 +783,7 @@ async function askSingleShot(
     throw new QaNoSourceError();
   }
 
+  deps.onEvidence?.(sources);
   // 兜底管线输出的是纯 Markdown，不用过 JSON 提取器
   let streamed = "";
   const generation = await deps.chat(
@@ -804,22 +825,24 @@ async function askSingleShot(
 }
 
 /** 生产环境依赖组装：检索走 FTS+语义混合，读取走 knowledge IPC，对话走 qa 场景模型。 */
-export function createQaDeps(): QaDeps {
+export function createQaDeps(options?: { onWarning?: (message: string) => void; onEvidence?: (sources: QaSourceRef[]) => void }): QaDeps {
+  const warned = new Set<string>();
   return {
+    onEvidence: options?.onEvidence,
     chat: async (messages, options) => {
       const { runScenarioChat } = await import("./ai-invoke");
       return runScenarioChat("qa", messages, options);
     },
-    searchItems: async (query, limit) => {
+    searchItems: async (query, limit, signal) => {
       const { hybridSearchItems } = await import("./hybrid-search");
-      return hybridSearchItems(query, limit);
+      return hybridSearchItems(query, limit, { signal, onWarning: message => { if (!warned.has(message)) { warned.add(message); options?.onWarning?.(message); } } });
     },
     readItem: async (id) => {
       const item = await window.api.knowledge.get(id);
-      if (!item) {
+      if (!item || item.deletedAt != null) {
         return null;
       }
-      return {
+      return { reviewStatus: item.reviewStatus, reviewReasons: item.reviewReasons, updatedAt: item.updatedAt,
         title: item.title || "无标题",
         content: item.content,
         transcript: item.transcript,

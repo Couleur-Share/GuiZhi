@@ -1,3 +1,4 @@
+import type { SaveKnowledgeDraftInput, SaveKnowledgeDraftResult } from "@guizhi/shared/types/knowledge-draft";
 import { ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type {
@@ -19,6 +20,8 @@ import type {
 } from "@guizhi/shared/types";
 
 export const knowledgeApi = {
+  selection: (input: import("@guizhi/shared/types/knowledge-batch").KnowledgeSelectionCommand): Promise<{ ok: boolean; error?: string; ids?: string[]; selectionId?: string; versions?: { id: string; title: string; content: string; transcript: string | null; reviewJson: string; capturedAt: number }[]; results?: import("@guizhi/shared/types/knowledge-batch").KnowledgeBatchResult[] }> => ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_SELECTION, input),
+  saveDraft: (input: SaveKnowledgeDraftInput): Promise<SaveKnowledgeDraftResult> => ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_SAVE_DRAFT, input),
   list: (query: KnowledgeItemQuery): Promise<KnowledgeItemListResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_LIST, query),
   get: (id: string): Promise<KnowledgeItem | null> =>
@@ -41,10 +44,10 @@ export const knowledgeApi = {
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_MOVE_TO_TRASH, ids),
   restore: (ids: string[]): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_RESTORE, ids),
-  deleteForever: (ids: string[]): Promise<number> =>
-    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_DELETE_FOREVER, ids),
-  emptyTrash: (): Promise<number> =>
-    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH),
+  deleteForever: (ids: string[], options?: { clearEvidence?: boolean }): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_DELETE_FOREVER, ids, options),
+  emptyTrash: (options?: { clearEvidence?: boolean }): Promise<number> =>
+    ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_EMPTY_TRASH, options),
   counts: (query?: KnowledgeFacetCountsQuery): Promise<KnowledgeCounts> =>
     ipcRenderer.invoke(IPC_CHANNELS.KNOWLEDGE_COUNTS, query),
 };

@@ -11,10 +11,12 @@ import { wikiApi } from "./api/wiki";
 import { migrationApi } from "./api/migration";
 import { backupApi } from "./api/backup";
 import { configTransferApi } from "./api/config-transfer";
+import { articleAskApi } from "./api/article-ask";
 import { askSessionApi } from "./api/ask";
 import { semanticApi } from "./api/semantic";
 import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
 import { illustrationApi } from "./api/illustration";
+import { themedReadingApi } from "./api/themed-reading";
 import { backgroundJobApi } from "./api/background-job";
 import { inboxApi } from "./api/inbox";
 import { logApi } from "./api/log";
@@ -78,10 +80,12 @@ const api = {
     install: (client: string): Promise<McpInstallResult> =>
       ipcRenderer.invoke(IPC_CHANNELS.MCP_INSTALL, client),
   },
+  articleAsk: articleAskApi,
   askSession: askSessionApi,
   semantic: semanticApi,
   media: mediaApi,
   illustration: illustrationApi,
+  themedReading: themedReadingApi,
   backgroundJob: backgroundJobApi,
   inbox: inboxApi,
   log: logApi,

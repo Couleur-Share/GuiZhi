@@ -1,3 +1,4 @@
+import { registerWikiCompilerIPC } from "./wiki-compiler.ipc";
 import { ipcMain } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import type { WikiApplyCompilationInput } from "@guizhi/shared/types";
@@ -10,6 +11,7 @@ import type Database from "../database/sqlite";
  */
 export function registerWikiIPC(db: Database.Database): void {
   const wiki = new WikiDB(db);
+  registerWikiCompilerIPC(db);
 
   ipcMain.handle(IPC_CHANNELS.WIKI_CATALOG, () => wiki.getCatalog());
   ipcMain.handle(IPC_CHANNELS.WIKI_BACKLINK_COUNTS, () =>

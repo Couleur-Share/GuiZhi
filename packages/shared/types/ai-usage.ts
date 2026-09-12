@@ -22,6 +22,7 @@ export const AI_USAGE_SCENARIOS = [
   "formatting",
   "embedding",
   "illustration",
+  "themedReading",
 ] as const;
 
 export type AIUsageScenarioId = (typeof AI_USAGE_SCENARIOS)[number];

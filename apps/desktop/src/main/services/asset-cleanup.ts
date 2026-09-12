@@ -34,6 +34,27 @@ export function resolveAssetPath(
   return null;
 }
 
+const assetLeases = new Map<string, number>();
+
+/** 保护落盘到引用提交之间的图片；同一资源可被多个任务或备份同时租用。 */
+export function retainAssetFiles(files: Iterable<string>): () => void {
+  const names = [...new Set(files)];
+  for (const name of names) {
+    if (!isSafeAssetFileName(name)) throw new Error("资产租约包含无效文件名");
+  }
+  for (const name of names) assetLeases.set(name, (assetLeases.get(name) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    for (const name of names) {
+      const count = (assetLeases.get(name) ?? 1) - 1;
+      if (count) assetLeases.set(name, count);
+      else assetLeases.delete(name);
+    }
+  };
+}
+
 /**
  * 删除不再被任何条目引用的资产文件，返回实际删除的数量。
  *
@@ -51,6 +72,7 @@ export function cleanupOrphanAssets(
   // 引用集合一次取全：逐个资产查一遍等于 N 次全表扫描
   const referenced = items.listReferencedAssets();
   for (const name of leasedSnapshotAssets()) referenced.add(name);
+  for (const name of assetLeases.keys()) referenced.add(name);
   let removed = 0;
 
   for (const fileName of candidates) {

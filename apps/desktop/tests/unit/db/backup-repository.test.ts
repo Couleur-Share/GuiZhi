@@ -1,3 +1,5 @@
+import { saveSourceRevision } from '@guizhi/db/source-revisions';
+import { KnowledgeItemDB } from '@guizhi/db/knowledge';
 import { WebSourceDB } from "@guizhi/db";
 import { createHash } from "node:crypto";
 import type { WebCaptureResult } from "@guizhi/shared/types";
@@ -80,6 +82,20 @@ afterEach(() => {
 });
 
 describe("BackupRepository", () => {
+  it("来源更新中尚未采用的媒体仍纳入备份与引用保护，删除来源后可清理", () => {
+    saveSourceRevision(db, 'item-1', { title: '新来源', content: '![图](local-image://revision.png) [视频](local-video://revision.mp4)', reasons: [] });
+    fs.writeFileSync(path.join(workDir, 'data/assets/images/revision.png'), 'new-image');
+    fs.writeFileSync(path.join(workDir, 'data/assets/videos/revision.mp4'), 'new-video');
+    const items = new KnowledgeItemDB(db);
+    expect(items.listAssetRefs(['item-1'])).toEqual(expect.arrayContaining(['revision.png', 'revision.mp4']));
+    expect(items.isAssetReferenced('revision.png')).toBe(true);
+    const repository = createRepository(); repository.initialize('correct horse battery');
+    const result = repository.createSnapshot({ db, appVersion: '0.24.0' });
+    expect(result.success).toBe(true);
+    expect(repository.readManifest(result.snapshot!.fileName).entries.map(e => e.logicalPath)).toEqual(expect.arrayContaining(['data/assets/images/revision.png','data/assets/videos/revision.mp4']));
+    items.deleteForever(['item-1']);
+    expect(items.isAssetReferenced('revision.png')).toBe(false);
+  });
   it("恢复口令至少 12 字符，并为自动备份写入安全存储包装", () => {
     const repository = createRepository();
     expect(() => repository.initialize("short")).toThrow("至少需要 12 个字符");
