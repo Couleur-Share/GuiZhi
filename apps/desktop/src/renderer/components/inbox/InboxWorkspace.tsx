@@ -405,8 +405,8 @@ export function InboxWorkspace() {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {wikiCandidates ? <div className="m-3 rounded-lg border border-border p-3 text-sm">Wiki：可执行 {wikiCandidates.ready} · 需复核 {wikiCandidates.review} · 等待重试/继续 {wikiCandidates.waiting} · 待选择升级 {wikiCandidates.upgrade} <button className="text-primary underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>查看范围和任务</button></div> : null}
-        {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="m-3 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? "Wiki" : "语义索引"}状态读取失败：{error} <button className="text-primary underline" onClick={() => void refresh()}>重试</button></div>)}
+        {wikiCandidates ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">Wiki：可执行 {wikiCandidates.ready} · 需复核 {wikiCandidates.review} · 等待重试/继续 {wikiCandidates.waiting} · 待选择升级 {wikiCandidates.upgrade} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>查看范围和任务</button></div> : null}
+        {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="mb-2 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? "Wiki" : "语义索引"}状态读取失败：{error} <button className="text-primary hover:underline" onClick={() => void refresh()}>重试</button></div>)}
         {isLoading && items.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />
