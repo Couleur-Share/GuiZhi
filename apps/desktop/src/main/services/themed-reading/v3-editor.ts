@@ -54,5 +54,12 @@ export function normalizeV3Outline(
       raw.questions.some((q) => typeof q !== "string"))
   )
     throw new Error("查证问题必须为文本列表");
-  return { ...raw, questions: online ? (raw.questions ?? []).slice(0, 3) : [] };
+  if (online && raw.searchQueries !== undefined &&
+      (!Array.isArray(raw.searchQueries) || raw.searchQueries.some(
+        (query) => typeof query !== "string" || !query.trim() || query.trim().length > 160,
+      )))
+    throw new Error("检索词必须为不超过160字符的非空文本列表");
+  return { ...raw, questions: online ? (raw.questions ?? []).slice(0, 3) : [],
+    searchQueries: online ? raw.searchQueries?.map(query => query.trim()).slice(0, 3) : [],
+  };
 }

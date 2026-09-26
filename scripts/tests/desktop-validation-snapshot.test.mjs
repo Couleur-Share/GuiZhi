@@ -92,6 +92,7 @@ test("依赖包复用，Vite 缓存独立，工作区包指向副本，清理不
   const { root, write } = fixture(t);
   write("apps/desktop/node_modules/example/index.js", "dependency");
   write("apps/desktop/node_modules/.vite/cache", "dev-cache");
+  write("apps/desktop/node_modules/.pnpm/lock.yaml", "source dependency lock");
   fs.mkdirSync(path.join(root, "apps/desktop/node_modules/@guizhi"));
   fs.symlinkSync(
     path.join(root, "packages/core"),
@@ -107,6 +108,9 @@ test("依赖包复用，Vite 缓存独立，工作区包指向副本，清理不
       "dependency",
     );
     assert.equal(fs.existsSync(path.join(modules, ".vite/cache")), false);
+    assert.equal(fs.existsSync(path.join(modules, ".pnpm")), false);
+    fs.mkdirSync(path.join(modules, ".pnpm"));
+    fs.writeFileSync(path.join(modules, ".pnpm/lock.yaml"), "isolated dependency lock");
     assert.equal(
       fs.realpathSync(path.join(modules, "@guizhi/core")),
       fs.realpathSync(path.join(snapshot.root, "packages/core")),
@@ -116,6 +120,10 @@ test("依赖包复用，Vite 缓存独立，工作区包指向副本，清理不
   } finally {
     snapshot.cleanup();
   }
+  assert.equal(
+    fs.readFileSync(path.join(root, "apps/desktop/node_modules/.pnpm/lock.yaml"), "utf8"),
+    "source dependency lock",
+  );
   assert.equal(
     fs.readFileSync(
       path.join(root, "apps/desktop/node_modules/example/index.js"),
@@ -130,6 +138,22 @@ test("依赖包复用，Vite 缓存独立，工作区包指向副本，清理不
     ),
     "dev-cache",
   );
+});
+
+test("打包副本独立安装依赖，并保留其他工作区的依赖声明", (t) => {
+  const { root, write } = fixture(t);
+  write("apps/capture-relay/package.json", '{"name":"@guizhi/capture-relay"}');
+  write("node_modules/example/index.js", "original dependency");
+  const snapshot = createDesktopSnapshot(root, { reuseDependencies: false });
+  try {
+    assert.equal(fs.existsSync(path.join(snapshot.root, "node_modules")), false);
+    assert.equal(fs.existsSync(path.join(snapshot.desktopRoot, "node_modules")), false);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(snapshot.root, "apps/capture-relay/package.json"), "utf8")).name,
+      "@guizhi/capture-relay");
+  } finally {
+    snapshot.cleanup();
+  }
+  assert.equal(fs.readFileSync(path.join(root, "node_modules/example/index.js"), "utf8"), "original dependency");
 });
 
 test("两个验证实例的构建目录互不覆盖", (t) => {

@@ -41,6 +41,7 @@ try {
   function Invoke-Phase([string]$Phase, [string]$Database = '') {
     Write-Host "Testing $Phase"
     $env:GUIZHI_INSTALLED_PHASE = $Phase
+    $env:GUIZHI_INSTALLED_EXPECTED_VERSION = if ($Phase -eq 'previous') { $manifest.previousVersion } else { $manifest.candidateVersion }
     $shotArguments = @((Join-Path $inputPath 'screenshot.mjs'), '--executable', (Join-Path $installPath 'GuiZhi.exe'), '--steps', (Join-Path $inputPath 'electron-installed.mjs'), '--out', (Join-Path $runPath $Phase), '--keep-profile')
     if ($Database) { $shotArguments += @('--data-db', $Database) }
     $savedPreference = $ErrorActionPreference
@@ -84,7 +85,7 @@ try {
   Install-App 'candidate.exe'
   Assert-ElectronRuntime
   Invoke-Phase 'clean'
-  @{ passed=$true; source='windows-sandbox'; previousVersion='0.24.0'; candidateVersion='0.24.0'; upgradeKind='same-version replacement'; oldDataPreserved=$true; oldWebVersionsPreserved=$true; standaloneChromiumRemoved=$true; cleanInstall=$true; staticCapture=$true; dynamicCapture=$true; idleCleanup=$true; normalExit=$true; previousDatabaseSha256=$dbHash } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
+  @{ passed=$true; source='windows-sandbox'; previousVersion=$manifest.previousVersion; candidateVersion=$manifest.candidateVersion; upgradeKind=$(if ($manifest.previousVersion -eq $manifest.candidateVersion) { 'same-version replacement' } else { 'version upgrade' }); oldDataPreserved=$true; oldWebVersionsPreserved=$true; standaloneChromiumRemoved=$true; cleanInstall=$true; staticCapture=$true; dynamicCapture=$true; idleCleanup=$true; normalExit=$true; previousDatabaseSha256=$dbHash } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
 } catch {
   @{ passed=$false; error=$_.Exception.Message } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
   throw

@@ -219,7 +219,7 @@ export async function runReadingV3(
       s.editorNotes = notes;
       s.outline = normalizeV3Outline(
         await call({
-          task: "规划专题，返回{title,direction,questions:string[],sections:[{title,brief,reuseFrom?,referenceIds?:string[]}]}，3-10章；最多3个公开查证问题，不搜索私有原文，已有资料支持的事实不重复研究。若有currentDraft，未受修改要求影响的章节指定reuseFrom为原0基索引并保持标题，以逐字复用。只为新增关键事实列查证问题。",
+          task: "规划专题，返回{title,direction,questions:string[],searchQueries:string[],sections:[{title,brief,reuseFrom?,referenceIds?:string[]}]}，3-10章；最多3个公开查证问题，不搜索私有原文，已有资料支持的事实不重复研究。searchQueries为对应问题的简短公开检索词，每条最多160字符：保留实体、技术名与关键概念，技术资料优先使用英文术语；不要把完整中文问句或多项论证要求直接当检索词。没有查证问题时两个列表均为空。若有currentDraft，未受修改要求影响的章节指定reuseFrom为原0基索引并保持标题，以逐字复用。只为新增关键事实列查证问题。",
           title: page.source.title,
           notes: s.editorNotes,
           preference: page.options.style,
@@ -231,7 +231,7 @@ export async function runReadingV3(
         }),
         page.options.research === true,
       );
-      s.queries = (s.outline.questions ?? [])
+      s.queries = (s.outline.searchQueries?.length ? s.outline.searchQueries : s.outline.questions ?? [])
         .slice(0, page.options.researchDepth === "deep" ? 3 : 2)
         .map((query) => ({ query, done: false, results: [] }));
       save();

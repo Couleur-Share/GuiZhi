@@ -154,6 +154,26 @@ renderer 的 HMR 也可能改变用户正在操作的界面。修改 Vite 配置
 结束进程，也不要停止、复用用户的 Vite 服务。截图实例的日志在临时 userData 中；
 用户 `startup.log` 新增的启动记录不能解释成离屏验证启动。
 
+### 打包依赖分类
+
+被 Vite 编译进主进程、渲染进程、MCP 或阅读组件脚本的纯 JavaScript/CSS 库放在
+`apps/desktop/package.json` 的 `devDependencies`，避免 electron-builder 再把整包
+`node_modules` 带入安装包。例如 Mermaid、ECharts、CodeMirror 和阅读组件依赖。
+保持 `dependencies` 中的运行时 external、原生模块、WASM 和需要按路径读取的资源；
+不能只按“开发/运行时使用”字面分类。调整时同步锁文件，并验证真实打包产物的启动、
+相关功能及资源读取；开发环境可解析依赖不代表安装包完整。
+
+打包副本应使用 `createDesktopSnapshot(root, { reuseDependencies: false })`，在副本中
+按冻结锁文件独立安装依赖。不要把共享包链接的验证副本交给包管理器：pnpm 的依赖
+枚举也可能触发自动整理。验证副本不共享 `.pnpm` 或包管理器状态，避免改写原目录。
+
+### 阅读组件编译内存
+
+阅读图形库由 `scripts/reading-libraries-worker.mjs` 在独立 Node 子进程内编译，
+父 Vite 进程只接收最终脚本，等待子进程退出后再输出资源。不要把多次图形库构建
+合回长期运行的 Vite 进程；这会把编译堆保留在开发服务中。编译失败必须中断构建，
+重试时重新启动子进程；正文库仍按需读取，不改变应用的运行时加载策略。
+
 ## 编码约定
 
 - TreatWarnings 严格：eslint `--max-warnings 0`；文件行数上限见

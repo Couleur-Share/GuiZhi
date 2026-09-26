@@ -8,7 +8,7 @@
  * 索引仅在彻底删除时移除。
  */
 import { listThemedReadingAssetFiles } from "./themed-reading";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import type Database from "./adapter";
 import { buildFtsMatchQuery, segmentTextForFts } from "./fts";
 import { extractAllLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
@@ -76,6 +76,7 @@ const SNIPPET_MAX_LENGTH = 160;
  */
 const SNIPPET_SOURCE_LENGTH = 2000;
 const COUNT_CACHE_TTL_MS = 5_000;
+const COUNT_CACHE_MAX_ENTRIES = 128;
 
 /** 排序字段白名单：调用方传入的键只能命中这里的固定 SQL 片段 */
 const SORT_COLUMNS: Record<KnowledgeSortField, string> = {
@@ -429,7 +430,9 @@ export class KnowledgeItemDB {
     const limit = Math.max(1, Math.min(query.limit ?? LIST_DEFAULT_LIMIT, 500));
     const offset = query.cursor ? 0 : Math.max(0, query.offset ?? 0);
     const fingerprint = queryFingerprint(query);
-    const cached = this.countCache.get(fingerprint);
+    // 游标仍用原始指纹；短期计数缓存只保留定长摘要，避免常驻大排除列表。
+    const countCacheKey = createHash("sha256").update(fingerprint).digest("hex");
+    const cached = this.countCache.get(countCacheKey);
     let total: number;
     if (cached && cached.expiresAt > Date.now()) {
       total = cached.total;
@@ -439,7 +442,14 @@ export class KnowledgeItemDB {
         ...params,
       ) as { count: number } | undefined;
       total = totalRow?.count ?? 0;
-      this.countCache.set(fingerprint, { total, expiresAt: Date.now() + COUNT_CACHE_TTL_MS });
+      const now = Date.now();
+      for (const [key, entry] of this.countCache) {
+        if (entry.expiresAt <= now) this.countCache.delete(key);
+      }
+      if (this.countCache.size >= COUNT_CACHE_MAX_ENTRIES) {
+        this.countCache.delete(this.countCache.keys().next().value!);
+      }
+      this.countCache.set(countCacheKey, { total, expiresAt: now + COUNT_CACHE_TTL_MS });
     }
 
     // 平台筛选是「任一来源命中」，而列表列若仍一律拿最新来源，旧库中

@@ -21,6 +21,8 @@ export interface ReadingResearchBatch {
 }
 export interface ReadingOutline {
   title: string; direction: string; questions: string[];
+  /** 简短的公开检索词；旧检查点可能没有，查证问题仍用于证据评审。 */
+  searchQueries?: string[];
   sections: { title: string; brief: string; reuseFrom?: number; referenceIds?: string[] }[];
 }
 export interface ReadingDraftSection { title: string; markdown: string; referenceIds: string[]; }

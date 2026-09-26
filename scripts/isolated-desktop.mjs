@@ -138,7 +138,15 @@ export async function runIsolatedDesktop(
         return status;
       }
     }
-    console.log("隔离构建完成；开发目录的 out/ 未被用于本次验证。");
+    status = await runNode(
+      path.join(snapshot.desktopRoot, "scripts/check-bundle-budget.mts"),
+      [], snapshot.desktopRoot, env, logFile,
+    );
+    if (status !== 0) {
+      console.error(fs.readFileSync(logFile, "utf8").split(/\r?\n/).slice(-30).join("\n"));
+      return status;
+    }
+    console.log("隔离构建与包体预算通过；开发目录的 out/ 未被用于本次验证。");
     if (command === "shot") {
       // 步骤脚本保持原来的相对 fixture 路径；Electron 本身另设 cwd 到源码副本。
       status = await runNode(

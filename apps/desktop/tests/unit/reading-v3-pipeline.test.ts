@@ -72,6 +72,23 @@ beforeEach(() => {
   });
 });
 describe("v3 自适应生成", () => {
+  it("联网规划保留查证问题，用短检索词发起研究且不增加模型请求", async () => {
+    const page = fixture();
+    page.options.research = true;
+    mocks.call.mockResolvedValueOnce({ title: "标题", direction: "简洁",
+      questions: ["盒模型尺寸与绝对定位的包含块有什么关系？"],
+      searchQueries: [" CSS box-sizing containing block specification "],
+      sections: [{ title: "说明", brief: "完整解释" }],
+    });
+    mocks.research.mockRejectedValueOnce(new Error("研究边界"));
+    await expect(runReadingV3(page, { model: "test" } as any,
+      new AbortController().signal, hooks())).rejects.toThrow("研究边界");
+    expect(page.reconstruction.outline.questions).toEqual(["盒模型尺寸与绝对定位的包含块有什么关系？"]);
+    expect(page.reconstruction.queries).toEqual([
+      { query: "CSS box-sizing containing block specification", done: false, results: [] },
+    ]);
+    expect(mocks.call).toHaveBeenCalledTimes(1);
+  });
   it("离线规划中的多余研究问题不导致整稿失败", async () => {
     mocks.call.mockResolvedValue({
       outline: {

@@ -49,6 +49,13 @@ beforeEach(() => {
   mocks.capture.mockResolvedValue({ complete: true, markdown: source });
 });
 describe("v3 有界查证与复用", () => {
+  it("无相关结果时明确说明原因，不抓取无关网页或冒充查证完成", async () => {
+    const p = fixture();
+    await expect(runV3Research(p, vi.fn().mockResolvedValue({ urls: [] }),
+      new AbortController().signal, hooks())).rejects.toThrow("搜索结果与查证问题不相关");
+    expect(mocks.capture).not.toHaveBeenCalled();
+    expect(p.reconstruction.researchComplete).not.toBe(true);
+  });
   it("标准查证只派发两个问题、四篇正文并保存逐字证据", async () => {
     const p = fixture();
     const call = vi.fn().mockImplementation(async (input) =>

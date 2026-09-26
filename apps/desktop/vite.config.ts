@@ -15,10 +15,6 @@ const mainExternalModules = new Set([
   "https-proxy-agent",
   "socks-proxy-agent",
   "undici",
-  // playwright-core 必须作为运行时依赖保留：打进 Rollup 会把内部懒加载的
-  // chromium-bidi require 提升到入口，导致应用启动时就去解析并不存在的可选模块。
-  // external 后仍只携带控制库，不下载或打包 Chromium。
-  "playwright-core",
   "@resvg/resvg-js",
   "css-tree",
   // linkedom 的可选依赖（未安装）：external 保留 require 调用，

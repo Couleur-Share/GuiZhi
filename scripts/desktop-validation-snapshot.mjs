@@ -10,6 +10,7 @@ const SOURCE_PATHS = [
   "pnpm-workspace.yaml",
   "tsconfig*.json",
   "apps/desktop",
+  "apps/*/package.json",
   "packages",
   "scripts",
   "config",
@@ -57,8 +58,9 @@ function linkDependencies(sourceRoot, root, relativeDir) {
     );
   };
   for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
-    // .bin、.vite、.vite-temp 都不共享；通过包内 CLI 的绝对路径启动工具。
-    if (entry.name.startsWith(".") && entry.name !== ".pnpm") continue;
+    // 包管理器可改写 .pnpm，不能链接共享；仅复用单个包的只读目录。
+    // .bin、.vite、.vite-temp 同样独立；通过包内 CLI 的绝对路径启动工具。
+    if (entry.name.startsWith(".")) continue;
     const from = path.join(source, entry.name);
     const to = path.join(target, entry.name);
     if (entry.name.startsWith("@")) {
@@ -71,7 +73,7 @@ function linkDependencies(sourceRoot, root, relativeDir) {
   }
 }
 
-export function createDesktopSnapshot(sourceRoot) {
+export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true } = {}) {
   sourceRoot = fs.realpathSync(sourceRoot);
   // macOS 的临时目录可能含 /var -> /private/var 链接，统一实路径以匹配模块路径。
   const tempRoot = fs.realpathSync(os.tmpdir());
@@ -143,7 +145,7 @@ export function createDesktopSnapshot(sourceRoot) {
       "packages/db",
       "packages/shared",
     ]) {
-      linkDependencies(sourceRoot, root, relativeDir);
+      if (reuseDependencies) linkDependencies(sourceRoot, root, relativeDir);
     }
     fs.writeFileSync(
       path.join(root, ".validation-snapshot.json"),

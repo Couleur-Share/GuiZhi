@@ -20,6 +20,8 @@ if __name__ == "__main__":
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--guest-script", choices=["guest.ps1", "electron-guest.ps1", "memory-guest.ps1"], default="guest.ps1")
+    parser.add_argument("--candidate-version", default="0.24.0")
+    parser.add_argument("--previous-version", default="0.24.0")
     args = parser.parse_args()
     root = args.output.resolve()
     assert not root.exists(), "验收包输出已存在，请使用新目录保留历史结果"
@@ -48,6 +50,7 @@ if __name__ == "__main__":
     shutil.copytree(args.runtime / "licenses", inputs / "licenses")
     shutil.copyfile(args.runtime / "THIRD-PARTY-NOTICES.txt", inputs / "THIRD-PARTY-NOTICES.txt")
     manifest = {"buildHost": os.environ.get("COMPUTERNAME"), "files": {p.relative_to(inputs).as_posix(): digest(p) for p in sorted(inputs.rglob("*")) if p.is_file()}}
+    manifest.update(candidateVersion=args.candidate_version, previousVersion=args.previous_version)
     (inputs / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     # 转移到另一台主机后，可直接运行同目录 launch.ps1 重新生成绝对路径映射。
     launcher = '''$ErrorActionPreference = 'Stop'

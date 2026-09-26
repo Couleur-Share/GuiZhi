@@ -73,6 +73,67 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@modelcontextprotocol/server':
+        specifier: ^2.0.0
+        version: 2.0.0
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
+      '@resvg/resvg-js':
+        specifier: ^2.6.2
+        version: 2.6.2
+      adm-zip:
+        specifier: ^0.6.0
+        version: 0.6.0
+      css-tree:
+        specifier: ^3.2.1
+        version: 3.2.1
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
+      hnswlib-wasm:
+        specifier: 0.8.2
+        version: 0.8.2
+      http-proxy-agent:
+        specifier: ^7.0.2
+        version: 7.0.2
+      https-proxy-agent:
+        specifier: ^7.0.6
+        version: 7.0.6
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+      linkedom:
+        specifier: ^0.18.13
+        version: 0.18.13
+      material-icon-theme:
+        specifier: ^5.35.0
+        version: 5.35.0
+      node-sqlite3-wasm:
+        specifier: ^0.8.0
+        version: 0.8.53
+      qrcode:
+        specifier: 1.5.4
+        version: 1.5.4
+      sanitize-html:
+        specifier: ^2.17.7
+        version: 2.17.7
+      smol-toml:
+        specifier: ^1.7.0
+        version: 1.7.0
+      socks-proxy-agent:
+        specifier: ^7.0.0
+        version: 7.0.0
+      turndown:
+        specifier: ^7.2.4
+        version: 7.2.4
+      undici:
+        specifier: ^7.24.8
+        version: 7.24.8
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
       '@codemirror/autocomplete':
         specifier: ^6.20.2
         version: 6.20.2
@@ -115,109 +176,6 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.0
         version: 6.43.0
-      '@lezer/highlight':
-        specifier: ^1.2.3
-        version: 1.2.3
-      '@modelcontextprotocol/server':
-        specifier: ^2.0.0
-        version: 2.0.0
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
-      '@resvg/resvg-js':
-        specifier: ^2.6.2
-        version: 2.6.2
-      '@tanstack/react-virtual':
-        specifier: ^3.13.24
-        version: 3.13.24(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      adm-zip:
-        specifier: ^0.6.0
-        version: 0.6.0
-      animejs:
-        specifier: 4.5.0
-        version: 4.5.0
-      css-tree:
-        specifier: ^3.2.1
-        version: 3.2.1
-      d3-force:
-        specifier: ^3.0.0
-        version: 3.0.0
-      daisyui:
-        specifier: 5.7.28
-        version: 5.7.28
-      echarts:
-        specifier: 6.1.0
-        version: 6.1.0
-      fflate:
-        specifier: ^0.8.2
-        version: 0.8.2
-      hnswlib-wasm:
-        specifier: 0.8.2
-        version: 0.8.2
-      http-proxy-agent:
-        specifier: ^7.0.2
-        version: 7.0.2
-      https-proxy-agent:
-        specifier: ^7.0.6
-        version: 7.0.6
-      jsonc-parser:
-        specifier: ^3.3.1
-        version: 3.3.1
-      linkedom:
-        specifier: ^0.18.13
-        version: 0.18.13
-      material-icon-theme:
-        specifier: ^5.35.0
-        version: 5.35.0
-      mermaid:
-        specifier: 11.17.2
-        version: 11.17.2
-      node-sqlite3-wasm:
-        specifier: ^0.8.0
-        version: 0.8.53
-      qrcode:
-        specifier: 1.5.4
-        version: 1.5.4
-      react-force-graph-2d:
-        specifier: ^1.29.1
-        version: 1.29.1(react@18.3.1)
-      rehype-raw:
-        specifier: ^7.0.0
-        version: 7.0.0
-      rehype-stringify:
-        specifier: ^10.0.1
-        version: 10.0.1
-      remark-parse:
-        specifier: ^11.0.0
-        version: 11.0.0
-      remark-rehype:
-        specifier: ^11.1.2
-        version: 11.1.2
-      sanitize-html:
-        specifier: ^2.17.7
-        version: 2.17.7
-      smol-toml:
-        specifier: ^1.7.0
-        version: 1.7.0
-      socks-proxy-agent:
-        specifier: ^7.0.0
-        version: 7.0.0
-      turndown:
-        specifier: ^7.2.4
-        version: 7.2.4
-      undici:
-        specifier: ^7.24.8
-        version: 7.24.8
-      unified:
-        specifier: ^11.0.5
-        version: 11.0.5
-      yet-another-react-lightbox:
-        specifier: ^3.32.1
-        version: 3.32.1(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -239,9 +197,15 @@ importers:
       '@guizhi/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@lezer/highlight':
+        specifier: ^1.2.3
+        version: 1.2.3
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.61.1
+      '@tanstack/react-virtual':
+        specifier: ^3.13.24
+        version: 3.13.24(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -293,6 +257,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^2.0.0
         version: 2.1.9(vitest@2.1.9(@types/node@24.12.4)(jsdom@27.4.0(@noble/hashes@2.2.0)))
+      animejs:
+        specifier: 4.5.0
+        version: 4.5.0
       autoprefixer:
         specifier: ^10.4.22
         version: 10.5.4(postcss@8.5.6)
@@ -308,6 +275,15 @@ importers:
       concurrently:
         specifier: ^9.0.0
         version: 9.2.1
+      d3-force:
+        specifier: ^3.0.0
+        version: 3.0.0
+      daisyui:
+        specifier: 5.7.28
+        version: 5.7.28
+      echarts:
+        specifier: 6.1.0
+        version: 6.1.0
       electron:
         specifier: '33'
         version: 33.4.11
@@ -341,6 +317,9 @@ importers:
       lucide-react:
         specifier: ^0.460.0
         version: 0.460.0(react@18.3.1)
+      mermaid:
+        specifier: 11.17.2
+        version: 11.17.2
       playwright:
         specifier: ^1.57.0
         version: 1.61.1
@@ -356,6 +335,9 @@ importers:
       react-dom:
         specifier: ^18.3.0
         version: 18.3.1(react@18.3.1)
+      react-force-graph-2d:
+        specifier: ^1.29.1
+        version: 1.29.1(react@18.3.1)
       react-i18next:
         specifier: ^15.0.0
         version: 15.7.4(i18next@24.2.3(typescript@5.9.3))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
@@ -365,15 +347,27 @@ importers:
       rehype-highlight:
         specifier: ^6.0.0
         version: 6.0.0
+      rehype-raw:
+        specifier: ^7.0.0
+        version: 7.0.0
       rehype-sanitize:
         specifier: ^6.0.0
         version: 6.0.0
+      rehype-stringify:
+        specifier: ^10.0.1
+        version: 10.0.1
       remark-cjk-friendly:
         specifier: 2.3.1
         version: 2.3.1(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(unified@11.0.5)
       remark-gfm:
         specifier: ^4.0.0
         version: 4.0.1
+      remark-parse:
+        specifier: ^11.0.0
+        version: 11.0.0
+      remark-rehype:
+        specifier: ^11.1.2
+        version: 11.1.2
       rollup-plugin-visualizer:
         specifier: ^7.0.1
         version: 7.0.1(rollup@4.63.1)
@@ -392,6 +386,9 @@ importers:
       typescript:
         specifier: ^5.6.0
         version: 5.9.3
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
       uuid:
         specifier: ^13.0.0
         version: 13.0.2
@@ -410,6 +407,9 @@ importers:
       wait-on:
         specifier: ^8.0.0
         version: 8.0.5
+      yet-another-react-lightbox:
+        specifier: ^3.32.1
+        version: 3.32.1(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       zustand:
         specifier: ^5.0.0
         version: 5.0.14(@types/react@18.3.31)(react@18.3.1)

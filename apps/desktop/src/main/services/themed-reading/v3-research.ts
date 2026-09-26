@@ -83,6 +83,8 @@ export async function runV3Research(
           questions: s.outline.questions,
           candidates: candidates.map((r) => ({ title: r.title, url: r.url })),
         });
+        if (Array.isArray(selected.urls) && !selected.urls.length)
+          throw new Error("搜索结果与查证问题不相关，请调整检索词、切换搜索服务或改为不联网生成");
         if (
           !Array.isArray(selected.urls) ||
           !selected.urls.length ||

@@ -10,139 +10,13 @@ type Check = {
   profile: Profile;
 };
 
+// 只列出当前仓库实际存在的入口；不能把未匹配的 filter 当成通过。
 const checks: Check[] = [
-  {
-    id: "shared-typecheck",
-    label: "Shared package typecheck",
-    args: ["--filter", "@guizhi/shared", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "db-typecheck",
-    label: "Database package typecheck",
-    args: ["--filter", "@guizhi/db", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "core-typecheck",
-    label: "Core package typecheck",
-    args: ["--filter", "@guizhi/core", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "cli-lint",
-    label: "CLI lint",
-    args: ["--filter", "@guizhi/cli", "lint"],
-    profile: "quick",
-  },
-  {
-    id: "cli-typecheck",
-    label: "CLI typecheck",
-    args: ["--filter", "@guizhi/cli", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "cli-test",
-    label: "CLI tests",
-    args: ["--filter", "@guizhi/cli", "test"],
-    profile: "quick",
-  },
-  {
-    id: "cli-build",
-    label: "CLI build",
-    args: ["--filter", "@guizhi/cli", "build"],
-    profile: "quick",
-  },
-  {
-    id: "desktop-lint",
-    label: "Desktop lint",
-    args: ["--filter", "@guizhi/desktop", "lint"],
-    profile: "quick",
-  },
-  {
-    id: "desktop-typecheck",
-    label: "Desktop typecheck",
-    args: ["--filter", "@guizhi/desktop", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "desktop-unit",
-    label: "Desktop unit tests",
-    args: ["--filter", "@guizhi/desktop", "test:unit"],
-    profile: "quick",
-  },
-  {
-    id: "desktop-build",
-    label: "Desktop build",
-    args: ["--filter", "@guizhi/desktop", "build"],
-    profile: "quick",
-  },
-  {
-    id: "desktop-integration",
-    label: "Desktop integration tests",
-    args: ["--filter", "@guizhi/desktop", "test:integration"],
-    profile: "release",
-  },
-  {
-    id: "desktop-performance",
-    label: "Desktop performance budget",
-    args: ["--filter", "@guizhi/desktop", "test:perf"],
-    profile: "release",
-  },
-  {
-    id: "desktop-bundle-budget",
-    label: "Desktop bundle budget",
-    args: ["--filter", "@guizhi/desktop", "bundle:budget"],
-    profile: "release",
-  },
-  {
-    id: "desktop-e2e-smoke",
-    label: "Desktop E2E smoke",
-    args: ["--filter", "@guizhi/desktop", "test:e2e:smoke"],
-    profile: "release",
-  },
-  {
-    id: "web-lint",
-    label: "Web lint",
-    args: ["--filter", "@guizhi/web", "lint"],
-    profile: "quick",
-  },
-  {
-    id: "web-typecheck",
-    label: "Web typecheck",
-    args: ["--filter", "@guizhi/web", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "web-test",
-    label: "Web tests",
-    args: ["--filter", "@guizhi/web", "test"],
-    profile: "quick",
-  },
-  {
-    id: "web-build",
-    label: "Web build",
-    args: ["--filter", "@guizhi/web", "build"],
-    profile: "quick",
-  },
-  {
-    id: "web-cloudflare-lint",
-    label: "Cloudflare worker lint",
-    args: ["--filter", "@guizhi/web-cloudflare", "lint"],
-    profile: "quick",
-  },
-  {
-    id: "web-cloudflare-typecheck",
-    label: "Cloudflare worker typecheck",
-    args: ["--filter", "@guizhi/web-cloudflare", "typecheck"],
-    profile: "quick",
-  },
-  {
-    id: "web-cloudflare-test",
-    label: "Cloudflare worker tests",
-    args: ["--filter", "@guizhi/web-cloudflare", "test"],
-    profile: "quick",
-  },
+  { id: "workspace-lint", label: "全仓文件门禁与桌面 ESLint", args: ["lint"], profile: "quick" },
+  { id: "workspace-typecheck", label: "全部工作区类型检查", args: ["typecheck"], profile: "quick" },
+  { id: "desktop-unit", label: "验证工具与桌面全量单测", args: ["test:unit"], profile: "quick" },
+  { id: "desktop-build", label: "隔离生产构建与包体预算", args: ["build:isolated"], profile: "quick" },
+  { id: "desktop-e2e-smoke", label: "隔离生产构建、包体预算与 Electron 冒烟", args: ["test:e2e:smoke"], profile: "release" },
 ];
 
 function getProfile(): Profile {
@@ -201,6 +75,8 @@ function formatDuration(startedAt: number): string {
 }
 
 function shouldRun(check: Check, profile: Profile): boolean {
+  // 完整检查由冒烟入口构建一次，避免重复编译；两种模式都检查新产物预算。
+  if (profile === "release" && check.id === "desktop-build") return false;
   return profile === "release" || check.profile === "quick";
 }
 

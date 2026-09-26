@@ -21,7 +21,25 @@ export default async function ({ win, app, outDir, shot }) {
     packaged: app.isPackaged, version: app.getVersion(), userData: app.getPath("userData"),
   }));
   assert.equal(runtime.packaged, true);
-  assert.equal(runtime.version, "0.24.0");
+  const expectedVersion = process.env.GUIZHI_INSTALLED_EXPECTED_VERSION;
+  assert.ok(expectedVersion, '验收必须明确指定安装版本');
+  assert.equal(runtime.version, expectedVersion);
+  let readingAssets;
+  if (phase !== "previous") {
+    readingAssets = await app.evaluate(({ app }) => {
+      const fs = process.getBuiltinModule("fs"), path = process.getBuiltinModule("path");
+      const root = app.getAppPath();
+      const require = process.getBuiltinModule("module").createRequire(path.join(root, "package.json"));
+      const { Resvg } = require("@resvg/resvg-js");
+      const png = new Resvg('<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><rect width="12" height="12" fill="red"/></svg>').render().asPng();
+      const assets = ["animation.js", "compiler.js", "runtime-animation.js", "runtime-echarts.js", "runtime-mermaid.js"];
+      return { pngSignature: png.subarray(0, 8).toString("hex"), assets: assets.map(name => ({
+        name, bytes: fs.readFileSync(path.join(root, "out/main/reading-libraries", name)).length,
+      })) };
+    });
+    assert.equal(readingAssets.pngSignature, "89504e470d0a1a0a");
+    assert.ok(readingAssets.assets.every(asset => asset.bytes > 1000));
+  }
   let preserved;
   if (phase === "upgrade") {
     const before = JSON.parse(fs.readFileSync(process.env.GUIZHI_INSTALLED_PREVIOUS, "utf8"));
@@ -83,7 +101,7 @@ export default async function ({ win, app, outDir, shot }) {
     }, (r) => r.available && !r.running, 85000);
     await shot("installed-capture");
     fs.writeFileSync(path.join(outDir, "installed.json"), JSON.stringify({
-      passed: true, phase, runtime, manual, preserved, captures, idle,
+      passed: true, phase, runtime, readingAssets, manual, preserved, captures, idle,
     }, null, 2));
   } finally {
     server.closeAllConnections();

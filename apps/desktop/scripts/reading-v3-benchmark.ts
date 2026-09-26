@@ -25,6 +25,9 @@ export async function readingV3Benchmark(input: {
   samples: string;
   searchConfig?: string;
   anomalyLedger?: string;
+  profile?: "release-online";
+  modelId?: string;
+  resumeDirectory?: string;
 }) {
   if (
     process.env.GUIZHI_E2E !== "1" ||
@@ -41,6 +44,12 @@ export async function readingV3Benchmark(input: {
     throw new Error("真实验收已有记录，禁止自动重复付费生成");
   const saved = JSON.parse(await fs.readFile(input.config, "utf8")),
     originalRead = coreAIConfigService.read;
+  if (input.modelId) {
+    if (!saved.models.some(model => model.id === input.modelId && model.enabled !== false))
+      throw new Error("指定的验收模型不存在或已禁用");
+    // 只覆盖本次隔离验收的内存副本，不修改用户配置或复制明文密钥到产物。
+    saved.modelRouteDefaults = { ...saved.modelRouteDefaults, mainText: input.modelId };
+  }
   coreAIConfigService.read = () => saved;
   try {
     const config = resolveMediaSummaryConfig();
@@ -78,6 +87,18 @@ export async function readingV3Benchmark(input: {
         })),
       );
     jobs.push({ sample: samples[0], version: 3, research: false, image: true });
+    if (input.profile === "release-online") {
+      if (!input.searchConfig || input.anomalyLedger || samples.length !== 2)
+        throw new Error("发版联网验收需要两个样例和搜索配置，不能复用历史对照预算");
+      jobs = samples.map(sample => ({ sample, version: 3, research: true, image: false }));
+    }
+    if (input.resumeDirectory) {
+      if (input.profile !== "release-online" || path.resolve(input.resumeDirectory) === directory)
+        throw new Error("续测只允许读取另一目录的发版联网检查点");
+      const previous = JSON.parse(await fs.readFile(path.join(input.resumeDirectory, "attempts.json"), "utf8"));
+      if (previous.length !== 2 || previous.some(result => result.status !== "failed" || result.stage !== "research"))
+        throw new Error("续测要求两个已结束且停在查证阶段的失败记录");
+    }
     if (input.anomalyLedger) {
       const original = JSON.parse(
         await fs.readFile(input.anomalyLedger, "utf8"),
@@ -94,6 +115,8 @@ export async function readingV3Benchmark(input: {
       ];
     }
     for (const job of jobs) {
+      if (input.profile === "release-online" && attempts.length >= 2)
+        throw new Error("本轮发版联网验收的两次生成预算已用完");
       if (input.anomalyLedger && attempts.length)
         throw new Error("仅剩一次异常复测预算");
       if (attempts.length >= 9)
@@ -102,6 +125,7 @@ export async function readingV3Benchmark(input: {
       const page = readingV3FixturePage("");
       Object.assign(page, {
         id,
+        sourceKind: job.sample.sourceKind === "summary" ? "summary" : "body",
         formatVersion: job.version,
         design: null,
         reconstruction: {
@@ -139,6 +163,14 @@ export async function readingV3Benchmark(input: {
           ? { enhancedInteraction: true, researchDepth: "standard" as const }
           : {}),
       };
+      if (input.resumeDirectory) {
+        const previous = JSON.parse(await fs.readFile(path.join(input.resumeDirectory, `${id}-checkpoint.json`), "utf8"));
+        if (previous.id !== id || previous.formatVersion !== 3 ||
+            previous.sourceKind !== page.sourceKind || previous.source.fingerprint !== page.source.fingerprint ||
+            !previous.reconstruction.queries.length || previous.reconstruction.queries.some(query => !query.done))
+          throw new Error("续测检查点与公开样例不匹配，或搜索尚未完成");
+        Object.assign(page, previous);
+      }
       const result: any = {
         id,
         model: config.model,
@@ -148,6 +180,7 @@ export async function readingV3Benchmark(input: {
         calls: { textCalls: 0, searchCalls: 0, pagesRead: 0, imageCalls: 0 },
         tokens: [],
         status: "running",
+        resumed: Boolean(input.resumeDirectory),
       };
       attempts.push(result);
       const persist = () =>
@@ -275,6 +308,10 @@ export async function readingV3Benchmark(input: {
       }
       result.elapsedMs = Date.now() - result.startedAt;
       result.repairs = page.generation?.repairs;
+      result.sourceKind = page.sourceKind;
+      result.readyReferences = page.reconstruction.references.filter(
+        (reference) => reference.status === "ready",
+      ).length;
       checkpoint();
       if (/429|限流|频繁/.test(result.error ?? "")) break;
     }

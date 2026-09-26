@@ -46,7 +46,11 @@ class AcceptanceKitEncodingTest(unittest.TestCase):
                 "--candidate", str(installer), "--previous", str(installer),
                 "--runtime", str(runtime), "--output", str(electron_output),
                 "--guest-script", "electron-guest.ps1",
+                "--candidate-version", "0.25.0", "--previous-version", "0.24.0",
             ], check=True, capture_output=True)
+            versions = json.loads((electron_output / "input/manifest.json").read_text("utf-8"))
+            self.assertEqual(versions["candidateVersion"], "0.25.0")
+            self.assertEqual(versions["previousVersion"], "0.24.0")
             for name in ("launch.ps1", "acceptance.wsb"):
                 self.assertIn("\\electron-guest.ps1", (electron_output / name).read_text("utf-8-sig"))
             if sys.platform == "win32":
