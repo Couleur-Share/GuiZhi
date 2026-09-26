@@ -25,6 +25,21 @@ export function readingLibrariesPlugin() {
   return { name: 'guizhi-reading-libraries', resolveId(id) { if (id === 'virtual:reading-libraries') return '\0' + id; }, async load(id) {
     if (id !== '\0virtual:reading-libraries') return;
     pending ??= libraries();
-    return `export default ${JSON.stringify(await pending)};`;
+    return readingLibraryModule(await pending, asset => this.emitFile(asset));
   } };
+}
+
+// 大型浏览器脚本单独输出；主进程仅在实际生成阅读页时读取，不常驻缓存。
+// 不能内联成字符串：入口源码和解码后的字符串会同时保留在 V8 堆中。
+export function readingLibraryModule(value, emit) {
+  const getter = (key, source, file) => {
+    const fileName = `reading-libraries/${file}.js`;
+    emit({ type: 'asset', fileName, source });
+    return `get ${key}(){return readLibrary(${JSON.stringify(fileName)})}`;
+  };
+  const fields = [getter('compiler', value.compiler, 'compiler'), getter('animation', value.animation, 'animation')];
+  const runtime = Object.entries(value.runtime).map(([name, source]) => getter(name, source, `runtime-${name}`));
+  return `import fs from 'node:fs';import path from 'node:path';
+function readLibrary(file){try{return fs.readFileSync(path.join(__dirname,file),'utf8')}catch(error){throw new Error('阅读组件资源读取失败：'+file+'；'+error.message)}}
+export default {${fields.join(',')},components:${JSON.stringify(value.components)},runtime:{${runtime.join(',')}}};`;
 }

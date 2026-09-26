@@ -14,7 +14,7 @@
 | 论坛 | <!-- source-platform:appinn -->**小众软件** | Discourse 正文 + 全部楼层 + AI 讨论总结 | 采集 `meta.appinn.net` 公开主题，无需登录 |
 | 论坛 | <!-- source-platform:twolibra -->**2Libra** | 正文 + 全部平铺评论 + 回复对象 / 楼层 + AI 讨论总结 | 走公开只读 API；分页失败时保留已取得内容并给出警告 |
 | 图文 | <!-- source-platform:wechat -->微信公众号 | HTML 原文排版快照 + Markdown + 本地图片 | 精确识别 mp.weixin.qq.com；旧文章可手动补采；音视频保留原文入口 |
-| 通用 | <!-- source-platform:web -->网页 | 内置 Crawl4AI + 独立 Chromium → Markdown | 无专用连接器的标准 URL；不支持系统或组件不可用时带原因回退 Readability |
+| 通用 | <!-- source-platform:web -->网页 | 静态获取 / Electron 隔离渲染 + Crawl4AI → Markdown | 无专用连接器的标准 URL；不支持系统或组件不可用时带原因回退 Readability |
 | 通用 | <!-- source-platform:local -->本地文件 | 文本 / 图片 / 音视频拖入即入库 | 媒体资产化，详情页可预览播放 |
 
 新增有限范围文档站导入、原文版本比较和指定网页研究，使用方式见 [内置网页采集](crawl4ai.md)。当前候选的全平台验收状态见 [实施记录](crawl4ai-implementation.md)，不以本机通过代替发布支持声明。

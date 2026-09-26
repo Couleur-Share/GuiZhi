@@ -24,12 +24,14 @@ def machine(file):
         return hex(struct.unpack("<H", stream.read(2))[0])
 
 
-def check(root, arch):
+def check(root, arch, unpacked_only=False):
     unpacked = root / ("win-unpacked" if arch == "x64" else "win-arm64-unpacked")
     resources = unpacked / "resources"
     runtime = resources / "crawl4ai"
     manifest = json.loads((runtime / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["target"] == "win32-x64"
+    assert manifest.get("renderer") == "electron" and "browser" not in manifest, "组件仍依赖独立 Chromium"
+    assert not (runtime / "browser").exists(), "分发目录不能包含独立 Chromium"
     expected = manifest["files"]
     actual = {p.relative_to(runtime).as_posix() for p in runtime.rglob("*") if p.is_file()}
     assert actual == set(expected) | {"manifest.json"}, "运行包文件集合不匹配"
@@ -43,29 +45,31 @@ def check(root, arch):
     architectures = {
         "electron": machine(unpacked / "GuiZhi.exe"),
         "python": machine(runtime / manifest["python"]),
-        "chromium": machine(runtime / manifest["browser"]),
     }
     assert architectures["electron"] == ("0x8664" if arch == "x64" else "0xaa64")
-    assert architectures["python"] == architectures["chromium"] == "0x8664"
-    installers = list(root.glob(f"GuiZhi-Setup-*-{arch}.exe"))
-    assert len(installers) == 1, "安装包缺失或不唯一"
-    installer = installers[0]
-    return {
-        "arch": arch, "architectures": architectures,
-        "installer": str(installer.resolve()), "installerBytes": installer.stat().st_size,
-        "installerSha256": digest(installer),
+    assert architectures["python"] == "0x8664"
+    result = {
+        "arch": arch, "architectures": architectures, "renderer": "electron",
         "runtimeFiles": len(expected), "workerFiles": len(worker_files),
         "runtimeBytes": sum(p.stat().st_size for p in runtime.rglob("*") if p.is_file()),
         "resourceIntegrity": "passed", "installedRuntimeAcceptance": "pending",
     }
+    if not unpacked_only:
+        installers = list(root.glob(f"GuiZhi-Setup-*-{arch}.exe"))
+        assert len(installers) == 1, "安装包缺失或不唯一"
+        installer = installers[0]
+        result.update(installer=str(installer.resolve()), installerBytes=installer.stat().st_size,
+                      installerSha256=digest(installer))
+    return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--single-arch", choices=["x64", "arm64"])
+    parser.add_argument("--unpacked-only", action="store_true", help="仅验证 --dir 产物，不声称完成安装包验收")
     args = parser.parse_args()
-    results = [check(args.root, args.single_arch)] if args.single_arch else [check(args.root / arch, arch) for arch in ("x64", "arm64")]
+    results = [check(args.root, args.single_arch, args.unpacked_only)] if args.single_arch else [check(args.root / arch, arch, args.unpacked_only) for arch in ("x64", "arm64")]
     output = args.root.parent / "package-check.json"
     output.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
     print(output)

@@ -29,7 +29,11 @@ function readLatestChangelogSection() {
 const extraResources = [
   { from: "../../NOTICE", to: "NOTICE" },
   { from: "../../LICENSE", to: "LICENSE" },
-  { from: "resources/crawl4ai", to: "crawl4ai" },
+  {
+    from: "resources/crawl4ai", to: "crawl4ai",
+    // 旧开发组件也不能把独立 Chromium 带回安装包。
+    filter: ["**/*", "!browser", "!browser/**"],
+  },
   { from: "resources/crawl4ai-worker", to: "crawl4ai-worker", filter: ["*.py"] },
   {
     from: "resources/icon.ico",
@@ -135,9 +139,8 @@ module.exports = {
     const platform = context.electronPlatformName;
     const target = `${platform}-${platform === "win32" ? "x64" : arch}`;
     if (manifest.version !== "0.9.3" || manifest.target !== target) throw new Error(`网页组件架构不匹配：需要 ${target}`);
-    manifest.workerHashes=crawlerPackage.workerHashes(path.join(__dirname,"resources/crawl4ai-worker"));
-    fs.writeFileSync(path.join(__dirname,"resources/crawl4ai/manifest.json"),JSON.stringify(manifest,null,2));
   },
+  afterPack: crawlerPackage.afterPack,
   afterSign: crawlerPackage.afterSign,
   asarUnpack: ["**/*.node", "**/node-sqlite3-wasm/**"],
   asar: true,

@@ -1,4 +1,4 @@
-/* 打包签名可能改变 Chromium / Python 二进制，最后再生成分发文件校验表。 */
+/* 复制和签名可能改变 Python 二进制，只在分发目录生成最终校验表。 */
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
@@ -21,6 +21,8 @@ function finalizeManifest(resources) {
   const root = path.join(resources, "crawl4ai"),
     file = path.join(root, "manifest.json");
   const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+  if (fs.existsSync(path.join(root, "browser")))
+    throw new Error("分发目录仍包含独立 Chromium，请检查资源过滤规则");
   const files = {};
   function walk(directory) {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -32,9 +34,18 @@ function finalizeManifest(resources) {
     }
   }
   walk(root);
+  if (!files[manifest.python]) throw new Error("分发目录缺少 Python 可执行文件");
+  delete manifest.browser;
+  manifest.renderer = "electron";
   manifest.files = files;
   manifest.workerHashes = workerHashes(path.join(resources, "crawl4ai-worker"));
   fs.writeFileSync(file, JSON.stringify(manifest, null, 2));
+}
+async function afterPack(context) {
+  const resources = context.electronPlatformName === "darwin"
+    ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, "Contents/Resources")
+    : path.join(context.appOutDir, "resources");
+  finalizeManifest(resources);
 }
 async function afterSign(context) {
   const mac = context.electronPlatformName === "darwin";
@@ -90,4 +101,4 @@ async function signMac(options) {
     });
   }
 }
-module.exports = { workerHashes, finalizeManifest, afterSign, signMac };
+module.exports = { workerHashes, finalizeManifest, afterPack, afterSign, signMac };

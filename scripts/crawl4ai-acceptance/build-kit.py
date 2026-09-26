@@ -19,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--guest-script", choices=["guest.ps1", "electron-guest.ps1", "memory-guest.ps1"], default="guest.ps1")
     args = parser.parse_args()
     root = args.output.resolve()
     assert not root.exists(), "验收包输出已存在，请使用新目录保留历史结果"
@@ -41,6 +42,9 @@ if __name__ == "__main__":
     shutil.copyfile(source.parent.parent / "apps/desktop/scripts/screenshot.mjs", inputs / "screenshot.mjs")
     shutil.copytree(args.runtime / "site-packages/playwright/driver", inputs / "tools/driver")
     shutil.copytree(args.runtime / "python", inputs / "tools/python")
+    if args.guest_script == "memory-guest.ps1":
+        shutil.copytree(args.runtime / "site-packages/psutil", inputs / "tools/metrics/psutil",
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     shutil.copytree(args.runtime / "licenses", inputs / "licenses")
     shutil.copyfile(args.runtime / "THIRD-PARTY-NOTICES.txt", inputs / "THIRD-PARTY-NOTICES.txt")
     manifest = {"buildHost": os.environ.get("COMPUTERNAME"), "files": {p.relative_to(inputs).as_posix(): digest(p) for p in sorted(inputs.rglob("*")) if p.is_file()}}
@@ -60,8 +64,24 @@ $outputPath = [Security.SecurityElement]::Escape((Join-Path $PSScriptRoot 'outpu
   <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\GuiZhiAcceptanceInput\\guest.ps1</Command></LogonCommand>
 </Configuration>
 "@ | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'acceptance.wsb') -Encoding UTF8
-Start-Process -FilePath (Join-Path $PSScriptRoot 'acceptance.wsb')
+# Store 版沙盒使用本机 gRPC；继承的代理可能使 HTTP/2 初始化失败。
+# 仅清理启动子进程继承的代理，随后恢复当前进程；不修改系统代理。
+$proxyNames = @('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY')
+$savedProxy = @{}
+foreach ($name in $proxyNames) {
+  $savedProxy[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+  [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+}
+try {
+  $configurationPath = Join-Path $PSScriptRoot 'acceptance.wsb'
+  Start-Process -FilePath (Join-Path $env:WINDIR 'System32/WindowsSandbox.exe') -ArgumentList ('"' + $configurationPath + '"') -WindowStyle Hidden
+} finally {
+  foreach ($name in $proxyNames) {
+    [Environment]::SetEnvironmentVariable($name, $savedProxy[$name], 'Process')
+  }
+}
 '''
+    launcher = launcher.replace('\\guest.ps1', '\\' + args.guest_script)
     (root / "launch.ps1").write_text(launcher, encoding="utf-8-sig", newline="\r\n")
     configuration = f'''<Configuration>
   <Networking>Disable</Networking><vGPU>Disable</vGPU><MemoryInMB>8192</MemoryInMB>
@@ -72,6 +92,7 @@ Start-Process -FilePath (Join-Path $PSScriptRoot 'acceptance.wsb')
   </MappedFolders>
   <LogonCommand><Command>powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\GuiZhiAcceptanceInput\\guest.ps1</Command></LogonCommand>
 </Configuration>'''
+    configuration = configuration.replace('\\guest.ps1', '\\' + args.guest_script)
     (root / "acceptance.wsb").write_text(configuration, encoding="utf-8-sig", newline="\r\n")
     (root / "README.txt").write_text("Windows 11 x64 offline acceptance kit. NOT YET GUEST-VERIFIED.\nEnable Windows Sandbox on a disposable test host, then run launch.ps1. It installs only inside the guest.\nInput is read-only; only output is writable to the host. Internet, clipboard, microphone and camera are disabled.\nResults: output/run-*/result.json, screenshots, logs and synthetic databases. Failures remain preserved.\nDo not execute guest.ps1 on a daily-use computer. For a disposable VM, supply -DisposableVM and explicit InputRoot/OutputRoot.\n", encoding="utf-8")
     shutil.copyfile(source.parent.parent / "docs/crawl4ai-p5-windows.md", root / "README.zh-CN.md")

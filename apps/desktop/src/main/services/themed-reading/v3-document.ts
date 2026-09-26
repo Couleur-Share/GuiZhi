@@ -370,12 +370,13 @@ export function v3InnerDocument(
       ];
   if (interactive && !partial && page.options.enhancedInteraction !== false) {
     for (const lib of d.libraries ?? []) {
-      if (!libraries.runtime?.[lib])
+      const library = libraries.runtime?.[lib];
+      if (!library)
         throw new ReadingPageError({
           kind: "resource",
           message: `内置库 ${lib} 不可用`,
         });
-      code.push(libraries.runtime[lib]);
+      code.push(library);
     }
     for (const s of d.scripts ?? [])
       if (s.status !== "failed")

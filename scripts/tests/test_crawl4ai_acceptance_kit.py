@@ -17,8 +17,9 @@ class AcceptanceKitEncodingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             runtime = directory / "runtime"
-            for relative in ("site-packages/playwright/driver", "python", "licenses"):
+            for relative in ("site-packages/playwright/driver", "site-packages/psutil", "python", "licenses"):
                 (runtime / relative).mkdir(parents=True)
+            (runtime / "site-packages/psutil/__init__.py").write_text("# fixture", encoding="utf-8")
             (runtime / "THIRD-PARTY-NOTICES.txt").write_text("fixture", encoding="utf-8")
             installer = directory / "installer.exe"
             installer.write_bytes(b"test fixture - never executed")
@@ -39,6 +40,58 @@ class AcceptanceKitEncodingTest(unittest.TestCase):
             self.assertEqual(guest.read_text("utf-8-sig"), source.read_text("utf-8-sig"))
             if sys.platform == "win32":
                 self.check_windows_powershell(guest)
+            electron_output = directory / "electron-kit"
+            subprocess.run([
+                sys.executable, str(ROOT / "scripts/crawl4ai-acceptance/build-kit.py"),
+                "--candidate", str(installer), "--previous", str(installer),
+                "--runtime", str(runtime), "--output", str(electron_output),
+                "--guest-script", "electron-guest.ps1",
+            ], check=True, capture_output=True)
+            for name in ("launch.ps1", "acceptance.wsb"):
+                self.assertIn("\\electron-guest.ps1", (electron_output / name).read_text("utf-8-sig"))
+            if sys.platform == "win32":
+                self.check_launcher_proxy(electron_output / "launch.ps1")
+                script = electron_output / "input/electron-guest.ps1"
+                command = "$t=$null;$e=$null;[void][Management.Automation.Language.Parser]::ParseFile('__PATH__',[ref]$t,[ref]$e);if(@($e).Count){throw ($e|Out-String)}"
+                subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                                command.replace("__PATH__", str(script).replace("'", "''"))], check=True, capture_output=True)
+            memory_output = directory / "memory-kit"
+            subprocess.run([
+                sys.executable, str(ROOT / "scripts/crawl4ai-acceptance/build-kit.py"),
+                "--candidate", str(installer), "--previous", str(installer),
+                "--runtime", str(runtime), "--output", str(memory_output),
+                "--guest-script", "memory-guest.ps1",
+            ], check=True, capture_output=True)
+            memory_manifest = json.loads((memory_output / "input/manifest.json").read_text("utf-8"))
+            self.assertIn("tools/metrics/psutil/__init__.py", memory_manifest["files"])
+            self.assertIn("\\memory-guest.ps1", (memory_output / "acceptance.wsb").read_text("utf-8-sig"))
+            if sys.platform == "win32":
+                script = memory_output / "input/memory-guest.ps1"
+                subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                                command.replace("__PATH__", str(script).replace("'", "''"))], check=True, capture_output=True)
+
+    def check_launcher_proxy(self, launcher):
+        # 模拟启动失败，验证代理既不传给沙盒，也不会被永久清除。
+        command = """
+$env:HTTP_PROXY='http://proxy.invalid:1'
+$env:HTTPS_PROXY='http://proxy.invalid:2'
+$env:ALL_PROXY='socks5://proxy.invalid:3'
+$global:launchChecked=$false
+function Start-Process {
+  param($FilePath,$ArgumentList,$WindowStyle)
+  if ($env:HTTP_PROXY -or $env:HTTPS_PROXY -or $env:ALL_PROXY) { throw 'Proxy inherited' }
+  if ($FilePath -notlike '*WindowsSandbox.exe' -or $WindowStyle -ne 'Hidden') { throw 'Wrong launcher' }
+  if ($ArgumentList -notmatch '^".*acceptance.wsb"$') { throw 'Configuration path not quoted' }
+  $global:launchChecked=$true
+  throw 'Simulated launch failure'
+}
+try { & '__PATH__'; throw 'Expected failure' }
+catch { if ($_.Exception.Message -ne 'Simulated launch failure') { throw } }
+if (!$global:launchChecked) { throw 'Launcher was not called' }
+if ($env:HTTP_PROXY -ne 'http://proxy.invalid:1' -or $env:HTTPS_PROXY -ne 'http://proxy.invalid:2' -or $env:ALL_PROXY -ne 'socks5://proxy.invalid:3') { throw 'Proxy was not restored' }
+exit 0
+""".replace("__PATH__", str(launcher).replace("'", "''"))
+        subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command], check=True, capture_output=True)
 
     def check_windows_powershell(self, guest):
         # ParseFile uses Windows PowerShell's real BOM/ANSI handling without running installers.

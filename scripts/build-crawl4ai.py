@@ -7,11 +7,9 @@ from pathlib import Path
 import platform
 import shutil
 import subprocess
-import stat
 import sys
 import tarfile
 import urllib.request
-import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "config" / "crawl4ai"
@@ -19,7 +17,7 @@ CONFIG = ROOT / "config" / "crawl4ai"
 
 def verify_runtime(python):
     # 英文 Windows 构建机默认 CP1252；自检日志固定 UTF-8，不依赖系统语言。
-    subprocess.run([str(python), "-s", "-c", "import crawl4ai,playwright;print('Crawl4AI 随包依赖可加载')"], check=True,
+    subprocess.run([str(python), "-B", "-s", "-c", "import crawl4ai,playwright;print('Crawl4AI 随包依赖可加载')"], check=True,
                    env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "CRAWL4_AI_BASE_DIRECTORY": str(CONFIG / "downloads" / "build-cache"), "LITELLM_LOCAL_MODEL_COST_MAP": "True", "HF_HUB_OFFLINE": "1"})
 
 
@@ -40,6 +38,7 @@ def main():
     sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("--target", choices=["win32-x64", "darwin-x64", "darwin-arm64", "linux-x64"], required=True)
+    parser.add_argument("--output", type=Path, help="独立验证输出目录；必须尚不存在")
     args = parser.parse_args()
     lock = json.loads((CONFIG / "runtime-lock.json").read_text(encoding="utf-8"))
     spec = lock["targets"][args.target]
@@ -47,7 +46,7 @@ def main():
     arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "x64"
     if args.target != host + "-" + arch:
         raise RuntimeError("必须在目标运行环境构建；Windows ARM64 安装包复用 Windows x64 组件")
-    output = ROOT / "apps" / "desktop" / "resources" / "crawl4ai"
+    output = (args.output or ROOT / "apps" / "desktop" / "resources" / "crawl4ai").resolve()
     if output.exists():
         raise RuntimeError("输出目录已存在，请保留旧产物并在干净工作区构建")
     output.mkdir(parents=True)
@@ -55,28 +54,12 @@ def main():
         archive.extractall(output, filter="data")
     python = output / spec["pythonExecutable"]
     site = output / "site-packages"
-    subprocess.run([str(python), "-m", "pip", "install", "--no-compile", "--only-binary=:all:", "--require-hashes", "--target", str(site), "-r", str(CONFIG / (args.target + ".lock"))], check=True)
+    subprocess.run([str(python), "-B", "-m", "pip", "install", "--no-compile", "--only-binary=:all:", "--require-hashes", "--target", str(site), "-r", str(CONFIG / (args.target + ".lock"))], check=True)
     # 随包 Python 使用独立 site-packages，生产不读取系统或用户 Python 配置。
-    paths = subprocess.check_output([str(python), "-c", "import sysconfig;print(sysconfig.get_paths()['purelib'])"], text=True).strip()
+    paths = subprocess.check_output([str(python), "-B", "-c", "import sysconfig;print(sysconfig.get_paths()['purelib'])"], text=True).strip()
     Path(paths).mkdir(parents=True, exist_ok=True)
     (Path(paths) / "guizhi-crawl4ai.pth").write_text(os.path.relpath(site, paths) + "\n")
-    browser = output / "browser"
-    browser.mkdir()
-    with zipfile.ZipFile(download(spec["chromium"])) as archive:
-        for member in archive.infolist():
-            target = (browser / member.filename).resolve()
-            if not target.is_relative_to(browser.resolve()):
-                raise RuntimeError("浏览器压缩包路径越界")
-            mode = member.external_attr >> 16
-            if stat.S_ISLNK(mode):
-                link = archive.read(member).decode()
-                if not (target.parent / link).resolve().is_relative_to(browser.resolve()):
-                    raise RuntimeError("浏览器符号链接越界")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.symlink_to(link)
-            else:
-                archive.extract(member, browser)
-                if mode and host != "win32": target.chmod(mode)
+    # 页面渲染复用 Electron；Playwright Python 模块仍是 Crawl4AI 的导入依赖。
     verify_runtime(python)
     licenses = []
     for metadata in site.glob("*.dist-info/METADATA"):
@@ -93,8 +76,8 @@ def main():
             with file.open("rb") as source:
                 files[file.relative_to(output).as_posix()] = hashlib.file_digest(source, "sha256").hexdigest()
     (output / "manifest.json").write_text(json.dumps(dict(protocol=1, version="0.9.3", target=args.target,
-        python=spec["pythonExecutable"], browser="browser/" + spec["browserExecutable"], files=files,
-        workerHashes={file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in (output.parent / "crawl4ai-worker").glob("*.py")}), indent=2), encoding="utf-8")
+        python=spec["pythonExecutable"], renderer="electron", files=files,
+        workerHashes={file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in (ROOT / "apps/desktop/resources/crawl4ai-worker").glob("*.py")}), indent=2), encoding="utf-8")
     print("已构建：" + str(output))
 
 

@@ -109,6 +109,8 @@ export class WebWorker {
       "--proxy-bypass-list=<-loopback>",
       "about:blank",
     ];
+    if (!manifest.browser)
+      throw new Error("当前组件仅支持 Electron 渲染，请使用新的网页采集入口");
     this.browser = spawn(
       runtimeFile(webRuntimeRoot(), manifest.browser),
       args,

@@ -1,18 +1,22 @@
 import { app } from "electron";
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { WebRuntimeStatus } from "@guizhi/shared/types";
+import { runtimeFile, verifyRuntimeFiles } from "./web-runtime-integrity";
+
+export { runtimeFile } from "./web-runtime-integrity";
 
 export interface WebRuntimeManifest {
   protocol: 1;
   version: string;
   target: string;
   python: string;
-  browser: string;
+  /** 仅兼容旧开发运行包；当前采集由 Electron 渲染。 */
+  browser?: string;
+  renderer?: "electron";
   files: Record<string, string>;
   workerHashes?: Record<string, string>;
 }
@@ -36,16 +40,6 @@ export function workerRoot(): string {
   return app.isPackaged
     ? path.join(process.resourcesPath, "crawl4ai-worker")
     : path.join(developmentResources(), "crawl4ai-worker");
-}
-export function runtimeFile(root: string, relative: string): string {
-  const full = path.resolve(root, relative);
-  if (
-    !relative ||
-    path.isAbsolute(relative) ||
-    !full.startsWith(path.resolve(root) + path.sep)
-  )
-    throw new Error("组件清单路径越界");
-  return full;
 }
 export async function webRuntimeStatus(
   running = false,
@@ -101,7 +95,7 @@ export async function webRuntimeStatus(
       manifest.target !== target
     )
       throw new Error("组件版本或架构不匹配");
-    for (const file of [manifest.python, manifest.browser]) {
+    for (const file of [manifest.python]) {
       if (!manifest.files[file])
         throw new Error("组件清单缺少可执行文件校验值");
       await fs.access(runtimeFile(root, file));
@@ -112,7 +106,8 @@ export async function webRuntimeStatus(
       ...status,
       reason: app.isPackaged
         ? "随包网页组件缺失或清单无效；请重新安装当前归知版本修复组件"
-        : "开发环境网页组件缺失或清单无效；请在仓库根目录运行 python scripts/build-crawl4ai.py --target " + target,
+        : "开发环境网页组件缺失或清单无效；请在仓库根目录运行 python scripts/build-crawl4ai.py --target " +
+          target,
       repairRequired: true,
     };
   }
@@ -131,29 +126,7 @@ async function verifyFiles(): Promise<WebRuntimeManifest> {
   const manifest: WebRuntimeManifest = JSON.parse(
     await fs.readFile(path.join(root, "manifest.json"), "utf8"),
   );
-  const rootReal = await fs.realpath(root);
-  for (const entry of await fs.readdir(root, {
-    recursive: true,
-    withFileTypes: true,
-  })) {
-    if (entry.isDirectory()) continue;
-    const full = path.join(entry.parentPath, entry.name),
-      relative = path.relative(root, full).replaceAll(path.sep, "/");
-    const real = await fs.realpath(full);
-    if (!real.startsWith(rootReal + path.sep))
-      throw new Error("组件包含越界链接");
-    if ((await fs.stat(full)).isDirectory()) continue;
-    if (relative !== "manifest.json" && !manifest.files[relative])
-      throw new Error(`组件包含未登记文件：${relative}`);
-  }
-  for (const [relative, expected] of Object.entries(manifest.files)) {
-    if (!/^[a-f0-9]{64}$/.test(expected)) throw new Error("组件校验值无效");
-    const hash = createHash("sha256");
-    for await (const chunk of createReadStream(runtimeFile(root, relative)))
-      hash.update(chunk);
-    if (hash.digest("hex") !== expected)
-      throw new Error(`组件校验失败：${relative}；请重新安装当前归知版本`);
-  }
+  await verifyRuntimeFiles(root, manifest.files);
   if (app.isPackaged) {
     if (!manifest.workerHashes) throw new Error("组件清单缺少 worker 校验值");
     for (const entry of await fs.readdir(workerRoot()))
