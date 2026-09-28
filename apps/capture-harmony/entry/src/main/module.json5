@@ -1,0 +1,24 @@
+{
+  "module": {
+    "name": "entry", "type": "entry", "description": "$string:module_desc",
+    "mainElement": "EntryAbility", "deviceTypes": ["phone"],
+    "deliveryWithInstall": true, "installationFree": false,
+    "pages": "$profile:main_pages",
+    "metadata": [{ "name": "ohos.arkui.UIMaterial.state", "value": "default" }],
+    "requestPermissions": [{ "name": "ohos.permission.INTERNET" }, { "name": "ohos.permission.DETECT_GESTURE" }],
+    "abilities": [{
+      "name": "EntryAbility", "srcEntry": "./ets/entryability/EntryAbility.ets",
+      "description": "$string:module_desc", "icon": "$media:app_icon", "label": "$string:app_name",
+      "startWindowIcon": "$media:app_icon", "startWindowBackground": "$color:page_background",
+      "exported": true, "launchType": "singleton",
+      "skills": [
+        { "entities": ["entity.system.home"], "actions": ["action.system.home"] },
+        { "actions": ["ohos.want.action.sendData"], "uris": [
+          { "scheme": "file", "utd": "general.plain-text" },
+          { "scheme": "file", "utd": "general.hyperlink" },
+          { "type": "text/plain" }, { "type": "text/uri-list" }
+        ] }
+      ]
+    }]
+  }
+}

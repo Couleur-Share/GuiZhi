@@ -1,6 +1,16 @@
 # 从源码构建
 
-需要 Node.js ≥ 24、pnpm ≥ 11。
+## 平台支持边界
+
+官方仅为 Windows 11+ x64 提供安装包、平台测试与维护支持。Linux 和 macOS 不再提供
+官方安装包、平台测试及兼容性保证；保留现有适配代码与构建配置，供有需要的用户自行构建。
+构建成功不代表所有功能可用，平台专属问题不属于官方维护范围。欢迎提供复现步骤和验证结果
+的社区 PR，但不承诺修复或合并时限。
+
+## 构建命令
+
+需要 Node.js ≥ 24、pnpm ≥ 11。在准备运行的目标系统上安装依赖并执行构建；
+macOS 打包须在 macOS 上进行。下列 macOS / Linux 命令是自行构建入口，不代表已通过当前版本验收。
 
 ```bash
 pnpm install
@@ -16,8 +26,8 @@ pnpm test:e2e      # Playwright 真实 Electron 冒烟
 
 # 打包（须用 pnpm build，含 MCP 产物；不要只跑 vite build）
 pnpm electron:build:win
-pnpm electron:build:mac    # 须在 macOS 上；默认 ad-hoc 签名
-pnpm electron:build:linux
+pnpm electron:build:mac    # 自行构建，须在 macOS 上；默认 ad-hoc 签名
+pnpm electron:build:linux  # 自行构建，无官方兼容性保证
 ```
 
 macOS 正式 Developer ID 签名与公证需设 `GUIZHI_MAC_RELEASE_SIGN=true` 并配置

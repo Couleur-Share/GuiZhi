@@ -1,5 +1,6 @@
 import type { Settings } from "@guizhi/shared/types";
 import { normalizeNetworkProxySettings } from "@guizhi/shared/utils/network-proxy";
+import { normalizeFlareSolverrSettings } from "@guizhi/shared/utils/flaresolverr";
 import {
   applyBackgroundImageVars,
   clampBackgroundImageBlur,
@@ -74,6 +75,7 @@ function normalizeSharedSettingsState(next: SettingsState): void {
   normalizeAIModelDefaults(next);
   next.shortcutModes = normalizeShortcutModes(next.shortcutModes);
   next.networkProxy = normalizeNetworkProxySettings(next.networkProxy);
+  next.flareSolverr = normalizeFlareSolverrSettings(next.flareSolverr);
 }
 
 function normalizeMergedPresentationSettings(next: SettingsState): void {

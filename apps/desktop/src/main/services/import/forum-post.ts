@@ -33,6 +33,7 @@ const PLATFORM_LABELS: Record<ForumTarget["platform"], string> = {
   v2ex: "V2EX",
   nga: "NGA",
   linuxdo: "LINUX DO",
+  nodeseek: "NodeSeek",
   appinn: "小众软件",
   twolibra: "2Libra",
 };
@@ -51,6 +52,7 @@ export interface ForumPostDeps {
     url: string,
     signal?: AbortSignal,
   ) => Promise<T>;
+  fetchNodeseek?: (topicId: string, signal?: AbortSignal) => Promise<ForumThread>;
   /** 测试注入：总结模型解析（默认读 ai-config.json 的 mainText 路由） */
   getSummaryConfig?: () => AIClientConfig | null;
   /** 测试注入：讨论总结 */
@@ -68,6 +70,9 @@ async function fetchThreadByPlatform(
   signal?: AbortSignal,
 ): Promise<ForumThread> {
   switch (target.platform) {
+    case "nodeseek":
+      if (!deps.fetchNodeseek) throw new Error("NodeSeek 浏览器采集服务未就绪");
+      return deps.fetchNodeseek(target.topicId, signal);
     case "v2ex":
       return fetchV2exThread(target.topicId, {}, signal);
     case "nga":
@@ -101,7 +106,7 @@ function retentionNote(thread: ForumThread): string {
   if (thread.replyRetention === "op-only") {
     return "条目讨论区仅保留楼主回复，完整楼层见原帖链接。";
   }
-  return "原始讨论已完整入库。";
+  return thread.warningReason ? `讨论存在缺失：${thread.warningReason}。` : "原始讨论已完整入库。";
 }
 
 /** 交给模型的讨论素材：NGA 用采样页，其余用入库回复 */

@@ -13,7 +13,7 @@ import {
   ScanSearchIcon,
   SparklesIcon,
 } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useUpdaterStore } from "../../stores/updater.store";
@@ -185,6 +185,11 @@ export function AboutSettings() {
               <span aria-hidden="true"> · </span>
               {currentChannel}
             </p>
+            {!webRuntime ? (
+              <p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">
+                {t("settings.supportPolicyDesc")}
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -339,6 +344,34 @@ export function AboutSettings() {
         >
           <SettingSection title={t("settings.openSource")}>
             <SettingItem
+              label={t("settings.userGuide")}
+              description={t("settings.userGuideDesc")}
+            >
+              <a
+                href="https://github.com/Couleur-Share/GuiZhi/blob/main/docs/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-accent"
+              >
+                {t("settings.openUserGuide")}
+                <ExternalLinkIcon aria-hidden="true" className="h-4 w-4" />
+              </a>
+            </SettingItem>
+            <SettingItem
+              label={t("settings.changelog")}
+              description={t("settings.changelogDesc")}
+            >
+              <a
+                href="https://github.com/Couleur-Share/GuiZhi/blob/main/CHANGELOG.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-accent"
+              >
+                {t("settings.openChangelog")}
+                <ExternalLinkIcon aria-hidden="true" className="h-4 w-4" />
+              </a>
+            </SettingItem>
+            <SettingItem
               label={t("settings.projectRepository")}
               description={t("settings.projectRepositoryDesc")}
             >
@@ -363,7 +396,7 @@ export function AboutSettings() {
                 className="h-8 px-4 rounded-lg bg-orange-500 text-white text-sm hover:bg-orange-600 transition-colors inline-flex items-center gap-1.5"
               >
                 <MessageSquareIcon aria-hidden="true" className="w-4 h-4" />
-                Issue
+                {t("settings.submitIssue")}
               </a>
             </SettingItem>
           </SettingSection>
@@ -464,7 +497,29 @@ export function AboutSettings() {
 
         <div className="px-4 py-4 text-sm text-muted-foreground text-center">
           <div>AGPL-3.0 License &copy; 2026 GuiZhi</div>
-          <p className="mt-2 text-xs">This product includes software developed by UncleCode (https://x.com/unclecode) as part of the Crawl4AI project (https://github.com/unclecode/crawl4ai).</p>
+          <p className="mt-2 text-xs leading-5">
+            <Trans
+              i18nKey="settings.crawl4aiAttribution"
+              components={{
+                author: (
+                  <a
+                    href="https://x.com/unclecode"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  />
+                ),
+                project: (
+                  <a
+                    href="https://github.com/unclecode/crawl4ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  />
+                ),
+              }}
+            />
+          </p>
         </div>
       </div>
 

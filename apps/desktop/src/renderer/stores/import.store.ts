@@ -107,11 +107,12 @@ interface ImportState {
   retryTask: (
     id: string,
     options?: boolean | {
+      verifyWeb?: boolean;
       forceDuplicate?: boolean;
       captureStrategy?: ImportCaptureStrategy;
       commentLimit?: 0 | 10 | 20 | 50;
     },
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   /** 删除单条已结束的任务（失败任务不进「清理已完成」，需要单独的出口） */
   removeTask: (id: string) => Promise<void>;
   /** 批量：逐条走 IPC，结束后只刷新一次列表 */
@@ -246,6 +247,8 @@ export function filterTasks(
 // 查询代次同时保护首页和翻页，避免快速切换来源时旧结果覆盖新筛选。
 let listRevision = 0;
 let fetchRevision = 0;
+// IPC 推送可能先于列表请求回执到达；旧快照不能把终态覆盖回处理中。
+let taskRevision = 0;
 
 export const useImportStore = create<ImportState>()((set, get) => ({
   tasks: [],
@@ -309,7 +312,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   clearSelection: () => set({ selectionIds: [] }),
 
   fetchTasks: async () => {
-    const revision = listRevision, request = ++fetchRevision;
+    const revision = listRevision, request = ++fetchRevision, changes = taskRevision;
     const current = () => revision === listRevision && request === fetchRevision;
     set({ loadError: null });
     try {
@@ -344,6 +347,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
         ? await window.api.import.getQueueState()
         : fallbackQueueState(tasks);
       if (!current()) return;
+      if (changes !== taskRevision) return await get().fetchTasks();
       const alive = new Set(tasks.map((task) => task.id));
       set((state) => ({
         tasks,
@@ -370,7 +374,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   loadMore: async () => {
     const cursor = get().nextCursor;
     if (!cursor || get().isLoadingMore) return;
-    const revision = listRevision, request = fetchRevision;
+    const revision = listRevision, request = fetchRevision, changes = taskRevision;
     const current = () => revision === listRevision && request === fetchRevision;
     set({ isLoadingMore: true });
     try {
@@ -382,6 +386,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
         cursor,
       });
       if (!current()) return;
+      if (changes !== taskRevision) return;
       set((state) => {
         const tasks = mergeActiveFirst(result.active, [
           ...state.tasks.filter((task) => !isActive(task)),
@@ -429,14 +434,15 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   retryTask: async (id, options) => {
-    await runGuardedMutation("imports.actionRetry", "重试任务", async () => {
+    return runGuardedMutation("imports.actionRetry", "重试任务", async () => {
       const retryOptions = typeof options === "boolean"
         ? { forceDuplicate: options }
         : options;
-      await window.api.import.retry(
+      const retried = await window.api.import.retry(
         id,
         retryOptions,
       );
+      if (retried === null) throw new Error("任务已不存在，请刷新列表");
       await get().fetchTasks();
     });
   },
@@ -501,6 +507,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   subscribeChanges: () => {
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const handleChanged = (task: ImportTask) => {
+      taskRevision++;
       set((state) => {
         const index = state.tasks.findIndex(
           (candidate) => candidate.id === task.id,

@@ -31,6 +31,7 @@ export const importApi = {
   retry: (
     id: string,
     options?: {
+      verifyWeb?: boolean;
       forceDuplicate?: boolean;
       captureStrategy?: ImportTask["captureStrategy"];
       commentLimit?: ImportTask["commentLimit"];

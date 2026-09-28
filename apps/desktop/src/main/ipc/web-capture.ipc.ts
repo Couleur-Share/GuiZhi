@@ -1,6 +1,8 @@
 import { readSnapshot, snapshotSource, exportSnapshot } from "../services/web-capture/snapshot-service";
 import { getRegisteredImportService } from "./import.ipc";
 import { sanitizeSnapshot } from "../services/web-capture/snapshot-sanitize";
+import { checkFlareSolverrConnection } from "../services/web-capture/flaresolverr";
+import { validateFlareSolverrSettings } from "@guizhi/shared/utils/flaresolverr";
 import { ipcMain, shell } from "electron";
 import { IPC_CHANNELS as C } from "@guizhi/shared/constants/ipc-channels";
 import { KnowledgeItemDB, WebSourceDB, webContentHash } from "@guizhi/db";
@@ -47,6 +49,7 @@ export function registerWebCaptureIPC(db: Database.Database): void {
     return getRegisteredImportService().queue.enqueue(inputs);
   }));
   ipcMain.handle(C.WEB_STATUS, () => response(getWebCaptureStatus));
+  ipcMain.handle(C.WEB_SOLVER_CHECK, (_e, settings: unknown) => response(() => checkFlareSolverrConnection(validateFlareSolverrSettings(settings))));
   ipcMain.handle(C.WEB_REPAIR, () =>
     response(async () => {
       // 修复入口只定位当前版本安装包；不执行 pip 或在线替换组件。

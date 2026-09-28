@@ -226,8 +226,12 @@ describe("Electron 平台采集运行器", () => {
       "persist:guizhi-platform-capture-linuxdo",
       { cache: true },
     );
-    expect(mocks.targetSession.clearStorageData).toHaveBeenCalledTimes(3);
-    expect(mocks.targetSession.closeAllConnections).toHaveBeenCalledTimes(3);
+    expect(mocks.fromPartition).toHaveBeenCalledWith(
+      "persist:guizhi-platform-capture-nodeseek",
+      { cache: true },
+    );
+    expect(mocks.targetSession.clearStorageData).toHaveBeenCalledTimes(4);
+    expect(mocks.targetSession.closeAllConnections).toHaveBeenCalledTimes(4);
   });
 
   it("通过内置 WebContents 调试通道读取页面自身的结构化响应", async () => {

@@ -4,6 +4,7 @@ export function sourceIdentity(raw: string): string | null {
   const url = extractUrlsFromText(raw)[0] ?? raw;
   try {
     const parsed = new URL(url), host = parsed.hostname.toLowerCase();
+    if (['nodeseek.com', 'www.nodeseek.com'].includes(host)) { const id = parsed.pathname.match(/^\/post-([1-9]\d*)-[1-9]\d*\/?$/)?.[1]; if (id) return `https://www.nodeseek.com/post-${id}-1`; }
     if (/(^|\.)xiaohongshu\.com$/.test(host)) {
       const id = parsed.pathname.match(/\/(?:explore|discovery\/item)\/([a-f\d]{24})/i)?.[1];
       if (id) return `https://www.xiaohongshu.com/explore/${id.toLowerCase()}`;

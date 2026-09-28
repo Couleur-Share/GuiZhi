@@ -16,6 +16,13 @@ export interface StaticDecision {
   hasScripts: boolean;
 }
 
+export function isWebVerificationPage(html: string): boolean {
+  const { document } = parsePage(html);
+  const title = document.querySelector("title")?.textContent?.trim() ?? "";
+  return /^(just a moment|verify you are human|人机验证|安全验证)/i.test(title) ||
+    !!document.querySelector("#challenge-stage, #cf-wrapper, script[src*='/orchestrate/chl_page/']");
+}
+
 export function assessStaticPage(html: string, status: number): StaticDecision {
   const { document } = parsePage(html);
   const regions = Array.from(

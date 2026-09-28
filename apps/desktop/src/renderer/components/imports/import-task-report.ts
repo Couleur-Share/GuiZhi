@@ -14,6 +14,7 @@ import {
   STAGE_LABELS,
   STATUS_LABELS,
   formatDuration,
+  resolveStageStats,
   formatImportTaskErrorForReport,
   formatImportTaskWarning,
 } from "./import-task-meta";
@@ -27,6 +28,8 @@ export type ReportTranslate = (
 
 export interface ImportTaskReportContext {
   translate: ReportTranslate;
+  /** 诊断生成时刻；测试可注入固定时钟。 */
+  now?: number;
   /** 应用版本与平台（`window.electron.updater`）；取不到就不写这一行 */
   appVersion?: string;
   platform?: string;
@@ -111,7 +114,7 @@ export function buildImportTaskReport(
     );
   }
 
-  const stats = task.stageStats ?? [];
+  const stats = resolveStageStats(task, context.now ?? Date.now());
   if (stats.length > 0) {
     const totalMs = stats.reduce((total, entry) => total + entry.ms, 0);
     lines.push(

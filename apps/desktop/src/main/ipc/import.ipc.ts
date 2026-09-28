@@ -9,6 +9,7 @@ import {
   type ImportTaskListQuery,
 } from "@guizhi/shared/types";
 import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
+import { needsWebVerification } from "@guizhi/shared/utils/web-verification";
 import type Database from "../database/sqlite";
 import {
   createImportService,
@@ -85,6 +86,7 @@ export function registerImportIPC(
       _event,
       id: string,
       options?: {
+        verifyWeb?: boolean;
         forceDuplicate?: boolean;
         captureStrategy?: ImportTask["captureStrategy"];
         commentLimit?: ImportTask["commentLimit"];
@@ -105,6 +107,15 @@ export function registerImportIPC(
       ) throw new Error("重复导入参数不合法");
       const task = service!.taskDb.get(id);
       if (!task) return null;
+      if (options?.verifyWeb !== undefined && typeof options.verifyWeb !== "boolean")
+        throw new Error("网页验证参数不合法");
+      if (options?.verifyWeb === true) {
+        if (!needsWebVerification(task) || options.captureStrategy === "authenticated")
+          throw new Error("该任务不支持通用网页验证");
+        const url = new URL(task.sourceInput);
+        if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443"))
+          throw new Error("网页验证只支持 HTTPS 标准端口");
+      }
       const requestedStrategy = isImportCaptureStrategy(options?.captureStrategy)
         ? options.captureStrategy
         : undefined;
@@ -137,7 +148,16 @@ export function registerImportIPC(
           ? { commentLimit: requestedCommentLimit }
           : {}),
       };
-      return service!.queue.retry(id, safe);
+      if (options?.verifyWeb === true) service!.webVerificationTasks.add(id);
+      else service!.webVerificationTasks.delete(id);
+      try {
+        const retried = service!.queue.retry(id, safe);
+        if (!retried) service!.webVerificationTasks.delete(id);
+        return retried;
+      } catch (error) {
+        service!.webVerificationTasks.delete(id);
+        throw error;
+      }
     },
   );
   ipcMain.handle(IPC_CHANNELS.IMPORT_REMOVE, (_event, id: string) =>

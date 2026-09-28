@@ -112,7 +112,7 @@ export function registerPlatformCaptureIPC(
   ipcMain.handle(IPC_CHANNELS.PLATFORM_CAPTURE_LOGIN, (event, raw) => {
     const record =
       raw && typeof raw === "object"
-        ? (raw as { platform?: unknown; forceRelogin?: unknown; searchKeyword?: unknown })
+        ? (raw as { platform?: unknown; forceRelogin?: unknown; searchKeyword?: unknown; verificationUrl?: unknown })
         : null;
     const platform = requirePlatform(record ? record.platform : raw);
     return service.login(
@@ -120,6 +120,8 @@ export function registerPlatformCaptureIPC(
       record?.forceRelogin === true,
       BrowserWindow.fromWebContents(event.sender),
       platform === "douyin" && typeof record?.searchKeyword === "string" ? record.searchKeyword.trim().slice(0, 100) : undefined,
+      undefined,
+      platform === "nodeseek" && typeof record?.verificationUrl === "string" ? record.verificationUrl : undefined,
     );
   });
   ipcMain.handle(

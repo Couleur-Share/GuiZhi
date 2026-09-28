@@ -214,10 +214,28 @@ export default async ({ win, app, shot }) => {
       exact: true,
     })
     .waitFor();
-  await shot("mobile-capture-confirmed");
   await page
     .getByRole("button", { name: "解除绑定 我的另一台手机", exact: true })
-    .waitFor();
+    .waitFor({ timeout: 3000 });
+  assert.equal(
+    await page.getByText("确认暂时失败，请重试", { exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByRole("button", { name: "确认绑定此设备", exact: true })
+      .count(),
+    0,
+  );
+  await win
+    .getByText("手机收集操作失败", { exact: true })
+    .waitFor({ state: "detached" });
+  await page
+    .getByText("绑定成功，手机页面会自动更新，现在可以开始收集。", {
+      exact: true,
+    })
+    .scrollIntoViewIfNeeded();
+  await shot("mobile-capture-confirmed");
   await page
     .getByRole("button", { name: "解除绑定 我的另一台手机", exact: true })
     .click();

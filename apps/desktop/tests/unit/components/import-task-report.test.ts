@@ -73,6 +73,16 @@ describe("buildImportTaskReport", () => {
     );
   });
 
+  it("处理中诊断补上当前阶段等待，重复生成不累加到原始快照", () => {
+    const task = makeTask({ status: "processing", stage: "web-preparing",
+      stageStats: [{ stage: "fetching", ms: 36 }, { stage: "web-preparing", ms: 0 }] });
+    const report = buildImportTaskReport(task, { ...context, now: task.updatedAt + 381_000 });
+    expect(report).toContain("## 阶段耗时（共 6:21）");
+    expect(report).toContain("| 准备网页组件 | 6:21 | 100% |  |");
+    expect(task.stageStats![1].ms).toBe(0);
+    expect(buildImportTaskReport(task, { ...context, now: task.updatedAt + 382_000 })).toContain("共 6:22");
+  });
+
   it("拿不到版本时不写那一行，而不是留一个空的「应用：」", () => {
     expect(buildImportTaskReport(makeTask(), context)).not.toContain("- 应用：");
     expect(

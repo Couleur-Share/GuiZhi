@@ -45,7 +45,7 @@ export async function createServer(options: ServerOptions) {
     reply.code(status).send({ success: false, error: code });
   });
   app.get("/healthz", async () => ({ ok: db.get<{ ok: number }>("SELECT 1 AS ok")?.ok === 1, protocol: CAPTURE_PROTOCOL_VERSION }));
-  app.get("/v1/meta", async () => ({ protocol: CAPTURE_PROTOCOL_VERSION, serverTime: Date.now() }));
+  app.get("/v1/meta", async () => ({ protocol: CAPTURE_PROTOCOL_VERSION, serverTime: Date.now(), nativePairing: true }));
   app.post<{ Body: Record<string, unknown> }>("/v1/mailboxes", async req => {
     db.rate(`create:${hash(req.ip)}`, 5); return accounts.create(req.body);
   });
@@ -61,6 +61,12 @@ export async function createServer(options: ServerOptions) {
     const result = accounts.claim(req.body);
     reply.setCookie(cookieName, token(req.body.credential), cookieOptions); return result;
   });
+  // 原生端持有二维码中的一次性 nonce，仍须桌面确认；与浏览器 Cookie 流程隔离。
+  app.post<{ Body: Record<string, unknown> }>("/v1/pairings/native-claim", async req => {
+    assert(!req.headers.origin && !req.headers.cookie && !req.headers["sec-fetch-site"], "native_request_required", 403);
+    db.rate(`claim:${hash(req.ip)}`, 10);
+    return accounts.claim(req.body);
+  });
   app.get("/v1/pairings", async req => {
     const p = auth(req, "desktop");
     return db.all("SELECT p.id,p.expires_at AS expiresAt,p.device_id AS deviceId,d.name FROM pairings p LEFT JOIN devices d ON d.id=p.device_id WHERE p.mailbox_id=? AND p.confirmed=0 AND p.expires_at>?", p.mailboxId, Date.now());
@@ -71,6 +77,12 @@ export async function createServer(options: ServerOptions) {
   app.get("/v1/session", async req => {
     const p = auth(req, undefined, true); assert(p.kind === "phone", "forbidden", 403);
     return { paired: p.active === 1, deviceId: p.id };
+  });
+  app.delete("/v1/session", async (req, reply) => {
+    const p = auth(req, "phone", true);
+    accounts.revoke(p.mailboxId, p.id);
+    reply.clearCookie(cookieName, cookieOptions);
+    return { success: true };
   });
   app.get("/v1/devices", async req => {
     const p = auth(req, "desktop");

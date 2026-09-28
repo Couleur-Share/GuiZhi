@@ -27,6 +27,8 @@ export interface WebSeed {
   directory?: string;
 }
 export interface WebCaptureRequest {
+  /** 仅主进程在用户主动重试时设置；不持久化验证 Cookie。 */
+  interactiveVerification?: boolean;
   taskId: string;
   purpose: WebCapturePurpose;
   url: string;

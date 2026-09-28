@@ -141,6 +141,7 @@ function createPersistence(db: Database.Database): ImportPersistence {
 export interface ImportService {
   queue: ImportQueue;
   taskDb: ImportTaskDB;
+  webVerificationTasks: Set<string>;
 }
 
 function readToolPathSetting(
@@ -208,11 +209,13 @@ export function createImportService(
   const browserCapture = getBrowserCaptureService({
     getNetworkProxy: () => readNetworkProxySetting(db),
   });
+  const webVerificationTasks = new Set<string>();
   const queue = new ImportQueue({
     store: taskDb,
     persistence: createPersistence(db),
     resolveSource: resolveSourceIdentity,
     extract: (task, signal, onStage) => {
+      const interactiveVerification = webVerificationTasks.delete(task.id);
       let fallbackReason: string | undefined;
       if (task.captureStrategy === "authenticated") {
         onStage("browser-capture");
@@ -223,11 +226,13 @@ export function createImportService(
           onStage("web-preparing");
           const status = await getWebCaptureStatus();
           if (!status.available) { fallbackReason = `使用兼容网页采集：${status.reason}`; return null; }
-          const result = await captureWebPage({taskId:task.id,purpose:"import",url},requestSignal,onStage);
+          if (interactiveVerification) onStage("web-verifying");
+          const result = await captureWebPage({taskId:task.id,purpose:"import",url,interactiveVerification},requestSignal,onStage);
           return {title:result.title,content:result.markdown,itemType:"webpage",sourceUri:result.finalUrl,
             webCapture:result,degradedReason:result.error?.message,warningReason:result.warnings.join("；") || undefined};
         },
         captureStrategy: task.captureStrategy,
+        fetchNodeseek: (topicId, requestSignal) => browserCapture.captureNodeseek(topicId, requestSignal),
         getYtDlpPath: () => readYtDlpPathSetting(db),
         getFfmpegPath: () => readFfmpegPathSetting(db),
         getDiarize: () => readTranscribeDiarizeSetting(db),
@@ -265,9 +270,10 @@ export function createImportService(
       );
     },
     onTaskChanged: task => {
+      if (!["pending", "processing"].includes(task.status)) webVerificationTasks.delete(task.id);
       new MobileCaptureDB(db).observe(task);
       broadcast(task);
     },
   });
-  return { queue, taskDb };
+  return { queue, taskDb, webVerificationTasks };
 }

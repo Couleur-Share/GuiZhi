@@ -75,6 +75,7 @@ export const SOURCE_PLATFORM_META: Record<SourcePlatform, SourcePlatformMeta> =
       Icon: NgaLogo,
       colorClass: "text-[#548C2F]",
     },
+    nodeseek: { labelKey: "library.platformNodeseek", fallback: "NodeSeek", Icon: MessagesSquareIcon, colorClass: "text-foreground" },
     linuxdo: {
       labelKey: "library.platformLinuxdo",
       fallback: "LINUX DO",

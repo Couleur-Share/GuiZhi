@@ -10,7 +10,8 @@ import { useToast } from "../ui/Toast";
 export function useMobileCaptureSettings(
   text: (zh: string, en: string) => string,
 ) {
-  const { showToast } = useToast();
+  const { showToast, dismissToast } = useToast();
+  const failureToast = useRef<string | null>(null);
   const [settings, setSettings] = useState<MobileCaptureSettings | null>(null);
   const [error, setError] = useState("");
   const [origin, setOrigin] = useState("");
@@ -64,9 +65,14 @@ export function useMobileCaptureSettings(
     action: "generate" | "confirm" | "" = "",
   ) {
     if (working.current) return;
+    if (failureToast.current) {
+      dismissToast(failureToast.current);
+      failureToast.current = null;
+    }
     working.current = true;
     revision.current += 1;
     setBusy(true);
+    setError("");
     setPairingAction(action);
     if (action) setPairingSuccess("");
     try {
@@ -75,9 +81,13 @@ export function useMobileCaptureSettings(
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setError(message);
-      showToast(text("手机收集操作失败", "Mobile capture failed"), "error", {
-        detail: message,
-      });
+      failureToast.current = showToast(
+        text("手机收集操作失败", "Mobile capture failed"),
+        "error",
+        {
+          detail: message,
+        },
+      );
     } finally {
       working.current = false;
       setBusy(false);
@@ -119,13 +129,20 @@ export function useMobileCaptureSettings(
     document.addEventListener("visibilitychange", poll);
     return () => {
       disposed = true;
-      revision.current += 1;
       clearInterval(timer);
       window.removeEventListener("online", online);
       window.removeEventListener("focus", poll);
       document.removeEventListener("visibilitychange", poll);
     };
   }, [refresh, awaitingPairing]);
+
+  // 轮询频率切换不应废弃正在执行的操作刷新；仅卸载时使响应失效。
+  useEffect(
+    () => () => {
+      revision.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!expires && !pairings.length) return;
@@ -143,6 +160,9 @@ export function useMobileCaptureSettings(
   const confirmPairing = (pairing: CapturePairing) =>
     void perform(async () => {
       await window.api.mobileCapture.confirm(pairing.id, pairing.deviceId!);
+      setPairings((current) =>
+        current.filter((item) => item.id !== pairing.id),
+      );
       setQr("");
       setExpires(0);
       setPairingSuccess(

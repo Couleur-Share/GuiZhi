@@ -30,6 +30,11 @@ describe("isPersistedSettingKey", () => {
 });
 
 describe("filterWritableSettings", () => {
+  it("FlareSolverr 设置进入白名单，拒绝注入式 SSH 别名", () => {
+    const value = { enabled: true, connection: "ssh" as const, port: 8191, sshHost: "gatewaysentry" };
+    expect(filterWritableSettings({ flareSolverr: value }, acceptAny).accepted.flareSolverr).toEqual(value);
+    expect(() => filterWritableSettings({ flareSolverr: { ...value, sshHost: "-oProxyCommand=evil" } }, acceptAny)).toThrow();
+  });
   it("非白名单键被拒并记录", () => {
     const { accepted, rejected } = filterWritableSettings(
       {

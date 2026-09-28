@@ -3,6 +3,8 @@
 手机分享链接或文字 → 公共中转暂存 → 电脑事务入队 → 现有采集管线 → 手机近期记录。
 电脑可以关闭；手机需要网络提交。离线或请求失败的草稿保留在本机浏览器，只有服务端提交事务成功后才显示“已接收”。清理浏览器数据会删除未发送草稿。
 
+鸿蒙原生收集端第一版见 [capture-harmony](../apps/capture-harmony/README.md)。已通过鸿蒙 SDK 编译；用户已用 HoKit 为 0.1.0 签名安装，并提供 Mate80 Pro Max 主页面启动截图。2026-09-27 中转原生配对接口已部署并通过公网合成配对/确认/投递/回执/撤销验证；配对、系统分享和投递仍待真机验收，本地构建仍输出未签名 HAP。
+
 ## 使用
 
 1. 桌面「设置 → 手机收集」填写服务根地址和一次性邀请码。无需注册账号。
@@ -41,13 +43,14 @@ PWA 用 Secure、HttpOnly、SameSite=Strict Cookie；变更接口核对 Origin �
 
 | 路径 | 方法 | 权限 / 参数 |
 | --- | --- | --- |
-| `/v1/meta` | GET | 协议版本与服务时间 |
+| `/v1/meta` | GET | 协议版本、服务时间与 `nativePairing` 能力标记 |
 | `/v1/mailboxes` | POST | `{invite,requestId,credential}`；凭证客户端生成 32 个随机字节的 base64url，创建可重试 |
 | `/v1/mailbox` | DELETE | 桌面停用收件箱 |
 | `/v1/pairings` | POST / GET | 桌面生成 `{nonce}` / 查询待确认手机 |
 | `/v1/pairings/claim` | POST | 同源手机 `{pairingId,nonce,credential,name}` |
 | `/v1/pairings/:id/confirm` | POST | 桌面确认 `{deviceId}` |
-| `/v1/session` | GET | 手机检查 Cookie 配对状态 |
+| `/v1/pairings/native-claim` | POST | 原生手机配对申请；参数与网页 claim 一致，拒绝浏览器来源头和 Cookie |
+| `/v1/session` | GET / DELETE | 手机通过 Cookie 或 Bearer 检查配对状态 / 撤销自身与快捷指令 |
 | `/v1/devices` | GET | 桌面列设备 |
 | `/v1/devices/:id` | DELETE | 桌面撤销设备及其快捷指令 |
 | `/v1/shortcut` | POST / DELETE | 手机生成 `{credential}` / 撤销专用凭证 |

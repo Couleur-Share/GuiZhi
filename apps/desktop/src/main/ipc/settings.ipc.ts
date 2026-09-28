@@ -12,6 +12,7 @@ import type {
 } from '@guizhi/core';
 import { applyNetworkProxySettings } from '../services/network-proxy';
 import { isAcceptableBinaryPath } from '../services/picked-binary-paths';
+import { validateFlareSolverrSettings } from '@guizhi/shared/utils/flaresolverr';
 
 export { getMinimizeOnLaunchSetting } from '../settings/settings-readers';
 
@@ -93,6 +94,7 @@ const PERSISTED_SETTINGS_KEYS = new Set<string>([
   "minimizeOnLaunch",
   "backgroundTasksEnabled",
   "networkProxy",
+  "flareSolverr",
   "backupAutoEnabled",
   "backupIntervalHours",
   "backupKeepCount",
@@ -125,7 +127,7 @@ export function filterWritableSettings(
       rejected.push(key);
       continue;
     }
-    accepted[key] = value;
+    accepted[key] = key === "flareSolverr" ? validateFlareSolverrSettings(value) : value;
   }
 
   return { accepted: accepted as Partial<Settings>, rejected };

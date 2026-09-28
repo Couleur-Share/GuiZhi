@@ -12,7 +12,7 @@ const HARD_LIMIT = 2000;
 const PREFERRED_LIMIT = 1500;
 const REPORT_THRESHOLD = 1400;
 const ROOTS = ["apps", "packages", "scripts"];
-const SOURCE_EXTENSIONS = new Set([".js", ".mjs", ".ts", ".mts", ".tsx"]);
+const SOURCE_EXTENSIONS = new Set([".js", ".mjs", ".ts", ".mts", ".tsx", ".ets"]);
 const IGNORED_DIRECTORIES = new Set(["dist", "node_modules", "out"]);
 const baseline = JSON.parse(
   await readFile("config/file-line-limit-baseline.json", "utf8"),
@@ -24,6 +24,9 @@ async function collectSourceFiles(directory) {
   for (const entry of entries) {
     if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
     const entryPath = path.join(directory, entry.name);
+    // 鸿蒙源码纳入门禁，但不统计 Hvigor 生成代码和 ohpm 依赖。
+    if (entry.isDirectory() && entryPath.replaceAll("\\", "/").startsWith("apps/capture-harmony/") &&
+        ["build", ".hvigor", "oh_modules"].includes(entry.name)) continue;
     if (entryPath.replaceAll("\\", "/") === "apps/desktop/resources/crawl4ai") continue;
     if (entry.isDirectory()) {
       files.push(...(await collectSourceFiles(entryPath)));

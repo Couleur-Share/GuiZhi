@@ -4,6 +4,7 @@ export const PLATFORM_CAPTURE_PLATFORMS = [
   "xiaohongshu",
   "douyin",
   "linuxdo",
+  "nodeseek",
 ] as const;
 
 export type PlatformCapturePlatform =

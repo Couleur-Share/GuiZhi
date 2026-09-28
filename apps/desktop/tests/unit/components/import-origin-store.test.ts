@@ -58,6 +58,24 @@ describe("来源筛选状态与异步边界", () => {
     expect(useImportStore.getState().tasks.map(t => t.id)).toEqual(["手机"]);
     expect(useImportStore.getState().isLoadingMore).toBe(false);
   });
+  it("翻页旧快照不能把收到失败通知的任务复活为处理中", async () => {
+    const processing = { ...task("快速失败", "desktop"), status: "processing" as const, stage: "fetching" as const };
+    const failed = { ...processing, status: "failed" as const, stage: null, updatedAt: 2 };
+    const more = deferred<ImportTaskListResult>();
+    useImportStore.setState({ tasks: [processing], nextCursor: "older" });
+    window.api.import.list = vi.fn().mockReturnValueOnce(more.promise).mockResolvedValue(page([failed]));
+    const unsubscribe = useImportStore.getState().subscribeChanges();
+    try {
+      const loading = useImportStore.getState().loadMore();
+      const listener = vi.mocked(window.api.on).mock.calls.find(call => call[0] === "import:changed")![1];
+      listener(failed);
+      more.resolve({ ...page([task("历史", "desktop")]), active: [processing] });
+      await loading;
+      expect(useImportStore.getState().tasks[0].status).toBe("failed");
+      expect(useImportStore.getState().isLoadingMore).toBe(false);
+      expect(useImportStore.getState().nextCursor).toBe("older");
+    } finally { unsubscribe(); }
+  });
   it("确认清理使用预览时的范围快照", async () => {
     const query = { scope: "filtered", origin: "mobile", status: "failed", query: "网络" } as const;
     window.api.import.previewClearTerminal = vi.fn().mockResolvedValue({ count: 1 });
@@ -68,6 +86,29 @@ describe("来源筛选状态与异步边界", () => {
     await useImportStore.getState().clearTerminal(query);
     expect(window.api.import.previewClearTerminal).toHaveBeenCalledWith(query);
     expect(window.api.import.clearTerminal).toHaveBeenCalledWith(query);
+  });
+  it.each(["list", "queue"])("快速失败的 IPC 推送不被迟到的 %s 回执覆盖", async (boundary) => {
+    const processing = { ...task("快速失败", "desktop"), status: "processing" as const, stage: "web-preparing" as const };
+    const failed = { ...processing, status: "failed" as const, stage: null, updatedAt: 2 };
+    const pendingList = deferred<ImportTaskListResult>();
+    const pendingQueue = deferred<any>();
+    const queue = { paused: false, runningCount: 0, pendingCount: 0, concurrency: 2 };
+    const oldPage = { ...page([processing]), active: [processing] };
+    window.api.import.list = vi.fn().mockReturnValueOnce(boundary === "list" ? pendingList.promise : Promise.resolve(oldPage)).mockResolvedValue(page([failed]));
+    window.api.import.getQueueState = vi.fn().mockReturnValueOnce(boundary === "queue" ? pendingQueue.promise : Promise.resolve(queue)).mockResolvedValue(queue);
+    const unsubscribe = useImportStore.getState().subscribeChanges();
+    try {
+      const loading = useImportStore.getState().fetchTasks();
+      if (boundary === "queue") await vi.waitFor(() => expect(window.api.import.getQueueState).toHaveBeenCalled());
+      const listener = vi.mocked(window.api.on).mock.calls.find(call => call[0] === "import:changed")![1];
+      listener(failed);
+      pendingList.resolve(oldPage);
+      pendingQueue.resolve(queue);
+      await loading;
+      expect(useImportStore.getState().tasks[0].status).toBe("failed");
+      expect(useImportStore.getState().counts.active).toBe(0);
+      expect(useImportStore.getState().hasLoaded).toBe(true);
+    } finally { unsubscribe(); }
   });
   it("其他来源的实时事件不混入列表，刷新计数不丢失已加载历史", async () => {
     const older = task("历史手机任务", "mobile");

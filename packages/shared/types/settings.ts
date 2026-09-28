@@ -31,6 +31,7 @@ export interface Settings {
   backgroundTasksEnabled?: boolean;
   // Global desktop network proxy.
   networkProxy?: NetworkProxySettings;
+  flareSolverr?: import("../utils/flaresolverr").FlareSolverrSettings;
   // 本地定时备份（主进程调度器读取）
   backupAutoEnabled?: boolean;
   backupIntervalHours?: number;

@@ -4,13 +4,16 @@
 
 ## 平台与安装
 
-- **macOS** 安装包已发布，但仅 ad-hoc 签名、未经 Apple 公证；首次打开需在
-  「隐私与安全性」手动允许，或对「已损坏」提示执行 `xattr -dr com.apple.quarantine`
-- **FunASR 一键安装**：Windows（Python SenseVoice，约 3GB，含说话人分离）；
+- **官方支持仅限 Windows 11+ x64**：提供官方安装包、平台测试与维护支持。
+  Windows ARM64 不提供当前版本安装包。
+- **Linux / macOS 为自行构建平台**：不再提供官方安装包、平台测试及兼容性保证，
+  平台专属问题不属于官方维护范围。保留源码适配与[构建入口](./building.md)，但不保证
+  构建成功或功能完整。欢迎可验证的社区 PR，不承诺修复或合并时限；旧安装包仅作历史存档。
+- **现有媒体适配**（macOS / Linux 自行构建功能未经官方持续测试）：FunASR 一键安装在 Windows 使用 Python SenseVoice（约 3GB，含说话人分离）；
   **macOS Apple Silicon**（FunASR llama.cpp / GGUF，约 300MB，无说话人分离）。
   Intel Mac / Linux 请在「模型服务」配置云端 `audioText`。**ffmpeg 一键安装仅支持 Windows**；macOS 设置页提供
   `brew install ffmpeg` 复制入口，也可依赖 PATH / 自定义路径；Linux 请用系统包管理器
-- Windows / Linux 安装包暂未做代码签名，SmartScreen 可能拦截
+- Windows 官方安装包暂未做代码签名，SmartScreen 可能拦截。macOS 自行构建默认仅 ad-hoc 签名、未经 Apple 公证，可能被 Gatekeeper 拦截；详见[构建说明](./building.md)。
 
 ## 近期研究
 

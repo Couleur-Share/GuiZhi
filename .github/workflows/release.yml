@@ -4,9 +4,9 @@ name: Desktop Build and Release
 #   gh release edit <tag> --draft=false --latest
 # 正式对外发布。
 #
-# 当前发布仅 Windows x64；其他平台构建分支保留但不参与本版。
-# Linux (AppImage / deb)。有 Apple Developer ID 后再开 GUIZHI_MAC_RELEASE_SIGN
-# 走正式签名与公证；icon.iconset 仍待换成归知图案。
+# 官方发布与维护仅限 Windows x64。
+# Linux / macOS 不再提供官方安装包、平台测试或兼容性保证；
+# 保留现有平台构建分支，供源码自行构建参考，不加入官方发布矩阵。
 
 on:
   push:

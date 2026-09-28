@@ -1,0 +1,9 @@
+{
+  "modelVersion": "6.0.0",
+  "name": "guizhi-capture",
+  "version": "0.2.2",
+  "description": "归知鸿蒙原生收集端",
+  "license": "AGPL-3.0",
+  "dependencies": {},
+  "devDependencies": {}
+}

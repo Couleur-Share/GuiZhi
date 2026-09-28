@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ImportTask } from "@guizhi/shared/types";
@@ -155,6 +155,20 @@ describe("导入任务详情弹窗", () => {
       screen.getByText("文字稿生成失败：本地转写服务启动失败"),
     ).toBeInTheDocument();
     expect(screen.queryByText("报错")).not.toBeInTheDocument();
+  });
+
+  it("处理中详情随时钟推进，与复制诊断的耗时一致", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_800_000_381_000);
+    try {
+      const user = userEvent.setup();
+      renderModal(makeTask({ status: "processing", stage: "web-preparing", updatedAt: 1_800_000_000_000,
+        stageStats: [{ stage: "fetching", ms: 36 }, { stage: "web-preparing", ms: 0 }] }));
+      expect(screen.getByText("共 6:21")).toBeInTheDocument();
+      clock.mockReturnValue(1_800_000_382_000);
+      await waitFor(() => expect(screen.getByText("共 6:22")).toBeInTheDocument(), { timeout: 2000 });
+      await user.click(screen.getByRole("button", { name: "复制诊断信息" }));
+      expect(await copiedText()).toContain("共 6:22");
+    } finally { clock.mockRestore(); }
   });
 
   it("复制诊断信息：整块 Markdown 进剪贴板，含全部阶段", async () => {

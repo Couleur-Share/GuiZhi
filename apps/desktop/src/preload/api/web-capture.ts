@@ -24,6 +24,7 @@ export const webCaptureApi = {
   supplement: (ids: string[]) => invoke<ImportTask[]>(C.WEB_SNAPSHOT_ENQUEUE,ids),
   exportHtml: (itemId: string, versionId: string) => invoke<{canceled?:boolean;path?:string;incomplete?:boolean}>(C.WEB_SNAPSHOT_EXPORT,itemId,versionId),
   status: () => invoke<WebRuntimeStatus>(C.WEB_STATUS),
+  checkSolver: (settings: import("@guizhi/shared/utils/flaresolverr").FlareSolverrSettings) => invoke<{ connected: boolean }>(C.WEB_SOLVER_CHECK, settings),
   repair: () => invoke<void>(C.WEB_REPAIR),
   create: (input: CreateCrawlJobInput) => invoke<string>(C.CRAWL_CREATE, input),
   list: () => invoke<CrawlJob[]>(C.CRAWL_LIST),

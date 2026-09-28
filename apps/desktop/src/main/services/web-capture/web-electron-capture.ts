@@ -11,7 +11,19 @@ import {
 } from "./web-electron-renderer";
 import { WebTaskGate, withWebAbort, webAbortError } from "./web-task-gate";
 import { webNetworkRequest } from "./web-network";
-import { assessStaticPage, staticPageLinks } from "./web-static-route";
+import { assessStaticPage, staticPageLinks, isWebVerificationPage } from "./web-static-route";
+import { WEB_VERIFICATION_REQUIRED } from "@guizhi/shared/utils/web-verification";
+import { captureWithFlareSolverr, getFlareSolverrSettings } from "./flaresolverr";
+import { webCaptureError } from "./web-error";
+
+async function solvePage(request: WebCaptureRequest, signal: AbortSignal, settings: ReturnType<typeof getFlareSolverrSettings>) {
+  try { return await captureWithFlareSolverr(request, signal, settings); }
+  catch (error) {
+    const failure = webCaptureError(error);
+    if (failure.code === "security" || failure.code === "canceled") throw error;
+    throw new Error(`${WEB_VERIFICATION_REQUIRED}：${failure.message}。可重试自动验证或在采集设置中关闭后备服务后手动验证。`, { cause: error });
+  }
+}
 
 export class ElectronWebCapture {
   private extractor = new WebHtmlExtractor();
@@ -34,9 +46,14 @@ export class ElectronWebCapture {
     const combined = AbortSignal.any([signal, this.lifetime.signal]);
     const work = this.pages.run(combined, async () => {
       const entryUrl = canonicalWebUrl(request.url);
-      stage?.("fetching");
-      let page = await this.staticPage({ ...request, url: entryUrl }, combined);
-      let engine = "static";
+      const solver = getFlareSolverrSettings();
+      stage?.(request.interactiveVerification ? "web-verifying" : "fetching");
+      let page = request.interactiveVerification && solver.enabled
+        ? await solvePage({ ...request, url: entryUrl }, combined, solver)
+        : request.interactiveVerification
+        ? await (await import("./web-verification-browser")).captureVerifiedWebPage({ ...request, url: entryUrl }, combined)
+        : await this.staticPage({ ...request, url: entryUrl }, combined);
+      let engine = request.interactiveVerification ? solver.enabled ? "flaresolverr" : "verified-electron" : "static";
       if (!page) {
         page = await this.renderer.render(
           { ...request, url: entryUrl },
@@ -44,6 +61,15 @@ export class ElectronWebCapture {
         );
         engine = "electron";
       }
+      if (isWebVerificationPage(page.html) && solver.enabled) {
+        stage?.("web-verifying");
+        page = await solvePage({ ...request, url: page.url }, combined, solver);
+        engine = "flaresolverr";
+      }
+      if (isWebVerificationPage(page.html)) throw new Error(
+        `${WEB_VERIFICATION_REQUIRED}：网站需要网页验证，点击「验证并自动采集」后完成验证。`,
+        { cause: { webCaptureCode: "captcha" } },
+      );
       stage?.("extracting");
       let result = await this.extractor.extract(
         page.html,
@@ -58,6 +84,15 @@ export class ElectronWebCapture {
           combined,
         );
         engine = "electron";
+        if (isWebVerificationPage(page.html) && solver.enabled) {
+          stage?.("web-verifying");
+          page = await solvePage({ ...request, url: page.url }, combined, solver);
+          engine = "flaresolverr";
+        }
+        if (isWebVerificationPage(page.html)) throw new Error(
+          `${WEB_VERIFICATION_REQUIRED}：网站需要网页验证，点击「验证并自动采集」后完成验证。`,
+          { cause: { webCaptureCode: "captcha" } },
+        );
         stage?.("extracting");
         result = await this.extractor.extract(
           page.html,

@@ -5,6 +5,16 @@ const mocks = vi.hoisted(() => ({
   render: vi.fn(),
   extract: vi.fn(),
   close: vi.fn(),
+  verify: vi.fn(),
+  solver: vi.fn(),
+  solverSettings: vi.fn(),
+}));
+vi.mock("../../../src/main/services/web-capture/flaresolverr", () => ({
+  captureWithFlareSolverr: mocks.solver,
+  getFlareSolverrSettings: mocks.solverSettings,
+}));
+vi.mock("../../../src/main/services/web-capture/web-verification-browser", () => ({
+  captureVerifiedWebPage: mocks.verify,
 }));
 vi.mock("../../../src/main/services/web-capture/web-network", () => ({
   webNetworkRequest: mocks.network,
@@ -33,6 +43,7 @@ const response = (html: string, status = 200) => ({
 });
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.solverSettings.mockReturnValue({ enabled: false, connection: "local", port: 8191, sshHost: "" });
   mocks.extract.mockResolvedValue({
     markdown: "正文",
     complete: true,
@@ -47,6 +58,42 @@ beforeEach(() => {
   mocks.close.mockResolvedValue(undefined);
 });
 describe("正式采集分流和安全失败", () => {
+  it("启用服务后仅验证页自动转 FlareSolverr，直接提取返回正文", async () => {
+    mocks.solverSettings.mockReturnValue({ enabled: true, connection: "ssh", port: 8191, sshHost: "gatewaysentry" });
+    mocks.network.mockResolvedValue(response("<title>Just a moment...</title>", 403));
+    mocks.solver.mockResolvedValue({ html: "<article>已验证正文</article>", url: request.url, status: 200, links: [] });
+    const result = await new ElectronWebCapture().capture(request, new AbortController().signal);
+    expect(result.engineVersion).toContain("flaresolverr");
+    expect(mocks.network).toHaveBeenCalledTimes(1);
+    expect(mocks.extract).toHaveBeenCalledWith("<article>已验证正文</article>", request.url, 200, expect.any(AbortSignal));
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+  it("FlareSolverr 失败保留可验证重试，不自动打开无限勾选窗口", async () => {
+    mocks.solverSettings.mockReturnValue({ enabled: true, connection: "ssh", port: 8191, sshHost: "gatewaysentry" });
+    mocks.network.mockResolvedValue(response("<title>Just a moment...</title>", 403));
+    mocks.solver.mockRejectedValue(new Error("FlareSolverr 未能完成请求"));
+    await expect(new ElectronWebCapture().capture(request, new AbortController().signal)).rejects.toThrow("web_verification_required");
+    expect(mocks.verify).not.toHaveBeenCalled(); expect(mocks.extract).not.toHaveBeenCalled();
+  });
+  it("启用服务仍不把普通 HTTP 403 当验证页", async () => {
+    mocks.solverSettings.mockReturnValue({ enabled: true, connection: "ssh", port: 8191, sshHost: "gatewaysentry" });
+    mocks.network.mockResolvedValue(response("Forbidden", 403));
+    await new ElectronWebCapture().capture(request, new AbortController().signal);
+    expect(mocks.solver).not.toHaveBeenCalled();
+  });
+  it("403 验证页先识别验证，不交给提取器当成限流", async () => {
+    mocks.network.mockResolvedValue(response('<title>Just a moment...</title><div id="challenge-stage">验证</div>', 403));
+    await expect(new ElectronWebCapture().capture(request, new AbortController().signal)).rejects.toThrow("web_verification_required");
+    expect(mocks.extract).not.toHaveBeenCalled();
+    expect(mocks.verify).not.toHaveBeenCalled();
+  });
+  it("主动验证直接提取已验证窗口，不重新请求静态页面", async () => {
+    mocks.verify.mockResolvedValue({ html: "<article>验证后正文</article>", url: request.url, status: 200, links: [] });
+    const result = await new ElectronWebCapture().capture({ ...request, interactiveVerification: true }, new AbortController().signal);
+    expect(result.engineVersion).toContain("verified-electron");
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.extract).toHaveBeenCalledWith("<article>验证后正文</article>", request.url, 200, expect.any(AbortSignal));
+  });
   it("短静态网页直接提取并补齐链接", async () => {
     mocks.network.mockResolvedValue(
       response('<p>正文</p><a href="/next">下一页</a>'),

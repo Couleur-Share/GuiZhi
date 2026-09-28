@@ -4,6 +4,7 @@ const PLATFORM_DOMAINS: Record<PlatformCapturePlatform, readonly string[]> = {
   xiaohongshu: ["xiaohongshu.com", "xhslink.com", "xhslink.cn"],
   douyin: ["douyin.com", "iesdouyin.com"],
   linuxdo: ["linux.do"],
+  nodeseek: ["nodeseek.com"],
 };
 
 export function isHostOrSubdomain(hostname: string, domain: string): boolean {
@@ -18,6 +19,7 @@ export function isAllowedPlatformUrl(
 ): boolean {
   try {
     const url = new URL(value);
+    if (platform === "nodeseek" && (url.username || url.password || url.port || !["nodeseek.com", "www.nodeseek.com"].includes(url.hostname))) return false;
     return (
       url.protocol === "https:" &&
       PLATFORM_DOMAINS[platform].some((domain) =>
@@ -35,6 +37,7 @@ export function detectPlatformCapturePlatform(
   if (isAllowedPlatformUrl("xiaohongshu", value)) return "xiaohongshu";
   if (isAllowedPlatformUrl("douyin", value)) return "douyin";
   if (isAllowedPlatformUrl("linuxdo", value)) return "linuxdo";
+  if (isAllowedPlatformUrl("nodeseek", value)) return "nodeseek";
   return null;
 }
 
@@ -43,7 +46,7 @@ export function isCreatorProfileUrl(
   value: string,
 ): boolean {
   if (!isAllowedPlatformUrl(platform, value)) return false;
-  if (platform === "linuxdo") return false;
+  if (platform === "linuxdo" || platform === "nodeseek") return false;
   const pathname = new URL(value).pathname;
   return platform === "xiaohongshu"
     ? /^\/user\/profile\/[^/?#]+\/?$/i.test(pathname)
@@ -60,6 +63,7 @@ export function detectPlatformCreatorUrl(value: string): {
 }
 
 export function platformLoginUrl(platform: PlatformCapturePlatform): string {
+  if (platform === "nodeseek") return "https://www.nodeseek.com/";
   if (platform === "xiaohongshu") {
     return "https://www.xiaohongshu.com/explore";
   }
@@ -73,6 +77,7 @@ export function platformSearchUrl(
   platform: PlatformCapturePlatform,
   keyword: string,
 ): string {
+  if (platform === "nodeseek") throw new Error("NodeSeek 当前仅支持帖子采集");
   const encoded = encodeURIComponent(keyword);
   if (platform === "xiaohongshu") {
     return `https://www.xiaohongshu.com/search_result?keyword=${encoded}`;

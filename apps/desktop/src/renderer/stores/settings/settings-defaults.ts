@@ -1,4 +1,5 @@
 import { DEFAULT_NETWORK_PROXY_SETTINGS } from "@guizhi/shared/types";
+import { DEFAULT_FLARESOLVERR_SETTINGS } from "@guizhi/shared/utils/flaresolverr";
 import i18n from "../../i18n";
 import {
   DEFAULT_BACKGROUND_IMAGE_BLUR,
@@ -57,6 +58,7 @@ function createDefaultWorkspaceValues() {
     ffmpegPath: "",
     transcribeDiarize: false,
     networkProxy: { ...DEFAULT_NETWORK_PROXY_SETTINGS },
+    flareSolverr: { ...DEFAULT_FLARESOLVERR_SETTINGS },
   } satisfies Partial<SettingsValues>;
 }
 

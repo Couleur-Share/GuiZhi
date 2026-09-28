@@ -1,4 +1,8 @@
+import { isOfficialLoginFlowUrl, isAllowedBrowserResourceUrl, shouldBlockLoginPageRequest } from "./browser-capture-policy";
+export { isAllowedBrowserResourceUrl, shouldBlockLoginPageRequest } from "./browser-capture-policy";
 import fs from "fs";
+import { readNodeseekPage, nodeseekVerificationUrl } from "./nodeseek-capture";
+import { fetchNodeseekThread } from "../import/nodeseek";
 import path from "path";
 import { readDiscoveryPage, waitForXhsSearch } from "./discovery-page";
 import { searchResponseRows } from "./search-capture";
@@ -32,8 +36,6 @@ import {
 } from "./electron-capture-runtime";
 import {
   LOGIN_COOKIE_NAMES,
-  LOGIN_FLOW_DOMAINS,
-  RESOURCE_DOMAINS,
 } from "./browser-capture-domains";
 
 const LOGIN_TIMEOUT_MS = 5 * 60_000;
@@ -50,78 +52,6 @@ const PAGE_SIZE = 20;
 const MAX_DISCOVERY_ITEMS = 100;
 const SESSION_STATUS_VERSION = 3;
 
-function isAllowedSecureProtocol(protocol: string): boolean {
-  return protocol === "https:" || protocol === "wss:";
-}
-
-function isOfficialLoginFlowUrl(
-  platform: PlatformCapturePlatform,
-  value: string,
-): boolean {
-  if (isAllowedPlatformUrl(platform, value)) return true;
-  try {
-    const url = new URL(value);
-    if (!isAllowedSecureProtocol(url.protocol)) return false;
-    const host = url.hostname.toLowerCase();
-    return LOGIN_FLOW_DOMAINS[platform].some(
-      (domain) => host === domain || host.endsWith(`.${domain}`),
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function isAllowedBrowserResourceUrl(
-  platform: PlatformCapturePlatform,
-  value: string,
-): boolean {
-  if (/^(?:about:blank|data:|blob:)/i.test(value)) return true;
-  if (platform === "linuxdo") {
-    try {
-      const url = new URL(value);
-      return isAllowedSecureProtocol(url.protocol);
-    } catch {
-      return false;
-    }
-  }
-  if (isOfficialLoginFlowUrl(platform, value)) return true;
-  try {
-    const url = new URL(value);
-    if (!isAllowedSecureProtocol(url.protocol)) return false;
-    const host = url.hostname.toLowerCase();
-    return RESOURCE_DOMAINS[platform].some(
-      (domain) => host === domain || host.endsWith(`.${domain}`),
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function shouldBlockLoginPageRequest(
-  platform: PlatformCapturePlatform,
-  value: string,
-  resourceType: string,
-): boolean {
-  // 登录不需要播放信息流音视频；二维码与验证码图片仍正常加载。
-  if (resourceType === "media") return true;
-  if (platform !== "douyin") return false;
-  try {
-    const url = new URL(value);
-    const pathname = url.pathname;
-    const host = url.hostname.toLowerCase();
-    // 推荐流封面是登录页最重的一批无关资源；登录二维码使用 passport
-    // 资源和同源接口，不落在 douyinpic.com。
-    if (
-      resourceType === "image" &&
-      (host === "douyinpic.com" || host.endsWith(".douyinpic.com"))
-    )
-      return true;
-    return /^\/aweme\/v1\/web\/(?:tab|follow)\/feed\//i.test(pathname);
-  } catch {
-    return false;
-  }
-}
-
 type OperationKind = "login" | "capture" | "discovery" | "comments";
 
 interface ProfileState {
@@ -129,6 +59,7 @@ interface ProfileState {
   xiaohongshu?: boolean;
   douyin?: boolean;
   linuxdo?: boolean;
+  nodeseek?: boolean;
 }
 
 type LoginCookieSnapshot = Readonly<Record<string, string>>;
@@ -502,6 +433,7 @@ export class BrowserCaptureService {
   private activeKind: OperationKind | null = null;
   private activePlatform: PlatformCapturePlatform | null = null;
   private activeContext: ElectronCaptureContext | null = null;
+  private nodeseekVerificationAbort: AbortController | null = null;
   private browserVersion: string | undefined = process.versions.chrome;
 
   constructor(options: BrowserCaptureServiceOptions = {}) {
@@ -524,7 +456,7 @@ export class BrowserCaptureService {
 
   getStatuses(): PlatformSessionStatus[] {
     const state = this.readState();
-    return (["xiaohongshu", "douyin", "linuxdo"] as const).map((platform) => ({
+    return (["xiaohongshu", "douyin", "linuxdo", "nodeseek"] as const).map((platform) => ({
       platform,
       browser: "embedded",
       browserVersion: this.browserVersion,
@@ -546,6 +478,10 @@ export class BrowserCaptureService {
     kind: OperationKind,
     platform: PlatformCapturePlatform,
   ): boolean {
+    if (kind === "login" && platform === "nodeseek" && this.nodeseekVerificationAbort) {
+      this.nodeseekVerificationAbort.abort();
+      return true;
+    }
     if (this.activePlatform !== platform) return false;
     return this.cancel(kind);
   }
@@ -556,12 +492,22 @@ export class BrowserCaptureService {
     parent?: BrowserWindow | null,
     searchKeyword?: string,
     callerSignal?: AbortSignal,
+    verificationUrl?: string,
   ): Promise<PlatformSessionStatus> {
+    const verificationAbort = platform === "nodeseek" ? new AbortController() : null;
+    if (verificationAbort && this.nodeseekVerificationAbort) throw new PlatformCaptureError("verification_required", "NodeSeek 已有验证进行中，请先完成或取消");
+    if (verificationAbort) this.nodeseekVerificationAbort = verificationAbort;
+    const loginSignal = verificationAbort ? (callerSignal ? AbortSignal.any([callerSignal, verificationAbort.signal]) : verificationAbort.signal) : callerSignal;
     await this.runSerialized(
       platform,
       "login",
       async (context, signal) => {
         const page = await this.preparePage(context, platform);
+        if (platform === "nodeseek") {
+          await readNodeseekPage(page, nodeseekVerificationUrl(verificationUrl), signal, true);
+          this.writeLoginState(platform, true);
+          return;
+        }
         if (platform === "douyin" && cleanText(searchKeyword, 100)) {
           await verifyDouyinSearch(page, cleanText(searchKeyword, 100), () => this.throwIfAborted(signal));
           this.writeLoginState(platform, true);
@@ -639,9 +585,11 @@ export class BrowserCaptureService {
         );
       },
       true,
-      callerSignal,
+      loginSignal,
       parent,
-    );
+    ).finally(() => {
+      if (verificationAbort) this.nodeseekVerificationAbort = null;
+    });
     return this.getStatuses().find((status) => status.platform === platform)!;
   }
 
@@ -676,6 +624,22 @@ export class BrowserCaptureService {
     if (!/^\d{6,}$/.test(awemeId)) throw new Error("无效的抖音作品 ID");
     return this.runSerialized("douyin", "capture", (context, operationSignal) => captureDouyinDetailPage(context.page, awemeId, operationSignal), true, signal);
   }
+  async captureNodeseek(topicId: string, signal?: AbortSignal) {
+    return this.runSerialized("nodeseek", "capture", async (context, operationSignal) => {
+      try {
+        const thread = await fetchNodeseekThread(topicId, (url) => readNodeseekPage(context.page, url, operationSignal), operationSignal);
+        this.writeLoginState("nodeseek", true);
+        return thread;
+      } catch (error) {
+        this.writeLoginState("nodeseek", false);
+        if (!(error instanceof PlatformCaptureError) && !operationSignal.aborted) {
+          throw new PlatformCaptureError("platform_changed", error instanceof Error ? error.message : String(error), { cause: error });
+        }
+        throw error;
+      }
+    }, true, signal);
+  }
+
   async capturePage(
     platform: PlatformCapturePlatform,
     url: string,

@@ -33,7 +33,7 @@ import { formatItemTime } from "./type-meta";
 const MORE_MENU_WIDTH_PX = 160;
 
 const ACTION_BUTTON_BASE =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors";
+  "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const ACTION_BUTTON_IDLE =
   "text-muted-foreground hover:bg-accent/60 hover:text-foreground";
 
@@ -98,9 +98,11 @@ function ActionButton({
 function MoreActionsButton({
   item,
   onOpenTools,
+  toolsOpen = false,
 }: {
   item: KnowledgeItem;
   onOpenTools?: () => void;
+  toolsOpen?: boolean;
 }) {
   const sourceComments = useSourceComments();
   const { t } = useTranslation();
@@ -143,6 +145,15 @@ function MoreActionsButton({
           ignoreRef={buttonRef}
           onClose={() => setAnchor(null)}
           items={[
+            ...(onOpenTools
+              ? [{
+                  label: toolsOpen
+                    ? t("articleReader.closeTools", "收起文章工具")
+                    : t("articleReader.tools", "文章信息与工具"),
+                  icon: <SlidersHorizontalIcon className="h-4 w-4" aria-hidden="true" />,
+                  onClick: onOpenTools,
+                }]
+              : []),
             ...(sourceComments?.supported
               ? [
                   {
@@ -382,9 +393,9 @@ export function ItemDetailHeader({
         className="block w-full resize-none border-none bg-transparent rounded-sm pt-0.5 text-[1.375rem] font-semibold leading-snug text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0"
       />
 
-      {/* 动作区并进元信息行右侧：不新增一行高度，与 Wiki 页面详情同形态 */}
-      <div className="mt-2.5 flex items-start gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+      {/* 空间不足时整组操作换行，避免把元信息挤成碎片。 */}
+      <div className="mt-2.5 flex flex-wrap items-start gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-[1_1_16rem] flex-wrap items-center gap-1.5">
           <CollectionChip item={item} disabled={isTrashed} />
           <SourceChip item={item} />
           {wordCount > 0 ? (
@@ -431,7 +442,7 @@ export function ItemDetailHeader({
         </div>
 
         {/* 按钮 32px、chip 24px，上提 4px 才与第一行 chip 对齐 */}
-        <div className="-mt-1 flex shrink-0 items-center gap-0.5">
+        <div className="-mt-1 ml-auto flex shrink-0 items-center gap-0.5">
           {isTrashed ? (
             <button
               type="button"
@@ -443,24 +454,16 @@ export function ItemDetailHeader({
             </button>
           ) : (
             <>
-              {onToggleAsk ? <button type="button" onClick={onToggleAsk} aria-expanded={askOpen} className="mr-2 rounded-lg border border-border px-2 py-1.5 text-xs text-foreground hover:bg-accent">{t("articleAsk.title", "围绕本文提问")}</button> : null}
-              {onToggleTools ? (
+              {onToggleAsk ? (
                 <button
                   type="button"
-                  onClick={onToggleTools}
-                  aria-controls="article-tools-panel"
-                  aria-expanded={toolsOpen}
-                  className={`${ACTION_BUTTON_BASE} ${ACTION_BUTTON_IDLE}`}
-                  aria-label={t("articleReader.tools", "文章信息与工具")}
-                  title={t(
-                    "articleReader.toolsHint",
-                    "标签、配图、内容处理与来源版本",
-                  )}
+                  onClick={onToggleAsk}
+                  aria-expanded={askOpen}
+                  aria-label={t("articleAsk.title", "围绕本文提问")}
+                  className={`mr-2 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${askOpen ? "bg-primary/15 text-primary" : "text-foreground hover:bg-accent/60"}`}
                 >
-                  <SlidersHorizontalIcon
-                    className="h-4 w-4"
-                    aria-hidden="true"
-                  />
+                  <MessageCircleIcon className="h-4 w-4" aria-hidden="true" />
+                  {t("articleAsk.action", "提问")}
                 </button>
               ) : null}
               <ActionButton
@@ -492,7 +495,7 @@ export function ItemDetailHeader({
                   aria-hidden="true"
                 />
               </ActionButton>
-              <MoreActionsButton item={item} onOpenTools={onToggleTools} />
+              <MoreActionsButton item={item} onOpenTools={onToggleTools} toolsOpen={toolsOpen} />
             </>
           )}
           {onClose ? (

@@ -1,4 +1,4 @@
-import type { ImportStage, ImportTask } from "@guizhi/shared/types";
+import type { ImportStage, ImportStageStat, ImportTask } from "@guizhi/shared/types";
 import type { PlatformParseErrorCode } from "@guizhi/shared/utils/platform-parse-error";
 import { getPlatformParseCode, splitPlatformParseErrorMessage } from "@guizhi/shared/utils/platform-parse-error";
 import { detectPlatformCapturePlatform } from "@guizhi/shared/utils/platform-capture";
@@ -10,6 +10,7 @@ const AUTHENTICATED_RETRY_CODES = new Set<PlatformParseErrorCode>([
 ]);
 
 export function getAuthenticatedRetryPlatform(task: ImportTask) {
+  if (task.status === "failed" && task.sourceKind === "url" && detectPlatformCapturePlatform(task.sourceInput) === "nodeseek" && /nodeseek_verification_required|拒绝访问|验证|403|Just a moment/i.test(task.error ?? "")) return "nodeseek" as const;
   if (
     task.status !== "failed" ||
     task.sourceKind !== "url" ||
@@ -35,6 +36,7 @@ export const STAGE_LABELS: Record<
   { key: string; fallback: string }
 > = {
   "web-preparing": { key: "imports.stageWebPreparing", fallback: "准备网页组件" },
+  "web-verifying": { key: "imports.stageWebVerifying", fallback: "网页验证中" },
   fetching: { key: "imports.stageFetching", fallback: "抓取中" },
   extracting: { key: "imports.stageExtracting", fallback: "解析中" },
   saving: { key: "imports.stageSaving", fallback: "入库中" },
@@ -95,6 +97,18 @@ export const STATUS_LABELS: Record<
 /** 单个阶段超过这个时长仍无进展，行内给出「本阶段已 x」提示 */
 export const STALL_THRESHOLD_MS = 90_000;
 
+/** 补算快照之后的当前阶段耗时，列表、详情与诊断使用相同口径。 */
+export function resolveStageStats(task: ImportTask, now: number): ImportStageStat[] {
+  const stats = task.stageStats ?? [];
+  if (task.status !== "processing" || !task.stage) return stats;
+  const pendingMs = Math.max(0, now - task.updatedAt);
+  if (!stats.some((entry) => entry.stage === task.stage)) {
+    return [...stats, { stage: task.stage, ms: pendingMs }];
+  }
+  return stats.map((entry) => entry.stage === task.stage
+    ? { ...entry, ms: entry.ms + pendingMs } : entry);
+}
+
 /**
  * 处理中任务的**实际工作**时长，不含排队等待。
  *
@@ -114,8 +128,7 @@ export function resolveWorkElapsed(task: ImportTask, now: number): number {
     // 加统计之前的老任务没有这一列，退回原口径——不准，但不比以前差
     return Math.max(0, now - task.createdAt);
   }
-  const settled = stats.reduce((total, entry) => total + entry.ms, 0);
-  return settled + Math.max(0, now - task.updatedAt);
+  return resolveStageStats(task, now).reduce((total, entry) => total + entry.ms, 0);
 }
 
 /**
@@ -203,6 +216,14 @@ export function formatImportTaskError(
 ): string {
   if (!error) {
     return "";
+  }
+  if (error.includes("web_verification_required")) {
+    if (/FlareSolverr|未通过|取消|超时|失败|拒绝|预算|超过/.test(error))
+      return error.replace(/^web_verification_required[:：]?\s*/, "");
+    return t("imports.webVerificationRequired", "网站需要网页验证。点击「验证并自动采集」，完成验证后会自动继续；关闭验证窗口可取消。");
+  }
+  if (error.includes("nodeseek_verification_required")) {
+    return t("imports.nodeseekVerificationRequired", "NodeSeek 需要网页验证。点击「验证并自动采集」，完成后会自动继续。");
   }
   const { code, body } = splitPlatformParseErrorMessage(error);
   if (!code) {

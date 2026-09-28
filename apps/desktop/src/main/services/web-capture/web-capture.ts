@@ -9,6 +9,7 @@ import { ElectronWebCapture } from "./web-electron-capture";
 import { webRuntimeStatus } from "./web-runtime";
 import { webCaptureError } from "./web-error";
 import { logAppError } from "../../diagnostic-log";
+import { WEB_VERIFICATION_REQUIRED } from "@guizhi/shared/utils/web-verification";
 
 const worker = new ElectronWebCapture();
 let captureLifetime = new AbortController();
@@ -38,7 +39,7 @@ export async function captureWebPage(
   if (!status.available) throw new Error(status.reason ?? "网页组件不可用");
   const url = canonicalWebUrl(request.url),
     origin = new URL(url).origin;
-  const timeout = AbortSignal.timeout(60_000);
+  const timeout = AbortSignal.timeout(request.interactiveVerification ? 300_000 : 120_000);
   const combined = AbortSignal.any([timeout, lifetime, ...(signal ? [signal] : [])]);
   while (active >= 2 || origins.has(origin)) {
     await new Promise<void>((resolve, reject) => {
@@ -62,6 +63,8 @@ export async function captureWebPage(
     return await worker.capture({ ...request, url }, combined, stage);
   } catch (error) {
     const failure = webCaptureError(error);
+    if (request.interactiveVerification && failure.code !== "security" && !failure.message.includes(WEB_VERIFICATION_REQUIRED))
+      failure.message = `${WEB_VERIFICATION_REQUIRED}：${failure.message}。可再次点击「验证并自动采集」。`;
     logAppError({
       scope: "main",
       action: "网页采集",

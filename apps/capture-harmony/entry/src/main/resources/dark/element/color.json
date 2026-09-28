@@ -1,0 +1,96 @@
+{
+  "color": [
+    {
+      "name": "page_background",
+      "value": "#101113"
+    },
+    {
+      "name": "surface",
+      "value": "#1C1D20"
+    },
+    {
+      "name": "surface_muted",
+      "value": "#282A30"
+    },
+    {
+      "name": "border_subtle",
+      "value": "#34363D"
+    },
+    {
+      "name": "text_primary",
+      "value": "#F3F4F7"
+    },
+    {
+      "name": "text_secondary",
+      "value": "#ADB2BD"
+    },
+    {
+      "name": "text_tertiary",
+      "value": "#858C99"
+    },
+    {
+      "name": "accent",
+      "value": "#A8C7FF"
+    },
+    {
+      "name": "accent_soft",
+      "value": "#202F49"
+    },
+    {
+      "name": "on_accent",
+      "value": "#102E60"
+    },
+    {
+      "name": "error",
+      "value": "#FFB4AB"
+    },
+    {
+      "name": "purple_accent",
+      "value": "#D0B5FA"
+    },
+    {
+      "name": "purple_soft",
+      "value": "#342744"
+    },
+    {
+      "name": "purple_on_accent",
+      "value": "#342052"
+    },
+    {
+      "name": "rose_accent",
+      "value": "#F3AFC7"
+    },
+    {
+      "name": "rose_soft",
+      "value": "#442633"
+    },
+    {
+      "name": "rose_on_accent",
+      "value": "#541D32"
+    },
+    {
+      "name": "amber_accent",
+      "value": "#F0BF73"
+    },
+    {
+      "name": "amber_soft",
+      "value": "#3D2F1D"
+    },
+    {
+      "name": "amber_on_accent",
+      "value": "#482C05"
+    },
+    {
+      "name": "slate_accent",
+      "value": "#BAC7D8"
+    },
+    {
+      "name": "slate_soft",
+      "value": "#2A303A"
+    },
+    {
+      "name": "slate_on_accent",
+      "value": "#25303E"
+    }
+  ]
+}

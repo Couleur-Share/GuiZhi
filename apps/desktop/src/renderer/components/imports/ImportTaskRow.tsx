@@ -19,10 +19,12 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask } from "@guizhi/shared/types";
+import { needsWebVerification } from "@guizhi/shared/utils/web-verification";
 import { RefreshCwIcon } from "lucide-react";
 import { useImportStore } from "../../stores/import.store";
 import { reportOperationError } from "../../stores/operation-error.store";
 import { useUIStore } from "../../stores/ui.store";
+import { useSettingsStore } from "../../stores/settings.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
 import { ImportOriginLabel } from "./ImportOrigin";
 import { ImportStageSummary } from "./ImportStageSummary";
@@ -276,6 +278,7 @@ export function ImportTaskRow({
 }) {
   const { t } = useTranslation();
   const cancelTask = useImportStore((state) => state.cancelTask);
+  const solverEnabled = useSettingsStore((state) => state.flareSolverr.enabled);
   const retryTask = useImportStore((state) => state.retryTask);
   const removeTask = useImportStore((state) => state.removeTask);
   const requestSettingsSection = useUIStore(
@@ -303,6 +306,7 @@ export function ImportTaskRow({
 
   const retryAuthenticated = async () => {
     if (!authenticatedRetryPlatform) return;
+    if (authenticatedRetryPlatform === "nodeseek") { onOpenDetail(); return; }
     try {
       const statuses = await window.api.platformCapture.getStatuses();
       const status = statuses.find((entry) => entry.platform === authenticatedRetryPlatform);
@@ -409,8 +413,8 @@ export function ImportTaskRow({
 
         {task.status === "failed" || task.status === "canceled" ? (
           <RowAction
-            label={t("imports.retry", "重试")}
-            onClick={() => void retryTask(task.id)}
+            label={needsWebVerification(task) ? solverEnabled ? t("imports.webSolverRetry", "自动验证并采集") : t("imports.webVerifyRetry", "验证并自动采集") : t("imports.retry", "重试")}
+            onClick={() => needsWebVerification(task) ? onOpenDetail() : void retryTask(task.id)}
           >
             <RotateCcwIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </RowAction>
@@ -418,7 +422,7 @@ export function ImportTaskRow({
 
         {authenticatedRetryPlatform ? (
           <RowAction
-            label={t("imports.authenticatedRetry", "使用登录态重试")}
+            label={authenticatedRetryPlatform === "nodeseek" ? t("imports.nodeseekOpenVerification", "网页验证") : t("imports.authenticatedRetry", "使用登录态重试")}
             onClick={() => void retryAuthenticated()}
           >
             <LogInIcon className="h-3.5 w-3.5" aria-hidden="true" />

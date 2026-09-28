@@ -11,7 +11,8 @@ export type ForumPlatform =
   | "nga"
   | "linuxdo"
   | "appinn"
-  | "twolibra";
+  | "twolibra"
+  | "nodeseek";
 
 export interface ForumTarget {
   platform: ForumPlatform;
@@ -80,6 +81,19 @@ export function twolibraCanonicalUrl(
   return `https://2libra.com/post/${encodeURIComponent(nodeSlug)}/${encodeURIComponent(topicId)}`;
 }
 
+export function nodeseekCanonicalUrl(topicId: string, page = 1): string {
+  return `https://www.nodeseek.com/post-${topicId}-${page}`;
+}
+
+/** 仅复用同一帖子在错误中明确记录的受阻分页地址。 */
+export function nodeseekVerificationTarget(source: string, error?: string | null): string {
+  const target = detectForumPlatform(source);
+  if (target?.platform !== "nodeseek") return source;
+  const candidates = error?.includes("nodeseek_verification_required")
+    ? error.match(/https:\/\/www\.nodeseek\.com\/post-[1-9]\d*-[1-9]\d*/g) ?? [] : [];
+  return candidates.find((url) => detectForumPlatform(url)?.topicId === target.topicId) ?? source;
+}
+
 export function detectForumPlatform(url: string): ForumTarget | null {
   let hostname: string;
   let pathname: string;
@@ -97,6 +111,11 @@ export function detectForumPlatform(url: string): ForumTarget | null {
   if (hostname === "v2ex.com" || hostname.endsWith(".v2ex.com")) {
     const topicId = V2EX_TOPIC_PATH.exec(pathname)?.[1];
     return topicId ? { platform: "v2ex", topicId } : null;
+  }
+
+  if (hostname === "nodeseek.com" || hostname === "www.nodeseek.com") {
+    const topicId = /^\/post-([1-9]\d*)-[1-9]\d*\/?$/.exec(pathname)?.[1];
+    if (topicId) return { platform: "nodeseek", topicId };
   }
 
   if (isNgaHostname(hostname) && NGA_READ_PATH.test(pathname)) {

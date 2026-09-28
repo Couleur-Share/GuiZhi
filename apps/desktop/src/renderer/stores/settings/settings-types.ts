@@ -132,6 +132,7 @@ export interface SettingsState {
   scenarioModelDefaults: ScenarioModelDefaults;
   modelRouteDefaults: ModelRouteDefaults;
   networkProxy: NetworkProxySettings;
+  flareSolverr: import("@guizhi/shared/utils/flaresolverr").FlareSolverrSettings;
   setThemeMode: (mode: ThemeMode) => void;
   setThemeColor: (colorId: string) => void;
   setCustomThemeHex: (hex: string) => void;

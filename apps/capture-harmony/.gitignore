@@ -1,0 +1,13 @@
+/build-profile.json5
+/local.properties
+/.idea/
+/.hvigor/
+/oh_modules/
+**/build/
+**/oh_modules/
+/oh-package-lock.json5
+*.p12
+*.p7b
+*.cer
+*.hap
+*.app

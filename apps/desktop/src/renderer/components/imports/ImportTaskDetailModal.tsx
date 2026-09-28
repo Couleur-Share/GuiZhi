@@ -7,6 +7,9 @@
  * 「复制诊断信息」——用户报「这批采集特别慢」时，双方手上得有数。
  */
 import { useEffect, useState } from "react";
+import { NodeseekRetryButton } from "./NodeseekRetryButton";
+import { WebVerificationRetryButton } from "./WebVerificationRetryButton";
+import { needsWebVerification } from "@guizhi/shared/utils/web-verification";
 import { ClipboardCopyIcon, ExternalLinkIcon, LogInIcon, RotateCcwIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask, KnowledgeItem } from "@guizhi/shared/types";
@@ -20,6 +23,7 @@ import {
 import { useToast } from "../ui/Toast";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { useImportStore } from "../../stores/import.store";
+import { useSettingsStore } from "../../stores/settings.store";
 import { ImportOriginLabel } from "./ImportOrigin";
 import { ImportStageBreakdown } from "./ImportStageBreakdown";
 import { ImportCompletionCard } from "./ImportCompletionCard";
@@ -31,6 +35,7 @@ import {
   getStageLabel,
   resolveTaskFolder,
   resolveTaskHost,
+  resolveStageStats,
   STATUS_LABELS,
 } from "./import-task-meta";
 
@@ -62,6 +67,7 @@ export function ImportTaskDetailModal({
   const { t } = useTranslation();
   const { showToast } = useToast();
   const retryTask = useImportStore((state) => state.retryTask);
+  const solverEnabled = useSettingsStore((state) => state.flareSolverr.enabled);
   const [isCopying, setIsCopying] = useState(false);
   const [refreshPair, setRefreshPair] = useState<{
     original: KnowledgeItem;
@@ -71,7 +77,14 @@ export function ImportTaskDetailModal({
 
   const host = resolveTaskHost(task);
   const folder = resolveTaskFolder(task);
-  const stats = task.stageStats ?? [];
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isOpen || task.status !== "processing") return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [isOpen, task.status]);
+  const stats = resolveStageStats(task, now);
   // 品牌 logo + 平台名比一行 `v.douyin.com` 认得快，与侧栏「平台」分区、
   // 表格「来源」列共用同一套判定与图标
   const platform = resolveSourcePlatform(task.sourceKind, task.sourceInput);
@@ -98,8 +111,7 @@ export function ImportTaskDetailModal({
       const status = statuses.find((entry) => entry.platform === authenticatedRetryPlatform);
       if (!status?.available) throw new Error("归知内置登录窗口暂不可用");
       if (!status.loggedIn) await window.api.platformCapture.login(authenticatedRetryPlatform);
-      await retryTask(task.id, { captureStrategy: "authenticated" });
-      onClose();
+      if (await retryTask(task.id, { captureStrategy: "authenticated" })) onClose();
     } catch (error) {
       showToast(t("imports.authenticatedRetryFailed", "登录态重试未开始"), "error", {
         detail: error instanceof Error ? error.message : String(error),
@@ -289,7 +301,9 @@ export function ImportTaskDetailModal({
               {t("imports.reportError", "报错")}
             </div>
             <p className="mt-0.5 break-words text-xs text-destructive">
-              {formatImportTaskError(task.error, t)}
+              {needsWebVerification(task) && !task.error.includes("web_verification_required")
+                ? solverEnabled ? t("imports.webSolverRequired", "网站需要 Cloudflare 验证。点击「自动验证并采集」，由配置的 FlareSolverr 服务获取正文。") : t("imports.webVerificationRequired", "网站需要网页验证。点击「验证并自动采集」，完成验证后会自动继续；关闭验证窗口可取消。")
+                : formatImportTaskError(task.error, t)}
             </p>
           </div>
         ) : null}
@@ -357,7 +371,9 @@ export function ImportTaskDetailModal({
                 {t("imports.openOriginal", "打开原条目")}
               </button>
             ) : null}
-            {canRetry ? (
+            {needsWebVerification(task) ? (
+              <WebVerificationRetryButton taskId={task.id} onComplete={onClose} />
+            ) : canRetry ? (
               <button
                 type="button"
                 onClick={() => {
@@ -370,7 +386,7 @@ export function ImportTaskDetailModal({
                 {t("imports.retry", "重试")}
               </button>
             ) : null}
-            {authenticatedRetryPlatform ? (
+            {authenticatedRetryPlatform === "nodeseek" ? <NodeseekRetryButton task={task} onComplete={onClose} /> : authenticatedRetryPlatform ? (
               <button
                 type="button"
                 onClick={() => void retryAuthenticated()}

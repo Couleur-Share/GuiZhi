@@ -207,16 +207,17 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* 设置侧边栏 */}
-      <div className="w-56 app-wallpaper-panel border-r border-border flex flex-col">
+      <div className="w-14 shrink-0 sm:w-56 app-wallpaper-panel border-r border-border flex flex-col">
         {/* 返回按钮 */}
         <div className="p-3 border-b border-border">
           <button
             type="button"
             onClick={onBack}
+            aria-label={t("common.back")}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
-            <span>{t("common.back")}</span>
+            <span className="hidden sm:inline">{t("common.back")}</span>
           </button>
         </div>
 
@@ -229,14 +230,15 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
               onClick={() => setActiveSection(item.id as SettingsSectionId)}
               data-testid={`settings-nav-${item.id}`}
               aria-pressed={activeSection === item.id}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-quick ${
+              aria-label={t(item.labelKey)}
+              className={`w-full flex items-center justify-center sm:justify-start gap-3 px-2 sm:px-3 py-2 rounded-lg text-[13px] transition-all duration-quick ${
                 activeSection === item.id
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-foreground/80 hover:bg-muted/70"
               }`}
             >
-              <item.icon className="w-4 h-4" aria-hidden="true" />
-              <span>{t(item.labelKey)}</span>
+              <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span className="hidden sm:inline">{t(item.labelKey)}</span>
             </button>
           ))}
         </nav>
@@ -248,7 +250,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         className={
           activeSection === "ai"
             ? "flex-1 overflow-hidden app-wallpaper-section"
-            : "flex-1 overflow-y-auto px-5 py-5 app-wallpaper-section sm:px-6 xl:px-8 2xl:px-10"
+            : "min-w-0 flex-1 overflow-y-auto px-3 py-5 app-wallpaper-section sm:px-6 xl:px-8 2xl:px-10"
         }
       >
         <div

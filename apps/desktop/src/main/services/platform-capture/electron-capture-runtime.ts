@@ -507,7 +507,7 @@ export function getElectronCaptureSession(
 }
 
 export async function clearElectronCaptureSessions(): Promise<void> {
-  for (const platform of ["xiaohongshu", "douyin", "linuxdo"] as const) {
+  for (const platform of ["xiaohongshu", "douyin", "linuxdo", "nodeseek"] as const) {
     const targetSession = getElectronCaptureSession(platform);
     await targetSession.clearStorageData();
     await targetSession.clearCache().catch(() => undefined);
@@ -550,7 +550,7 @@ export async function createElectronCaptureContext(
         ? "小红书官方登录"
         : input.platform === "douyin"
           ? "抖音官方登录"
-          : "LINUX DO 验证",
+          : input.platform === "nodeseek" ? "NodeSeek 验证 · 完成后自动采集" : "LINUX DO 验证",
     backgroundColor: "#ffffff",
     webPreferences: {
       session: targetSession,

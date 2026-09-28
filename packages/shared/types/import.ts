@@ -75,6 +75,7 @@ export interface ImportQueueState {
  */
 export const IMPORT_STAGES = [
   "web-preparing",
+  "web-verifying",
   "fetching",
   "extracting",
   "saving",

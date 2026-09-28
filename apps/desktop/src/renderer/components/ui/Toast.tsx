@@ -59,7 +59,9 @@ interface ToastContextType {
     message: string,
     type?: ToastType,
     options?: ShowToastOptions,
-  ) => void;
+  ) => string;
+  /** 操作重试时仅撤下该操作已经过时的提示，保留其他错误。 */
+  dismissToast: (id: string) => void;
   /**
    * 带「撤销」按钮的提示。
    *
@@ -227,7 +229,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (isPersistent(type)) {
-      return;
+      return id;
     }
 
     // Auto-dismiss via the same exit-animation pipeline.
@@ -237,6 +239,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       removeToast(id);
     }, AUTO_DISMISS_MS);
     autoDismissTimers.current.set(id, dismiss);
+    return id;
   }, [enableNotifications, removeToast, t]);
 
   const showUndoToast = useCallback((message: string, onUndo: () => void) => {
@@ -304,7 +307,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ToastContext.Provider value={{ showToast, showUndoToast }}>
+    <ToastContext.Provider value={{ showToast, showUndoToast, dismissToast: removeToast }}>
       {children}
 
       {/* Toast container - z-index needs to be the highest to stay above everything */}

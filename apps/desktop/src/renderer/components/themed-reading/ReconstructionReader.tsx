@@ -182,7 +182,7 @@ export function ReconstructionReader({
   };
   const actions = (
     <div
-      className="flex shrink-0 items-center gap-1"
+      className="flex shrink-0 items-center gap-1.5"
       data-testid="reading-version-actions"
     >
       {mode.editing ? (
@@ -203,29 +203,30 @@ export function ReconstructionReader({
       ) : (
         <>
           <div
-            className="flex items-center gap-0.5"
+            className="flex items-center gap-0.5 rounded-lg border border-border/60 bg-muted/40 p-0.5"
             role="group"
             aria-label={t("themedReading.readerVersion", "阅读版本")}
           >
             <button
-              className={`${readerButton} ${!mode.active ? "bg-muted font-medium !text-foreground" : ""}`}
+              className={`${readerButton} !h-7 ${!mode.active ? "bg-background font-medium !text-foreground shadow-sm" : ""}`}
               aria-pressed={!mode.active}
               onClick={() => switchMode(false)}
             >
               {t("themedReading.readerOriginal", "原文")}
             </button>
             <button
-              className={`${readerButton} ${mode.active ? "bg-muted font-medium !text-foreground" : ""}`}
+              className={`${readerButton} !h-7 ${mode.active ? "bg-background font-medium !text-foreground shadow-sm" : ""}`}
               aria-pressed={mode.active}
               onClick={() => switchMode(true)}
             >
               {t("themedReading.readerAi", "AI 阅读")}
             </button>
           </div>
+          <span aria-hidden="true" className="mx-1 h-4 w-px bg-border/70" />
           {!mode.active ? (
             <button
               data-snapshot-toc-trigger
-              className={readerButton}
+              className={`${readerButton} ${catalogOpen ? "bg-muted !text-foreground" : ""}`}
               aria-expanded={catalogOpen}
               onClick={() => changeCatalog(!catalogOpen)}
             >

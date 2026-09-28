@@ -59,6 +59,7 @@ export interface ImportConnectorContext {
   captureWebpage?: (url: string, signal?: AbortSignal) => Promise<ExtractedContent | null>;
   webFallbackReason?: () => string | undefined;
   captureStrategy?: ImportCaptureStrategy;
+  fetchNodeseek?: (topicId: string, signal?: AbortSignal) => Promise<import("./forum-types").ForumThread>;
   fetchAuthenticatedDouyin?: (
     url: string,
     signal?: AbortSignal,
@@ -286,6 +287,7 @@ export async function extractContent(
           {
             onStage: context?.onStage,
             fetchAuthenticatedJson: context?.fetchAuthenticatedLinuxdoJson,
+            fetchNodeseek: context?.fetchNodeseek,
           },
           signal,
         );

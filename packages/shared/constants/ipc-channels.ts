@@ -341,6 +341,7 @@ export const IPC_CHANNELS = {
   // Data path
   DATA_PREVIEW_RECOVERY: "data:previewRecovery",
   WEB_STATUS: "web:status",
+  WEB_SOLVER_CHECK: "web:solverCheck",
   WEB_REPAIR: "web:repair",
   CRAWL_CREATE: "crawl:create",
   CRAWL_LIST: "crawl:list",

@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from urllib.parse import urlsplit
 from lxml import html as lhtml
+from article_cleanup import article_root, clean_article
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
@@ -24,8 +25,7 @@ def extract(html, url, status):
             pass
     # 只有显式正文区域存在时才去除页面级导航；保留正文内目录、表格与代码。
     wechat = tree.xpath('//*[@id="js_content"]') if urlsplit(url).hostname == "mp.weixin.qq.com" else []
-    regions = wechat or tree.xpath("//main | //article | //*[@role='main']")
-    root = regions[0] if len(regions) == 1 else tree
+    root = wechat[0] if wechat else clean_article(article_root(tree))
     if wechat:
         title = " ".join(tree.xpath('//*[@id="activity-name"]//text()') or tree.xpath('//meta[@property="og:title"]/@content')).strip()[:300] or title
         # 公众号正文初始隐藏，图片由脚本填充；明确正文区域不依赖脚本执行成功。

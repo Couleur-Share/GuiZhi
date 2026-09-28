@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import type { Settings } from "@guizhi/shared/types";
 import type { AIProtocol } from "@guizhi/shared/types";
 import { normalizeNetworkProxySettings } from "@guizhi/shared/utils/network-proxy";
+import { normalizeFlareSolverrSettings } from "@guizhi/shared/utils/flaresolverr";
 import { createAISettingsActions } from "./settings/settings-ai-actions";
 import {
   attachProviderIdsToAIModels,
@@ -196,6 +197,7 @@ export async function loadSettingsFromMainProcess(): Promise<void> {
       aiSettings.modelRouteDefaults ?? state.modelRouteDefaults,
     ),
     networkProxy,
+    flareSolverr: normalizeFlareSolverrSettings(settings.flareSolverr),
   });
 
   if (typeof settings.launchAtStartup !== "boolean")

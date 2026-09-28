@@ -13,6 +13,7 @@ export const LOGIN_COOKIE_NAMES: Record<
     "sid_ucp_virtual",
   ],
   linuxdo: ["_t"],
+  nodeseek: [], // 验证成功以实际帖子正文为准，不以 Cookie 存在代替。
 };
 
 export const LOGIN_FLOW_DOMAINS: Record<
@@ -22,6 +23,7 @@ export const LOGIN_FLOW_DOMAINS: Record<
   xiaohongshu: ["xiaohongshu.com"],
   // 消费端搜索页的验证码 iframe；与创作者中心登录使用不同的验证入口。
   douyin: ["douyin.com", "iesdouyin.com", "zijieapi.com", "snssdk.com", "rmc.bytedance.com"],
+  nodeseek: ["nodeseek.com", "challenges.cloudflare.com"],
   linuxdo: [
     "linux.do",
     "cloudflare.com",
@@ -36,6 +38,7 @@ export const RESOURCE_DOMAINS: Record<
   readonly string[]
 > = {
   xiaohongshu: ["xhscdn.com", "xhsimg.com"],
+  nodeseek: ["nodeseek.com", "challenges.cloudflare.com"],
   douyin: [
     // 只放行页面运行必需的字节官方资源域；遥测域刻意不在白名单内。
     "douyinstatic.com",

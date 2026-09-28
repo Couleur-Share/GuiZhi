@@ -25,7 +25,7 @@ export interface WebNetworkResponse {
   body: string;
 }
 
-async function proxyAgent(url: URL): Promise<http.Agent | undefined> {
+export async function proxyAgent(url: URL): Promise<http.Agent | undefined> {
   if (getActiveNetworkProxySettings().mode !== "system")
     return getHttpRequestAgent(url) as http.Agent | undefined;
   const { session } = await import("electron");

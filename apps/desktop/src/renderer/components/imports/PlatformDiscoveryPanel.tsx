@@ -50,6 +50,7 @@ const PLATFORM_NAMES: Record<PlatformCapturePlatform, string> = {
   xiaohongshu: "小红书",
   douyin: "抖音",
   linuxdo: "LINUX DO",
+  nodeseek: "NodeSeek",
 };
 
 export function updateDiscoverySelection(

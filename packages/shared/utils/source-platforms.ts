@@ -26,6 +26,7 @@ export const SOURCE_PLATFORMS = [
   "v2ex",
   "nga",
   "linuxdo",
+  "nodeseek",
   "appinn",
   "twolibra",
   "wechat",

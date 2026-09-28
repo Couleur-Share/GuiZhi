@@ -58,6 +58,15 @@ export function MobileCapturePairing({
 
   return (
     <section className="app-settings-card overflow-hidden">
+      {success && (
+        <p
+          role="status"
+          className="flex items-center gap-2 border-b border-primary/20 bg-primary/5 p-5 text-sm text-primary"
+        >
+          <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
+          {success}
+        </p>
+      )}
       {pending.length > 0 && (
         <div className="space-y-3 border-b border-primary/20 bg-primary/5 p-5">
           <p role="status" className="text-sm font-medium text-primary">
@@ -211,16 +220,6 @@ export function MobileCapturePairing({
           </Button>
         </div>
       </div>
-      {success && (
-        <p
-          role="status"
-          className="flex items-center gap-2 border-t border-primary/20 bg-primary/5 p-5 text-sm text-primary"
-        >
-          <Check aria-hidden="true" className="h-4 w-4 shrink-0" />
-          {success}
-        </p>
-      )}
-
     </section>
   );
 }
