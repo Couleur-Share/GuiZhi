@@ -7,6 +7,7 @@ import { builtinModules } from "node:module";
 import { build } from "vite";
 import { _electron, type ElectronApplication } from "playwright";
 import type { WebCaptureRequest } from "@guizhi/shared/types";
+import { readingLibrariesPlugin } from "../../scripts/reading-libraries-plugin.mjs";
 import type { fixture } from "./fixtures/web-runtime-main";
 
 declare global {
@@ -48,11 +49,17 @@ describe.skipIf(!enabled)("真实 Electron 与随包 Python 的离线受控流�
     await build({
       configFile: false,
       logLevel: "warn",
+      // 夹具会打包真实主进程依赖，需与正式主进程使用同一阅读资源插件。
+      plugins: [readingLibrariesPlugin()],
       resolve: {
         alias: [
           {
             find: /^\.\/web-network$/,
             replacement: path.join(fixtures, "web-runtime-network.ts"),
+          },
+          {
+            find: /^\.\/flaresolverr$/,
+            replacement: path.join(fixtures, "web-runtime-flaresolverr.ts"),
           },
           {
             find: "@guizhi/shared",

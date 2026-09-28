@@ -1,8 +1,21 @@
 import { webPause } from "../../../src/main/services/web-capture/web-task-gate";
-import type { webNetworkRequest as productionRequest } from "../../../src/main/services/web-capture/web-network";
+import type {
+  webNetworkRequest as productionRequest,
+  webTextRequest as productionTextRequest,
+  proxyAgent as productionProxyAgent,
+} from "../../../src/main/services/web-capture/web-network";
 
 // 所有网络响应由固定夹具提供，不访问真实网站。
 export const calls: string[] = [];
+// 临时 Vite 构建会把同目录导入统一指向此夹具，需保留真实模块的导出形状。
+export const WEB_RESPONSE_LIMIT = 10 * 1024 * 1024;
+// 验证分支不会在本用例执行；若意外进入，不允许触网。
+export const proxyAgent: typeof productionProxyAgent = async () => {
+  throw new Error("离线采集夹具禁止访问真实代理");
+};
+export const webTextRequest: typeof productionTextRequest = async () => {
+  throw new Error("离线采集夹具禁止访问真实网站");
+};
 export const webNetworkRequest: typeof productionRequest = async (
   request,
   signal,
