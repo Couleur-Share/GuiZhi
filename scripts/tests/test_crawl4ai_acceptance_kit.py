@@ -10,6 +10,19 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+KIT = ROOT / "scripts/crawl4ai-acceptance"
+
+
+def fixture_driver(directory):
+    """Playwright driver 的最小替身：验收包只校验 node.exe 与 package/index.mjs 存在并整体复制。"""
+    (directory / "package").mkdir(parents=True, exist_ok=True)
+    (directory / "node.exe").write_bytes(b"fixture - never executed")
+    (directory / "package/index.mjs").write_text("// fixture", encoding="utf-8")
+
+
+def run_powershell(command):
+    return subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", command],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 class AcceptanceKitEncodingTest(unittest.TestCase):
@@ -17,8 +30,9 @@ class AcceptanceKitEncodingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             runtime = directory / "runtime"
-            for relative in ("site-packages/playwright/driver", "site-packages/psutil", "python", "licenses"):
+            for relative in ("site-packages/playwright/driver/package", "site-packages/psutil", "python", "licenses"):
                 (runtime / relative).mkdir(parents=True)
+            fixture_driver(runtime / "site-packages/playwright/driver")
             (runtime / "site-packages/psutil/__init__.py").write_text("# fixture", encoding="utf-8")
             (runtime / "THIRD-PARTY-NOTICES.txt").write_text("fixture", encoding="utf-8")
             installer = directory / "installer.exe"
@@ -73,6 +87,71 @@ class AcceptanceKitEncodingTest(unittest.TestCase):
                 script = memory_output / "input/memory-guest.ps1"
                 subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
                                 command.replace("__PATH__", str(script).replace("'", "''"))], check=True, capture_output=True)
+
+    def test_pruned_runtime_needs_an_explicit_driver_and_declares_the_baseline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            # 裁剪后的候选运行包：没有 site-packages/playwright/driver，但有 python 与许可证。
+            runtime = directory / "runtime"
+            for relative in ("python", "licenses"):
+                (runtime / relative).mkdir(parents=True)
+            (runtime / "THIRD-PARTY-NOTICES.txt").write_text("fixture", encoding="utf-8")
+            installer = directory / "installer.exe"
+            installer.write_bytes(b"test fixture - never executed")
+            driver = directory / "driver"
+            fixture_driver(driver)
+            command = [sys.executable, str(KIT / "build-kit.py"), "--candidate", str(installer), "--previous", str(installer),
+                       "--runtime", str(runtime), "--guest-script", "electron-guest.ps1"]
+
+            # 子进程按本机代码页写出中文错误信息；这里只核对 ASCII 的参数名，解码时容错。
+            refused = subprocess.run(command + ["--output", str(directory / "refused")], capture_output=True, text=True,
+                                     encoding="utf-8", errors="replace")
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("--driver", refused.stderr)
+            self.assertFalse((directory / "refused").exists(), "缺少 driver 时不应留下半成品验收包")
+
+            output = directory / "kit"
+            subprocess.run(command + ["--output", str(output), "--driver", str(driver),
+                                      "--previous-baseline", "electron"], check=True, capture_output=True)
+            manifest = json.loads((output / "input/manifest.json").read_text("utf-8"))
+            self.assertEqual(manifest["previousBaseline"], "electron")
+            for name in ("tools/driver/node.exe", "tools/driver/package/index.mjs", "runtime-tree.ps1"):
+                self.assertIn(name, manifest["files"])
+
+            legacy = directory / "legacy"
+            subprocess.run(command + ["--output", str(legacy), "--driver", str(driver)], check=True, capture_output=True)
+            self.assertEqual(json.loads((legacy / "input/manifest.json").read_text("utf-8"))["previousBaseline"],
+                             "standalone-chromium")
+
+    @unittest.skipUnless(sys.platform == "win32", "来宾脚本运行在 Windows PowerShell 5.1")
+    def test_runtime_tree_matches_manifest_exactly(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = Path(temporary) / "crawl4ai"
+            (runtime / "site-packages/pkg").mkdir(parents=True)
+            (runtime / "site-packages/pkg/a.py").write_text("a", encoding="utf-8")
+            (runtime / "python.exe").write_text("p", encoding="utf-8")
+            (runtime / "manifest.json").write_text(json.dumps(
+                {"files": {"site-packages/pkg/a.py": "0" * 64, "python.exe": "1" * 64}}), encoding="utf-8")
+            script = str(KIT / "runtime-tree.ps1").replace("'", "''")
+            check = lambda: run_powershell(f". '{script}'; Assert-RuntimeTree '{str(runtime).replace(chr(39), chr(39) * 2)}'")
+
+            passed = check()
+            self.assertEqual(passed.returncode, 0, passed.stderr)
+            self.assertEqual(passed.stdout.strip(), "2")
+
+            # 覆盖安装残留了旧版依赖（清单里没有的文件）：必须失败并指出文件。
+            (runtime / "site-packages/pkg/stale.py").write_text("stale", encoding="utf-8")
+            stale = check()
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("unregistered", stale.stderr)
+            self.assertIn("site-packages/pkg/stale.py", stale.stderr)
+            (runtime / "site-packages/pkg/stale.py").unlink()
+
+            # 清单里登记了但安装后缺失的文件同样必须失败。
+            (runtime / "python.exe").unlink()
+            missing = check()
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("manifest lists", missing.stderr)
 
     def check_launcher_proxy(self, launcher):
         # 模拟启动失败，验证代理既不传给沙盒，也不会被永久清除。

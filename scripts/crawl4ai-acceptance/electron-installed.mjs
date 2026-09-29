@@ -88,7 +88,9 @@ export default async function ({ win, app, outDir, shot }) {
       const result = await win.evaluate((id) => window.api.webCapture.versions(id), completed.resultItemId);
       assert.equal(result.ok, true, result.error);
       const { versions, content } = result.data;
-      assert.equal(versions[0].engineVersion, phase === "previous" ? "crawl4ai/0.9.3" : `crawl4ai/0.9.3-${mode === "static" ? "static" : "electron"}`);
+      // 上一版基线由验收包声明：带独立 Chromium 的版本引擎标识没有渲染器后缀，已发布的 Electron 版本带 -electron。
+      const previousEngine = process.env.GUIZHI_INSTALLED_PREVIOUS_BASELINE === "electron" ? "crawl4ai/0.9.3-electron" : "crawl4ai/0.9.3";
+      assert.equal(versions[0].engineVersion, phase === "previous" ? previousEngine : `crawl4ai/0.9.3-${mode === "static" ? "static" : "electron"}`);
       assert.ok(content.includes(mode === "static" ? "静态正文已就绪" : "动态正文已加载"));
       assert.ok(content.includes('print("归知")'));
       captures.push({ mode, itemId: completed.resultItemId, versions, content });

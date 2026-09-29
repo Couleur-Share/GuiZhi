@@ -18,6 +18,10 @@ if __name__ == "__main__":
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--runtime", type=Path, required=True)
+    parser.add_argument("--driver", type=Path, help="含 node.exe 与 package/index.mjs 的 Playwright driver 目录，默认取 <runtime>/site-packages/playwright/driver。"
+                        "裁剪后的运行包不再携带它，需要指向历史运行包或 Playwright 发行包里的 driver 目录")
+    parser.add_argument("--previous-baseline", choices=["standalone-chromium", "electron"], default="standalone-chromium",
+                        help="上一版安装包的采集基线：带独立 Chromium 的 0.24.x 用默认值，已发布的 Electron 渲染版本用 electron")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--guest-script", choices=["guest.ps1", "electron-guest.ps1", "memory-guest.ps1"], default="guest.ps1")
     parser.add_argument("--candidate-version", default="0.24.0")
@@ -25,6 +29,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     root = args.output.resolve()
     assert not root.exists(), "验收包输出已存在，请使用新目录保留历史结果"
+    driver = args.driver or args.runtime / "site-packages/playwright/driver"
+    if not ((driver / "node.exe").is_file() and (driver / "package/index.mjs").is_file()):
+        # 在创建任何输出之前失败，不留下半成品验收包。
+        raise SystemExit(f"找不到 Playwright driver（需要 node.exe 与 package/index.mjs）：{driver}\n"
+                         "裁剪后的运行包不再携带它，请用 --driver 指向历史运行包或 Playwright 发行包里的 driver 目录")
     source = Path(__file__).resolve().parent
     inputs, outputs = root / "input", root / "output"
     inputs.mkdir(parents=True)
@@ -42,7 +51,7 @@ if __name__ == "__main__":
             else:
                 shutil.copyfile(file, inputs / file.name)
     shutil.copyfile(source.parent.parent / "apps/desktop/scripts/screenshot.mjs", inputs / "screenshot.mjs")
-    shutil.copytree(args.runtime / "site-packages/playwright/driver", inputs / "tools/driver")
+    shutil.copytree(driver, inputs / "tools/driver")
     shutil.copytree(args.runtime / "python", inputs / "tools/python")
     if args.guest_script == "memory-guest.ps1":
         shutil.copytree(args.runtime / "site-packages/psutil", inputs / "tools/metrics/psutil",
@@ -50,7 +59,7 @@ if __name__ == "__main__":
     shutil.copytree(args.runtime / "licenses", inputs / "licenses")
     shutil.copyfile(args.runtime / "THIRD-PARTY-NOTICES.txt", inputs / "THIRD-PARTY-NOTICES.txt")
     manifest = {"buildHost": os.environ.get("COMPUTERNAME"), "files": {p.relative_to(inputs).as_posix(): digest(p) for p in sorted(inputs.rglob("*")) if p.is_file()}}
-    manifest.update(candidateVersion=args.candidate_version, previousVersion=args.previous_version)
+    manifest.update(candidateVersion=args.candidate_version, previousVersion=args.previous_version, previousBaseline=args.previous_baseline)
     (inputs / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     # 转移到另一台主机后，可直接运行同目录 launch.ps1 重新生成绝对路径映射。
     launcher = '''$ErrorActionPreference = 'Stop'

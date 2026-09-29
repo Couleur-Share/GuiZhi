@@ -38,6 +38,8 @@ python scripts/crawl4ai-acceptance/build-kit.py `
   --runtime <候选resources/crawl4ai> --output <全新验收包目录>
 ```
 
+裁剪后的运行包不再携带 `site-packages/playwright/driver`，构建验收包时用 `--driver <含 node.exe 与 package/index.mjs 的目录>` 指向历史运行包或 Playwright 发行包里的 driver；找不到时构建器在写出任何文件之前失败。上一版是已发布的 Electron 渲染版本（0.25 及以后）时加 `--previous-baseline electron`；默认值 `standalone-chromium` 对应带独立 Chromium 的 0.24.x，来宾会核对旧安装包与声明一致。每次安装后来宾还会逐文件对照安装目录与 `manifest.json`（`runtime-tree.ps1`），清单外的残留或缺失都会失败——应用启动提取进程前的完整性校验会拒绝这样的目录，覆盖安装若留下旧版依赖就会让采集不可用。
+
 本机复测使用 `corepack pnpm shot --executable <包内GuiZhi.exe> --steps <步骤脚本> --out <输出目录> --keep-profile`；升级/恢复追加 `--data-db <已关闭的数据库副本>`。
 
 ## 补丁前状态（历史记录）

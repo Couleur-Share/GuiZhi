@@ -22,6 +22,7 @@ try {
   $nodePath = Join-Path $inputPath 'tools\driver\node.exe'
   $env:GUIZHI_SHOT_PLAYWRIGHT = Join-Path $inputPath 'tools\driver\package\index.mjs'
   $env:PYTHONDONTWRITEBYTECODE = '1'
+  . (Join-Path $inputPath 'runtime-tree.ps1')
   function Install-App([string]$Name) {
     Write-Host "Installing $Name"
     $p = Start-Process -FilePath (Join-Path $inputPath $Name) -ArgumentList @('/S', '/currentuser', "/D=$installPath") -WindowStyle Hidden -PassThru
@@ -59,9 +60,15 @@ try {
     $value = Get-Content -LiteralPath (Join-Path $runtime 'manifest.json') -Raw | ConvertFrom-Json
     if ($value.renderer -ne 'electron' -or $value.browser -or (Test-Path -LiteralPath (Join-Path $runtime 'browser'))) { throw 'Standalone Chromium remains after installation.' }
     if (!$value.workerHashes.'extract-only.py') { throw 'Extractor missing from installed manifest.' }
+    # 覆盖安装不得残留旧版文件，否则应用的完整性校验会拒绝启动提取进程。
+    $script:runtimeFiles = Assert-RuntimeTree $runtime
   }
   Install-App 'previous.exe'
-  if (!(Test-Path -LiteralPath (Join-Path $installPath 'resources\crawl4ai\browser'))) { throw 'Previous installer is not the standalone Chromium baseline.' }
+  # 上一版基线由验收包声明：旧包默认是带独立 Chromium 的 0.24.x；已发布的 Electron 渲染版本声明为 electron。
+  $previousBaseline = if ($manifest.previousBaseline) { $manifest.previousBaseline } else { 'standalone-chromium' }
+  $previousHasChromium = Test-Path -LiteralPath (Join-Path $installPath 'resources\crawl4ai\browser')
+  if ($previousHasChromium -ne ($previousBaseline -eq 'standalone-chromium')) { throw "Previous installer does not match the declared baseline: $previousBaseline" }
+  $env:GUIZHI_INSTALLED_PREVIOUS_BASELINE = $previousBaseline
   Invoke-Phase 'previous'
   $profile = Get-Content -LiteralPath (Join-Path $runPath 'previous\profile.json') -Raw | ConvertFrom-Json
   $dbPath = [IO.Path]::GetFullPath((Join-Path $profile.userDataDir 'data\knowledge.db'))
@@ -85,7 +92,7 @@ try {
   Install-App 'candidate.exe'
   Assert-ElectronRuntime
   Invoke-Phase 'clean'
-  @{ passed=$true; source='windows-sandbox'; previousVersion=$manifest.previousVersion; candidateVersion=$manifest.candidateVersion; upgradeKind=$(if ($manifest.previousVersion -eq $manifest.candidateVersion) { 'same-version replacement' } else { 'version upgrade' }); oldDataPreserved=$true; oldWebVersionsPreserved=$true; standaloneChromiumRemoved=$true; cleanInstall=$true; staticCapture=$true; dynamicCapture=$true; idleCleanup=$true; normalExit=$true; previousDatabaseSha256=$dbHash } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
+  @{ passed=$true; source='windows-sandbox'; previousVersion=$manifest.previousVersion; candidateVersion=$manifest.candidateVersion; upgradeKind=$(if ($manifest.previousVersion -eq $manifest.candidateVersion) { 'same-version replacement' } else { 'version upgrade' }); oldDataPreserved=$true; oldWebVersionsPreserved=$true; previousBaseline=$previousBaseline; previousHadStandaloneChromium=$previousHasChromium; standaloneChromiumRemoved=$(if ($previousHasChromium) { $true } else { 'not-applicable' }); runtimeTreeMatchesManifest=$true; runtimeFiles=$runtimeFiles; cleanInstall=$true; staticCapture=$true; dynamicCapture=$true; idleCleanup=$true; normalExit=$true; previousDatabaseSha256=$dbHash } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
 } catch {
   @{ passed=$false; error=$_.Exception.Message } | ConvertTo-Json | Set-Content (Join-Path $runPath 'result.json') -Encoding UTF8
   throw
