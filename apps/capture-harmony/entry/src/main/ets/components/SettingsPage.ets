@@ -1,6 +1,7 @@
 import { AppPreferences } from '../services/AppPreferences';
 import { ThemePalette } from '../services/ThemePalette';
 import { animationSpeedLabel, pressFeedback, revealTransition } from '../services/InterfaceMotion';
+import { appVersionLabel } from '../services/AppVersion';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingChoiceRow, SettingSwitchRow, SettingsRouteRow } from './SettingsRows';
 
@@ -11,6 +12,8 @@ export struct SettingsPage {
   @Prop busy: boolean = false;
   @Prop holdingMessage: string = '等待握持识别';
   @State routes: NavPathStack = new NavPathStack();
+  // 版本号只在进入设置时读取一次，来自安装包本身。
+  private version: string = appVersionLabel();
   onRetryHolding: () => void = () => {};
   onChange: (settings: AppPreferences) => void = () => {};
   onReset: () => void = () => {};
@@ -90,7 +93,7 @@ export struct SettingsPage {
             Column({ space: 12 }) {
               Image($r('app.media.app_icon')).width(64).height(64).borderRadius(16)
               Text('归知收集').fontSize(22).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-              Text('0.3.0 · 邀请测试').fontSize(13).fontColor($r('app.color.text_secondary'))
+              Text(`${this.version} · 邀请测试`).fontSize(13).fontColor($r('app.color.text_secondary'))
               Text('先收集，再整理。').fontSize(14).fontColor($r('app.color.text_secondary'))
             }.width('100%').padding(28).backgroundColor($r('app.color.surface')).borderRadius(20)
             Button('恢复默认设置', { type: ButtonType.Normal }).height(56).width('100%').fontSize(15)

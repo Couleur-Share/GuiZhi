@@ -45,6 +45,22 @@
       "value": "#B42318"
     },
     {
+      "name": "warning",
+      "value": "#8A5100"
+    },
+    {
+      "name": "warning_soft",
+      "value": "#FFF1DA"
+    },
+    {
+      "name": "success",
+      "value": "#146C2E"
+    },
+    {
+      "name": "success_soft",
+      "value": "#E6F4EA"
+    },
+    {
       "name": "purple_accent",
       "value": "#7043B5"
     },

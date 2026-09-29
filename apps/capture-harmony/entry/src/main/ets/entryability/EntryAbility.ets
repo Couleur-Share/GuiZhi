@@ -4,6 +4,7 @@ import { systemShare } from '@kit.ShareKit';
 import { util } from '@kit.ArkTS';
 import { CaptureRuntime } from '../services/CaptureRuntime';
 import { WindowAppearance } from '../services/WindowAppearance';
+import { ShareRecordView, pickShareText, shareSavedNotice, shareFailureMessage } from '../core/ShareRecords';
 
 export default class EntryAbility extends UIAbility {
   private appearance: WindowAppearance = new WindowAppearance();
@@ -37,28 +38,24 @@ export default class EntryAbility extends UIAbility {
 
   private receive(want: Want): void {
     if (want.action !== 'ohos.want.action.sendData') return;
-    this.saveShare(want).catch(() => {
-      AppStorage.setOrCreate('captureError', '本次分享未保存。请保留原内容，打开归知后重试，或复制文字到输入框。');
+    this.saveShare(want).catch((error: Error) => {
+      AppStorage.setOrCreate('captureError', shareFailureMessage(error));
     });
   }
 
   private async saveShare(want: Want): Promise<void> {
     const data = await systemShare.getSharedData(want);
-    const records = data.getRecords();
-    const parts: string[] = [];
-    for (let i = 0; i < records.length; i++) {
-      const record = records[i];
-      if (record.utd !== 'general.hyperlink' && record.utd !== 'general.plain-text' && record.utd !== 'general.text') {
-        throw new Error('暂不支持图片或文件分享，请分享链接或文字');
-      }
-      if (typeof record.content !== 'string' || !record.content.trim()) throw new Error('分享缺少文字内容');
-      parts.push(record.content); // 原样保存，不抽取或归一化 URL 参数。
+    const shared = data.getRecords();
+    const records: ShareRecordView[] = [];
+    for (let i = 0; i < shared.length; i++) {
+      const record = shared[i];
+      records.push(new ShareRecordView(record.utd, typeof record.content === 'string' ? record.content : ''));
     }
-    if (parts.length === 0) throw new Error('分享内容为空');
+    const selection = pickShareText(records);
     const runtime = await CaptureRuntime.open(this.context);
-    await runtime.queue.receive(util.generateRandomUUID(true), parts.join('\n'));
+    await runtime.queue.receive(util.generateRandomUUID(true), selection.text);
     AppStorage.setOrCreate('captureError', '');
     AppStorage.setOrCreate('captureRevision', (AppStorage.get<number>('captureRevision') ?? 0) + 1);
-    AppStorage.setOrCreate('captureNotice', '分享已保存到本机草稿，确认后发送');
+    AppStorage.setOrCreate('captureNotice', shareSavedNotice(selection.ignored));
   }
 }

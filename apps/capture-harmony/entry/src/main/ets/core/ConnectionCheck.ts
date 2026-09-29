@@ -1,7 +1,12 @@
 // 仅重试读取状态，不自动重发配对或投递；限流期间手动检查也遵守冷却。
 export class RelayRequestError extends Error {
   status: number;
-  constructor(message: string, status: number = 0) { super(message); this.status = status; }
+  // 服务端错误码（如 daily_limit）或本地分类码（network / local_rate_limit）；未知时为空串。
+  // 发送失败后据此判断“内容是否可能已被中转保存”，见 SendOutcome。
+  code: string;
+  constructor(message: string, status: number = 0, code: string = '') {
+    super(message); this.status = status; this.code = code;
+  }
 }
 
 export class ConnectionCheck {

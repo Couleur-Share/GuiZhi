@@ -9,6 +9,9 @@ export class Draft extends Submission {
   attempted: boolean = false;
   binding: string = '';
   createdAt: number = 0;
+  // 最近一次发送失败的原因与时间；重新发送成功（草稿被移除）或改为可编辑时不再保留。
+  lastError: string = '';
+  lastErrorAt: number = 0;
 }
 export class LocalState {
   version: number = 1;
@@ -74,22 +77,57 @@ export function validateInput(input: string): void {
   if (bytes > 32768) throw new Error('内容超过 32 KiB，请拆分后保存');
 }
 
+// 电脑端逐项处理结果的统计。
+export class ProgressTally {
+  completed: number = 0;
+  failed: number = 0;
+  duplicate: number = 0;
+  canceled: number = 0;
+  get finished(): number { return this.completed + this.failed + this.duplicate + this.canceled; }
+}
+
+export function tallyProgress(receipt: Receipt): ProgressTally {
+  const tally = new ProgressTally();
+  if (!receipt.progress) return tally;
+  const items = receipt.progress.items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].status === 'completed') tally.completed++;
+    else if (items[i].status === 'failed') tally.failed++;
+    else if (items[i].status === 'duplicate') tally.duplicate++;
+    else if (items[i].status === 'canceled') tally.canceled++;
+  }
+  return tally;
+}
+
 export function receiptLabel(receipt: Receipt): string {
   if (receipt.state === 'expired') return '已过期';
   if (!receipt.progress || receipt.progress.items.length === 0) {
     return receipt.state === 'received' ? '电脑已接收，等待处理' : '中转已接收，等待电脑';
   }
-  const items = receipt.progress.items;
-  let completed = 0, failed = 0, duplicate = 0, canceled = 0;
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].status === 'completed') completed++;
-    if (items[i].status === 'failed') failed++;
-    if (items[i].status === 'duplicate') duplicate++;
-    if (items[i].status === 'canceled') canceled++;
+  const tally = tallyProgress(receipt);
+  // 只列出非零的计数，避免“重复 0 · 取消 0”这类噪声。
+  const parts: string[] = [];
+  if (tally.completed > 0) parts.push(`成功 ${tally.completed}`);
+  if (tally.failed > 0) parts.push(`失败 ${tally.failed}`);
+  if (tally.duplicate > 0) parts.push(`重复 ${tally.duplicate}`);
+  if (tally.canceled > 0) parts.push(`取消 ${tally.canceled}`);
+  const summary = parts.join(' · ');
+  if (tally.finished < receipt.itemCount) {
+    return summary ? `电脑处理中（${tally.finished}/${receipt.itemCount}） · ${summary}` : `电脑处理中（0/${receipt.itemCount}）`;
   }
-  const finished = completed + failed + duplicate + canceled;
-  const summary = `成功 ${completed} · 失败 ${failed} · 重复 ${duplicate} · 取消 ${canceled}`;
-  return finished < receipt.itemCount ? `电脑处理中（${finished}/${receipt.itemCount}） · ${summary}` : summary;
+  return summary ? summary : '电脑已处理';
+}
+
+// 记录状态的语义色调：界面据此选择 success / warning / error 色，颜色本身不承载唯一信息（文案仍完整）。
+export type ReceiptTone = 'success' | 'warning' | 'error' | 'neutral';
+
+export function receiptTone(receipt: Receipt): ReceiptTone {
+  if (receipt.state === 'expired') return 'warning';
+  if (!receipt.progress || receipt.progress.items.length === 0) return 'neutral';
+  const tally = tallyProgress(receipt);
+  if (tally.finished < receipt.itemCount) return 'neutral';
+  if (tally.failed > 0) return tally.completed > 0 || tally.duplicate > 0 ? 'warning' : 'error';
+  return tally.completed > 0 || tally.duplicate > 0 ? 'success' : 'neutral';
 }
 
 export function apiErrorMessage(code: string): string {
@@ -103,6 +141,17 @@ export function apiErrorMessage(code: string): string {
     case 'request_conflict': return '请求内容冲突，原草稿已保留，请先核对近期记录';
     case 'protocol_mismatch': return '客户端与中转服务版本不兼容';
     case 'invalid_name': return '设备名称应为 1–60 个字符';
+    case 'empty_input': return '内容为空，请输入链接或文字';
+    case 'invalid_input': return '内容格式不正确，请检查后重试';
+    case 'input_too_large': return '内容超过 32 KiB，请拆分后保存';
+    case 'no_links': return '没有识别到链接。请切换到「文字」模式保存，或粘贴以 http:// 或 https:// 开头的链接';
+    case 'too_many_links': return '一次最多收集 20 个链接，请拆分后保存';
+    case 'forbidden': return '此设备没有权限执行该操作，请在电脑上检查设备状态';
+    case 'json_required': return '请求格式异常，请更新应用后重试';
+    case 'invalid_cursor': return '记录游标无效，请下拉刷新后重试';
+    case 'invalid_credential': return '连接凭证无效，请解除配对后重新配对';
+    case 'invalid_id': return '请求编号格式无效，请重新保存后再试';
+    case 'device_limit': return '已绑定设备达到 50 台上限，请在电脑撤销不用的设备后再配对';
     default: return '服务暂时无法完成请求，草稿已保留';
   }
 }

@@ -15,6 +15,7 @@ import { animateInterface, revealTransition, pressFeedback, motionDuration } fro
 import { HoldingHandObserver, HoldingHandState } from '../services/HoldingHandObserver';
 import { CaptureRuntime } from '../services/CaptureRuntime';
 import { ConnectionCheck, RelayRequestError } from '../core/ConnectionCheck';
+import { EditorAutosave } from '../core/EditorAutosave';
 import { Draft, CaptureMode, Receipt, PairingLink, parsePairingLink } from '../core/Protocol';
 
 @Entry
@@ -57,7 +58,13 @@ struct Index {
     this.animate(() => { this.holdingSide = state.side; this.holdingMessage = state.message; });
   });
   private settingsStore: AppPreferencesStore | undefined;
-  private editRevision: number = 0;
+  // 输入框内容的防抖落盘；runtime 在初始化完成后才存在，写入函数按需读取。
+  private autosave: EditorAutosave = new EditorAutosave(
+    (text: string, mode: CaptureMode): Promise<void> => this.runtime ? this.runtime.queue.edit(text, mode) : Promise.resolve(),
+    (action: () => void, delay: number): number => setTimeout(action, delay),
+    (id: number): void => { clearTimeout(id); },
+    (saving: boolean, error: string): void => { this.editorSaving = saving; this.editorError = error; }
+  );
   @StorageLink('captureSafeTop') safeTop: number = 0;
   @StorageLink('captureSafeBottom') safeBottom: number = 0;
   @StorageLink('captureSafeLeft') safeLeft: number = 0;
@@ -78,9 +85,15 @@ struct Index {
     this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
     this.initialize();
   }
-  aboutToDisappear(): void { this.visible = false; this.stopPolling(); this.holdingObserver.stop(); }
+  aboutToDisappear(): void {
+    this.visible = false; this.stopPolling(); this.holdingObserver.stop();
+    this.autosave.flush().catch(() => {});
+  }
   onPageShow(): void { this.visible = true; this.startPolling(); this.syncHolding(); }
-  onPageHide(): void { this.visible = false; this.stopPolling(); this.holdingObserver.stop(); }
+  onPageHide(): void {
+    this.visible = false; this.stopPolling(); this.holdingObserver.stop();
+    this.autosave.flush().catch(() => {});
+  }
 
   private animate(change: () => void): void {
     animateInterface(this.getUIContext(), this.settings, change);
@@ -103,7 +116,10 @@ struct Index {
 
   private foregroundChanged(): void {
     this.syncHolding();
-    if (this.foreground) this.startPolling(); else this.stopPolling();
+    if (this.foreground) { this.startPolling(); return; }
+    this.stopPolling();
+    // 进入后台前立即落盘：防抖计时器可能随进程被系统挂起而永远不触发。失败原因已在编辑面板显示。
+    this.autosave.flush().catch(() => {});
   }
 
   private async initialize(): Promise<void> {
@@ -220,25 +236,24 @@ struct Index {
     this.error = ''; this.showEditor = true;
   }
 
+  // 输入变化时只登记；连续输入停顿约 400ms 后合并成一次落盘。
   private persistEditor(): void {
-    const runtime = this.runtime;
-    if (!runtime) return;
-    const revision = ++this.editRevision;
-    this.editorSaving = true; this.editorError = '';
-    runtime.queue.edit(this.input, this.mode).then(() => {
-      if (revision === this.editRevision) this.editorSaving = false;
-    }).catch(() => {
-      if (revision === this.editRevision) {
-        this.editorSaving = false; this.editorError = '自动保存失败，请保留输入内容并点击保存重试';
-      }
-    });
+    if (!this.runtime) return;
+    this.autosave.schedule(this.input, this.mode);
+  }
+
+  // 立即以输入框当前内容落盘并等待完成，失败则抛出。
+  // 关闭、保存、编辑草稿前必须调用：既写出待落盘输入，也避免过期计时器之后覆盖新的编辑内容。
+  private async flushEditor(): Promise<void> {
+    this.autosave.schedule(this.input, this.mode);
+    await this.autosave.flush();
   }
 
   private closeEditor(): void {
     if (this.busy) return;
     // 明确落盘后才收起；失败时编辑面板保留，错误在面板内可见。
     this.act(async () => {
-      await this.runtime?.queue.edit(this.input, this.mode);
+      await this.flushEditor();
       this.editorError = ''; this.showEditor = false;
     });
   }
@@ -246,7 +261,7 @@ struct Index {
   private async saveDraft(): Promise<void> {
     const runtime = this.runtime;
     if (!runtime) return;
-    await runtime.queue.edit(this.input, this.mode);
+    await this.flushEditor();
     await runtime.queue.enqueue(util.generateRandomUUID(true));
     this.input = ''; this.editorError = ''; this.showEditor = false;
     this.selectTab(0); this.notice = '已保存到收集箱，确认后即可发送';
@@ -275,7 +290,7 @@ struct Index {
 
   private async editDraft(draft: Draft): Promise<void> {
     if (!this.runtime) return;
-    await this.runtime.queue.edit(this.input, this.mode);
+    await this.flushEditor();
     await this.runtime.queue.restoreForEdit(draft.requestId);
     const state = this.runtime.queue.snapshot(); this.input = state.editor; this.mode = state.mode;
     this.editorError = ''; this.showEditor = true; this.notice = '';
@@ -332,13 +347,18 @@ struct Index {
     this.notice = localOnly ? '本机连接已清除，请在电脑撤销原设备' : '配对已解除';
   }
 
+  // 复制到系统剪贴板；成功与失败都给出可见反馈，失败时提示改用长按复制。
+  private async copyText(text: string, done: string): Promise<void> {
+    try {
+      await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text));
+      this.notice = done;
+    } catch { this.notice = '复制失败，请长按文字复制'; }
+  }
+
   private async copyError(): Promise<void> {
     // 不经过 act：它会先清除当前错误，导致复制到空内容。
     const detail = [this.error, this.statusError, this.incomingError].filter((value: string) => value.length > 0).join('\n');
-    try {
-      await pasteboard.getSystemPasteboard().setData(pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, detail));
-      this.notice = '错误信息已复制';
-    } catch { this.notice = '复制失败，请长按错误文字复制'; }
+    await this.copyText(detail, '错误信息已复制');
   }
 
   // @test-boundary 此行之前是页面控制逻辑，Node 测试会真实执行；之后是 ArkUI Builder，只由 Hvigor 编译验证。
@@ -443,7 +463,10 @@ struct Index {
           } else if (this.historyLoaded && this.history.length === 0 && !this.statusError) {
             this.EmptyState($r('app.media.ic_history'), '还没有发送记录', '在收集箱中选一条内容，点击发送。')
           }
-          ForEach(this.history, (receipt: Receipt, index: number) => { ReceiptCard({ receipt: receipt, settings: this.settings, index: index }) }, (receipt: Receipt) => receipt.id)
+          ForEach(this.history, (receipt: Receipt, index: number) => {
+            ReceiptCard({ receipt: receipt, settings: this.settings, index: index,
+              onCopyId: () => { this.copyText(receipt.requestId, '请求编号已复制'); } })
+          }, (receipt: Receipt) => receipt.id)
           if (this.historyLoaded && this.history.length > 0) {
             Text('最近 100 条 · 采集失败可在电脑重试').fontSize(12).fontColor($r('app.color.text_tertiary'))
           }

@@ -1,4 +1,5 @@
 import { Draft, LocalState, CaptureMode, Receipt, Submission, validateInput } from './Protocol';
+import { classifySendFailure, failureDetail } from './SendOutcome';
 
 export interface StateStore { save(state: LocalState): Promise<void> }
 export interface CaptureSender { send(body: Submission): Promise<Receipt> }
@@ -46,7 +47,7 @@ export class DraftQueue {
     return this.serial(async () => {
       validateInput(input);
       const next = this.snapshot();
-      if (next.drafts.length >= 100) throw new Error('本机草稿已满，本次分享尚未保存，请先清理再分享');
+      if (next.drafts.length >= 100) throw new Error('本机草稿已满（100 条），请先发送或清理后再分享');
       const draft = new Draft(); draft.requestId = requestId; draft.input = input; draft.createdAt = Date.now();
       next.drafts.push(draft); // 分享始终另存草稿，不覆盖正在编辑的文字。
       await this.commit(next);
@@ -60,17 +61,48 @@ export class DraftQueue {
       const draft = next.drafts.find((item: Draft) => item.requestId === requestId);
       if (!draft) throw new Error('草稿不存在，请刷新');
       if (draft.attempted && draft.binding !== binding) throw new Error('此条曾发往另一台电脑，请先核对原电脑的收集记录');
+      const priorAttempted = draft.attempted;
+      const priorBinding = draft.binding;
       draft.attempted = true; draft.binding = binding;
       await this.commit(next); // 必须先持久化，再发出网络请求。
       const body: Submission = { requestId: draft.requestId, input: draft.input, mode: draft.mode };
-      const receipt = await sender.send(body);
+      let receipt: Receipt;
+      try {
+        receipt = await sender.send(body);
+      } catch (error) {
+        await this.recordFailure(requestId, error as Error, priorAttempted, priorBinding);
+        throw error as Error;
+      }
       if (receipt.requestId !== requestId || !receipt.id || !['accepted', 'received'].includes(receipt.state)) {
-        throw new Error('未收到有效的接收回执，草稿已保留');
+        const invalid = new Error('未收到有效的接收回执，草稿已保留');
+        await this.recordFailure(requestId, invalid, priorAttempted, priorBinding); // 普通 Error 归为 uncertain，保留已尝试标记。
+        throw invalid;
       }
       const acknowledged = this.snapshot();
       acknowledged.drafts = acknowledged.drafts.filter((item: Draft) => item.requestId !== requestId);
       await this.commit(acknowledged);
     });
+  }
+
+  // 发送失败后按 SendOutcome 修正“已尝试”标记并记录原因。
+  // 只有在能证明中转没有保存时才放开修改；落盘失败时保持发送前写入的已尝试状态（偏保守），不掩盖原始错误。
+  private async recordFailure(requestId: string, error: Error, priorAttempted: boolean, priorBinding: string): Promise<void> {
+    const outcome = classifySendFailure(error);
+    const next = this.snapshot();
+    const draft = next.drafts.find((item: Draft) => item.requestId === requestId);
+    if (!draft) return;
+    draft.lastError = failureDetail(error);
+    draft.lastErrorAt = Date.now();
+    if (outcome === 'rejected') {
+      draft.attempted = false; draft.binding = '';
+    } else if (outcome === 'notProcessed') {
+      draft.attempted = priorAttempted; draft.binding = priorBinding;
+    }
+    try {
+      await this.commit(next);
+    } catch (saveError) {
+      // 忽略：内存与磁盘仍是“已尝试”的保守状态，重试沿用原编号。
+    }
   }
 
   remove(requestId: string): Promise<void> {

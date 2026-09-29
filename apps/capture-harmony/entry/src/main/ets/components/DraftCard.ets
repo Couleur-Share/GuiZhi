@@ -3,16 +3,20 @@ import { animateInterface, revealTransition, pressFeedback } from '../services/I
 import { AppPreferences } from '../services/AppPreferences';
 import { panelMaterial } from '../services/ImmersiveAppearance';
 import { Draft } from '../core/Protocol';
+import { relativeTime } from '../core/RelativeTime';
 
 @Component
 export struct DraftCard {
   @Consume('capturePalette') palette: ThemePalette;
-  @Prop draft: Draft = new Draft();
+  @Prop @Watch('measureClamped') draft: Draft = new Draft();
   @Prop busy: boolean = false;
-  @Prop settings: AppPreferences = new AppPreferences();
+  @Prop @Watch('measureClamped') settings: AppPreferences = new AppPreferences();
   @Prop index: number = 0;
   @Prop connected: boolean = false;
   @State expanded: boolean = false;
+  // 折叠时文字是否被截断，决定是否显示“展开内容”；尚未测量或测量失败时保守显示按钮，避免长文无法展开。
+  @State clamped: boolean = true;
+  private textWidth: number = 0;
   onSend: () => void = () => {};
   onEdit: () => void = () => {};
   onRemove: () => void = () => {};
@@ -21,6 +25,40 @@ export struct DraftCard {
   private source(): string {
     const match = /https?:\/\/([^\s/]+)/i.exec(this.draft.input);
     return match ? match[1] : '文字笔记';
+  }
+
+  // 用同一套测量接口比较“不限行数”与“限制预览行数”的高度，只有前者更高才说明文字被截断；
+  // 两次测量单位一致，不依赖 px 与 vp 的换算。
+  private measureClamped(): void {
+    if (this.textWidth <= 0) return;
+    try {
+      const measure = this.getUIContext().getMeasureUtils();
+      const full = measure.measureTextSize({
+        textContent: this.draft.input, fontSize: 16, lineHeight: 25, constraintWidth: this.textWidth });
+      const limited = measure.measureTextSize({
+        textContent: this.draft.input, fontSize: 16, lineHeight: 25, constraintWidth: this.textWidth,
+        maxLines: this.settings.previewLines });
+      this.clamped = (full.height as number) > (limited.height as number) + 1;
+    } catch (error) {
+      this.clamped = true;
+    }
+  }
+
+  private onTextArea(area: Area): void {
+    const width = area.width as number;
+    if (Math.abs(width - this.textWidth) < 0.5) return;
+    this.textWidth = width;
+    this.measureClamped();
+  }
+
+  private statusText(): string {
+    if (this.draft.attempted) return '待确认结果';
+    return this.draft.lastError ? '发送失败，可修改后重试' : '尚未发送';
+  }
+
+  private statusColor(): ResourceColor {
+    if (this.draft.attempted) return $r('app.color.warning');
+    return this.draft.lastError ? $r('app.color.error') : $r('app.color.text_secondary');
   }
 
   build() {
@@ -44,21 +82,31 @@ export struct DraftCard {
       if (this.expanded) {
         Text(this.draft.input).fontSize(16).lineHeight(25).fontColor($r('app.color.text_primary'))
           .width('100%').copyOption(CopyOptions.LocalDevice)
+          .onAreaChange((_previous: Area, area: Area) => { this.onTextArea(area); })
           .transition(revealTransition(this.settings))
       } else {
         Text(this.draft.input).fontSize(16).lineHeight(25).fontColor($r('app.color.text_primary'))
           .width('100%').maxLines(this.settings.previewLines).textOverflow({ overflow: TextOverflow.Ellipsis })
-          .copyOption(CopyOptions.LocalDevice).transition(revealTransition(this.settings))
+          .copyOption(CopyOptions.LocalDevice)
+          .onAreaChange((_previous: Area, area: Area) => { this.onTextArea(area); })
+          .transition(revealTransition(this.settings))
       }
-      Button(this.expanded ? '收起内容' : '展开内容').height(44).clickEffect(pressFeedback(this.settings)).fontSize(12)
-        .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary'))
-        .onClick(() => { animateInterface(this.getUIContext(), this.settings, () => { this.expanded = !this.expanded; }); })
+      if (this.clamped || this.expanded) {
+        Button(this.expanded ? '收起内容' : '展开内容').height(44).clickEffect(pressFeedback(this.settings)).fontSize(12)
+          .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary'))
+          .onClick(() => { animateInterface(this.getUIContext(), this.settings, () => { this.expanded = !this.expanded; }); })
+      }
       Divider().color($r('app.color.border_subtle'))
       Row({ space: 12 }) {
         Column({ space: 4 }) {
-          Text(this.draft.attempted ? '待确认结果' : '尚未发送').fontSize(12)
-            .fontColor(this.draft.attempted ? $r('app.color.error') : $r('app.color.text_secondary'))
-          Text(new Date(this.draft.createdAt).toLocaleString()).fontSize(11).fontColor($r('app.color.text_tertiary'))
+          Text(this.statusText()).fontSize(12).fontColor(this.statusColor())
+          if (this.draft.lastError) {
+            Text(`上次发送失败：${this.draft.lastError}`).fontSize(12).lineHeight(18)
+              .fontColor($r('app.color.error')).copyOption(CopyOptions.LocalDevice)
+          } else if (this.draft.attempted) {
+            Text('已发出但未收到回执，重试不会重复保存').fontSize(12).lineHeight(18).fontColor($r('app.color.text_secondary'))
+          }
+          Text(relativeTime(this.draft.createdAt, Date.now())).fontSize(11).fontColor($r('app.color.text_tertiary'))
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         Button(this.busy ? '处理中' : !this.connected ? '连接电脑' : this.draft.attempted ? '重试发送' : '发送')
           .height(44).clickEffect(pressFeedback(this.settings)).fontSize(14).padding({ left: 18, right: 18 })

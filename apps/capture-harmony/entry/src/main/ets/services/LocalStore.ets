@@ -24,6 +24,9 @@ export class LocalStore implements StateStore {
         typeof draft.attempted !== 'boolean' || !['auto', 'urls', 'text'].includes(draft.mode)) {
         throw new Error('本机草稿校验失败，已停止写入以保留原数据');
       }
+      // 0.3.0 及更早保存的草稿没有失败原因字段；缺失或类型异常时补默认值，不影响草稿本身。
+      if (typeof draft.lastError !== 'string') draft.lastError = '';
+      if (typeof draft.lastErrorAt !== 'number') draft.lastErrorAt = 0;
     }
     return state;
   }

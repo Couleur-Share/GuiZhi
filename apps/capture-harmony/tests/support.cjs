@@ -48,6 +48,7 @@ const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve()
 // 只装载一次：测试里的 RelayRequestError 必须与页面 instanceof 判断的是同一个类。
 const check = load('core/ConnectionCheck.ts');
 const { ConnectionCheck, RelayRequestError } = check;
+const editorAutosave = load('core/EditorAutosave.ts');
 
 // 页面装载：extraImports 覆盖或补充默认桩，供后续新增模块使用。
 function createPage(client, extraImports = {}) {
@@ -56,6 +57,7 @@ function createPage(client, extraImports = {}) {
     '../services/ThemePalette': load('services/ThemePalette.ets', {}, { '$r': name => name }),
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
+    '../core/EditorAutosave': editorAutosave,
     ...extraImports,
   }, time.globals, true);
   const ui = new Index();
@@ -67,4 +69,29 @@ function createPage(client, extraImports = {}) {
   return { ui, time };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError };
+// RelayClient 装载：http 由脚本编排（每次请求消耗一项），其余使用真实的 Protocol / ConnectionCheck / SendOutcome。
+// 脚本项：{ status, body } 表示服务端响应；'hang' 表示永不返回（用于触发超时）。
+function loadRelayClient(time, script) {
+  const calls = [];
+  const http = {
+    RequestMethod: { GET: 'GET', POST: 'POST', DELETE: 'DELETE' }, HttpDataType: { STRING: 0 },
+    createHttp: () => ({
+      request: (url, options) => {
+        calls.push({ url, options });
+        const step = script.shift();
+        if (step === 'hang') return new Promise(() => {});
+        if (!step) return Promise.reject(new Error('测试脚本已耗尽'));
+        return Promise.resolve({ responseCode: step.status, result: typeof step.body === 'string' ? step.body : JSON.stringify(step.body) });
+      },
+      destroy: () => {},
+    }),
+  };
+  const outcome = load('core/SendOutcome.ts', { './ConnectionCheck': check });
+  const { RelayClient } = load('services/RelayClient.ets', {
+    '../core/ConnectionCheck': check, '../core/Protocol': load('core/Protocol.ts'), '../core/SendOutcome': outcome,
+    '../core/DraftQueue': {}, '@kit.NetworkKit': { http },
+  }, time.globals);
+  return { RelayClient, calls };
+}
+
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient };
