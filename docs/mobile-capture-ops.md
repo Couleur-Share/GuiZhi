@@ -49,6 +49,8 @@ docker compose run --rm --no-deps capture node dist/backup.js restore /backups/c
 
 升级前加密备份、保留旧镜像 ID 和环境文件。构建新固定版本，运行集成测试与 Docker 重启测试，然后替换镜像启动并验证协议及真实链路。数据库迁移在启动执行，当前版本 1；未知更新版本不得用旧代码继续打开。
 
+电脑在线状态（`desktop_status` 表）是纯加法变更：建表语句为 `CREATE TABLE IF NOT EXISTS`，不提升 `user_version`，新旧镜像可以互相打开同一个数据库；回滚到旧镜像时该表被直接忽略，手机端因收不到 `desktopSeenAgoMs` 而不显示电脑状态，其余功能不受影响。升级后除协议外还应核对 `GET /v1/meta` 含 `desktopStatus: true`，并在桌面开启取件约 30 秒后，用已配对手机的 `GET /v1/session` 确认 `desktopSeenAgoMs` 为不足一分钟的数值。停止桌面取件后该值应持续增长；它只反映最近一次通过认证的取件请求，不代表桌面进程的健康状态。
+
 回滚优先退回兼容当前数据库的旧镜像；若迁移不兼容，停止服务，在独立路径恢复升级前备份并验证后替换。不得直接覆盖运行中的 SQLite 文件。
 
 ## 邀请测试记录

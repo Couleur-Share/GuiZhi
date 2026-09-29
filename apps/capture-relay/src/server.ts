@@ -45,7 +45,7 @@ export async function createServer(options: ServerOptions) {
     reply.code(status).send({ success: false, error: code });
   });
   app.get("/healthz", async () => ({ ok: db.get<{ ok: number }>("SELECT 1 AS ok")?.ok === 1, protocol: CAPTURE_PROTOCOL_VERSION }));
-  app.get("/v1/meta", async () => ({ protocol: CAPTURE_PROTOCOL_VERSION, serverTime: Date.now(), nativePairing: true }));
+  app.get("/v1/meta", async () => ({ protocol: CAPTURE_PROTOCOL_VERSION, serverTime: Date.now(), nativePairing: true, desktopStatus: true }));
   app.post<{ Body: Record<string, unknown> }>("/v1/mailboxes", async req => {
     db.rate(`create:${hash(req.ip)}`, 5); return accounts.create(req.body);
   });
@@ -76,7 +76,9 @@ export async function createServer(options: ServerOptions) {
   });
   app.get("/v1/session", async req => {
     const p = auth(req, undefined, true); assert(p.kind === "phone", "forbidden", 403);
-    return { paired: p.active === 1, deviceId: p.id };
+    // 电脑最近一次取件距今的毫秒数（服务端计算，不受手机时钟影响；从未取件为 null）。只有已被电脑确认的手机能看到，待确认设备不应得知收件箱的活动情况。
+    if (p.active !== 1) return { paired: false, deviceId: p.id };
+    return { paired: true, deviceId: p.id, desktopSeenAgoMs: db.desktopSeenAgo(p.mailboxId) };
   });
   app.delete("/v1/session", async (req, reply) => {
     const p = auth(req, "phone", true);
@@ -97,7 +99,12 @@ export async function createServer(options: ServerOptions) {
     const p = auth(req); assert(p.kind !== "desktop", "forbidden", 403); db.rate(`submit:${p.id}`, 30);
     return reply.code(201).send(captures.submit(p, req.body));
   });
-  app.get<{ Querystring: { after?: string } }>("/v1/deliveries", async req => captures.deliveries(auth(req, "desktop").mailboxId, req.query.after ? identifier(req.query.after) : ""));
+  app.get<{ Querystring: { after?: string } }>("/v1/deliveries", async req => {
+    const mailboxId = auth(req, "desktop").mailboxId;
+    // 通过认证的取件请求本身就是“电脑在线”的证据；在线状态只是辅助信息，写入失败不能影响取件。
+    try { db.touchDesktop(mailboxId); } catch { process.stderr.write("桌面在线状态写入失败\n"); }
+    return captures.deliveries(mailboxId, req.query.after ? identifier(req.query.after) : "");
+  });
   app.post<{ Params: { id: string } }>("/v1/deliveries/:id/ack", async req => captures.acknowledge(auth(req, "desktop").mailboxId, identifier(req.params.id)));
   app.put<{ Params: { id: string } }>("/v1/deliveries/:id/progress", async req => captures.progress(auth(req, "desktop").mailboxId, identifier(req.params.id), req.body));
   app.get<{ Querystring: { before?: string } }>("/v1/history", async req => {

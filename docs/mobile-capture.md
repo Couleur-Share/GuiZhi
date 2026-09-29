@@ -21,6 +21,8 @@ HTTPS 传输；首版公共服务能够读取暂存内容，不提供端到端�
 
 桌面仅主进程持有收件箱凭证，safeStorage 加密整个连接配置至 `.machine/mobile-capture.json`。该目录不在备份、配置导出或数据目录迁移白名单内。Linux `basic_text` 或安全存储不可用时只保留当前运行期凭证；退出后须新建收件箱和重新配对。丢失凭证无账号找回。
 
+为了让已配对的手机显示“电脑是否在取件”，中转按收件箱保存一个「最近一次取件时间」时间戳（`desktop_status` 表）：不含 IP、设备名或内容，只有已确认的手机能读到距今毫秒数，收件箱停用后随定期清理删除。鸿蒙收集端（0.5.1 起）据此显示：不超过 90 秒（取件间隔 30 秒的三倍）为“电脑在线”，不超过 6 分钟（覆盖 5 分钟退避）为“最近取件 N 分钟前”，更久则提示内容暂存在中转、最长保留 30 天；旧中转没有该字段时手机不显示状态。读数精度约 10 秒。
+
 PWA 用 Secure、HttpOnly、SameSite=Strict Cookie；变更接口核对 Origin 与 CSRF 头。配对过程中临时凭证只用于完成 Cookie 建立，成功后清除临时缓存。快捷指令凭证独立生成和撤销；撤销手机同时撤销其快捷指令。服务端只存 SHA-256 凭证摘要。
 
 ## 可靠性
@@ -43,18 +45,18 @@ PWA 用 Secure、HttpOnly、SameSite=Strict Cookie；变更接口核对 Origin �
 
 | 路径 | 方法 | 权限 / 参数 |
 | --- | --- | --- |
-| `/v1/meta` | GET | 协议版本、服务时间与 `nativePairing` 能力标记 |
+| `/v1/meta` | GET | 协议版本、服务时间与 `nativePairing`、`desktopStatus` 能力标记；客户端据后者判断会话响应是否携带电脑在线状态 |
 | `/v1/mailboxes` | POST | `{invite,requestId,credential}`；凭证客户端生成 32 个随机字节的 base64url，创建可重试 |
 | `/v1/mailbox` | DELETE | 桌面停用收件箱 |
 | `/v1/pairings` | POST / GET | 桌面生成 `{nonce}` / 查询待确认手机 |
 | `/v1/pairings/claim` | POST | 同源手机 `{pairingId,nonce,credential,name}` |
 | `/v1/pairings/:id/confirm` | POST | 桌面确认 `{deviceId}` |
 | `/v1/pairings/native-claim` | POST | 原生手机配对申请；参数与网页 claim 一致，拒绝浏览器来源头和 Cookie |
-| `/v1/session` | GET / DELETE | 手机通过 Cookie 或 Bearer 检查配对状态 / 撤销自身与快捷指令 |
+| `/v1/session` | GET / DELETE | 手机通过 Cookie 或 Bearer 检查配对状态 `{paired,deviceId}` / 撤销自身与快捷指令。已被电脑确认的手机另得 `desktopSeenAgoMs`：电脑最近一次取件距今的毫秒数，由服务端计算（不受手机时钟影响），从未取件为 `null`；待确认与已撤销的设备不返回该字段 |
 | `/v1/devices` | GET | 桌面列设备 |
 | `/v1/devices/:id` | DELETE | 桌面撤销设备及其快捷指令 |
 | `/v1/shortcut` | POST / DELETE | 手机生成 `{credential}` / 撤销专用凭证 |
-| `/v1/deliveries?after=…` | GET | 桌面按 UUID 游标分页，每页最多 50；扫完下一轮从头取 |
+| `/v1/deliveries?after=…` | GET | 桌面按 UUID 游标分页，每页最多 50；扫完下一轮从头取。通过认证的请求同时刷新该收件箱的「电脑最近取件时间」（10 秒节流，写入失败不影响取件） |
 | `/v1/deliveries/:id/ack` | POST | 桌面事务落盘后确认，body `{}` |
 | `/v1/deliveries/:id/progress` | PUT | `{version,items:[{index,status,error?}]}`，ACK 后发送 |
 | `/v1/history?before=…` | GET | 本设备及所属快捷指令近期记录，最多 100；不含输入 |
