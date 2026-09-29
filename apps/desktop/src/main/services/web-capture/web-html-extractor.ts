@@ -19,6 +19,12 @@ export type WebExtracted = Omit<
 >;
 const FRAME_LIMIT = 16 * 1024 * 1024;
 
+/** 提取器按协议回报的失败：帧完整、编号匹配，Python 进程仍与主进程同步，无需回收。 */
+class WebExtractionFailure extends Error {}
+
+// Python 异常类名（如 TypeError）。只放行标识符，避免把任意文本带进错误信息。
+const EXCEPTION_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+
 /** 一个离线 Python 进程，串行提取；活跃任务取消后回收进程，下一任务重新启动。 */
 export class WebHtmlExtractor {
   private child?: ChildProcessWithoutNullStreams;
@@ -49,13 +55,20 @@ export class WebHtmlExtractor {
           throw new Error("正文提取输入超过 16 MiB");
         await this.start(combined);
         const message = await this.frame(combined, input);
-        if (
-          message.v !== 1 ||
-          message.id !== id ||
-          message.error ||
-          !message.result
-        )
+        // 版本或编号对不上说明协议已失步，必须回收进程，否则下一任务会读到旧响应。
+        if (message.v !== 1 || message.id !== id)
           throw new Error("正文提取协议无效");
+        if (message.error !== undefined) {
+          // 提取器捕获了页面处理中的异常并按协议回报：进程仍然可用，不回收；
+          // 只把异常类型带给用户，便于区分页面问题与组件缺陷（异常消息可能含页面内容，不转发）。
+          if (typeof message.error !== "string")
+            throw new Error("正文提取协议无效");
+          const name = EXCEPTION_NAME.test(message.error)
+            ? message.error
+            : "未知异常";
+          throw new WebExtractionFailure(`正文提取失败（${name}）`);
+        }
+        if (!message.result) throw new Error("正文提取协议无效");
         const result = message.result as WebExtracted;
         if (
           typeof result.markdown !== "string" ||
@@ -65,7 +78,7 @@ export class WebHtmlExtractor {
           throw new Error("正文提取结果无效");
         return result;
       } catch (error) {
-        await this.stopChild();
+        if (!(error instanceof WebExtractionFailure)) await this.stopChild();
         throw error;
       }
     });

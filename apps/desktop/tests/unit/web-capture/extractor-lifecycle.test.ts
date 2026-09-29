@@ -38,6 +38,8 @@ class Child extends EventEmitter {
   messages: Record<string, unknown>[] = [];
   hold = false;
   bad = false;
+  /** 设置后，reply 按协议回报 error（提取器捕获的异常）而不是 result。 */
+  failure?: unknown;
   stdin = new Writable({
     write: (chunk, _encoding, callback) => {
       const message = JSON.parse(chunk.toString());
@@ -56,6 +58,10 @@ class Child extends EventEmitter {
       JSON.stringify({ v: 1, id: message.id, result }) + "\n",
     );
     if (this.bad) return this.stdout.write('{"v":7}\n');
+    if (this.failure !== undefined)
+      return this.stdout.write(
+        JSON.stringify({ v: 1, id: message.id, error: this.failure }) + "\n",
+      );
     // 故意在中文 UTF-8 编码中间分帧。
     const split = bytes.indexOf(Buffer.from("中文")) + 1;
     this.stdout.write(bytes.subarray(0, split));
@@ -174,6 +180,34 @@ describe("正文提取进程生命周期", () => {
     await capture();
     children[0].bad = true;
     await expect(capture()).rejects.toThrow("协议");
+    expect(await capture()).toMatchObject(result);
+    expect(children).toHaveLength(2);
+  });
+  it("提取器回报的异常带出类型，进程保留供后续任务复用", async () => {
+    await capture();
+    children[0].failure = "TypeError";
+    const failed = await capture().catch((reason: Error) => reason);
+    expect((failed as Error).message).toBe("正文提取失败（TypeError）");
+    // 页面触发的异常不是协议错误：不回收进程，也不能被说成“协议无效”。
+    expect((failed as Error).message).not.toContain("协议");
+    expect(children[0].exitCode).toBeNull();
+    children[0].failure = undefined;
+    expect(await capture()).toMatchObject(result);
+    expect(children).toHaveLength(1);
+    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+  });
+  it("回报的异常名不是标识符时不回显原文", async () => {
+    await capture();
+    children[0].failure = "Type Error: C:\\Users\\secret\\页面内容";
+    const failed = await capture().catch((reason: Error) => reason);
+    expect((failed as Error).message).toBe("正文提取失败（未知异常）");
+    expect(children[0].exitCode).toBeNull();
+  });
+  it("error 字段类型不符属于协议错误，回收进程", async () => {
+    await capture();
+    children[0].failure = { code: 1 };
+    await expect(capture()).rejects.toThrow("协议");
+    expect(children[0].exitCode).toBe(0);
     expect(await capture()).toMatchObject(result);
     expect(children).toHaveLength(2);
   });

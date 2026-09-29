@@ -67,6 +67,10 @@ jobs:
           python3 scripts/tests/test_crawl4ai_prune.py
           python3 scripts/tests/test_crawl4ai_build_encoding.py
 
+      # extract-only.py 的 stdio 协议：提取异常按协议回报、进程继续服务。用桩 extract 模块，不需要 Crawl4AI。
+      - name: Crawler worker protocol tests
+        run: python3 scripts/tests/test_extract_only_protocol.py
+
       - name: Build
         run: pnpm --filter @guizhi/desktop build
 
