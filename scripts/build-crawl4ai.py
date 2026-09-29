@@ -50,8 +50,16 @@ print("Crawl4AI 正文提取自检通过")
 
 
 def crawler_env():
+    """自检子进程的环境：与生产启动一致，清除 PYTHONPATH / PYTHONHOME。
+
+    开发者环境若带着指向其它运行包的 PYTHONPATH，随包 Python 会优先从那里导入，
+    已裁剪的包便“重新可导入”，自检在错误的目录上空转通过。
+    """
+    env = {key: value for key, value in os.environ.items() if key not in ("PYTHONPATH", "PYTHONHOME")}
     # 英文 Windows 构建机默认 CP1252；自检日志固定 UTF-8，不依赖系统语言。
-    return {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "CRAWL4_AI_BASE_DIRECTORY": str(CONFIG / "downloads" / "build-cache"), "LITELLM_LOCAL_MODEL_COST_MAP": "True", "HF_HUB_OFFLINE": "1"}
+    env.update(PYTHONIOENCODING="utf-8", PYTHONUTF8="1", CRAWL4_AI_BASE_DIRECTORY=str(CONFIG / "downloads" / "build-cache"),
+               LITELLM_LOCAL_MODEL_COST_MAP="True", HF_HUB_OFFLINE="1")
+    return env
 
 
 def verify_runtime(python):

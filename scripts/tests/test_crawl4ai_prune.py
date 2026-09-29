@@ -1,9 +1,11 @@
 """随包运行包裁剪：按 RECORD 精确卸载、不越出 site-packages、幂等，并保留 Crawl4AI 仍会导入的模块。"""
+import os
 from pathlib import Path
 import re
 import runpy
 import tempfile
 import unittest
+from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "build-crawl4ai.py"
 BUILD = runpy.run_path(str(SCRIPT))
@@ -108,6 +110,18 @@ class PruneRuntimeTest(unittest.TestCase):
         locked = {normalize(name) for name in re.findall(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==", lock, re.MULTILINE)}
         wanted = {normalize(name) for name in BUILD["PRUNED_DISTRIBUTIONS"]}
         self.assertLessEqual(wanted, locked, f"锁文件里找不到 {sorted(wanted - locked)}：请核对 PRUNED_DISTRIBUTIONS 是否随依赖升级改名或已移除")
+
+
+class CrawlerEnvTest(unittest.TestCase):
+    def test_drops_python_path_variables_that_could_redirect_imports(self):
+        # 实测：PYTHONPATH 指向另一份运行包时，随包 Python 能导入已被裁剪的 litellm，自检便在错误的目录上通过。
+        leaked = {"PYTHONPATH": "C:/other/site-packages", "PYTHONHOME": "C:/other/python", "GUIZHI_KEEP": "1"}
+        with mock.patch.dict(os.environ, leaked):
+            env = BUILD["crawler_env"]()
+        self.assertNotIn("PYTHONPATH", env)
+        self.assertNotIn("PYTHONHOME", env)
+        self.assertEqual(env["GUIZHI_KEEP"], "1")
+        self.assertEqual((env["PYTHONUTF8"], env["HF_HUB_OFFLINE"]), ("1", "1"))
 
 
 if __name__ == "__main__":
