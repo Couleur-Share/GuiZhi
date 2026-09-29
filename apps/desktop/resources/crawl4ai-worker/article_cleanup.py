@@ -1,6 +1,8 @@
 """按 DOM 正文边界清理博客模板；不按正文关键词或英文词数删段落。"""
 import re
 
+from lxml import etree
+
 
 CONTENT_NAMES = {"entry-content", "post-content", "article-content", "post-body"}
 CHROME_NAMES = {
@@ -54,6 +56,9 @@ def is_promotion(node):
 
 
 def clean_article(root):
+    # 注释与处理指令不含正文，又是 .get()/.tag 语义与元素不同的节点：先整体移除并保留其后的文字，
+    # 下游只需处理元素。此前正文内出现 HTML 注释会因 None + str 抛 TypeError，整页提取失败。
+    etree.strip_elements(root, etree.Comment, etree.ProcessingInstruction, with_tail=False)
     for node in list(root.iterdescendants()):
         if node.getparent() is None or root not in node.iterancestors():
             continue

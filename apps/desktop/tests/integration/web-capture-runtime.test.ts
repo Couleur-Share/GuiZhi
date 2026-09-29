@@ -132,6 +132,17 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
     expect(short.complete).toBe(true);
     expect(short.engineVersion).toBe("crawl4ai/0.9.3-static");
     expect(short.markdown).toContain("小更新");
+    // 正文内的 HTML 注释曾使清理阶段抛 TypeError，整页提取失败。
+    const commented = await capture({
+      taskId: "comments",
+      purpose: "import",
+      url: "https://fixture.example/comments",
+    });
+    expect(commented.complete).toBe(true);
+    expect(commented.markdown).toContain("注释不影响正文");
+    expect(commented.markdown).toContain("正文位于注释之间");
+    expect(commented.markdown).not.toContain("站点统计");
+    expect(commented.markdown).not.toContain("推广位");
     const denied = await capture({
       taskId: "denied",
       purpose: "import",

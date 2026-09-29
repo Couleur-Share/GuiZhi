@@ -88,6 +88,14 @@ class ArticleCleanupTests(unittest.TestCase):
         self.assertIn("第一篇正文", markdown)
         self.assertIn("第二篇正文", markdown)
 
+    def test_html_comments_do_not_break_extraction(self):
+        # 注释节点曾使清理阶段抛 TypeError；WordPress 区块注释与 React 服务端渲染的注释十分常见。
+        result = capture('''<main><article><!-- wp:paragraph --><p>正文位于注释之间。</p><!-- /wp:paragraph -->
+          <div class="sidebar"><!-- ad -->推广位</div></article></main>''')
+        self.assertIn("正文位于注释之间", result["markdown"])
+        self.assertNotIn("推广位", result["markdown"])
+        self.assertTrue(result["complete"])
+
     def test_wechat_explicit_body_is_preserved(self):
         result = extract('''<html><body><div id="js_content" style="display:none">
           <h2>加入我们</h2><p>公众号正文内容。</p><img data-src="https://example.com/a.png">

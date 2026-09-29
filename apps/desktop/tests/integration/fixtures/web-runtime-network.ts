@@ -42,6 +42,15 @@ export const webNetworkRequest: typeof productionRequest = async (
         '<article>主页面正文</article><iframe src="https://frame.example/short"></iframe><script>fetch("/redirect").then(r=>r.text()).then(t=>document.querySelector("article").textContent="动态请求完成："+t)</script>',
       ).toString("base64"),
     };
+  // 正文内外都有 HTML 注释（WordPress、React 服务端渲染等常见）：注释不应让提取失败，也不应混入正文。
+  if (url.pathname === "/comments")
+    return {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" },
+      body: Buffer.from(
+        '<title>带注释的文章</title><!-- 站点统计：不应出现 --><main><h1>注释不影响正文</h1><!-- wp:paragraph --><p>正文位于注释之间。</p><!-- /wp:paragraph --><div class="sidebar">推广位</div></main>',
+      ).toString("base64"),
+    };
   if (url.pathname === "/slow") {
     // 网络替身与正式安全出口一样响应取消，不能让超时掩盖取消结果。
     await webPause(5000, signal);
