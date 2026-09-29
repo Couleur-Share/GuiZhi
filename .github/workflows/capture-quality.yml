@@ -17,6 +17,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm --filter @guizhi/capture-relay test
+      - name: Harmony capture client logic tests
+        run: pnpm test:harmony
       - run: pnpm --filter @guizhi/capture-relay build && pnpm --filter @guizhi/capture-web build
       - run: pnpm --filter @guizhi/capture-web exec playwright install --with-deps chromium
       - run: pnpm --filter @guizhi/capture-web test:e2e

@@ -341,6 +341,7 @@ struct Index {
     } catch { this.notice = '复制失败，请长按错误文字复制'; }
   }
 
+  // @test-boundary 此行之前是页面控制逻辑，Node 测试会真实执行；之后是 ArkUI Builder，只由 Hvigor 编译验证。
   @Builder
   private EmptyState(icon: Resource, title: string, detail: string) {
     Column({ space: 10 }) {

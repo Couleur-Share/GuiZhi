@@ -1,46 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
-const ts = require('typescript');
-const root = path.join(__dirname, '../entry/src/main/ets');
-function load(file, imports = {}, globals = {}, page = false) {
-  let source = fs.readFileSync(path.join(root, file), 'utf8');
-  // 执行页面真实的控制方法；ArkUI Builder 由 Hvigor 编译验证，不模拟渲染。
-  if (page) source = source.split('  @Builder')[0].replace('struct Index', 'export class Index')
-    .replace(/@(Entry|Component|State|StorageLink|Watch|Provide)(\([^\n]*?\))?\s*/g, '') + '\n}';
-  const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
-  const scope = { exports: {}, require: name => imports[name] || {}, ...globals };
-  vm.runInNewContext(js, scope); return scope.exports;
-}
-const check = load('core/ConnectionCheck.ts');
-const { ConnectionCheck, RelayRequestError } = check;
-function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
-function clock() {
-  let now = 0, id = 0; const timers = new Map();
-  return { timers, now: () => now, advance: value => { now += value; }, globals: {
-    Date: { now: () => now }, setInterval: (fn, delay) => { timers.set(++id, { fn, delay }); return id; },
-    clearInterval: id => timers.delete(id), setTimeout: (fn, delay) => { timers.set(++id, { fn, delay }); return id; },
-    clearTimeout: id => timers.delete(id), TabsController: class {},
-  } };
-}
-function page(client) {
-  const time = clock();
-  const { Index } = load('pages/Index.ets', {
-    '../services/ThemePalette': load('services/ThemePalette.ets', {}, { '$r': name => name }),
-    '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
-    '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
-  }, time.globals, true);
-  const ui = new Index();
-  ui.runtime = { client, connection: { origin: 'https://example.invalid' }, queue: { snapshot: () => ({ drafts: [] }) } };
-  ui.animate = fn => fn(); ui.ready = true; ui.connected = true; ui.foreground = true;
-  // ConnectionCheck 使用同一时钟，避免依赖真实时间。
-  ui.connectionCheck.canCheck = (manual) => ConnectionCheck.prototype.canCheck.call(ui.connectionCheck, manual, time.now());
-  ui.connectionCheck.failed = error => ConnectionCheck.prototype.failed.call(ui.connectionCheck, error, time.now());
-  return { ui, time };
-}
-const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+// 装载器、时钟与页面工厂集中在 support.cjs，页面以显式 test-boundary 标记分割控制逻辑与 Builder。
+const { load, deferred, clock, settle, createPage: page, check, ConnectionCheck, RelayRequestError } = require('./support.cjs');
 
 test('前台立即检查、每两秒轮询，慢响应期间不会并发；绑定成功不等待记录', async () => {
   const pending = deferred(); let calls = 0;
