@@ -17,6 +17,7 @@ CI 的 `quality` 工作流执行构建、预算和 Electron 冒烟；本地发�
 - 文件数同样受限：每次启动 Python 提取进程前，主进程都会逐文件校验哈希，耗时随文件数和字节数增长（Windows x64 实测约 11 s → 4.7 s，对应 15,128 个 / 585.9 MiB → 8,099 个 / 193.7 MiB）。
 - 上限取实测值上浮：运行包约 5%（同一份锁文件两次独立构建只差几十字节），安装包约 8%。有意增长（升级 Crawl4AI、新增随包组件）时，在同一个提交里修改预算并写明原因，先确认新增内容确实在正文提取路径上被加载。
 - 运行包只保留正文提取路径实际加载的内容，清单见 `scripts/build-crawl4ai.py` 的 `PRUNED_DISTRIBUTIONS`／`PRUNED_SUBDIRECTORIES`。`quality` 工作流运行 `python3 scripts/tests/test_crawl4ai_prune.py`，依赖升级使清单与锁文件不再对应时，在 PR 阶段就会失败。
+- 提取器契约分两处回归：`quality` 工作流运行 `python3 scripts/tests/test_extract_only_protocol.py`，用桩 `extract` 模块核对 `extract-only.py` 的 stdio 协议（提取异常按协议回报、进程继续服务）；正文去噪的完整转换链路（lxml → Crawl4AI → Markdown）依赖随包依赖，`quality` 跑不了，改由发版工作流在运行包构建后用随包 Python 执行 `scripts/tests/test_article_cleanup.py`。
 - 本地检查：`node scripts/check-package-size.mjs --runtime apps/desktop/resources/crawl4ai`；安装包加 `--installer apps/desktop/dist/GuiZhi-Setup-<版本>-x64.exe`。
 
 ## 性能观察口径

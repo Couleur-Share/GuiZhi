@@ -84,6 +84,15 @@ jobs:
         if: matrix.platform == 'win'
         run: node scripts/check-package-size.mjs --runtime apps/desktop/resources/crawl4ai
 
+      # 完整转换链路（lxml → Crawl4AI → Markdown）的正文去噪回归。依赖只存在于随包运行包，
+      # 所以在这里用随包 Python 运行；PR 阶段的 quality 工作流只覆盖不依赖 Crawl4AI 的部分。
+      - name: Verify bundled crawler article cleanup
+        if: matrix.platform == 'win'
+        shell: bash
+        env:
+          CRAWL4_AI_BASE_DIRECTORY: ${{ runner.temp }}/crawl4ai-cache
+        run: apps/desktop/resources/crawl4ai/python/python.exe -B -s scripts/tests/test_article_cleanup.py
+
       - name: Verify crawler offline fixtures
         run: pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts
         env:
