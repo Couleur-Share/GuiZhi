@@ -23,7 +23,7 @@
     "lint:file-size:report": "node scripts/check-file-line-limits.mjs --report",
     "format": "pnpm --filter @guizhi/desktop format",
     "test": "pnpm --filter @guizhi/desktop test",
-    "test:validation": "node --test scripts/tests/desktop-validation-snapshot.test.mjs scripts/tests/reading-libraries.test.mjs scripts/tests/reading-libraries-build.test.mjs scripts/tests/reading-benchmark-gate.test.mjs",
+    "test:validation": "node --test scripts/tests/desktop-validation-snapshot.test.mjs scripts/tests/reading-libraries.test.mjs scripts/tests/reading-libraries-build.test.mjs scripts/tests/reading-benchmark-gate.test.mjs scripts/tests/package-size.test.mjs",
     "test:unit": "pnpm test:validation && pnpm --filter @guizhi/desktop test:unit",
     "test:run": "pnpm --filter @guizhi/desktop test:run",
     "test:e2e": "node scripts/isolated-desktop.mjs e2e",

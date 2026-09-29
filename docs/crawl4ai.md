@@ -8,7 +8,11 @@
 
 2026-09-26 采集路径和打包规则已调整：新构建不再下载独立 Chromium，打包旧开发运行包时也会排除 `browser/` 并重建分发清单。本轮 Windows x64 候选已通过离线 Windows Sandbox 安装验收：覆盖官方 0.24.0 后清除旧浏览器、数据库结构 31→39 迁移并保留人工条目和旧网页版本、正常卸载重装、静态及动态采集、60 秒空闲回收与正常退出。显示版本仍为 0.24.0；本轮使用合成数据及受控网页，不代表公网或真实登录流程验收，也尚未发布。完整本地证据位于 `artifacts/crawl4ai/windows-installer-2026-09-26/README.md`。
 
-Python、Crawl4AI 及其 Python 依赖继续随包保留；其中 Playwright 模块仍由 Crawl4AI 导入，不等于安装或启动了另一个浏览器。原开发运行包可保留用于对照；它的完整性校验仍覆盖清单内的所有文件。使用 `python scripts/build-crawl4ai.py --target win32-x64 --output <尚不存在的目录>` 可独立构建精简运行包，省略 `--output` 则使用默认资源目录；已有目录不会被覆盖。
+Python、Crawl4AI 及正文提取路径实际加载的 Python 依赖随包保留；其中 Playwright 模块仍由 Crawl4AI 导入，不等于安装或启动了另一个浏览器。页面渲染由 Electron 完成，构建脚本在安装依赖之后删除这条路径从不加载的内容：`litellm`（发行包名 `unclecode-litellm`）、`scipy`、`networkx`、`nltk`、`openai`、`tokenizers`、`hf-xet`，以及 Playwright／Patchright 各自携带的 Node driver（每份含一个约 88 MiB 的 `node.exe`）。锁文件仍是完整依赖闭包（`--require-hashes` 需要），裁剪清单是 `scripts/build-crawl4ai.py` 的 `PRUNED_DISTRIBUTIONS`／`PRUNED_SUBDIRECTORIES`；构建结束前用随包 Python 真实执行一次 `extract.py`，Crawl4AI 升级后一旦开始导入被删内容，构建当场失败。
+
+Windows x64 实测（2026-09-29，同一份锁文件）：运行包由 15,128 个文件、585.9 MiB 降到 8,099 个、193.7 MiB；x64 安装包由已发布 v0.26.0 的 208.4 MiB 降到 125.9 MiB；每次启动提取进程前的完整性校验约由 11 s 降到 4.7 s；同一批 38 个公开网页 HTML 的提取结果与裁剪前逐页一致。体积上限见 `config/package-size-budget.json` 与 [质量门禁](quality-gates.md)。
+
+原开发运行包可保留用于对照；它的完整性校验仍覆盖清单内的所有文件。使用 `python scripts/build-crawl4ai.py --target win32-x64 --output <尚不存在的目录>` 可独立构建精简运行包，省略 `--output` 则使用默认资源目录；已有目录不会被覆盖。
 
 网页采集最多两页并发，共用最多八个安全网络请求槽位。最多复用两个内存页面会话，每页结束清理存储、缓存与认证状态；Python 正文提取串行处理，空闲 60 秒后退出。静态分流使用保守的 HTML 结构判断，不能保证识别所有网站的延迟更新。虚拟代码编辑器读取完整文档模型，不能确认完整性时返回可重试失败。
 

@@ -10,6 +10,15 @@
 CI 的 `quality` 工作流执行构建、预算和 Electron 冒烟；本地发布前可直接运行
 `pnpm --filter @guizhi/desktop test:release`，再从根目录补一轮 `pnpm test:e2e:smoke`；存在开发服务时，打包与发布门禁在独立副本运行。
 
+## 交付体积门禁
+
+`config/package-size-budget.json` 给随包 Python 运行包（字节数、文件数）和 Windows 安装包各设一条上限，由 `scripts/check-package-size.mjs` 判定。发版工作流在运行包构建后、安装包构建后各执行一次，超限直接失败，不会产出 Draft Release。renderer 的 gzip 预算（`apps/desktop/bundle-budget.json`）只覆盖前端资源，两者互不替代。
+
+- 文件数同样受限：每次启动 Python 提取进程前，主进程都会逐文件校验哈希，耗时随文件数和字节数增长（Windows x64 实测约 11 s → 4.7 s，对应 15,128 个 / 585.9 MiB → 8,099 个 / 193.7 MiB）。
+- 上限取实测值上浮：运行包约 5%（同一份锁文件两次独立构建只差几十字节），安装包约 8%。有意增长（升级 Crawl4AI、新增随包组件）时，在同一个提交里修改预算并写明原因，先确认新增内容确实在正文提取路径上被加载。
+- 运行包只保留正文提取路径实际加载的内容，清单见 `scripts/build-crawl4ai.py` 的 `PRUNED_DISTRIBUTIONS`／`PRUNED_SUBDIRECTORIES`。`quality` 工作流运行 `python3 scripts/tests/test_crawl4ai_prune.py`，依赖升级使清单与锁文件不再对应时，在 PR 阶段就会失败。
+- 本地检查：`node scripts/check-package-size.mjs --runtime apps/desktop/resources/crawl4ai`；安装包加 `--installer apps/desktop/dist/GuiZhi-Setup-<版本>-x64.exe`。
+
 ## 性能观察口径
 
 - 知识库列表使用服务端分页；批量普通字段操作以 400 条为一个 SQL 批次。

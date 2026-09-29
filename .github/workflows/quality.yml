@@ -50,6 +50,12 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      # 运行包裁剪清单与锁文件、构建脚本的约定；不下载依赖，几秒内完成。
+      - name: Crawler build helper tests
+        run: |
+          python3 scripts/tests/test_crawl4ai_prune.py
+          python3 scripts/tests/test_crawl4ai_build_encoding.py
+
       - name: Build
         run: pnpm --filter @guizhi/desktop build
 

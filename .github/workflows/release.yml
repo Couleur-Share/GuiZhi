@@ -79,6 +79,11 @@ jobs:
         shell: bash
         run: python scripts/build-crawl4ai.py --target ${{ matrix.platform == 'win' && 'win32-x64' || matrix.platform == 'linux' && 'linux-x64' || matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64' }}
 
+      # 运行包体积在安装包构建之前就拦截；预算与放宽规则见 config/package-size-budget.json。
+      - name: Check bundled crawler size budget
+        if: matrix.platform == 'win'
+        run: node scripts/check-package-size.mjs --runtime apps/desktop/resources/crawl4ai
+
       - name: Verify crawler offline fixtures
         run: pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts
         env:
@@ -112,6 +117,14 @@ jobs:
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check Windows installer size budget
+        if: matrix.platform == 'win'
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node ../../scripts/check-package-size.mjs --installer "dist/GuiZhi-Setup-${VERSION}-${{ matrix.arch }}.exe"
 
       - name: Verify macOS app architecture
         if: matrix.platform == 'mac'
