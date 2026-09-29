@@ -132,6 +132,9 @@ tmp-*
 # 抓下来对比发布 feed 的一次性产物
 /atom.txt
 
+# 任务验证产物（截图、基线快照、堆快照、临时 userData 等），仅本地留存，不入库
+/artifacts/
+
 # 手机收集的本地运行数据与凭证
 deploy/capture/.env
 deploy/capture/data/
@@ -142,5 +145,4 @@ apps/capture-web/test-results/
 apps/capture-web/playwright-report/
 apps/desktop/resources/crawl4ai/
 config/crawl4ai/downloads/
-artifacts/crawl4ai/
 apps/desktop/resources/crawl4ai-worker/__pycache__/
