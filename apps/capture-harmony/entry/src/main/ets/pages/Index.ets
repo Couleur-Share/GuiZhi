@@ -18,10 +18,11 @@ import { ConnectionCheck, RelayRequestError } from '../core/ConnectionCheck';
 import { EditorAutosave } from '../core/EditorAutosave';
 import { CaptureParse, MAX_ITEMS, parseCapture, splitUrlChunks } from '../core/CaptureParser';
 import { BatchHooks, BatchResult, sendBatch, batchHeadline, batchReport } from '../core/BatchSend';
+import { DesktopPoll, DesktopStatus, desktopStatusOf, waitingCount } from '../core/DesktopStatus';
 import { HistoryItem, firstPage, historyCursor, historyKey, mergeHistory, nextPage } from '../core/HistoryView';
 import { SentEntry, buildSentEntry } from '../core/SentLog';
 import { SendingEntry, sendingBegin, sendingEnd, sendingFind, sendingTick } from '../core/SendingState';
-import { Draft, CaptureMode, Receipt, PairingLink, parsePairingLink } from '../core/Protocol';
+import { Draft, CaptureMode, Receipt, ReceiptTone, PairingLink, Session, parsePairingLink } from '../core/Protocol';
 
 @Entry
 @Component
@@ -49,6 +50,8 @@ struct Index {
   @State sentEntries: SentEntry[] = [];
   // 发送记录读写出问题时的说明，近期页顶部持续显示，直到下一次成功写入或清除。
   @State sentLogWarning: string = '';
+  // 电脑在线状态：会话里的 desktopSeenAgoMs 加上近期记录里等待取件的条数；未知（旧中转、未配对、查询失败）时不显示。
+  @State desktop: DesktopStatus = new DesktopStatus();
   @State statusError: string = '';
   @State error: string = '';
   @State notice: string = '';
@@ -104,6 +107,11 @@ struct Index {
   private visible: boolean = true;
   private connectionCheck: ConnectionCheck = new ConnectionCheck();
   private checkRevision: number = 0;
+  // 最近一次会话响应里的 desktopSeenAgoMs（undefined 表示中转没有提供）；desktopPoll 控制已配对后每 30 秒查询一次。
+  private desktopAgo: number | null | undefined = undefined;
+  private desktopPoll: DesktopPoll = new DesktopPoll();
+  // 后台状态查询在途标志：不进入界面状态（refreshing 会让标题转圈、按钮变灰），只防止上一次未返回时重叠。
+  private silentRefreshing: boolean = false;
 
   aboutToAppear(): void {
     this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
@@ -171,12 +179,38 @@ struct Index {
     if (this.runtime) { const rows = this.runtime.queue.snapshot().drafts; this.animate(() => { this.drafts = rows; }); }
   }
 
+  // 自动检查：等待电脑确认时约每 2 秒一次（受 ConnectionCheck 退避约束）；配对后放慢到每 30 秒一次，只为刷新电脑在线状态。
   private startPolling(): void {
     if (!this.ready || !this.visible || !this.foreground || this.timer !== -1) return;
-    this.refresh(false, false);
+    this.refresh(false, this.watchingHistory());
     this.timer = setInterval(() => {
-      if (this.connected && !this.paired) this.refresh(false, false);
+      if (this.connected) this.refresh(false, this.watchingHistory());
     }, 2000);
+  }
+
+  // 近期记录里还有“等待电脑取件”的条目时，自动检查顺带刷新近期记录，让状态及时从“等待”变为“已接收”；没有等待项就不额外请求。
+  private watchingHistory(): boolean { return this.paired && waitingCount(this.history) > 0; }
+
+  // 记录会话检查的结果：配对状态与电脑在线状态一起更新（每次都以本次响应为准，旧中转没有该字段就回到“未知”）。
+  private applySession(session: Session): void {
+    this.paired = session.paired;
+    this.desktopAgo = session.desktopSeenAgoMs;
+    this.syncDesktop();
+  }
+
+  // 重新计算电脑在线状态行（会话读数或近期记录变化后调用）。只有已配对时才有意义：待确认、已撤销的设备一律按未知处理。
+  private syncDesktop(): void {
+    this.desktop = desktopStatusOf(this.paired ? this.desktopAgo : undefined, this.paired ? waitingCount(this.history) : 0);
+  }
+
+  // 连不上中转时电脑状态未知：不显示过期的“在线”。
+  private forgetDesktop(): void {
+    this.desktopAgo = undefined; this.syncDesktop();
+  }
+
+  // 解除配对或重新配对：忘掉旧读数，并让下一次自动检查立即到期。
+  private clearDesktop(): void {
+    this.desktopPoll.reset(); this.forgetDesktop();
   }
 
   private stopPolling(): void { if (this.timer !== -1) clearInterval(this.timer); this.timer = -1; }
@@ -199,32 +233,46 @@ struct Index {
   private async refresh(manual: boolean = true, loadHistory: boolean = true): Promise<void> {
     const client = this.runtime?.client;
     if (!client || this.refreshing || this.busy) return;
-    if (!manual && (this.paired || !this.visible || !this.foreground)) return;
+    if (!manual && (!this.visible || !this.foreground)) return;
+    // 已配对后的自动检查只为刷新电脑在线状态：每 30 秒一次，并保持安静（不转圈、不弹红色横幅）；等待确认时沿用连接检查自身的节奏。
+    const silent = !manual && this.paired;
+    if (silent && (this.silentRefreshing || !this.desktopPoll.due(Date.now()))) return;
     if (!this.connectionCheck.canCheck(manual)) return;
     const revision = this.checkRevision;
-    this.refreshing = true;
+    if (silent) this.silentRefreshing = true; else this.refreshing = true;
+    this.desktopPoll.started(Date.now());
+    // 会话检查已成功：之后近期记录的失败不应清掉电脑状态。
+    let sessionChecked = false;
     try {
       const session = await client.session();
       // 解绑或配对期间产生的旧响应不得覆盖新连接状态。
       if (client !== this.runtime?.client || revision !== this.checkRevision) return;
+      sessionChecked = true;
       const newlyPaired = !this.paired && session.paired;
-      this.paired = session.paired;
-      this.connectionCheck.reset(); this.automaticCheck = true; this.statusError = '';
+      this.applySession(session);
+      this.connectionCheck.reset(); this.automaticCheck = true;
+      // 后台检查不擦掉用户可见的提示（如发送后记录刷新失败）：等近期记录重新读取成功才撤掉；配对已失效时旧提示不再适用。
+      if (!silent || !this.paired) this.statusError = '';
       if (newlyPaired) { this.error = ''; this.notice = '绑定成功，可以开始收集了'; }
       else if (manual && !this.paired) this.notice = '尚未收到电脑确认，请在电脑「设置 → 手机收集」批准；无需重复提交。';
-      // 绑定成功立即显示，自动轮询不再串行等待近期记录。
-      if (this.paired && loadHistory) {
+      // 后台检查发现已配对的设备被电脑撤销：明确告知，而不是悄悄回到“等待确认”。
+      else if (silent && !this.paired) this.notice = '与电脑的配对已失效，请在电脑「设置 → 手机收集」重新确认，或重新扫码配对。';
+      // 绑定成功立即显示，自动轮询不再串行等待近期记录；后台检查遇到未消除的提示时，顺带重读一次近期记录。
+      if (this.paired && (loadHistory || (silent && this.statusError !== ''))) {
         const rows = await client.history();
         if (client !== this.runtime?.client || revision !== this.checkRevision) return;
         this.applyHistory(rows);
+        this.statusError = '';
       }
     } catch (error) {
       if (client === this.runtime?.client && revision === this.checkRevision) {
+        if (!sessionChecked) this.forgetDesktop();
         this.connectionCheck.failed(error as Error); this.automaticCheck = this.connectionCheck.automatic;
-        this.statusError = (error as Error).message;
+        // 后台状态查询失败只让电脑状态回到“未知”：发送与手动检查仍会给出明确原因，不用红色横幅打扰。
+        if (!silent) this.statusError = (error as Error).message;
       }
     }
-    finally { this.refreshing = false; }
+    finally { if (silent) this.silentRefreshing = false; else this.refreshing = false; }
   }
 
   private async pullHistory(): Promise<void> {
@@ -236,6 +284,7 @@ struct Index {
   private applyHistory(rows: Receipt[]): void {
     const page = firstPage(this.history, this.historyMore, rows);
     this.history = page.receipts; this.historyMore = page.more; this.historyLoaded = true;
+    this.syncDesktop();
   }
 
   // 追加更早的一页记录。失败在页面顶部提示并保留已加载的内容，可再次点击重试。
@@ -250,6 +299,7 @@ struct Index {
       if (client !== this.runtime?.client || revision !== this.checkRevision) return;
       const page = nextPage(this.history, older);
       this.history = page.receipts; this.historyMore = page.more;
+      this.syncDesktop();
     } catch (error) {
       this.animate(() => { this.error = `加载更多记录失败：${(error as Error).message || '请稍后重试'}`; });
     } finally {
@@ -399,7 +449,7 @@ struct Index {
     // 已确认配对时直接发送：凭证失效会得到明确的 401 提示，也省掉一次往返；尚未确认时先查会话，给出更准确的原因。
     if (!this.paired) {
       const session = await runtime.client.session();
-      this.paired = session.paired;
+      this.applySession(session);
       if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
     }
     const receipt = await runtime.queue.send(draft.requestId, runtime.connection.pairingId, runtime.client);
@@ -465,7 +515,7 @@ struct Index {
     try {
       if (!runtime.client || !runtime.connection) throw new Error('请先在“连接”页面配对电脑');
       const session = await runtime.client.session();
-      this.paired = session.paired;
+      this.applySession(session);
       if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
       const hooks = new BatchHooks();
       hooks.started = (requestId: string): void => { this.beginSending(requestId); };
@@ -542,7 +592,7 @@ struct Index {
   private async pair(): Promise<void> {
     if (!this.runtime || !this.pairing) throw new Error('请先扫描或解析配对二维码');
     await this.runtime.pair(this.pairing, this.deviceName, (message: string) => { this.operation = message; });
-    this.paired = false; this.statusError = '';
+    this.paired = false; this.clearDesktop(); this.statusError = '';
     this.connectionCheck.reset(); this.automaticCheck = true;
     this.pairing = undefined; this.pairingOrigin = '';
     this.notice = '已发起配对，请在电脑上的归知确认这台手机';
@@ -553,7 +603,7 @@ struct Index {
     this.operation = '正在检查电脑确认结果…';
     try {
       const session = await this.runtime.client.session();
-      this.paired = session.paired;
+      this.applySession(session);
       this.notice = session.paired ? '绑定成功，可以开始收集了' : '请求已送达，请在电脑「设置 → 手机收集」确认；无需重复提交。';
     } catch (error) {
       // 只有服务端明确尚未识别凭证才补发；超时不能当作未提交。
@@ -573,6 +623,7 @@ struct Index {
     if (result.index !== 1 || !this.runtime) return;
     if (localOnly) await this.runtime.forget(); else await this.runtime.disconnect();
     this.paired = false; this.history = []; this.historyLoaded = false; this.historyMore = false; this.statusError = '';
+    this.clearDesktop();
     this.connectionCheck.reset(); this.automaticCheck = true;
     this.notice = localOnly ? '本机连接已清除，请在电脑撤销原设备' : '配对已解除';
   }
@@ -624,6 +675,26 @@ struct Index {
       .enabled(enabled).clickEffect(pressFeedback(this.settings)).onClick(action)
   }
 
+  // 语义色只是辅助：状态行的文字本身已完整表达状态，不依赖颜色区分。
+  private desktopToneColor(tone: ReceiptTone): ResourceColor {
+    if (tone === 'success') return $r('app.color.success');
+    if (tone === 'warning') return $r('app.color.warning');
+    if (tone === 'error') return $r('app.color.error');
+    return $r('app.color.text_secondary');
+  }
+
+  // 电脑在线状态行：收集页标题下方左对齐，连接页状态卡居中。
+  @Builder
+  private DesktopStatusLine(center: boolean) {
+    Row({ space: 8 }) {
+      Row().width(8).height(8).borderRadius(4).backgroundColor(this.desktopToneColor(this.desktop.tone))
+      Text(this.desktop.summary).fontSize(13).lineHeight(20).fontColor($r('app.color.text_secondary'))
+        .textAlign(center ? TextAlign.Center : TextAlign.Start).constraintSize({ maxWidth: '85%' })
+        .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
+    }.width('100%').alignItems(VerticalAlign.Center).justifyContent(center ? FlexAlign.Center : FlexAlign.Start)
+      .accessibilityGroup(true).accessibilityText(this.desktop.summary)
+  }
+
   @Builder
   private EditorSheet() {
     CaptureEditor({ input: $input, mode: $mode, busy: this.busy, saving: this.editorSaving,
@@ -639,6 +710,9 @@ struct Index {
     Scroll() {
       Column({ space: 14 }) {
         Text('随手记，稍后在电脑整理。').fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+        if (this.connected && this.paired && this.desktop.visible) {
+          this.DesktopStatusLine(false)
+        }
         Button({ type: ButtonType.Normal }) {
           Row({ space: 16 }) {
             Column({ space: 8 }) {
@@ -755,10 +829,18 @@ struct Index {
             Text(this.paired ? '已配对归知' : this.statusError || this.error ? '连接需要检查' : '等待电脑确认').fontSize(21).fontWeight(FontWeight.Medium)
               .fontColor($r('app.color.text_primary'))
             Text(this.origin).fontSize(13).fontColor($r('app.color.text_secondary')).copyOption(CopyOptions.LocalDevice)
-            Text(this.paired ? '发送后，电脑上线即可接收。' : this.statusError ?
-              (this.automaticCheck ? '网络恢复后会自动继续检查，也可以手动重试。' : '请按上方原因处理，再点击重试。') :
-              '打开电脑「设置 → 手机收集」确认绑定。此页每 2 秒自动检查，无需重复提交；二维码过期请在电脑重新生成。')
-              .fontSize(13).fontColor($r('app.color.text_secondary'))
+            if (this.paired && this.desktop.visible) {
+              this.DesktopStatusLine(true)
+              if (this.desktop.detail !== '') {
+                Text(this.desktop.detail).fontSize(13).lineHeight(21).fontColor($r('app.color.text_secondary'))
+                  .width('100%').textAlign(TextAlign.Center)
+              }
+            } else {
+              Text(this.paired ? '发送后，电脑上线即可接收。' : this.statusError ?
+                (this.automaticCheck ? '网络恢复后会自动继续检查，也可以手动重试。' : '请按上方原因处理，再点击重试。') :
+                '打开电脑「设置 → 手机收集」确认绑定。此页每 2 秒自动检查，无需重复提交；二维码过期请在电脑重新生成。')
+                .fontSize(13).fontColor($r('app.color.text_secondary'))
+            }
             this.PrimaryAction(this.refreshing ? '正在检查' : '检查连接', $r('app.media.ic_link'), !this.busy && !this.refreshing,
               () => { this.refresh(); })
             if (!this.paired) {

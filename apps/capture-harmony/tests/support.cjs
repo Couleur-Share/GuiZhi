@@ -61,6 +61,8 @@ const batchSend = load('core/BatchSend.ts', {
 // 发送记录与近期页合并逻辑：与页面共用同一份解析实现，避免测试里另写一套“预期”。
 const sentLog = load('core/SentLog.ts', { './CaptureParser': captureParser, './TextPreview': textPreview });
 const historyView = load('core/HistoryView.ts', { './CaptureParser': captureParser, './SentLog': sentLog });
+// 电脑在线状态：纯函数与 30 秒节奏，页面与测试共用同一份实现。
+const desktopStatus = load('core/DesktopStatus.ts');
 
 // 内存端口：记录每次落盘的条目，可按需让读取或写入失败。
 function memorySentPort({ initial = [], damaged = false, failLoad = null, failSave = null } = {}) {
@@ -81,7 +83,7 @@ function createPage(client, extraImports = {}) {
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
     '../core/EditorAutosave': editorAutosave, '../core/CaptureParser': captureParser, '../core/SendingState': sendingState, '../core/BatchSend': batchSend,
-    '../core/SentLog': sentLog, '../core/HistoryView': historyView,
+    '../core/SentLog': sentLog, '../core/HistoryView': historyView, '../core/DesktopStatus': desktopStatus,
     ...extraImports,
     // $r 是 ArkTS 的资源引用，测试里直接返回资源名，页面里的对话框按钮等控制逻辑才能真实执行。
   }, { ...time.globals, $r: name => name }, true);
@@ -120,4 +122,4 @@ function loadRelayClient(time, script) {
   return { RelayClient, calls };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, memorySentPort };
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, desktopStatus, memorySentPort };

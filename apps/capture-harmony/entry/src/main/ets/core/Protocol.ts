@@ -37,8 +37,9 @@ export interface Receipt {
   id: string; requestId: string; createdAt: number; itemCount: number;
   state: string; progress: Progress | null;
 }
-export interface Session { paired: boolean; deviceId: string }
-export interface Meta { protocol: number; nativePairing?: boolean }
+// desktopSeenAgoMs：电脑最近一次取件距今的毫秒数（服务端计算），从未取件为 null；旧中转、待确认或已撤销的设备没有该字段。
+export interface Session { paired: boolean; deviceId: string; desktopSeenAgoMs?: number | null }
+export interface Meta { protocol: number; nativePairing?: boolean; desktopStatus?: boolean }
 export interface Claim { pairingId: string; nonce: string; credential: string; name: string }
 export interface ClaimResult { id: string }
 export interface ApiError { error?: string }
