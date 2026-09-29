@@ -8,7 +8,7 @@
     "requestPermissions": [{ "name": "ohos.permission.INTERNET" }, { "name": "ohos.permission.DETECT_GESTURE" }],
     "abilities": [{
       "name": "EntryAbility", "srcEntry": "./ets/entryability/EntryAbility.ets",
-      "description": "$string:module_desc", "icon": "$media:app_icon", "label": "$string:app_name",
+      "description": "$string:module_desc", "icon": "$media:app_icon", "label": "$string:launcher_name",
       "startWindowIcon": "$media:app_icon", "startWindowBackground": "$color:page_background",
       "exported": true, "launchType": "singleton",
       "skills": [

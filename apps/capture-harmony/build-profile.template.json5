@@ -1,13 +1,33 @@
 {
   "app": {
+    // 模板不含任何签名；本机 build-profile.json5（已被 .gitignore 忽略）由 DevEco 自动签名写入 signingConfigs。
     "signingConfigs": [],
-    "products": [{
-      "name": "default",
-      "compatibleSdkVersion": "6.1.0(23)",
-      "targetSdkVersion": "26.0.0",
-      "runtimeOS": "HarmonyOS"
-    }],
+    "products": [
+      {
+        "name": "default",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS"
+      },
+      {
+        // 真机开发包：独立包名、可与正式包并存，应用名带 Dev；调试签名需按此包名单独生成。
+        "name": "dev",
+        "bundleName": "com.couleurapp.guizhi.capture.dev",
+        "bundleType": "app",
+        "label": "$string:app_name_dev",
+        "compatibleSdkVersion": "6.1.0(23)",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS"
+      }
+    ],
     "buildModeSet": [{ "name": "debug" }, { "name": "release" }]
   },
-  "modules": [{ "name": "entry", "srcPath": "./entry", "targets": [{ "name": "default", "applyToProducts": ["default"] }] }]
+  "modules": [{
+    "name": "entry",
+    "srcPath": "./entry",
+    "targets": [
+      { "name": "default", "applyToProducts": ["default"] },
+      { "name": "dev", "applyToProducts": ["dev"] }
+    ]
+  }]
 }

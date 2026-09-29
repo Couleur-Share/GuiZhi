@@ -1,1 +1,14 @@
-{ "apiType": "stageMode", "buildOption": {}, "targets": [{ "name": "default" }] }
+{
+  "apiType": "stageMode",
+  "buildOption": {},
+  "targets": [
+    { "name": "default" },
+    {
+      // 桌面名称由入口 Ability 的 launcher_name 决定。同名资源“按配置顺序先到先得”，
+      // 所以 dev 目录排在前面覆盖名称；构建日志里的 conflict 提示是预期行为。
+      // AppScope 与模块资源同名时 AppScope 优先，故 launcher_name 只放在模块资源里。
+      "name": "dev",
+      "resource": { "directories": ["./src/dev/resources", "./src/main/resources"] }
+    }
+  ]
+}

@@ -11,3 +11,7 @@
 *.cer
 *.hap
 *.app
+# 调试签名材料一律留在本机，不进仓库。
+/signing/
+*.csr
+*.pem
