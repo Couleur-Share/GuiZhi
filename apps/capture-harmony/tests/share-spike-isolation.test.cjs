@@ -19,13 +19,13 @@ function sourceFiles(dir) {
   return files;
 }
 
-test('正式包 module.json5 不注册任何扩展，也不出现 spike 名称；权限仍只有 INTERNET 与 DETECT_GESTURE', () => {
+test('正式包 module.json5 不注册任何扩展，也不出现 spike 名称；权限只有 INTERNET、DETECT_GESTURE 与 VIBRATE（0.7.0 起，发送成功轻触觉）', () => {
   const module = read('entry/src/main/module.json5');
   assert.equal(/extensionAbilities/.test(module), false);
   assert.equal(/"type"\s*:\s*"share"/.test(module), false);
   assert.equal(/sharediag/i.test(module), false);
   const permissions = [...module.matchAll(/"name"\s*:\s*"(ohos\.permission\.[A-Z_]+)"/g)].map(match => match[1]);
-  assert.deepEqual(permissions.sort(), ['ohos.permission.DETECT_GESTURE', 'ohos.permission.INTERNET']);
+  assert.deepEqual(permissions.sort(), ['ohos.permission.DETECT_GESTURE', 'ohos.permission.INTERNET', 'ohos.permission.VIBRATE']);
 });
 
 test('正式包路由表只有 pages/Index；dev 路由 = 正式路由 + 两个诊断页，且页面源码存在并带 @Entry', () => {

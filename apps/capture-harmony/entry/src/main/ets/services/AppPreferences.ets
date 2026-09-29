@@ -19,6 +19,12 @@ export class AppPreferences {
   autoSendShare: boolean = false;
 }
 
+// 列表行里内容预览的行数：精简（存储值 3）单行，让行高一致；详细（存储值 6）最多 3 行。
+// 存储值沿用 3 / 6，已保存的设置无需迁移；换算只在这里，界面各处共用。
+export function previewLineCount(value: AppPreferences): number {
+  return value.previewLines === 6 ? 3 : 1;
+}
+
 export class AppPreferencesStore {
   private prefs: preferences.Preferences;
   constructor(prefs: preferences.Preferences) { this.prefs = prefs; }

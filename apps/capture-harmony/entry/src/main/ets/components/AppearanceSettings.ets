@@ -48,7 +48,7 @@ export struct AppearanceSettings {
         SettingSwitchRow({ title: '减少动效', value: this.settings.reduceMotion, settings: this.settings,
           interactive: !this.busy, onChange: (checked: boolean) => this.onChange('motion', `${checked}`) })
       }.width('100%').backgroundColor($r('app.color.surface')).borderRadius(20).transition(revealTransition(this.settings, 1))
-      this.Caption('减少动效会关闭应用的位移、缩放和过渡。重新开启后，保留原来的动画速度。')
+      this.Caption('减少动效会关闭应用的位移、缩放、过渡和发送成功时的触感。重新开启后，保留原来的动画速度。')
       Text('材质与反馈').fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding({ left: 8, top: 8 })
       Column() {
         SettingChoiceRow({ title: '沉浸光感', icon: $r('sys.symbol.rectangle_on_rectangle_fill'), settings: this.settings,
@@ -71,8 +71,8 @@ export struct AppearanceSettings {
         SettingSwitchRow({ title: '按压反馈', icon: $r('sys.symbol.hand_draw'), value: this.settings.lightFeedback,
           settings: this.settings, interactive: !this.busy, onChange: (checked: boolean) => this.onChange('light', `${checked}`) })
       }.width('100%').backgroundColor($r('app.color.surface')).borderRadius(20).transition(revealTransition(this.settings, 2))
-      this.Caption(materialAvailable() ? '光感用于底栏、菜单和弹层。按压反馈同时控制按钮形变，效果随系统与设备调整。' :
-        '当前设备使用普通系统材质。按压反馈仍可控制按钮形变。')
+      this.Caption(materialAvailable() ? '光感用于底栏、菜单和弹层。按压反馈同时控制按钮形变与发送成功时的触感，效果随系统与设备调整。' :
+        '当前设备使用普通系统材质。按压反馈仍可控制按钮形变与发送成功时的触感。')
       Text('单手操作').fontSize(13).fontColor($r('app.color.text_secondary')).width('100%').padding({ left: 8, top: 8 })
       Column() {
         SettingSwitchRow({ title: '智感握姿', icon: $r('sys.symbol.hand_draw'), value: this.settings.handedness,

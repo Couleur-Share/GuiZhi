@@ -63,6 +63,12 @@ const sentLog = load('core/SentLog.ts', { './CaptureParser': captureParser, './T
 const historyView = load('core/HistoryView.ts', { './CaptureParser': captureParser, './SentLog': sentLog });
 // 电脑在线状态：纯函数与 30 秒节奏，页面与测试共用同一份实现。
 const desktopStatus = load('core/DesktopStatus.ts');
+// 列表分组、多选与延迟删除：纯逻辑，页面与测试共用同一份实现。
+const dayGroups = load('core/DayGroups.ts');
+const selection = load('core/Selection.ts');
+const pendingDelete = load('core/PendingDelete.ts');
+// 列表键：ForEach 是否复用旧子项完全取决于它，所以单独作为可测试的纯函数。
+const listKeys = load('core/ListKeys.ts');
 // 分享入口 spike（仅 dev 包）的诊断整理：与应用共用同一份 ShareRecords / CaptureParser，才能如实反映现有逻辑对各来源分享的处理。
 const shareProbe = load('sharediag/ShareProbe.ts', { '../core/ShareRecords': load('core/ShareRecords.ts'), '../core/CaptureParser': captureParser });
 
@@ -80,12 +86,17 @@ function memorySentPort({ initial = [], damaged = false, failLoad = null, failSa
 // 页面装载：extraImports 覆盖或补充默认桩，供后续新增模块使用。
 function createPage(client, extraImports = {}) {
   const time = clock();
+  // 发送成功的触觉：只记录调用（传入的设置），不触碰系统振动；真实效果由 haptics.test.cjs 用假的 vibrator 验证。
+  const haptics = [];
   const { Index } = load('pages/Index.ets', {
     '../services/ThemePalette': load('services/ThemePalette.ets', {}, { '$r': name => name }),
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
     '../core/EditorAutosave': editorAutosave, '../core/CaptureParser': captureParser, '../core/SendingState': sendingState, '../core/BatchSend': batchSend,
     '../core/SentLog': sentLog, '../core/HistoryView': historyView, '../core/DesktopStatus': desktopStatus,
+    '../core/PendingDelete': pendingDelete, '../core/Selection': selection, '../core/TextPreview': textPreview,
+    '../services/Layout': load('services/Layout.ets'),
+    '../services/Haptics': { hapticSuccess: settings => { haptics.push(settings); } },
     ...extraImports,
     // $r 是 ArkTS 的资源引用，测试里直接返回资源名，页面里的对话框按钮等控制逻辑才能真实执行。
   }, { ...time.globals, $r: name => name }, true);
@@ -96,7 +107,7 @@ function createPage(client, extraImports = {}) {
   // ConnectionCheck 使用同一时钟，避免依赖真实时间。
   ui.connectionCheck.canCheck = (manual) => ConnectionCheck.prototype.canCheck.call(ui.connectionCheck, manual, time.now());
   ui.connectionCheck.failed = error => ConnectionCheck.prototype.failed.call(ui.connectionCheck, error, time.now());
-  return { ui, time };
+  return { ui, time, haptics };
 }
 
 // RelayClient 装载：http 由脚本编排（每次请求消耗一项），其余使用真实的 Protocol / ConnectionCheck / SendOutcome。
@@ -124,4 +135,4 @@ function loadRelayClient(time, script) {
   return { RelayClient, calls };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, desktopStatus, shareProbe, memorySentPort };
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, desktopStatus, dayGroups, selection, pendingDelete, listKeys, shareProbe, memorySentPort };

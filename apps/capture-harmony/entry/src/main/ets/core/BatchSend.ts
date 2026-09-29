@@ -76,11 +76,14 @@ function findDraft(state: LocalState, requestId: string): Draft | undefined {
 // - 不占用页面锁：sender 每条的网络请求之间，界面仍可继续记录。
 // - 已被其他路径发送或移除的条目不算失败，由对应路径负责报告。
 // - 绑定其他电脑的草稿跳过并注明原因；遇到对后续条目同样成立的错误立即停止，其余条目标记为“未发送”。
-export async function sendBatch(queue: BatchQueue, binding: string, sender: CaptureSender, hooks: BatchHooks): Promise<BatchResult> {
+// - only 给出时只发送这些编号（多选发送）；没给则发送收集箱里的全部草稿。不在收集箱里的编号直接忽略，不计入总数。
+export async function sendBatch(queue: BatchQueue, binding: string, sender: CaptureSender, hooks: BatchHooks, only?: string[]): Promise<BatchResult> {
   const result = new BatchResult();
   const ids: string[] = [];
   const initial = queue.snapshot().drafts;
-  for (let i = 0; i < initial.length; i++) ids.push(initial[i].requestId);
+  for (let i = 0; i < initial.length; i++) {
+    if (only === undefined || only.includes(initial[i].requestId)) ids.push(initial[i].requestId);
+  }
   result.total = ids.length;
   let done = 0;
   for (let i = 0; i < ids.length; i++) {

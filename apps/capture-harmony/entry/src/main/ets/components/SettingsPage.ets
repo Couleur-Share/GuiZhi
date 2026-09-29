@@ -2,6 +2,7 @@ import { AppPreferences } from '../services/AppPreferences';
 import { ThemePalette } from '../services/ThemePalette';
 import { animationSpeedLabel, pressFeedback, revealTransition } from '../services/InterfaceMotion';
 import { appVersionLabel } from '../services/AppVersion';
+import { CONTENT_MAX_WIDTH } from '../services/Layout';
 import { SENT_LOG_LIMIT } from '../core/SentLog';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingChoiceRow, SettingSwitchRow, SettingsRouteRow } from './SettingsRows';
@@ -67,9 +68,9 @@ export struct SettingsPage {
         ] })
       Divider().color($r('app.color.border_subtle')).margin({ left: 50 }).width('82%')
       SettingChoiceRow({ title: '内容预览', icon: $r('sys.symbol.list_square_bill'), settings: this.settings,
-        value: this.settings.previewLines === 3 ? '精简 · 3 行' : '详细 · 6 行', interactive: !this.busy, items: [
-          { value: '精简 · 3 行', action: () => this.update('preview', '3') },
-          { value: '详细 · 6 行', action: () => this.update('preview', '6') }
+        value: this.settings.previewLines === 3 ? '精简 · 1 行' : '详细 · 3 行', interactive: !this.busy, items: [
+          { value: '精简 · 1 行', action: () => this.update('preview', '3') },
+          { value: '详细 · 3 行', action: () => this.update('preview', '6') }
         ] })
       Divider().color($r('app.color.border_subtle')).margin({ left: 50 }).width('82%')
       SettingSwitchRow({ title: '编辑时显示字数', icon: $r('sys.symbol.doc_text'), settings: this.settings,
@@ -119,8 +120,8 @@ export struct SettingsPage {
             Text('只重置外观与收集偏好，保留草稿和电脑连接。').fontSize(12).lineHeight(20)
               .fontColor($r('app.color.text_secondary')).padding(8).width('100%')
           }
-        }.width('100%').padding({ left: 20, right: 20, top: 12, bottom: 32 })
-      }.width('100%').height('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+        }.width('100%').constraintSize({ maxWidth: CONTENT_MAX_WIDTH }).padding({ left: 20, right: 20, top: 12, bottom: 32 })
+      }.width('100%').height('100%').align(Alignment.Top).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
     }.title(name === 'appearance' ? '外观与动效' : name === 'capture' ? '收集偏好' : name === 'privacy' ? '连接与隐私' : '关于归知')
       .backgroundColor($r('app.color.page_background')).onBackPressed(() => this.back())
       .onShown(() => this.onDetail(true)).onHidden(() => this.onDetail(false))
@@ -141,8 +142,8 @@ export struct SettingsPage {
             settings: this.settings, onOpen: () => this.open('privacy') }).transition(revealTransition(this.settings, 2))
           SettingsRouteRow({ title: '关于归知', detail: '版本信息与恢复默认', icon: $r('sys.symbol.info_circle'),
             settings: this.settings, onOpen: () => this.open('about') }).transition(revealTransition(this.settings, 3))
-        }.padding({ left: 20, right: 20, bottom: 112 }).width('100%')
-      }.height('100%').width('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
+        }.padding({ left: 20, right: 20, bottom: 112 }).width('100%').constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+      }.height('100%').width('100%').align(Alignment.Top).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
     }.mode(NavigationMode.Stack).hideTitleBar(true).navDestination(this.Destination).width('100%').height('100%')
       .backgroundColor($r('app.color.page_background'))
   }

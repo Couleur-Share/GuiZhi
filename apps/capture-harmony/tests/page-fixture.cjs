@@ -23,7 +23,7 @@ async function pageWith(clientParts = {}, inputs = ['https://example.com/a'], ex
     send: body => { stats.sends.push(body.requestId); return sendImpl(body); },
   };
   const copied = [];
-  const { ui, time } = createPage(client, {
+  const { ui, time, haptics } = createPage(client, {
     '@kit.ArkTS': { util: { generateRandomUUID: () => uuid() } },
     '@kit.BasicServicesKit': { pasteboard: {
       MIMETYPE_TEXT_PLAIN: 'text/plain', createData: (mime, text) => ({ mime, text }),
@@ -39,7 +39,7 @@ async function pageWith(clientParts = {}, inputs = ['https://example.com/a'], ex
   ui.drafts = queue.snapshot().drafts; ui.paired = true;
   ui.selectTab = () => {}; ui.syncHolding = () => {}; ui.startPolling = () => {};
   ui.settings = { autoSendShare: false, defaultMode: 'auto' }; ui.settingsReady = true;
-  return { ui, time, queue, store, stats, copied, client, sentPort };
+  return { ui, time, queue, store, stats, copied, client, sentPort, haptics };
 }
 
 // 等待后台 Promise 链（串行步骤有多次 await）走完。

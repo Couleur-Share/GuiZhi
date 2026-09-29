@@ -53,6 +53,15 @@ test('设置持久化失败向调用者报告，不能伪报保存成功', async
   assert.equal(memory.disk(), '');
 });
 
+test('预览行数：已存储的 3 / 6 分别对应紧凑列表的 1 / 3 行，未知值退回精简而不是撑开列表', () => {
+  const { previewLineCount } = preferences;
+  const value = new AppPreferences();
+  assert.equal(previewLineCount(value), 1, '默认值（3）是精简 1 行');
+  value.previewLines = 6; assert.equal(previewLineCount(value), 3);
+  value.previewLines = 3; assert.equal(previewLineCount(value), 1);
+  value.previewLines = 99; assert.equal(previewLineCount(value), 1);
+});
+
 function materialRuntime(device, supported = true) {
   const empty = { disabled: true };
   const kit = supported === 'missing' ? new Proxy({}, { get() { throw Error('old OS API accessed'); } }) : {

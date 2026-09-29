@@ -4,14 +4,20 @@ import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { scanBarcode, scanCore } from '@kit.ScanKit';
-import { KeyboardAvoidMode } from '@kit.ArkUI';
+import { KeyboardAvoidMode, SymbolGlyphModifier } from '@kit.ArkUI';
+import { SecondaryAction } from '../components/Actions';
 import { CaptureEditor } from '../components/CaptureEditor';
-import { DraftCard } from '../components/DraftCard';
-import { ReceiptCard } from '../components/ReceiptCard';
+import { CaptureTab } from '../components/CaptureTab';
+import { ConnectionTab } from '../components/ConnectionTab';
+import { HistoryTab } from '../components/HistoryTab';
+import { SelectionBar } from '../components/SelectionBar';
 import { SettingsPage } from '../components/SettingsPage';
+import { UndoBar } from '../components/UndoBar';
 import { AppPreferences, AppPreferencesStore, applyColorMode } from '../services/AppPreferences';
 import { CaptureTabsAppearance, panelMaterial } from '../services/ImmersiveAppearance';
-import { animateInterface, revealTransition, pressFeedback, motionDuration } from '../services/InterfaceMotion';
+import { hapticSuccess } from '../services/Haptics';
+import { animateInterface, revealTransition, motionDuration } from '../services/InterfaceMotion';
+import { CONTENT_END_OFFSET, CONTENT_END_OFFSET_SELECTING, CONTENT_END_OFFSET_UNDO, CONTENT_MAX_WIDTH } from '../services/Layout';
 import { HoldingHandObserver, HoldingHandState } from '../services/HoldingHandObserver';
 import { CaptureRuntime } from '../services/CaptureRuntime';
 import { ConnectionCheck, RelayRequestError } from '../core/ConnectionCheck';
@@ -19,10 +25,13 @@ import { EditorAutosave } from '../core/EditorAutosave';
 import { CaptureParse, MAX_ITEMS, parseCapture, splitUrlChunks } from '../core/CaptureParser';
 import { BatchHooks, BatchResult, sendBatch, batchHeadline, batchReport } from '../core/BatchSend';
 import { DesktopPoll, DesktopStatus, desktopStatusOf, waitingCount } from '../core/DesktopStatus';
-import { HistoryItem, firstPage, historyCursor, historyKey, mergeHistory, nextPage } from '../core/HistoryView';
+import { HistoryItem, firstPage, historyCursor, mergeHistory, nextPage } from '../core/HistoryView';
+import { DeleteFailure, DeleteHooks, PendingDeletes } from '../core/PendingDelete';
 import { SentEntry, buildSentEntry } from '../core/SentLog';
+import { allSelected, keepExisting, toggleId } from '../core/Selection';
 import { SendingEntry, sendingBegin, sendingEnd, sendingFind, sendingTick } from '../core/SendingState';
-import { Draft, CaptureMode, Receipt, ReceiptTone, PairingLink, Session, parsePairingLink } from '../core/Protocol';
+import { previewText } from '../core/TextPreview';
+import { Draft, CaptureMode, Receipt, PairingLink, Session, parsePairingLink } from '../core/Protocol';
 
 @Entry
 @Component
@@ -73,6 +82,13 @@ struct Index {
   // “全部发送”的进度；batchTotal > 0 表示批量发送进行中。
   @State batchDone: number = 0;
   @State batchTotal: number = 0;
+  // 多选：长按草稿进入；selectedIds 只保存仍在列表里的草稿编号，草稿被发送或删除后自动收缩。
+  @State selecting: boolean = false;
+  @State selectedIds: string[] = [];
+  // 延迟删除中的草稿编号（撤销窗口内，或正在真正删除）：仍保存在本机，只是不在列表里显示。
+  @State hiddenIds: string[] = [];
+  // 撤销条文案；空字符串表示当前没有可撤销的删除。
+  @State undoMessage: string = '';
   private sendTimer: number = -1;
   // 批量发送失败时，界面只内联展示前几条原因，完整原因通过“复制原因”提供；二者以文案相等关联，文案变化后自动失效。
   private errorDetail: string = '';
@@ -89,6 +105,13 @@ struct Index {
     (action: () => void, delay: number): number => setTimeout(action, delay),
     (id: number): void => { clearTimeout(id); },
     (saving: boolean, error: string): void => { this.editorSaving = saving; this.editorError = error; }
+  );
+  // 延迟删除：先隐藏并留 8 秒撤销，到点才真正删除；进入后台前立即删除，不把决定留到进程被回收之后。
+  private pendingDeletes: PendingDeletes = new PendingDeletes(
+    (ids: string[]): Promise<DeleteFailure[]> => this.commitDeletes(ids),
+    this.deleteHooks(),
+    (action: () => void, delay: number): number => setTimeout(action, delay),
+    (id: number): void => { clearTimeout(id); }
   );
   @StorageLink('captureSafeTop') safeTop: number = 0;
   @StorageLink('captureSafeBottom') safeBottom: number = 0;
@@ -121,11 +144,19 @@ struct Index {
     this.visible = false; this.stopPolling(); this.holdingObserver.stop();
     if (this.sendTimer !== -1) { clearInterval(this.sendTimer); this.sendTimer = -1; }
     this.autosave.flush().catch(() => {});
+    this.pendingDeletes.flush().catch(() => {});
   }
   onPageShow(): void { this.visible = true; this.startPolling(); this.syncHolding(); }
   onPageHide(): void {
     this.visible = false; this.stopPolling(); this.holdingObserver.stop();
     this.autosave.flush().catch(() => {});
+    this.pendingDeletes.flush().catch(() => {});
+  }
+  // 系统返回键/手势：多选中先退出多选，不直接退出应用。
+  onBackPress(): boolean {
+    if (!this.selecting) return false;
+    this.exitSelection();
+    return true;
   }
 
   private animate(change: () => void): void {
@@ -153,6 +184,8 @@ struct Index {
     this.stopPolling();
     // 进入后台前立即落盘：防抖计时器可能随进程被系统挂起而永远不触发。失败原因已在编辑面板显示。
     this.autosave.flush().catch(() => {});
+    // 撤销窗口只在前台有意义：离开前直接完成删除，失败的条目回到列表并在回来时提示。
+    this.pendingDeletes.flush().catch(() => {});
   }
 
   private async initialize(): Promise<void> {
@@ -176,7 +209,19 @@ struct Index {
   }
 
   private reloadDrafts(): void {
-    if (this.runtime) { const rows = this.runtime.queue.snapshot().drafts; this.animate(() => { this.drafts = rows; }); }
+    if (this.runtime) {
+      const rows = this.runtime.queue.snapshot().drafts;
+      this.animate(() => { this.drafts = rows; });
+      this.pruneSelection(rows);
+    }
+  }
+
+  // 草稿被发送、删除或隐藏后，多选集合只保留仍可见的条目；没有可选的草稿时自动退出多选。
+  private pruneSelection(rows: Draft[]): void {
+    if (!this.selecting) return;
+    const visible = rows.map((draft: Draft): string => draft.requestId).filter((id: string): boolean => !this.hiddenIds.includes(id));
+    this.selectedIds = keepExisting(this.selectedIds, visible);
+    if (visible.length === 0) this.exitSelection();
   }
 
   // 自动检查：等待电脑确认时约每 2 秒一次（受 ConnectionCheck 退避约束）；配对后放慢到每 30 秒一次，只为刷新电脑在线状态。
@@ -433,6 +478,7 @@ struct Index {
     this.error = ''; this.notice = '';
     try {
       await this.sendOne(draft);
+      hapticSuccess(this.settings);
       return true;
     } catch (error) {
       this.animate(() => { this.error = (error as Error).message || '发送失败，请重试'; });
@@ -503,15 +549,29 @@ struct Index {
     catch { this.statusError = '提交已成功，近期记录刷新失败，请重试刷新'; }
   }
 
-  // 全部发送：逐条串行，预检会话与结束后的近期记录刷新各只做一次；界面在整个过程中保持可用。
+  // 列表里可见的草稿编号（本机队列里的草稿，去掉延迟删除中的）。
+  private visibleIds(): string[] {
+    const rows: Draft[] = this.runtime ? this.runtime.queue.snapshot().drafts : [];
+    return rows.map((draft: Draft): string => draft.requestId).filter((id: string): boolean => !this.hiddenIds.includes(id));
+  }
+
+  // 全部发送：所有可见草稿；多选发送只发选中的几条，二者共用同一套发送与汇总流程。
+  private async sendAll(): Promise<void> { await this.runBatch(this.visibleIds()); }
+
+  private async sendSelected(): Promise<void> {
+    if (this.batchTotal > 0 || this.busy) return;
+    const ids = keepExisting(this.selectedIds, this.visibleIds());
+    this.exitSelection();
+    await this.runBatch(ids);
+  }
+
+  // 逐条串行，预检会话与结束后的近期记录刷新各只做一次；界面在整个过程中保持可用。
   // 配对、解绑、编辑草稿等占用页面锁的操作进行中不启动：它们会改变连接或草稿本身。
-  private async sendAll(): Promise<void> {
+  private async runBatch(ids: string[]): Promise<void> {
     const runtime = this.runtime;
-    if (!runtime || this.batchTotal > 0 || this.busy) return;
-    const pending = runtime.queue.snapshot().drafts.length;
-    if (pending === 0) return;
+    if (!runtime || this.batchTotal > 0 || this.busy || ids.length === 0) return;
     this.error = ''; this.notice = '';
-    this.batchDone = 0; this.batchTotal = pending;
+    this.batchDone = 0; this.batchTotal = ids.length;
     try {
       if (!runtime.client || !runtime.connection) throw new Error('请先在“连接”页面配对电脑');
       const session = await runtime.client.session();
@@ -523,7 +583,7 @@ struct Index {
         this.endSending(requestId); this.batchDone = done; this.reloadDrafts();
       };
       hooks.sent = (draft: Draft, receipt: Receipt): Promise<void> => this.recordSent(draft, receipt);
-      const result = await sendBatch(runtime.queue, runtime.connection.pairingId, runtime.client, hooks);
+      const result = await sendBatch(runtime.queue, runtime.connection.pairingId, runtime.client, hooks, ids);
       if (result.sent.length > 0) await this.refreshHistoryAfterSend();
       this.reportBatch(result);
     } catch (error) {
@@ -537,7 +597,7 @@ struct Index {
   // 只有全部成功才提示成功；否则汇总数量与原因，界面内联展示前几条，完整原因可复制。
   private reportBatch(result: BatchResult): void {
     const headline = batchHeadline(result);
-    if (result.ok) { this.notice = headline; return; }
+    if (result.ok) { this.notice = headline; hapticSuccess(this.settings); return; }
     const inline = batchReport(result, 3);
     const message = inline ? `${headline}\n${inline}` : headline;
     this.errorDetail = `${headline}\n${batchReport(result, 0)}`;
@@ -559,14 +619,138 @@ struct Index {
     if (draft) this.sendDraft(draft);
   }
 
-  private async remove(draft: Draft): Promise<void> {
-    const result = await this.getUIContext().getPromptAction().showDialog({
-      title: '删除本机草稿？', systemMaterial: panelMaterial(this.settings),
-      message: draft.attempted ? '此条可能已被服务端接收。删除本机草稿不会撤回投递，请先核对近期记录。' : '这条尚未发送，删除后无法恢复。',
-      buttons: [{ text: '保留', color: $r('app.color.text_secondary') }, { text: '删除草稿', color: $r('app.color.error') }]
-    });
-    if (result.index === 1) await this.runtime?.queue.remove(draft.requestId);
+  // 删除草稿（单条滑动删除、多选删除共用）：先隐藏并给 8 秒撤销窗口，到点才真正删除。
+  // 曾尝试发送过的草稿仍先确认：它们可能已被服务端接收，删除本机草稿不会撤回投递；选择“保留”时不改动任何东西（含多选状态）。
+  // leaveSelection：多选删除成功进入撤销窗口后退出多选。
+  private async requestDelete(drafts: Draft[], leaveSelection: boolean = false): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime || drafts.length === 0) return;
+    // 正在发送的草稿不能删除：发送结果回来前删除会破坏它与回执的对应关系。
+    const removable = drafts.filter((draft: Draft): boolean =>
+      !runtime.queue.isSending(draft.requestId) && sendingFind(this.sendings, draft.requestId) === undefined);
+    const blocked = drafts.length - removable.length;
+    if (removable.length === 0) {
+      this.animate(() => { this.error = '正在发送的草稿不能删除，请等待发送结果'; });
+      return;
+    }
+    const attempted = removable.filter((draft: Draft): boolean => draft.attempted).length;
+    if (attempted > 0) {
+      const result = await this.getUIContext().getPromptAction().showDialog({
+        title: '删除已尝试发送的草稿？', systemMaterial: panelMaterial(this.settings),
+        message: (attempted === 1 && removable.length === 1 ? '此条' : `其中 ${attempted} 条`) +
+          '可能已被服务端接收。删除本机草稿不会撤回投递，请先核对近期记录。',
+        buttons: [{ text: '保留', color: $r('app.color.text_secondary') }, { text: '删除草稿', color: $r('app.color.error') }]
+      });
+      if (result.index !== 1) return;
+    }
+    const scheduled = this.pendingDeletes.schedule(removable.map((draft: Draft): string => draft.requestId));
+    this.undoMessage = removable.length === 1 ? '已删除 1 条草稿' : `已删除 ${removable.length} 条草稿`;
+    if (blocked > 0) this.notice = `${blocked} 条正在发送，未删除`;
+    if (leaveSelection) this.exitSelection();
+    await scheduled;
   }
+
+  private async deleteSelected(): Promise<void> { await this.requestDelete(this.selectedDrafts(), true); }
+
+  // 撤销窗口内撤销：草稿恢复显示，本机数据从未被改动。撤销条随窗口关闭由 deleteHooks().changed 收起。
+  private undoDelete(): void {
+    const restored = this.pendingDeletes.undo();
+    if (restored.length > 0) this.notice = restored.length === 1 ? '已撤销删除' : `已撤销删除 ${restored.length} 条`;
+  }
+
+  // 真正删除：逐条记账，单条失败不影响其他条，失败原因交给 deleteHooks().failed 汇总展示。
+  private async commitDeletes(ids: string[]): Promise<DeleteFailure[]> {
+    const queue = this.runtime?.queue;
+    const failures: DeleteFailure[] = [];
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        if (queue === undefined) throw new Error('本机数据尚未就绪');
+        await queue.remove(ids[i]);
+      } catch (error) {
+        const failure = new DeleteFailure();
+        failure.requestId = ids[i]; failure.message = (error as Error).message || '删除失败';
+        failures.push(failure);
+      }
+    }
+    return failures;
+  }
+
+  private deleteHooks(): DeleteHooks {
+    const hooks = new DeleteHooks();
+    hooks.changed = (hidden: string[], undoable: boolean): void => {
+      this.hiddenIds = hidden;
+      if (!undoable) this.undoMessage = '';
+      // 隐藏集合变化后重新读取本机草稿：删除完成的条目消失，撤销或删除失败的条目重新出现。
+      this.reloadDrafts();
+    };
+    hooks.failed = (failures: DeleteFailure[]): void => { this.reportDeleteFailures(failures); };
+    return hooks;
+  }
+
+  // 删除失败的草稿已经恢复显示：分别说明每一条的原因，界面内联展示前几条，完整原因可复制。
+  private reportDeleteFailures(failures: DeleteFailure[]): void {
+    const lines: string[] = failures.map((failure: DeleteFailure): string => {
+      const draft = this.drafts.find((item: Draft): boolean => item.requestId === failure.requestId);
+      return `· ${draft === undefined ? '一条草稿' : previewText(draft.input, 28)} — ${failure.message}`;
+    });
+    const headline = `${failures.length} 条草稿没能删除，已恢复显示`;
+    const inline = lines.slice(0, 3);
+    if (lines.length > 3) inline.push(`· 另有 ${lines.length - 3} 条，可点“复制原因”查看全部`);
+    const message = `${headline}\n${inline.join('\n')}`;
+    this.errorDetail = `${headline}\n${lines.join('\n')}`;
+    this.errorDetailFor = message;
+    this.animate(() => { this.error = message; });
+  }
+
+  // 长按草稿进入多选，并选中这一条；批量发送或删除进行中不进入。
+  private enterSelection(requestId: string): void {
+    if (this.busy || this.batchTotal > 0 || this.hiddenIds.includes(requestId)) return;
+    this.animate(() => { this.selecting = true; this.selectedIds = [requestId]; });
+  }
+
+  private toggleSelection(requestId: string): void {
+    if (this.selecting) this.selectedIds = toggleId(this.selectedIds, requestId);
+  }
+
+  private exitSelection(): void {
+    if (!this.selecting && this.selectedIds.length === 0) return;
+    this.animate(() => { this.selecting = false; this.selectedIds = []; });
+  }
+
+  // 全选与取消全选：只针对当前可见的草稿。
+  private toggleSelectAll(): void {
+    const ids = this.visibleIds();
+    this.selectedIds = allSelected(this.selectedIds, ids) ? [] : ids;
+  }
+
+  private selectedDrafts(): Draft[] {
+    return this.drafts.filter((draft: Draft): boolean => this.selectedIds.includes(draft.requestId) && !this.hiddenIds.includes(draft.requestId));
+  }
+
+  // 收集页展示的草稿：最新在前，去掉延迟删除中的。
+  private visibleDrafts(): Draft[] {
+    return this.drafts.filter((draft: Draft): boolean => !this.hiddenIds.includes(draft.requestId)).reverse();
+  }
+
+  // 页签栏是否收起：键盘弹出、多选中、设置详情页里都收起。
+  private barHidden(): boolean {
+    return this.keyboardVisible || this.selecting || (this.selectedTab === 3 && this.settingsDetail);
+  }
+
+  // 列表末尾为页签栏、多选栏、撤销条预留的空间，避免最后一条被浮层挡住。
+  private contentEndOffset(): number {
+    if (this.selecting) return CONTENT_END_OFFSET_SELECTING;
+    return this.undoMessage !== '' ? CONTENT_END_OFFSET_UNDO : CONTENT_END_OFFSET;
+  }
+
+  // 配对链接输入变化后，之前解析出的服务地址不再可信，需要重新解析。
+  private editPairingText(value: string): void {
+    this.pairingText = value; this.pairing = undefined; this.pairingOrigin = '';
+  }
+
+  private editDeviceName(value: string): void { this.deviceName = value; }
+
+  private togglePairingLink(): void { this.animate(() => { this.showPairingLink = !this.showPairingLink; }); }
 
   private async editDraft(draft: Draft): Promise<void> {
     if (!this.runtime) return;
@@ -646,56 +830,6 @@ struct Index {
 
   // @test-boundary 此行之前是页面控制逻辑，Node 测试会真实执行；之后是 ArkUI Builder，只由 Hvigor 编译验证。
   @Builder
-  private EmptyState(icon: Resource, title: string, detail: string) {
-    Column({ space: 10 }) {
-      Image(icon).fillColor(this.palette.accent).padding(18).width(72).height(72)
-        .backgroundColor(this.palette.soft).borderRadius(24).margin({ bottom: 6 })
-      Text(title).fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-      Text(detail).fontSize(13).lineHeight(21).fontColor($r('app.color.text_secondary')).textAlign(TextAlign.Center)
-    }.width('100%').padding({ top: 32, bottom: 32, left: 24, right: 24 })
-  }
-
-  @Builder
-  private PrimaryAction(label: string, icon: Resource, enabled: boolean, action: () => void) {
-    Button({ type: ButtonType.Normal }) {
-      Row({ space: 8 }) {
-        Image(icon).width(19).height(19)
-          .fillColor(enabled ? this.palette.onAccent : $r('app.color.text_tertiary'))
-        Text(label).fontSize(16).fontWeight(FontWeight.Medium)
-          .fontColor(enabled ? this.palette.onAccent : $r('app.color.text_tertiary'))
-      }.justifyContent(FlexAlign.Center).width('100%')
-    }.height(50).width('100%').borderRadius(16).enabled(enabled).opacity(1)
-      .clickEffect(pressFeedback(this.settings)).backgroundColor(enabled ? this.palette.accent : $r('app.color.surface_muted')).onClick(action)
-  }
-
-  @Builder
-  private SecondaryAction(label: string, enabled: boolean, action: () => void) {
-    Button(label, { type: ButtonType.Normal }).height(44).fontSize(14).borderRadius(12)
-      .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.text_primary'))
-      .enabled(enabled).clickEffect(pressFeedback(this.settings)).onClick(action)
-  }
-
-  // 语义色只是辅助：状态行的文字本身已完整表达状态，不依赖颜色区分。
-  private desktopToneColor(tone: ReceiptTone): ResourceColor {
-    if (tone === 'success') return $r('app.color.success');
-    if (tone === 'warning') return $r('app.color.warning');
-    if (tone === 'error') return $r('app.color.error');
-    return $r('app.color.text_secondary');
-  }
-
-  // 电脑在线状态行：收集页标题下方左对齐，连接页状态卡居中。
-  @Builder
-  private DesktopStatusLine(center: boolean) {
-    Row({ space: 8 }) {
-      Row().width(8).height(8).borderRadius(4).backgroundColor(this.desktopToneColor(this.desktop.tone))
-      Text(this.desktop.summary).fontSize(13).lineHeight(20).fontColor($r('app.color.text_secondary'))
-        .textAlign(center ? TextAlign.Center : TextAlign.Start).constraintSize({ maxWidth: '85%' })
-        .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
-    }.width('100%').alignItems(VerticalAlign.Center).justifyContent(center ? FlexAlign.Center : FlexAlign.Start)
-      .accessibilityGroup(true).accessibilityText(this.desktop.summary)
-  }
-
-  @Builder
   private EditorSheet() {
     CaptureEditor({ input: $input, mode: $mode, busy: this.busy, saving: this.editorSaving,
       error: this.error || this.editorError, settings: this.settings, canSend: this.connected && this.paired,
@@ -705,200 +839,16 @@ struct Index {
       onClose: () => this.closeEditor() })
   }
 
-  @Builder
-  private CapturePage() {
-    Scroll() {
-      Column({ space: 14 }) {
-        Text('随手记，稍后在电脑整理。').fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-        if (this.connected && this.paired && this.desktop.visible) {
-          this.DesktopStatusLine(false)
-        }
-        Button({ type: ButtonType.Normal }) {
-          Row({ space: 16 }) {
-            Column({ space: 8 }) {
-              Text(this.input.trim() ? '继续未完成的记录' : '记下一个想法…').fontSize(19).fontWeight(FontWeight.Medium)
-                .fontColor($r('app.color.text_primary'))
-              Text(this.input.trim() ? this.input : '链接、文字，都可以留在这里').fontSize(13)
-                .fontColor($r('app.color.text_secondary')).maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis })
-            }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-            Image($r('app.media.ic_compose')).width(26).height(26).fillColor(this.palette.accent)
-          }.width('100%').padding(22)
-        }.width('100%').constraintSize({ minHeight: 112 }).borderRadius(20)
-          .backgroundColor($r('app.color.surface')).enabled(!this.busy)
-          .clickEffect(pressFeedback(this.settings)).onClick(() => this.openEditor())
-        Row({ space: 8 }) {
-          Text('待发送').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-          Text(`${this.drafts.length}`).fontSize(12).fontColor($r('app.color.text_tertiary'))
-          Blank()
-          if (this.connected && this.drafts.length >= 2) {
-            // 批量发送期间显示进度；整个过程不锁页面，可以继续记录。
-            Button(this.batchTotal > 0 ? `发送中 ${this.batchDone}/${this.batchTotal}` : '全部发送', { type: ButtonType.Normal })
-              .height(44).fontSize(14).padding({ left: 14, right: 14 }).borderRadius(12)
-              .backgroundColor(this.palette.soft).fontColor(this.palette.accent)
-              .enabled(this.batchTotal === 0 && !this.busy).clickEffect(pressFeedback(this.settings))
-              .accessibilityText(this.batchTotal > 0 ? `全部发送进行中，已处理 ${this.batchDone} 条，共 ${this.batchTotal} 条` : `全部发送，共 ${this.drafts.length} 条`)
-              .onClick(() => { this.sendAll(); })
-          } else {
-            Text('仅保存在本机').fontSize(12).fontColor($r('app.color.text_tertiary'))
-          }
-        }.width('100%')
-        if (this.drafts.length === 0) {
-          this.EmptyState($r('app.media.ic_inbox'), '从第一条收集开始', '点击上方记录，或从其他应用\n分享链接与文字到归知。')
-        }
-        ForEach(this.drafts.slice().reverse(), (draft: Draft, index: number) => {
-          DraftCard({ draft: draft, index: index, busy: this.busy, connected: this.connected, settings: this.settings,
-            sending: sendingFind(this.sendings, draft.requestId) !== undefined,
-            sendingSeconds: this.sendingSecondsOf(draft.requestId),
-            onSend: () => { this.sendDraft(draft); },
-            onEdit: () => { this.act(() => this.editDraft(draft)); },
-            onRemove: () => { this.act(() => this.remove(draft)); }, onConnect: () => { this.selectTab(2); } })
-        }, (draft: Draft) => draft.requestId)
-        if (!this.connected) {
-          Button({ type: ButtonType.Normal }) {
-            Row({ space: 12 }) {
-              Image($r('app.media.ic_link')).width(20).height(20).fillColor($r('app.color.text_secondary'))
-              Column({ space: 4 }) {
-                Text('连接你的电脑').fontSize(14).fontColor($r('app.color.text_primary'))
-                Text('随时收集，配对后再发送').fontSize(12).fontColor($r('app.color.text_tertiary'))
-              }.layoutWeight(1).alignItems(HorizontalAlign.Start)
-              SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(14).fontColor([$r('app.color.text_tertiary')])
-            }.padding(16).width('100%')
-          }.width('100%').borderRadius(20).backgroundColor($r('app.color.surface')).clickEffect(pressFeedback(this.settings)).onClick(() => { this.selectTab(2); })
-        }
-      }.padding({ left: 20, right: 20, top: 4, bottom: 112 }).width('100%')
-    }.height('100%').width('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
-  }
-
-  @Builder
-  private HistoryPage() {
-    Refresh({ refreshing: $$this.historyPulling }) {
-      Scroll() {
-        Column({ space: 14 }) {
-          Text('追踪接收与处理结果 · 下拉刷新').fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-          if (this.sentLogWarning !== '') {
-            Text(this.sentLogWarning).fontSize(13).lineHeight(20).fontColor($r('app.color.warning')).width('100%')
-              .padding(12).backgroundColor($r('app.color.warning_soft')).borderRadius(14)
-          }
-          if (!this.connected) {
-            this.EmptyState($r('app.media.ic_link'), '连接后查看投递进度', '本机草稿不会自动发送，\n你可以先收集，再连接电脑。')
-            this.PrimaryAction('连接电脑', $r('app.media.ic_link'), !this.busy, () => { this.selectTab(2); })
-          } else if (!this.historyLoaded && !this.statusError) {
-            this.EmptyState($r('app.media.ic_history'), this.paired ? '正在读取记录' : '等待电脑确认', '配对完成后，记录会显示在这里。')
-          } else if (this.historyLoaded && this.history.length === 0 && !this.statusError) {
-            this.EmptyState($r('app.media.ic_history'), '还没有发送记录', '在收集箱中选一条内容，点击发送。')
-          }
-          ForEach(mergeHistory(this.history, this.sentEntries), (item: HistoryItem, index: number) => {
-            ReceiptCard({ item: item, settings: this.settings, index: index,
-              onCopyId: () => { this.copyText(item.receipt.requestId, '请求编号已复制'); },
-              onCopyUrl: (url: string) => { this.copyText(url, '链接已复制'); },
-              onOpenUrl: (url: string) => { this.openUrl(url); },
-              onCopyReason: (summary: string) => { this.copyText(summary, '失败原因已复制'); } })
-          }, (item: HistoryItem) => historyKey(item))
-          if (this.historyLoaded && this.history.length > 0) {
-            if (this.historyMore) {
-              this.SecondaryAction(this.historyLoadingMore ? '正在加载…' : '加载更多', !this.historyLoadingMore, () => { this.loadMoreHistory(); })
-            }
-            Text(`${this.historyMore ? '已显示最近' : '已显示全部'} ${this.history.length} 条 · 采集失败可在电脑重试`)
-              .fontSize(12).fontColor($r('app.color.text_tertiary'))
-          }
-        }.padding({ left: 20, right: 20, top: 4, bottom: 112 }).width('100%')
-      }.height('100%').width('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
-    }.height('100%').width('100%').pullToRefresh(this.connected && !this.busy && !this.refreshing)
-      .onRefreshing(() => { this.pullHistory(); })
-  }
-
-  @Builder
-  private PairingStep(number: string, title: string, detail: string) {
-    Row({ space: 14 }) {
-      Text(number).width(30).height(30).textAlign(TextAlign.Center).fontSize(13)
-        .fontColor(this.palette.accent).backgroundColor(this.palette.soft).borderRadius(15)
-      Column({ space: 5 }) {
-        Text(title).fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-        Text(detail).fontSize(13).lineHeight(21).fontColor($r('app.color.text_secondary'))
-      }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-    }.width('100%').alignItems(VerticalAlign.Top)
-  }
-
-  @Builder
-  private ConnectionPage() {
-    Scroll() {
-      Column({ space: 20 }) {
-        if (this.connected) {
-          Column({ space: 14 }) {
-            Image($r('app.media.ic_computer')).width(44).height(44).fillColor(this.palette.accent)
-            Text(this.paired ? '已配对归知' : this.statusError || this.error ? '连接需要检查' : '等待电脑确认').fontSize(21).fontWeight(FontWeight.Medium)
-              .fontColor($r('app.color.text_primary'))
-            Text(this.origin).fontSize(13).fontColor($r('app.color.text_secondary')).copyOption(CopyOptions.LocalDevice)
-            if (this.paired && this.desktop.visible) {
-              this.DesktopStatusLine(true)
-              if (this.desktop.detail !== '') {
-                Text(this.desktop.detail).fontSize(13).lineHeight(21).fontColor($r('app.color.text_secondary'))
-                  .width('100%').textAlign(TextAlign.Center)
-              }
-            } else {
-              Text(this.paired ? '发送后，电脑上线即可接收。' : this.statusError ?
-                (this.automaticCheck ? '网络恢复后会自动继续检查，也可以手动重试。' : '请按上方原因处理，再点击重试。') :
-                '打开电脑「设置 → 手机收集」确认绑定。此页每 2 秒自动检查，无需重复提交；二维码过期请在电脑重新生成。')
-                .fontSize(13).fontColor($r('app.color.text_secondary'))
-            }
-            this.PrimaryAction(this.refreshing ? '正在检查' : '检查连接', $r('app.media.ic_link'), !this.busy && !this.refreshing,
-              () => { this.refresh(); })
-            if (!this.paired) {
-              this.SecondaryAction(this.operation || '重试配对请求', !this.busy && !this.refreshing,
-                () => { this.act(() => this.retryPair(), '正在检查配对…'); })
-            }
-          }.padding(22).width('100%').backgroundColor($r('app.color.surface')).borderRadius(20)
-          Button('管理连接  ▾').height(44).fontSize(14).backgroundColor(Color.Transparent)
-            .fontColor($r('app.color.text_secondary')).enabled(!this.busy)
-            .bindMenu([
-              { value: '解除与电脑的配对', action: () => { this.act(() => this.disconnect(false)); } },
-              { value: '无法联网？仅清除本机连接', action: () => { this.act(() => this.disconnect(true)); } }
-            ], { systemMaterial: panelMaterial(this.settings) })
-        } else {
-          Text('让手机里的灵感，回到你的知识库。').fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
-          Column({ space: 24 }) {
-            this.PairingStep('1', '在电脑生成二维码', '打开归知 → 设置 → 手机收集')
-            this.PairingStep('2', '用手机扫码', '扫描电脑上显示的配对二维码')
-            this.PairingStep('3', '回到电脑确认', '批准设备后，即可手动发送收集内容')
-          }.width('100%').padding(22).backgroundColor($r('app.color.surface')).borderRadius(20)
-          this.PrimaryAction('扫描二维码', $r('app.media.ic_scan'), !this.busy, () => { this.act(() => this.scan()); })
-          Button(this.showPairingLink ? '收起链接配对' : '使用配对链接  ›').height(44).fontSize(14)
-            .backgroundColor(Color.Transparent).fontColor($r('app.color.text_secondary')).enabled(!this.busy)
-            .onClick(() => { this.animate(() => { this.showPairingLink = !this.showPairingLink; }); })
-          if (this.showPairingLink) {
-            Column({ space: 14 }) {
-              Text('粘贴电脑生成的完整链接').fontSize(14).fontColor($r('app.color.text_primary')).width('100%')
-              TextInput({ placeholder: 'https://…#pair=…', text: this.pairingText }).height(48).fontSize(14).borderRadius(12)
-                .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.text_primary'))
-                .placeholderColor($r('app.color.text_tertiary')).enabled(!this.busy)
-                .onChange((value: string) => { this.pairingText = value; this.pairing = undefined; this.pairingOrigin = ''; })
-              this.SecondaryAction('解析链接', !this.busy && this.pairingText.length > 0,
-                () => { this.act(async () => { this.inspectPairing(this.pairingText); }); })
-              if (this.pairingOrigin) {
-                Divider().color($r('app.color.border_subtle'))
-                Text(`确认服务地址\n${this.pairingOrigin}`).fontSize(14).lineHeight(22)
-                  .fontColor($r('app.color.text_primary')).copyOption(CopyOptions.LocalDevice).width('100%')
-                TextInput({ placeholder: '设备名称', text: this.deviceName }).height(48).fontSize(14).borderRadius(12)
-                  .backgroundColor($r('app.color.surface_muted')).fontColor($r('app.color.text_primary')).maxLength(60)
-                  .enabled(!this.busy).onChange((value: string) => { this.deviceName = value; })
-                this.PrimaryAction(this.operation || '确认配对', $r('app.media.ic_link'), !this.busy,
-                  () => { this.act(() => this.pair(), '正在提交配对…'); })
-              }
-            }.padding(18).width('100%').backgroundColor($r('app.color.surface')).borderRadius(18)
-              .transition(revealTransition(this.settings))
-          }
-        }
-        Text('收集内容始终由你确认发送。配对与传输使用 HTTPS，设备凭证保存在系统安全存储中。')
-          .fontSize(12).lineHeight(21).fontColor($r('app.color.text_tertiary')).width('100%')
-      }.padding({ left: 20, right: 20, top: 4, bottom: this.keyboardVisible ? 24 : 112 }).width('100%')
-    }.height('100%').width('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
-  }
-
-  private tabStyle(icon: Resource, label: string): BottomTabBarStyle {
-    return BottomTabBarStyle.of(icon, label)
+  // 页签图标使用系统符号：选中态用实心变体与强调色，未选中态用次要文字色。
+  private tabStyle(icon: Resource, selectedIcon: Resource, label: string): BottomTabBarStyle {
+    const normal = new SymbolGlyphModifier(icon);
+    normal.fontColor([$r('app.color.text_secondary')]);
+    const selected = new SymbolGlyphModifier(selectedIcon);
+    selected.fontColor([this.palette.accent]);
+    const symbol: TabBarSymbol = { normal: normal, selected: selected };
+    return BottomTabBarStyle.of(symbol, label)
       .labelStyle({ selectedColor: this.palette.accent, unselectedColor: $r('app.color.text_secondary'),
-        font: { size: 12, weight: FontWeight.Medium } })
-      .iconStyle({ selectedColor: this.palette.accent, unselectedColor: $r('app.color.text_secondary') });
+        font: { size: 12, weight: FontWeight.Medium } });
   }
 
   build() {
@@ -915,20 +865,24 @@ struct Index {
           Text(`${this.operation} 已等待 ${this.operationSeconds} 秒${this.operationSeconds >= 5 ? '\n网络响应较慢，请勿重复点击；结束后会显示结果或重试原因。' : ''}`)
             .fontSize(13).lineHeight(20).fontColor(this.palette.accent).layoutWeight(1)
         }.padding(14).margin({ left: 20, right: 20, bottom: 8 }).borderRadius(14).backgroundColor(this.palette.soft)
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
       }
       if (this.error || this.statusError || this.incomingError) {
         Column({ space: 8 }) {
           Text([this.error, this.statusError, this.incomingError].filter((value: string) => value.length > 0).join('\n'))
             .fontSize(13).lineHeight(20).fontColor($r('app.color.error')).copyOption(CopyOptions.LocalDevice)
           Row({ space: 6 }) {
-            this.SecondaryAction('复制原因', !this.busy, () => { this.copyError(); })
-            this.SecondaryAction('重试', !this.busy && !this.refreshing, () => { if (!this.ready) this.initialize(); else if (!this.settingsReady) this.loadSettings(); else this.refresh(); })
+            SecondaryAction({ label: '复制原因', active: !this.busy, settings: this.settings,
+              onAction: () => { this.copyError(); } })
+            SecondaryAction({ label: '重试', active: !this.busy && !this.refreshing, settings: this.settings,
+              onAction: () => { if (!this.ready) this.initialize(); else if (!this.settingsReady) this.loadSettings(); else this.refresh(); } })
             if (this.incomingError) {
-              this.SecondaryAction('关闭', !this.busy, () => { this.incomingError = ''; })
+              SecondaryAction({ label: '关闭', active: !this.busy, settings: this.settings,
+                onAction: () => { this.incomingError = ''; } })
             }
           }
         }.padding(14).margin({ left: 20, right: 20, bottom: 8 }).borderRadius(16).backgroundColor($r('app.color.surface'))
-          .transition(revealTransition(this.settings))
+          .constraintSize({ maxWidth: CONTENT_MAX_WIDTH }).transition(revealTransition(this.settings))
       }
       if (this.notice || this.incomingNotice) {
         Row({ space: 8 }) {
@@ -936,34 +890,95 @@ struct Index {
           Button('关闭').height(44).fontSize(12).fontColor($r('app.color.text_secondary')).backgroundColor(Color.Transparent)
             .onClick(() => { this.animate(() => { this.notice = ''; this.incomingNotice = ''; }); })
         }.padding({ left: 16, right: 4 }).margin({ left: 20, right: 20, bottom: 12 })
-          .backgroundColor(this.palette.soft).borderRadius(14)
+          .backgroundColor(this.palette.soft).borderRadius(14).constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
           .transition(revealTransition(this.settings))
       }
-      Column() {
+      // 页签内容与浮在其上的多选栏、撤销条：二者都贴底，不参与页面滚动。
+      Stack({ alignContent: Alignment.Bottom }) {
         if (this.ready) {
           Tabs({ barPosition: BarPosition.End, index: this.selectedTab, controller: this.tabsController }) {
-            TabContent() { this.CapturePage() }
-              .tabBar(this.tabStyle($r('app.media.ic_inbox'), '收集'))
-            TabContent() { this.HistoryPage() }
-              .tabBar(this.tabStyle($r('app.media.ic_history'), '近期'))
-            TabContent() { this.ConnectionPage() }
-              .tabBar(this.tabStyle($r('app.media.ic_computer'), '连接'))
+            TabContent() {
+              CaptureTab({ input: this.input, drafts: this.visibleDrafts(), connected: this.connected, paired: this.paired,
+                desktop: this.desktop, busy: this.busy, batchDone: this.batchDone, batchTotal: this.batchTotal,
+                sendings: this.sendings, selecting: this.selecting, selectedIds: this.selectedIds,
+                settings: this.settings, endOffset: this.contentEndOffset(),
+                onCompose: () => { this.openEditor(); },
+                onSendAll: () => { this.sendAll(); },
+                onSend: (draft: Draft) => { this.sendDraft(draft); },
+                onEdit: (draft: Draft) => { this.act(() => this.editDraft(draft)); },
+                onDelete: (draft: Draft) => { this.requestDelete([draft]); },
+                onEnterSelect: (draft: Draft) => { this.enterSelection(draft.requestId); },
+                onToggleSelect: (draft: Draft) => { this.toggleSelection(draft.requestId); },
+                onConnect: () => { this.selectTab(2); } })
+            }.tabBar(this.tabStyle($r('sys.symbol.inbox'), $r('sys.symbol.inbox_fill'), '收集'))
+            TabContent() {
+              HistoryTab({ pulling: $historyPulling, items: mergeHistory(this.history, this.sentEntries),
+                receiptCount: this.history.length, connected: this.connected, paired: this.paired,
+                loaded: this.historyLoaded, statusError: this.statusError, more: this.historyMore,
+                loadingMore: this.historyLoadingMore, refreshing: this.refreshing, busy: this.busy,
+                sentLogWarning: this.sentLogWarning, settings: this.settings, endOffset: this.contentEndOffset(),
+                onConnect: () => { this.selectTab(2); },
+                onPull: () => { this.pullHistory(); },
+                onLoadMore: () => { this.loadMoreHistory(); },
+                onCopyId: (item: HistoryItem) => { this.copyText(item.receipt.requestId, '请求编号已复制'); },
+                onCopyUrl: (url: string) => { this.copyText(url, '链接已复制'); },
+                onOpenUrl: (url: string) => { this.openUrl(url); },
+                onCopyReason: (summary: string) => { this.copyText(summary, '失败原因已复制'); } })
+            }.tabBar(this.tabStyle($r('sys.symbol.clock'), $r('sys.symbol.clock_fill'), '近期'))
+            TabContent() {
+              ConnectionTab({ connected: this.connected, paired: this.paired, origin: this.origin, desktop: this.desktop,
+                statusError: this.statusError, hasProblem: this.statusError !== '' || this.error !== '',
+                automaticCheck: this.automaticCheck, refreshing: this.refreshing, busy: this.busy,
+                operation: this.operation, showPairingLink: this.showPairingLink, pairingText: this.pairingText,
+                pairingOrigin: this.pairingOrigin, deviceName: this.deviceName, keyboardVisible: this.keyboardVisible,
+                settings: this.settings,
+                onRefresh: () => { this.refresh(); },
+                onRetryPair: () => { this.act(() => this.retryPair(), '正在检查配对…'); },
+                onDisconnect: (localOnly: boolean) => { this.act(() => this.disconnect(localOnly)); },
+                onScan: () => { this.act(() => this.scan()); },
+                onTogglePairingLink: () => { this.togglePairingLink(); },
+                onPairingText: (value: string) => { this.editPairingText(value); },
+                onParseLink: () => { this.act(async () => { this.inspectPairing(this.pairingText); }); },
+                onDeviceName: (value: string) => { this.editDeviceName(value); },
+                onPair: () => { this.act(() => this.pair(), '正在提交配对…'); } })
+            }.tabBar(this.tabStyle($r('sys.symbol.computer'), $r('sys.symbol.computer_fill'), '连接'))
             TabContent() {
               SettingsPage({ settings: this.settings, busy: this.busy || !this.settingsReady,
                 holdingMessage: this.holdingMessage, onRetryHolding: () => this.retryHolding(), onDetail: (visible: boolean) => { this.settingsDetail = visible; },
                 onChange: (value: AppPreferences) => { this.act(() => this.updateSettings(value)); },
                 onReset: () => { this.act(() => this.resetSettings()); }, onConnect: () => { this.selectTab(2); },
                 sentCount: this.sentEntries.length, onClearSentLog: () => { this.act(() => this.clearSentLog()); } })
-            }.tabBar(this.tabStyle($r('app.media.ic_settings'), '设置'))
+            }.tabBar(this.tabStyle($r('sys.symbol.gearshape'), $r('sys.symbol.gearshape_fill'), '设置'))
           }.width('100%').height('100%').vertical(false).barMode(BarMode.Fixed)
-            .barOverlap(true).barHeight(this.keyboardVisible || (this.selectedTab === 3 && this.settingsDetail) ? 0 : 64, true)
+            .barOverlap(true).barHeight(this.barHidden() ? 0 : 64, true)
             .scrollable(false).animationDuration(motionDuration(this.settings))
             .animationMode(AnimationMode.CONTENT_FIRST_WITH_JUMP)
-            .attributeModifier(new CaptureTabsAppearance(this.keyboardVisible || (this.selectedTab === 3 && this.settingsDetail), this.settings))
-            .onChange((index: number) => { this.selectedTab = index; if (index === 1 || index === 2) this.refresh(true, index === 1); })
+            .attributeModifier(new CaptureTabsAppearance(this.barHidden(), this.settings))
+            .onChange((index: number) => {
+              this.exitSelection();
+              this.selectedTab = index;
+              if (index === 1 || index === 2) this.refresh(true, index === 1);
+            })
         } else if (!this.error) {
-          LoadingProgress().width(28).height(28).color(this.palette.accent).margin({ top: 40 })
-          Text('正在读取本机草稿…').fontSize(14).fontColor($r('app.color.text_secondary')).padding(16)
+          Column() {
+            LoadingProgress().width(28).height(28).color(this.palette.accent).margin({ top: 40 })
+            Text('正在读取本机草稿…').fontSize(14).fontColor($r('app.color.text_secondary')).padding(16)
+          }.width('100%').height('100%')
+        }
+        if (this.selecting) {
+          SelectionBar({ count: this.selectedIds.length, allSelected: allSelected(this.selectedIds, this.visibleIds()),
+            connected: this.connected, busy: this.busy || this.batchTotal > 0, settings: this.settings,
+            onExit: () => { this.exitSelection(); },
+            onToggleAll: () => { this.toggleSelectAll(); },
+            onSend: () => { this.sendSelected(); },
+            onDelete: () => { this.deleteSelected(); },
+            onConnect: () => { this.exitSelection(); this.selectTab(2); } })
+            .margin({ left: 16, right: 16, bottom: 12 }).constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
+        } else if (this.undoMessage !== '') {
+          // 撤销条叠在悬浮页签栏上方；页签栏收起（键盘、设置详情）时贴底。
+          UndoBar({ message: this.undoMessage, settings: this.settings, onUndo: () => { this.undoDelete(); } })
+            .margin({ left: 16, right: 16, bottom: this.barHidden() ? 12 : 88 })
+            .constraintSize({ maxWidth: CONTENT_MAX_WIDTH })
         }
       }.layoutWeight(1).width('100%')
     }.width('100%').height('100%').backgroundColor($r('app.color.page_background'))

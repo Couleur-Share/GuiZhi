@@ -1,6 +1,7 @@
 import { AppPreferences } from '../services/AppPreferences';
 import { ThemePalette } from '../services/ThemePalette';
 import { pressFeedback } from '../services/InterfaceMotion';
+import { CONTENT_MAX_WIDTH } from '../services/Layout';
 
 @Component
 export struct PageHeader {
@@ -16,7 +17,7 @@ export struct PageHeader {
   private Action() {
     Button({ type: ButtonType.Circle }) {
       if (this.tab === 0) {
-        Image($r('app.media.ic_plus')).width(22).height(22).fillColor(this.palette.accent)
+        SymbolGlyph($r('sys.symbol.plus')).fontSize(22).fontColor([this.palette.accent])
       } else {
         SymbolGlyph($r('sys.symbol.arrow_clockwise')).fontSize(22).fontColor([this.palette.accent])
       }
@@ -33,6 +34,6 @@ export struct PageHeader {
         .minFontSize(22).maxFontSize(30).heightAdaptivePolicy(TextHeightAdaptivePolicy.MIN_FONT_SIZE_FIRST)
       if (this.loading) { LoadingProgress().width(20).height(20).color(this.palette.accent) }
       if (this.tab === 1 || (this.tab === 0 && !this.leftHand)) { this.Action() }
-    }.width('100%').constraintSize({ minHeight: 76 }).padding({ left: 24, right: 24, top: 12, bottom: 16 })
+    }.width('100%').constraintSize({ minHeight: 76, maxWidth: CONTENT_MAX_WIDTH }).padding({ left: 24, right: 24, top: 12, bottom: 16 })
   }
 }

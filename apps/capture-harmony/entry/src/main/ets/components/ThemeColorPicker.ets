@@ -40,10 +40,11 @@ export struct ThemeColorPicker {
         ForEach(THEME_COLOR_IDS, (id: string) => { this.Swatch(themePalette(id)) }, (id: string) => id)
       }.width('100%')
       Row({ space: 10 }) {
-        Image($r('app.media.ic_compose')).width(22).height(22).fillColor(this.palette.accent)
+        SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(22).fontColor([this.palette.accent])
         Text('按钮、图标与选中状态').fontSize(12).fontColor(this.palette.accent).layoutWeight(1)
-        Image($r('app.media.ic_plus')).fillColor(this.palette.onAccent)
-          .padding(8).width(32).height(32).backgroundColor(this.palette.accent).borderRadius(16)
+        Column() {
+          SymbolGlyph($r('sys.symbol.plus')).fontSize(16).fontColor([this.palette.onAccent])
+        }.width(32).height(32).justifyContent(FlexAlign.Center).backgroundColor(this.palette.accent).borderRadius(16)
       }.width('100%').padding(12).backgroundColor(this.palette.soft).borderRadius(12)
         .accessibilityText(`${this.palette.label}配色预览`)
     }.width('100%').padding(16).backgroundColor($r('app.color.surface')).borderRadius(14)
