@@ -6,6 +6,8 @@ param(
   [ValidateSet('targets', 'install', 'launch', 'stop', 'shot', 'dump', 'tap', 'key', 'logs', 'server-stop')]
   [string]$Command,
   [string]$Bundle = 'com.couleurapp.guizhi.capture.dev',
+  # launch 要启动的 Ability；分享诊断页用 ShareDiagAbility（仅 dev 包内置）。
+  [string]$Ability = 'EntryAbility',
   [string]$Hap,
   [string]$Name = 'shot',
   [string]$Text,
@@ -42,6 +44,7 @@ if ($Bundle -notmatch '^[A-Za-z][A-Za-z0-9_.]{2,127}$') { Fail "包名格式不�
 if ($Bundle -eq $productionBundle -and -not $Force) {
   Fail "拒绝操作正式包 $productionBundle。默认只操作开发包 $devBundle；确需操作正式包请显式加 -Force。" 2
 }
+if ($Ability -notmatch '^[A-Za-z][A-Za-z0-9_]{1,63}$') { Fail "Ability 名称格式不合法：$Ability" 2 }
 if ($Device -and $Device -notmatch '^[A-Za-z0-9._:\-\[\]]{1,80}$') { Fail "设备标识格式不合法：$Device" 2 }
 if ($Name -notmatch '^[A-Za-z0-9_\-]{1,40}$') { Fail '名称只能包含字母、数字、下划线和连字符（最长 40）。' 2 }
 if ($Key -and $Key -notmatch '^[A-Za-z0-9]+( [A-Za-z0-9]+)?$') { Fail '按键只能是键名或最多两个键值，例如 Back、Home、2072 2038。' 2 }
@@ -163,10 +166,10 @@ try {
     }
     'launch' {
       $script:target = Resolve-Target
-      $result = Invoke-Hdc @('shell', 'aa', 'start', '-a', 'EntryAbility', '-b', $Bundle) -AllowFailure
+      $result = Invoke-Hdc @('shell', 'aa', 'start', '-a', $Ability, '-b', $Bundle) -AllowFailure
       $joined = $result.Lines -join "`n"
       Write-Output $joined
-      if ($joined -notmatch 'start ability successfully') { Fail '启动失败，请确认应用已安装。' 1 }
+      if ($joined -notmatch 'start ability successfully') { Fail "启动失败，请确认应用已安装且包含 ${Ability}。" 1 }
     }
     'stop' {
       $script:target = Resolve-Target

@@ -55,6 +55,17 @@ test('launch 默认启动开发包并带上设备标识；stop 强制停止开�
   assert.ok(run(['stop']).commands.includes('shell aa force-stop com.couleurapp.guizhi.capture.dev'));
 });
 
+test('launch 可指定 Ability（分享诊断页），名称先校验再调用 hdc', options, () => {
+  const diag = run(['launch', '-Ability', 'ShareDiagAbility']);
+  assert.equal(diag.status, 0);
+  assert.deepEqual(diag.commands, ['list targets', 'shell aa start -a ShareDiagAbility -b com.couleurapp.guizhi.capture.dev']);
+  for (const bad of ['a;rm -rf', 'A', '1Abc', 'Entry Ability', 'x'.repeat(65)]) {
+    const result = run(['launch', '-Ability', bad]);
+    assert.equal(result.status, 2, bad); assert.equal(result.calls.length, 0, bad);
+    assert.match(result.stderr, /Ability 名称格式不合法/);
+  }
+});
+
 test('没有设备或有多台设备时明确失败，多台设备可用 -Device 指定', options, () => {
   const none = run(['launch'], { HDC_STUB_TARGETS: 'none' });
   assert.equal(none.status, 3); assert.match(none.stderr, /未发现已授权设备/);

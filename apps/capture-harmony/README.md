@@ -315,3 +315,18 @@ pnpm --filter @guizhi/capture-relay exec tsx --test tests/harmony-core.test.ts
 5. 在电脑上撤销这台手机：手机在前台 30 秒内出现「与电脑的配对已失效…」提示，连接页回到等待电脑确认。
 6. 切到桌面再回来（超过 30 秒）：状态立即刷新；未超过 30 秒时不多发请求。
 7. 深色模式与系统大字体下，状态行不重叠、不被裁掉，文字读起来不依赖颜色。
+
+## 分享入口 spike（仅 dev 包，不发版）
+
+“从浏览器、微信等 App 直接分享到归知”需要 `ShareExtensionAbility`，并牵动草稿存储迁移（`Preferences` 不支持多进程）。投入约 4.5–6.5 天之前，先用 dev 包里的最小扩展回答几个事实问题：归知 Dev 会不会出现在各来源的分享面板里、各来源交来的记录长什么样、扩展是否独立进程、扩展内能否读凭证和访问网络。完整说明、操作步骤、判据与结果表见 [docs/share-spike.md](docs/share-spike.md)。
+
+- **只在 dev 包里**：扩展与报告页由 `entry/hvigorfile.ts` 的构建插件仅为 `dev` 产品注册；正式包不含扩展、不含分享诊断代码，`inspect-hap.ps1 -ForbidExtensions -ForbidCode` 与 `tests/share-spike-isolation.test.cjs` 双重把关。权限不变。
+- **只记形状，不记内容**：记录字段长度与类型、来源包名、`want` 参数名、三项探测状态；不保存正文、标题、链接、缩略图地址或任何凭证，也不向中转投递任何内容。
+- **判据**沿用计划：出现且扩展内凭证与网络可用则 go，否则 no-go；no-go 或部分可用时改做“分享后自动返回来源 App”。
+
+| 类型 | 结果 |
+| --- | --- |
+| 源码 / 隔离测试 | `pnpm test:harmony` 171 项通过（0.5.1 基线 151，新增 20 项）；89 处变异全部被发现 |
+| 编译 | 隔离副本 `default` 与 `dev` 均构建成功，`inspect-hap.ps1` 核对通过（详见 share-spike.md） |
+| 真机 | **未执行**：需要先配置 dev 调试签名（[docs/device-loop.md](docs/device-loop.md)），再从四个 App 各分享一次；结论未取得，p5-build 的走向（go 或 no-go）尚未决定 |
+| 发布状态 | 仅功能分支源码；正式包版本与内容不变（0.5.1） |

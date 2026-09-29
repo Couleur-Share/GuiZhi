@@ -58,11 +58,19 @@ powershell -NoProfile -File apps/capture-harmony/scripts/device.ps1 server-stop 
 
 也可以设置环境变量 `HARMONY_COMMAND_LINE_TOOLS`（或 `GUIZHI_HDC` 直接指向 `hdc.exe`），省去每次的 `-ToolsRoot`。多台设备时用 `-Device <key>` 指定。
 
-`inspect-hap.ps1` 只读检查任意 HAP 的包名、版本、Ability、扩展、权限和资源文字，用来在不装机的情况下核对构建产物：
+`launch` 默认启动 `EntryAbility`；`-Ability <名称>` 可启动同一个包里的其他 Ability（名称只允许字母、数字、下划线，脚本先校验再调用 hdc）。dev 包的分享诊断页用 `launch -Ability ShareDiagAbility`，用法见 [share-spike.md](share-spike.md)。
+
+`inspect-hap.ps1` 只读检查任意 HAP 的包名、版本、Ability、扩展、路由页面、权限和资源文字，用来在不装机的情况下核对构建产物：
 
 ```powershell
-powershell -NoProfile -File apps/capture-harmony/scripts/inspect-hap.ps1 -Hap artifacts/harmony/hap/dev/entry-dev-unsigned.hap -ExpectBundle com.couleurapp.guizhi.capture.dev -ExpectText '归知收集 Dev'
+# 开发包：应带分享诊断扩展
+powershell -NoProfile -Command "& apps/capture-harmony/scripts/inspect-hap.ps1 -Hap artifacts/harmony/hap/dev/entry-dev-unsigned.hap -ExpectBundle com.couleurapp.guizhi.capture.dev -ExpectText '归知收集 Dev','分享诊断' -ExpectExtension ShareDiagExtAbility"
+
+# 正式包：不得出现 Dev、任何扩展和分享诊断代码
+powershell -NoProfile -Command "& apps/capture-harmony/scripts/inspect-hap.ps1 -Hap artifacts/harmony/hap/default/entry-default-unsigned.hap -ExpectBundle com.couleurapp.guizhi.capture -ExpectText '归知收集' -ForbidText 'Dev' -ForbidExtensions -ForbidCode 'ShareDiag','sharediag'"
 ```
+
+`-ExpectText`、`-ForbidText`、`-ForbidCode`、`-ExpectExtension` 都接受多个值。用 `powershell -File` 传数组会被当成位置参数报错，所以多值时用上面正式包那种 `-Command "& …"` 的写法，或直接在已打开的 PowerShell 里用 `&` 调用。
 
 ## 使用开发包时的注意
 

@@ -63,6 +63,8 @@ const sentLog = load('core/SentLog.ts', { './CaptureParser': captureParser, './T
 const historyView = load('core/HistoryView.ts', { './CaptureParser': captureParser, './SentLog': sentLog });
 // 电脑在线状态：纯函数与 30 秒节奏，页面与测试共用同一份实现。
 const desktopStatus = load('core/DesktopStatus.ts');
+// 分享入口 spike（仅 dev 包）的诊断整理：与应用共用同一份 ShareRecords / CaptureParser，才能如实反映现有逻辑对各来源分享的处理。
+const shareProbe = load('sharediag/ShareProbe.ts', { '../core/ShareRecords': load('core/ShareRecords.ts'), '../core/CaptureParser': captureParser });
 
 // 内存端口：记录每次落盘的条目，可按需让读取或写入失败。
 function memorySentPort({ initial = [], damaged = false, failLoad = null, failSave = null } = {}) {
@@ -122,4 +124,4 @@ function loadRelayClient(time, script) {
   return { RelayClient, calls };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, desktopStatus, memorySentPort };
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, desktopStatus, shareProbe, memorySentPort };

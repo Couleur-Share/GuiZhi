@@ -1,0 +1,7 @@
+{
+  "src": [
+    "pages/Index",
+    "sharediag/ShareDiagPanel",
+    "sharediag/ShareDiagReport"
+  ]
+}
