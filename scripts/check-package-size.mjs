@@ -1,7 +1,7 @@
 /**
  * 交付体积门禁：随包 Python 运行包与 Windows 安装包各设一条上限。
  *
- * 背景：已发布的 x64 安装包从 v0.22.0 的 83.9 MiB 涨到 v0.26.0 的 208.4 MiB（v0.23–v0.24 随包 Chromium 时曾达 341 MiB），
+ * 背景：已发布的 x64 安装包从 v0.22.0 的 83.9 MiB 涨到 v0.26.0 的 208.3 MiB（v0.23–v0.24 随包 Chromium 时曾达 341 MiB），
  * 增量主要来自随包 Python 运行包；renderer 的 gzip 预算（apps/desktop/bundle-budget.json）只覆盖前端资源，
  * 这几次增长没有任何门禁拦截。
  * 运行包文件数同样受限：每次启动 Python 提取进程前都会逐文件校验哈希，耗时与文件数、字节数成正比
