@@ -15,6 +15,8 @@ export class AppPreferences {
   defaultMode: CaptureMode = 'auto';
   previewLines: number = 3;
   showCount: boolean = true;
+  // 分享落盘后，应用位于前台且已连接时自动发送；仍先保存为本机草稿。0.4.0 新增，默认关闭。
+  autoSendShare: boolean = false;
 }
 
 export class AppPreferencesStore {
@@ -33,11 +35,14 @@ export class AppPreferencesStore {
     if (value.tabStyle === undefined) value.tabStyle = 'floating';
     if (value.animationSpeed === undefined) value.animationSpeed = 'normal';
     if (value.reduceMotion === undefined) value.reduceMotion = false;
+    // 0.4.0 之前没有自动发送字段：缺失按关闭处理，非布尔的值仍视为损坏。
+    if (value.autoSendShare === undefined) value.autoSendShare = false;
     if (!['floating', 'standard'].includes(value.tabStyle) || !['system', 'light', 'dark'].includes(value.theme) || !THEME_COLOR_IDS.includes(value.themeColor) ||
       !['system', 'off', 'ultraThin', 'thin', 'regular', 'thick', 'ultraThick'].includes(value.material) ||
       !['auto', 'urls', 'text'].includes(value.defaultMode) || !['fast', 'normal', 'relaxed'].includes(value.animationSpeed) ||
       ![3, 6].includes(value.previewLines) || typeof value.lightFeedback !== 'boolean' ||
-      typeof value.reduceMotion !== 'boolean' || typeof value.handedness !== 'boolean' || typeof value.showCount !== 'boolean') {
+      typeof value.reduceMotion !== 'boolean' || typeof value.handedness !== 'boolean' || typeof value.showCount !== 'boolean' ||
+      typeof value.autoSendShare !== 'boolean') {
       throw new Error('设置读取失败，原设置未覆盖。请重试或联系开发者。');
     }
     return value;

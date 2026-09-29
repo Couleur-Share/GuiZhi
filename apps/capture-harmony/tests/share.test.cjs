@@ -64,6 +64,8 @@ test('入口分享：纯链接保存并提示；修订号递增让页面重新�
   assert.equal(storage.get('captureNotice'), '分享已保存到本机草稿，确认后发送');
   assert.equal(storage.get('captureError'), '');
   assert.equal(storage.get('captureRevision'), 1);
+  // 页面据此判断是否自动发送：必须是刚落盘那条草稿的编号，且晚于草稿列表修订号写入。
+  assert.equal(storage.get('captureShared'), received[0].id);
 });
 
 test('入口分享：带图片的分享保留文字并提示已忽略数量，不再整体拒绝', async () => {
@@ -85,6 +87,7 @@ test('入口分享失败：给出具体原因且不产生保存提示（仅图�
     await share();
     assert.match(storage.get('captureError'), expected);
     assert.equal(storage.get('captureNotice'), undefined);
+    assert.equal(storage.get('captureShared'), undefined, '失败的分享不触发自动发送');
     assert.equal(received.length, 0);
   }
 });

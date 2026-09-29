@@ -62,9 +62,8 @@ export function parsePairingLink(raw: string): PairingLink {
   return result;
 }
 
-export function validateInput(input: string): void {
-  if (!input.trim()) throw new Error('请输入链接或文字');
-  // 逐码点计算 UTF-8 大小，保持与服务端 32 KiB 限制一致。
+// 逐码点计算 UTF-8 字节数，与服务端 32 KiB 限制的计算口径一致（孤立代理项按 3 字节，与 TextEncoder 的替换字符一致）。
+export function utf8Bytes(input: string): number {
   let bytes = 0;
   for (let i = 0; i < input.length; i++) {
     const code = input.charCodeAt(i);
@@ -74,7 +73,12 @@ export function validateInput(input: string): void {
       input.charCodeAt(i + 1) >= 0xDC00 && input.charCodeAt(i + 1) <= 0xDFFF) { bytes += 4; i++; }
     else bytes += 3;
   }
-  if (bytes > 32768) throw new Error('内容超过 32 KiB，请拆分后保存');
+  return bytes;
+}
+
+export function validateInput(input: string): void {
+  if (!input.trim()) throw new Error('请输入链接或文字');
+  if (utf8Bytes(input) > 32768) throw new Error('内容超过 32 KiB，请拆分后保存');
 }
 
 // 电脑端逐项处理结果的统计。

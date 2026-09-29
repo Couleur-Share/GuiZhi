@@ -53,9 +53,12 @@ export default class EntryAbility extends UIAbility {
     }
     const selection = pickShareText(records);
     const runtime = await CaptureRuntime.open(this.context);
-    await runtime.queue.receive(util.generateRandomUUID(true), selection.text);
+    const requestId = util.generateRandomUUID(true);
+    await runtime.queue.receive(requestId, selection.text);
     AppStorage.setOrCreate('captureError', '');
     AppStorage.setOrCreate('captureRevision', (AppStorage.get<number>('captureRevision') ?? 0) + 1);
     AppStorage.setOrCreate('captureNotice', shareSavedNotice(selection.ignored));
+    // 最后写入：页面先看到草稿列表已更新；是否自动发送由页面按“分享后自动发送”设置决定。
+    AppStorage.setOrCreate('captureShared', requestId);
   }
 }

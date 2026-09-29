@@ -4,12 +4,16 @@ import { AppPreferences } from '../services/AppPreferences';
 import { panelMaterial } from '../services/ImmersiveAppearance';
 import { Draft } from '../core/Protocol';
 import { relativeTime } from '../core/RelativeTime';
+import { sendingLabel, sendingSlowHint } from '../core/SendingState';
 
 @Component
 export struct DraftCard {
   @Consume('capturePalette') palette: ThemePalette;
   @Prop @Watch('measureClamped') draft: Draft = new Draft();
   @Prop busy: boolean = false;
+  // 这一条正在网络发送：只锁定本卡片的发送与菜单，页面其他操作不受影响。
+  @Prop sending: boolean = false;
+  @Prop sendingSeconds: number = 0;
   @Prop @Watch('measureClamped') settings: AppPreferences = new AppPreferences();
   @Prop index: number = 0;
   @Prop connected: boolean = false;
@@ -52,11 +56,13 @@ export struct DraftCard {
   }
 
   private statusText(): string {
+    if (this.sending) return '正在发送';
     if (this.draft.attempted) return '待确认结果';
     return this.draft.lastError ? '发送失败，可修改后重试' : '尚未发送';
   }
 
   private statusColor(): ResourceColor {
+    if (this.sending) return this.palette.accent;
     if (this.draft.attempted) return $r('app.color.warning');
     return this.draft.lastError ? $r('app.color.error') : $r('app.color.text_secondary');
   }
@@ -71,7 +77,7 @@ export struct DraftCard {
         Button({ type: ButtonType.Circle }) {
           SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(20).fontColor([$r('app.color.text_secondary')])
         }.width(44).height(44).clickEffect(pressFeedback(this.settings)).backgroundColor(Color.Transparent)
-          .fontColor($r('app.color.text_secondary')).enabled(!this.busy).accessibilityText('草稿操作')
+          .fontColor($r('app.color.text_secondary')).enabled(!this.busy && !this.sending).accessibilityText('草稿操作')
           .bindMenu(this.draft.attempted ? [
             { value: '删除本机草稿', action: this.onRemove }
           ] : [
@@ -100,7 +106,11 @@ export struct DraftCard {
       Row({ space: 12 }) {
         Column({ space: 4 }) {
           Text(this.statusText()).fontSize(12).fontColor(this.statusColor())
-          if (this.draft.lastError) {
+          if (this.sending) {
+            if (sendingSlowHint(this.sendingSeconds)) {
+              Text(sendingSlowHint(this.sendingSeconds)).fontSize(12).lineHeight(18).fontColor($r('app.color.text_secondary'))
+            }
+          } else if (this.draft.lastError) {
             Text(`上次发送失败：${this.draft.lastError}`).fontSize(12).lineHeight(18)
               .fontColor($r('app.color.error')).copyOption(CopyOptions.LocalDevice)
           } else if (this.draft.attempted) {
@@ -108,10 +118,10 @@ export struct DraftCard {
           }
           Text(relativeTime(this.draft.createdAt, Date.now())).fontSize(11).fontColor($r('app.color.text_tertiary'))
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        Button(this.busy ? '处理中' : !this.connected ? '连接电脑' : this.draft.attempted ? '重试发送' : '发送')
+        Button(this.sending ? sendingLabel(this.sendingSeconds) : this.busy ? '处理中' : !this.connected ? '连接电脑' : this.draft.attempted ? '重试发送' : '发送')
           .height(44).clickEffect(pressFeedback(this.settings)).fontSize(14).padding({ left: 18, right: 18 })
           .backgroundColor(this.palette.soft).fontColor(this.palette.accent)
-          .enabled(!this.busy).onClick(() => { if (this.connected) this.onSend(); else this.onConnect(); })
+          .enabled(!this.busy && !this.sending).onClick(() => { if (this.connected) this.onSend(); else this.onConnect(); })
       }.width('100%')
     }.width('100%').padding({ left: 18, right: 18, top: 12, bottom: 16 })
       .alignItems(HorizontalAlign.Start).backgroundColor($r('app.color.surface')).borderRadius(20)

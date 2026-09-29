@@ -49,6 +49,14 @@ const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve()
 const check = load('core/ConnectionCheck.ts');
 const { ConnectionCheck, RelayRequestError } = check;
 const editorAutosave = load('core/EditorAutosave.ts');
+// 识别与拆分依赖 Protocol 的字节计数，与页面共用同一份解析实现。
+const captureParser = load('core/CaptureParser.ts', { './Protocol': load('core/Protocol.ts') });
+const sendingState = load('core/SendingState.ts');
+// BatchSend 依赖真实的 SendOutcome / ConnectionCheck：失败分类基于 instanceof RelayRequestError，必须是同一个类。
+const batchSend = load('core/BatchSend.ts', {
+  './ConnectionCheck': check, './SendOutcome': load('core/SendOutcome.ts', { './ConnectionCheck': check }),
+  './TextPreview': load('core/TextPreview.ts'),
+});
 
 // 页面装载：extraImports 覆盖或补充默认桩，供后续新增模块使用。
 function createPage(client, extraImports = {}) {
@@ -57,7 +65,7 @@ function createPage(client, extraImports = {}) {
     '../services/ThemePalette': load('services/ThemePalette.ets', {}, { '$r': name => name }),
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
-    '../core/EditorAutosave': editorAutosave,
+    '../core/EditorAutosave': editorAutosave, '../core/CaptureParser': captureParser, '../core/SendingState': sendingState, '../core/BatchSend': batchSend,
     ...extraImports,
   }, time.globals, true);
   const ui = new Index();
@@ -94,4 +102,4 @@ function loadRelayClient(time, script) {
   return { RelayClient, calls };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient };
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser };

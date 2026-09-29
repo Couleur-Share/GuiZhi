@@ -34,6 +34,7 @@ export struct SettingsPage {
       case 'mode': next.defaultMode = value === 'urls' ? 'urls' : value === 'text' ? 'text' : 'auto'; break;
       case 'preview': next.previewLines = value === '6' ? 6 : 3; break;
       case 'count': next.showCount = value === 'true'; break;
+      case 'autoSend': next.autoSendShare = value === 'true'; break;
     }
     this.onChange(next);
   }
@@ -69,9 +70,14 @@ export struct SettingsPage {
       Divider().color($r('app.color.border_subtle')).margin({ left: 50 }).width('82%')
       SettingSwitchRow({ title: '编辑时显示字数', icon: $r('sys.symbol.doc_text'), settings: this.settings,
         value: this.settings.showCount, interactive: !this.busy, onChange: (checked: boolean) => this.update('count', `${checked}`) })
+      Divider().color($r('app.color.border_subtle')).margin({ left: 50 }).width('82%')
+      SettingSwitchRow({ title: '分享后自动发送', icon: $r('sys.symbol.paperplane'), settings: this.settings,
+        value: this.settings.autoSendShare, interactive: !this.busy, onChange: (checked: boolean) => this.update('autoSend', `${checked}`) })
     }.width('100%').backgroundColor($r('app.color.surface')).borderRadius(20)
     Text('默认方式用于下一条新收集，已有内容保持原方式。').fontSize(12).lineHeight(20)
       .fontColor($r('app.color.text_secondary')).width('100%').padding(8)
+    Text('开启后，从其他应用分享到归知的内容会先保存到本机，再在应用位于前台且已连接电脑时自动发送；未连接或发送失败时草稿保留，可手动重试。')
+      .fontSize(12).lineHeight(20).fontColor($r('app.color.text_secondary')).width('100%').padding(8)
   }
 
   @Builder
@@ -118,7 +124,7 @@ export struct SettingsPage {
           SettingsRouteRow({ title: '外观与动效', detail: `${this.palette.label} · ${this.settings.reduceMotion ? '减少动效' : animationSpeedLabel(this.settings.animationSpeed) + '动效'}`,
             icon: $r('sys.symbol.paintpalette_fill'), settings: this.settings, onOpen: () => this.open('appearance') })
             .transition(revealTransition(this.settings))
-          SettingsRouteRow({ title: '收集偏好', detail: '默认方式、预览行数与字数', icon: $r('sys.symbol.doc_text'),
+          SettingsRouteRow({ title: '收集偏好', detail: '默认方式、预览、字数与自动发送', icon: $r('sys.symbol.doc_text'),
             settings: this.settings, onOpen: () => this.open('capture') }).transition(revealTransition(this.settings, 1))
           SettingsRouteRow({ title: '连接与隐私', detail: '电脑配对与本机数据', icon: $r('sys.symbol.link'),
             settings: this.settings, onOpen: () => this.open('privacy') }).transition(revealTransition(this.settings, 2))

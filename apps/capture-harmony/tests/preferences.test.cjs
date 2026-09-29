@@ -301,3 +301,28 @@ test('三档动效驱动实际动画参数，错峰总延迟封顶，减少动�
   settings.lightFeedback = false; assert.equal(motion.pressFeedback(settings).scale, 1);
   settings.lightFeedback = true; assert.equal(motion.pressFeedback(settings).scale, 0.97);
 });
+
+test('0.4.0 偏好补齐分享后自动发送为关闭，保留其他偏好且不隐式重写；开启后保存重载保持', async () => {
+  const legacy = { ...new AppPreferences(), theme: 'dark', material: 'thick', defaultMode: 'text' };
+  delete legacy.autoSendShare;
+  const raw = JSON.stringify(legacy), memory = store(raw);
+  const restored = await new AppPreferencesStore(memory.port).load();
+  assert.equal(restored.autoSendShare, false);
+  assert.equal(restored.theme, 'dark'); assert.equal(restored.material, 'thick'); assert.equal(restored.defaultMode, 'text');
+  assert.equal(memory.disk(), raw); assert.equal(memory.flushes(), 0);
+  assert.equal(new AppPreferences().autoSendShare, false, '默认关闭');
+  const saved = store(), prefs = new AppPreferencesStore(saved.port);
+  const on = new AppPreferences(); on.autoSendShare = true;
+  await prefs.save(on);
+  assert.equal((await new AppPreferencesStore(saved.port).load()).autoSendShare, true);
+  await prefs.save(new AppPreferences());
+  assert.equal((await prefs.load()).autoSendShare, false, '恢复默认后关闭');
+});
+
+test('分享后自动发送的非布尔值视为损坏，拒绝加载且不覆盖原数据', async () => {
+  for (const invalid of ['true', 'false', 1, 0, null, {}]) {
+    const raw = JSON.stringify({ ...new AppPreferences(), autoSendShare: invalid }), memory = store(raw);
+    await assert.rejects(new AppPreferencesStore(memory.port).load(), undefined, String(invalid));
+    assert.equal(memory.disk(), raw); assert.equal(memory.flushes(), 0);
+  }
+});

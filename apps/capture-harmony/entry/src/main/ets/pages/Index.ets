@@ -16,6 +16,9 @@ import { HoldingHandObserver, HoldingHandState } from '../services/HoldingHandOb
 import { CaptureRuntime } from '../services/CaptureRuntime';
 import { ConnectionCheck, RelayRequestError } from '../core/ConnectionCheck';
 import { EditorAutosave } from '../core/EditorAutosave';
+import { CaptureParse, MAX_ITEMS, parseCapture, splitUrlChunks } from '../core/CaptureParser';
+import { BatchHooks, BatchResult, sendBatch, batchHeadline, batchReport } from '../core/BatchSend';
+import { SendingEntry, sendingBegin, sendingEnd, sendingFind, sendingTick } from '../core/SendingState';
 import { Draft, CaptureMode, Receipt, PairingLink, parsePairingLink } from '../core/Protocol';
 
 @Entry
@@ -53,6 +56,16 @@ struct Index {
   @State holdingSide: string = 'right';
   @State holdingMessage: string = '等待握持识别';
   @State settingsDetail: boolean = false;
+  // 正在网络发送的草稿：只锁定各自的卡片，页面其他操作（新建记录、编辑其他草稿）不受影响。
+  @State sendings: SendingEntry[] = [];
+  // “全部发送”的进度；batchTotal > 0 表示批量发送进行中。
+  @State batchDone: number = 0;
+  @State batchTotal: number = 0;
+  private sendTimer: number = -1;
+  // 批量发送失败时，界面只内联展示前几条原因，完整原因通过“复制原因”提供；二者以文案相等关联，文案变化后自动失效。
+  private errorDetail: string = '';
+  private errorDetailFor: string = '';
+  private handledShareId: string = '';
   private tabsController: TabsController = new TabsController();
   private holdingObserver: HoldingHandObserver = new HoldingHandObserver((state: HoldingHandState) => {
     this.animate(() => { this.holdingSide = state.side; this.holdingMessage = state.message; });
@@ -72,6 +85,8 @@ struct Index {
   @StorageLink('captureKeyboardVisible') keyboardVisible: boolean = false;
   @StorageLink('captureForeground') @Watch('foregroundChanged') foreground: boolean = false;
   @StorageLink('captureRevision') @Watch('reloadDrafts') revision: number = 0;
+  // 最近一次分享落盘生成的草稿编号；开启“分享后自动发送”时据此发送。
+  @StorageLink('captureShared') @Watch('autoSendShared') sharedId: string = '';
   @StorageLink('captureError') incomingError: string = '';
   @StorageLink('captureNotice') incomingNotice: string = '';
   private runtime: CaptureRuntime | undefined;
@@ -87,6 +102,7 @@ struct Index {
   }
   aboutToDisappear(): void {
     this.visible = false; this.stopPolling(); this.holdingObserver.stop();
+    if (this.sendTimer !== -1) { clearInterval(this.sendTimer); this.sendTimer = -1; }
     this.autosave.flush().catch(() => {});
   }
   onPageShow(): void { this.visible = true; this.startPolling(); this.syncHolding(); }
@@ -116,7 +132,7 @@ struct Index {
 
   private foregroundChanged(): void {
     this.syncHolding();
-    if (this.foreground) { this.startPolling(); return; }
+    if (this.foreground) { this.startPolling(); this.autoSendShared(); return; }
     this.stopPolling();
     // 进入后台前立即落盘：防抖计时器可能随进程被系统挂起而永远不触发。失败原因已在编辑面板显示。
     this.autosave.flush().catch(() => {});
@@ -131,6 +147,8 @@ struct Index {
       this.syncConnection(); this.ready = true; this.startPolling();
       await this.loadSettings();
       if (this.connected) await this.refresh();
+      // 冷启动时分享可能早于页面就绪：设置与连接状态都读完后再判断是否自动发送。
+      this.autoSendShared();
     } catch { this.error = '本机数据或安全存储读取失败。请解锁后重试；原数据不会被覆盖。'; }
   }
 
@@ -267,16 +285,153 @@ struct Index {
     this.selectTab(0); this.notice = '已保存到收集箱，确认后即可发送';
   }
 
-  private async send(draft: Draft): Promise<void> {
+  // 保存并发送：先把输入框内容落成草稿（先落盘），关闭编辑面板，再在后台发送这一条。
+  // 只有本地保存这一步占用页面锁；网络发送的进度显示在草稿卡片上。
+  private async saveAndSend(): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) return;
+    await this.flushEditor();
+    const requestId = util.generateRandomUUID(true);
+    await runtime.queue.enqueue(requestId);
+    this.input = ''; this.editorError = ''; this.showEditor = false;
+    this.selectTab(0);
+    this.reloadDrafts();
+    const draft = runtime.queue.snapshot().drafts.find((item: Draft) => item.requestId === requestId);
+    if (draft) this.sendDraft(draft);
+  }
+
+  // 输入超过 20 个链接时，按每份 20 个拆成多条草稿并一次落盘：全部保存或一条都不保存，不会只留下前几份。
+  // 拆分后的草稿都是“链接”模式；链接模式本来就只采集链接，链接以外的文字不会保留，与直接发送的语义一致。
+  private async saveSplit(): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime) return;
+    const parse: CaptureParse = parseCapture(this.input, this.mode);
+    if (parse.code !== 'too_many_links') throw new Error('当前内容不需要拆分，请直接保存');
+    // 先落盘并取消待触发的防抖写入，否则它稍后可能把已拆分的原文重新写回输入框。
+    await this.flushEditor();
+    const chunks: string[][] = splitUrlChunks(parse.urls, MAX_ITEMS);
+    const ids: string[] = [];
+    const inputs: string[] = [];
+    for (let i = 0; i < chunks.length; i++) {
+      ids.push(util.generateRandomUUID(true));
+      inputs.push(chunks[i].join('\n'));
+    }
+    await runtime.queue.enqueueMany(ids, inputs, 'urls');
+    this.input = ''; this.editorError = ''; this.showEditor = false;
+    this.selectTab(0);
+    this.notice = `已按每份 ${MAX_ITEMS} 个链接拆成 ${chunks.length} 条草稿（共 ${parse.linkCount} 个链接），确认后即可发送`;
+  }
+
+  // 登记一条开始发送并按需启动每秒刷新的计时器；已在发送中返回 false。
+  private beginSending(requestId: string): boolean {
+    if (sendingFind(this.sendings, requestId) !== undefined) return false;
+    this.sendings = sendingBegin(this.sendings, requestId, Date.now());
+    if (this.sendTimer === -1) {
+      this.sendTimer = setInterval(() => { this.sendings = sendingTick(this.sendings, Date.now()); }, 1000);
+    }
+    return true;
+  }
+
+  private endSending(requestId: string): void {
+    this.sendings = sendingEnd(this.sendings, requestId);
+    if (this.sendings.length === 0 && this.sendTimer !== -1) { clearInterval(this.sendTimer); this.sendTimer = -1; }
+  }
+
+  private sendingSecondsOf(requestId: string): number {
+    const entry = sendingFind(this.sendings, requestId);
+    return entry === undefined ? 0 : entry.seconds;
+  }
+
+  // 单条发送：不经过 act()，不占用页面锁，只登记这一条的发送状态。失败原因既显示在卡片上，也在页面顶部提示。
+  private async sendDraft(draft: Draft): Promise<boolean> {
+    if (!this.beginSending(draft.requestId)) return false;
+    this.error = ''; this.notice = '';
+    try {
+      await this.sendOne(draft);
+      return true;
+    } catch (error) {
+      this.animate(() => { this.error = (error as Error).message || '发送失败，请重试'; });
+      return false;
+    } finally {
+      this.endSending(draft.requestId);
+      this.syncConnection(); this.reloadDrafts();
+    }
+  }
+
+  private async sendOne(draft: Draft): Promise<void> {
     const runtime = this.runtime;
     if (!runtime?.client || !runtime.connection) throw new Error('请先在“连接”页面配对电脑');
-    const session = await runtime.client.session();
-    this.paired = session.paired;
-    if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
+    // 已确认配对时直接发送：凭证失效会得到明确的 401 提示，也省掉一次往返；尚未确认时先查会话，给出更准确的原因。
+    if (!this.paired) {
+      const session = await runtime.client.session();
+      this.paired = session.paired;
+      if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
+    }
     await runtime.queue.send(draft.requestId, runtime.connection.pairingId, runtime.client);
     this.notice = '中转已接收，电脑上线后将处理';
-    try { this.history = await runtime.client.history(); this.historyLoaded = true; this.statusError = ''; }
+    await this.refreshHistoryAfterSend();
+  }
+
+  private async refreshHistoryAfterSend(): Promise<void> {
+    const client = this.runtime?.client;
+    if (!client) return;
+    try { this.history = await client.history(); this.historyLoaded = true; this.statusError = ''; }
     catch { this.statusError = '提交已成功，近期记录刷新失败，请重试刷新'; }
+  }
+
+  // 全部发送：逐条串行，预检会话与结束后的近期记录刷新各只做一次；界面在整个过程中保持可用。
+  // 配对、解绑、编辑草稿等占用页面锁的操作进行中不启动：它们会改变连接或草稿本身。
+  private async sendAll(): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime || this.batchTotal > 0 || this.busy) return;
+    const pending = runtime.queue.snapshot().drafts.length;
+    if (pending === 0) return;
+    this.error = ''; this.notice = '';
+    this.batchDone = 0; this.batchTotal = pending;
+    try {
+      if (!runtime.client || !runtime.connection) throw new Error('请先在“连接”页面配对电脑');
+      const session = await runtime.client.session();
+      this.paired = session.paired;
+      if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
+      const hooks = new BatchHooks();
+      hooks.started = (requestId: string): void => { this.beginSending(requestId); };
+      hooks.finished = (requestId: string, done: number, _total: number): void => {
+        this.endSending(requestId); this.batchDone = done; this.reloadDrafts();
+      };
+      const result = await sendBatch(runtime.queue, runtime.connection.pairingId, runtime.client, hooks);
+      if (result.sent.length > 0) await this.refreshHistoryAfterSend();
+      this.reportBatch(result);
+    } catch (error) {
+      this.animate(() => { this.error = (error as Error).message || '发送失败，请重试'; });
+    } finally {
+      this.batchTotal = 0; this.batchDone = 0;
+      this.syncConnection(); this.reloadDrafts();
+    }
+  }
+
+  // 只有全部成功才提示成功；否则汇总数量与原因，界面内联展示前几条，完整原因可复制。
+  private reportBatch(result: BatchResult): void {
+    const headline = batchHeadline(result);
+    if (result.ok) { this.notice = headline; return; }
+    const inline = batchReport(result, 3);
+    const message = inline ? `${headline}\n${inline}` : headline;
+    this.errorDetail = `${headline}\n${batchReport(result, 0)}`;
+    this.errorDetailFor = message;
+    this.animate(() => { this.error = message; });
+  }
+
+  // 开启“分享后自动发送”时，把刚落盘的分享草稿交给发送流程。
+  // 条件不满足（设置未读完、未连接、不在前台）时不标记已处理，之后条件满足再判断；始终不影响草稿本身，用户可手动发送。
+  private autoSendShared(): void {
+    const requestId = this.sharedId;
+    if (!requestId || requestId === this.handledShareId) return;
+    // 页面、设置或前台状态暂时不具备判断条件：保留待办，条件满足后再决定。
+    if (!this.ready || !this.settingsReady || !this.foreground || !this.visible) return;
+    // 一次分享只做一次决定：之后才开启设置或才连接电脑，都不会回头发送这条旧分享。
+    this.handledShareId = requestId;
+    if (!this.settings.autoSendShare || !this.connected) return;
+    const draft = this.runtime?.queue.snapshot().drafts.find((item: Draft) => item.requestId === requestId);
+    if (draft) this.sendDraft(draft);
   }
 
   private async remove(draft: Draft): Promise<void> {
@@ -357,7 +512,9 @@ struct Index {
 
   private async copyError(): Promise<void> {
     // 不经过 act：它会先清除当前错误，导致复制到空内容。
-    const detail = [this.error, this.statusError, this.incomingError].filter((value: string) => value.length > 0).join('\n');
+    // 批量发送的完整逐条原因只在文案未变化时使用，避免复制到已过期的内容。
+    const primary = this.error && this.error === this.errorDetailFor ? this.errorDetail : this.error;
+    const detail = [primary, this.statusError, this.incomingError].filter((value: string) => value.length > 0).join('\n');
     await this.copyText(detail, '错误信息已复制');
   }
 
@@ -395,8 +552,10 @@ struct Index {
   @Builder
   private EditorSheet() {
     CaptureEditor({ input: $input, mode: $mode, busy: this.busy, saving: this.editorSaving,
-      error: this.error || this.editorError, settings: this.settings,
+      error: this.error || this.editorError, settings: this.settings, canSend: this.connected && this.paired,
       onEdit: () => this.persistEditor(), onSave: () => { this.act(() => this.saveDraft()); },
+      onSend: () => { this.act(() => this.saveAndSend()); },
+      onSplit: () => { this.act(() => this.saveSplit()); },
       onClose: () => this.closeEditor() })
   }
 
@@ -422,14 +581,26 @@ struct Index {
           Text('待发送').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
           Text(`${this.drafts.length}`).fontSize(12).fontColor($r('app.color.text_tertiary'))
           Blank()
-          Text('仅保存在本机').fontSize(12).fontColor($r('app.color.text_tertiary'))
+          if (this.connected && this.drafts.length >= 2) {
+            // 批量发送期间显示进度；整个过程不锁页面，可以继续记录。
+            Button(this.batchTotal > 0 ? `发送中 ${this.batchDone}/${this.batchTotal}` : '全部发送', { type: ButtonType.Normal })
+              .height(44).fontSize(14).padding({ left: 14, right: 14 }).borderRadius(12)
+              .backgroundColor(this.palette.soft).fontColor(this.palette.accent)
+              .enabled(this.batchTotal === 0 && !this.busy).clickEffect(pressFeedback(this.settings))
+              .accessibilityText(this.batchTotal > 0 ? `全部发送进行中，已处理 ${this.batchDone} 条，共 ${this.batchTotal} 条` : `全部发送，共 ${this.drafts.length} 条`)
+              .onClick(() => { this.sendAll(); })
+          } else {
+            Text('仅保存在本机').fontSize(12).fontColor($r('app.color.text_tertiary'))
+          }
         }.width('100%')
         if (this.drafts.length === 0) {
           this.EmptyState($r('app.media.ic_inbox'), '从第一条收集开始', '点击上方记录，或从其他应用\n分享链接与文字到归知。')
         }
         ForEach(this.drafts.slice().reverse(), (draft: Draft, index: number) => {
           DraftCard({ draft: draft, index: index, busy: this.busy, connected: this.connected, settings: this.settings,
-            onSend: () => { this.act(() => this.send(draft)); },
+            sending: sendingFind(this.sendings, draft.requestId) !== undefined,
+            sendingSeconds: this.sendingSecondsOf(draft.requestId),
+            onSend: () => { this.sendDraft(draft); },
             onEdit: () => { this.act(() => this.editDraft(draft)); },
             onRemove: () => { this.act(() => this.remove(draft)); }, onConnect: () => { this.selectTab(2); } })
         }, (draft: Draft) => draft.requestId)
