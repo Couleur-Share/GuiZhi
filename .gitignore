@@ -124,6 +124,8 @@ packages/shared/types/index.js.map
 *.tmp
 *.temp
 *.tsbuildinfo
+# Python 字节码缓存（脚本与内置 worker 运行后生成，任意层级）
+__pycache__/
 .omx/
 # 调试脚本与截图产物（.tmp-shots/、.tmp-ui-check.mjs 等）
 .tmp-*
@@ -145,4 +147,3 @@ apps/capture-web/test-results/
 apps/capture-web/playwright-report/
 apps/desktop/resources/crawl4ai/
 config/crawl4ai/downloads/
-apps/desktop/resources/crawl4ai-worker/__pycache__/
