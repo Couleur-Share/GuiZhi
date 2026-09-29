@@ -103,27 +103,50 @@ export function tallyProgress(receipt: Receipt): ProgressTally {
   return tally;
 }
 
-export function receiptLabel(receipt: Receipt): string {
-  if (receipt.state === 'expired') return '已过期';
-  if (!receipt.progress || receipt.progress.items.length === 0) {
-    return receipt.state === 'received' ? '电脑已接收，等待处理' : '中转已接收，等待电脑';
-  }
-  const tally = tallyProgress(receipt);
-  // 只列出非零的计数，避免“重复 0 · 取消 0”这类噪声。
-  const parts: string[] = [];
-  if (tally.completed > 0) parts.push(`成功 ${tally.completed}`);
-  if (tally.failed > 0) parts.push(`失败 ${tally.failed}`);
-  if (tally.duplicate > 0) parts.push(`重复 ${tally.duplicate}`);
-  if (tally.canceled > 0) parts.push(`取消 ${tally.canceled}`);
-  const summary = parts.join(' · ');
-  if (tally.finished < receipt.itemCount) {
-    return summary ? `电脑处理中（${tally.finished}/${receipt.itemCount}） · ${summary}` : `电脑处理中（0/${receipt.itemCount}）`;
-  }
-  return summary ? summary : '电脑已处理';
-}
-
 // 记录状态的语义色调：界面据此选择 success / warning / error 色，颜色本身不承载唯一信息（文案仍完整）。
 export type ReceiptTone = 'success' | 'warning' | 'error' | 'neutral';
+
+// 回执的一枚计数徽标，如“成功 2”。
+export class ReceiptBadge {
+  text: string;
+  tone: ReceiptTone;
+  constructor(text: string, tone: ReceiptTone) { this.text = text; this.tone = tone; }
+}
+
+function hasProgress(receipt: Receipt): boolean {
+  return receipt.state !== 'expired' && receipt.progress !== null && receipt.progress.items.length > 0;
+}
+
+// 逐项结果的计数，只列出非零的，避免“重复 0 · 取消 0”这类噪声。
+export function receiptBadges(receipt: Receipt): ReceiptBadge[] {
+  const badges: ReceiptBadge[] = [];
+  if (!hasProgress(receipt)) return badges;
+  const tally = tallyProgress(receipt);
+  if (tally.completed > 0) badges.push(new ReceiptBadge(`成功 ${tally.completed}`, 'success'));
+  if (tally.failed > 0) badges.push(new ReceiptBadge(`失败 ${tally.failed}`, 'error'));
+  if (tally.duplicate > 0) badges.push(new ReceiptBadge(`重复 ${tally.duplicate}`, 'neutral'));
+  if (tally.canceled > 0) badges.push(new ReceiptBadge(`取消 ${tally.canceled}`, 'neutral'));
+  return badges;
+}
+
+// 处理进度说明；电脑已处理完且有逐项计数时为空，由计数徽标表达结果。
+export function receiptStatus(receipt: Receipt): string {
+  if (receipt.state === 'expired') return '已过期';
+  if (!hasProgress(receipt)) return receipt.state === 'received' ? '电脑已接收，等待处理' : '中转已接收，等待电脑';
+  const tally = tallyProgress(receipt);
+  if (tally.finished < receipt.itemCount) return `电脑处理中（${tally.finished}/${receipt.itemCount}）`;
+  return receiptBadges(receipt).length > 0 ? '' : '电脑已处理';
+}
+
+// 一行完整文案：进度说明加各项计数，供不分栏显示与无障碍朗读使用。
+export function receiptLabel(receipt: Receipt): string {
+  const parts: string[] = [];
+  const status = receiptStatus(receipt);
+  if (status !== '') parts.push(status);
+  const badges = receiptBadges(receipt);
+  for (let i = 0; i < badges.length; i++) parts.push(badges[i].text);
+  return parts.join(' · ');
+}
 
 export function receiptTone(receipt: Receipt): ReceiptTone {
   if (receipt.state === 'expired') return 'warning';

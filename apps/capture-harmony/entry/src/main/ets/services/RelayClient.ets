@@ -52,7 +52,11 @@ export class RelayClient implements CaptureSender {
   }
 
   session(): Promise<Session> { return this.request<Session>('session', http.RequestMethod.GET); }
-  history(): Promise<Receipt[]> { return this.request<Receipt[]>('history', http.RequestMethod.GET); }
+  // before 为 0 取最新一页；否则取创建时间严格早于 before（毫秒）的一页，用于“加载更多”。
+  history(before: number = 0): Promise<Receipt[]> {
+    const path = before > 0 ? `history?before=${Math.floor(before)}` : 'history';
+    return this.request<Receipt[]>(path, http.RequestMethod.GET);
+  }
   send(body: Submission): Promise<Receipt> { return this.request<Receipt>('captures', http.RequestMethod.POST, JSON.stringify(body)); }
   async disconnect(): Promise<void> { await this.request<Object>('session', http.RequestMethod.DELETE, '{}'); }
 }

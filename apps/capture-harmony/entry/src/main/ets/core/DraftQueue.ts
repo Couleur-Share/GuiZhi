@@ -87,18 +87,19 @@ export class DraftQueue {
     });
   }
 
-  async send(requestId: string, binding: string, sender: CaptureSender): Promise<void> {
+  // 发送成功时返回已校验的接收回执，草稿此时已从本机移除。
+  async send(requestId: string, binding: string, sender: CaptureSender): Promise<Receipt> {
     // 同步登记在途状态，避免双击等并发调用同时越过检查。
     if (this.inFlight.has(requestId)) throw new Error('这条内容正在发送，请等待结果');
     this.inFlight.add(requestId);
     try {
-      await this.sendOnce(requestId, binding, sender);
+      return await this.sendOnce(requestId, binding, sender);
     } finally {
       this.inFlight.delete(requestId);
     }
   }
 
-  private async sendOnce(requestId: string, binding: string, sender: CaptureSender): Promise<void> {
+  private async sendOnce(requestId: string, binding: string, sender: CaptureSender): Promise<Receipt> {
     if (!binding) throw new Error('请先配对电脑');
     // 第一步（串行）：校验并先持久化“已尝试”，之后才允许发出网络请求。
     const start = await this.serial<SendStart>(async (): Promise<SendStart> => {
@@ -133,6 +134,7 @@ export class DraftQueue {
       acknowledged.drafts = acknowledged.drafts.filter((item: Draft) => item.requestId !== requestId);
       await this.commit(acknowledged);
     });
+    return receipt;
   }
 
   private failed(requestId: string, error: Error, start: SendStart): Promise<void> {

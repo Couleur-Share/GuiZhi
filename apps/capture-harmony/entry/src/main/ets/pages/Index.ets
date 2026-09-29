@@ -18,6 +18,8 @@ import { ConnectionCheck, RelayRequestError } from '../core/ConnectionCheck';
 import { EditorAutosave } from '../core/EditorAutosave';
 import { CaptureParse, MAX_ITEMS, parseCapture, splitUrlChunks } from '../core/CaptureParser';
 import { BatchHooks, BatchResult, sendBatch, batchHeadline, batchReport } from '../core/BatchSend';
+import { HistoryItem, firstPage, historyCursor, historyKey, mergeHistory, nextPage } from '../core/HistoryView';
+import { SentEntry, buildSentEntry } from '../core/SentLog';
 import { SendingEntry, sendingBegin, sendingEnd, sendingFind, sendingTick } from '../core/SendingState';
 import { Draft, CaptureMode, Receipt, PairingLink, parsePairingLink } from '../core/Protocol';
 
@@ -40,6 +42,13 @@ struct Index {
   @State history: Receipt[] = [];
   @State historyPulling: boolean = false;
   @State historyLoaded: boolean = false;
+  // 服务端还有更早的记录可加载；historyLoadingMore 为“加载更多”请求进行中。
+  @State historyMore: boolean = false;
+  @State historyLoadingMore: boolean = false;
+  // 本机发送记录：与回执按请求编号关联，给近期页补上内容预览与来源。
+  @State sentEntries: SentEntry[] = [];
+  // 发送记录读写出问题时的说明，近期页顶部持续显示，直到下一次成功写入或清除。
+  @State sentLogWarning: string = '';
   @State statusError: string = '';
   @State error: string = '';
   @State notice: string = '';
@@ -144,6 +153,7 @@ struct Index {
       this.runtime = await CaptureRuntime.open(this.getUIContext().getHostContext() as common.UIAbilityContext);
       const snapshot = this.runtime.queue.snapshot();
       this.input = snapshot.editor; this.mode = snapshot.mode; this.drafts = snapshot.drafts;
+      this.sentEntries = this.runtime.sentLog.snapshot(); this.sentLogWarning = this.runtime.sentLog.problem;
       this.syncConnection(); this.ready = true; this.startPolling();
       await this.loadSettings();
       if (this.connected) await this.refresh();
@@ -206,7 +216,7 @@ struct Index {
       if (this.paired && loadHistory) {
         const rows = await client.history();
         if (client !== this.runtime?.client || revision !== this.checkRevision) return;
-        this.history = rows; this.historyLoaded = true;
+        this.applyHistory(rows);
       }
     } catch (error) {
       if (client === this.runtime?.client && revision === this.checkRevision) {
@@ -220,6 +230,31 @@ struct Index {
   private async pullHistory(): Promise<void> {
     try { if (this.connected && !this.busy) await this.refresh(true, true); }
     finally { this.historyPulling = false; }
+  }
+
+  // 收到最新一页记录：替换最新的部分，保留用户已经“加载更多”翻出的更早记录。
+  private applyHistory(rows: Receipt[]): void {
+    const page = firstPage(this.history, this.historyMore, rows);
+    this.history = page.receipts; this.historyMore = page.more; this.historyLoaded = true;
+  }
+
+  // 追加更早的一页记录。失败在页面顶部提示并保留已加载的内容，可再次点击重试。
+  private async loadMoreHistory(): Promise<void> {
+    const client = this.runtime?.client;
+    if (!client || !this.historyMore || this.historyLoadingMore || this.history.length === 0) return;
+    const revision = this.checkRevision;
+    this.historyLoadingMore = true;
+    try {
+      const older = await client.history(historyCursor(this.history));
+      // 解绑或重新配对期间返回的旧响应不能写进新连接的列表。
+      if (client !== this.runtime?.client || revision !== this.checkRevision) return;
+      const page = nextPage(this.history, older);
+      this.history = page.receipts; this.historyMore = page.more;
+    } catch (error) {
+      this.animate(() => { this.error = `加载更多记录失败：${(error as Error).message || '请稍后重试'}`; });
+    } finally {
+      this.historyLoadingMore = false;
+    }
   }
 
   private async loadSettings(): Promise<void> {
@@ -367,15 +402,54 @@ struct Index {
       this.paired = session.paired;
       if (!session.paired) throw new Error('请在电脑上的归知确认这台手机');
     }
-    await runtime.queue.send(draft.requestId, runtime.connection.pairingId, runtime.client);
+    const receipt = await runtime.queue.send(draft.requestId, runtime.connection.pairingId, runtime.client);
+    await this.recordSent(draft, receipt);
     this.notice = '中转已接收，电脑上线后将处理';
     await this.refreshHistoryAfterSend();
+  }
+
+  // 发送成功后在本机留一条记录（内容预览与来源），近期页据此显示回执对应的是什么内容。
+  // 记录只是辅助信息：写入失败不影响这次发送，只在近期页提示；本方法不会抛出。
+  private async recordSent(draft: Draft, receipt: Receipt): Promise<void> {
+    const log = this.runtime?.sentLog;
+    if (!log) return;
+    try {
+      await log.append(buildSentEntry(draft.input, draft.mode, receipt, Date.now()));
+      this.sentLogWarning = '';
+    } catch (error) {
+      this.sentLogWarning = `发送记录未能保存：${(error as Error).message || '未知原因'}。近期页可能不显示这条内容的预览`;
+    }
+    this.sentEntries = log.snapshot();
+  }
+
+  // 清除本机发送记录：只影响近期页的内容预览，草稿、电脑上已收集的内容与中转回执都不受影响。
+  private async clearSentLog(): Promise<void> {
+    const log = this.runtime?.sentLog;
+    if (!log) return;
+    const result = await this.getUIContext().getPromptAction().showDialog({
+      title: '清除发送记录？', systemMaterial: panelMaterial(this.settings),
+      message: '只清除本机保存的内容预览与来源，近期页里的旧回执会只显示条数。草稿与电脑上已收集的内容不受影响。',
+      buttons: [{ text: '取消', color: $r('app.color.text_secondary') }, { text: '清除', color: $r('app.color.error') }]
+    });
+    if (result.index !== 1) return;
+    await log.clear();
+    this.sentEntries = log.snapshot(); this.sentLogWarning = ''; this.notice = '已清除本机发送记录';
+  }
+
+  // 在系统浏览器打开来源链接；打不开时说明原因，并提示可改用复制。
+  private async openUrl(url: string): Promise<void> {
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await context.openLink(url, { appLinkingOnly: false });
+    } catch (error) {
+      this.animate(() => { this.error = `无法打开链接：${(error as Error).message || '未知原因'}。可改用“复制链接”`; });
+    }
   }
 
   private async refreshHistoryAfterSend(): Promise<void> {
     const client = this.runtime?.client;
     if (!client) return;
-    try { this.history = await client.history(); this.historyLoaded = true; this.statusError = ''; }
+    try { this.applyHistory(await client.history()); this.statusError = ''; }
     catch { this.statusError = '提交已成功，近期记录刷新失败，请重试刷新'; }
   }
 
@@ -398,6 +472,7 @@ struct Index {
       hooks.finished = (requestId: string, done: number, _total: number): void => {
         this.endSending(requestId); this.batchDone = done; this.reloadDrafts();
       };
+      hooks.sent = (draft: Draft, receipt: Receipt): Promise<void> => this.recordSent(draft, receipt);
       const result = await sendBatch(runtime.queue, runtime.connection.pairingId, runtime.client, hooks);
       if (result.sent.length > 0) await this.refreshHistoryAfterSend();
       this.reportBatch(result);
@@ -497,7 +572,7 @@ struct Index {
     });
     if (result.index !== 1 || !this.runtime) return;
     if (localOnly) await this.runtime.forget(); else await this.runtime.disconnect();
-    this.paired = false; this.history = []; this.historyLoaded = false; this.statusError = '';
+    this.paired = false; this.history = []; this.historyLoaded = false; this.historyMore = false; this.statusError = '';
     this.connectionCheck.reset(); this.automaticCheck = true;
     this.notice = localOnly ? '本机连接已清除，请在电脑撤销原设备' : '配对已解除';
   }
@@ -626,6 +701,10 @@ struct Index {
       Scroll() {
         Column({ space: 14 }) {
           Text('追踪接收与处理结果 · 下拉刷新').fontSize(14).fontColor($r('app.color.text_secondary')).width('100%')
+          if (this.sentLogWarning !== '') {
+            Text(this.sentLogWarning).fontSize(13).lineHeight(20).fontColor($r('app.color.warning')).width('100%')
+              .padding(12).backgroundColor($r('app.color.warning_soft')).borderRadius(14)
+          }
           if (!this.connected) {
             this.EmptyState($r('app.media.ic_link'), '连接后查看投递进度', '本机草稿不会自动发送，\n你可以先收集，再连接电脑。')
             this.PrimaryAction('连接电脑', $r('app.media.ic_link'), !this.busy, () => { this.selectTab(2); })
@@ -634,12 +713,19 @@ struct Index {
           } else if (this.historyLoaded && this.history.length === 0 && !this.statusError) {
             this.EmptyState($r('app.media.ic_history'), '还没有发送记录', '在收集箱中选一条内容，点击发送。')
           }
-          ForEach(this.history, (receipt: Receipt, index: number) => {
-            ReceiptCard({ receipt: receipt, settings: this.settings, index: index,
-              onCopyId: () => { this.copyText(receipt.requestId, '请求编号已复制'); } })
-          }, (receipt: Receipt) => receipt.id)
+          ForEach(mergeHistory(this.history, this.sentEntries), (item: HistoryItem, index: number) => {
+            ReceiptCard({ item: item, settings: this.settings, index: index,
+              onCopyId: () => { this.copyText(item.receipt.requestId, '请求编号已复制'); },
+              onCopyUrl: (url: string) => { this.copyText(url, '链接已复制'); },
+              onOpenUrl: (url: string) => { this.openUrl(url); },
+              onCopyReason: (summary: string) => { this.copyText(summary, '失败原因已复制'); } })
+          }, (item: HistoryItem) => historyKey(item))
           if (this.historyLoaded && this.history.length > 0) {
-            Text('最近 100 条 · 采集失败可在电脑重试').fontSize(12).fontColor($r('app.color.text_tertiary'))
+            if (this.historyMore) {
+              this.SecondaryAction(this.historyLoadingMore ? '正在加载…' : '加载更多', !this.historyLoadingMore, () => { this.loadMoreHistory(); })
+            }
+            Text(`${this.historyMore ? '已显示最近' : '已显示全部'} ${this.history.length} 条 · 采集失败可在电脑重试`)
+              .fontSize(12).fontColor($r('app.color.text_tertiary'))
           }
         }.padding({ left: 20, right: 20, top: 4, bottom: 112 }).width('100%')
       }.height('100%').width('100%').align(Alignment.TopStart).scrollBar(BarState.Off).edgeEffect(EdgeEffect.Spring)
@@ -784,7 +870,8 @@ struct Index {
               SettingsPage({ settings: this.settings, busy: this.busy || !this.settingsReady,
                 holdingMessage: this.holdingMessage, onRetryHolding: () => this.retryHolding(), onDetail: (visible: boolean) => { this.settingsDetail = visible; },
                 onChange: (value: AppPreferences) => { this.act(() => this.updateSettings(value)); },
-                onReset: () => { this.act(() => this.resetSettings()); }, onConnect: () => { this.selectTab(2); } })
+                onReset: () => { this.act(() => this.resetSettings()); }, onConnect: () => { this.selectTab(2); },
+                sentCount: this.sentEntries.length, onClearSentLog: () => { this.act(() => this.clearSentLog()); } })
             }.tabBar(this.tabStyle($r('app.media.ic_settings'), '设置'))
           }.width('100%').height('100%').vertical(false).barMode(BarMode.Fixed)
             .barOverlap(true).barHeight(this.keyboardVisible || (this.selectedTab === 3 && this.settingsDetail) ? 0 : 64, true)

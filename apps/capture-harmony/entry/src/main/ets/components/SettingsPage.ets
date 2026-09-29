@@ -2,6 +2,7 @@ import { AppPreferences } from '../services/AppPreferences';
 import { ThemePalette } from '../services/ThemePalette';
 import { animationSpeedLabel, pressFeedback, revealTransition } from '../services/InterfaceMotion';
 import { appVersionLabel } from '../services/AppVersion';
+import { SENT_LOG_LIMIT } from '../core/SentLog';
 import { AppearanceSettings } from './AppearanceSettings';
 import { SettingChoiceRow, SettingSwitchRow, SettingsRouteRow } from './SettingsRows';
 
@@ -11,12 +12,15 @@ export struct SettingsPage {
   @Prop settings: AppPreferences = new AppPreferences();
   @Prop busy: boolean = false;
   @Prop holdingMessage: string = '等待握持识别';
+  // 本机已保存的发送记录条数；清除入口在“连接与隐私”。
+  @Prop sentCount: number = 0;
   @State routes: NavPathStack = new NavPathStack();
   // 版本号只在进入设置时读取一次，来自安装包本身。
   private version: string = appVersionLabel();
   onRetryHolding: () => void = () => {};
   onChange: (settings: AppPreferences) => void = () => {};
   onReset: () => void = () => {};
+  onClearSentLog: () => void = () => {};
   onConnect: () => void = () => {};
   onDetail: (visible: boolean) => void = () => {};
 
@@ -95,6 +99,13 @@ export struct SettingsPage {
               settings: this.settings, onOpen: () => this.connect() })
             this.Paragraph('草稿保存在本机，确认发送后才上传。你可以离线记录，连接电脑后再发送。')
             this.Paragraph('设备凭证由系统安全存储保护。中转服务可以读取暂存内容；卸载应用会移除本机草稿。')
+            Button('清除发送记录', { type: ButtonType.Normal }).height(56).width('100%').fontSize(15)
+              .fontColor($r('app.color.text_primary')).backgroundColor($r('app.color.surface')).borderRadius(20)
+              .clickEffect(pressFeedback(this.settings)).enabled(!this.busy && this.sentCount > 0).onClick(this.onClearSentLog)
+            Text(this.sentCount > 0
+              ? `本机保存了最近 ${this.sentCount} 条发送记录（最多 ${SENT_LOG_LIMIT} 条），只用于在“近期”页显示内容预览与来源，不会上传。清除后旧回执只显示条数。`
+              : '本机没有发送记录。发送后，“近期”页会用它显示内容预览与来源；记录只保存在本机，不会上传。')
+              .fontSize(12).lineHeight(20).fontColor($r('app.color.text_secondary')).width('100%').padding(8)
           } else {
             Column({ space: 12 }) {
               Image($r('app.media.app_icon')).width(64).height(64).borderRadius(16)

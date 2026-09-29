@@ -82,7 +82,8 @@ test('warning / success / error 在所有底色上文字对比度不低于 4.5:1
         assert.ok(contrast(c[name], c[background]) >= 4.5, `${mode}/${name} 在 ${background} 上对比度 ${contrast(c[name], c[background]).toFixed(2)}`);
       }
     }
-    for (const name of ['warning', 'success']) {
+    for (const name of ['warning', 'success', 'error']) {
+      assert.ok(c[`${name}_soft`], `${mode}/${name}_soft 缺失`);
       assert.ok(contrast(c[name], c[`${name}_soft`]) >= 4.5, `${mode}/${name} 在 ${name}_soft 上对比度不足`);
     }
   }

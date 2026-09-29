@@ -128,13 +128,29 @@ function ipv6Valid(text: string): boolean {
   return compress === -1 ? pieces === 8 : pieces <= 7;
 }
 
-// 校验 http(s):// 之后的 authority（userinfo@host:port）。WHATWG 对特殊协议会吞掉多余的斜杠，反斜杠等同斜杠。
-function authorityValid(url: string): boolean {
+// 取出 http(s):// 之后去掉 userinfo 的 host[:port]。WHATWG 对特殊协议会吞掉多余的斜杠，反斜杠等同斜杠。
+function hostPortOf(url: string): string {
   const rest = url.replace(/^https?:[\\/]*/i, '');
   const end = rest.search(/[\\/?#]/);
   const authority = end === -1 ? rest : rest.slice(0, end);
   const at = authority.lastIndexOf('@');
-  const hostPort = at === -1 ? authority : authority.slice(at + 1);
+  return at === -1 ? authority : authority.slice(at + 1);
+}
+
+// 链接的小写主机名（IPv6 保留方括号），不校验合法性；已发送记录用它归类来源与显示失败项。
+export function hostOfUrl(url: string): string {
+  const hostPort = hostPortOf(url);
+  if (hostPort.charAt(0) === '[') {
+    const close = hostPort.indexOf(']');
+    return (close === -1 ? hostPort : hostPort.slice(0, close + 1)).toLowerCase();
+  }
+  const colon = hostPort.indexOf(':');
+  return (colon === -1 ? hostPort : hostPort.slice(0, colon)).toLowerCase();
+}
+
+// 校验 http(s):// 之后的 authority（userinfo@host:port）。
+function authorityValid(url: string): boolean {
+  const hostPort = hostPortOf(url);
   let port = '';
   if (hostPort.charAt(0) === '[') {
     const close = hostPort.indexOf(']');

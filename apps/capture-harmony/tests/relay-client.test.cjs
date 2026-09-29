@@ -64,3 +64,15 @@ test('网络超时抛出 code=network、status=0 的错误，供发送分类判�
   assert.deepEqual([error.status, error.code], [0, 'network']);
   assert.match(error.message, /网络超时/);
 });
+
+test('近期记录分页：不带游标取最新一页，带游标取严格更早的一页；非法游标退回最新一页，小数取整', async () => {
+  const cases = [[undefined, '/v1/history'], [0, '/v1/history'], [1700000000123, '/v1/history?before=1700000000123'],
+    [1700000000123.9, '/v1/history?before=1700000000123'], [-5, '/v1/history'], [Number.NaN, '/v1/history']];
+  for (const [before, path] of cases) {
+    const { client, calls } = fixture([{ status: 200, body: [] }]);
+    assert.deepEqual(Array.from(await client.history(before)), []);
+    assert.equal(calls[0].url, `https://example.invalid${path}`, `before=${before}`);
+    assert.equal(calls[0].options.method, 'GET');
+    assert.equal(calls[0].options.header.Authorization, 'Bearer test-only', '分页请求同样带设备凭证');
+  }
+});

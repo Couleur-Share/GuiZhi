@@ -3,9 +3,11 @@ import { util } from '@kit.ArkTS';
 import { cryptoFramework } from '@kit.CryptoArchitectureKit';
 import { DraftQueue } from '../core/DraftQueue';
 import { Connection, PairingLink } from '../core/Protocol';
+import { SentLog } from '../core/SentLog';
 import { CredentialStore } from './CredentialStore';
 import { LocalStore } from './LocalStore';
 import { RelayClient } from './RelayClient';
+import { SentLogStore } from './SentLogStore';
 
 export class CaptureRuntime {
   private static opening: Promise<CaptureRuntime> | undefined;
@@ -13,7 +15,9 @@ export class CaptureRuntime {
   client: RelayClient | undefined;
   readonly vault: CredentialStore = new CredentialStore();
   queue: DraftQueue;
-  constructor(queue: DraftQueue) { this.queue = queue; }
+  // 已发送记录：近期页的内容预览来源，读写失败不影响收集与发送。
+  sentLog: SentLog;
+  constructor(queue: DraftQueue, sentLog: SentLog) { this.queue = queue; this.sentLog = sentLog; }
 
   static open(context: common.Context): Promise<CaptureRuntime> {
     if (!CaptureRuntime.opening) {
@@ -26,7 +30,11 @@ export class CaptureRuntime {
 
   private static async create(context: common.Context): Promise<CaptureRuntime> {
     const store = await LocalStore.open(context);
-    const runtime = new CaptureRuntime(new DraftQueue(store, await store.load()));
+    const queue = new DraftQueue(store, await store.load());
+    // 发送记录打不开时不抛出，只在 problem 中说明；草稿读取失败仍会中止启动，以免覆盖原数据。
+    const sentLog = new SentLog(new SentLogStore(context));
+    await sentLog.open();
+    const runtime = new CaptureRuntime(queue, sentLog);
     runtime.connection = await runtime.vault.load();
     if (runtime.connection) runtime.client = new RelayClient(runtime.connection);
     return runtime;

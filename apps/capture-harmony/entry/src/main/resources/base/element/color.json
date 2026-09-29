@@ -45,6 +45,10 @@
       "value": "#B42318"
     },
     {
+      "name": "error_soft",
+      "value": "#FDECEA"
+    },
+    {
       "name": "warning",
       "value": "#8A5100"
     },

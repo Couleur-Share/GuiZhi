@@ -52,11 +52,26 @@ const editorAutosave = load('core/EditorAutosave.ts');
 // 识别与拆分依赖 Protocol 的字节计数，与页面共用同一份解析实现。
 const captureParser = load('core/CaptureParser.ts', { './Protocol': load('core/Protocol.ts') });
 const sendingState = load('core/SendingState.ts');
+const textPreview = load('core/TextPreview.ts');
 // BatchSend 依赖真实的 SendOutcome / ConnectionCheck：失败分类基于 instanceof RelayRequestError，必须是同一个类。
 const batchSend = load('core/BatchSend.ts', {
   './ConnectionCheck': check, './SendOutcome': load('core/SendOutcome.ts', { './ConnectionCheck': check }),
-  './TextPreview': load('core/TextPreview.ts'),
+  './TextPreview': textPreview,
 });
+// 发送记录与近期页合并逻辑：与页面共用同一份解析实现，避免测试里另写一套“预期”。
+const sentLog = load('core/SentLog.ts', { './CaptureParser': captureParser, './TextPreview': textPreview });
+const historyView = load('core/HistoryView.ts', { './CaptureParser': captureParser, './SentLog': sentLog });
+
+// 内存端口：记录每次落盘的条目，可按需让读取或写入失败。
+function memorySentPort({ initial = [], damaged = false, failLoad = null, failSave = null } = {}) {
+  const port = {
+    saves: [],
+    load: async () => { if (port.failLoad) throw port.failLoad; return { entries: initial.slice(), damaged }; },
+    save: async entries => { if (port.failSave) throw port.failSave; port.saves.push(Array.from(entries)); },
+    failLoad, failSave,
+  };
+  return port;
+}
 
 // 页面装载：extraImports 覆盖或补充默认桩，供后续新增模块使用。
 function createPage(client, extraImports = {}) {
@@ -66,10 +81,13 @@ function createPage(client, extraImports = {}) {
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
     '../core/EditorAutosave': editorAutosave, '../core/CaptureParser': captureParser, '../core/SendingState': sendingState, '../core/BatchSend': batchSend,
+    '../core/SentLog': sentLog, '../core/HistoryView': historyView,
     ...extraImports,
-  }, time.globals, true);
+    // $r 是 ArkTS 的资源引用，测试里直接返回资源名，页面里的对话框按钮等控制逻辑才能真实执行。
+  }, { ...time.globals, $r: name => name }, true);
   const ui = new Index();
-  ui.runtime = { client, connection: { origin: 'https://example.invalid' }, queue: { snapshot: () => ({ drafts: [] }) } };
+  ui.runtime = { client, connection: { origin: 'https://example.invalid' }, queue: { snapshot: () => ({ drafts: [] }) },
+    sentLog: new sentLog.SentLog(memorySentPort()) };
   ui.animate = fn => fn(); ui.ready = true; ui.connected = true; ui.foreground = true;
   // ConnectionCheck 使用同一时钟，避免依赖真实时间。
   ui.connectionCheck.canCheck = (manual) => ConnectionCheck.prototype.canCheck.call(ui.connectionCheck, manual, time.now());
@@ -102,4 +120,4 @@ function loadRelayClient(time, script) {
   return { RelayClient, calls };
 }
 
-module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser };
+module.exports = { root, BOUNDARY, load, deferred, clock, settle, createPage, pageSource, check, ConnectionCheck, RelayRequestError, loadRelayClient, sendingState, batchSend, captureParser, textPreview, sentLog, historyView, memorySentPort };

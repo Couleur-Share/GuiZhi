@@ -1,4 +1,4 @@
-import { Draft, LocalState } from './Protocol';
+import { Draft, LocalState, Receipt } from './Protocol';
 import { CaptureSender } from './DraftQueue';
 import { RelayRequestError } from './ConnectionCheck';
 import { failureDetail } from './SendOutcome';
@@ -8,7 +8,7 @@ import { previewText } from './TextPreview';
 export interface BatchQueue {
   snapshot(): LocalState;
   isSending(requestId: string): boolean;
-  send(requestId: string, binding: string, sender: CaptureSender): Promise<void>;
+  send(requestId: string, binding: string, sender: CaptureSender): Promise<Receipt>;
 }
 
 export class BatchFailure {
@@ -43,6 +43,9 @@ export class BatchHooks {
   started: (requestId: string) => void = (requestId: string): void => {};
   // 每处理完一条（含被跳过的）调用一次，done 为已处理条数。
   finished: (requestId: string, done: number, total: number) => void = (requestId: string, done: number, total: number): void => {};
+  // 一条发送成功后调用（回执已确认、草稿已移除），用于留存发送记录。
+  // 实现方必须自行处理失败：这里抛出的异常会中断整批发送，也不能因此把已成功的发送汇报成失败。
+  sent: (draft: Draft, receipt: Receipt) => Promise<void> = async (draft: Draft, receipt: Receipt): Promise<void> => {};
 }
 
 export const SKIP_OTHER_COMPUTER: string = '曾发往另一台电脑，请先核对原电脑的收集记录';
@@ -94,17 +97,25 @@ export async function sendBatch(queue: BatchQueue, binding: string, sender: Capt
         result.skipped.push(skip);
       } else if (!queue.isSending(requestId)) {
         hooks.started(requestId);
+        let receipt: Receipt | undefined = undefined;
+        let failure: Error | undefined = undefined;
         try {
-          await queue.send(requestId, binding, sender);
-          result.sent.push(requestId);
+          receipt = await queue.send(requestId, binding, sender);
         } catch (error) {
-          const failure = new BatchFailure();
-          failure.requestId = requestId; failure.preview = previewText(draft.input, PREVIEW_LENGTH);
-          failure.message = failureDetail(error as Error);
-          result.failed.push(failure);
-          if (!isItemSpecific(error as Error)) {
-            result.stoppedBy = errorCode(error as Error);
-            result.stoppedMessage = failure.message;
+          failure = error as Error;
+        }
+        if (failure === undefined) {
+          result.sent.push(requestId);
+          // 放在 try 之外：发送记录的问题不能改变这条“已发送”的结论。
+          await hooks.sent(draft, receipt as Receipt);
+        } else {
+          const item = new BatchFailure();
+          item.requestId = requestId; item.preview = previewText(draft.input, PREVIEW_LENGTH);
+          item.message = failureDetail(failure);
+          result.failed.push(item);
+          if (!isItemSpecific(failure)) {
+            result.stoppedBy = errorCode(failure);
+            result.stoppedMessage = item.message;
           }
         }
       }
