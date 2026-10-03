@@ -9,7 +9,8 @@
  *   GUIZHI_TRACE_CORPUS      语料 JSON（{ urls: string[] } 或 string[]），默认 scripts/web-trace-corpus.json
  *   GUIZHI_TRACE_LIMIT       只跑前 N 个网址（冒烟）
  *   GUIZHI_TRACE_REPS        轮数，默认 1；奇数轮先 A 后 B，偶数轮先 B 后 A，抵消时间漂移
- *   GUIZHI_TRACE_VARIANT     对照变量：reuse（默认，连接复用）| settle（事件驱动等待 vs 固定等待）
+ *   GUIZHI_TRACE_VARIANT     对照变量：reuse（默认，连接复用）| settle（事件驱动等待 vs 固定等待）|
+ *                            frames（跨源子框架不加载 vs 加载全部子框架）
  *   GUIZHI_TRACE_CONDITIONS  默认 A,B；A=旧行为，B=新行为，含义随 GUIZHI_TRACE_VARIANT 而定
  *   GUIZHI_TRACE_PROXY_MODE  manual（默认，使用 GUIZHI_TEST_PROXY）| system | direct
  *                            system 会在隔离实例内固定代理规则为 GUIZHI_TEST_PROXY 来模拟系统代理，不改动操作系统设置
@@ -32,6 +33,7 @@ const REPO = path.resolve(import.meta.dirname, "..");
  * 对照实验的变量：同一套脚本、同一份语料，A 为旧行为、B 为新行为。
  *   reuse  A=GUIZHI_WEB_CONNECTION_REUSE=0（每个请求新建连接） B=开启单次采集内连接复用
  *   settle A=GUIZHI_WEB_SETTLE=fixed（固定等待约 1.84 s）       B=事件驱动等待；两边都开启连接复用
+ *   frames A=GUIZHI_WEB_SUBFRAMES=allow（加载全部子框架）       B=不加载跨源子框架；两边都开启连接复用与事件驱动等待
  */
 const VARIANTS = {
   reuse: {
@@ -45,9 +47,17 @@ const VARIANTS = {
       GUIZHI_WEB_SETTLE: cond === "B" ? "quiet" : "fixed",
     }),
   },
+  frames: {
+    labels: { A: "A 旧行为（加载全部子框架）", B: "B 新行为（跨源子框架不加载）" },
+    env: (cond) => ({
+      GUIZHI_WEB_CONNECTION_REUSE: "1",
+      GUIZHI_WEB_SETTLE: "quiet",
+      GUIZHI_WEB_SUBFRAMES: cond === "B" ? "block" : "allow",
+    }),
+  },
 };
 const variantName = process.env.GUIZHI_TRACE_VARIANT || "reuse";
-if (!(variantName in VARIANTS)) throw new Error("GUIZHI_TRACE_VARIANT 只能是 reuse 或 settle");
+if (!(variantName in VARIANTS)) throw new Error("GUIZHI_TRACE_VARIANT 只能是 reuse、settle 或 frames");
 const VARIANT = VARIANTS[variantName];
 const CONDITION_LABEL = VARIANT.labels;
 const intEnv = (name, fallback) => {
@@ -282,6 +292,18 @@ export default async function ({ win, app, outDir, mainEntry }) {
       settleOverCap: rendered.filter((record) => (record.trace.settle?.initialMs ?? 0) > 1300).length,
       settleStageP95Ms: percentile(rendered.map((record) => record.trace.ms.settle), 0.95),
       settleStageMaxMs: percentile(rendered.map((record) => record.trace.ms.settle), 1),
+      // 被取消的跨源子框架：页数与个数。
+      blockedFramesPages: rendered.filter((record) => record.trace.blockedFrames).length,
+      blockedFramesTotal: rendered.reduce((total, record) => total + (record.trace.blockedFrames ?? 0), 0),
+      // load 比 DOMContentLoaded 晚多少：是“以 DOMContentLoaded 作沉降起点”最多能省的时间上限。
+      domReadyMedianMs: median(rendered.map((record) => record.trace.domReadyMs)),
+      loadStageMedianMs: median(rendered.map((record) => record.trace.ms.load)),
+      domReadyToLoad: (() => {
+        const gaps = rendered
+          .filter((record) => Number.isFinite(record.trace.domReadyMs))
+          .map((record) => record.trace.ms.load - record.trace.domReadyMs);
+        return { n: gaps.length, median: median(gaps), p90: percentile(gaps, 0.9), max: percentile(gaps, 1), over300: gaps.filter((value) => value > 300).length };
+      })(),
       requests,
       reusedSocket: reused,
       reuseRate: requests ? reused / requests : null,
@@ -404,6 +426,9 @@ export default async function ({ win, app, outDir, mainEntry }) {
     console.log(`  渲染路径阶段中位数(ms)：${Object.entries(s.renderedStageMedianMs).map(([name, value]) => `${name}=${Math.round(value)}`).join(" ")}`);
     console.log(`  沉降等待：结束原因 ${JSON.stringify(s.settleReasons)}，首段中位数 ${sec(s.settleInitialMedianMs)}，整段 P95 ${sec(s.settleStageP95Ms)} 最大 ${sec(s.settleStageMaxMs)}`);
     console.log(`  沉降轮询开销：读取往返最大 ${s.settlePollMaxMs} ms，页面侧计算最大 ${s.settleCostMaxMs} ms，首段超出上限 100 ms 以上 ${s.settleOverCap} 次`);
+    const gap = s.domReadyToLoad;
+    console.log(`  DOMContentLoaded 中位数 ${sec(s.domReadyMedianMs)}，load 阶段中位数 ${sec(s.loadStageMedianMs)}；load 晚于 DOMContentLoaded：${gap.n} 页，中位数 ${sec(gap.median)} P90 ${sec(gap.p90)} 最大 ${sec(gap.max)}，超过 300 ms 的 ${gap.over300} 页`);
+    console.log(`  被取消的跨源子框架：${s.blockedFramesPages} 页，共 ${s.blockedFramesTotal} 个`);
     for (const failure of s.failed) console.log(`  失败：${failure.url} ${String(failure.error).slice(0, 120)}`);
   }
   if (summary.paired) {

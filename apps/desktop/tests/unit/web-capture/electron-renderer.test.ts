@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   windows: [] as any[],
   flood: false,
   background: false,
+  // 页面载入后发起的导航，按顺序由窗口替身触发；默认没有。
+  pageNavigations: [] as Array<{ url: string; isMainFrame?: boolean }>,
+  // 上述导航的处置记录：是否被监听取消。
+  navigationLog: [] as Array<{ url: string; isMainFrame: boolean; prevented: boolean }>,
   // 后台请求的 Accept；沉降等待按它区分样式/图片/文档类与其余请求。
   backgroundAccept: undefined as string | undefined,
   snapshot: {} as Record<string, unknown>,
@@ -35,7 +39,6 @@ vi.mock("electron", () => ({
       >();
       const target = {
         handlers,
-        before: null as any,
         setProxy: vi.fn(async () => undefined),
         setPermissionRequestHandler: vi.fn(),
         setPermissionCheckHandler: vi.fn(),
@@ -49,11 +52,7 @@ vi.mock("electron", () => ({
           handle: vi.fn((scheme, action) => handlers.set(scheme, action)),
           unhandle: vi.fn((scheme) => handlers.delete(scheme)),
         },
-        webRequest: {
-          onBeforeRequest: vi.fn((handler) => {
-            target.before = handler;
-          }),
-        },
+        webRequest: { onBeforeRequest: vi.fn() },
       };
       mocks.sessions.push(target);
       return target;
@@ -64,11 +63,22 @@ vi.mock("electron", () => ({
     url = "";
     workerPolicy = "";
     target: any;
+    // webContents.on 注册的导航事件监听（同一事件只保留最后一个，足够本测试使用）。
+    listeners = new Map<string, (event: any) => void>();
     constructor(options: any) {
       this.target = options.webPreferences.session;
       mocks.windows.push(this);
     }
     webContents = {
+      on: vi.fn((event: string, listener: (event: any) => void) => {
+        this.listeners.set(event, listener);
+      }),
+      once: vi.fn((event: string, listener: (event: any) => void) => {
+        this.listeners.set(event, (payload: any) => {
+          this.listeners.delete(event);
+          listener(payload);
+        });
+      }),
       setWebRTCIPHandlingPolicy: vi.fn(),
       setWindowOpenHandler: vi.fn(),
       getURL: () => this.url,
@@ -83,30 +93,57 @@ vi.mock("electron", () => ({
         return mocks.snapshot;
       }),
     };
+    /** 触发导航事件，返回监听是否调用了 preventDefault（与真实 Electron 一致：被取消则导航中止）。 */
+    emitNavigation(event: string, url: string, isMainFrame = true): boolean {
+      let prevented = false;
+      this.listeners.get(event)?.({
+        url,
+        isMainFrame,
+        isSameDocument: false,
+        preventDefault: () => {
+          prevented = true;
+        },
+      });
+      return prevented;
+    }
+    /** 页面脚本、点击或 meta 刷新发起的导航：先过 will-frame-navigate，放行才取页面。 */
+    async navigateFromPage(navigation: { url: string; isMainFrame?: boolean }) {
+      const isMainFrame = navigation.isMainFrame ?? true;
+      const prevented = this.emitNavigation("will-frame-navigate", navigation.url, isMainFrame);
+      mocks.navigationLog.push({ url: navigation.url, isMainFrame, prevented });
+      if (prevented) return;
+      if (!isMainFrame || !/^https?:/.test(navigation.url)) return;
+      this.url = navigation.url;
+      // 取页失败时 Chromium 展示错误页，窗口继续存在；失败由 protocol.handle 的 serve 记账。
+      await this.target.handlers
+        .get(new URL(navigation.url).protocol.slice(0, -1))(
+          new Request(navigation.url, { headers: { accept: "text/html,application/xhtml+xml,*/*;q=0.8" } }),
+        )
+        .catch(() => undefined);
+    }
     async loadURL(url: string) {
       this.url = url;
-      let canceled = false;
-      this.target.before(
-        { url, resourceType: "mainFrame" },
-        (result: { cancel: boolean }) => {
-          canceled = result.cancel;
-        },
-      );
-      if (canceled) throw new Error("导航被拒绝");
       const response = await this.target.handlers.get(
         new URL(url).protocol.slice(0, -1),
       )(new Request(url, { headers: { accept: "text/html,application/xhtml+xml,*/*;q=0.8" } }));
       this.workerPolicy = response.headers.get("content-security-policy") ?? "";
+      // 主文档解析完成：Chromium 此时触发 dom-ready（主框架 DOMContentLoaded）。
+      this.listeners.get("dom-ready")?.({});
       if (mocks.background) {
         const headers = mocks.backgroundAccept ? { accept: mocks.backgroundAccept } : undefined;
         void this.target.handlers.get("https")(new Request(url + "late", { headers })).catch(() => undefined);
       }
       if (mocks.flood) await Promise.allSettled(Array.from({ length: 210 }, (_, index) =>
         this.target.handlers.get("https")(new Request(url + "?asset=" + index))));
-      if (response.status === 302)
-        await this.loadURL(
-          new URL(response.headers.get("location")!, url).href,
-        );
+      if (response.status === 302) {
+        const next = new URL(response.headers.get("location")!, url).href;
+        // 服务端重定向：Chromium 在取下一跳之前触发 will-redirect，被取消则整个导航中止。
+        if (this.emitNavigation("will-redirect", next)) throw new Error("ERR_ABORTED (-3)");
+        await this.loadURL(next);
+      }
+      // 页面载入后由脚本/点击/meta 刷新发起的主框架导航。
+      for (const navigation of mocks.pageNavigations.splice(0))
+        await this.navigateFromPage(navigation);
     }
     isDestroyed() {
       return this.destroyed;
@@ -128,6 +165,8 @@ beforeEach(() => {
   mocks.windows.length = 0;
   mocks.flood = false;
   mocks.background = false;
+  mocks.pageNavigations.length = 0;
+  mocks.navigationLog.length = 0;
   mocks.backgroundAccept = undefined;
   mocks.snapshot = { html: "<html><body>完整正文</body></html>" };
   mocks.probe.install = true;
@@ -141,9 +180,9 @@ beforeEach(() => {
   renderer = new WebElectronRenderer(new WebTaskGate(8));
 });
 afterEach(() => vi.useRealTimers());
-async function render() {
+async function render(input: Parameters<WebElectronRenderer["render"]>[0] = request) {
   vi.useFakeTimers();
-  const work = renderer.render(request, new AbortController().signal);
+  const work = renderer.render(input, new AbortController().signal);
   await vi.runAllTimersAsync();
   return work;
 }
@@ -215,6 +254,170 @@ describe("Electron 页面会话与网络隔离", () => {
     ).rejects.toThrow("范围");
     expect(mocks.network).toHaveBeenCalledTimes(1);
     expect(mocks.windows[0].destroyed).toBe(true);
+  });
+  describe("主框架导航的范围防护", () => {
+    const scoped = {
+      ...request,
+      url: "https://example.com/docs/",
+      scope: { origin: "https://example.com", directory: "/docs/" },
+    };
+    const okPage = {
+      status: 200,
+      headers: { "content-type": "text/html" },
+      body: Buffer.from("<p>正文</p>").toString("base64"),
+    };
+
+    it("在窗口上注册 will-frame-navigate 与 will-redirect，覆盖脚本跳转、点击、meta 刷新与重定向", async () => {
+      await render(scoped);
+      expect(
+        mocks.windows[0].webContents.on.mock.calls.map(([event]: [string]) => event),
+      ).toEqual(["will-frame-navigate", "will-redirect"]);
+    });
+
+    it("页面把主框架导航到范围外：取消导航、不请求目标页面，采集以越界失败", async () => {
+      mocks.pageNavigations.push({ url: "https://example.com/other/b" });
+      await expect(
+        renderer.render(scoped, new AbortController().signal),
+      ).rejects.toMatchObject({
+        message: "导航超出允许范围",
+        cause: { webCaptureCode: "security" },
+      });
+      // 只取过入口页面；越界目标没有被请求，更没有被执行。
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+      expect(mocks.windows[0].destroyed).toBe(true);
+    });
+
+    it("跨站的主框架导航同样被取消", async () => {
+      mocks.pageNavigations.push({ url: "https://elsewhere.example/x" });
+      await expect(
+        renderer.render(scoped, new AbortController().signal),
+      ).rejects.toThrow("导航超出允许范围");
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+    });
+
+    it("范围内的导航放行，最终网址与主文档响应随之更新", async () => {
+      mocks.pageNavigations.push({ url: "https://example.com/docs/next" });
+      const page = await render(scoped);
+      expect(page.url).toBe("https://example.com/docs/next");
+      expect(mocks.network).toHaveBeenCalledTimes(2);
+    });
+
+    it("范围内的导航取页失败：按真实原因终止，而不是采到浏览器错误页", async () => {
+      mocks.pageNavigations.push({ url: "https://example.com/docs/next" });
+      mocks.network.mockImplementation(async (incoming: { url: string }) => {
+        if (incoming.url.endsWith("/docs/next")) throw new Error("连接中断");
+        return okPage;
+      });
+      await expect(
+        renderer.render(scoped, new AbortController().signal),
+      ).rejects.toThrow("连接中断");
+    });
+
+    it("目录范围只约束主框架：范围外的同源子框架与非 http(s) 的主框架导航都不终止采集", async () => {
+      mocks.pageNavigations.push(
+        { url: "https://example.com/widget", isMainFrame: false },
+        // 应用唤起类跳转：外部协议由会话的权限处理器拒绝，不在这里终止采集。
+        { url: "weixin://dl/business", isMainFrame: true },
+      );
+      const page = await render(scoped);
+      expect(page.url).toBe("https://example.com/docs/");
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+      expect(mocks.navigationLog.map((entry) => entry.prevented)).toEqual([false, false]);
+    });
+
+    it("没有目录范围时不拦截主框架导航", async () => {
+      mocks.pageNavigations.push({ url: "https://elsewhere.example/page" });
+      const page = await render();
+      expect(page.url).toBe("https://elsewhere.example/page");
+    });
+
+    it("webRequest 监听只取消 WebSocket 与非 http(s) 请求，http(s) 交给 protocol.handle", async () => {
+      await render();
+      const hook = mocks.sessions[0].webRequest.onBeforeRequest.mock.calls[0][0];
+      const cancelled = (url: string, resourceType: string) => {
+        let cancel: boolean | undefined;
+        hook({ url, resourceType }, (result: { cancel: boolean }) => {
+          cancel = result.cancel;
+        });
+        return cancel;
+      };
+      expect(cancelled("ws://127.0.0.1:8080/ws", "webSocket")).toBe(true);
+      expect(cancelled("wss://example.com/ws", "webSocket")).toBe(true);
+      expect(cancelled("https://example.com/ws", "webSocket")).toBe(true);
+      expect(cancelled("ftp://example.com/f", "mainFrame")).toBe(true);
+      expect(cancelled("file:///C:/Windows/win.ini", "subFrame")).toBe(true);
+      // http(s) 的内网/范围判断不在这里：由 serve 内的出口校验与导航事件负责。
+      expect(cancelled("https://example.com/a.png", "image")).toBe(false);
+      expect(cancelled("http://example.com/", "mainFrame")).toBe(false);
+      // 渲染结束后监听被摘除。
+      expect(mocks.sessions[0].webRequest.onBeforeRequest).toHaveBeenLastCalledWith(null);
+    });
+  });
+  describe("跨源子框架", () => {
+    const frames = [
+      // 视频嵌入、广告、统计：跨源
+      { url: "https://www.youtube.com/embed/abc", isMainFrame: false },
+      { url: "http://ads.example/slot", isMainFrame: false },
+      // 同源子框架照常加载；about:blank 不产生网络请求
+      { url: "https://example.com/widget", isMainFrame: false },
+      { url: "about:blank", isMainFrame: false },
+    ];
+
+    it("取消跨源子框架，放行同源与非 http(s) 子框架，采集照常完成并在追踪里记数", async () => {
+      vi.useFakeTimers();
+      mocks.pageNavigations.push(...frames);
+      const { trace, fields } = recordingTrace();
+      const work = renderer.render(request, new AbortController().signal, { trace });
+      await vi.runAllTimersAsync();
+      await work;
+      expect(mocks.navigationLog.map((entry) => entry.prevented)).toEqual([true, true, false, false]);
+      expect(fields).toContainEqual({ blockedFrames: 2 });
+      // 被取消的子框架从未走到出口：只取过入口页面。
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+    });
+
+    it("没有被取消的子框架时，追踪里不出现 blockedFrames", async () => {
+      vi.useFakeTimers();
+      mocks.pageNavigations.push(frames[2], frames[3]);
+      const { trace, fields } = recordingTrace();
+      const work = renderer.render(request, new AbortController().signal, { trace });
+      await vi.runAllTimersAsync();
+      await work;
+      expect(fields.some((patch) => "blockedFrames" in patch)).toBe(false);
+    });
+
+    it("子框架重定向到跨源同样被取消（will-redirect）", async () => {
+      const window = () => mocks.windows[0];
+      mocks.network.mockResolvedValue({
+        status: 200,
+        headers: { "content-type": "text/html" },
+        body: Buffer.from("<p>正文</p>").toString("base64"),
+      });
+      await render();
+      expect(
+        window().emitNavigation("will-redirect", "https://tracker.example/pixel", false),
+      ).toBe(true);
+      expect(
+        window().emitNavigation("will-redirect", "https://example.com/next", false),
+      ).toBe(false);
+    });
+
+    it("GUIZHI_WEB_SUBFRAMES=allow 恢复加载全部子框架", async () => {
+      vi.stubEnv("GUIZHI_WEB_SUBFRAMES", "allow");
+      try {
+        mocks.pageNavigations.push(...frames);
+        await render();
+        expect(mocks.navigationLog.every((entry) => !entry.prevented)).toBe(true);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+  it("请求预算用尽时，错误里写明请求数最多的主机，便于判断是页面本身还是第三方内容", async () => {
+    mocks.flood = true;
+    await expect(
+      renderer.render(request, new AbortController().signal),
+    ).rejects.toThrow("页面网络预算已用尽（超过 200 个请求，主要来源：example.com ×201）");
   });
   it("网络安全拒绝保留原因并清理会话", async () => {
     mocks.network.mockRejectedValue(new Error("拒绝内网目标"));
@@ -298,6 +501,16 @@ describe("Electron 页面会话与网络隔离", () => {
       "drain",
       "cleanup",
     ]);
+  });
+  it("追踪开启时记录主框架 DOMContentLoaded 的时刻；追踪关闭时不注册监听", async () => {
+    vi.useFakeTimers();
+    const { trace, fields } = recordingTrace();
+    const work = renderer.render(request, new AbortController().signal, { trace });
+    await vi.runAllTimersAsync();
+    await work;
+    expect(fields).toContainEqual({ domReadyMs: expect.any(Number) });
+    await render();
+    expect(mocks.windows[1].webContents.once).not.toHaveBeenCalled();
   });
   it("渲染失败时追踪记录 error 阶段，随后仍记录收尾", async () => {
     mocks.network.mockRejectedValue(new Error("拒绝内网目标"));

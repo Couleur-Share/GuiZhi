@@ -89,6 +89,10 @@ export interface WebTraceFields {
   shadowRoots: number;
   /** 页面沉降等待的结果：结束原因与首段用时，用于评估事件驱动等待的收益与风险。 */
   settle: WebSettleResult;
+  /** 渲染中被取消的跨源子框架数（见 web-subframe-policy）；没有则不记录。 */
+  blockedFrames: number;
+  /** 主框架 DOMContentLoaded 距窗口创建的毫秒数；对照 ms.load 可看出子资源把 load 拖后了多少。 */
+  domReadyMs: number;
 }
 
 export interface WebTrace {
@@ -272,8 +276,17 @@ class RecordingWebTrace implements WebTrace {
     } catch {
       // 网址无法解析时仍写入一行，origin 标记为 invalid。
     }
-    const { engine, proxy, outcome, fallback, route, shadowRoots, settle } =
-      this.fields;
+    const {
+      engine,
+      proxy,
+      outcome,
+      fallback,
+      route,
+      shadowRoots,
+      settle,
+      blockedFrames,
+      domReadyMs,
+    } = this.fields;
     return {
       v: 1,
       at: new Date().toISOString(),
@@ -287,6 +300,8 @@ class RecordingWebTrace implements WebTrace {
       ...(route ? { route } : {}),
       ...(shadowRoots ? { shadowRoots } : {}),
       ...(settle ? { settle } : {}),
+      ...(blockedFrames ? { blockedFrames } : {}),
+      ...(domReadyMs !== undefined ? { domReadyMs } : {}),
       ms: {
         total: Math.round(finishedAt - this.startedAt),
         ...Object.fromEntries(

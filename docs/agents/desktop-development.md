@@ -68,7 +68,7 @@ packages/
   `maxPollMs`（一次读取的最长往返）与 `maxCostMs`（页面侧 `innerText` 的最长计算）用来区分
   “页面主线程忙”和“轮询本身太重”。`GUIZHI_WEB_SETTLE=fixed` 回退到固定等待。
 - 渲染窗口的请求类别只能取自 `Accept`（`web-trace.ts` 的 `classifyAccept`）：`protocol.handle`
-  接管 http(s) 后，Electron 33 里 `webRequest` 回调不再触发（含主框架导航），
+  接管 http(s) 后，Electron 33 里 `webRequest` 回调对它们不再触发（含主框架导航），
   `request.destination` 恒为空，也没有 `Sec-Fetch-*`。Chromium 的导航与 `<link rel=prefetch>`
   以 `text/html,application/xhtml+xml` 开头（逗号后无空格）；jQuery 一类取 HTML 片段的 XHR 是
   `text/html, */*; q=0.01`（有空格），它会改动 DOM，必须计入。改动分类规则后用
@@ -81,6 +81,22 @@ packages/
   会不会改动正文，保守起见一律等待，不按站点写名单。对照与验收：`GUIZHI_TRACE_VARIANT=settle` 配合
   `scripts/web-trace-steps.mjs` 做公网语料 A/B（`GUIZHI_TRACE_CORPUS` 指定语料，
   `GUIZHI_TRACE_SAVE_CONTENT=1` 保存正文用于逐页相似度对比）。
+- 渲染窗口的出口与导航防护（`web-electron-renderer.ts`）：http(s) 经 `protocol.handle` 统一走
+  `webNetworkRequest`（SSRF 校验、200 个请求 / 50 MiB 预算；预算用尽的错误会写明请求数最多的主机）。
+  `webRequest.onBeforeRequest` 只对未被接管的请求生效，实测 WebSocket 仍会触发，该监听一律取消
+  ws/wss 与非 http(s)；监听之外还有两层兜底：黑洞代理 `127.0.0.1:9`（配合 `<-loopback>`，连本机也
+  不直连）与 WebRTC `disable_non_proxied_udp`。**http(s) 的主框架范围检查（目录模式）不能放在
+  `webRequest` 上**（对它不触发），放在 `will-frame-navigate` 与 `will-redirect`：它们先于取页面触发，
+  越界的导航不会被请求，也不会执行；程序化的 `loadURL` 不触发（入口由调用方校验）。同一对事件
+  也承担子框架策略：跨源子框架默认不加载（`web-subframe-policy.ts`；采集只用主框架 DOM，跨源
+  子框架拖慢 load，且渲染窗口没有跨框架缓存，每个子框架重复下载同一批脚本，会耗尽请求预算），
+  `GUIZHI_WEB_SUBFRAMES=allow` 恢复加载；追踪的 `blockedFrames` 记被取消的个数，`domReadyMs`
+  记主框架 DOMContentLoaded 的时刻（对照 `ms.load`）。
+  改动这些逻辑后用 `scripts/web-egress-probe-steps.mjs`（`pnpm shot --steps`，不依赖公网）回归：
+  本机见证端口加夹具代理，断言没有连接绕过出口（ws/wss、WebRTC、`file:`、到本机的 HTTP 类请求），
+  越界导航在取页面之前被拦截且报“导航超出允许范围”，跨源子框架不被取走也不拖慢 load；
+  加 `GUIZHI_WEB_SUBFRAMES=allow` 运行同一脚本得到“放行”基线。公网语料对照用
+  `GUIZHI_TRACE_VARIANT=frames`。
 
 ## 常用命令
 

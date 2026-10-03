@@ -213,6 +213,20 @@ describe("网页采集诊断追踪", () => {
     expect(second).not.toHaveProperty("settle");
   });
 
+  it("被取消的跨源子框架数有值才写入；DOMContentLoaded 时刻为 0 也写入", async () => {
+    const file = path.join(dir, "trace.jsonl");
+    const framed = createWebTrace("https://example.com/a", "import", { file });
+    framed.set({ blockedFrames: 9, domReadyMs: 0 });
+    await framed.flush();
+    const plain = createWebTrace("https://example.com/b", "import", { file });
+    await plain.flush();
+    const [first, second] = await rows(file);
+    expect(first.blockedFrames).toBe(9);
+    expect(first.domReadyMs).toBe(0);
+    expect(second).not.toHaveProperty("blockedFrames");
+    expect(second).not.toHaveProperty("domReadyMs");
+  });
+
   it("没有失败时失败明细为空数组", async () => {
     const file = path.join(dir, "trace.jsonl");
     const trace = createWebTrace("https://example.com/", "import", { file });

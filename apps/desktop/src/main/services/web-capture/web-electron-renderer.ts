@@ -8,6 +8,7 @@ import { webCaptureError } from "./web-error";
 import { captureRenderedDocument } from "./web-rendered-document";
 import { WebNetworkActivity } from "./web-network-activity";
 import { pageSettleEnv, settleRenderedPage } from "./web-settle";
+import { shouldBlockSubframe } from "./web-subframe-policy";
 import { NOOP_WEB_TRACE, classifyAccept } from "./web-trace";
 import {
   WebTaskGate,
@@ -33,6 +34,18 @@ export interface RenderedWebPage {
   url: string;
   status: number;
   links: string[];
+}
+
+/** 单页请求数上限；超过即终止采集，防止页面无限发请求。 */
+const MAX_REQUESTS = 200;
+
+/** 请求数最多的前三个主机，如“www.youtube.com ×94、www.gstatic.com ×43”。只含主机，不含路径与参数。 */
+function summarizeHosts(hosts: Map<string, number>): string {
+  return [...hosts]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 3)
+    .map(([host, count]) => `${host} ×${count}`)
+    .join("、");
 }
 
 async function limitedBody(request: Request): Promise<string | undefined> {
@@ -105,6 +118,10 @@ export class WebElectronRenderer {
     const activity = new WebNetworkActivity();
     let requests = 0,
       bytes = 0;
+    // 按主机统计请求数：预算用尽时据此说明是谁在消耗，区分页面本身与第三方内容。
+    const hosts = new Map<string, number>();
+    // 被取消的跨源子框架数，写入追踪便于判断页面是否受此策略影响。
+    let blockedFrames = 0;
     let fatal: Error | undefined;
     let failure: unknown;
     let result: RenderedWebPage | undefined;
@@ -114,9 +131,13 @@ export class WebElectronRenderer {
     };
     const denyDownload = (event: Electron.Event) => event.preventDefault();
     const serve = (incoming: Request): Promise<Response> => {
+      const host = new URL(incoming.url).host;
+      hosts.set(host, (hosts.get(host) ?? 0) + 1);
       // 入队前计数，避免页面一次发起大量请求时先堆满等待队列。
-      if (++requests > 200) {
-        fatal ??= new Error("页面网络预算已用尽");
+      if (++requests > MAX_REQUESTS) {
+        fatal ??= new Error(
+          `页面网络预算已用尽（超过 ${MAX_REQUESTS} 个请求，主要来源：${summarizeHosts(hosts)}）`,
+        );
         controller.abort();
         return Promise.reject(fatal);
       }
@@ -196,20 +217,15 @@ export class WebElectronRenderer {
       target.setPermissionRequestHandler(denyPermissionRequest);
       target.setPermissionCheckHandler(denyPermissionCheck);
       target.on("will-download", denyDownload);
+      // http(s) 被下面的 protocol.handle 接管后，webRequest 不再对它们触发（含主框架导航，
+      // Electron 33 实测）；该监听只对未被接管的请求生效，实测 WebSocket 仍会触发。
+      // 它们一律取消，黑洞代理是第二层兜底（监听失效时 ws/wss 也到不了本机或外网）。
       target.webRequest.onBeforeRequest((details, callback) => {
-        const main = details.resourceType === "mainFrame";
-        if (main) navigations.add(details.url);
-        const allowed =
-          /^https?:\/\//i.test(details.url) &&
-          details.resourceType !== "webSocket" &&
-          (!main || !request.scope || inWebScope(details.url, request.scope));
-        if (!allowed && main) {
-          fatal ??= new Error("导航超出允许范围", {
-            cause: { webCaptureCode: "security" },
-          });
-          controller.abort();
-        }
-        callback({ cancel: !allowed });
+        callback({
+          cancel:
+            !/^https?:\/\//i.test(details.url) ||
+            details.resourceType === "webSocket",
+        });
       });
       target.protocol.handle("http", serve);
       target.protocol.handle("https", serve);
@@ -232,18 +248,54 @@ export class WebElectronRenderer {
       });
       window.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      // 导航检查放在导航事件上：它先于取页面触发，被取消的目标不会被请求，更不会执行。
+      // 事件不对程序化的 loadURL 触发（入口已由调用方校验），但对脚本跳转、点击、meta 刷新、
+      // 子框架加载与服务端重定向（含入口自身的重定向）都会触发。
+      const pageContents = window.webContents;
+      const guardNavigation = (
+        event: Electron.Event<{ url: string; isMainFrame: boolean }>,
+      ) => {
+        if (!/^https?:\/\//i.test(event.url)) return;
+        if (!event.isMainFrame) {
+          // 子框架：取消跨源的，理由见 web-subframe-policy.ts；这不是错误，采集照常进行。
+          if (shouldBlockSubframe(event.url, pageContents.getURL())) {
+            event.preventDefault();
+            blockedFrames++;
+          }
+          return;
+        }
+        // 主框架：越界即取消并终止采集。
+        if (request.scope && !inWebScope(event.url, request.scope)) {
+          event.preventDefault();
+          fatal ??= new Error("导航超出允许范围", {
+            cause: { webCaptureCode: "security" },
+          });
+          controller.abort();
+          return;
+        }
+        // 主框架导航取页失败必须终止采集，不能把浏览器错误页当作正文。
+        navigations.add(event.url);
+      };
+      pageContents.on("will-frame-navigate", guardNavigation);
+      pageContents.on("will-redirect", guardNavigation);
+      if (trace.enabled) {
+        // 诊断：主框架 DOMContentLoaded 的时刻，对照 load 阶段可看出子资源把 load 拖后了多少。
+        const windowAt = performance.now();
+        pageContents.once("dom-ready", () =>
+          trace.set({ domReadyMs: Math.round(performance.now() - windowAt) }),
+        );
+      }
       combined.addEventListener("abort", abortWindow, { once: true });
       trace.mark("window");
       await withWebAbort(window.loadURL(request.url), combined);
       trace.mark("load");
       showWindowOffscreen(window);
-      const contents = window.webContents;
       // 事件驱动沉降：网络、DOM、正文都静止即提前结束，上限与原先的固定等待相同。
       trace.set({
         settle: await settleRenderedPage(
           pageSettleEnv({
             evaluate: (script) =>
-              withWebAbort(contents.executeJavaScript(script), combined),
+              withWebAbort(pageContents.executeJavaScript(script), combined),
             pause: (ms) => webPause(ms, combined),
             networkQuietMs: () => activity.quietMs(),
             inflight: () => activity.inflight(),
@@ -295,6 +347,7 @@ export class WebElectronRenderer {
       combined.removeEventListener("abort", abortWindow);
       controller.abort();
       abortWindow();
+      if (blockedFrames) trace.set({ blockedFrames });
       await Promise.allSettled([...pending]);
       trace.mark("drain");
       target.protocol.unhandle("http");
