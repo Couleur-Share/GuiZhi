@@ -91,6 +91,8 @@ export interface WebTraceFields {
   settle: WebSettleResult;
   /** 渲染中被取消的跨源子框架数（见 web-subframe-policy）；没有则不记录。 */
   blockedFrames: number;
+  /** 渲染中以占位图本地应答（未出网）的图片请求数（见 web-inert-resources）；没有则不记录。 */
+  inertStubs: number;
   /** 主框架 DOMContentLoaded 距窗口创建的毫秒数；对照 ms.load 可看出子资源把 load 拖后了多少。 */
   domReadyMs: number;
 }
@@ -285,6 +287,7 @@ class RecordingWebTrace implements WebTrace {
       shadowRoots,
       settle,
       blockedFrames,
+      inertStubs,
       domReadyMs,
     } = this.fields;
     return {
@@ -301,6 +304,7 @@ class RecordingWebTrace implements WebTrace {
       ...(shadowRoots ? { shadowRoots } : {}),
       ...(settle ? { settle } : {}),
       ...(blockedFrames ? { blockedFrames } : {}),
+      ...(inertStubs ? { inertStubs } : {}),
       ...(domReadyMs !== undefined ? { domReadyMs } : {}),
       ms: {
         total: Math.round(finishedAt - this.startedAt),

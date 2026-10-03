@@ -97,6 +97,46 @@ packages/
   越界导航在取页面之前被拦截且报“导航超出允许范围”，跨源子框架不被取走也不拖慢 load；
   加 `GUIZHI_WEB_SUBFRAMES=allow` 运行同一脚本得到“放行”基线。公网语料对照用
   `GUIZHI_TRACE_VARIANT=frames`。
+- 静态请求的身份（`web-request-identity.ts`）：静态获取、重定向的每一跳以及 robots.txt / sitemap
+  的文本请求，与渲染窗口使用同一个身份——Chromium 自己的 `User-Agent`（含 `GuiZhi/<版本>` 标记，
+  自报家门，不冒充搜索引擎或其他爬虫）和导航 `Accept`。此前这些请求不带 UA，Wikipedia 等站点据此
+  直接 403（en/zh 条目实测全部失败），同一页面由渲染窗口取却正常；robots.txt 取不到还会让文档站
+  批量暂停。不带 `Accept-Language`：渲染窗口经 `protocol.handle` 转发时本来就没有（Electron 33
+  实测），补上只会让两条路径因语言协商拿到不同版本；也不带 `Upgrade-Insecure-Requests`（渲染窗口的
+  主文档请求会带，这是有意保留的差异：它是能力声明而非身份，静态请求发出去只会让 http 站点多一次
+  重定向）。**这不是 403 之后的重试**：
+  静态遇到 403/429 仍保持失败状态、不回退到渲染窗口——那等于遇到访问限制后升级手段
+  （`docs/crawl4ai.md`：已经遇到的访问限制不能通过回退绕过；公开样例 `httpbin.org/status/403`
+  期望 `restricted`）。`GUIZHI_WEB_IDENTITY=none` 恢复旧行为。回归：
+  `scripts/web-identity-probe-steps.mjs`（`pnpm shot --steps`，本机夹具，不依赖公网）断言静态与
+  渲染的 UA/Accept 一致、仅凭 UA 放行的站点可采集；公网对照用 `GUIZHI_TRACE_VARIANT=identity`
+  （45 个网址 × 2 轮 × 2 条件，只有 Wikipedia 的 4 对由 403 变为成功，其余路由、状态、正文无变化）。
+- 渲染窗口里的图片不出网（`web-inert-resources.ts`）：`Accept` 以 `image/` 开头的 GET 子请求（img、
+  picture、CSS 背景图、图标）以一张有效的 1×1 透明 GIF 本地应答，不占请求预算与网络槽位。采集结果
+  来自渲染后的 DOM，图片在其中只是网址；图片由导入流程按网址另行下载，渲染窗口从不截图（本路径没有
+  `capturePage`），窗口里加载的那一份没有下游使用，却会拖住 load。不取消、不报错：`onerror` 处理器
+  常把 `src` 改写成占位图，会污染采集到的图片地址；有效图片使 `onload` 照常触发，`src` 保持原样。应答
+  带 CORS（回显 `Origin`）与 CORP 头，否则 `<img crossorigin>` 与 COEP 页面会收到 `onerror`。字体、
+  媒体、脚本在协议处理器里区分不了（只有 `Accept`），不处理。已知差异：图片塌缩为 1×1，没有标注尺寸
+  的图片不再撑高页面，依赖滚动位置的懒加载 / 无限滚动会比真实加载多取几批（`scroll` / `scrollbare`
+  夹具，接口延迟 80 ms：每批带文字的信息流 2→4 批、多约 0.2 s；每批只有未标注尺寸图片的最坏情形
+  2→21 批、多约 1.1 s，均采集成功——批数受沉降上限约束，随接口往返时间而变）；脚本若按
+  `naturalWidth` 判断图片真假会读到 1。`GUIZHI_WEB_INERT_RESOURCES=load` 恢复真实加载；追踪的
+  `inertStubs` 记本地应答数。占位图只在渲染采集窗口生效，不影响验证浏览器和平台连接器（它们自成
+  一套窗口）。公网对照（`GUIZHI_TRACE_VARIANT=inert`，53 个网址 × 2 轮 × 2 条件）：图片占渲染页请求的
+  22%–49%、字节的 9%–34%；超出 200 个请求预算而失败的图片密集页（theverge.com、smzdm.com，两轮
+  皆然）全部变为成功；主框架 DOMContentLoaded 到 load 的间隔 P90 由 2.4–2.8 s 降到 1.4–1.8 s。
+  采集总时长按配对计：一般语料（66 对）中位数 −73 ms（−1.7%），快 300 ms 以上的配对占 41%、慢
+  300 ms 以上的占 35%，在噪声内（load 由最慢的第三方子资源决定，同一页面两轮能差 2–3 s）；图片
+  密集语料（22 对）中位数 −434 ms（−13%），59% 的配对快 300 ms 以上、14% 慢。正文无超出同条件
+  重复噪声的差异（个别页面的推荐流每次加载本就不同）。回归：
+  `scripts/web-inert-probe-steps.mjs`；沉降夹具与出口探测需要真实的在途图片，脚本里已固定
+  `GUIZHI_WEB_INERT_RESOURCES=load`。
+- 评估过但不做：主框架 DOMContentLoaded 时就开始沉降观察（与 load 重叠）。网络静止窗口的计时本来
+  就跨越 load（`web-network-activity.ts` 的时钟是连续的），重叠只能提前 DOM 与可见文字这两个从沉降
+  开始才计时的窗口；100 次渲染采集里只有 12 次不被网络窗口卡住，据 `settle.blocked` 推算最多省
+  约 28 ms/次（占采集总时长 0.5%）。把网络窗口也算上的朴素上限 276 ms/次不成立。收益低于单次采集
+  的噪声，不值得再加一种沉降模式。
 
 ## 常用命令
 

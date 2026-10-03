@@ -9,7 +9,11 @@ const mocks = vi.hoisted(() => ({
   sessions: [] as any[],
   windows: [] as any[],
   flood: false,
+  // 洪泛请求的 Accept；默认不带，用来区分“图片洪泛”（占位图本地应答）与普通洪泛（占请求预算）。
+  floodAccept: undefined as string | undefined,
   background: false,
+  // 后台请求拿到的应答，供断言占位图应答的内容。
+  backgroundResponses: [] as Response[],
   // 页面载入后发起的导航，按顺序由窗口替身触发；默认没有。
   pageNavigations: [] as Array<{ url: string; isMainFrame?: boolean }>,
   // 上述导航的处置记录：是否被监听取消。
@@ -131,10 +135,12 @@ vi.mock("electron", () => ({
       this.listeners.get("dom-ready")?.({});
       if (mocks.background) {
         const headers = mocks.backgroundAccept ? { accept: mocks.backgroundAccept } : undefined;
-        void this.target.handlers.get("https")(new Request(url + "late", { headers })).catch(() => undefined);
+        void this.target.handlers.get("https")(new Request(url + "late", { headers }))
+          .then((late: Response) => mocks.backgroundResponses.push(late), () => undefined);
       }
       if (mocks.flood) await Promise.allSettled(Array.from({ length: 210 }, (_, index) =>
-        this.target.handlers.get("https")(new Request(url + "?asset=" + index))));
+        this.target.handlers.get("https")(new Request(url + "?asset=" + index,
+          mocks.floodAccept ? { headers: { accept: mocks.floodAccept } } : undefined))));
       if (response.status === 302) {
         const next = new URL(response.headers.get("location")!, url).href;
         // 服务端重定向：Chromium 在取下一跳之前触发 will-redirect，被取消则整个导航中止。
@@ -164,7 +170,9 @@ beforeEach(() => {
   mocks.sessions.length = 0;
   mocks.windows.length = 0;
   mocks.flood = false;
+  mocks.floodAccept = undefined;
   mocks.background = false;
+  mocks.backgroundResponses.length = 0;
   mocks.pageNavigations.length = 0;
   mocks.navigationLog.length = 0;
   mocks.backgroundAccept = undefined;
@@ -202,6 +210,44 @@ describe("Electron 页面会话与网络隔离", () => {
     await expect(renderer.render(request, new AbortController().signal)).rejects.toThrow("预算");
     expect(mocks.network.mock.calls.length).toBeLessThanOrEqual(9);
     expect(mocks.windows[0].destroyed).toBe(true);
+  });
+  describe("惰性图片以占位图本地应答", () => {
+    const IMAGE_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
+    afterEach(() => vi.unstubAllEnvs());
+
+    it("图片请求不出网，也不占请求预算：210 个图片请求不会触发预算失败", async () => {
+      mocks.flood = true;
+      mocks.floodAccept = IMAGE_ACCEPT;
+      await expect(render()).resolves.toMatchObject({ status: 200 });
+      // 只有主文档出网。
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+    });
+
+    it("应答是一张有效的 GIF，且不缓存", async () => {
+      mocks.background = true;
+      mocks.backgroundAccept = IMAGE_ACCEPT;
+      await render();
+      expect(mocks.network).toHaveBeenCalledTimes(1);
+      const [answer] = mocks.backgroundResponses;
+      expect(answer.status).toBe(200);
+      expect(answer.headers.get("content-type")).toBe("image/gif");
+      expect(answer.headers.get("cache-control")).toBe("no-store");
+      expect(Buffer.from(await answer.arrayBuffer()).subarray(0, 6).toString("ascii")).toBe("GIF89a");
+    });
+
+    it("样式表与其他请求照常出网", async () => {
+      mocks.background = true;
+      mocks.backgroundAccept = "text/css,*/*;q=0.1";
+      await render();
+      expect(mocks.network).toHaveBeenCalledTimes(2);
+    });
+
+    it("GUIZHI_WEB_INERT_RESOURCES=load 恢复真实加载：图片请求出网并占请求预算", async () => {
+      vi.stubEnv("GUIZHI_WEB_INERT_RESOURCES", "load");
+      mocks.flood = true;
+      mocks.floodAccept = IMAGE_ACCEPT;
+      await expect(renderer.render(request, new AbortController().signal)).rejects.toThrow("预算");
+    });
   });
   it("逐页销毁窗口并清理数据；会话可复用", async () => {
     await render();
@@ -574,6 +620,10 @@ describe("Electron 页面会话与网络隔离", () => {
   });
 
   describe("沉降等待", () => {
+    // 沉降等待关心真实网络活动的类别；占位图本地应答（默认）下图片请求根本不会登记，
+    // 所以这里恢复真实加载，才能继续覆盖“图片在途不阻止沉降”的语义。
+    beforeEach(() => vi.stubEnv("GUIZHI_WEB_INERT_RESOURCES", "load"));
+    afterEach(() => vi.unstubAllEnvs());
     const okResponse = {
       status: 200,
       headers: { "content-type": "text/html" },

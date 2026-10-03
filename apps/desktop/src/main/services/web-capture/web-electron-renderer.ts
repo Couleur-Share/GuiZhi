@@ -6,6 +6,11 @@ import { showWindowOffscreen } from "../../testing/window-mode";
 import { webNetworkRequest, type WebCaptureNet } from "./web-network";
 import { webCaptureError } from "./web-error";
 import { captureRenderedDocument } from "./web-rendered-document";
+import {
+  inertImageResponse,
+  inertResourceMode,
+  isInertImageRequest,
+} from "./web-inert-resources";
 import { WebNetworkActivity } from "./web-network-activity";
 import { pageSettleEnv, settleRenderedPage } from "./web-settle";
 import { shouldBlockSubframe } from "./web-subframe-policy";
@@ -122,6 +127,9 @@ export class WebElectronRenderer {
     const hosts = new Map<string, number>();
     // 被取消的跨源子框架数，写入追踪便于判断页面是否受此策略影响。
     let blockedFrames = 0;
+    // 惰性图片：以占位图本地应答的请求数（见 web-inert-resources.ts）。
+    const inertImages = inertResourceMode() === "stub";
+    let inertStubs = 0;
     let fatal: Error | undefined;
     let failure: unknown;
     let result: RenderedWebPage | undefined;
@@ -131,6 +139,14 @@ export class WebElectronRenderer {
     };
     const denyDownload = (event: Electron.Event) => event.preventDefault();
     const serve = (incoming: Request): Promise<Response> => {
+      // protocol.handle 接管后拿不到 webRequest 的资源类型，只能按 Accept 粗分；
+      // 沉降等待与追踪共用这一分类。
+      const kind = classifyAccept(incoming.headers.get("accept"));
+      // 惰性图片不出网（理由见 web-inert-resources.ts），因此也不占请求数预算与网络槽位。
+      if (inertImages && isInertImageRequest(incoming.method, kind)) {
+        inertStubs++;
+        return Promise.resolve(inertImageResponse(incoming.headers));
+      }
       const host = new URL(incoming.url).host;
       hosts.set(host, (hosts.get(host) ?? 0) + 1);
       // 入队前计数，避免页面一次发起大量请求时先堆满等待队列。
@@ -141,9 +157,6 @@ export class WebElectronRenderer {
         controller.abort();
         return Promise.reject(fatal);
       }
-      // protocol.handle 接管后拿不到 webRequest 的资源类型，只能按 Accept 粗分；
-      // 沉降等待与追踪共用这一分类。
-      const kind = classifyAccept(incoming.headers.get("accept"));
       const work = this.network
         .run(combined, async (waitedMs) => {
           const response = await webNetworkRequest(
@@ -348,6 +361,7 @@ export class WebElectronRenderer {
       controller.abort();
       abortWindow();
       if (blockedFrames) trace.set({ blockedFrames });
+      if (inertStubs) trace.set({ inertStubs });
       await Promise.allSettled([...pending]);
       trace.mark("drain");
       target.protocol.unhandle("http");

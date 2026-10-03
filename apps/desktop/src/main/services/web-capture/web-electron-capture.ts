@@ -12,6 +12,7 @@ import {
 import { WebTaskGate, withWebAbort, webAbortError } from "./web-task-gate";
 import { webNetworkRequest, type WebCaptureNet } from "./web-network";
 import { WebConnectionPool } from "./web-connection-pool";
+import { webDocumentHeaders } from "./web-request-identity";
 import { NOOP_WEB_TRACE, type WebTrace } from "./web-trace";
 import { assessStaticPage, staticPageLinks, isWebVerificationPage } from "./web-static-route";
 import { WEB_VERIFICATION_REQUIRED } from "@guizhi/shared/utils/web-verification";
@@ -142,11 +143,13 @@ export class ElectronWebCapture {
     net: WebCaptureNet,
   ): Promise<RenderedWebPage | null> {
     let url = request.url;
+    // 与渲染窗口同一身份（见 web-request-identity.ts）；重定向的每一跳沿用。
+    const headers = await webDocumentHeaders();
     for (let hop = 0; hop <= 5; hop++) {
       if (request.scope && !inWebScope(url, request.scope))
         throw new Error("重定向超出目录范围");
       const response = await this.network.run(signal, (waitedMs) =>
-        webNetworkRequest({ url }, signal, {
+        webNetworkRequest({ url, headers }, signal, {
           ...net,
           resourceType: "document",
           gateWaitMs: waitedMs,

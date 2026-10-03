@@ -227,6 +227,18 @@ describe("网页采集诊断追踪", () => {
     expect(second).not.toHaveProperty("domReadyMs");
   });
 
+  it("以占位图本地应答的图片请求数有值才写入", async () => {
+    const file = path.join(dir, "trace.jsonl");
+    const stubbed = createWebTrace("https://example.com/a", "import", { file });
+    stubbed.set({ inertStubs: 12 });
+    await stubbed.flush();
+    const plain = createWebTrace("https://example.com/b", "import", { file });
+    await plain.flush();
+    const [first, second] = await rows(file);
+    expect(first.inertStubs).toBe(12);
+    expect(second).not.toHaveProperty("inertStubs");
+  });
+
   it("没有失败时失败明细为空数组", async () => {
     const file = path.join(dir, "trace.jsonl");
     const trace = createWebTrace("https://example.com/", "import", { file });

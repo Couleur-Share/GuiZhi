@@ -10,7 +10,9 @@
  *   GUIZHI_TRACE_LIMIT       只跑前 N 个网址（冒烟）
  *   GUIZHI_TRACE_REPS        轮数，默认 1；奇数轮先 A 后 B，偶数轮先 B 后 A，抵消时间漂移
  *   GUIZHI_TRACE_VARIANT     对照变量：reuse（默认，连接复用）| settle（事件驱动等待 vs 固定等待）|
- *                            frames（跨源子框架不加载 vs 加载全部子框架）
+ *                            frames（跨源子框架不加载 vs 加载全部子框架）|
+ *                            identity（静态请求带渲染窗口同一身份 vs 不带）|
+ *                            inert（图片请求以占位图本地应答 vs 真实加载）
  *   GUIZHI_TRACE_CONDITIONS  默认 A,B；A=旧行为，B=新行为，含义随 GUIZHI_TRACE_VARIANT 而定
  *   GUIZHI_TRACE_PROXY_MODE  manual（默认，使用 GUIZHI_TEST_PROXY）| system | direct
  *                            system 会在隔离实例内固定代理规则为 GUIZHI_TEST_PROXY 来模拟系统代理，不改动操作系统设置
@@ -34,6 +36,8 @@ const REPO = path.resolve(import.meta.dirname, "..");
  *   reuse  A=GUIZHI_WEB_CONNECTION_REUSE=0（每个请求新建连接） B=开启单次采集内连接复用
  *   settle A=GUIZHI_WEB_SETTLE=fixed（固定等待约 1.84 s）       B=事件驱动等待；两边都开启连接复用
  *   frames A=GUIZHI_WEB_SUBFRAMES=allow（加载全部子框架）       B=不加载跨源子框架；两边都开启连接复用与事件驱动等待
+ *   identity A=GUIZHI_WEB_IDENTITY=none（静态请求不带 UA/Accept） B=静态请求带渲染窗口同一身份；两边都开启连接复用与事件驱动等待
+ *   inert  A=GUIZHI_WEB_INERT_RESOURCES=load（图片真实加载）    B=图片请求以占位图本地应答；两边都开启连接复用与事件驱动等待
  */
 const VARIANTS = {
   reuse: {
@@ -55,9 +59,25 @@ const VARIANTS = {
       GUIZHI_WEB_SUBFRAMES: cond === "B" ? "block" : "allow",
     }),
   },
+  identity: {
+    labels: { A: "A 旧行为（静态请求不带身份）", B: "B 新行为（静态请求带渲染窗口同一身份）" },
+    env: (cond) => ({
+      GUIZHI_WEB_CONNECTION_REUSE: "1",
+      GUIZHI_WEB_SETTLE: "quiet",
+      GUIZHI_WEB_IDENTITY: cond === "B" ? "browser" : "none",
+    }),
+  },
+  inert: {
+    labels: { A: "A 旧行为（渲染窗口真实加载图片）", B: "B 新行为（图片请求以占位图本地应答）" },
+    env: (cond) => ({
+      GUIZHI_WEB_CONNECTION_REUSE: "1",
+      GUIZHI_WEB_SETTLE: "quiet",
+      GUIZHI_WEB_INERT_RESOURCES: cond === "B" ? "stub" : "load",
+    }),
+  },
 };
 const variantName = process.env.GUIZHI_TRACE_VARIANT || "reuse";
-if (!(variantName in VARIANTS)) throw new Error("GUIZHI_TRACE_VARIANT 只能是 reuse、settle 或 frames");
+if (!(variantName in VARIANTS)) throw new Error("GUIZHI_TRACE_VARIANT 只能是 reuse、settle、frames、identity 或 inert");
 const VARIANT = VARIANTS[variantName];
 const CONDITION_LABEL = VARIANT.labels;
 const intEnv = (name, fallback) => {

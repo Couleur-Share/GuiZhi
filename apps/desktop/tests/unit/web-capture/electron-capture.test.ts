@@ -20,6 +20,12 @@ vi.mock("../../../src/main/services/web-capture/web-verification-browser", () =>
 vi.mock("../../../src/main/services/web-capture/web-network", () => ({
   webNetworkRequest: mocks.network,
 }));
+vi.mock("../../../src/main/services/web-capture/web-request-identity", () => ({
+  webDocumentHeaders: async () => ({
+    "user-agent": "GuiZhi-test",
+    accept: "text/html",
+  }),
+}));
 vi.mock("../../../src/main/services/web-capture/web-electron-renderer", () => ({
   WebElectronRenderer: class {
     render = mocks.render;
@@ -153,6 +159,28 @@ describe("正式采集分流和安全失败", () => {
       ),
     ).rejects.toThrow("范围");
     expect(mocks.network).toHaveBeenCalledTimes(1);
+  });
+  it("静态请求带与渲染窗口一致的身份头，重定向的每一跳沿用", async () => {
+    mocks.network
+      .mockResolvedValueOnce({
+        status: 301,
+        headers: { location: "https://example.com/next" },
+        body: "",
+      })
+      .mockResolvedValueOnce(response("<p>正文</p>"));
+    await new ElectronWebCapture().capture(
+      request,
+      new AbortController().signal,
+    );
+    expect(mocks.network.mock.calls.map(([input]) => input.url)).toEqual([
+      "https://example.com/",
+      "https://example.com/next",
+    ]);
+    for (const [input] of mocks.network.mock.calls)
+      expect(input.headers).toEqual({
+        "user-agent": "GuiZhi-test",
+        accept: "text/html",
+      });
   });
   it("非网页响应明确失败", async () => {
     mocks.network.mockResolvedValue({

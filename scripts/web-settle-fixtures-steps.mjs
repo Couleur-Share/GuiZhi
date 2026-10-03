@@ -344,6 +344,9 @@ export default async function ({ win, app, outDir, mainEntry }) {
         (_electron, arg) => {
           process.env.GUIZHI_WEB_SETTLE = arg.settle;
           process.env.GUIZHI_WEB_CONNECTION_REUSE = "1";
+          // 沉降夹具要验证“在途的图片请求不阻止提前结束”；默认的占位图本地应答下图片根本不出网，
+          // 这类夹具会失去意义，所以恢复真实加载（占位图本身由 web-inert-probe-steps.mjs 回归）。
+          process.env.GUIZHI_WEB_INERT_RESOURCES = "load";
           process.env.GUIZHI_WEB_TRACE_FILE = arg.traceFile;
         },
         { settle: CONDITIONS[cond].settle, traceFile },

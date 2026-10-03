@@ -10,9 +10,13 @@ import {
 } from "../../../src/main/services/network-proxy";
 import {
   webNetworkRequest,
+  webTextRequest,
   WEB_RESPONSE_LIMIT,
 } from "../../../src/main/services/web-capture/web-network";
 
+vi.mock("../../../src/main/services/web-capture/web-request-identity", () => ({
+  webTextHeaders: async () => ({ "user-agent": "GuiZhi-test" }),
+}));
 vi.mock("node:https", () => ({ request: vi.fn() }));
 vi.mock("dns/promises", () => ({ lookup: vi.fn() }));
 vi.mock("../../../src/main/services/network-proxy", () => ({
@@ -137,5 +141,24 @@ describe("主进程网页安全出口", () => {
     ).rejects.toThrow(/代理认证/);
     expect(https.request).toHaveBeenCalledTimes(1);
     expect(dns.lookup).not.toHaveBeenCalled();
+  });
+  it("robots.txt 与 sitemap 的文本请求带上请求身份，与渲染窗口一致", async () => {
+    response(Buffer.from("User-agent: *\nDisallow:"));
+    const result = await webTextRequest(
+      "https://public.example/robots.txt",
+      AbortSignal.timeout(1000),
+      () => true,
+    );
+    expect(result.status).toBe(200);
+    expect(https.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/robots.txt",
+        headers: expect.objectContaining({
+          host: "public.example",
+          "user-agent": "GuiZhi-test",
+        }),
+      }),
+      expect.any(Function),
+    );
   });
 });

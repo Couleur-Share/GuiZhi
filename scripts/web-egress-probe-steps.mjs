@@ -324,6 +324,11 @@ export default async function ({ win, app, outDir, mainEntry }) {
     if (!runtime?.ok || !runtime.data?.available)
       throw new Error(`网页组件不可用：${runtime?.data?.reason ?? runtime?.error ?? "未知原因"}`);
     const importOnce = createImporter({ win, outDir: out, timeoutMs: 90_000 });
+    // 本探测检验各类真实请求的出口行为（含 img 向量），并用 /hold.png 这张真实的慢图片撑住 load；
+    // 默认的占位图本地应答下图片根本不出网，探测会失去意义，所以恢复真实加载。
+    await app.evaluate(() => {
+      process.env.GUIZHI_WEB_INERT_RESOURCES = "load";
+    });
 
     const plan = [
       ...["V0", "V2"].map((variant) => ({ scenario: "A", vector: "", variant })),

@@ -13,6 +13,7 @@ import { assertSafeTarget } from "../import/safe-fetch";
 import { resolvePublicAddress } from "../net-safety";
 import { canonicalWebUrl } from "@guizhi/shared/utils/web-scope";
 import type { WebConnectionPool } from "./web-connection-pool";
+import { webTextHeaders } from "./web-request-identity";
 import type { WebTrace } from "./web-trace";
 
 export const WEB_RESPONSE_LIMIT = 10 * 1024 * 1024;
@@ -269,9 +270,11 @@ export async function webTextRequest(
   allowed: (url: string) => boolean,
 ): Promise<{ status: number; text: string; url: string }> {
   let url = canonicalWebUrl(raw);
+  // robots.txt、sitemap 与渲染窗口同一身份，否则按客户端特征拒绝请求的站点会让批次因“规则读取失败”暂停。
+  const headers = await webTextHeaders();
   for (let hop = 0; hop <= 5; hop++) {
     if (!allowed(url)) throw new Error("重定向超出允许范围");
-    const response = await webNetworkRequest({ url }, signal);
+    const response = await webNetworkRequest({ url, headers }, signal);
     if (
       [301, 302, 303, 307, 308].includes(response.status) &&
       response.headers.location
