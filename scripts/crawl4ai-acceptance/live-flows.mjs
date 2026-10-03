@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { testProxySettings } from "../lib/test-proxy.mjs";
 
 export default async function ({ win, app, shot, outDir, userDataDir }) {
   const results = {};
@@ -109,19 +110,8 @@ export default async function ({ win, app, shot, outDir, userDataDir }) {
       .apiUrl,
   ).hostname;
   await win.evaluate(
-    (bypass) =>
-      window.api.settings.set({
-        networkProxy: {
-          mode: "manual",
-          protocol: "http",
-          host: "127.0.0.1",
-          port: 7897,
-          bypass,
-          username: "",
-          password: "",
-        },
-      }),
-    `<local>,localhost,127.0.0.1,::1,${modelHost}`,
+    (networkProxy) => window.api.settings.set({ networkProxy }),
+    testProxySettings({ bypass: `<local>,localhost,127.0.0.1,::1,${modelHost}` }),
   );
   await attempt("single-import", async () => {
     const [task] = await win.evaluate(() =>

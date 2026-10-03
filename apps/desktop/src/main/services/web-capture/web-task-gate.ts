@@ -46,7 +46,12 @@ export class WebTaskGate {
   private active = 0;
   private waiting: Array<() => void> = [];
   constructor(private readonly limit: number) {}
-  async run<T>(signal: AbortSignal, action: () => Promise<T>): Promise<T> {
+  /** action 的参数是本次排队等待槽位的毫秒数，供诊断追踪使用；不关心时可忽略。 */
+  async run<T>(
+    signal: AbortSignal,
+    action: (waitedMs: number) => Promise<T>,
+  ): Promise<T> {
+    const queuedAt = performance.now();
     await new Promise<void>((resolve, reject) => {
       const enter = () => {
         signal.removeEventListener("abort", abort);
@@ -67,7 +72,7 @@ export class WebTaskGate {
     });
     try {
       if (signal.aborted) throw webAbortError(signal);
-      return await action();
+      return await action(performance.now() - queuedAt);
     } finally {
       this.active--;
       this.waiting.shift()?.();

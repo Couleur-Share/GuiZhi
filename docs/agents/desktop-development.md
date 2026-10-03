@@ -48,6 +48,39 @@ packages/
   `ai:httpStream` IPC 走主进程发起请求（绕过 CORS、支持代理）。
  模型路由：mainText（问答/Wiki/视频总结）、fastText（摘要/标签）、
  visionText（OCR）、embedding（语义检索）、audioText（语音转写）。
+- 网页采集耗时诊断：设置环境变量 `GUIZHI_WEB_TRACE_FILE=<绝对路径>` 后，每次
+  `captureWebPage` 向该文件追加一行 JSON（`services/web-capture/web-trace.ts`）：
+  各阶段耗时、出口请求数与新建/复用连接数、静态路由判定；只含 origin 与网址哈希，
+  默认关闭。单次采集内的代理连接由 `web-connection-pool.ts` 持有并在采集结束时销毁，
+  `GUIZHI_WEB_CONNECTION_REUSE=0` 可关闭复用用于排查。前后对照用
+  `scripts/web-trace-steps.mjs`（经 `pnpm shot` 运行，本机代理地址由
+  `GUIZHI_TEST_PROXY` 提供，默认见 `scripts/lib/test-proxy.mjs`）。
+  渲染后的快照会把开放 shadow root 的内容展开进快照副本（`web-rendered-document.ts`）；
+  闭合 root 不可见，shadow 内的 CodeMirror 编辑器不做还原。
+- 渲染页加载后的沉降等待（`web-settle.ts`）：事件驱动，替代固定的 1.2 s + 3×(滚动 + 0.2 s)。
+  网络、DOM（MutationObserver）与可见文字都静止约 300 ms 即结束；可见文字不足 200 字的空壳页
+  等满。各段上限之和等于旧的固定等待，命中上限时与旧行为等价；首段上限从沉降开始（安装探针之前）
+  计时，因为探针脚本要排在页面刚加载完的水合任务后面（Next.js 站点实测排队 0.3–0.4 s），这段排队
+  不计入就会比旧版更久。网络信号只统计“可能改动文档”的在途请求（`web-network-activity.ts`）：
+  样式表、图片，以及文档类请求（`<link rel=prefetch>`、子框架）不计入。结果写入追踪的 `settle`：
+  `reason`（`quiet|cap|shell|fixed|blind`）、首段用时、各信号的阻塞轮数 `blocked`、命中上限时仍在途
+  的请求 `last.blockers`（类别、origin、已等待毫秒），用来回答“为什么没有提前结束”；
+  `maxPollMs`（一次读取的最长往返）与 `maxCostMs`（页面侧 `innerText` 的最长计算）用来区分
+  “页面主线程忙”和“轮询本身太重”。`GUIZHI_WEB_SETTLE=fixed` 回退到固定等待。
+- 渲染窗口的请求类别只能取自 `Accept`（`web-trace.ts` 的 `classifyAccept`）：`protocol.handle`
+  接管 http(s) 后，Electron 33 里 `webRequest` 回调不再触发（含主框架导航），
+  `request.destination` 恒为空，也没有 `Sec-Fetch-*`。Chromium 的导航与 `<link rel=prefetch>`
+  以 `text/html,application/xhtml+xml` 开头（逗号后无空格）；jQuery 一类取 HTML 片段的 XHR 是
+  `text/html, */*; q=0.01`（有空格），它会改动 DOM，必须计入。改动分类规则后用
+  `scripts/web-settle-fixtures-steps.mjs` 的本机夹具回归（经 `pnpm shot` 运行，
+  `GUIZHI_FIXTURE_ONLY=ajaxHtml,prefetchHang` 只跑指定夹具）。
+- 沉降等待的已知限制：既不发请求也不改 DOM 的纯定时器渲染（实测约 0.6–0.7 s 之后才写入正文的会
+  漏）、open shadow root 内部的变化（由网络静止兜底）、间隔超过 300 ms 的请求链，都可能比固定
+  等待更早截取；约一半的渲染页仍等到上限，`last.blockers` 里最常见的是第三方 consent/统计脚本
+  （OneTrust、微软遥测等）、部分站点的同源接口请求，以及 MDN 兼容表的 XHR：请求头无法区分它们
+  会不会改动正文，保守起见一律等待，不按站点写名单。对照与验收：`GUIZHI_TRACE_VARIANT=settle` 配合
+  `scripts/web-trace-steps.mjs` 做公网语料 A/B（`GUIZHI_TRACE_CORPUS` 指定语料，
+  `GUIZHI_TRACE_SAVE_CONTENT=1` 保存正文用于逐页相似度对比）。
 
 ## 常用命令
 

@@ -8,6 +8,7 @@ import { canonicalWebUrl } from "@guizhi/shared/utils/web-scope";
 import { ElectronWebCapture } from "./web-electron-capture";
 import { webRuntimeStatus } from "./web-runtime";
 import { webCaptureError } from "./web-error";
+import { createWebTrace } from "./web-trace";
 import { logAppError } from "../../diagnostic-log";
 import { WEB_VERIFICATION_REQUIRED } from "@guizhi/shared/utils/web-verification";
 
@@ -39,6 +40,8 @@ export async function captureWebPage(
   if (!status.available) throw new Error(status.reason ?? "网页组件不可用");
   const url = canonicalWebUrl(request.url),
     origin = new URL(url).origin;
+  // 诊断追踪默认关闭（见 web-trace.ts）；开启后记录从排队到收尾的各阶段耗时。
+  const trace = createWebTrace(url, request.purpose);
   const timeout = AbortSignal.timeout(request.interactiveVerification ? 300_000 : 120_000);
   const combined = AbortSignal.any([timeout, lifetime, ...(signal ? [signal] : [])]);
   while (active >= 2 || origins.has(origin)) {
@@ -57,12 +60,16 @@ export async function captureWebPage(
       combined.addEventListener("abort", abort, { once: true });
     });
   }
+  trace.mark("queued");
   active++;
   origins.add(origin);
   try {
-    return await worker.capture({ ...request, url }, combined, stage);
+    const result = await worker.capture({ ...request, url }, combined, stage, trace);
+    trace.set({ outcome: result.error?.code ?? "ok" });
+    return result;
   } catch (error) {
     const failure = webCaptureError(error);
+    trace.set({ outcome: failure.code });
     if (request.interactiveVerification && failure.code !== "security" && !failure.message.includes(WEB_VERIFICATION_REQUIRED))
       failure.message = `${WEB_VERIFICATION_REQUIRED}：${failure.message}。可再次点击「验证并自动采集」。`;
     logAppError({
@@ -93,5 +100,7 @@ export async function captureWebPage(
     active--;
     origins.delete(origin);
     for (const wake of [...waiting]) wake();
+    // 先释放并发名额再落盘，追踪的磁盘写入不占用同源串行窗口。
+    await trace.flush();
   }
 }

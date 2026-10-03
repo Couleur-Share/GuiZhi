@@ -102,6 +102,19 @@ function getManualProxyUrlForTarget(targetUrl: URL): string | null {
   return buildProxyUrl(activeNetworkProxy);
 }
 
+/**
+ * 手动代理对目标网址的决策（含绕过规则）。
+ * 供需要自建 agent 的调用方使用（如网页采集的单次采集连接复用）；
+ * getHttpRequestAgent 的共享缓存行为不变，仍服务其它调用方。
+ */
+export function resolveManualProxy(
+  targetUrl: URL,
+): { proxyUrl: string; socks: boolean } | null {
+  const proxyUrl = getManualProxyUrlForTarget(targetUrl);
+  if (!proxyUrl) return null;
+  return { proxyUrl, socks: activeNetworkProxy.protocol === "socks5" };
+}
+
 function getCachedAgent<T extends RequestAgent>(
   proxyUrl: string,
   current: T | undefined,

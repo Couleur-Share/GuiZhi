@@ -3,9 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { WebCaptureRequest } from "@guizhi/shared/types";
 import { inWebScope } from "@guizhi/shared/utils/web-scope";
 import { showWindowOffscreen } from "../../testing/window-mode";
-import { webNetworkRequest } from "./web-network";
+import { webNetworkRequest, type WebCaptureNet } from "./web-network";
 import { webCaptureError } from "./web-error";
 import { captureRenderedDocument } from "./web-rendered-document";
+import { WebNetworkActivity } from "./web-network-activity";
+import { pageSettleEnv, settleRenderedPage } from "./web-settle";
+import { NOOP_WEB_TRACE, classifyAccept } from "./web-trace";
 import {
   WebTaskGate,
   withWebAbort,
@@ -61,14 +64,20 @@ export class WebElectronRenderer {
   render(
     request: WebCaptureRequest,
     signal: AbortSignal,
+    options: WebCaptureNet = {},
   ): Promise<RenderedWebPage> {
-    return this.pages.run(signal, () => this.renderOwned(request, signal));
+    return this.pages.run(signal, () => {
+      options.trace?.mark("renderGate");
+      return this.renderOwned(request, signal, options);
+    });
   }
 
   private async renderOwned(
     request: WebCaptureRequest,
     signal: AbortSignal,
+    options: WebCaptureNet,
   ): Promise<RenderedWebPage> {
+    const trace = options.trace ?? NOOP_WEB_TRACE;
     let slot = this.slots.find((item) => !item.busy && !item.broken);
     if (!slot && this.slots.length < 2) {
       slot = {
@@ -82,6 +91,7 @@ export class WebElectronRenderer {
     }
     if (!slot) throw new Error("网页会话清理失败，请重启归知后重试");
     slot.busy = true;
+    trace.mark("slot");
     const target = slot.session;
     const controller = new AbortController();
     const combined = AbortSignal.any([signal, controller.signal]);
@@ -91,6 +101,8 @@ export class WebElectronRenderer {
     >();
     const navigations = new Set([request.url]);
     const pending = new Set<Promise<Response>>();
+    // 子请求活动（样式表、图片、文档类预取/子框架不算）供沉降等待判断“网络是否已静止”。
+    const activity = new WebNetworkActivity();
     let requests = 0,
       bytes = 0;
     let fatal: Error | undefined;
@@ -108,8 +120,11 @@ export class WebElectronRenderer {
         controller.abort();
         return Promise.reject(fatal);
       }
+      // protocol.handle 接管后拿不到 webRequest 的资源类型，只能按 Accept 粗分；
+      // 沉降等待与追踪共用这一分类。
+      const kind = classifyAccept(incoming.headers.get("accept"));
       const work = this.network
-        .run(combined, async () => {
+        .run(combined, async (waitedMs) => {
           const response = await webNetworkRequest(
             {
               url: incoming.url,
@@ -118,6 +133,12 @@ export class WebElectronRenderer {
               body: await limitedBody(incoming),
             },
             combined,
+            {
+              pool: options.pool,
+              trace,
+              resourceType: trace.enabled ? kind : undefined,
+              gateWaitMs: waitedMs,
+            },
           );
           const data = Buffer.from(response.body, "base64");
           bytes += data.length;
@@ -152,10 +173,15 @@ export class WebElectronRenderer {
           throw failure;
         });
       pending.add(work);
-      void work.then(
-        () => pending.delete(work),
-        () => pending.delete(work),
+      const ended = activity.begin(
+        kind,
+        trace.enabled ? new URL(incoming.url).origin : undefined,
       );
+      const finished = () => {
+        pending.delete(work);
+        ended();
+      };
+      void work.then(finished, finished);
       return work;
     };
     try {
@@ -207,24 +233,35 @@ export class WebElectronRenderer {
       window.webContents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
       window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
       combined.addEventListener("abort", abortWindow, { once: true });
+      trace.mark("window");
       await withWebAbort(window.loadURL(request.url), combined);
+      trace.mark("load");
       showWindowOffscreen(window);
-      await webPause(1200, combined);
-      for (let i = 0; i < 3; i++) {
-        await withWebAbort(
-          window.webContents.executeJavaScript(
-            "window.scrollBy(0, Math.min(window.innerHeight, 1000))",
-          ),
+      const contents = window.webContents;
+      // 事件驱动沉降：网络、DOM、正文都静止即提前结束，上限与原先的固定等待相同。
+      trace.set({
+        settle: await settleRenderedPage(
+          pageSettleEnv({
+            evaluate: (script) =>
+              withWebAbort(contents.executeJavaScript(script), combined),
+            pause: (ms) => webPause(ms, combined),
+            networkQuietMs: () => activity.quietMs(),
+            inflight: () => activity.inflight(),
+            blockers: () => activity.blockers(),
+          }),
           combined,
-        );
-        await webPause(200, combined);
-      }
+        ),
+      });
+      trace.mark("settle");
       const snapshot = await withWebAbort(
         window.webContents.executeJavaScript(
           `(${captureRenderedDocument.toString()})()`,
         ),
         combined,
       );
+      trace.mark("snapshot");
+      if (snapshot.flattenedShadowRoots)
+        trace.set({ shadowRoots: snapshot.flattenedShadowRoots });
       if (snapshot.error)
         throw new Error(snapshot.error, {
           cause: { webCaptureCode: "incomplete" },
@@ -249,14 +286,17 @@ export class WebElectronRenderer {
         ),
         combined,
       );
+      trace.mark("links");
       result = { html: snapshot.html, url, status: response.status, links };
     } catch (error) {
       failure = fatal ?? error;
+      trace.mark("error");
     } finally {
       combined.removeEventListener("abort", abortWindow);
       controller.abort();
       abortWindow();
       await Promise.allSettled([...pending]);
+      trace.mark("drain");
       target.protocol.unhandle("http");
       target.protocol.unhandle("https");
       target.webRequest.onBeforeRequest(null);
@@ -269,6 +309,7 @@ export class WebElectronRenderer {
       } catch {
         slot.broken = true;
       }
+      trace.mark("cleanup");
       slot.busy = false;
       if (slot.broken) failure ??= new Error("网页会话清理失败，请重启归知后重试");
     }

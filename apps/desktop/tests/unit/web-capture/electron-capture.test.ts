@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ElectronWebCapture } from "../../../src/main/services/web-capture/web-electron-capture";
+import type { WebTrace } from "../../../src/main/services/web-capture/web-trace";
 const mocks = vi.hoisted(() => ({
   network: vi.fn(),
   render: vi.fn(),
@@ -162,5 +163,112 @@ describe("正式采集分流和安全失败", () => {
     await expect(
       new ElectronWebCapture().capture(request, new AbortController().signal),
     ).rejects.toThrow("非网页");
+  });
+
+  function recordingTrace() {
+    const marks: string[] = [];
+    const fields: Record<string, unknown>[] = [];
+    const trace: WebTrace = {
+      enabled: true,
+      mark: (name) => marks.push(name),
+      set: (patch) => fields.push(patch),
+      egress: () => undefined,
+      flush: async () => undefined,
+    };
+    return { trace, marks, fields };
+  }
+  const staticHtml = '<p>正文</p><a href="/next">下一页</a>';
+  it("静态路径追踪记录阶段、路由判定与引擎", async () => {
+    mocks.network.mockResolvedValue(response(staticHtml));
+    const { trace, marks, fields } = recordingTrace();
+    await new ElectronWebCapture().capture(
+      request,
+      new AbortController().signal,
+      undefined,
+      trace,
+    );
+    expect(marks).toEqual(["pageGate", "static", "extract"]);
+    expect(fields).toContainEqual({
+      route: expect.objectContaining({ decision: "static" }),
+    });
+    expect(fields).toContainEqual({ engine: "static" });
+  });
+  it("静态抽取为空回退渲染：追踪标记 fallback 并记录渲染引擎", async () => {
+    mocks.network.mockResolvedValue(response(staticHtml));
+    mocks.extract.mockResolvedValueOnce({
+      complete: false,
+      paragraphs: [],
+      error: { code: "empty" },
+    });
+    const { trace, fields } = recordingTrace();
+    const result = await new ElectronWebCapture().capture(
+      request,
+      new AbortController().signal,
+      undefined,
+      trace,
+    );
+    expect(result.engineVersion).toContain("electron");
+    expect(fields).toContainEqual({ fallback: "empty" });
+    expect(fields).toContainEqual({ engine: "electron" });
+    expect(mocks.render).toHaveBeenCalledTimes(1);
+  });
+  it("静态判定要求渲染时追踪记录判定原因", async () => {
+    mocks.network.mockResolvedValue(
+      response('<main>Loading...</main><script src="/app.js"></script>'),
+    );
+    const { trace, fields } = recordingTrace();
+    await new ElectronWebCapture().capture(
+      request,
+      new AbortController().signal,
+      undefined,
+      trace,
+    );
+    expect(fields).toContainEqual({
+      route: expect.objectContaining({
+        decision: "render",
+        reasons: expect.any(Array),
+      }),
+    });
+    expect(mocks.render).toHaveBeenCalledTimes(1);
+  });
+  it("静态请求与渲染共用同一连接范围，采集结束后销毁", async () => {
+    mocks.network.mockResolvedValue(
+      response('<main>Loading...</main><script src="/app.js"></script>'),
+    );
+    await new ElectronWebCapture().capture(request, new AbortController().signal);
+    const staticOptions = mocks.network.mock.calls[0][2];
+    const renderOptions = mocks.render.mock.calls[0][2];
+    expect(staticOptions).toMatchObject({
+      resourceType: "document",
+      gateWaitMs: expect.any(Number),
+    });
+    expect(renderOptions.pool).toBe(staticOptions.pool);
+    expect(staticOptions.pool.closed).toBe(true);
+  });
+  it("采集失败或取消时同样销毁连接范围", async () => {
+    mocks.network.mockRejectedValue(new Error("拒绝内网目标"));
+    await expect(
+      new ElectronWebCapture().capture(request, new AbortController().signal),
+    ).rejects.toThrow("内网");
+    expect(mocks.network.mock.calls[0][2].pool.closed).toBe(true);
+
+    mocks.network.mockReset();
+    const controller = new AbortController();
+    mocks.network.mockImplementation(
+      (_input, signal: AbortSignal) =>
+        new Promise((_resolve, reject) =>
+          signal.addEventListener("abort", () => reject(new Error("已取消")), {
+            once: true,
+          }),
+        ),
+    );
+    const work = new ElectronWebCapture().capture(request, controller.signal);
+    const rejected = expect(work).rejects.toThrow("取消");
+    await vi.waitFor(() => expect(mocks.network).toHaveBeenCalled());
+    const pool = mocks.network.mock.calls[0][2].pool;
+    expect(pool.closed).toBe(false);
+    controller.abort();
+    await rejected;
+    expect(pool.closed).toBe(true);
   });
 });

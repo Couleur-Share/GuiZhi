@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { testProxySettings } from "../../../../scripts/lib/test-proxy.mjs";
 
 // pnpm shot --steps <本文件绝对路径> --keep-profile；始终使用截图工具独立数据目录。
 export default async function ({ win, app, shot, outDir, userDataDir, mainEntry, readingOnly = false }) {
@@ -18,18 +19,9 @@ export default async function ({ win, app, shot, outDir, userDataDir, mainEntry,
   };
   assert.ok(path.basename(userDataDir).startsWith("guizhi-shot-"));
   const url = "https://mp.weixin.qq.com/s/wFgc0MsEKjAuJcPgpf93Pw";
-  await win.evaluate(() =>
-    window.api.settings.set({
-      networkProxy: {
-        mode: "manual",
-        protocol: "http",
-        host: "127.0.0.1",
-        port: 7897,
-        username: "",
-        password: "",
-        bypass: "",
-      },
-    }),
+  await win.evaluate(
+    (networkProxy) => window.api.settings.set({ networkProxy }),
+    testProxySettings({ bypass: "" }),
   );
   const [task] = await win.evaluate(
     (url) => window.api.import.enqueue([{ kind: "url", input: url }]),
