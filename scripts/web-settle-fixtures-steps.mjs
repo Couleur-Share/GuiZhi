@@ -239,6 +239,16 @@ const FIXTURES = [
     }),
   },
   {
+    id: "onloadTimer",
+    kind: "must",
+    marker: "MARK-onloadtimer",
+    note: "图片把 load 拖到约 1 s 后，load 处理器再用 550 ms 定时器写入：沉降必须从 load 之后起算，不能沿用 DOMContentLoaded 起的静默",
+    html: page("load 后定时", {
+      body: '<img src="/api/img?d=1000" alt="">',
+      script: "addEventListener('load',function(){setTimeout(function(){late('MARK-onloadtimer')},550)})",
+    }),
+  },
+  {
     id: "timer700",
     kind: "limit",
     marker: "MARK-timer700",

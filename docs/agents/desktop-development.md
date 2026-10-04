@@ -135,8 +135,16 @@ packages/
 - 评估过但不做：主框架 DOMContentLoaded 时就开始沉降观察（与 load 重叠）。网络静止窗口的计时本来
   就跨越 load（`web-network-activity.ts` 的时钟是连续的），重叠只能提前 DOM 与可见文字这两个从沉降
   开始才计时的窗口；100 次渲染采集里只有 12 次不被网络窗口卡住，据 `settle.blocked` 推算最多省
-  约 28 ms/次（占采集总时长 0.5%）。把网络窗口也算上的朴素上限 276 ms/次不成立。收益低于单次采集
-  的噪声，不值得再加一种沉降模式。
+  约 28 ms/次（占采集总时长 0.5%）。把网络窗口也算上的朴素上限 276 ms/次不成立。
+  随后做了原型实测（DOM / 文字窗口计入 load 之前已安静的时间，load 后至少再观察 100 ms；公网 51 个
+  网址 × 2 轮，两侧都走渲染的 91 对）：首段用时配对差中位数 −1 ms、均值 +11 ms，81% 在 ±50 ms 内，
+  快 ≥100 ms 与慢 ≥100 ms 各 8 对；整个沉降阶段中位数 +3 ms、均值 +16 ms；正文差异未超出同条件
+  重复噪声。代价是 load 之后才触发的定时渲染会丢：夹具 `onloadTimer`（图片把 load 拖到约 1 s 后，
+  load 处理器再用 550 ms 定时器写入）现行模式 2/2 采到，重叠模式 0/2，其余夹具的结束时间不变。
+  结论：没有可测的收益，却更容易丢内容，不做；`onloadTimer` 留作哨兵，防止以后把静止窗口前移到
+  DOMContentLoaded。实现上有个陷阱：页面加载期间 `webContents.executeJavaScript` 会被推迟到 load
+  之后才执行（Electron 33 实测：dom-ready 时调用，load 后才返回；`webContents.mainFrame.executeJavaScript`
+  则立即执行），在 DOMContentLoaded 提前安装探针必须用后者，否则“提前”实际没有发生。
 
 ## 常用命令
 
