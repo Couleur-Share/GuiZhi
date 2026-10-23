@@ -1,0 +1,2 @@
+# Keep Linux preflight entrypoints usable after a Windows checkout.
+scripts/wslc/** text eol=lf

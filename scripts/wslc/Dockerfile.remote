@@ -1,0 +1,22 @@
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE} AS dependencies
+RUN --mount=type=cache,id=gs-preflight-npm,target=/root/.npm,sharing=locked \
+    npm install -g pnpm@11.1.0 --no-audit --no-fund
+WORKDIR /work/repo
+COPY source/package.json source/pnpm-lock.yaml source/pnpm-workspace.yaml ./
+COPY source/packages/shared/package.json packages/shared/package.json
+COPY source/apps/capture-web/package.json apps/capture-web/package.json
+COPY source/apps/capture-relay/package.json apps/capture-relay/package.json
+RUN --mount=type=cache,id=gs-preflight-pnpm,target=/cache/pnpm-store,sharing=locked \
+    pnpm config set store-dir /cache/pnpm-store && \
+    pnpm --filter @guizhi/capture-web... --filter @guizhi/capture-relay... install --frozen-lockfile
+
+FROM dependencies AS checks
+ARG VALIDATION_DAY
+ARG CHECK_LINUX_TIMEOUT=900
+RUN --mount=type=bind,target=/input,ro \
+    test -n "$VALIDATION_DAY" && mkdir -p /output && \
+    (PREFLIGHT_PREPARED=1 timeout --foreground "$CHECK_LINUX_TIMEOUT" bash /input/source/scripts/wslc/run.sh || test -s /output/result.json)
+
+FROM scratch AS evidence
+COPY --from=checks /output/ /
