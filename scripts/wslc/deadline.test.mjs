@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -18,13 +19,12 @@ test('overall limit accepts integers from 1 to 86400 only', () => {
     assert.throws(() => overallSeconds({CHECK_LINUX_TIMEOUT: bad}), /CHECK_LINUX_TIMEOUT/, bad);
   }
 });
-test('the entry arms and clears the deadline and reports timeouts before generic failures', () => {
-  const source = fs.readFileSync(path.join(here, 'check-linux-local.mjs'), 'utf8');
-  assert.match(source, /import \{ overallSeconds \} from '\.\/deadline\.mjs'/);
-  assert.match(source, /const limitSeconds = overallSeconds\(\);/);
-  assert.match(source, /setTimeout\(\(\) => \{\s*timedOut = true;\s*stop\(\);\s*\}, limitSeconds \* 1000\)/);
-  assert.equal(source.match(/clearTimeout\(deadline\)/g)?.length, 2, 'both error and close must clear the timer');
-  assert(source.indexOf('if (timedOut) throw') < source.indexOf('if (interrupted || exitCode !== 0)'));
+test('retired local entries refuse execution while the Germany adapter stays available', () => {
+  for (const args of [['check-linux-local.mjs'], ['check-linux.mjs', '--local']]) {
+    const result = spawnSync(process.execPath, [path.join(here, args[0]), ...args.slice(1)], {encoding: 'utf8', timeout: 10000});
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /WSLC retired/);
+  }
 });
 
 test('Germany entry keeps the configured deadline and Docker executes it', () => {

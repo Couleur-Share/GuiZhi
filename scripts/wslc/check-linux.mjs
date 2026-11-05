@@ -8,8 +8,7 @@ import { overallSeconds } from './deadline.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 try {
   if (process.argv.includes('--local')) {
-    process.argv.splice(process.argv.indexOf('--local'), 1);
-    await import('./check-linux-local.mjs');
+    throw Error("WSLC retired on 2026-10-27; --local is disabled. Use check:linux:prepare and verify the Germany gs-preflight receipt; preparing alone is not a passed gate.");
   } else {
     const config = JSON.parse(fs.readFileSync(path.join(root, 'scripts/wslc/config.json'), 'utf8'));
     config.remote.timeoutSeconds = overallSeconds();

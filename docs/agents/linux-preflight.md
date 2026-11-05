@@ -15,9 +15,9 @@
 
 Node 24、shared/capture-web/capture-relay 类型检查、中转全量单测、两端构建、真实进程健康与网页、临时 SQLite 重启持久性验收全部保留。默认检查时限 900 秒，`CHECK_LINUX_TIMEOUT` 仍接受 1–86400 秒并进入请求回执；镜像/包准备另有最多 600 秒余量。Windows 桌面隔离验证和 Harmony 构建/设备验收不变。
 
-## 本机 WSLC 参考（仅显式回退）
+## 已退役本机 WSLC 的历史参考
 
-以下是原有本机运行方式、历史测量和恢复说明。需要本机执行时将 `pnpm check:linux` 换为 `pnpm check:linux:local`；默认路径以本页上方为准。
+以下仅保留原本机运行方式与历史验收。2026-10-27 本机 WSL/WSLC 已卸载，`check:linux:local` 别名已移除，`--local` 和直接启动旧脚本均返回非零；不得按历史内容自动重装或恢复会话。当前可用操作以上方德国机步骤为准，打包成功不代表门禁通过。
 
 
 在 Windows 的仓库根目录运行：

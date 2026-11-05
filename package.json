@@ -12,7 +12,6 @@
   "scripts": {
     "check:linux": "node scripts/wslc/check-linux.mjs",
     "check:linux:prepare": "node scripts/wslc/check-linux.mjs --prepare",
-    "check:linux:local": "node scripts/wslc/check-linux.mjs --local",
     "check:linux:reuse": "node scripts/wslc/check-linux.mjs --reuse",
     "check:linux:verify": "node scripts/wslc/check-linux.mjs --verify",
     "test:wslc": "node --test scripts/wslc/*.test.mjs",

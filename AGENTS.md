@@ -56,13 +56,13 @@ pnpm electron:build:win
 
 ## Linux 收集服务预检（默认德国共享构建器）
 
-2026-10-23 起默认通过 XTerminal 在德国 Bero 的既有 `gs-preflight` 公共构建器执行，复用公共执行器、BuildKit 依赖层及下载缓存，不新建项目专属 builder。下文的完整检查范围、风险分级、源码快照和发版规则保持不变，“完整 WSLC”在默认路径指同一套脚本的德国 Linux 检查；本机 WSLC 仅通过 `pnpm check:linux:local` 显式选择。
+2026-10-23 起默认通过 XTerminal 在德国 Bero 的既有 `gs-preflight` 公共构建器执行，复用公共执行器、BuildKit 依赖层及下载缓存，不新建项目专属 builder。下文的完整检查范围、风险分级、源码快照和发版规则保持不变，完整检查由同一套脚本在德国 Linux 执行。本机 WSL/WSLC 已于 2026-10-27 卸载，旧本机入口与 `--local` 已禁用，不得自动重装。
 
 `pnpm check:linux:prepare` 仅打包；Agent 必须按 `docs/agents/linux-preflight.md` 完成 XTerminal plan、按需上传、run 和取回完整证据，再执行 `pnpm check:linux:verify --run <本机运行目录>`。`check:linux` 强制新检查；`check:linux:reuse` 优先核验已有完整证据；缺少结果时生成远程请求并返回非零，绝不把 prepare 当作通过。共享客户端在本机配置文件中登记一次，各仓库只留薄适配器；不得复制公共执行器、读取宿主凭据或挂载生产数据库。
 
 
 Windows Agent 修改 apps/capture-relay、apps/capture-web、apps/capture-harmony/entry/src/main/ets/core、packages/shared、根依赖/锁文件或 scripts/wslc 后，交付前必须在仓库根目录运行 pnpm check:linux。命令检查当前源码快照，在独立 Node 24/Linux 容器内执行共享包/收集网页/中转服务类型检查、中转服务全量单测、两端构建，以及真实中转进程的健康、静态网页和 SQLite 重启持久性检查。源码变化后须重跑，报告结果指纹和证据目录。
 
-输入只读挂载，依赖及构建放在容器副本内；不得挂载用户数据、手机配对凭据、宿主 .env 或 Windows node_modules，不得停掉或重启用户实例。该门禁验证 Linux 收集服务，桌面端仍执行原有 Windows 隔离验证，HarmonyOS 仍需原有构建/设备验收；不改变官方桌面平台政策，不替代浏览器/E2E、镜像构建或生产发布。WSLC 不可用或检查失败必须如实报告，不能把入口存在当成预检通过；Linux CI 使用原生检查。详情见 docs/agents/linux-preflight.md。
+输入只读挂载，依赖及构建放在容器副本内；不得挂载用户数据、手机配对凭据、宿主 .env 或 Windows node_modules，不得停掉或重启用户实例。该门禁验证 Linux 收集服务，桌面端仍执行原有 Windows 隔离验证，HarmonyOS 仍需原有构建/设备验收；不改变官方桌面平台政策，不替代浏览器/E2E、镜像构建或生产发布。德国机检查不可用或失败必须如实报告，不能把入口存在当成预检通过；Linux CI 使用原生检查。详情见 docs/agents/linux-preflight.md。
 
 修改预检工具 scripts/wslc 时，还必须先运行 pnpm test:wslc 验证源码快照、凭据排除及原 Git 暂存区保留。
