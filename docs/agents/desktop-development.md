@@ -251,6 +251,22 @@ renderer 的 HMR 也可能改变用户正在操作的界面。修改 Vite 配置
 结束进程，也不要停止、复用用户的 Vite 服务。截图实例的日志在临时 userData 中；
 用户 `startup.log` 新增的启动记录不能解释成离屏验证启动。
 
+### 开发态构建失败不会杀掉应用
+
+`electron:dev` 里 main / preload 是监听构建。vite-plugin-electron 在构建失败时同样会执行
+`onstart`（Rollup 仍会触发 `closeBundle`），而 Vite 监听重建在开始前就清空输出目录：
+一次构建错误会杀掉运行中的应用，再用空的 `out/main` 重启 Electron，弹出
+“Unable to find Electron app … out/main/index.js”，整个 dev 会话随之退出。
+
+`scripts/electron-dev-guard.mjs` 记录每个入口最近一次构建的成败：失败时跳过重启/重载，
+只在终端留下 `[guizhi] main 构建失败…` 提示，修复后下一次成功的重建自动恢复。它只作用于
+dev 的 `onstart`，不改变构建产物，也不影响 `vite build`。看到提示时，以终端里
+`build started...` 之后的第一条构建错误为准；批量改写源码时重建也可能读到中间状态而失败，
+保存一次相关文件即可重新构建。
+
+已知余量：失败期间 `out/main` 仍是空的，此时应用自身的 `app.relaunch()`（如恢复备份）
+会找不到入口；修复构建错误后即恢复。
+
 ### 打包依赖分类
 
 被 Vite 编译进主进程、渲染进程、MCP 或阅读组件脚本的纯 JavaScript/CSS 库放在

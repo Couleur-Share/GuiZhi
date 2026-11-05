@@ -1,4 +1,5 @@
 import { readingLibrariesPlugin } from "./scripts/reading-libraries-plugin.mjs";
+import { createDevBuildGuard } from "./scripts/electron-dev-guard.mjs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
@@ -30,6 +31,13 @@ const aliases = {
   "@guizhi/db": path.resolve(__dirname, "../../packages/db/src"),
   "@renderer": path.resolve(__dirname, "src/renderer"),
 };
+
+// 开发态：main / preload 重建失败时保留正在运行的应用，不再重启或重载
+// （原因见 scripts/electron-dev-guard.mjs）。生产构建不受影响。
+// Dev only: keep the running app alive when a main / preload rebuild fails
+// instead of relaunching Electron against an emptied out/ directory.
+const mainBuildGuard = createDevBuildGuard({ label: "main", skipped: "重启 Electron" });
+const preloadBuildGuard = createDevBuildGuard({ label: "preload", skipped: "页面重载" });
 
 // When BUILD_ANALYZE=1 is set, emit a treemap report alongside the renderer
 // build for offline inspection. The report is written to dist-stats/ and is
@@ -87,10 +95,13 @@ export default defineConfig(async () => ({
           // is a Linux-only Chromium flag and unnecessary on macOS/Windows.
           // 覆盖默认 argv，移除 "--no-sandbox" 参数。该参数仅适用于 Linux，
           // 在 macOS/Windows 上会导致 Electron 启动失败。
-          args.startup(["."]);
+          // 构建失败时跳过启动（否则会杀掉运行中的应用并用空的 out/main 重启）。
+          // Skip startup when the build failed (it would kill the running app and
+          // relaunch against an empty out/main).
+          mainBuildGuard.run(() => args.startup(["."]));
         },
         vite: {
-          plugins: [readingLibrariesPlugin()],
+          plugins: [readingLibrariesPlugin(), mainBuildGuard.plugin],
           define: { __GUIZHI_GRAPHICS_VALIDATION__: JSON.stringify(process.env.GUIZHI_GRAPHICS_VALIDATION === "1") },
           resolve: { alias: aliases },
           build: {
@@ -110,9 +121,10 @@ export default defineConfig(async () => ({
       {
         entry: "src/preload/index.ts",
         onstart(args) {
-          args.reload();
+          preloadBuildGuard.run(() => args.reload());
         },
         vite: {
+          plugins: [preloadBuildGuard.plugin],
           resolve: {
             alias: aliases,
           },
