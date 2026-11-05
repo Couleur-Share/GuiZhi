@@ -30,9 +30,9 @@ export function LibraryBatchResults() {
   if (!notice && !results.length) return null;
   const failures = results.filter(row => !row.ok);
   return <div role="status" className="border-b border-border bg-muted/30 px-4 py-2 text-xs">
-    <div className="flex items-center gap-2"><span className="mr-auto">{busy ? `处理中，已核对 ${results.length} 项` : notice}</span>
-      {failures.length > 0 && <Button size="sm" variant="secondary" disabled={busy} onClick={() => command?.kind === "delete" ? setConfirm(true) : void retryFailed()}>仅重试失败项</Button>}
-      <Button size="sm" variant="ghost" disabled={busy} onClick={dismiss}>收起</Button></div>
+    <div className="flex items-center gap-2"><span className="min-w-0 flex-1">{busy ? `处理中，已核对 ${results.length} 项` : notice}</span>
+      {failures.length > 0 && <Button size="sm" variant="secondary" className="shrink-0 whitespace-nowrap" disabled={busy} onClick={() => command?.kind === "delete" ? setConfirm(true) : void retryFailed()}>仅重试失败项</Button>}
+      <Button size="sm" variant="ghost" className="shrink-0 whitespace-nowrap" disabled={busy} onClick={dismiss}>收起</Button></div>
     <ItemConfirmDialog state={confirm ? { kind: "delete-forever", ids: failures.map(row => row.id) } : null} onClose={() => setConfirm(false)} />
     {results.length > 0 && <details><summary className="cursor-pointer">逐条结果（{results.length}）</summary><ul className="max-h-36 overflow-auto">{results.map(row => <li key={row.id}>{row.id}：{row.ok ? '成功' : row.error}</li>)}</ul></details>}
   </div>;
