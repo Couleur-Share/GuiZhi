@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
   ARTICLE_ASK_CONTEXT: "articleAsk:context",
   ARTICLE_ASK_SEARCH: "articleAsk:search",
   ARTICLE_ASK_CANCEL: "articleAsk:cancelSearch",
+  READING_SYNC: 'reading-sync:command',
   MOBILE_CAPTURE: "mobile-capture:invoke",
   // Knowledge items
   KNOWLEDGE_LIST: "knowledge:list",

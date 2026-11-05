@@ -1,3 +1,4 @@
+import { stopReadingSync } from "./services/reading-sync/lifecycle";
 import { hasActiveThemedReading, shutdownThemedReading } from "./services/themed-reading/runtime";
 import { closeReadingViews } from "./services/themed-reading/v3-views";
 import { stopMobileCapture } from "./services/mobile-capture/lifecycle";
@@ -227,6 +228,7 @@ const trayController = createTrayController({
   onQuit: () => {
     isQuitting = true;
   stopMobileCapture();
+  stopReadingSync();
     // 走窗口关闭路径而不是直接 app.quit()：渲染进程的 beforeunload 要在
     // before-quit 关掉数据库之前把未保存的编辑落盘。窗口销毁后
     // window-all-closed 会接着退出应用。
@@ -613,6 +615,7 @@ ipcMain.on(
     } else {
       isQuitting = true;
   stopMobileCapture();
+  stopReadingSync();
       mainWindow?.close();
     }
   },
@@ -821,6 +824,7 @@ async function applyDataPathChange(
     }
 
     stopMobileCapture(true);
+    stopReadingSync(true);
     writeConfiguredDataPath(app.getPath("appData"), resolvedTargetPath);
     return {
       success: true,
@@ -836,6 +840,7 @@ async function applyDataPathChange(
     }
 
     stopMobileCapture(true);
+    stopReadingSync(true);
     let migratedCount = 0;
     for (const item of DATA_PATH_MIGRATION_ITEMS) {
       const sourcePath = path.join(currentPath, item);
@@ -850,6 +855,7 @@ async function applyDataPathChange(
     }
 
     stopMobileCapture(true);
+    stopReadingSync(true);
     writeConfiguredDataPath(app.getPath("appData"), resolvedTargetPath);
 
     return {
@@ -1172,6 +1178,7 @@ app.on("before-quit", (event) => {
   closeReadingViews();
   isQuitting = true;
   stopMobileCapture();
+  stopReadingSync();
   backgroundJobRuntime?.stop();
   if (quitCleanupComplete) {
     closeDatabase();

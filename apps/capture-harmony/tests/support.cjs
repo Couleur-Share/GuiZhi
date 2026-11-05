@@ -11,17 +11,18 @@ const BOUNDARY = '// @test-boundary';
 // 只擦除装饰器；最长名称在前并要求词边界，避免 @Local 误吃 @LocalStorageLink。
 const DECORATORS = /@(LocalStorageLink|LocalStorageProp|StorageLink|StorageProp|ObjectLink|Component|Provide|Consume|Observed|Watch|Entry|State|Prop|Link|Local|Param|Event|Monitor|Trace|Computed)\b(\([^\n]*?\))?\s*/g;
 
-function pageSource(source) {
+function pageSource(source, name = 'Index') {
   const parts = source.split(BOUNDARY);
   if (parts.length !== 2) {
     throw new Error(`Index.ets 必须恰好包含一个 ${BOUNDARY} 标记（当前 ${parts.length - 1} 个）`);
   }
-  return parts[0].replace('struct Index', 'export class Index').replace(DECORATORS, '') + '\n}';
+  if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) throw new Error('测试页面名称无效');
+  return parts[0].replace(`struct ${name}`, `export class ${name}`).replace(DECORATORS, '') + '\n}';
 }
 
 function load(file, imports = {}, globals = {}, page = false) {
   let source = fs.readFileSync(path.join(root, file), 'utf8');
-  if (page) source = pageSource(source);
+  if (page) source = pageSource(source, typeof page === 'string' ? page : 'Index');
   const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText;
   const scope = { exports: {}, require: name => imports[name] || {}, ...globals };
   vm.runInNewContext(js, scope);
@@ -90,6 +91,7 @@ function createPage(client, extraImports = {}) {
   const haptics = [];
   const { Index } = load('pages/Index.ets', {
     '../services/ThemePalette': load('services/ThemePalette.ets', {}, { '$r': name => name }),
+    '../services/ReadingRuntime': { readingTrialEnabled: () => false },
     '../core/ConnectionCheck': check, '../services/AppPreferences': { AppPreferences: class {} },
     '../services/HoldingHandObserver': { HoldingHandObserver: class {} },
     '../core/EditorAutosave': editorAutosave, '../core/CaptureParser': captureParser, '../core/SendingState': sendingState, '../core/BatchSend': batchSend,

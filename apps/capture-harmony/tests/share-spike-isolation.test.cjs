@@ -28,11 +28,11 @@ test('正式包 module.json5 不注册任何扩展，也不出现 spike 名称�
   assert.deepEqual(permissions.sort(), ['ohos.permission.DETECT_GESTURE', 'ohos.permission.INTERNET', 'ohos.permission.VIBRATE']);
 });
 
-test('正式包路由表只有 pages/Index；dev 路由 = 正式路由 + 两个诊断页，且页面源码存在并带 @Entry', () => {
+test('正式包路由表只有 pages/Index；dev 路由 = 正式路由 + 分享与阅读同步诊断页，且页面源码存在并带 @Entry', () => {
   const official = JSON.parse(read('entry/src/main/resources/base/profile/main_pages.json')).src;
   assert.deepEqual(official, ['pages/Index']);
   const dev = JSON.parse(read('entry/src/dev/resources/base/profile/main_pages.json')).src;
-  assert.deepEqual(dev, [...official, 'sharediag/ShareDiagPanel', 'sharediag/ShareDiagReport']);
+  assert.deepEqual(dev, [...official, 'sharediag/ShareDiagPanel', 'sharediag/ShareDiagReport', 'syncdiag/ReadingDiagPage']);
   for (const page of dev) {
     const file = path.join(main, 'ets', `${page}.ets`);
     assert.ok(fs.existsSync(file), `路由页面缺少源码：${page}`);
@@ -40,11 +40,11 @@ test('正式包路由表只有 pages/Index；dev 路由 = 正式路由 + 两个�
   }
 });
 
-test('正式包的其他源码不导入 sharediag：未被引用的文件不会进入正式包编译产物', () => {
+test('正式包的其他源码不导入分享或阅读诊断：测试密钥不会进入正式包编译产物', () => {
   const offenders = [];
   for (const file of sourceFiles(path.join(main, 'ets'))) {
-    if (file.split(path.sep).includes('sharediag')) continue;
-    if (/from\s+['"][^'"]*sharediag[^'"]*['"]/i.test(fs.readFileSync(file, 'utf8'))) offenders.push(path.relative(app, file));
+    if (file.split(path.sep).some(part => ['sharediag', 'syncdiag'].includes(part))) continue;
+    if (/from\s+['"][^'"]*(?:sharediag|syncdiag)[^'"]*['"]/i.test(fs.readFileSync(file, 'utf8'))) offenders.push(path.relative(app, file));
   }
   assert.deepEqual(offenders, []);
 });
@@ -55,7 +55,7 @@ test('hvigorfile 只对 dev 产品注册扩展与诊断入口，入口文件、�
   assert.match(plugin, /getProductName\(\)\s*!==\s*SHARE_SPIKE_PRODUCT\)\s*return/);
   assert.equal(/requestPermissions/.test(plugin), false, 'spike 不应改动权限');
   const entries = [...plugin.matchAll(/name:\s*'(\w+)',[\s\S]*?srcEntry:\s*'(\.\/ets\/[^']+)'/g)];
-  assert.deepEqual(entries.map(match => match[1]).sort(), ['ShareDiagAbility', 'ShareDiagExtAbility']);
+  assert.deepEqual(entries.map(match => match[1]).sort(), ['ReadingDiagAbility', 'ShareDiagAbility', 'ShareDiagExtAbility']);
   for (const [, name, srcEntry] of entries) {
     const file = path.join(main, srcEntry);
     assert.ok(fs.existsSync(file), `入口文件不存在：${srcEntry}`);

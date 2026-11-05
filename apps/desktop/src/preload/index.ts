@@ -1,3 +1,4 @@
+import { readingSyncApi } from './api/reading-sync';
 import { mobileCaptureApi } from "./api/mobile-capture";
 window.addEventListener("online", () => { void mobileCaptureApi.fetch().catch(() => undefined); });
 import { contextBridge, ipcRenderer, webUtils } from "electron";
@@ -65,6 +66,7 @@ const api = {
   tag: tagApi,
   import: importApi,
   mobileCapture: mobileCaptureApi,
+  readingSync: readingSyncApi,
   platformCapture: platformCaptureApi,
   wiki: wikiApi,
   migration: migrationApi,

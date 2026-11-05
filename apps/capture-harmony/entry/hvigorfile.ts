@@ -40,6 +40,14 @@ const shareDiagAbility = {
   skills: [{ entities: ['entity.system.home'], actions: ['action.system.home'] }],
 };
 
+// 阅读密码互操作诊断只允许通过命令行启动，不增加桌面启动图标。
+const readingDiagAbility = {
+  ...shareDiagAbility,
+  name: 'ReadingDiagAbility',
+  srcEntry: './ets/syncdiag/ReadingDiagAbility.ets',
+  skills: [],
+};
+
 function shareSpikePlugin(): HvigorPlugin {
   return {
     pluginId: 'guizhiShareSpike',
@@ -48,7 +56,7 @@ function shareSpikePlugin(): HvigorPlugin {
       hapContext.targets((target) => {
         if (target.getCurrentProduct().getProductName() !== SHARE_SPIKE_PRODUCT) return;
         const moduleJson = hapContext.getModuleJsonOpt();
-        moduleJson.module.abilities = (moduleJson.module.abilities ?? []).concat([shareDiagAbility]);
+        moduleJson.module.abilities = (moduleJson.module.abilities ?? []).concat([shareDiagAbility, readingDiagAbility]);
         moduleJson.module.extensionAbilities = (moduleJson.module.extensionAbilities ?? []).concat([shareDiagExtension]);
         hapContext.setModuleJsonOpt(moduleJson);
       });

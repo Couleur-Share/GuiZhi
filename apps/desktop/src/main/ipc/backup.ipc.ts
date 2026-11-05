@@ -1,3 +1,4 @@
+import { stopReadingSync } from "../services/reading-sync/lifecycle";
 import { hasActiveThemedReading, retireIdleThemedReading } from "../services/themed-reading/runtime";
 import { stopMobileCapture } from "../services/mobile-capture/lifecycle";
 /**
@@ -392,6 +393,7 @@ export function registerBackupIPC(
       try {
         backgroundJobs.stop();
         stopMobileCapture(true);
+        stopReadingSync(true);
         retireIdleThemedReading();
         closeDatabase();
         applyPreparedRepositoryRestore(prepared, targets);
@@ -467,6 +469,7 @@ export function registerBackupIPC(
 
       try {
         stopMobileCapture(true);
+        stopReadingSync(true);
         retireIdleThemedReading();
         closeDatabase();
         performRestoreSwap({

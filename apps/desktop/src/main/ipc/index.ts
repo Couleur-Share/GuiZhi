@@ -1,4 +1,5 @@
 import { registerThemedReadingIPC } from "./themed-reading.ipc";
+import { registerReadingSyncIPC } from './reading-sync.ipc';
 import { registerMobileCaptureIPC } from "./mobile-capture.ipc";
 import { ipcMain } from "electron";
 import Database from "../database/sqlite";
@@ -28,6 +29,7 @@ import type { DiscoveryServiceOptions } from "../services/discovery/discovery-se
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 
 const REBINDABLE_DB_CHANNELS = [
+  IPC_CHANNELS.READING_SYNC,
   IPC_CHANNELS.ARTICLE_ASK_CONTEXT, IPC_CHANNELS.ARTICLE_ASK_SEARCH, IPC_CHANNELS.ARTICLE_ASK_CANCEL,
   ...Object.entries(IPC_CHANNELS).filter(([key]) => key.startsWith("THEMED_READING_") && key !== "THEMED_READING_PROGRESS").map(([, value]) => value),
   IPC_CHANNELS.KNOWLEDGE_SELECTION, IPC_CHANNELS.KNOWLEDGE_SAVE_DRAFT, IPC_CHANNELS.WIKI_COMPILER,
@@ -222,6 +224,7 @@ export function registerAllIPC(
     registerImportIPC(db, options.broadcastImportChanged),
   );
   registerIpcGroup("mobile-capture", () => registerMobileCaptureIPC(db));
+  registerIpcGroup("reading-sync", () => registerReadingSyncIPC(db));
   registerIpcGroup("platform-capture", () =>
     registerPlatformCaptureIPC(db, {
       backgroundJobs: options.backgroundJobs,

@@ -1,4 +1,6 @@
 import { PageHeader } from '../components/PageHeader';
+import { ReadingTab } from '../components/ReadingTab';
+import { readingTrialEnabled } from '../services/ReadingRuntime';
 import { ThemePalette, themePalette } from '../services/ThemePalette';
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
@@ -38,6 +40,7 @@ import { Draft, CaptureMode, Receipt, PairingLink, Session, parsePairingLink } f
 struct Index {
   @Provide('capturePalette') palette: ThemePalette = themePalette('blue');
   @State ready: boolean = false;
+  @State readingEnabled: boolean = false;
   @State busy: boolean = false;
   @State operation: string = '';
   @State operationSeconds: number = 0;
@@ -137,6 +140,7 @@ struct Index {
   private silentRefreshing: boolean = false;
 
   aboutToAppear(): void {
+    this.readingEnabled = readingTrialEnabled();
     this.getUIContext().setKeyboardAvoidMode(KeyboardAvoidMode.RESIZE);
     this.initialize();
   }
@@ -853,7 +857,7 @@ struct Index {
 
   build() {
     Column() {
-      if (this.selectedTab !== 3) {
+      if (this.selectedTab !== 3 && this.selectedTab !== 4) {
         PageHeader({ tab: this.selectedTab, settings: this.settings, leftHand: this.holdingSide === 'left',
           loading: this.busy || this.refreshing,
           interactive: this.selectedTab === 0 ? this.ready && !this.busy : this.connected && !this.busy && !this.refreshing,
@@ -949,6 +953,11 @@ struct Index {
                 onReset: () => { this.act(() => this.resetSettings()); }, onConnect: () => { this.selectTab(2); },
                 sentCount: this.sentEntries.length, onClearSentLog: () => { this.act(() => this.clearSentLog()); } })
             }.tabBar(this.tabStyle($r('sys.symbol.gearshape'), $r('sys.symbol.gearshape_fill'), '设置'))
+            if (this.readingEnabled) {
+              TabContent() {
+                ReadingTab({ settings: this.settings, active: this.selectedTab === 4 })
+              }.tabBar(this.tabStyle($r('sys.symbol.book'), $r('sys.symbol.book'), '阅读'))
+            }
           }.width('100%').height('100%').vertical(false).barMode(BarMode.Fixed)
             .barOverlap(true).barHeight(this.barHidden() ? 0 : 64, true)
             .scrollable(false).animationDuration(motionDuration(this.settings))

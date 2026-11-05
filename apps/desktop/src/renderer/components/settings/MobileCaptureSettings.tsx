@@ -1,3 +1,4 @@
+import { ReadingSyncSettings } from './ReadingSyncSettings';
 import { useTranslation } from "react-i18next";
 import {
   ArrowDownToLine,
@@ -38,6 +39,7 @@ export function MobileCaptureSettings() {
       className="space-y-6 text-foreground"
       data-testid="mobile-capture-settings"
     >
+      <ReadingSyncSettings />
       <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-primary/5 p-6">
         <div
           className="pointer-events-none absolute right-0 -top-20 h-64 w-64 rounded-full bg-primary/5"

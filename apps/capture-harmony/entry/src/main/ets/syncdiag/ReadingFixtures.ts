@@ -1,0 +1,61 @@
+// 自动生成的公开测试密钥和虚构资料，仅用于开发包。
+import { ReadingIdentity } from '../core/ReadingSyncFormat';
+export interface ReadingFixture { name: string; identity: ReadingIdentity; keyHex: string; plainHex: string; token: string; }
+export const READING_FIXTURES: ReadingFixture[] = [
+  {
+    "name": "article",
+    "identity": {
+      "libraryId": "fixture_library_01",
+      "generation": "fixture_generation_01",
+      "objectId": "fixture_article_01",
+      "keyId": "fixture_content_key_01",
+      "revision": 1,
+      "kind": "article"
+    },
+    "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "plainHex": "7b22736368656d61223a312c226964223a22666978747572655f61727469636c655f3031222c227469746c65223a22e59088e68890e69687e7aba0efbc9ae7a6bbe7babfe99885e8afbb222c22636f6e74656e74223a222320e7a6bbe7babfe99885e8afbb5c6ee794b5e88491e585b3e69cbae5908eefbc8ce6898be69cbae4bb8de58fafe99885e8afbbe38082f09f9880222c2273756d6d617279223a22e8bf99e698afe8999ae69e84e6b58be8af95e8b584e69699e38082222c226974656d54797065223a226e6f7465222c22737461747573223a22616374697665222c22636f6c6c656374696f6e4e616d65223a22e59088e68890e79fa5e8af86e5ba93222c2274616773223a5b22e6b58be8af95225d2c22736f7572636555726c223a6e756c6c7d",
+    "token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiZ3VpemhpLXJlYWRpbmcrandlIiwidiI6MSwibGlicmFyeUlkIjoiZml4dHVyZV9saWJyYXJ5XzAxIiwiZ2VuZXJhdGlvbiI6ImZpeHR1cmVfZ2VuZXJhdGlvbl8wMSIsIm9iamVjdElkIjoiZml4dHVyZV9hcnRpY2xlXzAxIiwia2V5SWQiOiJmaXh0dXJlX2NvbnRlbnRfa2V5XzAxIiwicmV2aXNpb24iOjEsImtpbmQiOiJhcnRpY2xlIn0..AAAAAAAAAAAAAAAB.bvTMnyyRXX8sFGAVzs9e1S-9ej0cxiH2Fl9iq1JZEDJfyVfACgCmSDCrr2RO3iXWvp61Gm0Ii8BZvr2K5C98rr-W30X40RguZRAWnWJa94egwLRjVmSiO-Mea9vT5tfg1HJJleeHmCKSV5gcqg-KxKWGsark2gfAWlSLRy-N84H3P87VlvpDSu_YnIoQKxblSiAc9Yo_HuBCWGIeyHYyLxPpH8iyD2QSgG9p0Okqtz1jI2dlVgvMpmTgH8AzWhpbEtN_aylTysdhgqrFZal71oBiqlD_AXhl9XjR0lhsds7aFkbayl7lacki0hIonF0dGTCGCK5B8navlbHyY1AVfUtLMht-lB6eoEMYdoOgG6wXWnAMVrhBeV9EqPmLOnz-rR4HpO9y.KjdxVozHcbZazwknXEVf3A"
+  },
+  {
+    "name": "article2",
+    "identity": {
+      "libraryId": "fixture_library_01",
+      "generation": "fixture_generation_01",
+      "objectId": "fixture_article_02",
+      "keyId": "fixture_content_key_01",
+      "revision": 1,
+      "kind": "article"
+    },
+    "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "plainHex": "7b22736368656d61223a312c226964223a22666978747572655f61727469636c655f3032222c227469746c65223a22e59088e68890e69687e7aba0efbc9ae59bbee78987222c22636f6e74656e74223a22215be6b58be8af95e59bbee789875d286775697a68692d73796e633a2f2f666978747572655f696d6167655f303129222c2273756d6d617279223a22e8bf99e698afe8999ae69e84e6b58be8af95e8b584e69699e38082222c226974656d54797065223a226e6f7465222c22737461747573223a22616374697665222c22636f6c6c656374696f6e4e616d65223a22e59088e68890e79fa5e8af86e5ba93222c2274616773223a5b22e6b58be8af95225d2c22736f7572636555726c223a6e756c6c7d",
+    "token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiZ3VpemhpLXJlYWRpbmcrandlIiwidiI6MSwibGlicmFyeUlkIjoiZml4dHVyZV9saWJyYXJ5XzAxIiwiZ2VuZXJhdGlvbiI6ImZpeHR1cmVfZ2VuZXJhdGlvbl8wMSIsIm9iamVjdElkIjoiZml4dHVyZV9hcnRpY2xlXzAyIiwia2V5SWQiOiJmaXh0dXJlX2NvbnRlbnRfa2V5XzAxIiwicmV2aXNpb24iOjEsImtpbmQiOiJhcnRpY2xlIn0..AAAAAAAAAAAAAAAC.slNdHtwut7CbNw09VSiPrrw1U7mW3Xrd6yIzSAWyOOiBfMn9BE0KkHC_jlWwWbhH6o_3kTBmJKIWdyPPrPmScTWh3VbRNdRDFEHiHzgJ9fwezRH1CaS69nDftgyhmyb872nodoY2c4LjfmltujyfM3MTFNWF6NqiF_PrDufsjuDx4E-0LdsPzCJxD8AWk5zJrcWGeWgThgOovzUxkILj80BhGE0jkp2SK6q3LBQtDznsVI8subDpFcCDkMUnQtjsGNUs_Hrk7hlPnGKNDwKtYR6qf1Lvq1Z_JXf6X2j05Xn65ZQBdlIW3X9iTS-Dy9Xz2ik11wYG8f8xUtr2J6zoWTRI8yKZveVrt4kixUIIgGsTM0bi.bxpnAn_3HUZs0R3YsrcB-Q"
+  },
+  {
+    "name": "image",
+    "identity": {
+      "libraryId": "fixture_library_01",
+      "generation": "fixture_generation_01",
+      "objectId": "fixture_image_01",
+      "keyId": "fixture_content_key_01",
+      "revision": 1,
+      "kind": "image"
+    },
+    "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "plainHex": "89504e470d0a1a0a0000000d4948445200000001000000010804000000b51c0c020000000b4944415478da63fcff1f0003030200efbf67570000000049454e44ae426082",
+    "token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiZ3VpemhpLXJlYWRpbmcrandlIiwidiI6MSwibGlicmFyeUlkIjoiZml4dHVyZV9saWJyYXJ5XzAxIiwiZ2VuZXJhdGlvbiI6ImZpeHR1cmVfZ2VuZXJhdGlvbl8wMSIsIm9iamVjdElkIjoiZml4dHVyZV9pbWFnZV8wMSIsImtleUlkIjoiZml4dHVyZV9jb250ZW50X2tleV8wMSIsInJldmlzaW9uIjoxLCJraW5kIjoiaW1hZ2UifQ..AAAAAAAAAAAAAAAD.hHRA9Ft8q9Czkpdy4k060wqD8VxHIgZOKT0nauWheFrvLmoDt3_shJGQ6b8rH8rwxubG2ByAqzNevDOkdNnYiINQ1A8.Fj5ciSYyAXL4wmR2wMgcvA"
+  },
+  {
+    "name": "recovery",
+    "identity": {
+      "libraryId": "fixture_library_01",
+      "generation": "fixture_generation_01",
+      "objectId": "fixture_content_key_01",
+      "keyId": "fixture_content_key_01",
+      "revision": 1,
+      "kind": "recovery"
+    },
+    "keyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "plainHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "token": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIiwidHlwIjoiZ3VpemhpLXJlYWRpbmcrandlIiwidiI6MSwibGlicmFyeUlkIjoiZml4dHVyZV9saWJyYXJ5XzAxIiwiZ2VuZXJhdGlvbiI6ImZpeHR1cmVfZ2VuZXJhdGlvbl8wMSIsIm9iamVjdElkIjoiZml4dHVyZV9jb250ZW50X2tleV8wMSIsImtleUlkIjoiZml4dHVyZV9jb250ZW50X2tleV8wMSIsInJldmlzaW9uIjoxLCJraW5kIjoicmVjb3ZlcnkifQ..AAAAAAAAAAAAAAAE.lLACrF387VxF9Tijrtv7Zz6l_Fad6BRP8W5gkrJZgn0.surWNcobIVOsG_7-TX1T-Q"
+  }
+];
