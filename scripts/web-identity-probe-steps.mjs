@@ -123,7 +123,7 @@ export default async function ({ win, outDir, mainEntry }) {
         expect(Boolean(staticDoc?.headers[name]), `静态请求应带 ${name}`);
         expect(staticDoc?.headers[name] === renderDoc?.headers[name], `静态与渲染的 ${name} 应一致：静态 ${staticDoc?.headers[name]}；渲染 ${renderDoc?.headers[name]}`);
       }
-      // 渲染窗口经 protocol.handle 转发时本来就没有 Accept-Language（Electron 33 实测）；静态不补，两边才不会因语言协商得到不同版本。
+      // 渲染窗口经 protocol.handle 转发时本来就没有 Accept-Language（Electron 45 实测）；静态不补，两边才不会因语言协商得到不同版本。
       expect(!staticDoc?.headers["accept-language"] && !renderDoc?.headers["accept-language"], "静态与渲染都不应带 accept-language");
       expect(by("gated")?.status === "completed", `gated：带 User-Agent 后应采集成功，实际 ${by("gated")?.status} ${by("gated")?.error ?? ""}`);
     }

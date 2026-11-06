@@ -254,7 +254,7 @@ describe("网页采集诊断追踪", () => {
     // Chromium 导航（含 <link rel=prefetch>）的完整 Accept。
     expect(
       classifyAccept(
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
       ),
     ).toBe("document");
     // 库发的 XHR/fetch 即使要 HTML，也是数据请求，不是文档。

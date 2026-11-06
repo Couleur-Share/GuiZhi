@@ -10,7 +10,7 @@
  * 没有冒用任何爬虫身份；robots.txt 里针对 GuiZhi 的规则也由此可被站点识别）与文档导航的 Accept。
  *
  * 不带 Accept-Language 与 Upgrade-Insecure-Requests：渲染窗口经 protocol.handle 转发时本来就没有
- * Accept-Language（Electron 33 实测），不补它，静态与渲染才不会因语言协商得到不同版本；
+ * Accept-Language（Electron 45 实测），不补它，静态与渲染才不会因语言协商得到不同版本；
  * Upgrade-Insecure-Requests 是能力声明，不是身份，发出去只会让 http 站点多一次重定向。
  *
  * 遇到 HTTP 错误仍保持失败：这里只是让第一次请求不再缺少身份，不是被拒之后换一种方式重试。
@@ -19,9 +19,12 @@
  */
 export const WEB_IDENTITY_ENV = "GUIZHI_WEB_IDENTITY";
 
-/** Chromium 130 对文档导航发出的 Accept，取自渲染窗口主文档请求的实测值。 */
+/**
+ * Chromium 156（Electron 45）对文档导航发出的 Accept，取自渲染窗口主文档请求的实测值。
+ * Chromium 按 JXL/SXG 等开关拼接这个值，升级 Electron 后要用 scripts/web-identity-probe-steps.mjs 重新取值。
+ */
 export const DOCUMENT_ACCEPT =
-  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7";
 
 type Env = Record<string, string | undefined>;
 

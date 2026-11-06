@@ -230,9 +230,10 @@ export class WebElectronRenderer {
       target.setPermissionRequestHandler(denyPermissionRequest);
       target.setPermissionCheckHandler(denyPermissionCheck);
       target.on("will-download", denyDownload);
-      // http(s) 被下面的 protocol.handle 接管后，webRequest 不再对它们触发（含主框架导航，
-      // Electron 33 实测）；该监听只对未被接管的请求生效，实测 WebSocket 仍会触发。
-      // 它们一律取消，黑洞代理是第二层兜底（监听失效时 ws/wss 也到不了本机或外网）。
+      // 被下面的 protocol.handle 接管的 http(s) 请求（含主框架导航）也会先经过该监听
+      // （Electron 45 实测），所以它必须放行 http(s)，由协议处理器统一做出口检查。
+      // WebSocket 与非 http(s) 请求不经协议处理器，在这里一律取消；黑洞代理是第二层兜底
+      // （监听失效时 ws/wss 也到不了本机或外网）。
       target.webRequest.onBeforeRequest((details, callback) => {
         callback({
           cancel:

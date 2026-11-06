@@ -212,7 +212,7 @@ describe("Electron 页面会话与网络隔离", () => {
     expect(mocks.windows[0].destroyed).toBe(true);
   });
   describe("惰性图片以占位图本地应答", () => {
-    const IMAGE_ACCEPT = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
+    const IMAGE_ACCEPT = "image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8";
     afterEach(() => vi.unstubAllEnvs());
 
     it("图片请求不出网，也不占请求预算：210 个图片请求不会触发预算失败", async () => {
@@ -715,12 +715,12 @@ describe("Electron 页面会话与网络隔离", () => {
       );
 
     it.each([
-      ["image", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"],
+      ["image", "image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"],
       ["style", "text/css,*/*;q=0.1"],
       // 子框架与 <link rel=prefetch> 都用 Chromium 的导航式 Accept。
       [
         "document",
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
       ],
     ])("在途的是%s请求（不改动主框架 DOM）时不阻止提前结束；诊断里仍能看到它", async (kind, accept) => {
       mocks.background = true;

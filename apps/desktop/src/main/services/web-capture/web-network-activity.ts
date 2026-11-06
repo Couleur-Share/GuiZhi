@@ -12,8 +12,8 @@
  * 其余请求（脚本、XHR/fetch、字体、信标……）在协议处理器里无法可靠区分，
  * 一律按“可能改动 DOM”处理——保守，宁可多等。
  *
- * 请求类别取自 Accept（见 classifyAccept）：protocol.handle 接管 http/https 后，
- * webRequest 不再触发，处理器里也收不到 Sec-Fetch-Dest（Electron 33 实测）。
+ * 请求类别取自 Accept（见 classifyAccept）：protocol.handle 接管 http/https 后，处理器里的
+ * request.destination 为空，也收不到 Sec-Fetch-Dest（Electron 45 实测）。
  */
 const INERT_KINDS = new Set(["style", "image", "document"]);
 
