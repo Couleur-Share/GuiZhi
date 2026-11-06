@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- Electron 33（main / preload / renderer 三进程）
+- Electron 45（main / preload / renderer 三进程；Chromium 156、内置 Node 24）
 - React 18 + TypeScript 5 + Vite 6
 - Zustand 5（渲染进程状态）
 - Tailwind CSS 3 + Liquid Glass 玻璃拟态令牌（`renderer/styles/globals.css`）
@@ -67,10 +67,11 @@ packages/
   的请求 `last.blockers`（类别、origin、已等待毫秒），用来回答“为什么没有提前结束”；
   `maxPollMs`（一次读取的最长往返）与 `maxCostMs`（页面侧 `innerText` 的最长计算）用来区分
   “页面主线程忙”和“轮询本身太重”。`GUIZHI_WEB_SETTLE=fixed` 回退到固定等待。
-- 渲染窗口的请求类别只能取自 `Accept`（`web-trace.ts` 的 `classifyAccept`）：`protocol.handle`
-  接管 http(s) 后，Electron 33 里 `webRequest` 回调对它们不再触发（含主框架导航），
-  `request.destination` 恒为空，也没有 `Sec-Fetch-*`。Chromium 的导航与 `<link rel=prefetch>`
-  以 `text/html,application/xhtml+xml` 开头（逗号后无空格）；jQuery 一类取 HTML 片段的 XHR 是
+- 渲染窗口的请求类别取自 `Accept`（`web-trace.ts` 的 `classifyAccept`）：`protocol.handle`
+  接管 http(s) 后，处理器里的 `request.destination` 恒为空，也没有 `Sec-Fetch-*`（Electron 45 实测，
+  33 相同）。Electron 45 上 `webRequest` 对这些被接管的请求也会触发并带 `resourceType`（33 不触发），
+  目前没有用它分类。Chromium 的导航、子框架与 `<link rel=prefetch>` 以 `text/html,application/xhtml+xml`
+  开头（逗号后无空格；Chromium 156 的预取另带 `Sec-Purpose: prefetch`）；jQuery 一类取 HTML 片段的 XHR 是
   `text/html, */*; q=0.01`（有空格），它会改动 DOM，必须计入。改动分类规则后用
   `scripts/web-settle-fixtures-steps.mjs` 的本机夹具回归（经 `pnpm shot` 运行，
   `GUIZHI_FIXTURE_ONLY=ajaxHtml,prefetchHang` 只跑指定夹具）。
@@ -83,11 +84,12 @@ packages/
   `GUIZHI_TRACE_SAVE_CONTENT=1` 保存正文用于逐页相似度对比）。
 - 渲染窗口的出口与导航防护（`web-electron-renderer.ts`）：http(s) 经 `protocol.handle` 统一走
   `webNetworkRequest`（SSRF 校验、200 个请求 / 50 MiB 预算；预算用尽的错误会写明请求数最多的主机）。
-  `webRequest.onBeforeRequest` 只对未被接管的请求生效，实测 WebSocket 仍会触发，该监听一律取消
-  ws/wss 与非 http(s)；监听之外还有两层兜底：黑洞代理 `127.0.0.1:9`（配合 `<-loopback>`，连本机也
-  不直连）与 WebRTC `disable_non_proxied_udp`。**http(s) 的主框架范围检查（目录模式）不能放在
-  `webRequest` 上**（对它不触发），放在 `will-frame-navigate` 与 `will-redirect`：它们先于取页面触发，
-  越界的导航不会被请求，也不会执行；程序化的 `loadURL` 不触发（入口由调用方校验）。同一对事件
+  `webRequest.onBeforeRequest` 在 Electron 45 上对被接管的 http(s) 请求（含主框架导航）也会触发
+  （33 只对未被接管的请求触发），所以该监听必须放行 http(s)，只取消 ws/wss 与非 http(s)（实测 WebSocket
+  仍会触发）；监听之外还有两层兜底：黑洞代理 `127.0.0.1:9`（配合 `<-loopback>`，连本机也
+  不直连）与 WebRTC `disable_non_proxied_udp`。http(s) 的主框架范围检查（目录模式）放在
+  `will-frame-navigate` 与 `will-redirect`：它们先于取页面触发，越界的导航不会被请求，也不会执行
+  （Electron 45 出口探测复测）；程序化的 `loadURL` 不触发（入口由调用方校验）。同一对事件
   也承担子框架策略：跨源子框架默认不加载（`web-subframe-policy.ts`；采集只用主框架 DOM，跨源
   子框架拖慢 load，且渲染窗口没有跨框架缓存，每个子框架重复下载同一批脚本，会耗尽请求预算），
   `GUIZHI_WEB_SUBFRAMES=allow` 恢复加载；追踪的 `blockedFrames` 记被取消的个数，`domReadyMs`
@@ -101,7 +103,7 @@ packages/
   的文本请求，与渲染窗口使用同一个身份——Chromium 自己的 `User-Agent`（含 `GuiZhi/<版本>` 标记，
   自报家门，不冒充搜索引擎或其他爬虫）和导航 `Accept`。此前这些请求不带 UA，Wikipedia 等站点据此
   直接 403（en/zh 条目实测全部失败），同一页面由渲染窗口取却正常；robots.txt 取不到还会让文档站
-  批量暂停。不带 `Accept-Language`：渲染窗口经 `protocol.handle` 转发时本来就没有（Electron 33
+  批量暂停。不带 `Accept-Language`：渲染窗口经 `protocol.handle` 转发时本来就没有（Electron 45
   实测），补上只会让两条路径因语言协商拿到不同版本；也不带 `Upgrade-Insecure-Requests`（渲染窗口的
   主文档请求会带，这是有意保留的差异：它是能力声明而非身份，静态请求发出去只会让 http 站点多一次
   重定向）。**这不是 403 之后的重试**：
@@ -143,7 +145,7 @@ packages/
   load 处理器再用 550 ms 定时器写入）现行模式 2/2 采到，重叠模式 0/2，其余夹具的结束时间不变。
   结论：没有可测的收益，却更容易丢内容，不做；`onloadTimer` 留作哨兵，防止以后把静止窗口前移到
   DOMContentLoaded。实现上有个陷阱：页面加载期间 `webContents.executeJavaScript` 会被推迟到 load
-  之后才执行（Electron 33 实测：dom-ready 时调用，load 后才返回；`webContents.mainFrame.executeJavaScript`
+  之后才执行（Electron 33 与 45 实测：dom-ready 时调用，load 后才返回；`webContents.mainFrame.executeJavaScript`
   则立即执行），在 DOMContentLoaded 提前安装探针必须用后者，否则“提前”实际没有发生。
 
 ## 常用命令
@@ -199,7 +201,7 @@ electron-deck 为了截图走的是同一套（`setPosition(-3000, -3000)` +
 
 截图默认带 `animations: "disabled"` + `caret: "hide"`：不加的话，界面就绪后
 立刻截的**第一张**会抓到淡入过渡的中间态——实测同一界面连截三张，默认选项下
-首张与后两张不一致，加上之后三张逐字节相同，耗时不变。
+首张与后两张不一致，加上之后三张逐字节相同，耗时不变（Electron 45 复测：加上之后三张仍逐字节相同）。
 
 将来做 macOS 时这套要重新验证：`showInactive()` 在那边虽不给焦点，却硬编码
 把窗口带到前台（electron#49393，2026-01 仍未合入可选项），全屏状态下还会

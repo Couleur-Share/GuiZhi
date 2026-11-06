@@ -137,3 +137,77 @@
 - 上游变更：executeJavaScript <https://github.com/electron/electron/pull/53969>；对话框默认目录 <https://github.com/electron/electron/pull/49868>；registerFileProtocol opaque 响应 <https://github.com/electron/electron/pull/52822>；webRequest/协议链路 #53141、#53240、#53685、#55119；隐藏窗口渲染 #54118、#54341
 - Chromium 导航 Accept：<https://github.com/chromium/chromium/blob/156.0.8078.80/content/public/browser/frame_accept_header.cc>
 - Playwright Electron 支持：<https://playwright.dev/docs/api/class-electron>；回归 <https://github.com/microsoft/playwright/issues/43247>
+
+## 实施结果（2026-11-07）
+
+在独立工作副本的 `chore/electron-45` 分支（基于快照 `50288cfe`）完成：`apps/desktop` 的 electron 锁定为 `45.2.3`，实测 Chromium 156.0.8078.80、Node 24.22.2。Electron 33 对照在同一快照的临时工作副本中独立安装依赖，用同一命令运行。下文全部是源码与隔离测试，没有跑真实第三方流程，也没有发布。
+
+### 代码改动
+
+- 登录项：删除 `wasOpenedAsHidden` 与 `openAsHidden`（改前 `tsc` 恰好报这两处），隐藏启动只认 `--hidden`。macOS 上 `args` 不生效，按代码阅读由 `minimizeOnLaunch` 兜底，未实测。
+- `console-message`：两处改读事件对象，`level` 按字符串判断。临时探测确认：45 上 `console.error`、未捕获异常、未处理的 Promise 拒绝都报 `"error"`，`console.warn` 报 `"warning"`；33 的事件对象没有这些字段。
+- `DOCUMENT_ACCEPT` 改为 Chromium 156 的实测值（多了 `image/jxl`），见下文第 2、5 条。
+- `tests/e2e/reading-v3-shots.mjs` 的 Worker 边界检查改为以脚本能否执行为准：Chromium 156 拦截 `data:` Worker 时不再同步抛 `SecurityError`，改为异步触发 error 事件，脚本仍不执行。
+- 安装包体积预算上调，见下文。
+
+### 门禁结果
+
+| 门禁 | 结果 | 说明 |
+| --- | --- | --- |
+| typecheck、lint、test:unit、build:isolated | 通过 | vitest 304 个文件、2612 个测试；node --test 20/20 |
+| test:e2e | 6 项中 5 项通过 | accessibility 失败，33 上同样失败，属既有问题 |
+| 出口探测（默认与 `GUIZHI_WEB_SUBFRAMES=allow`） | 通过 | 没有连接绕过出口；越界导航在取页面前被拦截 |
+| 沉降夹具 | 通过 | 更新 `DOCUMENT_ACCEPT` 前后各跑一次 |
+| 请求身份探测与 `GUIZHI_WEB_IDENTITY=none` 基线 | 通过 | 首跑因导航 Accept 多了 `image/jxl` 而失败，更新常量后通过 |
+| 惰性图片探测 | 通过 | |
+| web-capture-runtime 集成测试 | 默认失败；`allow` 时通过 | 默认失败在“跨源子框架被请求”的断言，33 上同样失败，属既有问题 |
+| reading-v3-acceptance | 第 3 次通过 | 第 1 次失败于上述 Worker 检查；第 2 次在高负载下等待 900 ms 后找不到阅读子视图（第 1、3 次这一步都通过）。死循环 5.6 s 内报故障，导出无网络请求 |
+| reading-graphics-shots | 通过 | 只覆盖成功路径，失败判定由上述 console-message 探测补充 |
+| heavy-user-workflows-shots | 1 次失败、1 次通过 | 失败时 CPU 约 83%，等待“已选 60 项”超时 |
+| heavy-user-index-shots | 4 次中 2 次失败 | 见下文“SwiftShader 下的输入延迟” |
+| 打包与体积门禁 | 通过（预算已上调） | 运行包 193.7 MiB，未变 |
+| 打包产物冒烟（`shot --executable`） | 通过 | asar 内外资源、网页组件可用；MCP 以 `ELECTRON_RUN_AS_NODE`（Node 24.22.2）完成握手，并检索到打包产物写入的条目 |
+| Linux 预检（Bero） | 通过 | snapshotSHA256 `39ca02447f3c3a4d86123f58021ce6b3ac3de6b4eb0870566af9e808fa83290a`，runId `2026-11-06T19-10-35-213Z-c5a8fe3d` |
+
+### SwiftShader 下的输入延迟
+
+`heavy-user-index-shots` 测量 5 万分块检索期间“输入事件到下一帧”的 P95（阈值 100 ms）：45 上四次为 103.1、71.9、111.4、68.8 ms，33 上三次为 18.9、16.8、15.9 ms。不跑检索时 45 三次的 p50 为 42–74 ms、p95 为 125–164 ms，33 为 11–13 ms、36–55 ms；页面上临时插入的原生 `<input>` 两边接近；输入后的同步更新 45 为 3.3/5.4 ms、33 为 5.6/8.4 ms（p50/p95），时间耗在出帧阶段。检索让出事件循环的方式从 `setImmediate` 换成 `setTimeout(0)` 不改善（P95 约 68 ms），已撤回。改走 e2e 路径（`file://`、默认 GPU 合成）时，45 为 p50 3.6 ms、p95 6.0 ms，33 为 3.9 ms、23.4 ms。
+
+结论：变慢只出现在 `pnpm shot` 固定使用的 SwiftShader 软件渲染下，GPU 路径没有变慢。没有 GPU 加速、靠软件渲染的用户机器是否受影响，未验证。门禁如何处理（调整阈值、换测量路径或继续追查 SwiftShader）待决定。
+
+### 安装包体积
+
+本地打包 `GuiZhi-Setup-0.26.0-x64.exe` 为 159,948,002 字节（152.5 MiB），超过原上限 143,000,000。同一份应用代码用 Electron 33.4.11 打包为 129,979,908 字节，相差 29,968,094 字节；win-unpacked 中 resources 以外的 Electron 文件由 280,967,425 增至 374,036,010 字节，resources 两边相同。按 `config/package-size-budget.json` 的约定，上限改为 173,000,000（实测约 +8%）。`electronLanguages` 精简语言包未评估。
+
+### 重验结论（编号对应上文“需要重验的结论”）
+
+1. **已变化**：45 上 `webRequest` 对被 `protocol.handle` 接管的 http(s) 请求都会触发，包括 `loadURL` 的主框架导航、脚本跳转、子框架、样式、脚本、图片、XHR 与预取；33 上一个都不触发。`request.destination` 仍为空，仍无 `Sec-Fetch-*`。现有监听放行 http(s)，行为不变；已更新相关注释与 `desktop-development.md`。
+2. **成立**：导航、子框架与预取的 Accept 仍以 `text/html,application/xhtml+xml` 开头；值多了 `image/jxl`，预取另带 `Sec-Purpose: prefetch`；jQuery 式自定义 Accept 原样转发。图片 Accept 改为 `image/jxl,image/avif,…`，仍以 `image/` 开头。
+3. **成立**：WebSocket 仍触发 `webRequest`；去掉监听后被黑洞代理兜住；本机端口没有收到连接，也没有 UDP 数据报。
+4. **成立**：越界导航在取页面前被拦截；跨源子框架默认不取，`allow` 时取。
+5. **成立**：转发请求仍无 `Accept-Language`；`DOCUMENT_ACCEPT` 已更新。
+6. **成立**：CORS 与 COEP 用例中占位图正常加载。
+7. **成立**：dom-ready 时调用，`webContents.executeJavaScript` 在 did-finish-load 之后 1–3 ms 返回，`mainFrame.executeJavaScript` 在 3–6 ms 内返回（两个版本各测 2 次）。
+8. **部分重验**：屏幕外窗口连截三张逐字节相同。“与正常显示逐字节相同”需要把窗口显示出来，未重测。“真隐藏窗口 rAF 停摆”没有复现：在同一个 Playwright 实例里新建、从未显示的窗口，33 与 45 都约 330 帧/2 s；原测量对象是不调用 `show()` 的主窗口加 `page.screenshot`，条件不同，这条结论未重验。
+9. **成立**：默认截图选项下连截三张逐字节相同。
+10. 本机上两条路径都正常（e2e 走 `file://`，shot 走回环 HTTP + SwiftShader）；“部分图形环境加载 `file://` 失败”无法在本机重测。
+11. 死循环在 5.6 s 内经故障通道报出；`loadURL` 本身是否仍不返回，未单独验证。
+12. 未测，需要平台登录手工验证。
+
+“未确认事项”中，第 1、2、5 条已有实测结果；第 4、8、9 条部分有结果（本机网络下 `install-electron` 用 26 s 下载成功；electron-builder 26.15.7 能打包 45；vite-plugin-electron 的开发模式与 electron-updater 未跑）；第 3、6、7 条仍未确认。
+
+### 既有问题（33 上同样出现，本分支未修复）
+
+- 新用户首次启动的界面语言可能是英文。`settings-defaults.ts` 的默认 `language` 读取 `i18n.language`，而 `main.tsx` 并行加载 App 与语言资源；探测中 `navigator.language` 为 `zh-CN`，`guizhi-settings` 里保存的却是 `en`，离屏实例与打包产物首次启动都显示英文。机制来自代码阅读与探测结果，未单独证实。这也是 accessibility 用例失败的原因之一：“处理中心”的匹配正则不含英文的 `Inbox`。
+- web-capture-runtime 集成测试仍断言跨源子框架会被请求，与默认不加载跨源子框架的策略矛盾。
+
+### 本次未验证
+
+- 公网 `web-trace` 基线对照、NodeSeek 与公众号流程（需要本机代理和公网）。
+- 平台登录（抖音、小红书、LINUX DO、NodeSeek）与网站验证窗口。
+- Windows Sandbox 安装验收（覆盖升级、卸载重装）。
+- 回滚到 33 后 localStorage、平台登录 Cookie 与 safeStorage 已存凭据能否读取。
+- 33 经 electron-updater 升级到新版（Draft Release）。
+- 7 处对话框的默认目录、`local-image://` 与 `local-video://` 的显示和拖动进度。
+- 开机隐藏启动与托盘、系统通知、在真实 Cursor 中使用 MCP、四种代理模式、数据目录迁移。
+- `executeJavaScript` 改走 mojo 对真实脚本跳转页面的影响（只跑了夹具 `jsRedirect`），以及 `document.requestStorageAccessFor` 默认禁用对平台登录的影响。
