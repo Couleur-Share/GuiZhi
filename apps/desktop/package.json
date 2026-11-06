@@ -101,7 +101,7 @@
     "clsx": "^2.1.0",
     "daisyui": "5.7.28",
     "echarts": "6.1.0",
-    "electron": "33",
+    "electron": "45.2.3",
     "electron-builder": "^26.15.7",
     "electron-updater": "^6.6.2",
     "eslint": "^9.0.0",

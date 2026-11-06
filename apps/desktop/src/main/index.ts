@@ -350,19 +350,7 @@ async function createWindow() {
     }
 
     const launchArgs = Array.isArray(process.argv) ? process.argv : [];
-    const hasHiddenArg = launchArgs.includes("--hidden");
-    let openedAsHiddenByOs: boolean;
-    try {
-      openedAsHiddenByOs =
-        app.getLoginItemSettings().wasOpenedAsHidden === true;
-    } catch (error) {
-      console.warn(
-        "Failed to read login item settings; assuming not opened-as-hidden:",
-        error instanceof Error ? error.message : error,
-      );
-      openedAsHiddenByOs = false;
-    }
-    const osRequestedHidden = hasHiddenArg || openedAsHiddenByOs;
+    const osRequestedHidden = launchArgs.includes("--hidden");
 
     const shouldMinimize =
       osRequestedHidden || (appDb ? getMinimizeOnLaunchSetting(appDb) : false);
@@ -515,7 +503,6 @@ ipcMain.on(
     try {
       app.setLoginItemSettings({
         openAtLogin: enabled,
-        openAsHidden: startHidden,
         args: startHidden ? ["--hidden"] : [],
       });
     } catch (error) {

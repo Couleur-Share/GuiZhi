@@ -47,7 +47,7 @@ export async function renderReadingGraphic(visual: ReadingVisual, signal: AbortS
       ipcMain.on(IPC_CHANNELS.READING_GRAPHICS_RESULT, receive);
       signal.addEventListener("abort", abort, { once: true });
       wc.once("preload-error", (_event, _file, error) => finish(new Error(`图形编译桥接加载失败：${error.message}`)));
-      wc.on("console-message", (_event, level, message) => { if (level >= 3) finish(new Error(`图形编译脚本失败：${message.slice(0, 700)}`)); });
+      wc.on("console-message", ({ level, message }) => { if (level === "error") finish(new Error(`图形编译脚本失败：${message.slice(0, 700)}`)); });
       wc.once("render-process-gone", () => finish(new Error("图形编译进程意外退出")));
       wc.loadURL(url).then(() => { if (!done) wc.send(IPC_CHANNELS.READING_GRAPHICS_JOB, { id, visual }); }).catch(error => finish(error));
     });

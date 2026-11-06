@@ -579,9 +579,9 @@ export async function createElectronCaptureContext(
       event.preventDefault();
     }
   });
-  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
-    if (level >= 2) {
-      console.warn(`[platform-window:${input.platform}] ${message} (${sourceId}:${line})`);
+  window.webContents.on("console-message", ({ level, message, lineNumber, sourceId }) => {
+    if (level === "warning" || level === "error") {
+      console.warn(`[platform-window:${input.platform}] ${message} (${sourceId}:${lineNumber})`);
     }
   });
   window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
