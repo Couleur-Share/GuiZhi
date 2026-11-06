@@ -68,7 +68,8 @@ export default async ({ win, app, shot, outDir }) => {
     "(()=>{try{return window.open('https://example.com')?'allowed':'blocked'}catch{return 'blocked'}})()",
     "(()=>{try{top.location.href='https://example.com';return 'allowed'}catch{return 'blocked'}})()",
     "(()=>{try{new Function('return 1')();return 'allowed'}catch{return 'blocked'}})()",
-    "(()=>{try{new Worker('data:text/javascript,postMessage(1)');return 'allowed'}catch{return 'blocked'}})()",
+    // 以 Worker 脚本能否执行为准：Chromium 156 拦截时不再同步抛 SecurityError，而是异步触发 error 事件。
+    "new Promise(r=>{try{const w=new Worker('data:text/javascript,postMessage(1)');w.onmessage=()=>r('allowed');w.onerror=()=>r('blocked');setTimeout(()=>r('blocked'),1500)}catch{r('blocked')}})",
   ])
     assert.equal(await inner(code), "blocked");
   await inner(
