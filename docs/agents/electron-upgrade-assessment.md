@@ -198,10 +198,30 @@
 
 “未确认事项”中，第 1、2、5 条已有实测结果；第 4、8、9 条部分有结果（本机网络下 `install-electron` 用 26 s 下载成功；electron-builder 26.15.7 能打包 45；vite-plugin-electron 的开发模式与 electron-updater 未跑）；第 3、6、7 条仍未确认。
 
-### 既有问题（33 上同样出现，本分支未修复）
+### 既有问题（33 上同样出现，已在评审后续修复）
 
-- 新用户首次启动的界面语言可能是英文。`settings-defaults.ts` 的默认 `language` 读取 `i18n.language`，而 `main.tsx` 并行加载 App 与语言资源；探测中 `navigator.language` 为 `zh-CN`，`guizhi-settings` 里保存的却是 `en`，离屏实例与打包产物首次启动都显示英文。机制来自代码阅读与探测结果，未单独证实。这也是 accessibility 用例失败的原因之一：“处理中心”的匹配正则不含英文的 `Inbox`。
-- web-capture-runtime 集成测试仍断言跨源子框架会被请求，与默认不加载跨源子框架的策略矛盾。
+- 新用户首次启动的界面语言是英文：离屏插桩确认，`settings.store` 随 App 分包求值时创建，比语言包加载与 `i18n.init()` 早约 9 ms，默认值读到的 `i18n.language` 为 `undefined`，归一成 `en`；App 启动时以 store 为准同步语言，把 `en` 写入 `guizhi-settings` 并同步到主进程。现在默认语言取 i18n 导出的启动语言（已存设置优先，否则跟随系统）。已经存成 `en` 的老用户数据无法与主动选择区分，不改写。
+- accessibility 用例写死中英正则，“处理中心”的英文备选写成了未翻译键 `nav.inbox`：改为按设置按钮的可访问名认出当前语言包，从中取按钮名。复验时另发现快速采集弹窗淡入期间运行 axe 会误报对比度，改为等弹窗 opacity 为 1。
+- web-capture-runtime 集成测试断言跨源子框架会被请求：默认策略是有意设计，不改；子框架场景改为按场景显式设置策略，默认策略断言跨源子框架不被请求，`allow` 断言被请求。
+
+### 评审后续复验（2026-11-07）
+
+在 `chore/review-followups` 工作副本中执行，全部是源码与隔离测试；本机同时有另一代理在跑测试与打包。
+
+| 检查 | 结果 |
+| --- | --- |
+| typecheck、lint、test:unit | 通过；vitest 303 个文件、2604 项，node --test 22/22 |
+| test:e2e | 6 项全部通过（运行前 CPU 52%） |
+| accessibility 英文界面（`--lang=en-US`，临时改启动参数） | 通过 |
+| web-capture-runtime 集成测试 | 默认环境与 `GUIZHI_WEB_SUBFRAMES=allow` 各一次通过；把默认那一步临时改成放行时新增断言失败 |
+| article-ask-frames-shots | 修复后连续 5 次通过（运行前 CPU 15%–77%），12 张截图与两份 JSON 齐全 |
+| article-ask-shots 单独运行 | 通过；修复前收尾时 Playwright 报 "No dialog is showing" 后进程崩溃 |
+| heavy-user-index-shots（`--gpu`） | 见上文“SwiftShader 下的输入延迟” |
+| 默认 `pnpm shot` | 首次启动为中文界面；`guizhi-settings` 与主进程保存的语言均为 `zh` |
+
+article-ask 两个截图脚本自 2026-09-12 关闭前保存开始拦截问答消息起就跑不通：刷新与截图脚本收尾的 `app.close()` 都撞上这项拦截（产品行为，不改）。脚本改为刷新前点“新对话”、结束时走用户点关闭再选退出的路径。另修两处时序：选段前等正文渲染；iframe 上方的选段菜单要等按钮收到指针（`:hover`）再点击，否则点击可能按上一帧的命中区域落进 iframe 并清空选区。
+
+截图脚本失败时，收尾的 `app.close()` 仍会撞上这项拦截：Playwright 报错后进程崩溃，原始错误被掩盖。未修改截图脚本的收尾逻辑。
 
 ### 本次未验证
 
