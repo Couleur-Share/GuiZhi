@@ -2123,6 +2123,7 @@
     "filterDiscoveryCandidate": "发现候选",
     "filterSemanticPending": "语义索引",
     "filterWikiPending": "Wiki 编译",
+    "optionalSection": "整理建议 · 可选",
     "backgroundSection": "后台任务 · 待执行内容",
     "organized": "已整理 {{count}} 条内容",
     "semanticRunning": "语义索引正在执行",

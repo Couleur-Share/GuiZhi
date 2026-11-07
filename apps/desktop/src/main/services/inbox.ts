@@ -181,13 +181,16 @@ export function listInboxItems(db: Database.Database): InboxListResult {
   return {
     items,
     counts,
-    // 按内容身份去重；全量查询不受分组列表上限影响，后台任务不计入。
+    // 角标与「全部待处理」只计不处理就有风险或损失的项：需复核、导入问题、发现候选。
+    // 未归合集属于可选整理（counts.unclassified 单独展示），后台任务也不计入；
+    // 否则每条新笔记都会让角标加一、永远无法归零。
+    // 按内容身份去重；全量查询不受分组列表上限影响。
     total: scalarCount(
       db,
       `SELECT COUNT(*) AS count FROM (
         SELECT 'item:' || id AS identity FROM knowledge_items
         WHERE deleted_at IS NULL AND status = 'active'
-          AND (review_status = 'needs_review' OR collection_id IS NULL)
+          AND review_status = 'needs_review'
         UNION
         SELECT CASE WHEN COALESCE(result_item_id, duplicate_item_id) IS NOT NULL
           THEN 'item:' || COALESCE(result_item_id, duplicate_item_id)

@@ -2123,6 +2123,7 @@
     "filterDiscoveryCandidate": "Discovery candidates",
     "filterSemanticPending": "Semantic index",
     "filterWikiPending": "Wiki compile",
+    "optionalSection": "Suggestions · optional",
     "backgroundSection": "Background tasks · queued work",
     "organized": "Organized {{count}} items",
     "semanticRunning": "Semantic indexing is already running",

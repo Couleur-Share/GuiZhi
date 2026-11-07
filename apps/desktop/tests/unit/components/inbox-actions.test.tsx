@@ -112,6 +112,7 @@ describe("处理中心聚合任务", () => {
         "wiki-pending": 0,
       },
       total: 1,
+      filter: "unclassified",
       selectionIds: ["item-1"],
       smartClassify,
     });
@@ -200,6 +201,7 @@ describe("处理中心聚合任务", () => {
         "wiki-pending": 0,
       },
       total: 1,
+      filter: "unclassified",
     });
     const user = userEvent.setup();
     renderWorkspace();
@@ -210,14 +212,44 @@ describe("处理中心聚合任务", () => {
     expect(useInboxStore.getState().selectionIds).toEqual(["item-1"]);
   });
 
-  it("全选只覆盖当前列表里的可选条目，并显示半选状态", async () => {
+  it("「全部待处理」不列出可选整理的未归合集条目，切到该分组才显示", async () => {
     useInboxStore.setState({
       items: [
         {
           kind: "unclassified",
           id: "unclassified:item-1",
           itemId: "item-1",
+          title: "随手记",
+          createdAt: 1,
+        },
+      ],
+      counts: {
+        "review-required": 0,
+        unclassified: 1,
+        "import-issue": 0,
+        "discovery-candidate": 0,
+        "semantic-pending": 0,
+        "wiki-pending": 0,
+      },
+      total: 0,
+      filter: "all",
+    });
+    renderWorkspace();
+    expect(screen.queryByText("随手记")).toBeNull();
+
+    act(() => useInboxStore.getState().setFilter("unclassified"));
+    expect(await screen.findByText("随手记")).toBeTruthy();
+  });
+
+  it("全选只覆盖当前列表里的可选条目，并显示半选状态", async () => {
+    useInboxStore.setState({
+      items: [
+        {
+          kind: "review-required",
+          id: "review:item-1",
+          itemId: "item-1",
           title: "条目一",
+          reasons: [],
           createdAt: 1,
         },
         {

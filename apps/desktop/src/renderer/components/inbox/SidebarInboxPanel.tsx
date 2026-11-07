@@ -20,9 +20,10 @@ const ROWS: Array<{
 }> = [
   { id: "all", labelKey: "inbox.filterAll", fallback: "全部待处理", icon: InboxIcon },
   { id: "review-required", labelKey: "inbox.filterReviewRequired", fallback: "需要复核", icon: CircleHelpIcon },
-  { id: "unclassified", labelKey: "inbox.filterUnclassified", fallback: "未归知识库", icon: BoxesIcon },
   { id: "import-issue", labelKey: "inbox.filterImportIssue", fallback: "导入问题", icon: AlertTriangleIcon },
   { id: "discovery-candidate", labelKey: "inbox.filterDiscoveryCandidate", fallback: "发现候选", icon: CompassIcon },
+  // 可选整理：不计入角标与「全部待处理」，单独成组
+  { id: "unclassified", labelKey: "inbox.filterUnclassified", fallback: "未归合集", icon: BoxesIcon },
   { id: "semantic-pending", labelKey: "inbox.filterSemanticPending", fallback: "语义索引", icon: ScanSearchIcon },
   { id: "wiki-pending", labelKey: "inbox.filterWikiPending", fallback: "Wiki 编译", icon: NetworkIcon },
 ];
@@ -45,6 +46,11 @@ export function SidebarInboxPanel() {
             row.id === "all" ? total : counts[row.id as InboxItemKind];
           return (
             <Fragment key={row.id}>
+              {row.id === "unclassified" ? (
+                <p className="mx-3 mt-4 border-t border-sidebar-border pb-2 pt-3 text-xs text-muted-foreground">
+                  {t("inbox.optionalSection", "整理建议 · 可选")}
+                </p>
+              ) : null}
               {row.id === "semantic-pending" ? (
                 <p className="mx-3 mt-4 border-t border-sidebar-border pb-2 pt-3 text-xs text-muted-foreground">
                   {t("inbox.backgroundSection", "后台任务 · 待执行内容")}

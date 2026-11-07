@@ -87,7 +87,8 @@ describe("处理中心聚合", () => {
       "semantic-pending": 2,
       "wiki-pending": 0,
     });
-    expect(result.total).toBe(4);
+    // 总数只含需复核、导入问题、发现候选；未归合集是可选整理，不计入
+    expect(result.total).toBe(3);
     expect(result.items.map((item) => item.kind)).toEqual(
       expect.arrayContaining([
         "review-required",
@@ -105,25 +106,38 @@ describe("处理中心聚合", () => {
   it("关联同一内容的导入问题不重复增加总数", () => {
     db.run(
       "UPDATE import_tasks SET result_item_id = ? WHERE id = ?",
-      "unclassified-1",
+      "review-1",
       "task-1",
     );
-    expect(listInboxItems(db).total).toBe(3);
+    expect(listInboxItems(db).total).toBe(2);
+  });
+
+  it("新增未归合集条目不改变总数，角标不会因整理建议而常年不归零", () => {
+    for (let index = 0; index < 20; index++) {
+      db.run(
+        "INSERT INTO knowledge_items (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)",
+        `loose-${index}`,
+        "未归合集",
+      );
+    }
+    const result = listInboxItems(db);
+    expect(result.counts.unclassified).toBe(21);
+    expect(result.total).toBe(3);
   });
 
   it("总数不受每组最多展示 100 条限制", () => {
     for (let index = 0; index < 105; index++) {
       db.run(
-        "INSERT INTO knowledge_items (id, title, created_at, updated_at) VALUES (?, ?, 1, 1)",
+        "INSERT INTO knowledge_items (id, title, review_status, created_at, updated_at) VALUES (?, ?, 'needs_review', 1, 1)",
         `extra-${index}`,
-        "待归类",
+        "待复核",
       );
     }
     const result = listInboxItems(db);
     expect(
-      result.items.filter((item) => item.kind === "unclassified"),
+      result.items.filter((item) => item.kind === "review-required"),
     ).toHaveLength(100);
-    expect(result.total).toBe(109);
+    expect(result.total).toBe(108);
   });
 
   it("批量归知识库、打标签并标记已复核", () => {

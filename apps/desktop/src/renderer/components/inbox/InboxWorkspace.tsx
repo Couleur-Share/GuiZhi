@@ -86,7 +86,10 @@ export function InboxWorkspace() {
 
   const visible = useMemo(
     () =>
-      filter === "all" ? items : items.filter((item) => item.kind === filter),
+      // 「全部待处理」不含可选整理（未归合集），与角标口径一致
+      filter === "all"
+        ? items.filter((item) => item.kind !== "unclassified")
+        : items.filter((item) => item.kind === filter),
     [filter, items],
   );
   const selectableVisibleIds = useMemo(
