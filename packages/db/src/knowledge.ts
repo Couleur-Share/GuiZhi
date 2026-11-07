@@ -310,7 +310,7 @@ function buildFacetCountSql(
 }
 
 export class KnowledgeItemDB {
-  private readonly countCache = new Map<string, { total: number; expiresAt: number }>();
+  private readonly countCache = new Map<string, { total: number; stamp: string; expiresAt: number }>();
 
   constructor(private readonly db: Database.Database) {}
 
@@ -432,9 +432,11 @@ export class KnowledgeItemDB {
     const fingerprint = queryFingerprint(query);
     // 游标仍用原始指纹；短期计数缓存只保留定长摘要，避免常驻大排除列表。
     const countCacheKey = createHash("sha256").update(fingerprint).digest("hex");
+    // 变更戳须在 COUNT 之前读取：两者之间若有提交，下次查询会因戳不同而重算。
+    const stamp = this.dataChangeStamp();
     const cached = this.countCache.get(countCacheKey);
     let total: number;
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > Date.now() && cached.stamp === stamp) {
       total = cached.total;
     } else {
       const totalRow = this.db.get(
@@ -449,7 +451,7 @@ export class KnowledgeItemDB {
       if (this.countCache.size >= COUNT_CACHE_MAX_ENTRIES) {
         this.countCache.delete(this.countCache.keys().next().value!);
       }
-      this.countCache.set(countCacheKey, { total, expiresAt: now + COUNT_CACHE_TTL_MS });
+      this.countCache.set(countCacheKey, { total, stamp, expiresAt: now + COUNT_CACHE_TTL_MS });
     }
 
     // 平台筛选是「任一来源命中」，而列表列若仍一律拿最新来源，旧库中
@@ -644,7 +646,6 @@ export class KnowledgeItemDB {
   // ── 写入 ──────────────────────────────────────────────────────────────────
 
   create(input: CreateKnowledgeItemInput): KnowledgeItem {
-    this.invalidateListCountCache();
     const now = Date.now();
     const id = randomUUID();
     const tagNames = normalizeTagNames(input.tagNames);
@@ -680,7 +681,6 @@ export class KnowledgeItemDB {
   }
 
   update(id: string, input: UpdateKnowledgeItemInput): KnowledgeItem | null {
-    this.invalidateListCountCache();
     const existing = this.db.get(
       "SELECT * FROM knowledge_items WHERE id = ?",
       id,
@@ -769,7 +769,6 @@ export class KnowledgeItemDB {
    * 每次还要重写一遍 FTS 行；中途失败没有回滚也没有提示。
    */
   bulkUpdate(ids: string[], input: BulkUpdateKnowledgeItemsInput): number {
-    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -859,7 +858,6 @@ export class KnowledgeItemDB {
   }
 
   setStatus(ids: string[], status: KnowledgeItemStatus): number {
-    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -880,7 +878,6 @@ export class KnowledgeItemDB {
   }
 
   moveToTrash(ids: string[]): number {
-    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -901,7 +898,6 @@ export class KnowledgeItemDB {
   }
 
   restore(ids: string[]): number {
-    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -921,7 +917,6 @@ export class KnowledgeItemDB {
   }
 
   deleteForever(ids: string[]): number {
-    this.invalidateListCountCache();
     if (ids.length === 0) {
       return 0;
     }
@@ -948,7 +943,6 @@ export class KnowledgeItemDB {
   }
 
   emptyTrash(): number {
-    this.invalidateListCountCache();
     return this.deleteForever(this.listTrashedIds());
   }
 
@@ -1023,7 +1017,6 @@ export class KnowledgeItemDB {
    * 回收站范围内搜不到。全量重建对大库太贵，这里只补缺失的。
    */
   backfillMissingFtsRows(): number {
-    this.invalidateListCountCache();
     // 先把 rowid 映射补齐：映射表是后加的，老库里已有的索引行一条都没登记，
     // 不补的话写路径会一直走「按 item_id 全表扫」那条退路
     this.db.run(
@@ -1056,7 +1049,6 @@ export class KnowledgeItemDB {
 
   /** 重建整个 FTS 索引（数据修复 / 迁移后使用）。 */
   rebuildFtsIndex(): number {
-    this.invalidateListCountCache();
     const rows = this.db.all("SELECT * FROM knowledge_items") as ItemRow[];
     const tagsByItem = this.loadTagsFor(rows.map((row) => row.id));
     const run = this.db.transaction(() => {
@@ -1099,8 +1091,15 @@ export class KnowledgeItemDB {
     };
   }
 
-  private invalidateListCountCache(): void {
-    this.countCache.clear();
+  /**
+   * 数据变更戳：本连接累计改动行数（含 FTS 写入与外键级联）加其他连接的提交版本。
+   * 导入、批量命令等服务各自持有本类实例或直接写 SQL，计数缓存只认这个戳，不靠写入方逐个清缓存。
+   */
+  private dataChangeStamp(): string {
+    const row = this.db.get(
+      "SELECT total_changes() AS changes, data_version AS version FROM pragma_data_version",
+    ) as { changes: number; version: number };
+    return `${row.version}:${row.changes}`;
   }
 
   private loadTagsFor(itemIds: string[]): Map<string, Tag[]> {

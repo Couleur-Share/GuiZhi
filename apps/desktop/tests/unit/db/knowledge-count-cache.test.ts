@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import Database from '@guizhi/db/adapter';
 import { SCHEMA_TABLES, SCHEMA_INDEXES } from '@guizhi/db/schema';
@@ -52,4 +55,35 @@ it('查询其他条件时移除过期记录，并保持短时命中和写入失�
   expect(counts()).toBe(3);
   items.create({ title: '新增', content: '正文' });
   expect(items.list({ scope: 'all' }).total).toBe(1);
+});
+
+it('导入、批量等服务用其他实例或直接 SQL 写库后，计数不沿用短时缓存', () => {
+  const { db, items } = fixture();
+  const service = new KnowledgeItemDB(db);
+  expect(items.list({ scope: 'all' }).total).toBe(0);
+  const created = service.create({ title: '导入服务写入', content: '正文' });
+  expect(items.list({ scope: 'all' })).toMatchObject({ total: 1, entries: [{ id: created.id }] });
+  service.moveToTrash([created.id]);
+  expect(items.list({ scope: 'all' })).toMatchObject({ total: 0, entries: [] });
+  db.run("INSERT INTO knowledge_items (id,title,content,created_at,updated_at) VALUES ('direct','直接写入','',1,1)");
+  expect(items.list({ scope: 'all' }).total).toBe(1);
+});
+
+it('其他连接提交后计数同样重算', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'guizhi-count-cache-'));
+  const file = join(dir, 'knowledge.db');
+  const reader = new Database(file);
+  const writer = new Database(file);
+  try {
+    reader.exec(SCHEMA_TABLES);
+    reader.exec(SCHEMA_INDEXES);
+    const items = new KnowledgeItemDB(reader);
+    expect(items.list({ scope: 'all' }).total).toBe(0);
+    new KnowledgeItemDB(writer).create({ title: '另一连接写入', content: '正文' });
+    expect(items.list({ scope: 'all' })).toMatchObject({ total: 1, entries: [{ title: '另一连接写入' }] });
+  } finally {
+    writer.close();
+    reader.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
