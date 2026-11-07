@@ -17,6 +17,15 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { highlightReactChildren } from "./highlight-text";
 import { ImageLightbox, type LightboxImage } from "./ImageLightbox";
 
+/**
+ * 代码块语言名来自网页 class、导入的 Markdown 和 AI 回答，取值不受控，而高亮库只注册了常用语言：
+ * 常见别名接到已注册的语言，其余未注册的按纯代码显示，不能让整块内容渲染失败。
+ */
+const highlightOptions = {
+  ignoreMissing: true,
+  aliases: { python: ["python3", "py3"], xml: ["markup"], bash: ["zsh"], shell: ["shell-session"] },
+};
+
 function extractText(node: ReactNode): string {
   if (typeof node === "string" || typeof node === "number") {
     return String(node);
@@ -313,7 +322,7 @@ export function MarkdownBody({
         rehypePlugins={[
           rehypeRaw,
           [rehypeSanitize, sanitizeSchema],
-          rehypeHighlight,
+          [rehypeHighlight, highlightOptions],
         ]}
         urlTransform={transformUrl}
         components={components}
