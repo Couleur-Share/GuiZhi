@@ -1,7 +1,7 @@
 /**
  * 网页正文提取（纯函数，在 worker 线程中运行，不访问网络与文件）。
  * Readability 选正文；它明显截断或选错时回退到清洗后的语义正文区域。
- * 结果字段、错误分类与 20 万字符截断沿用原随包 Crawl4AI 提取器（extract.py）。
+ * 结果字段、错误分类与 20 万字符截断沿用此前随包提取器的约定，已入库的原文版本按同一契约比较。
  */
 import { createHash } from "node:crypto";
 import { Readability } from "@mozilla/readability";
@@ -229,7 +229,7 @@ function semanticRegion(document: Document): Element | null {
   return null;
 }
 
-/** 移植 article_cleanup.py 的 clean_article，并补清理常见的推荐、订阅、分享与评论容器。 */
+/** 清理语义区域里的模板容器：边栏、评论、推荐、订阅、分享，以及正文之外的导航与页眉页脚。 */
 function cleanRegion(region: Element): Element {
   // 可展开的数据表把单元格内容包在 <button> 里（如 MDN 兼容表）：拆成普通文字后再清理按钮。
   // 只在区域回退里做：交给 Readability 的文档若保留这些文字，单元格得分会让它把表格内部当成正文。
@@ -317,7 +317,7 @@ function readabilityContent(document: Document): Element | null {
   }
 }
 
-/** 按 Unicode 码点截断（与原提取器的 Python 字符串长度一致，也不会切断代理对）。 */
+/** 按 Unicode 码点截断（与此前提取器的字符计数一致，也不会切断代理对）。 */
 function truncate(markdown: string): { markdown: string; truncated: boolean } {
   if (markdown.length <= MARKDOWN_LIMIT) return { markdown, truncated: false };
   let count = 0;

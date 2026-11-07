@@ -28,7 +28,6 @@ import http from "node:http";
 import net from "node:net";
 import path from "node:path";
 import { createImporter } from "./lib/web-import.mjs";
-import { ensureWebRuntime } from "./lib/web-runtime.mjs";
 
 const HOST = "guard.probe.example";
 const ORIGIN = `http://${HOST}`;
@@ -195,7 +194,7 @@ const listen = (server, port, host) =>
     server.listen(port, host, () => resolve(null));
   });
 
-export default async function ({ win, app, outDir, mainEntry }) {
+export default async function ({ win, app, outDir }) {
   const out = path.join(outDir, "egress-probe");
   fs.mkdirSync(out, { recursive: true });
   const state = { go: false, polls: 0, reports: [], proxyLog: [], held: [], l1: [], l2: [], udp: 0, scenario: "A", vector: "", hits: new Map(), timers: new Set() };
@@ -312,7 +311,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
 
   const results = [];
   try {
-    ensureWebRuntime(mainEntry);
     await win.evaluate(
       (port) =>
         window.api.settings.set({
@@ -320,9 +318,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
         }),
       server.address().port,
     );
-    const runtime = await win.evaluate(() => window.api.webCapture.status());
-    if (!runtime?.ok || !runtime.data?.available)
-      throw new Error(`网页组件不可用：${runtime?.data?.reason ?? runtime?.error ?? "未知原因"}`);
     const importOnce = createImporter({ win, outDir: out, timeoutMs: 90_000 });
     // 本探测检验各类真实请求的出口行为（含 img 向量），并用 /hold.png 这张真实的慢图片撑住 load；
     // 默认的占位图本地应答下图片根本不出网，探测会失去意义，所以恢复真实加载。

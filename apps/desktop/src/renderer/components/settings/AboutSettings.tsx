@@ -13,7 +13,7 @@ import {
   ScanSearchIcon,
   SparklesIcon,
 } from "lucide-react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useUpdaterStore } from "../../stores/updater.store";
@@ -497,29 +497,6 @@ export function AboutSettings() {
 
         <div className="px-4 py-4 text-sm text-muted-foreground text-center">
           <div>AGPL-3.0 License &copy; 2026 GuiZhi</div>
-          <p className="mt-2 text-xs leading-5">
-            <Trans
-              i18nKey="settings.crawl4aiAttribution"
-              components={{
-                author: (
-                  <a
-                    href="https://x.com/unclecode"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline underline-offset-2 hover:text-foreground"
-                  />
-                ),
-                project: (
-                  <a
-                    href="https://github.com/unclecode/crawl4ai"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline underline-offset-2 hover:text-foreground"
-                  />
-                ),
-              }}
-            />
-          </p>
         </div>
       </div>
 

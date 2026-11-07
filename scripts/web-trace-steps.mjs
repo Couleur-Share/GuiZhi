@@ -21,14 +21,13 @@
  *   GUIZHI_TRACE_BASELINE    先前一次运行的 results.jsonl；逐页对照本次与它的 A 条件第 1 轮的正文哈希与字符数
  *
  * 产物（<out>/web-trace/）：trace-<条件>-r<轮>.jsonl（应用内追踪原文）、results.jsonl、summary.json；
- * 终端打印对照表。网页组件运行时是被忽略的构建产物，隔离副本里没有，脚本会为副本建立只读联接。
+ * 终端打印对照表。
  */
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { testProxySettings } from "./lib/test-proxy.mjs";
 import { createImporter } from "./lib/web-import.mjs";
-import { ensureWebRuntime } from "./lib/web-runtime.mjs";
 
 const REPO = path.resolve(import.meta.dirname, "..");
 /**
@@ -171,7 +170,7 @@ function profileTypes(records) {
   return totals;
 }
 
-export default async function ({ win, app, outDir, mainEntry }) {
+export default async function ({ win, app, outDir }) {
   const urls = loadCorpus();
   const reps = intEnv("GUIZHI_TRACE_REPS", 1);
   const timeoutMs = intEnv("GUIZHI_TRACE_TIMEOUT_S", 180) * 1000;
@@ -191,7 +190,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
   const resultsFile = path.join(out, "results.jsonl");
   fs.writeFileSync(resultsFile, "");
 
-  ensureWebRuntime(mainEntry);
   await win.evaluate(
     (networkProxy) => window.api.settings.set({ networkProxy }),
     proxyMode === "manual" ? testProxySettings() : { mode: proxyMode },
@@ -211,9 +209,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
       throw new Error(`系统代理模拟未生效，resolveProxy 返回：${resolved}`);
     console.log(`系统代理模拟：resolveProxy → ${resolved}`);
   }
-  const runtime = await win.evaluate(() => window.api.webCapture.status());
-  if (!runtime?.ok || !runtime.data?.available)
-    throw new Error(`网页组件不可用：${runtime?.data?.reason ?? runtime?.error ?? "未知原因"}`);
 
   // 在主进程设置本条件的开关与追踪文件；开关由采集路径在每次采集时读取，无需重启。
   const setEnv = (cond, traceFile) =>

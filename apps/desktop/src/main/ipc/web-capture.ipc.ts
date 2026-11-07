@@ -3,7 +3,7 @@ import { getRegisteredImportService } from "./import.ipc";
 import { sanitizeSnapshot } from "../services/web-capture/snapshot-sanitize";
 import { checkFlareSolverrConnection } from "../services/web-capture/flaresolverr";
 import { validateFlareSolverrSettings } from "@guizhi/shared/utils/flaresolverr";
-import { ipcMain, shell } from "electron";
+import { ipcMain } from "electron";
 import { IPC_CHANNELS as C } from "@guizhi/shared/constants/ipc-channels";
 import { KnowledgeItemDB, WebSourceDB, webContentHash } from "@guizhi/db";
 import type {
@@ -12,10 +12,7 @@ import type {
 } from "@guizhi/shared/types";
 import type Database from "../database/sqlite";
 import { CrawlService } from "../services/web-capture/crawl-service";
-import {
-  getWebCaptureStatus,
-  shutdownWebCapture,
-} from "../services/web-capture/web-capture";
+import { shutdownWebCapture } from "../services/web-capture/web-capture";
 let service: CrawlService | undefined;
 const id = (value: unknown): string => {
   if (typeof value !== "string" || !value || value.length > 100)
@@ -48,17 +45,7 @@ export function registerWebCaptureIPC(db: Database.Database): void {
     const inputs = [...new Set(ids.map(id))].map(itemId=>({kind:"url" as const,input:snapshotSource(db,itemId),refreshOfItemId:itemId,forceDuplicate:true}));
     return getRegisteredImportService().queue.enqueue(inputs);
   }));
-  ipcMain.handle(C.WEB_STATUS, () => response(getWebCaptureStatus));
   ipcMain.handle(C.WEB_SOLVER_CHECK, (_e, settings: unknown) => response(() => checkFlareSolverrConnection(validateFlareSolverrSettings(settings))));
-  ipcMain.handle(C.WEB_REPAIR, () =>
-    response(async () => {
-      // 修复入口只定位当前版本安装包；不执行 pip 或在线替换组件。
-      const { app } = await import("electron");
-      await shell.openExternal(
-        `https://github.com/Couleur-Share/GuiZhi/releases/tag/v${app.getVersion()}`,
-      );
-    }),
-  );
   ipcMain.handle(C.CRAWL_CREATE, (_e, input: CreateCrawlJobInput) =>
     response(() => {
       if (input?.purpose !== "documents")

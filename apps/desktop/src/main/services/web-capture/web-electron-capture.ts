@@ -36,9 +36,6 @@ export class ElectronWebCapture {
   private lifetime = new AbortController();
   private operations = new Set<Promise<unknown>>();
   private closing?: Promise<void>;
-  get running(): boolean {
-    return this.operations.size > 0 || this.extractor.running;
-  }
 
   async capture(
     request: WebCaptureRequest,

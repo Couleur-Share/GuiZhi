@@ -13,7 +13,7 @@ import type { fixture } from "./fixtures/web-runtime-main";
 declare global {
   var runtimeFixture: typeof fixture;
 }
-const enabled = process.env.GUIZHI_TEST_BUNDLED_CRAWLER === "1";
+const enabled = process.env.GUIZHI_TEST_WEB_CAPTURE === "1";
 let directory: string;
 let application: ElectronApplication | undefined;
 const capture = (request: WebCaptureRequest, cancelAfter?: number) =>
@@ -38,7 +38,7 @@ afterAll(async () => {
   }
   if (directory) await fs.rm(directory, { recursive: true, force: true });
 });
-describe.skipIf(!enabled)("真实 Electron 与随包 Python 的离线受控流程", () => {
+describe.skipIf(!enabled)("真实 Electron 与正文提取线程的离线受控流程", () => {
   it("动态中文、表格、代码、短文与访问失败；所有请求经过主进程", async () => {
     directory = await fs.mkdtemp(
       path.join(os.tmpdir(), "guizhi-web-runtime-test-"),
@@ -87,6 +87,39 @@ describe.skipIf(!enabled)("真实 Electron 与随包 Python 的离线受控流�
         },
       },
     });
+    // 与正式构建一致：提取线程是独立单文件，主进程从相邻目录读出后启动。解析规则沿用
+    // vite-plugin-electron 的 Node 默认值，否则 turndown 会被换成依赖 DOM 全局的浏览器版。
+    await build({
+      configFile: false,
+      logLevel: "warn",
+      resolve: {
+        conditions: ["node"],
+        mainFields: ["module", "jsnext:main", "jsnext"],
+        alias: {
+          canvas: path.resolve("node_modules/linkedom/commonjs/canvas-shim.cjs"),
+        },
+      },
+      define: { "process.env": "process.env" },
+      build: {
+        target: "node22",
+        outDir: path.join(directory, "web-extract-worker"),
+        minify: false,
+        commonjsOptions: { transformMixedEsModules: true },
+        lib: {
+          entry: path.resolve(
+            "src/main/services/web-capture/web-extract-worker.ts",
+          ),
+          formats: ["cjs"],
+          fileName: () => "web-extract-worker.js",
+        },
+        rollupOptions: {
+          external: [
+            ...builtinModules,
+            ...builtinModules.map((name) => "node:" + name),
+          ],
+        },
+      },
+    });
     const env = Object.fromEntries(
       Object.entries(process.env).filter(
         ([key, value]) =>
@@ -117,7 +150,7 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
       url: "https://fixture.example/docs/start",
     });
     expect(result.complete).toBe(true);
-    expect(result.engineVersion).toBe("crawl4ai/0.9.3-electron");
+    expect(result.engineVersion).toBe("readability/1-electron");
     expect(result.markdown).toContain("动态正文支持中文知识管理");
     expect(result.markdown).toContain("Crawl4AI");
     expect(result.markdown).toContain("| 引擎");
@@ -130,7 +163,7 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
       url: "https://fixture.example/short",
     });
     expect(short.complete).toBe(true);
-    expect(short.engineVersion).toBe("crawl4ai/0.9.3-static");
+    expect(short.engineVersion).toBe("readability/1-static");
     expect(short.markdown).toContain("小更新");
     // 正文内的 HTML 注释曾使清理阶段抛 TypeError，整页提取失败。
     const commented = await capture({
@@ -184,7 +217,7 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
       ),
     ).rejects.toThrow(/取消/);
     expect(await calls()).toContain("https://fixture.example/docs/start");
-    // 关闭本夹具的提取进程，确认下一页能够重新初始化。
+    // 关闭本夹具的提取线程，确认下一页能够重新初始化。
     await closeCapture();
     expect(await running()).toBe(false);
     const restarted = await capture({

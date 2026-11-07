@@ -55,7 +55,6 @@ export interface ExtractedContent {
 /** 连接器运行环境（由 import-service 注入，避免连接器直接依赖 DB） */
 export interface ImportConnectorContext {
   captureWebpage?: (url: string, signal?: AbortSignal) => Promise<ExtractedContent | null>;
-  webFallbackReason?: () => string | undefined;
   captureStrategy?: ImportCaptureStrategy;
   fetchNodeseek?: (topicId: string, signal?: AbortSignal) => Promise<import("./forum-types").ForumThread>;
   fetchAuthenticatedDouyin?: (
@@ -304,9 +303,7 @@ export async function extractContent(
         const captured = await context.captureWebpage(url, signal);
         if (captured) return captured;
       }
-      const fallback = await extractWebpage(url, signal);
-      const reason = context?.webFallbackReason?.();
-      return reason ? { ...fallback, warningReason: [fallback.warningReason, reason].filter(Boolean).join("；") } : fallback;
+      return extractWebpage(url, signal);
     }
     default:
       throw new Error(`未知的导入类型: ${kind satisfies never}`);

@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
 import type { WebSeed } from "@guizhi/shared/types";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
@@ -12,34 +11,11 @@ export function WebResearchSeeds({
   onChange: (value: WebSeed[]) => void;
 }) {
   const { t } = useTranslation();
-  const [reason, setReason] = useState("");
-  useEffect(() => {
-    void window.api.webCapture
-      .status()
-      .then((r) =>
-        setReason(
-          r.ok
-            ? r.data?.available
-              ? ""
-              : (r.data?.reason ??
-                t("webCapture.componentUnavailable", "组件不可用"))
-            : (r.error ?? t("webCapture.componentError", "读取组件失败")),
-        ),
-      )
-      .catch(() =>
-        setReason(t("webCapture.webComponentError", "读取网页组件状态失败")),
-      );
-  }, [t]);
   return (
     <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
       <p className="text-sm font-medium">
         {t("webCapture.entries", "指定网页入口（最多 10 个）")}
       </p>
-      {reason && (
-        <p role="status" className="text-sm text-destructive">
-          {reason}
-        </p>
-      )}
       {value.map((seed, index) => {
         let scope = "";
         try {

@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import samples from "../../../../config/crawl4ai/public-samples.json";
+import samples from "../../../../config/web-capture/public-samples.json";
 import {
   captureWebPage,
   shutdownWebCapture,
@@ -21,6 +21,13 @@ vi.mock("electron", () => ({
     },
   },
 }));
+vi.mock(
+  "../../src/main/services/web-capture/web-node-extractor",
+  async (importOriginal) =>
+    (await import("./fixtures/source-web-extractor")).sourceExtractorModule(
+      await importOriginal(),
+    ),
+);
 const enabled = process.env.GUIZHI_TEST_LIVE_CRAWLER === "1";
 let directory: string;
 afterAll(async () => {
@@ -41,7 +48,7 @@ describe.skipIf(!enabled)("公开网址对照（显式开启，不调用模型�
         bypass: "",
       });
     }
-    const output = path.resolve("../../artifacts/crawl4ai/public-results.json");
+    const output = path.resolve("../../artifacts/web-capture/public-results.json");
     const rows: any[] =
       process.env.GUIZHI_TEST_RESUME === "1"
         ? JSON.parse(await fs.readFile(output, "utf8"))
@@ -102,13 +109,8 @@ describe.skipIf(!enabled)("公开网址对照（显式开启，不调用模型�
             expectedMatched: false,
           });
         }
-        await fs.mkdir(path.resolve("../../artifacts/crawl4ai"), {
-          recursive: true,
-        });
-        await fs.writeFile(
-          path.resolve("../../artifacts/crawl4ai/public-results.json"),
-          JSON.stringify(rows, null, 2),
-        );
+        await fs.mkdir(path.dirname(output), { recursive: true });
+        await fs.writeFile(output, JSON.stringify(rows, null, 2));
       }
     };
     await Promise.all([consume(), consume()]);

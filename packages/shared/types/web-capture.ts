@@ -1,8 +1,6 @@
 /** 网页采集的受限协议；不暴露上游脚本、文件路径或配置对象。 */
 export type WebCapturePurpose = "import" | "documents" | "research";
 export type WebCaptureErrorCode =
-  | "unavailable"
-  | "damaged"
   | "security"
   | "network"
   | "restricted"
@@ -66,15 +64,6 @@ export interface WebCaptureResult {
   truncated: boolean;
   warnings: string[];
   error?: WebCaptureError;
-}
-export interface WebRuntimeStatus {
-  supported: boolean;
-  available: boolean;
-  running: boolean;
-  version: string;
-  reason?: string;
-  repairRequired?: boolean;
-  runtimeTarget: string;
 }
 export type CrawlJobStatus =
   "pending" | "running" | "paused" | "interrupted" | "completed" | "canceled";

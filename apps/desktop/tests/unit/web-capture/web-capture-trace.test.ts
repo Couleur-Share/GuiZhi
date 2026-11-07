@@ -12,13 +12,9 @@ vi.mock("../../../src/main/services/web-capture/wechat", () => ({
   isWechatUrl: () => false,
   captureWechat: vi.fn(),
 }));
-vi.mock("../../../src/main/services/web-capture/web-runtime", () => ({
-  webRuntimeStatus: async () => ({ available: true }),
-}));
 vi.mock("../../../src/main/services/web-capture/web-electron-capture", () => ({
   ElectronWebCapture: class {
     capture = mocks.capture;
-    running = false;
     close = async () => undefined;
   },
 }));
@@ -42,7 +38,7 @@ const okResult = (error?: { code: string }) => ({
   paragraphs: [],
   contentHash: "hash",
   capturedAt: 1,
-  engineVersion: "crawl4ai/0.9.3-static",
+  engineVersion: "readability/1-static",
   complete: !error,
   truncated: false,
   warnings: [],

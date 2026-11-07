@@ -5,15 +5,20 @@ import path from "node:path";
 import Database from "@guizhi/db/adapter";
 import { SCHEMA_TABLES, SCHEMA_INDEXES } from "@guizhi/db/schema";
 import { CrawlService } from "../../src/main/services/web-capture/crawl-service";
-import {
-  getWebCaptureStatus,
-  shutdownWebCapture,
-} from "../../src/main/services/web-capture/web-capture";
+import { shutdownWebCapture } from "../../src/main/services/web-capture/web-capture";
+import { webNodeExtractor } from "../../src/main/services/web-capture/web-node-extractor";
 import { configureRuntimePaths } from "../../src/main/runtime-paths";
 
 vi.mock("electron", () => ({
   app: { isPackaged: false, getAppPath: () => process.cwd() },
 }));
+vi.mock(
+  "../../src/main/services/web-capture/web-node-extractor",
+  async (importOriginal) =>
+    (await import("./fixtures/source-web-extractor")).sourceExtractorModule(
+      await importOriginal(),
+    ),
+);
 vi.mock("../../src/main/services/web-capture/web-network", () => ({
   webTextRequest: async () => ({
     status: 404,
@@ -31,7 +36,7 @@ vi.mock("../../src/main/services/web-capture/web-network", () => ({
   },
 }));
 describe.skipIf(process.env.GUIZHI_TEST_50_PAGE_BATCH !== "1")(
-  "随包运行时的 50 页完整批次",
+  "正文提取线程的 50 页完整批次",
   () => {
     it("持久化一页一条、预算停止、等待空闲退出，重复导入幂等", async () => {
       const directory = await fs.mkdtemp(
@@ -71,25 +76,19 @@ describe.skipIf(process.env.GUIZHI_TEST_50_PAGE_BATCH !== "1")(
         expect(db.pragma("foreign_key_check")).toEqual([]);
         const completedMs = Date.now() - start;
         await vi.waitFor(
-          async () => expect((await getWebCaptureStatus()).running).toBe(false),
+          () => expect(webNodeExtractor().running).toBe(false),
           { timeout: 70_000, interval: 1000 },
         );
-        const cache = path.join(directory, "cache/web-capture");
-        await vi.waitFor(
-          async () => expect(await fs.readdir(cache)).toEqual([]),
-          { timeout: 10_000, interval: 500 },
-        );
-        await fs.mkdir(path.resolve("../../artifacts/crawl4ai"), {
+        await fs.mkdir(path.resolve("../../artifacts/web-capture"), {
           recursive: true,
         });
         await fs.writeFile(
-          path.resolve("../../artifacts/crawl4ai/batch-metrics.json"),
+          path.resolve("../../artifacts/web-capture/batch-metrics.json"),
           JSON.stringify(
             {
               pages: 50,
               completedMs,
               idleExitMs: Date.now() - start - completedMs,
-              remainingCacheDirectories: 0,
               platform: process.platform,
               arch: process.arch,
             },

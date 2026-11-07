@@ -7,7 +7,6 @@ import type {
 import { canonicalWebUrl } from "@guizhi/shared/utils/web-scope";
 import { ElectronWebCapture } from "./web-electron-capture";
 import { WEB_EXTRACT_ENGINE } from "./web-node-extractor";
-import { webRuntimeStatus } from "./web-runtime";
 import { webCaptureError } from "./web-error";
 import { createWebTrace } from "./web-trace";
 import { logAppError } from "../../diagnostic-log";
@@ -19,7 +18,6 @@ let shutdown: Promise<void> | undefined;
 const origins = new Set<string>();
 const waiting = new Set<() => void>();
 let active = 0;
-export const getWebCaptureStatus = () => webRuntimeStatus(worker.running);
 export function shutdownWebCapture(): Promise<void> {
   if (shutdown !== undefined) return shutdown;
   captureLifetime.abort();
@@ -37,8 +35,6 @@ export async function captureWebPage(
 ): Promise<WebCaptureResult> {
   if (isWechatUrl(request.url)) return captureWechat(request.url,request.taskId,signal);
   const lifetime = captureLifetime.signal;
-  const status = await getWebCaptureStatus();
-  if (!status.available) throw new Error(status.reason ?? "网页组件不可用");
   const url = canonicalWebUrl(request.url),
     origin = new URL(url).origin;
   // 诊断追踪默认关闭（见 web-trace.ts）；开启后记录从排队到收尾的各阶段耗时。

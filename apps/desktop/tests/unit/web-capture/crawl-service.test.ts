@@ -3,14 +3,10 @@ import Database from "@guizhi/db/adapter";
 import { SCHEMA_TABLES, SCHEMA_INDEXES } from "@guizhi/db/schema";
 import { KnowledgeItemDB, webContentHash } from "@guizhi/db";
 import { CrawlService } from "../../../src/main/services/web-capture/crawl-service";
-import {
-  captureWebPage,
-  getWebCaptureStatus,
-} from "../../../src/main/services/web-capture/web-capture";
+import { captureWebPage } from "../../../src/main/services/web-capture/web-capture";
 import { loadRobots } from "../../../src/main/services/web-capture/robots";
 vi.mock("../../../src/main/services/web-capture/web-capture", () => ({
   captureWebPage: vi.fn(),
-  getWebCaptureStatus: vi.fn(),
 }));
 vi.mock("../../../src/main/services/web-capture/robots", async (original) => ({
   ...(await original<
@@ -29,13 +25,6 @@ function fixture() {
   db.pragma("foreign_keys=ON");
   db.exec(SCHEMA_TABLES);
   db.exec(SCHEMA_INDEXES);
-  vi.mocked(getWebCaptureStatus).mockResolvedValue({
-    available: true,
-    supported: true,
-    running: false,
-    version: "0.9.3",
-    runtimeTarget: "test",
-  });
   vi.mocked(loadRobots).mockResolvedValue({ rules: [], sitemaps: [] });
   vi.mocked(captureWebPage).mockImplementation(async (request) => ({
     taskId: request.taskId,

@@ -167,7 +167,7 @@ export function htmlToMarkdown(html: string): string {
     return false;
   };
   const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced", bulletListMarker: "-" });
-  // 内联 SVG 不移除：图表里的文字标签可能是正文（旧路径与 Crawl4AI 都保留）。
+  // 内联 SVG 不移除：图表里的文字标签可能是正文。
   turndown.remove(["script", "style", "noscript", "iframe", "template", "canvas", "button", "select", "textarea", "input"]);
   turndown.addRule("preformatted", {
     filter: "pre",

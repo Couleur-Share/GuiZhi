@@ -19,7 +19,6 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { createImporter } from "./lib/web-import.mjs";
-import { ensureWebRuntime } from "./lib/web-runtime.mjs";
 
 const ORIGIN = "http://settle.fixture.example";
 const CONDITIONS = {
@@ -284,7 +283,7 @@ const median = (values) => {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
 
-export default async function ({ win, app, outDir, mainEntry }) {
+export default async function ({ win, app, outDir }) {
   const reps = Math.max(1, Number.parseInt(process.env.GUIZHI_FIXTURE_REPS ?? "", 10) || 2);
   // 只跑指定夹具（逗号分隔的 id），用于改动后的快速复验；服务端仍提供全部夹具页面。
   const only = (process.env.GUIZHI_FIXTURE_ONLY ?? "").split(",").map((item) => item.trim()).filter(Boolean);
@@ -328,7 +327,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 
   try {
-    ensureWebRuntime(mainEntry);
     await win.evaluate(
       (port) =>
         window.api.settings.set({
@@ -344,9 +342,6 @@ export default async function ({ win, app, outDir, mainEntry }) {
         }),
       server.address().port,
     );
-    const runtime = await win.evaluate(() => window.api.webCapture.status());
-    if (!runtime?.ok || !runtime.data?.available)
-      throw new Error(`网页组件不可用：${runtime?.data?.reason ?? runtime?.error ?? "未知原因"}`);
 
     const importOnce = createImporter({ win, outDir: out, timeoutMs: 120_000, saveContent: false });
     const setEnv = (cond, traceFile) =>

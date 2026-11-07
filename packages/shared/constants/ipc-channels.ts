@@ -307,9 +307,7 @@ export const IPC_CHANNELS = {
   IMAGE_SAVE: "image:save",
   IMAGE_READ_BASE64: "image:readBase64",
 
-  WEB_STATUS: "web:status",
   WEB_SOLVER_CHECK: "web:solverCheck",
-  WEB_REPAIR: "web:repair",
   CRAWL_CREATE: "crawl:create",
   CRAWL_LIST: "crawl:list",
   CRAWL_GET: "crawl:get",

@@ -22,7 +22,7 @@ import {
 } from "@guizhi/shared/utils/web-scope";
 import { normalizeUrl } from "../import/url-normalize";
 import { resolveSourcePlatform } from "@guizhi/shared/utils/source-platforms";
-import { captureWebPage, getWebCaptureStatus } from "./web-capture";
+import { captureWebPage } from "./web-capture";
 import { loadRobots, robotsAllows, type RobotsPolicy } from "./robots";
 import { webTextRequest } from "./web-network";
 
@@ -43,8 +43,6 @@ export class CrawlService {
       !this.db.get("SELECT id FROM collections WHERE id=?", input.collectionId)
     )
       throw new Error("目标集合不存在，请重新选择");
-    const status = await getWebCaptureStatus();
-    if (!status.available) throw new Error(status.reason);
     const job = this.jobs.create(input);
     void this.resume(job.id);
     return job.id;
@@ -81,8 +79,6 @@ export class CrawlService {
     );
     const policies = new Map<string, RobotsPolicy>();
     try {
-      const status = await getWebCaptureStatus();
-      if (!status.available) throw new Error(status.reason);
       for (let index = 0; index < job.input.seeds.length; index++) {
         const seed = job.input.seeds[index],
           origin = new URL(seed.url).origin;

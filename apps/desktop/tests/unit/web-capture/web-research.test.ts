@@ -8,7 +8,6 @@ import {
 } from "../../../src/main/services/web-capture/web-research";
 import { captureWebPage } from "../../../src/main/services/web-capture/web-capture";
 vi.mock("../../../src/main/services/web-capture/web-capture", () => ({
-  getWebCaptureStatus: async () => ({ available: true }),
   captureWebPage: vi.fn(),
 }));
 vi.mock("../../../src/main/services/web-capture/robots", () => ({

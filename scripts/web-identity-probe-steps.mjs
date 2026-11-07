@@ -19,7 +19,6 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { createImporter } from "./lib/web-import.mjs";
-import { ensureWebRuntime } from "./lib/web-runtime.mjs";
 
 const HOST = "identity.probe.example";
 const ORIGIN = `http://${HOST}`;
@@ -37,7 +36,7 @@ const listen = (server) =>
     server.listen(0, "127.0.0.1", () => resolve(null));
   });
 
-export default async function ({ win, outDir, mainEntry }) {
+export default async function ({ win, outDir }) {
   const out = path.join(outDir, "identity-probe");
   fs.mkdirSync(out, { recursive: true });
   const none = process.env.GUIZHI_WEB_IDENTITY === "none";
@@ -74,7 +73,6 @@ export default async function ({ win, outDir, mainEntry }) {
 
   const results = [];
   try {
-    ensureWebRuntime(mainEntry);
     await win.evaluate(
       (port) =>
         window.api.settings.set({
@@ -82,9 +80,6 @@ export default async function ({ win, outDir, mainEntry }) {
         }),
       server.address().port,
     );
-    const runtime = await win.evaluate(() => window.api.webCapture.status());
-    if (!runtime?.ok || !runtime.data?.available)
-      throw new Error(`网页组件不可用：${runtime?.data?.reason ?? runtime?.error ?? "未知原因"}`);
     const importOnce = createImporter({ win, outDir: out, timeoutMs: 90_000 });
 
     let nonce = 0;

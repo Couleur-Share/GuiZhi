@@ -78,7 +78,7 @@ describe("buildImportTaskReport", () => {
       stageStats: [{ stage: "fetching", ms: 36 }, { stage: "web-preparing", ms: 0 }] });
     const report = buildImportTaskReport(task, { ...context, now: task.updatedAt + 381_000 });
     expect(report).toContain("## 阶段耗时（共 6:21）");
-    expect(report).toContain("| 准备网页组件 | 6:21 | 100% |  |");
+    expect(report).toContain("| 准备网页采集 | 6:21 | 100% |  |");
     expect(task.stageStats![1].ms).toBe(0);
     expect(buildImportTaskReport(task, { ...context, now: task.updatedAt + 382_000 })).toContain("共 6:22");
   });

@@ -1,25 +1,23 @@
 import type { WebCaptureError } from "@guizhi/shared/types";
 export function webCaptureError(error: unknown): WebCaptureError {
   const text = error instanceof Error ? error.message : String(error);
-  let code: WebCaptureError["code"] = /校验|清单|组件文件/.test(text)
-    ? "damaged"
-    : /timeout|超时/i.test(text)
-      ? "timeout"
-      : /取消|abort/i.test(text)
-        ? "canceled"
-        : /内网|本地网络|private|internal network|local network|超出.*范围|不支持.*协议|目录.*越界/i.test(
-              text,
-            )
-          ? "security"
-          : /验证码|人机验证/.test(text)
-            ? "captcha"
-            : /登录/.test(text)
-              ? "login"
-              : /HTTP (403|429)|拒绝访问|限流/.test(text)
-                ? "restricted"
-                : /超过.*(MiB|限制)|超限|预算已用尽/.test(text)
-                  ? "incomplete"
-                  : "network";
+  let code: WebCaptureError["code"] = /timeout|超时/i.test(text)
+    ? "timeout"
+    : /取消|abort/i.test(text)
+      ? "canceled"
+      : /内网|本地网络|private|internal network|local network|超出.*范围|不支持.*协议|目录.*越界/i.test(
+            text,
+          )
+        ? "security"
+        : /验证码|人机验证/.test(text)
+          ? "captcha"
+          : /登录/.test(text)
+            ? "login"
+            : /HTTP (403|429)|拒绝访问|限流/.test(text)
+              ? "restricted"
+              : /超过.*(MiB|限制)|超限|预算已用尽/.test(text)
+                ? "incomplete"
+                : "network";
   const explicit =
     error instanceof Error
       ? (error.cause as { webCaptureCode?: string })?.webCaptureCode
@@ -27,7 +25,6 @@ export function webCaptureError(error: unknown): WebCaptureError {
   if (
     explicit &&
     [
-      "damaged",
       "canceled",
       "timeout",
       "security",

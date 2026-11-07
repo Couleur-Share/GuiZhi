@@ -1,10 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useState } from "react";
-import type {
-  CrawlJob,
-  CrawlPage,
-  WebRuntimeStatus,
-} from "@guizhi/shared/types";
+import type { CrawlJob, CrawlPage } from "@guizhi/shared/types";
 import { webScope } from "@guizhi/shared/utils/web-scope";
 import { Select } from "../ui/Select";
 import { Input } from "../ui/Input";
@@ -38,7 +34,6 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
     [jobs, setJobs] = useState<CrawlJob[]>([]),
     [details, setDetails] = useState<CrawlPage[]>([]);
   const [selected, setSelected] = useState(""),
-    [status, setStatus] = useState<WebRuntimeStatus | null>(null),
     [loadError, setLoadError] = useState<string | null>(null),
     [busy, setBusy] = useState(false);
   const collections = useCollectionStore((s) => s.collections);
@@ -47,12 +42,8 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
   }, []);
   const load = useCallback(async () => {
     try {
-      const [runtime, list] = await Promise.all([
-        window.api.webCapture.status(),
-        window.api.webCapture.list(),
-      ]);
-      if (!runtime.ok || !list.ok) throw new Error(runtime.error || list.error);
-      setStatus(runtime.data!);
+      const list = await window.api.webCapture.list();
+      if (!list.ok) throw new Error(list.error);
       setJobs(list.data!);
       if (selected) {
         const detail = await window.api.webCapture.get(selected);
@@ -113,14 +104,6 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
       </div>
       {loadError && (
         <LoadErrorState message={loadError} onRetry={() => void load()} />
-      )}
-      {status && !status.available && (
-        <p
-          role="status"
-          className="rounded-lg border border-border p-3 text-sm"
-        >
-          {status.reason}
-        </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
@@ -193,7 +176,7 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
         {t("webCapture.scopeHint", "（同源，按目录边界匹配）")}
       </p>
       <button
-        disabled={busy || !status?.available || !scope}
+        disabled={busy || !scope}
         className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50"
         onClick={() =>
           void mutate(() =>

@@ -9,7 +9,7 @@ import { MobileCaptureDB } from "@guizhi/db/mobile-capture";
  * 导入服务组装：把队列、DAO、连接器与广播接到一起。
  */
 import { KnowledgeItemDB, ImportTaskDB, SourceCommentDB, SourceAccessDB, WebSourceDB } from "@guizhi/db";
-import { captureWebPage, getWebCaptureStatus } from "../web-capture/web-capture";
+import { captureWebPage } from "../web-capture/web-capture";
 import type Database from "../../database/sqlite";
 import {
   DEFAULT_NETWORK_PROXY_SETTINGS,
@@ -216,16 +216,12 @@ export function createImportService(
     resolveSource: resolveSourceIdentity,
     extract: (task, signal, onStage) => {
       const interactiveVerification = webVerificationTasks.delete(task.id);
-      let fallbackReason: string | undefined;
       if (task.captureStrategy === "authenticated") {
         onStage("browser-capture");
       }
       return extractContent(task.sourceKind, task.sourceInput, signal, {
-        webFallbackReason: () => fallbackReason,
         captureWebpage: async (url, requestSignal) => {
           onStage("web-preparing");
-          const status = await getWebCaptureStatus();
-          if (!status.available) { fallbackReason = `使用兼容网页采集：${status.reason}`; return null; }
           if (interactiveVerification) onStage("web-verifying");
           const result = await captureWebPage({taskId:task.id,purpose:"import",url,interactiveVerification},requestSignal,onStage);
           return {title:result.title,content:result.markdown,itemType:"webpage",sourceUri:result.finalUrl,
