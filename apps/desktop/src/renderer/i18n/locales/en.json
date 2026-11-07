@@ -1955,6 +1955,7 @@
     "stageBrowserCapture": "Authenticated capture",
     "stageComments": "Collecting popular comments",
     "removeTask": "Remove from list",
+    "removedFromList": "Removed from list ({{count}})",
     "webSolverRetry": "Verify and capture automatically",
     "webSolverRequired": "This website requires Cloudflare verification. Use “Verify and capture automatically” to retrieve the content through your configured FlareSolverr service.",
     "summaryPaused": "Queue paused · {{pending}} waiting",

@@ -5,6 +5,7 @@ import type { ImportTask } from "@guizhi/shared/types";
 import { installWindowMocks } from "../../helpers/window";
 import { changeLanguage, i18nReady } from "../../../src/renderer/i18n";
 import { ImportTaskRow } from "../../../src/renderer/components/imports/ImportTaskRow";
+import { ToastProvider } from "../../../src/renderer/components/ui/Toast";
 import { STALL_THRESHOLD_MS } from "../../../src/renderer/components/imports/import-task-meta";
 
 const NOW = 1_800_000_000_000;
@@ -35,15 +36,17 @@ function makeTask(patch: Partial<ImportTask> = {}): ImportTask {
 
 function renderRow(task: ImportTask, onOpenItem = vi.fn(), onOpenDetail = vi.fn()) {
   render(
-    <ImportTaskRow
-      task={task}
-      now={NOW}
-      isChecked={false}
-      hasSelection={false}
-      onToggle={vi.fn()}
-      onOpenItem={onOpenItem}
-      onOpenDetail={onOpenDetail}
-    />,
+    <ToastProvider>
+      <ImportTaskRow
+        task={task}
+        now={NOW}
+        isChecked={false}
+        hasSelection={false}
+        onToggle={vi.fn()}
+        onOpenItem={onOpenItem}
+        onOpenDetail={onOpenDetail}
+      />
+    </ToastProvider>,
   );
   return onOpenItem;
 }
@@ -191,6 +194,7 @@ describe("导入任务行", () => {
 
   it("作品删除与已认证任务不显示登录态重试", () => {
     const { unmount } = render(
+      <ToastProvider>
       <ImportTaskRow
         task={makeTask({
           sourceInput: "https://www.douyin.com/video/123",
@@ -204,7 +208,8 @@ describe("导入任务行", () => {
         onToggle={vi.fn()}
         onOpenItem={vi.fn()}
         onOpenDetail={vi.fn()}
-      />,
+      />
+      </ToastProvider>,
     );
     expect(screen.queryByLabelText("使用登录态重试")).not.toBeInTheDocument();
     unmount();

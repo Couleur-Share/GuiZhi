@@ -18,6 +18,40 @@ import { describeLoadError } from "./load-error";
 import { useTagStore } from "./tag.store";
 
 /**
+ * 撤销窗口内已从界面隐藏、尚未提交给主进程的移除。
+ * 刷新、翻页和主进程推送都必须绕开它，否则被删的行会在撤销窗口内闪回来。
+ */
+const pendingRemovals = new Map<string, ImportTask>();
+/** 与撤销提示条的停留时长一致 */
+const REMOVAL_UNDO_WINDOW_MS = 8000;
+/** 尚未提交的移除；退出页面前统一提交，避免关窗口把「已删除」的行又带回来 */
+const activeRemovals = new Set<() => Promise<void>>();
+
+export interface ScheduledRemoval {
+  count: number;
+  /** 窗口内撤销：任务原样回到列表 */
+  undo: () => void;
+  /** 立即提交（窗口结束时自动调用） */
+  commit: () => Promise<void>;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", () => {
+    for (const commit of [...activeRemovals]) void commit();
+  });
+}
+
+/** 从各档计数里扣掉一批任务（仅用于撤销窗口内的乐观更新） */
+function subtractCounts(counts: ImportCounts, removed: ImportTask[]): ImportCounts {
+  const hidden = countByFilter(removed);
+  const next = { ...counts };
+  for (const key of Object.keys(next) as ImportFilter[]) {
+    next[key] = Math.max(0, next[key] - hidden[key]);
+  }
+  return next;
+}
+
+/**
  * 批量操作逐条独立执行。
  *
  * 此前是一个裸 for 循环：选中 20 条点「重试失败」，第 3 条抛异常，
@@ -37,7 +71,9 @@ async function runTaskBatch(
       await run(id);
     } catch (error) {
       const name =
-        get().tasks.find((task) => task.id === id)?.displayName ?? id;
+        get().tasks.find((task) => task.id === id)?.displayName ??
+        pendingRemovals.get(id)?.displayName ??
+        id;
       failures.push(
         `${name}：${error instanceof Error ? error.message : String(error)}`,
       );
@@ -114,12 +150,16 @@ interface ImportState {
       commentLimit?: 0 | 10 | 20 | 50;
     },
   ) => Promise<boolean>;
-  /** 删除单条已结束的任务（失败任务不进「清理已完成」，需要单独的出口） */
-  removeTask: (id: string) => Promise<void>;
+  /**
+   * 从列表删除已结束的任务（失败任务不进「清理已完成」，需要单独的出口）。
+   *
+   * 先在界面隐藏，窗口结束才真正提交，窗口内可撤销。任务记录只是队列的流水，
+   * 不含已入库的条目，值得撤销但不值得为它加软删除字段。
+   */
+  scheduleRemoveTasks: (ids: string[], delayMs?: number) => ScheduledRemoval | null;
   /** 批量：逐条走 IPC，结束后只刷新一次列表 */
   cancelTasks: (ids: string[]) => Promise<void>;
   retryTasks: (ids: string[]) => Promise<void>;
-  removeTasks: (ids: string[]) => Promise<void>;
   clearFinished: () => Promise<void>;
   previewClearTerminal: (query: ImportTaskClearQuery) => Promise<number>;
   clearTerminal: (query: ImportTaskClearQuery) => Promise<number>;
@@ -163,7 +203,7 @@ function countsFromResult(
   loaded: ImportTask[],
   degradedCount?: number,
 ): ImportCounts {
-  return {
+  const raw: ImportCounts = {
     all: Object.values(counts).reduce((sum, value) => sum + value, 0),
     active: counts.pending + counts.processing,
     completed: counts.completed,
@@ -172,6 +212,32 @@ function countsFromResult(
     failed: counts.failed,
     canceled: counts.canceled,
   };
+  if (pendingRemovals.size === 0) return raw;
+  // 服务端计数仍含撤销窗口内隐藏的任务；loaded 已经排除了它们，所以仅当
+  // 降级数取自服务端时才需要扣除。
+  const hidden = countByFilter([...pendingRemovals.values()]);
+  const next = { ...raw };
+  for (const key of Object.keys(next) as ImportFilter[]) {
+    if (key === "degraded" && degradedCount === undefined) continue;
+    next[key] = Math.max(0, next[key] - hidden[key]);
+  }
+  return next;
+}
+
+function hidePendingRemovals(tasks: ImportTask[]): ImportTask[] {
+  return pendingRemovals.size === 0
+    ? tasks
+    : tasks.filter((task) => !pendingRemovals.has(task.id));
+}
+
+/** 撤销窗口内被隐藏、且属于当前筛选范围的任务数（用于修正列表总数） */
+function hiddenInView(state: ImportState): number {
+  return filterTasks(
+    [...pendingRemovals.values()],
+    state.filter,
+    state.query,
+    state.origin,
+  ).length;
 }
 
 /** 侧栏筛选组的各档计数 */
@@ -342,7 +408,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
             ) as Record<ImportTask["status"], number>,
           }
         : response;
-      const tasks = mergeActiveFirst(result.active, result.entries);
+      const tasks = hidePendingRemovals(mergeActiveFirst(result.active, result.entries));
       // 老的测试桩和升级中的 preload 可能还没有这个方法；列表仍要能读出来。
       const queueState = window.api.import.getQueueState
         ? await window.api.import.getQueueState()
@@ -354,7 +420,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
         tasks,
         isLoadingMore: false,
         activeCount: queueState.runningCount + queueState.pendingCount,
-        total: result.total,
+        total: Math.max(0, result.total - hiddenInView(state)),
         counts: countsFromResult(result.counts, tasks, result.degradedCount),
         nextCursor: result.nextCursor,
         queueState,
@@ -389,14 +455,14 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       if (!current()) return;
       if (changes !== taskRevision) return;
       set((state) => {
-        const tasks = mergeActiveFirst(result.active, [
+        const tasks = hidePendingRemovals(mergeActiveFirst(result.active, [
           ...state.tasks.filter((task) => !isActive(task)),
           ...result.entries,
-        ]);
+        ]));
         return {
           tasks,
           counts: countsFromResult(result.counts, tasks, result.degradedCount),
-          total: result.total,
+          total: Math.max(0, result.total - hiddenInView(state)),
           nextCursor: result.nextCursor,
         };
       });
@@ -448,11 +514,55 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     });
   },
 
-  removeTask: async (id) => {
-    await runGuardedMutation("imports.actionRemove", translate("imports.actionRemove", "移除任务"), async () => {
-      await window.api.import.remove(id);
+  scheduleRemoveTasks: (ids, delayMs = REMOVAL_UNDO_WINDOW_MS) => {
+    const targets = new Set(ids);
+    const snapshot = get().tasks.filter(
+      (task) => targets.has(task.id) && !pendingRemovals.has(task.id) && !isActive(task),
+    );
+    if (snapshot.length === 0) return null;
+    const removeIds = snapshot.map((task) => task.id);
+    for (const task of snapshot) pendingRemovals.set(task.id, task);
+    set((state) => ({
+      tasks: hidePendingRemovals(state.tasks),
+      total: Math.max(0, state.total - snapshot.length),
+      counts: subtractCounts(state.counts, snapshot),
+      selectionIds: state.selectionIds.filter((id) => !targets.has(id)),
+    }));
+
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const release = () => {
+      for (const id of removeIds) pendingRemovals.delete(id);
+      activeRemovals.delete(commit);
+    };
+    const commit = async (): Promise<void> => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      // 提交期间保持隐藏，避免提交中的刷新让被删的行闪回
+      await runTaskBatch(get, removeIds, "imports.actionRemove", translate("imports.actionRemove", "移除任务"), (id) =>
+        window.api.import.remove(id),
+      );
+      release();
+      // 提交失败的任务会随这次刷新回到列表，并已有逐条原因的提示
       await get().fetchTasks();
-    });
+      void import("./inbox.store").then(({ useInboxStore }) =>
+        useInboxStore.getState().refresh(),
+      );
+    };
+    timer = setTimeout(() => void commit(), delayMs);
+    activeRemovals.add(commit);
+    return {
+      count: removeIds.length,
+      commit,
+      undo: () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        release();
+        void get().fetchTasks();
+      },
+    };
   },
 
   cancelTasks: async (ids) => {
@@ -471,13 +581,6 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     await get().fetchTasks();
   },
 
-  removeTasks: async (ids) => {
-    await runTaskBatch(get, ids, "imports.actionRemove", translate("imports.actionRemove", "移除任务"), (id) =>
-      window.api.import.remove(id),
-    );
-    set({ selectionIds: [] });
-    await get().fetchTasks();
-  },
 
   clearFinished: async () => {
     await runGuardedMutation(
@@ -509,6 +612,11 @@ export const useImportStore = create<ImportState>()((set, get) => ({
     let refreshTimer: ReturnType<typeof setTimeout> | undefined;
     const handleChanged = (task: ImportTask) => {
       taskRevision++;
+      // 撤销窗口内的任务已从界面隐藏：只更新被保留的快照，不能把它推回列表
+      if (pendingRemovals.has(task.id)) {
+        pendingRemovals.set(task.id, task);
+        return;
+      }
       set((state) => {
         const index = state.tasks.findIndex(
           (candidate) => candidate.id === task.id,

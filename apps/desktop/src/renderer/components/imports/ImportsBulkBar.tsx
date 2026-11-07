@@ -2,6 +2,7 @@ import { BanIcon, ListChecksIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ImportTask } from "@guizhi/shared/types";
 import { useImportStore } from "../../stores/import.store";
+import { useRemoveTasksWithUndo } from "./use-remove-tasks-with-undo";
 
 function BulkAction({
   label,
@@ -45,7 +46,7 @@ export function ImportsBulkBar({ selected }: { selected: ImportTask[] }) {
   const selectVisible = useImportStore((state) => state.selectVisible);
   const retryTasks = useImportStore((state) => state.retryTasks);
   const cancelTasks = useImportStore((state) => state.cancelTasks);
-  const removeTasks = useImportStore((state) => state.removeTasks);
+  const removeWithUndo = useRemoveTasksWithUndo();
 
   const isRunning = (task: ImportTask) =>
     task.status === "pending" || task.status === "processing";
@@ -101,7 +102,7 @@ export function ImportsBulkBar({ selected }: { selected: ImportTask[] }) {
           destructive
           label={t("imports.removeTask", "从列表中删除")}
           count={removable.length}
-          onClick={() => void removeTasks(removable)}
+          onClick={() => removeWithUndo(removable)}
         >
           <XIcon className="h-4 w-4" aria-hidden="true" />
         </BulkAction>

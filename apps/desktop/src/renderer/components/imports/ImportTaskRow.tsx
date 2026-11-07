@@ -28,6 +28,7 @@ import { useSettingsStore } from "../../stores/settings.store";
 import { formatItemTime, getItemTypeMeta } from "../library/type-meta";
 import { ImportOriginLabel } from "./ImportOrigin";
 import { ImportStageSummary } from "./ImportStageSummary";
+import { useRemoveTasksWithUndo } from "./use-remove-tasks-with-undo";
 import {
   formatDuration,
   formatImportTaskError,
@@ -280,7 +281,7 @@ export function ImportTaskRow({
   const cancelTask = useImportStore((state) => state.cancelTask);
   const solverEnabled = useSettingsStore((state) => state.flareSolverr.enabled);
   const retryTask = useImportStore((state) => state.retryTask);
-  const removeTask = useImportStore((state) => state.removeTask);
+  const removeWithUndo = useRemoveTasksWithUndo();
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
@@ -474,7 +475,7 @@ export function ImportTaskRow({
           <RowAction
             destructive
             label={t("imports.removeTask", "从列表中删除")}
-            onClick={() => void removeTask(task.id)}
+            onClick={() => removeWithUndo([task.id])}
           >
             <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </RowAction>
