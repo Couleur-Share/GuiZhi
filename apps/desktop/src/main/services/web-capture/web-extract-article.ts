@@ -13,7 +13,7 @@ export type WebExtracted = Omit<
   WebCaptureResult,
   "taskId" | "entryUrl" | "finalUrl" | "links" | "capturedAt" | "engineVersion"
 >;
-/** 提取结果与正文来源；来源与字数只供回归和诊断，不进入采集结果。 */
+/** 提取结果与正文来源；来源与段落字数只供回归和诊断，不进入采集结果。 */
 export interface WebArticle {
   result: WebExtracted;
   source: "readability" | "region" | "wechat" | "none";
@@ -22,9 +22,8 @@ export interface WebArticle {
 }
 
 const MARKDOWN_LIMIT = 200_000;
-// Readability 取到的文字不足语义区域的 60% 视为截断或选错；区域太短时差值不可靠，不回退。
-// 阈值在 59 页评估样本上校准（截断页 ≤0.48，正常页 ≥0.71）；47 页留出样本正常页 ≥0.75，
-// 回退的 3 页里 1 页是误判：没有标成导航的教程目录撑大了区域，正文完整但带进目录。
+// Readability 取到的段落文字不足语义区域的 60% 视为截断或选错；区域段落不足 500 字时差值不可靠，不回退。
+// 59 页评估样本与 47 页留出样本：截断页 ≤0.52，正常页 ≥0.85（区域段落 500 字以上的页面）。
 const FALLBACK_RATIO = 0.6;
 const FALLBACK_MIN_CHARS = 500;
 // 语义区域本身的下限：防止把文末标签块之类的短容器当成正文（爱范儿的 id="article-content"）。
@@ -59,16 +58,22 @@ function parsePage(html: string): Document {
 const textLength = (node: Node | null | undefined) =>
   (node?.textContent ?? "").replace(/\s+/g, "").length;
 
-/** 表格之外的文字量：大型数据表（如浏览器兼容表）会左右 Readability 的取舍，判断截断只比正文段落。 */
-function proseLength(node: Element | null): number {
-  if (!node) return 0;
-  const outermost = (table: Element) => {
-    for (let parent = table.parentElement; parent && parent !== node; parent = parent.parentElement)
-      if (parent.nodeName === "TABLE") return false;
-    return true;
-  };
-  const tables = Array.from(node.querySelectorAll("table")).filter(outermost);
-  return textLength(node) - tables.reduce((sum, table) => sum + textLength(table), 0);
+/**
+ * 段落文字量：只计表格之外 <p> 里的文字。判断截断只比正文段落——数据表（如浏览器兼容表）、
+ * 没有标成导航的链接目录与代码编辑器都会撑大语义区域，却不是 Readability 漏掉的正文。
+ */
+function paragraphLength(node: Element | null): number {
+  let total = 0;
+  const pending: [Node, boolean][] = node ? [[node, false]] : [];
+  while (pending.length) {
+    const [current, inParagraph] = pending.pop()!;
+    for (const child of Array.from(current.childNodes)) {
+      if (child.nodeType === 3 && inParagraph) total += (child.textContent ?? "").replace(/\s+/g, "").length;
+      else if (child.nodeType === 1 && child.nodeName !== "TABLE")
+        pending.push([child, inParagraph || child.nodeName === "P"]);
+    }
+  }
+  return total;
 }
 
 function absoluteUrl(value: string | null | undefined, base: string): URL | null {
@@ -359,8 +364,8 @@ export function extractWebArticle(html: string, url: string, status: number): We
     const region = semanticRegion(regionDocument);
     const article = readabilityContent(document);
     const cleaned = region ? cleanRegion(region) : null;
-    readabilityChars = proseLength(article);
-    regionChars = proseLength(cleaned);
+    readabilityChars = paragraphLength(article);
+    regionChars = paragraphLength(cleaned);
     if (cleaned && regionChars >= FALLBACK_MIN_CHARS && readabilityChars < FALLBACK_RATIO * regionChars) {
       root = cleaned;
       source = "region";

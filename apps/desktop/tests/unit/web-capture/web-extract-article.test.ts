@@ -136,6 +136,15 @@ describe("R5 语义区域回退", () => {
     expect(article.source).toBe("readability");
   });
 
+  it("比例只计段落文字：区域里没标成导航的链接目录不会触发回退", () => {
+    const menu = Array.from({ length: 60 }, (_, i) => `<li><a href="/chapter/${i}">第 ${i + 1} 章：组件与状态</a></li>`).join("");
+    const article = extract(page(`<main><div class="chapters"><span>基础</span><ul>${menu}</ul></div><div class="tutorial">${prose(12)}</div></main>`));
+    expect(article.regionChars).toBeGreaterThanOrEqual(500);
+    expect(article.source).toBe("readability");
+    expect(article.result.markdown).toContain("正文第 12 段");
+    expect(article.result.markdown).not.toContain("组件与状态");
+  });
+
   it("正文区域只按 class 认定：id 为 article-content 的短标签块不会被当成正文", () => {
     const html = page(
       `<main>${prose(6)}</main><div id="article-content" class="c-article-meta"><a href="/t/1">标签一</a> <a href="/t/2">标签二</a></div>`,
