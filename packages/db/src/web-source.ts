@@ -112,10 +112,13 @@ export class WebSourceDB {
         item = items.get(itemId);
       if (!item || item.deletedAt) throw new Error("条目不存在或已删除");
       const baseline = this.baseline(itemId),
-        version = this.remote(itemId, result);
-      const previousRemote = this.versions(itemId).find(
-        (v) => v.kind === "remote",
-      );
+        version = this.remote(itemId, result),
+        versions = this.versions(itemId);
+      const previousRemote = versions.find((v) => v.kind === "remote");
+      // 当前正文所依据的版本（基线）与本次提取引擎不同（如随包 Crawl4AI 换成 Readability）时，
+      // Markdown 整体变化不代表原文更新：只留待采用版本，不改正文。以基线版本而不是最近一次抓取为准，
+      // 否则第一次重采留下待采用版本后，第二次同引擎的重采会直接改写正文。
+      const basis = versions.find((v) => v.id === baseline?.version_id) ?? previousRemote;
       if (
         previousRemote?.contentHash === version.contentHash &&
         previousRemote.title === version.title &&
@@ -131,7 +134,12 @@ export class WebSourceDB {
           : ("pending-version" as const);
       }
       this.save(version);
-      if (version.snapshot || !baseline || webContentHash(item.content) !== baseline.content_hash)
+      if (
+        version.snapshot ||
+        !baseline ||
+        webContentHash(item.content) !== baseline.content_hash ||
+        basis?.engineVersion !== version.engineVersion
+      )
         return "pending-version" as const;
       this.snapshot(itemId, item.title, item.content, version.sourceUrl);
       const title = item.title === baseline.title ? version.title : item.title;

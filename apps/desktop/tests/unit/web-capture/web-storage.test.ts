@@ -134,6 +134,57 @@ describe("网页版本与持久队列", () => {
       content: "第三版",
     });
   });
+  const captured = (engineVersion: string, markdown?: string, title?: string) => ({
+    ...result(markdown, title),
+    engineVersion,
+  });
+  const count = (db: Database, table: string, itemId: string) =>
+    (db.get(`SELECT COUNT(*) AS n FROM ${table} WHERE item_id=?`, itemId) as { n: number }).n;
+  it("提取引擎相同时行为不变：未编辑且无快照自动更新，编辑过的只待采用", () => {
+    const db = fixture(),
+      items = new KnowledgeItemDB(db),
+      source = new WebSourceDB(db),
+      plain = items.create({ title: "原标题", content: "原始正文" }),
+      edited = items.create({ title: "原标题", content: "原始正文" });
+    source.initialize(plain.id, captured("readability/1-static"));
+    source.initialize(edited.id, captured("readability/1-static"));
+    items.update(edited.id, { content: "我改过的正文" });
+    expect(source.check(plain.id, captured("readability/1-static", "第二版正文"))).toBe("updated");
+    expect(items.get(plain.id)?.content).toBe("第二版正文");
+    expect(source.check(edited.id, captured("readability/1-static", "第二版正文"))).toBe("pending-version");
+    expect(items.get(edited.id)?.content).toBe("我改过的正文");
+  });
+  it("提取引擎变了：未编辑条目也只留待采用版本，正文、向量与 Wiki 摄取不动；逐条采用后恢复自动更新", () => {
+    const db = fixture(),
+      items = new KnowledgeItemDB(db),
+      source = new WebSourceDB(db),
+      item = items.create({ title: "原标题", content: "原始正文" });
+    source.initialize(item.id, captured("crawl4ai/0.9.3-static"));
+    db.run(
+      "INSERT INTO knowledge_embeddings (item_id,chunk_index,chunk_text,content_hash,model,dims,vector,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+      item.id, 0, "原始正文", "hash", "model", 1, new Uint8Array([1]), 1,
+    );
+    db.run("INSERT INTO wiki_ingestions (item_id,content_hash,updated_at) VALUES (?,?,?)", item.id, "hash", 1);
+    const baseline = source.baseline(item.id);
+    expect(source.check(item.id, captured("readability/1-static", "新引擎正文"))).toBe("pending-version");
+    // 第二次重采仍以正文所依据的旧引擎版本为准，不能绕过待采用直接改写。
+    expect(source.check(item.id, captured("readability/1-static", "新引擎正文第二版"))).toBe("pending-version");
+    expect(items.get(item.id)?.content).toBe("原始正文");
+    expect(count(db, "knowledge_embeddings", item.id)).toBe(1);
+    expect(count(db, "wiki_ingestions", item.id)).toBe(1);
+    expect(source.baseline(item.id)).toMatchObject({ version_id: baseline?.version_id, summary_stale: 0 });
+    const latest = source.versions(item.id).find((v) => v.kind === "remote")!;
+    expect(latest).toMatchObject({ engineVersion: "readability/1-static", markdown: "新引擎正文第二版" });
+    source.adopt({
+      itemId: item.id,
+      versionId: latest.id,
+      expectedContentHash: webContentHash("原始正文"),
+      expectedTitle: "原标题",
+    });
+    expect(items.get(item.id)?.content).toBe("新引擎正文第二版");
+    expect(source.check(item.id, captured("readability/1-static", "新引擎正文第三版"))).toBe("updated");
+    expect(items.get(item.id)?.content).toBe("新引擎正文第三版");
+  });
   it("发现预算与 URL 唯一约束持久化；重启不会自行继续", () => {
     const db = fixture(),
       jobs = new CrawlJobDB(db),
