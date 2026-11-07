@@ -35,18 +35,23 @@ export interface PlatformCaption {
  */
 export function parseCaptionText(raw: string): string {
   const lines: string[] = [];
-  let skipStyleBlock = false;
+  let skipBlock = false;
   for (const original of raw.replace(/^\uFEFF/, "").split(/\r?\n/)) {
     const line = original.trim();
     if (!line) {
-      skipStyleBlock = false;
+      skipBlock = false;
       continue;
     }
+    // 文件头元数据（Kind:、Language:）与 NOTE、STYLE、REGION 块都持续到空行；缺空行时以时间轴为界
     if (/^(WEBVTT|NOTE|STYLE|REGION)(\s|$)/i.test(line)) {
-      skipStyleBlock = /^(STYLE|REGION)(\s|$)/i.test(line);
+      skipBlock = true;
       continue;
     }
-    if (skipStyleBlock || /^\d+$/.test(line) || line.includes("-->")) {
+    if (line.includes("-->")) {
+      skipBlock = false;
+      continue;
+    }
+    if (skipBlock || /^\d+$/.test(line)) {
       continue;
     }
     const text = line
@@ -73,10 +78,17 @@ function preferredCaptionFiles(dir: string): string[] {
   const files = fs
     .readdirSync(dir)
     .filter((name) => /\.(vtt|srt)$/i.test(name));
-  // 中文视频是当前产品的主场；没有中文时仍会取任意可读字幕，不人为丢内容。
+  // 原始语言的自动字幕（yt-dlp 标 -orig）最忠实于原文，其余机器翻译轨不该按字母排序抢先；
+  // 中文视频是当前产品的主场，其次英文；都没有时仍取任意可读字幕，不人为丢内容。
   return files.sort((left, right) => {
     const score = (name: string) =>
-      /\.(zh|zh-[a-z-]+|cmn|yue)\./i.test(name) ? 0 : 1;
+      /-orig\.(?:vtt|srt)$/i.test(name)
+        ? 0
+        : /\.(zh|zh-[a-z-]+|cmn|yue)\./i.test(name)
+          ? 1
+          : /\.en(?:-[a-z]+)?\./i.test(name)
+            ? 2
+            : 3;
     return score(left) - score(right) || left.localeCompare(right);
   });
 }
