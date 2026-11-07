@@ -381,7 +381,8 @@
     "fontLarge": "Large",
     "motion": {
       "title": "Motion",
-      "desc": "Control how much animation the desktop renderer plays. 'Standard' overrides the system 'reduce motion' setting on this machine.",
+      "desc": "Control how much animation the desktop renderer plays. 'System' follows the system 'reduce motion' setting; 'Standard' always plays full animation.",
+      "system": "System",
       "off": "Off",
       "reduced": "Reduced",
       "standard": "Standard"

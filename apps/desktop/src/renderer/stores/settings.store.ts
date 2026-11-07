@@ -45,6 +45,7 @@ export type {
   AIQuickSetupInput,
   AIUsageScenario,
   ModelRouteDefaults,
+  MotionPreference,
   ScenarioModelDefaults,
   SupportedLanguage,
   ThemeMode,
@@ -86,7 +87,7 @@ export const useSettingsStore = create<SettingsState>()(
     },
     {
       name: "guizhi-settings",
-      version: 2,
+      version: 3,
       partialize: stripEphemeralSettings,
       merge: mergeSettingsState,
       migrate: migrateSettingsState,

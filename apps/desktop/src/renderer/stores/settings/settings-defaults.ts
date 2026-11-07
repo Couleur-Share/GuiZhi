@@ -23,7 +23,7 @@ function createDefaultAppearanceValues() {
     backgroundImageOpacity: DEFAULT_BACKGROUND_IMAGE_OPACITY,
     backgroundImageBlur: DEFAULT_BACKGROUND_IMAGE_BLUR,
     renderMarkdown: true,
-    motionPreference: "standard",
+    motionPreference: "system",
     editorMarkdownPreview: true,
     autoSave: true,
     showLineNumbers: false,

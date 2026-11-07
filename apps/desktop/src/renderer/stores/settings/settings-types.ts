@@ -9,6 +9,8 @@ export const SUPPORTED_LANGUAGES = ["zh", "en"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 export type ThemeMode = "light" | "dark" | "system";
+/** system 遵从系统「减少动态效果」；standard 在本机始终播放完整动画 */
+export type MotionPreference = "system" | "off" | "reduced" | "standard";
 export type AIUsageScenario =
   | "summary"
   | "tagging"
@@ -92,7 +94,7 @@ export interface SettingsState {
   backgroundImageBlur: number;
   renderMarkdown: boolean;
   editorMarkdownPreview: boolean;
-  motionPreference: "off" | "reduced" | "standard";
+  motionPreference: MotionPreference;
   autoSave: boolean;
   showLineNumbers: boolean;
   /** Wiki 自动编译开关（ADR 0023：后台把条目增量编译进 LLM 维护的 Wiki），默认关闭 */
@@ -142,7 +144,7 @@ export interface SettingsState {
   setBackgroundImageOpacity: (opacity: number) => void;
   setBackgroundImageBlur: (blur: number) => void;
   setRenderMarkdown: (enabled: boolean) => void;
-  setMotionPreference: (preference: "off" | "reduced" | "standard") => void;
+  setMotionPreference: (preference: MotionPreference) => void;
   setEditorMarkdownPreview: (enabled: boolean) => void;
   setAutoSave: (enabled: boolean) => void;
   setShowLineNumbers: (enabled: boolean) => void;

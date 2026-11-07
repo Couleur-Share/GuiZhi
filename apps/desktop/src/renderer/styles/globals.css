@@ -374,8 +374,9 @@ img {
 
 /* In-app motion preference. The renderer mirrors settings.motionPreference
  * onto <html data-motion="..."> at startup and on change.
- *   - "standard": full motion (default; also opts out of OS-level reduced-
- *     motion via the :not() selector above)
+ *   - "system": full motion unless the OS asks for reduced motion (default)
+ *   - "standard": full motion; also opts out of OS-level reduced motion via
+ *     the :not() selector above
  *   - "reduced": durations scale to ~60%; achieved by overriding the CSS
  *     variables consumed by handwritten transitions/animations
  *   - "off": forces near-instant durations on every element

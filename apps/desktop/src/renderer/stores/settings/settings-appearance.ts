@@ -1,5 +1,9 @@
 import { resolveLocalImageSrc } from "../../utils/media-url";
-import type { SettingsState, ThemeMode } from "./settings-types";
+import type {
+  MotionPreference,
+  SettingsState,
+  ThemeMode,
+} from "./settings-types";
 
 export const MORANDI_THEMES = [
   { id: "royal-blue", hue: 220, saturation: 70, name: "Royal Blue" },
@@ -177,12 +181,13 @@ export function normalizeFontSize(value: unknown): string {
     : "medium";
 }
 
-export function normalizeMotionPreference(
-  value: unknown,
-): "off" | "reduced" | "standard" {
-  return value === "off" || value === "reduced" || value === "standard"
+export function normalizeMotionPreference(value: unknown): MotionPreference {
+  return value === "system" ||
+    value === "off" ||
+    value === "reduced" ||
+    value === "standard"
     ? value
-    : "standard";
+    : "system";
 }
 
 export function normalizeAppearanceSettings(

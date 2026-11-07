@@ -377,12 +377,13 @@ export function AppearanceSettings() {
           <p className="text-xs text-muted-foreground">
             {t(
               "settings.motion.desc",
-              "Control how much animation the desktop renderer plays. 'Standard' overrides the system 'reduce motion' setting.",
+              "Control how much animation the desktop renderer plays. 'System' follows the system 'reduce motion' setting; 'Standard' always plays full animation.",
             )}
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {(
               [
+                { id: "system", labelKey: "settings.motion.system", fallback: "System" },
                 { id: "off", labelKey: "settings.motion.off", fallback: "Off" },
                 { id: "reduced", labelKey: "settings.motion.reduced", fallback: "Reduced" },
                 { id: "standard", labelKey: "settings.motion.standard", fallback: "Standard" },

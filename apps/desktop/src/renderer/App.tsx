@@ -13,6 +13,7 @@ import {
   loadSettingsFromMainProcess,
 } from "./stores/settings.store";
 import i18n from "./i18n";
+import type { MotionPreference } from "./stores/settings.store";
 import type { UpdateStatus } from "./components/UpdateDialog";
 import { BackgroundImageBackdrop } from "./components/ui/BackgroundImageBackdrop";
 import { isWebRuntime } from "./runtime";
@@ -603,7 +604,7 @@ function App() {
   // reads this attribute to scale motion durations or disable them entirely.
   // 把动画偏好同步到 <html data-motion>，globals.css 依据该属性缩放或关闭动画。
   useEffect(() => {
-    const apply = (preference: "off" | "reduced" | "standard"): void => {
+    const apply = (preference: MotionPreference): void => {
       document.documentElement.dataset.motion = preference;
     };
     apply(useSettingsStore.getState().motionPreference);

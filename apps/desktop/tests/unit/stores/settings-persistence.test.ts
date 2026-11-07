@@ -33,6 +33,37 @@ describe("settings 持久化归一（Markdown 渲染视图默认开启）", () =
   });
 });
 
+describe("动画偏好默认跟随系统", () => {
+  it("v3 之前作为默认值写入的「标准」迁移为跟随系统", () => {
+    for (const version of [0, 1, 2]) {
+      const migrated = migrateSettingsState(
+        { ...currentDefaults(), motionPreference: "standard" },
+        version,
+      );
+      expect(migrated.motionPreference).toBe("system");
+    }
+  });
+
+  it("v3 起用户主动选的「标准」保持不变", () => {
+    const migrated = migrateSettingsState(
+      { ...currentDefaults(), motionPreference: "standard" },
+      3,
+    );
+    expect(migrated.motionPreference).toBe("standard");
+  });
+
+  it("关闭与减弱不受迁移影响，未知值归一为跟随系统", () => {
+    expect(
+      migrateSettingsState({ ...currentDefaults(), motionPreference: "off" }, 2)
+        .motionPreference,
+    ).toBe("off");
+    expect(
+      mergeSettingsState({ motionPreference: "bogus" }, currentDefaults())
+        .motionPreference,
+    ).toBe("system");
+  });
+});
+
 describe("settings 持久化白名单（清理已下线字段）", () => {
   // v0.4.1 删掉的同步字段，其中两个是明文凭据
   const legacySyncKeys = {

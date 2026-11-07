@@ -115,12 +115,16 @@ export function mergeSettingsState(
 
 export function migrateSettingsState(
   state: unknown,
-  _version: number,
+  version: number,
 ): SettingsState {
   if (!state || typeof state !== "object") return state as SettingsState;
-  // 版本差异不做逐版本分支：pickKnownSettings 丢弃已下线字段，
-  // normalizeMergedState 对任意历史快照做归一
-  return normalizeMergedState(pickKnownSettings({ ...(state as SettingsState) }));
+  // pickKnownSettings 丢弃已下线字段，normalizeMergedState 对任意历史快照做归一
+  const next = pickKnownSettings({ ...(state as SettingsState) });
+  // v3 之前「标准」是默认值且无法与主动选择区分；改回跟随系统，避免一律压过系统的减少动态效果
+  if (version < 3 && next.motionPreference === "standard") {
+    next.motionPreference = "system";
+  }
+  return normalizeMergedState(next);
 }
 
 export function rehydrateSettingsState(
