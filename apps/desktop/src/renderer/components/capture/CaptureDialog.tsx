@@ -143,7 +143,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
       await enqueue(inputs);
     } catch (error) {
       showToast(
-        t("capture.enqueueFailed", "加入导入队列失败：{{message}}", {
+        t("capture.enqueueFailed", "加入采集队列失败：{{message}}", {
           message: error instanceof Error ? error.message : String(error),
         }),
         "error",
@@ -151,7 +151,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
       return;
     }
     showToast(
-      t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+      t("capture.enqueued", "已加入采集队列（{{count}} 项）", {
         count: inputs.length,
       }),
       "success",
@@ -452,7 +452,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
               onClick={() => void submit()}
               className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
             >
-              {t("capture.importAsWebPage", "按普通网页导入")}
+              {t("capture.importAsWebPage", "按普通网页采集")}
             </button>
           ) : null}
           <button
@@ -469,7 +469,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             )}
             {creatorProfile
               ? t("capture.browseCreator", "浏览作者作品")
-              : t("capture.submit", "导入")}
+              : t("capture.submit", "采集")}
           </button>
         </div>
       </div>

@@ -54,7 +54,7 @@ export function CaptureSection() {
           purpose: t("settings.ytDlpPurpose", "在线视频解析"),
           missingHint: t(
             "settings.ytDlpMissingHint",
-            "B 站 / YouTube 等站点的视频导入依赖它",
+            "B 站 / YouTube 等站点的视频采集依赖它",
           ),
           customPathHint,
           customPathPlaceholder: t(
@@ -64,7 +64,7 @@ export function CaptureSection() {
           installedToast: (version) =>
             t(
               "settings.ytDlpInstallDone",
-              "yt-dlp 安装完成（{{version}}），可在导入任务中重试解析",
+              "yt-dlp 安装完成（{{version}}），可在采集任务中重试解析",
               { version: formatEngineVersion(version) },
             ),
           removedToast: t("settings.ytDlpRemoved", "已移除内置版 yt-dlp"),
@@ -111,7 +111,7 @@ export function CaptureSection() {
       <FunasrEngineRow />
 
       <SettingItem
-        label={t("settings.transcribeDiarize", "导入时区分说话人")}
+        label={t("settings.transcribeDiarize", "采集时区分说话人")}
         description={
           diarizeAvailable
             ? t(
@@ -125,7 +125,7 @@ export function CaptureSection() {
         }
       >
         <ToggleSwitch
-          ariaLabel={t("settings.transcribeDiarize", "导入时区分说话人")}
+          ariaLabel={t("settings.transcribeDiarize", "采集时区分说话人")}
           checked={diarizeAvailable ? transcribeDiarize : false}
           onChange={setTranscribeDiarize}
           disabled={!diarizeAvailable}

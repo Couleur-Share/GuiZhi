@@ -20,7 +20,7 @@ const ROWS: Array<{
 }> = [
   { id: "all", labelKey: "inbox.filterAll", fallback: "全部待处理", icon: InboxIcon },
   { id: "review-required", labelKey: "inbox.filterReviewRequired", fallback: "需要复核", icon: CircleHelpIcon },
-  { id: "import-issue", labelKey: "inbox.filterImportIssue", fallback: "导入问题", icon: AlertTriangleIcon },
+  { id: "import-issue", labelKey: "inbox.filterImportIssue", fallback: "采集问题", icon: AlertTriangleIcon },
   { id: "discovery-candidate", labelKey: "inbox.filterDiscoveryCandidate", fallback: "发现候选", icon: CompassIcon },
   // 可选整理：不计入角标与「全部待处理」，单独成组
   { id: "unclassified", labelKey: "inbox.filterUnclassified", fallback: "未归合集", icon: BoxesIcon },

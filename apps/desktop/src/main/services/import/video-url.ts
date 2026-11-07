@@ -94,7 +94,7 @@ export function describeTranscriptionFailure(error: unknown): string {
     return "文字稿生成失败：平台拒绝访问音频（HTTP 403）。视频可能仅限登录或私密可见，也可能是平台暂时限制解析；请确认链接能在未登录状态打开后稍后重试。";
   }
   if (/HTTP\s*401/.test(message)) {
-    return "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件导入。";
+    return "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件采集。";
   }
   if (/HTTP\s*404/.test(message)) {
     return "文字稿生成失败：音频资源已不可用（HTTP 404）。视频可能已删除、下架或链接已失效。";

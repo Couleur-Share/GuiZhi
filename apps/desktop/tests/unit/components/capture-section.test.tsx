@@ -177,7 +177,7 @@ describe("采集区", () => {
     await waitFor(() =>
       expect(
         row("ytdlp").getByText(
-          "在线视频解析 · B 站 / YouTube 等站点的视频导入依赖它",
+          "在线视频解析 · B 站 / YouTube 等站点的视频采集依赖它",
         ),
       ).toBeInTheDocument(),
     );
@@ -524,7 +524,7 @@ describe("采集区", () => {
       expect(screen.getByText(/无此能力|此开关无效/)).toBeInTheDocument(),
     );
     expect(
-      screen.getByRole("switch", { name: "导入时区分说话人" }),
+      screen.getByRole("switch", { name: "采集时区分说话人" }),
     ).toBeDisabled();
   });
 
@@ -549,7 +549,7 @@ describe("采集区", () => {
       row("funasr").getByRole("button", { name: "一键安装" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("switch", { name: "导入时区分说话人" }),
+      screen.getByRole("switch", { name: "采集时区分说话人" }),
     ).toBeDisabled();
   });
 

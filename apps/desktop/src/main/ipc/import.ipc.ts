@@ -19,7 +19,7 @@ import {
 let service: ImportService | null = null;
 
 export function getRegisteredImportService(): ImportService {
-  if (!service) throw new Error("导入服务尚未初始化");
+  if (!service) throw new Error("采集服务尚未初始化");
   return service;
 }
 
@@ -55,7 +55,7 @@ export function registerImportIPC(
     IPC_CHANNELS.IMPORT_ENQUEUE,
     (_event, inputs: EnqueueImportInput[]) => {
       if (!Array.isArray(inputs) || inputs.some((input) => !validInput(input))) {
-        throw new Error("导入参数不合法");
+        throw new Error("采集参数不合法");
       }
       const safe = inputs;
       const authenticatedCount = safe.filter(
@@ -104,7 +104,7 @@ export function registerImportIPC(
       if (
         options?.forceDuplicate !== undefined &&
         typeof options.forceDuplicate !== "boolean"
-      ) throw new Error("重复导入参数不合法");
+      ) throw new Error("重复采集参数不合法");
       const task = service!.taskDb.get(id);
       if (!task) return null;
       if (options?.verifyWeb !== undefined && typeof options.verifyWeb !== "boolean")
@@ -186,7 +186,7 @@ export function registerImportIPC(
       BrowserWindow.getFocusedWindow() ?? undefined!,
       {
         properties: ["openFile", "multiSelections"],
-        title: "选择要导入的文件",
+        title: "选择要采集的文件",
         filters: [
           {
             name: "支持的文件",

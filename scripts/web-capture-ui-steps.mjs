@@ -14,8 +14,8 @@ export default async function ({ win, app, shot }) {
   });
   await win.reload();
   await win.getByTestId("topbar-search").waitFor();
-  await win.getByRole("button", { name: "导入", exact: true }).click();
-  await win.getByRole("button", { name: "导入文档站", exact: true }).click();
+  await win.getByRole("button", { name: "采集", exact: true }).click();
+  await win.getByRole("button", { name: "采集文档站", exact: true }).click();
   await win
     .getByPlaceholder("https://docs.example.com/guide/")
     .fill("https://docs.python.org/zh-cn/3/tutorial/index.html");

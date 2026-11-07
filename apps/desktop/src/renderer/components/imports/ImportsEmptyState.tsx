@@ -75,14 +75,14 @@ export function ImportsEmptyState() {
         })),
       );
       showToast(
-        t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+        t("capture.enqueued", "已加入采集队列（{{count}} 项）", {
           count: files.length,
         }),
         "success",
       );
     } catch (error) {
       showToast(
-        t("capture.enqueueFailed", "加入导入队列失败：{{message}}", {
+        t("capture.enqueueFailed", "加入采集队列失败：{{message}}", {
           message: error instanceof Error ? error.message : String(error),
         }),
         "error",
@@ -102,7 +102,7 @@ export function ImportsEmptyState() {
 
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-foreground">
-          {t("imports.empty", "还没有导入任务")}
+          {t("imports.empty", "还没有采集任务")}
         </p>
         <p className="text-xs text-muted-foreground">
           {t(
@@ -151,7 +151,7 @@ export function ImportsEmptyState() {
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
         >
           <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
-          {t("header.newImportFiles", "导入文件")}
+          {t("header.newImportFiles", "采集文件")}
         </button>
       </div>
 

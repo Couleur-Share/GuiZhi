@@ -57,7 +57,7 @@ describe("重转写读取访问入口", () => {
       new PlatformParseError("token_invalid", "原始错误"),
     );
     await expect(downloadItemVideoAudio(db, item, deps)).rejects.toThrow(
-      "将新链接重新导入以更新访问入口",
+      "将新链接重新采集以更新访问入口",
     );
     expect(downloadVideoAudio).toHaveBeenCalledTimes(1);
     expect(db.get("SELECT access_uri FROM source_records")).toEqual({

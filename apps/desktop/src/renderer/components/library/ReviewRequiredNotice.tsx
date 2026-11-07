@@ -75,7 +75,7 @@ export function ReviewRequiredNotice({
           <p className="text-xs leading-5 text-muted-foreground">
             {t(
               "library.reviewRequiredHint",
-              "已保留可用内容，但导入过程发现以下缺口；确认无误后可标记为已复核。",
+              "已保留可用内容，但采集过程发现以下缺口；确认无误后可标记为已复核。",
             )}
           </p>
           {reasons.length > 0 ? (

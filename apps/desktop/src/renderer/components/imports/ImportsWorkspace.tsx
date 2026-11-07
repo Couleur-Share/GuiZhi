@@ -56,7 +56,7 @@ export function ImportsWorkspace() {
   if (view === "documents") return <DocumentSitePanel onBack={() => setView("tasks")} />;
   return view === "discovery"
     ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
-    : <div className="flex h-full flex-col"><button className="self-start m-3 rounded-lg border border-border px-3 py-1.5 text-sm" onClick={() => setView("documents")}>{t("webCapture.importSite", "导入文档站")}</button><div className="min-h-0 flex-1"><ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} /></div></div>;
+    : <div className="flex h-full flex-col"><button className="self-start m-3 rounded-lg border border-border px-3 py-1.5 text-sm" onClick={() => setView("documents")}>{t("webCapture.importSite", "采集文档站")}</button><div className="min-h-0 flex-1"><ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} /></div></div>;
 }
 
 function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
@@ -172,7 +172,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
     // 当前问答引擎会从全库检索，标题是把召回收窄到这条导入结果的稳定锚点；
     // 只预填不发送，用户能先改成自己的问题，也不会因误点消耗模型调用。
     requestAskDraft(
-      t("imports.askAboutItemDraft", "请优先围绕「{{title}}」这条导入内容，概括核心观点与可复用结论。", {
+      t("imports.askAboutItemDraft", "请优先围绕「{{title}}」这条采集内容，概括核心观点与可复用结论。", {
         title: item.title || t("library.untitled", "无标题"),
       }),
     );
@@ -183,7 +183,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
       <div className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border px-5 py-2">
         <h2 className="shrink-0 text-sm font-semibold text-foreground">
-          {t("imports.title", "导入任务")}
+          {t("imports.title", "采集任务")}
         </h2>
         {/* 队列读出来之前不报数：否则会先写「共 0 条」再跳成真实条数 */}
         {hasLoaded ? (
@@ -360,7 +360,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
           void clearTerminal(clearConfirm.query);
           setClearConfirm(null);
         }}
-        title={t("imports.clearConfirmTitle", "清理导入任务历史")}
+        title={t("imports.clearConfirmTitle", "清理采集任务历史")}
         message={t(
           "imports.clearConfirmSource",
           "范围：{{scope}}。将删除 {{count}} 条终态任务记录（完成、失败、取消或重复），不会删除已经入库的知识条目。",

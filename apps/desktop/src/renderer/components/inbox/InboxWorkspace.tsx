@@ -189,7 +189,7 @@ export function InboxWorkspace() {
     try {
       const changed = await acknowledgeImportWarning(taskId);
       showToast(
-        changed > 0 ? t("inbox.warningAcknowledged", "已保留导入记录并从处理中心移除") : t("inbox.warningAlreadyHandled", "该警告已经处理"),
+        changed > 0 ? t("inbox.warningAcknowledged", "已保留采集记录并从处理中心移除") : t("inbox.warningAlreadyHandled", "该警告已经处理"),
         changed > 0 ? "success" : "info",
       );
     } catch (error) {
@@ -455,7 +455,7 @@ export function InboxWorkspace() {
                           ? t("inbox.unclassifiedReason", "尚未归入任何合集")
                           : item.kind === "import-issue"
                             ? item.message
-                            : t("inbox.discoveryReason", "定时发现的新候选，尚未导入")}
+                            : t("inbox.discoveryReason", "定时发现的新候选，尚未采集")}
                     </p>
                   </div>
                   {itemId ? (

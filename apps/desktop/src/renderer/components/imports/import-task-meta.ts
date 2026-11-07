@@ -283,7 +283,7 @@ export function formatImportTaskWarning(
   if (/HTTP\s*401/.test(warning)) {
     return t(
       "imports.transcriptionFailure401",
-      "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件导入。",
+      "文字稿生成失败：平台要求登录才能访问音频（HTTP 401）。请确认视频为公开内容，或改用本地文件采集。",
     );
   }
   if (/HTTP\s*404/.test(warning)) {

@@ -52,7 +52,7 @@ export function NewItemButton() {
       })),
     );
     showToast(
-      t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+      t("capture.enqueued", "已加入采集队列（{{count}} 项）", {
         count: files.length,
       }),
       "success",
@@ -74,10 +74,10 @@ export function NewItemButton() {
       onClick: () => void createBlankNote(),
     },
     {
-      label: t("header.newImportFiles", "导入文件"),
+      label: t("header.newImportFiles", "采集文件"),
       description: t(
         "header.newImportFilesDesc",
-        "选择文档、图片或音视频加入导入队列",
+        "选择文档、图片或音视频加入采集队列",
       ),
       icon: <FileUpIcon className="h-4 w-4" aria-hidden="true" />,
       onClick: () => void importFiles(),

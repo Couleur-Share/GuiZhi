@@ -191,7 +191,7 @@ export function ItemBulkBar({
         </>
       )}
 
-      {scope !== "trash" && wechatIds.length > 0 ? <BulkAction wide={wide} label={t("library.bulkSupplementWechat", "补采公众号原文（进度见导入任务）")} onClick={()=>void supplementWechatSelection(wechatIds)}><RotateCcwIcon className="h-4 w-4" aria-hidden="true" /></BulkAction> : null}
+      {scope !== "trash" && wechatIds.length > 0 ? <BulkAction wide={wide} label={t("library.bulkSupplementWechat", "补采公众号原文（进度见采集任务）")} onClick={()=>void supplementWechatSelection(wechatIds)}><RotateCcwIcon className="h-4 w-4" aria-hidden="true" /></BulkAction> : null}
       {moveAnchor ? (
         <ContextMenu
           x={moveAnchor.x}

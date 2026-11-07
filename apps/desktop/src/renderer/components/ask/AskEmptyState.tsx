@@ -8,7 +8,7 @@ import { useUIStore } from "../../stores/ui.store";
  * 追一个具体结论。给出模板比给一句「向你的知识库提问」有用得多。
  */
 const EXAMPLE_KEYS: { key: string; fallback: string }[] = [
-  { key: "ask.example1", fallback: "总结我最近收集的内容里有哪些主题" },
+  { key: "ask.example1", fallback: "总结我最近采集的内容里有哪些主题" },
   { key: "ask.example2", fallback: "我之前看过的关于内网穿透的方案有哪些？" },
   { key: "ask.example3", fallback: "把我收藏的几篇文章的共同观点整理出来" },
 ];

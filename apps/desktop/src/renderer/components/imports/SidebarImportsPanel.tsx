@@ -84,14 +84,14 @@ export function SidebarImportsPanel() {
         })),
       );
       showToast(
-        t("capture.enqueued", "已加入导入队列（{{count}} 项）", {
+        t("capture.enqueued", "已加入采集队列（{{count}} 项）", {
           count: files.length,
         }),
         "success",
       );
     } catch (error) {
       showToast(
-        t("capture.enqueueFailed", "加入导入队列失败：{{message}}", {
+        t("capture.enqueueFailed", "加入采集队列失败：{{message}}", {
           message: error instanceof Error ? error.message : String(error),
         }),
         "error",
@@ -179,7 +179,7 @@ export function SidebarImportsPanel() {
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-sidebar-border px-3 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:border-primary/50 hover:text-sidebar-foreground"
         >
           <FolderOpenIcon className="h-4 w-4" aria-hidden="true" />
-          {t("header.newImportFiles", "导入文件")}
+          {t("header.newImportFiles", "采集文件")}
         </button>
       </div>
 

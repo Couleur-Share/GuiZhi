@@ -106,7 +106,7 @@ describe("快速采集识别分享口令", () => {
   it("单个作者主页把主操作改为浏览作品，并保留普通网页导入", async () => {
     const user = await pasteDraft("https://www.xiaohongshu.com/user/profile/abc");
     expect(screen.getByRole("button", { name: "浏览作者作品" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "按普通网页导入" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "按普通网页采集" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "浏览作者作品" }));
     expect(JSON.parse(sessionStorage.getItem(DISCOVERY_DRAFT_KEY)!)).toMatchObject({

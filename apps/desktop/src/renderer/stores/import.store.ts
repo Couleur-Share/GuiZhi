@@ -429,7 +429,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       }));
     } catch (error) {
       if (!current()) return;
-      console.error("加载导入任务失败:", error);
+      console.error("加载采集任务失败:", error);
       // 不记下来就会铺出「还没有导入任务」的新手引导页，掩盖了读取失败
       set({ loadError: describeLoadError(error) });
     } finally {
@@ -600,7 +600,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
 
   clearTerminal: async (query) => {
     let count = 0;
-    const ok = await runGuardedMutation("imports.clearConfirmTitle", translate("imports.clearConfirmTitle", "清理导入任务历史"), async () => {
+    const ok = await runGuardedMutation("imports.clearConfirmTitle", translate("imports.clearConfirmTitle", "清理采集任务历史"), async () => {
       count = (await window.api.import.clearTerminal(query)).count;
       set({ selectionIds: [] });
       await get().fetchTasks();

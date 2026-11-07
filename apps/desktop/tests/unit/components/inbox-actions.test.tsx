@@ -177,7 +177,7 @@ describe("处理中心聚合任务", () => {
 
     expect(acknowledgeImportWarning).toHaveBeenCalledWith("task-warning");
     expect(
-      await screen.findByText("已保留导入记录并从处理中心移除"),
+      await screen.findByText("已保留采集记录并从处理中心移除"),
     ).toBeTruthy();
   });
 

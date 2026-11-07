@@ -51,7 +51,7 @@ export default async function ({ win, app, shot }) {
     ipcMain.removeHandler("import:list");
     ipcMain.handle("import:list", (_event, query) => query ? { entries: [task], active: [], total: 1, nextCursor: null, counts: { pending: 0, processing: 0, completed: 0, duplicate: 0, failed: 1, canceled: 0 } } : [task]);
   }, result);
-  await win.getByRole("button", { name: "导入", exact: true }).click();
+  await win.getByRole("button", { name: "采集", exact: true }).click();
   await win.getByText("Just a moment…", { exact: true }).hover();
   await win.getByRole("button", { name: "任务详情", exact: true }).click();
   await win.getByRole("button", { name: "验证并自动采集", exact: true }).waitFor();

@@ -89,11 +89,11 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
   return (
     <div className="h-full overflow-auto p-6 space-y-5">
       <button className="text-sm text-muted-foreground" onClick={onBack}>
-        {t("webCapture.back", "返回导入任务")}
+        {t("webCapture.back", "返回采集任务")}
       </button>
       <div>
         <h2 className="text-lg font-semibold">
-          {t("webCapture.importSite", "导入文档站")}
+          {t("webCapture.importSite", "采集文档站")}
         </h2>
         <p className="text-sm text-muted-foreground">
           {t(
@@ -193,7 +193,7 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
           )
         }
       >
-        {t("webCapture.start", "开始导入")}
+        {t("webCapture.start", "开始采集")}
       </button>
       <div className="space-y-3">
         {jobs.map((job) => (

@@ -54,7 +54,7 @@ const context = {
 describe("buildImportTaskReport", () => {
   it("表头给出任务、状态、来源与时间", () => {
     const report = buildImportTaskReport(makeTask(), context);
-    expect(report).toContain("# 导入任务诊断");
+    expect(report).toContain("# 采集任务诊断");
     expect(report).toContain("- 任务：API中转站暴利神话的真相");
     expect(report).toContain("- 状态：已完成");
     expect(report).toContain("- 来源：https://v.douyin.com/abcdefg/");

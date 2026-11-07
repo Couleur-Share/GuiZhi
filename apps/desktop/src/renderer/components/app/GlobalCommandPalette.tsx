@@ -72,7 +72,7 @@ export function GlobalCommandPalette() {
   const groups = useMemo(() => ({
     actions: t("commandPalette.groupActions", "常用动作"),
     knowledge: t("commandPalette.groupKnowledge", "知识条目"),
-    tasks: t("imports.title", "导入任务"),
+    tasks: t("imports.title", "采集任务"),
     settings: t("settings.title", "设置"),
   }), [t]);
   const results = useMemo<Result[]>(() => {

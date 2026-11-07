@@ -178,7 +178,7 @@ describe("导入任务详情弹窗", () => {
     await user.click(screen.getByRole("button", { name: "复制诊断信息" }));
 
     const copied = await copiedText();
-    expect(copied).toContain("# 导入任务诊断");
+    expect(copied).toContain("# 采集任务诊断");
     expect(copied).toContain("- 来源：https://v.douyin.com/abcdefg/");
     // 界面上折起来的亚秒阶段，诊断文本里必须在——少一行就是少一条线索
     expect(copied).toContain("| 抓取中 |");

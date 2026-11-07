@@ -96,7 +96,7 @@ export async function prepareOriginalAsset(asset: ThemedReadingAsset, signal: Ab
       return;
     } catch (error) {
       signal.throwIfAborted();
-      if (!/^https?:\/\//i.test(asset.originalUrl ?? "")) throw new Error(`原图无法读取，请重新导入来源图片：${error instanceof Error ? error.message : String(error)}`, { cause: error });
+      if (!/^https?:\/\//i.test(asset.originalUrl ?? "")) throw new Error(`原图无法读取，请重新采集来源图片：${error instanceof Error ? error.message : String(error)}`, { cause: error });
       // 只对已保存的原始网络地址补采，不猜测本地图片的替代来源。
     } finally { release(); }
   }

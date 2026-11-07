@@ -237,7 +237,7 @@ export function SavedDiscoveryViewsPanel({
                 ) : detail.candidates.filter((entry) => entry.state === "new").map((candidate) => (
                   <div key={candidate.externalId} className="flex items-center gap-2 rounded-md bg-muted/35 px-2.5 py-2">
                     <span className="min-w-0 flex-1 truncate text-xs">{candidate.item.title || candidate.item.url}</span>
-                    <button type="button" disabled={busy === candidate.externalId} onClick={() => void importCandidate(candidate.externalId)} className="text-xs text-primary">导入</button>
+                    <button type="button" disabled={busy === candidate.externalId} onClick={() => void importCandidate(candidate.externalId)} className="text-xs text-primary">采集</button>
                     <button type="button" aria-label="忽略候选" onClick={() => void dismissCandidate(candidate.externalId)} className="text-muted-foreground hover:text-foreground">
                       <XIcon className="h-3.5 w-3.5" />
                     </button>
@@ -276,7 +276,7 @@ export function SavedDiscoveryViewsPanel({
           });
         }}
         title="删除采集视图？"
-        message="该视图的运行记录和候选会一并删除，已导入的知识不受影响。"
+        message="该视图的运行记录和候选会一并删除，已采集的知识不受影响。"
         confirmText="删除"
         cancelText="取消"
         variant="destructive"

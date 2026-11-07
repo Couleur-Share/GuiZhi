@@ -1035,7 +1035,7 @@ void app.whenReady().then(async () => {
                 : `${view.name} 发现了新内容`,
               body: loginRequired
                 ? "登录状态已失效，定时发现已暂停。"
-                : `新增 ${count} 条候选，确认后才会导入知识库。`,
+                : `新增 ${count} 条候选，确认后才会采集入库。`,
             });
             notification.on("click", () => {
               if (mainWindow && !mainWindow.isDestroyed()) {

@@ -61,7 +61,7 @@ export default async ({ win, app, shot }) => {
     localStorage.setItem("guizhi-migration-dismissed", "1");
   });
   await win.reload();
-  await win.getByRole("button", { name: "导入", exact: true }).click();
+  await win.getByRole("button", { name: "采集", exact: true }).click();
   await win.getByText("桌面导入：本地 Markdown 学习笔记", { exact: true }).waitFor();
   await shot("import-origin-all");
   await win.getByRole("button", { name: "手机端", exact: true }).click();

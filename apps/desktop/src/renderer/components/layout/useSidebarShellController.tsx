@@ -106,7 +106,7 @@ function getRailItemLabel(
         ? t("nav.wiki", "Wiki")
         : module === "research"
           ? t("nav.research", "研究")
-        : t("nav.imports", "导入");
+        : t("nav.imports", "采集");
 }
 
 function getRailItemIcon(module: AppModule) {

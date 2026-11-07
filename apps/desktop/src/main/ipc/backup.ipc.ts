@@ -339,7 +339,7 @@ export function registerBackupIPC(
       if (countActiveImportTasks(db) > 0) {
         return {
           success: false,
-          error: "有导入任务正在进行，请等待完成或取消后再恢复",
+          error: "有采集任务正在进行，请等待完成或取消后再恢复",
         };
       }
       const runningJobs = db.get(
@@ -450,7 +450,7 @@ export function registerBackupIPC(
       if (countActiveImportTasks(db) > 0) {
         return {
           success: false,
-          error: "有导入任务正在进行，请等待完成或取消后再恢复",
+          error: "有采集任务正在进行，请等待完成或取消后再恢复",
         };
       }
 

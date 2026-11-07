@@ -59,7 +59,7 @@ export function createMenu(): void {
         },
         { type: 'separator' },
         {
-          label: '导入',
+          label: '采集',
           accelerator: 'CmdOrCtrl+I',
           click: () => {
             BrowserWindow.getFocusedWindow()?.webContents.send('menu:import');

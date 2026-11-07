@@ -85,7 +85,7 @@ export function buildImportTaskReport(
 
   const authenticated = task.captureStrategy === "authenticated";
   const lines: string[] = [
-    `# ${t("imports.reportTitle", "导入任务诊断")}`,
+    `# ${t("imports.reportTitle", "采集任务诊断")}`,
     "",
     `- ${t("imports.reportStatus", "状态")}：${t(status.key, status.fallback)}`,
   ];

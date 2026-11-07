@@ -37,7 +37,7 @@ export async function downloadItemVideoAudio(
       throw new PlatformParseError(
         "token_invalid",
         "小红书访问链接已失效或缺少访问令牌。请在小红书中「分享 → 复制链接」，" +
-          "将新链接重新导入以更新访问入口，再回到此条目重试；也请确认原笔记仍可打开。",
+          "将新链接重新采集以更新访问入口，再回到此条目重试；也请确认原笔记仍可打开。",
         { cause: error },
       );
     }

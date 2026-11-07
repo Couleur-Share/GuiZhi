@@ -471,7 +471,7 @@ export function PlatformDiscoveryPanel({ onBack }: { onBack: () => void }) {
                   onClick={() => void importSelected()}
                   className="h-8 rounded-lg bg-primary px-4 text-xs font-medium text-primary-foreground disabled:opacity-50"
                 >
-                  {t("imports.importSelected", "导入所选")}
+                  {t("imports.importSelected", "采集所选")}
                 </button>
               </div>
 
@@ -541,7 +541,7 @@ export function PlatformDiscoveryPanel({ onBack }: { onBack: () => void }) {
                               }}
                               className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
                             >
-                              {t("imports.alreadyImported", "已导入，打开条目")}
+                              {t("imports.alreadyImported", "已采集，打开条目")}
                               <SquareArrowOutUpRightIcon className="h-3 w-3" />
                             </button>
                           ) : null}

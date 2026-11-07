@@ -306,6 +306,6 @@ export async function extractContent(
       return extractWebpage(url, signal);
     }
     default:
-      throw new Error(`未知的导入类型: ${kind satisfies never}`);
+      throw new Error(`未知的采集类型: ${kind satisfies never}`);
   }
 }
