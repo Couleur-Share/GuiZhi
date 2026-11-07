@@ -432,6 +432,14 @@ html[data-motion="reduced"] {
   color: hsl(var(--primary));
 }
 
+/* On primary surfaces the global selection color equals the background */
+/* 主题色底（提问气泡、按钮）上沿用全局选区色会让文字与底色同色而消失，改用前景色 */
+.bg-primary::selection,
+.bg-primary ::selection {
+  background: hsl(var(--primary-foreground) / 0.3);
+  color: hsl(var(--primary-foreground));
+}
+
 /* Smooth font rendering */
 /* 平滑字体渲染 */
 body {
