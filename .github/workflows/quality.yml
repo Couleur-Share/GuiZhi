@@ -47,29 +47,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      # worker 的正文清理只依赖 lxml：版本取自随包运行时的锁文件，与交付的解析器一致，
-      # 不安装 Crawl4AI 全量依赖。经完整转换链路的回归见 scripts/tests/test_article_cleanup.py（需随包 Python）。
-      - name: Crawler worker cleanup tests
-        shell: bash
-        run: |
-          pin="$(grep -oE '^lxml==[0-9.]+' config/crawl4ai/win32-x64.lock)"
-          test -n "$pin" || { echo "::error::锁文件中找不到 lxml 固定版本"; exit 1; }
-          python3 -m venv "$RUNNER_TEMP/worker-venv"
-          "$RUNNER_TEMP/worker-venv/bin/pip" install --quiet "$pin"
-          "$RUNNER_TEMP/worker-venv/bin/python" scripts/tests/test_article_cleanup_comments.py
-
       - name: Unit tests
         run: pnpm test:unit
-
-      # 运行包裁剪清单与锁文件、构建脚本的约定；不下载依赖，几秒内完成。
-      - name: Crawler build helper tests
-        run: |
-          python3 scripts/tests/test_crawl4ai_prune.py
-          python3 scripts/tests/test_crawl4ai_build_encoding.py
-
-      # extract-only.py 的 stdio 协议：提取异常按协议回报、进程继续服务。用桩 extract 模块，不需要 Crawl4AI。
-      - name: Crawler worker protocol tests
-        run: python3 scripts/tests/test_extract_only_protocol.py
 
       - name: Build
         run: pnpm --filter @guizhi/desktop build

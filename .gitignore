@@ -145,5 +145,6 @@ deploy/capture/secrets/
 **/.machine/
 apps/capture-web/test-results/
 apps/capture-web/playwright-report/
+# 已移除的随包 Crawl4AI：旧检出里可能残留运行时与下载缓存，保留忽略以免误提交
 apps/desktop/resources/crawl4ai/
 config/crawl4ai/downloads/

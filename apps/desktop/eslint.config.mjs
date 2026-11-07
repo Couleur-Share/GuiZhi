@@ -45,6 +45,7 @@ export default [
       "out/**",
       ".tmp-*/**",
       "node_modules/**",
+      // 已移除的随包 Crawl4AI 运行时可能残留在旧检出里
       "resources/crawl4ai/**",
       "coverage/**",
       "website/**",

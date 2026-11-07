@@ -27,6 +27,7 @@ async function collectSourceFiles(directory) {
     // 鸿蒙源码纳入门禁，但不统计 Hvigor 生成代码和 ohpm 依赖。
     if (entry.isDirectory() && entryPath.replaceAll("\\", "/").startsWith("apps/capture-harmony/") &&
         ["build", ".hvigor", "oh_modules"].includes(entry.name)) continue;
+    // 已移除的随包 Crawl4AI 运行时可能残留在旧检出里，其中的第三方脚本不计入门禁。
     if (entryPath.replaceAll("\\", "/") === "apps/desktop/resources/crawl4ai") continue;
     if (entry.isDirectory()) {
       files.push(...(await collectSourceFiles(entryPath)));

@@ -70,33 +70,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Setup crawler build Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12.10"
-
-      - name: Build locked bundled crawler
-        shell: bash
-        run: python scripts/build-crawl4ai.py --target ${{ matrix.platform == 'win' && 'win32-x64' || matrix.platform == 'linux' && 'linux-x64' || matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64' }}
-
-      # 运行包体积在安装包构建之前就拦截；预算与放宽规则见 config/package-size-budget.json。
-      - name: Check bundled crawler size budget
-        if: matrix.platform == 'win'
-        run: node scripts/check-package-size.mjs --runtime apps/desktop/resources/crawl4ai
-
-      # 完整转换链路（lxml → Crawl4AI → Markdown）的正文去噪回归。依赖只存在于随包运行包，
-      # 所以在这里用随包 Python 运行；PR 阶段的 quality 工作流只覆盖不依赖 Crawl4AI 的部分。
-      - name: Verify bundled crawler article cleanup
-        if: matrix.platform == 'win'
-        shell: bash
-        env:
-          CRAWL4_AI_BASE_DIRECTORY: ${{ runner.temp }}/crawl4ai-cache
-        run: apps/desktop/resources/crawl4ai/python/python.exe -B -s scripts/tests/test_article_cleanup.py
-
-      - name: Verify crawler offline fixtures
+      - name: Verify web capture offline fixtures
         run: pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts
         env:
-          GUIZHI_TEST_BUNDLED_CRAWLER: "1"
+          GUIZHI_TEST_WEB_CAPTURE: "1"
 
       - name: Clean previous build artifacts
         shell: bash
