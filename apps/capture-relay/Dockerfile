@@ -1,4 +1,4 @@
-FROM node:24.15.0-bookworm-slim@sha256:152aceace5c03e2597988763165ee33e3fd3633636db0fc983cd2e126b02cfde AS build
+FROM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS build
 WORKDIR /source
 RUN npm install --global pnpm@11.1.0
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -9,7 +9,7 @@ RUN pnpm install --filter @guizhi/capture-web... --filter @guizhi/capture-relay.
 RUN pnpm --filter @guizhi/capture-web build && pnpm --filter @guizhi/capture-relay build
 RUN pnpm --filter @guizhi/capture-relay deploy --legacy --prod /runtime
 
-FROM node:24.15.0-bookworm-slim@sha256:152aceace5c03e2597988763165ee33e3fd3633636db0fc983cd2e126b02cfde
+FROM node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
 WORKDIR /app
 COPY --from=build /runtime/ /app/
 COPY --from=build /source/apps/capture-relay/dist/ /app/dist/
