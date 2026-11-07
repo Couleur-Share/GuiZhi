@@ -95,18 +95,16 @@ describe("setup-readiness", () => {
     expect(isEmbeddingReady([embeddingModel()], undefined)).toBe(true);
   });
 
-  it("buildSetupChecklist 映射四项就绪状态", () => {
+  it("buildSetupChecklist 映射三项就绪状态（yt-dlp 不进首启清单）", () => {
     const items = buildSetupChecklist({
       aiModels: [chatModel(), audioModel(), embeddingModel()],
       modelRouteDefaults: { audioText: "audio-1" },
       legacy: emptyLegacy,
       funasrInstalled: false,
-      ytdlpInstalled: true,
     });
     expect(items.map((item) => [item.id, item.ready, item.required])).toEqual([
       ["textModel", true, true],
       ["transcription", true, false],
-      ["ytdlp", true, false],
       ["embedding", true, false],
     ]);
   });
@@ -117,7 +115,6 @@ describe("setup-readiness", () => {
         aiModels: [],
         modelRouteDefaults: undefined,
         funasrInstalled: true,
-        ytdlpInstalled: false,
       }).find((item) => item.id === "transcription")?.ready,
     ).toBe(true);
 
@@ -126,7 +123,6 @@ describe("setup-readiness", () => {
         aiModels: [audioModel()],
         modelRouteDefaults: { audioText: "audio-1" },
         funasrInstalled: false,
-        ytdlpInstalled: false,
       }).find((item) => item.id === "transcription")?.ready,
     ).toBe(true);
   });
@@ -135,6 +131,5 @@ describe("setup-readiness", () => {
     expect(setupItemSettingsSection("textModel")).toBe("ai");
     expect(setupItemSettingsSection("embedding")).toBe("ai");
     expect(setupItemSettingsSection("transcription")).toBe("capture");
-    expect(setupItemSettingsSection("ytdlp")).toBe("capture");
   });
 });

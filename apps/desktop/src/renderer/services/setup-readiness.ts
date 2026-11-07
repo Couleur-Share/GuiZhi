@@ -1,6 +1,6 @@
 /**
  * 首次使用设置清单的就绪判定（纯函数，无 IPC）。
- * 引擎安装状态由调用方探测后传入。
+ * 引擎安装状态由调用方探测后传入。yt-dlp 不进首启清单：只有采集 B 站 / YouTube 才需要，失败时任务行自带安装入口。
  */
 import type {
   AIModelConfig,
@@ -13,7 +13,6 @@ export const SETUP_DISMISSED_KEY = "guizhi-setup-dismissed";
 export type SetupChecklistItemId =
   | "textModel"
   | "transcription"
-  | "ytdlp"
   | "embedding";
 
 export type SetupSettingsSection = "ai" | "capture";
@@ -37,7 +36,6 @@ export interface BuildSetupChecklistInput {
   modelRouteDefaults: ModelRouteDefaults | undefined;
   legacy?: LegacyAiFields;
   funasrInstalled: boolean;
-  ytdlpInstalled: boolean;
 }
 
 export function isLegacyTextModelReady(legacy: LegacyAiFields): boolean {
@@ -103,11 +101,6 @@ export function buildSetupChecklist(
         modelRouteDefaults,
         input.funasrInstalled,
       ),
-      required: false,
-    },
-    {
-      id: "ytdlp",
-      ready: input.ytdlpInstalled,
       required: false,
     },
     {
