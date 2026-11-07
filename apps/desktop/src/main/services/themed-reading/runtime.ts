@@ -1,9 +1,7 @@
 import { ensureRequestedReadingImage } from "./required-image";
 import { compileReadingVisuals } from "./visual-compiler";
-import { runReconstruction } from "./reconstruction-pipeline";
 import { runReadingV3 } from "./v3-pipeline";
 import { repairReadingRuntime } from "./v3-runtime-repair";
-import { adaptLegacyReadingWork } from "./v3-legacy";
 import { prepareResearchRetry } from "./research-pipeline";
 import { randomUUID } from "node:crypto";
 import { parseHTML } from "linkedom";
@@ -12,8 +10,6 @@ import { KnowledgeItemDB } from "@guizhi/db";
 import { ThemedReadingDB } from "@guizhi/db/themed-reading";
 import type { ThemedReadingOptions, ThemedReadingRequest, ThemedReadingTask, ThemedReadingVersion } from "@guizhi/shared/types";
 import { buildThemedReadingSource } from "./content";
-import { chunkDesignBlocks, designChapter, mergeThemeDesignParts, planTheme } from "./design";
-import { compositionAssetIds } from "@guizhi/shared/utils/themed-composition";
 import { collectOriginalThemeAssets, generateThemeAsset, prepareOriginalAsset } from "./assets";
 import { themedReadingDocument } from "./document";
 import { inspectThemedReadingImages } from "./image-health";
@@ -24,6 +20,10 @@ import { logAppError } from "../../diagnostic-log";
 
 export const describeThemeError = (error: unknown) => error instanceof Error ? error.message : String(error);
 const activeStates = new Set(["queued", "running"]);
+const resumableStates = new Set(["interrupted", "failed", "cancelled", "partial"]);
+// 旧格式（v1/v2）页面只读保留：可以阅读、导出和备份恢复，不再生成、补图或续跑。
+export const LEGACY_PAGE_ERROR = "旧格式阅读页只读，不能调整、补图或继续生成；请重新生成新版阅读页";
+export const LEGACY_TASK_ERROR = "旧格式任务不再支持继续，请重新生成新版阅读页";
 
 export class ThemedReadingRuntime {
   readonly pages: ThemedReadingDB;
@@ -38,6 +38,22 @@ export class ThemedReadingRuntime {
   constructor(readonly db: Database.Database, private readonly notify: (task: ThemedReadingTask) => void, private readonly verifyPage?: (page: ThemedReadingVersion) => Promise<string | undefined>) {
     this.pages = new ThemedReadingDB(db); this.items = new KnowledgeItemDB(db);
     this.pages.interruptRunning();
+    this.retireLegacyTasks();
+  }
+
+  /** 页面数据保持原样；只把旧格式任务标记为不可继续，未完成的工作任务写明失败原因。 */
+  private retireLegacyTasks() {
+    for (const task of this.pages.listTasks()) {
+      if (task.legacyFormat || !resumableStates.has(task.state)) continue;
+      try {
+        const version = this.pages.getVersion(task.versionId);
+        if (!version || version.formatVersion >= 3) continue;
+        this.pages.saveTask(version.role === "working" ? { ...task, legacyFormat: true, state: "failed", error: LEGACY_TASK_ERROR } : { ...task, legacyFormat: true });
+      } catch (error) {
+        // 单条存量记录损坏不能阻止阅读服务启动；继续时会再次报出具体原因。
+        logAppError({ scope: "themedReading", action: "retireLegacyTask", itemId: task.itemId, message: describeThemeError(error) });
+      }
+    }
   }
 
   hasActive(): boolean { return this.preparing.size > 0 || this.pages.hasActiveTasks() || this.activeId !== null; }
@@ -76,28 +92,25 @@ export class ThemedReadingRuntime {
       const item = this.items.get(input.itemId);
       if (!item || item.deletedAt) throw new Error("条目不存在或已移入回收站");
       const current = this.pages.get(input.itemId, input.sourceKind);
-      const useCurrent = input.options.action === "revise" || input.options.action === "redesign" || (input.options.fromCurrent && input.options.action !== "refresh") || assetId;
+      const useCurrent = assetId || reuseDesign || input.options.action === "revise" || input.options.action === "redesign" || (input.options.fromCurrent && input.options.action !== "refresh");
       const existing = useCurrent ? current : null;
-      if ((input.options.action === "revise" || input.options.action === "redesign") && ![2,3].includes(current?.formatVersion)) throw new Error("旧页面请使用升级重构");
       if (useCurrent && !existing) throw new Error("还没有可调整的主题页");
+      if (existing && existing.formatVersion < 3) throw new Error(LEGACY_PAGE_ERROR);
       const source = existing ? structuredClone(existing.source) : await buildThemedReadingSource(item, input.sourceKind);
       if (!source.blocks.length) throw new Error("当前内容为空，没有可排版的正文");
       const now = Date.now();
       const version: ThemedReadingVersion = {
-        id: randomUUID(), itemId: item.id, sourceKind: input.sourceKind, role: "working", formatVersion: (assetId || reuseDesign) && existing ? existing.formatVersion : input.options.enhancedInteraction !== undefined ? 3 : input.options.action ? 2 : 1, source,
-        reconstruction: (assetId || reuseDesign || input.options.action === "redesign" || input.options.action === "revise") && existing?.reconstruction ? structuredClone(existing.reconstruction) : { notes: [], queries: [], references: [], draft: [], interactions: [] },
+        id: randomUUID(), itemId: item.id, sourceKind: input.sourceKind, role: "working", formatVersion: 3, source,
+        reconstruction: (assetId || reuseDesign || input.options.action === "redesign" || input.options.action === "revise") && existing ? structuredClone(existing.reconstruction) : { notes: [], queries: [], references: [], draft: [], interactions: [] },
         options: { ...input.options, research: input.options.research ?? false }, design: (assetId || reuseDesign) && existing ? structuredClone(existing.design) : null,
         designDirection: assetId || reuseDesign ? existing?.designDirection : undefined,
         textModel: existing?.textModel, imageModel: existing?.imageModel,
         assets: existing ? structuredClone(existing.assets) : [], warnings: [], createdAt: now, updatedAt: now,
       };
-      // 未带 action 的旧内部调用维持 v1；新 IPC 一律提供明确动作。
-      if (version.formatVersion === 1) delete version.reconstruction;
-      if (!assetId && !reuseDesign && input.options.action === "revise") { version.reconstruction.revisionDraft = structuredClone(version.reconstruction.draft); version.reconstruction.outline = undefined; version.reconstruction.queries = []; version.reconstruction.selectedUrls = undefined; version.reconstruction.researchComplete = false; version.reconstruction.researchBatches = undefined; version.reconstruction.researchReview = undefined; version.reconstruction.readUrls = undefined; version.reconstruction.interactions = []; }
+      if (!assetId && !reuseDesign && input.options.action === "revise") { version.reconstruction.revisionDraft = structuredClone(version.reconstruction.draft); version.reconstruction.draft = []; version.reconstruction.outline = undefined; version.reconstruction.queries = []; version.reconstruction.selectedUrls = undefined; version.reconstruction.researchComplete = false; version.reconstruction.researchBatches = undefined; version.reconstruction.researchReview = undefined; version.reconstruction.readUrls = undefined; }
       if (!assetId && !reuseDesign && ["redesign", "revise"].includes(input.options.action)) { version.reconstruction.interactions = []; version.reconstruction.visuals = []; version.reconstruction.animations = []; }
       if (!existing) version.assets = collectOriginalThemeAssets(version);
-      if(version.formatVersion===3&&reuseDesign&&existing?.design?.scripts?.some(s=>s.status==="failed")&&existing.generation){version.generation=structuredClone(existing.generation);version.generation.repairs={};version.design=null;for(const s of version.generation.scripts)s.status="pending";}
-      if(version.formatVersion===3&&!reuseDesign&&!assetId&&input.options.action==="revise")version.reconstruction.draft=[];
+      if (reuseDesign && existing.design?.scripts?.some(s => s.status === "failed") && existing.generation) { version.generation = structuredClone(existing.generation); version.generation.repairs = {}; version.design = null; for (const s of version.generation.scripts) s.status = "pending"; }
       if (assetId) {
         const asset = version.assets.find(a => a.id === assetId);
         if (!asset) throw new Error("图片槽位不存在");
@@ -108,9 +121,9 @@ export class ThemedReadingRuntime {
       const oldAssets = this.pages.listAssetFiles();
       this.pages.saveVersion(version);
       const task: ThemedReadingTask = { id: randomUUID(), itemId: item.id, sourceKind: input.sourceKind, versionId: version.id,
-        ...(version.formatVersion===3?{reused:{chapters:version.reconstruction.draft.length,notes:version.reconstruction.notes.length,references:version.reconstruction.references.filter(r=>r.status==="ready").length,assets:version.assets.filter(a=>a.status==="ready").length}}:{}),
+        reused: { chapters: version.reconstruction.draft.length, notes: version.reconstruction.notes.length, references: version.reconstruction.references.filter(r => r.status === "ready").length, assets: version.assets.filter(a => a.status === "ready").length },
         title: source.title, state: "queued", stage: "prepare", completed: 0, total: 0, assetId,
-        usage: { textCalls: 0, imageCalls: 0, imagesSaved: 0, ...(version.formatVersion >= 2 ? { searchCalls: 0, pagesRead: 0 } : {}) }, createdAt: now, updatedAt: now };
+        usage: { textCalls: 0, imageCalls: 0, imagesSaved: 0, searchCalls: 0, pagesRead: 0 }, createdAt: now, updatedAt: now };
       this.saveTask(task);
       cleanupOrphanAssets(this.items, oldAssets);
       this.kick();
@@ -131,7 +144,8 @@ export class ThemedReadingRuntime {
   async continueOffline(id: string): Promise<ThemedReadingTask> {
     const task = this.pages.getTask(id);
     const version = task && this.pages.getVersion(task.versionId);
-    if (!task || !version || version.formatVersion < 2 || version.role !== "working" || task.stage !== "research" || activeStates.has(task.state)) throw new Error("当前任务不能改为不联网继续");
+    if (version && version.formatVersion < 3) throw new Error(LEGACY_TASK_ERROR);
+    if (!task || !version || version.role !== "working" || task.stage !== "research" || activeStates.has(task.state)) throw new Error("当前任务不能改为不联网继续");
     version.options.research = false; this.pages.saveVersion(version);
     return this.resume(id);
   }
@@ -143,20 +157,19 @@ export class ThemedReadingRuntime {
     if (activeStates.has(task.state)) return task;
     const version = this.pages.getVersion(task.versionId), item = this.items.get(task.itemId);
     if (!version || !item || item.deletedAt) throw new Error("任务内容已删除，无法继续");
+    if (version.formatVersion < 3) throw new Error(version.role === "working" ? LEGACY_TASK_ERROR : LEGACY_PAGE_ERROR);
     if (version.role !== "working") {
       if (version.role !== "current") throw new Error("页面已有新版本，请在当前主题页调整");
       const failed = version.assets.find(a => a.status !== "ready");
       const failedVisual = version.design?.visualResults?.some(r => r.status === "failed");
-      const failedScript=version.design?.scripts?.some(s=>s.status==="failed");
+      const failedScript = version.design?.scripts?.some(s => s.status === "failed");
       if (!failed && !failedVisual && !failedScript) throw new Error("这份页面没有需要继续的素材");
       return this.generate({ itemId: task.itemId, sourceKind: task.sourceKind, options: { ...version.options, fromCurrent: true,
         generateImages: version.assets.some(a => a.role === "generated" && a.status !== "ready") } }, undefined, true);
     }
     if (this.pages.listTasks().some(t => t.id !== id && t.itemId === task.itemId && t.sourceKind === task.sourceKind && activeStates.has(t.state))) throw new Error("已有其他活动任务");
-    if(version.formatVersion<3)version.options.enhancedInteraction=false;
-    if(version.role==="working"&&["design","validate"].includes(task.stage)&&!version.design&&((version.formatVersion===2&&version.reconstruction?.draft.length)||(version.formatVersion===1&&task.state==="failed")))adaptLegacyReadingWork(version);
-    if (version.reconstruction && task.stage === "research" && version.options.research) prepareResearchRetry(version.reconstruction);
-    if(version.generation&&task.stage==="research"&&/查证上限/.test(task.error??"")){version.generation.researchRoundLimit=(version.generation.researchRoundLimit??(version.options.researchDepth==="deep"?2:1))+1;}
+    if (task.stage === "research" && version.options.research) prepareResearchRetry(version.reconstruction);
+    if (version.generation && task.stage === "research" && /查证上限/.test(task.error ?? "")) { version.generation.researchRoundLimit = (version.generation.researchRoundLimit ?? (version.options.researchDepth === "deep" ? 2 : 1)) + 1; }
     if (version.generation) { version.generation.repairs = {}; for (const module of version.generation.scripts) if (module.status === "failed") module.status = "pending"; }
     for (const asset of version.assets) if (asset.status === "failed") { asset.status = "pending"; asset.error = undefined; }
     this.pages.saveVersion(version);
@@ -186,6 +199,7 @@ export class ThemedReadingRuntime {
   private async execute(task: ThemedReadingTask, signal: AbortSignal) {
     const version = this.pages.getVersion(task.versionId);
     if (!version) throw new Error("工作版本不存在");
+    if (version.formatVersion < 3) throw new Error(LEGACY_TASK_ERROR);
     task.state = "running"; this.saveTask(task); this.assertCurrent(task, signal);
     const checkpoint = () => {
       this.assertCurrent(task, signal); version.updatedAt = Date.now();
@@ -220,37 +234,20 @@ export class ThemedReadingRuntime {
     if (!version.design) {
       if (!text) throw new Error("主文本模型未配置");
       version.textModel = text.model; stage("design");
-      if (version.formatVersion >= 2) {
-        let lastDesignProgress = 0;
-        const hooks = { checkpoint, stage, request: recordRequest, designProgress: (attempt:number, receivedChars:number) => {
-          this.assertCurrent(task, signal);
-          if (receivedChars && Date.now() - lastDesignProgress < 1000) return;
-          lastDesignProgress = Date.now(); task.designProgress = { attempt, receivedChars }; this.saveTask(task);
-        } };
-        if(version.formatVersion===3)await runReadingV3(version,text,signal,hooks);
-        else await runReconstruction(version,text,signal,{...hooks,...(version.options.enhancedInteraction===false?{upgradeDesign:async()=>{adaptLegacyReadingWork(version);checkpoint();await runReadingV3(version,text,signal,hooks);}}:{})});
-      } else {
-      if (!version.designDirection) {
-        const plan = await planTheme(version, text, signal, () => recordRequest("textCalls"));
-        version.designDirection = plan.direction; version.assets.push(...plan.assets); checkpoint();
-      }
-      const chunks = chunkDesignBlocks(version.source.blocks);
-      version.designParts ??= [];
-      for (let index = version.designParts.length; index < chunks.length; index++) {
-        stage("design", index, chunks.length);
-        version.designParts.push(await designChapter(version, chunks[index], index, text, signal, () => recordRequest("textCalls"))); checkpoint();
-      }
-      version.design = mergeThemeDesignParts(version.designParts, version.designDirection);
-      }
+      let lastDesignProgress = 0;
+      await runReadingV3(version, text, signal, { checkpoint, stage, request: recordRequest, designProgress: (attempt: number, receivedChars: number) => {
+        this.assertCurrent(task, signal);
+        if (receivedChars && Date.now() - lastDesignProgress < 1000) return;
+        lastDesignProgress = Date.now(); task.designProgress = { attempt, receivedChars }; this.saveTask(task);
+      } });
       ensureRequestedReadingImage(version);
       const { document } = parseHTML(`<html><body>${version.design.html}</body></html>`);
       const used = new Set([...document.querySelectorAll("img[data-theme-asset]")].map(node => node.getAttribute("data-theme-asset")));
-      if (version.design.composition) for (const id of compositionAssetIds(version.design.composition)) used.add(id);
       // 没有进入实际页面的装饰不发起生图，也不计入缺图告警和导出。
-      version.assets = version.assets.filter(asset => (version.formatVersion === 1 && asset.role === "original") || used.has(asset.id));
+      version.assets = version.assets.filter(asset => used.has(asset.id));
       checkpoint();
     }
-    if (version.formatVersion >= 2 && !task.assetId && version.options.generateImages) { ensureRequestedReadingImage(version); checkpoint(); }
+    if (!task.assetId && version.options.generateImages) { ensureRequestedReadingImage(version); checkpoint(); }
     let imageBudget = task.assetId ? 1 : Math.min(version.options.maxImages, 5);
     const pending = version.assets.filter(a => {
       if (a.status === "ready" || (task.assetId && a.id !== task.assetId)) return false;
@@ -279,17 +276,15 @@ export class ThemedReadingRuntime {
       stage("images", index + 1, pending.length);
     }
     if (task.assetId && version.assets.find(a => a.id === task.assetId)?.status !== "ready") throw new Error("指定图片未能替换，原页面和图片已保留");
-    if (version.formatVersion >= 2 && !task.assetId) await compileReadingVisuals(version, signal, checkpoint, (done, total) => stage("assemble", done, total));
-    if(version.formatVersion===3){version.assets=(await inspectThemedReadingImages(version)).assets;this.assertCurrent(task,signal);}
+    if (!task.assetId) await compileReadingVisuals(version, signal, checkpoint, (done, total) => stage("assemble", done, total));
+    version.assets = (await inspectThemedReadingImages(version)).assets; this.assertCurrent(task, signal);
     version.warnings = [...version.assets.filter(a => a.status !== "ready").map(a => `${a.alt}：${a.error ?? "图片未完成"}`), ...(version.design.visualResults ?? []).filter(r => r.status === "failed").map(r => `图形 ${r.id}：${r.error}`)];
     stage("assemble"); checkpoint();
     stage("validate"); themedReadingDocument(version);
-    if(version.formatVersion===3){
-      if(this.verifyPage) await repairReadingRuntime(version,text,signal,this.verifyPage,checkpoint,()=>recordRequest("textCalls"));
-      this.assertCurrent(task,signal);
-      version.warnings.push(...(version.design.scripts??[]).filter(s=>s.status==="failed").map(s=>`${s.id}：${s.error??"交互未完成"}`));
-      checkpoint();
-    }
+    if (this.verifyPage) await repairReadingRuntime(version, text, signal, this.verifyPage, checkpoint, () => recordRequest("textCalls"));
+    this.assertCurrent(task, signal);
+    version.warnings.push(...(version.design.scripts ?? []).filter(s => s.status === "failed").map(s => `${s.id}：${s.error ?? "交互未完成"}`));
+    checkpoint();
     this.assertCurrent(task, signal);
     const oldAssets = this.pages.listAssetFiles();
     const completed: ThemedReadingTask = {...task,timings:{...task.timings,[task.stage]:(task.timings?.[task.stage]??0)+Date.now()-stageStarted},state:version.warnings.length?"partial":"completed",stage:"done",error:version.warnings.join("；")||undefined,updatedAt:Date.now()};

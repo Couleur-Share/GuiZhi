@@ -6,7 +6,6 @@ import { validateThemedComposition } from "@guizhi/shared/utils/themed-compositi
 import { validateThemedReadingVersion } from "@guizhi/db/themed-reading";
 import { validateThemedDesign } from "../../src/main/services/themed-reading/sanitize";
 import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
-import { mergeThemeDesignParts } from "../../src/main/services/themed-reading/design";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 import { sampleComposition } from "./themed-reading-composition-fixture";
 
@@ -72,11 +71,5 @@ describe("专题重构的来源与执行边界", () => {
     expect(doc.querySelector(".gz-card h3").textContent).toContain("<img");
     page.design.html = "<script>not allowed</script>";
     expect(() => themedReadingDocument(page)).toThrow("不能混用");
-  });
-
-  it("合并章节保留所有专题结构，拒绝混入旧版章节", () => {
-    const page = fixture(); const part = page.design;
-    expect(mergeThemeDesignParts([part, part], "跨章专题").composition.chapters).toHaveLength(2);
-    expect(() => mergeThemeDesignParts([part, themeTestPage().design], "混合")).toThrow("格式不一致");
   });
 });

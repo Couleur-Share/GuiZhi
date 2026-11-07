@@ -9,7 +9,6 @@ const svgAttrs = ["viewBox", "viewbox", "xmlns", "d", "x", "y", "x1", "x2", "y1"
 const filePattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*\.(?:png|jpe?g|gif|webp|avif)$/i;
 const dataImagePattern = /^data:image\/(?:png|jpeg|gif|webp|avif);base64,[a-zA-Z0-9+/]+=*$/;
 const labels = new Set(["目录", "文章目录", "返回顶部", "展开", "收起", "继续阅读", "阅读导航", "主题阅读", "原文", "来源", "正文", "上一节", "下一节", "核心概念", "阅读指南", "Contents", "Back to top", "Read more", "Source"]);
-export const THEMED_INTERFACE_LABELS = [...labels];
 
 export function themedAssetMapper(assets: ThemedReadingAsset[], assetUrls?: Record<string, string>) {
   const urls = new Map<string, string>();

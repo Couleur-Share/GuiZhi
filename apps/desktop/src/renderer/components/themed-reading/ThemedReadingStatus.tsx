@@ -68,10 +68,7 @@ export function ThemedReadingStatus({
   );
   const active = isThemeTaskActive(task),
     research = task.stage === "research";
-  const researchExhausted =
-    research &&
-    Boolean(task.error?.startsWith("补充查证仍未完成，已达到本次自动补查上限"));
-  const resumable = canResumeThemeTask(task) && !researchExhausted;
+  const resumable = canResumeThemeTask(task);
   const steps = (
     [
       "prepare",
@@ -104,11 +101,13 @@ export function ThemedReadingStatus({
     : research
       ? t("themedReading.readerResearchPaused", "资料查证尚未完成")
       : t(`themedReading.readerState.${task.state}`, states[task.state]);
-  const context = task.state === "completed" ? "" : hasPage
-    ? active
-      ? t("themedReading.readerUpdating", "正在更新，当前仍可阅读已有版本。")
-      : t("themedReading.readerPreviousAvailable", "当前显示上次生成的版本。")
-    : t("themedReading.readerSourceSafe", "原文已保留，可随时切回阅读。");
+  const context = task.state === "completed" ? "" : task.legacyFormat
+    ? t("themedReading.readerLegacyTask", "旧格式任务不再支持继续，可重新生成新版阅读页。")
+    : hasPage
+      ? active
+        ? t("themedReading.readerUpdating", "正在更新，当前仍可阅读已有版本。")
+        : t("themedReading.readerPreviousAvailable", "当前显示上次生成的版本。")
+      : t("themedReading.readerSourceSafe", "原文已保留，可随时切回阅读。");
   const copy = async () => {
     try {
       await copyTextToClipboard(task.error ?? "");
@@ -233,11 +232,6 @@ export function ThemedReadingStatus({
               : t("themedReading.readerResume", "继续生成")}
           </button>
         ) : null}
-        {!readOnly && researchExhausted && onOffline ? (
-          <button className={themeButton} disabled={busy} onClick={onOffline}>
-            {t("themedReading.readerOffline", "不联网继续生成")}
-          </button>
-        ) : null}
       </div>
       {expanded && active ? <div className="px-6 pb-6">{progress}</div> : null}
       <details
@@ -289,14 +283,6 @@ export function ThemedReadingStatus({
                 </p>
               ) : null}
             </div>
-          ) : null}
-          {researchExhausted ? (
-            <p>
-              {t(
-                "themedReading.readerResearchLimit",
-                "本次补查已达上限。可以不联网继续生成，或重新开始一次生成。",
-              )}
-            </p>
           ) : null}
           {Number.isSafeInteger(task.plannedImages) &&
           task.plannedImages >= 0 &&
@@ -355,8 +341,7 @@ export function ThemedReadingStatus({
           ) : null}
           {!readOnly &&
           research &&
-          !active &&
-          !researchExhausted &&
+          resumable &&
           onOffline ? (
             <button className={themeButton} disabled={busy} onClick={onOffline}>
               {t("themedReading.readerOffline", "不联网继续生成")}

@@ -92,6 +92,8 @@ export interface ThemedReadingTask {
   error?: string;
   /** 替换图片任务只执行这个槽位；不重新设计页面。 */
   assetId?: string;
+  /** 旧格式（v1/v2）页面的任务：只读保留，不能继续生成或补全素材。 */
+  legacyFormat?: boolean;
   createdAt: number;
   updatedAt: number;
 }

@@ -1,6 +1,6 @@
 # AI 阅读页 v3：使用与实现
 
-本次升级的源码在当前工作目录，未提交、推送或正式发版。原文、讨论总结与 AI 编辑稿仍独立保存；已有 v1/v2 成品按原有路径阅读和导出，不批量改写。
+本次升级的源码在当前工作目录，未提交、推送或正式发版。原文、讨论总结与 AI 编辑稿仍独立保存。新任务一律生成 v3；已有 v1/v2 成品只读保留，按原有路径阅读、导出和备份恢复，不批量改写，也不再继续生成、补图或调整，需要新版时重新生成。
 
 ## 使用
 
@@ -48,7 +48,7 @@
 - JS 使用 V8 语法编译检查，不执行代码。真正的权限边界是独立进程、session、iframe、CSP 和 IPC 校验，提示词及字符串过滤不承担安全边界。
 - 确定性格式处理、正文回填和重复正文引用清理不请求模型。其他问题携带失败单元及具体错误修复，每个单元自动一次；仍失败保留候选，手动继续再试。
 - 脚本语法或运行问题可标记 `partial` 并保留静态正文。正文、资源标识或安全结构不合格时阻止发布。实际图片请求和成功保存分别计数。
-- 旧任务保持原有脚本权限。已完成稿的失败设计经兼容适配进入新验证；旧研究任务先完成已保存的研究/写作流程，在设计交接点适配。仅补图的旧任务继续复用原设计。
+- v1/v2 的未完成任务不再续跑：应用启动时标记为失败并写明「旧格式任务不再支持继续」，继续、改为不联网继续和执行入口也会拒绝且不请求模型。旧页的单图重做、补图、「仅调整设计」和「调整内容与设计」同样被拒绝，界面隐藏这些入口并提示重新生成新版。
 
 ## 开发定位
 
@@ -58,7 +58,7 @@
 | 自适应管线 | `apps/desktop/src/main/services/themed-reading/v3-pipeline.ts`、`v3-editor.ts`、`v3-notes.ts`、`v3-copy.ts` |
 | 有界研究 | 同目录 `v3-research.ts` |
 | 规范化与记录流 | 同目录 `v3-document.ts`、`v3-css.ts`、`v3-stream.ts` |
-| 运行与恢复 | 同目录 `v3-views.ts`、`v3-reader-script.ts`、`v3-runtime-repair.ts`、`v3-legacy.ts` |
+| 运行与恢复 | 同目录 `runtime.ts`、`v3-views.ts`、`v3-reader-script.ts`、`v3-runtime-repair.ts` |
 | IPC | `apps/desktop/src/main/ipc/themed-reading.ipc.ts`、`apps/desktop/src/preload/reading-view.ts` |
 | 阅读 UI | `apps/desktop/src/renderer/components/themed-reading/NativeReadingView.tsx`、`ThemedReadingPane.tsx`、`use-themed-reading.ts` |
 | 离线导出 | `apps/desktop/src/main/services/themed-reading/export.ts` |

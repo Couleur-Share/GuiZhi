@@ -308,7 +308,7 @@ export async function runReadingV3(
     page.assets.push(...plan.assets);
     save();
   }
-  const copy = prepareDesignCopy(s.draft, true);
+  const copy = prepareDesignCopy(s.draft);
   const sortSections = () =>
     g.sections.sort(
       (a, b) =>

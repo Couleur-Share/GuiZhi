@@ -7,7 +7,8 @@ describe("设计复用编辑稿", () => {
     const copy = prepareDesignCopy(draft);
     const html = copy.expand('<section class="custom"><div data-reading-copy="s0b0"></div><aside>自由图解</aside><div data-reading-copy="s0b1"></div></section>');
     expect(html).toContain('<strong>需要保留</strong>'); expect(html).toContain('<li>第二步</li>');
-    expect(html).toContain('class="custom"'); expect(html).toContain('自由图解'); expect(html).not.toContain('data-reading-copy');
+    expect(html).toContain('class="custom"'); expect(html).toContain('自由图解'); expect(html).not.toContain('data-reading-copy=');
+    expect(html).toContain('data-reading-copy-id="s0b0"');
     expect(copy.manuscript[0].blocks[0]).toEqual({ copyId: "s0b0", markdown: draft[0].markdown.split("\n\n")[0] });
   });
   it("拒绝重复、未知、非空与嵌套引用", () => {

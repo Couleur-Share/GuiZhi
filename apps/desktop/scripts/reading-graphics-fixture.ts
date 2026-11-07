@@ -1,13 +1,10 @@
 import { ensureRequestedReadingImage } from "../src/main/services/themed-reading/required-image";
 import fs from "node:fs/promises";
-import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { reconstructionFixture } from "../tests/unit/reading-reconstruction-fixture";
 import { compileReadingVisuals, renderReadingGraphic } from "../src/main/services/themed-reading/visual-compiler";
 import { reconstructionDocument } from "../src/main/services/themed-reading/reconstruction-document";
 import type { ReadingVisual } from "@guizhi/shared/types/reading-visuals";
-import { runReconstruction } from "../src/main/services/themed-reading/reconstruction-pipeline";
-import type { AIClientConfig } from "@guizhi/core";
 import * as css from "css-tree";
 
 export async function createGraphicsFixtures(directory: string) {
@@ -73,48 +70,4 @@ export async function createGraphicsFixtures(directory: string) {
   }
   await fs.writeFile(path.join(directory, "performance.json"), JSON.stringify({ compilationMs, note: "单次隔离进程样本，heapUsed 为采样值而非峰值，非跨机器基准", measurements }, null, 2));
   return { success: extraCharts.every(r => r.status === "ready"), compilationMs, extraCharts, bytes: { offline: Buffer.byteLength(offline), embedded: Buffer.byteLength(embedded) }, visuals: page.design.visualResults.map(r => ({ id: r.id, bytes: r.svg.length })) };
-}
-
-/** 仅隔离验收构建可调用；读取模型配置，不复制配置或连接正式数据库。 */
-export async function createLiveGraphicsFixture(directory: string, configPath: string) {
-  const saved = JSON.parse(await fs.readFile(configPath, "utf8"));
-  const models = saved.models.filter((m: { capabilities?: { chat?: boolean } }) => m.capabilities?.chat !== false);
-  const model = models.find((m: { id: string }) => m.id === saved.modelRouteDefaults?.mainText) ?? models.find((m: { isDefault?: boolean }) => m.isDefault) ?? models[0];
-  if (!model?.apiKey || !model?.apiUrl || !model?.model) throw new Error("当前文本模型配置不可用");
-  const config: AIClientConfig = { provider: model.provider, apiProtocol: model.apiProtocol, apiKey: model.apiKey, apiUrl: model.apiUrl, model: model.model };
-  const page = reconstructionFixture(); page.id = "live-graphics"; page.design = null; page.designDirection = undefined;
-  page.source.title = "把阅读材料变成可复用知识";
-  page.source.content = "个人知识整理分为采集、理解、整理和复用。采集时保留来源，理解时提取问题与关键证据，整理时建立明确标题和关系，复用时根据具体问题检索并应用。阶段之间允许返回：发现缺失的依据时应回到采集，而不是编造细节。流程图适合展示阶段及返回路径，时间轴可以描述一次整理过程。下面是用于讲解图表的虚构课堂数据，不代表真实用户统计：甲为10个，乙为20个，丙为15个。这三个数值表示三次练习中整理的条目数，仅用于比较练习规模，不能推断学习效果。动画可以展示信息从采集移动到整理，再进入复用；不应持续闪烁或遮挡正文。普通阅读仍应以连贯文字、清晰标题和舒适行距为主，必要时使用图解帮助理解。";
-  page.source.blocks = [{ id: "b0", markdown: page.source.content, html: `<p>${page.source.content}</p>`, text: page.source.content }];
-  page.reconstruction = { notes: [], queries: [], references: [], draft: [], interactions: [] };
-  page.options = { action: "create", style: "克制的知识专题：用时间轴或步骤组件、一个Mermaid流程图、一张明确标注虚构课堂数据的柱状图，以及一个安全SVG描线动画帮助理解。所有重要文字保持静态可读。无需图片。", research: false, generateImages: false, maxImages: 0 };
-  const savedFixture = process.env.GUIZHI_READING_PAGE_FIXTURE;
-  if (savedFixture) {
-    const savedPage = JSON.parse(await fs.readFile(savedFixture, "utf8"));
-    Object.assign(page, savedPage, { design: null, designDirection: undefined });
-    page.options = { ...savedPage.options, action: "redesign", research: false, generateImages: false, maxImages: 0 };
-    page.reconstruction.visuals = []; page.reconstruction.animations = []; page.reconstruction.interactions = [];
-  }
-  const started = performance.now();
-  let calls = 0, receivedChars = 0, lastProgress = 0;
-  let stage = "pending";
-  await fs.mkdir(directory, { recursive: true });
-  const checkpoint = () => {
-    // 仅本次验收材料，保留已完成阶段；绝不序列化模型配置。
-    writeFileSync(path.join(directory, "live-checkpoint.json"), JSON.stringify(page, null, 2));
-    writeFileSync(path.join(directory, "live-progress.json"), JSON.stringify({ stage, calls, receivedChars, elapsedMs: performance.now() - started }, null, 2));
-  };
-  try {
-    await runReconstruction(page, config, AbortSignal.timeout(900000), { checkpoint, stage: value => { stage = value; checkpoint(); }, designProgress: (_attempt, count) => { receivedChars = count; if (performance.now() - lastProgress > 1000) { lastProgress = performance.now(); checkpoint(); } }, request: kind => { if (kind !== "textCalls" || ++calls > (savedFixture ? 2 : 12)) throw new Error("超过本轮十二次文本请求上限"); } });
-  } catch (error) {
-    const failure = { success: false, model: config.model, calls, stage, error: error instanceof Error ? error.message : "生成失败", cause: (error as { cause?: { code?: string; message?: string } }).cause?.code ?? (error as { cause?: { message?: string } }).cause?.message };
-    await fs.writeFile(path.join(directory, "live-evidence.json"), JSON.stringify(failure, null, 2));
-    return failure;
-  }
-  await compileReadingVisuals(page, AbortSignal.timeout(90000), checkpoint, () => {});
-  await fs.writeFile(path.join(directory, "live-page.json"), JSON.stringify(page, null, 2));
-  await fs.writeFile(path.join(directory, "live-offline.html"), reconstructionDocument(page));
-  const result = { model: config.model, calls, webVerified: false, syntheticSource: !savedFixture, elapsedMs: performance.now() - started, receivedChars, htmlChars: page.design.html.length, cssChars: page.design.css.length, visuals: page.reconstruction.visuals?.map(v => ({ id: v.id, kind: v.kind })), animations: page.reconstruction.animations?.length ?? 0, errors: page.design.visualResults?.filter(r => r.status === "failed").map(r => ({ id: r.id, error: r.error })) ?? [] };
-  await fs.writeFile(path.join(directory, "live-evidence.json"), JSON.stringify(result, null, 2));
-  return result;
 }

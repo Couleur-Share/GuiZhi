@@ -26,6 +26,7 @@ export function ThemedReadingPageTools({
   );
   const page = view.result?.page;
   if (!page) return null;
+  const legacy = page.formatVersion < 3;
   const references = (page.reconstruction?.references ?? []).filter(
     (reference) =>
       reference.status === "ready" &&
@@ -34,14 +35,15 @@ export function ThemedReadingPageTools({
       ),
   );
   const items: ContextMenuItem[] = [
-    {
-      label:
-        page.formatVersion >= 2
-          ? t("themedReading.readerAdjust", "调整阅读页")
-          : t("themedReading.readerUpgrade", "重新设计阅读页"),
-      disabled,
-      onClick: () => onSetup(page.formatVersion >= 2 ? "adjust" : "new"),
-    },
+    ...(legacy
+      ? []
+      : [
+          {
+            label: t("themedReading.readerAdjust", "调整阅读页"),
+            disabled,
+            onClick: () => onSetup("adjust"),
+          },
+        ]),
     {
       label: t("themedReading.readerRegenerate", "按最新原文重新生成"),
       disabled,
@@ -182,6 +184,14 @@ export function ThemedReadingPageTools({
                 ))}
               </>
             ) : null}
+            {panel === "assets" && legacy && page.assets.length ? (
+              <p className="text-sm text-muted-foreground">
+                {t(
+                  "themedReading.readerLegacyReadOnly",
+                  "旧格式阅读页只读，仍可阅读和导出；如需调整，请重新生成新版。",
+                )}
+              </p>
+            ) : null}
             {panel === "assets" ? (
               page.assets.length ? (
                 page.assets.map((asset) => (
@@ -212,8 +222,9 @@ export function ThemedReadingPageTools({
                           {asset.error}
                         </p>
                       ) : null}
-                      {asset.role === "generated" ||
-                      asset.status !== "ready" ? (
+                      {!legacy &&
+                      (asset.role === "generated" ||
+                        asset.status !== "ready") ? (
                         <button
                           className={themeButton}
                           disabled={disabled}

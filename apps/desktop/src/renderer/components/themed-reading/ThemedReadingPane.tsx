@@ -157,6 +157,14 @@ export function ThemedReadingPane({
               )}
             </p>
           ) : null}
+          {page && !showingPreview && page.formatVersion < 3 ? (
+            <p className="shrink-0 px-4 py-1.5 text-xs text-muted-foreground">
+              {t(
+                "themedReading.readerLegacyReadOnly",
+                "旧格式阅读页只读，仍可阅读和导出；如需调整，请重新生成新版。",
+              )}
+            </p>
+          ) : null}
           {readingPage?.formatVersion===3 ? <NativeReadingView page={readingPage} preview={showingPreview} revision={showingPreview?preview.revision:0} toolbar={readerToolbar} findQuery={findQuery} findIndex={findIndex} onFindCount={onFindCount} onFindOpen={onFindOpen}/> : page && view.result?.document ? (
             <ThemedReadingFrame
               toolbar={readerToolbar}

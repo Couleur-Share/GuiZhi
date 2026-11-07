@@ -3,7 +3,7 @@ import { renderThemedReadingBlocks } from "./content";
 import type { ReadingDraftSection } from "@guizhi/shared/types/reading-reconstruction";
 
 /** 普通正文由已保存编辑稿回填，模型只需输出布局和真正需要设计的内容。 */
-export function prepareDesignCopy(draft: ReadingDraftSection[], keepIds = false) {
+export function prepareDesignCopy(draft: ReadingDraftSection[]) {
   const copies = new Map<string, string>();
   const manuscript = draft.map((section, sectionIndex) => ({
     title: section.title,
@@ -26,7 +26,7 @@ export function prepareDesignCopy(draft: ReadingDraftSection[], keepIds = false)
         const id = node.getAttribute("data-reading-copy");
         if (node.localName !== "div" || node.childNodes.length || !copies.has(id) || used.has(id)) throw new Error("正文引用必须为唯一、有效的空 div");
         used.add(id); node.innerHTML = copies.get(id); node.removeAttribute("data-reading-copy");
-        if(keepIds)node.setAttribute("data-reading-copy-id",id);
+        node.setAttribute("data-reading-copy-id", id);
       }
       return doc.body.innerHTML;
     },

@@ -9,7 +9,6 @@ import { resolveMediaSummaryConfig } from "../src/main/services/media/media-summ
 import { resolveImageGenConfig } from "../src/main/services/illustration/image-gen";
 import { runWithAiCallSink } from "../src/main/services/ai-call-context";
 import { runReadingV3 } from "../src/main/services/themed-reading/v3-pipeline";
-import { runReconstruction } from "../src/main/services/themed-reading/reconstruction-pipeline";
 import { compileReadingVisuals } from "../src/main/services/themed-reading/visual-compiler";
 import { probeReadingPage } from "../src/main/services/themed-reading/v3-views";
 import { exportThemedReadingHtml } from "../src/main/services/themed-reading/export";
@@ -69,23 +68,14 @@ export async function readingV3Benchmark(input: {
     const samples = JSON.parse(
       (await fs.readFile(input.samples, "utf8")).replace(/^\uFEFF/, ""),
     );
-    let jobs = samples.flatMap((sample) =>
-      [2, 3].map((version) => ({
-        sample,
-        version,
-        research: false,
-        image: false,
-      })),
-    );
+    let jobs = samples.map((sample) => ({
+      sample,
+      version: 3,
+      research: false,
+      image: false,
+    }));
     if (input.searchConfig)
-      jobs.push(
-        ...[2, 3].map((version) => ({
-          sample: samples[0],
-          version,
-          research: true,
-          image: false,
-        })),
-      );
+      jobs.push({ sample: samples[0], version: 3, research: true, image: false });
     jobs.push({ sample: samples[0], version: 3, research: false, image: true });
     if (input.profile === "release-online") {
       if (!input.searchConfig || input.anomalyLedger || samples.length !== 2)
@@ -159,9 +149,8 @@ export async function readingV3Benchmark(input: {
         research: job.research,
         generateImages: job.image,
         maxImages: job.image ? 1 : 0,
-        ...(job.version === 3
-          ? { enhancedInteraction: true, researchDepth: "standard" as const }
-          : {}),
+        enhancedInteraction: true,
+        researchDepth: "standard",
       };
       if (input.resumeDirectory) {
         const previous = JSON.parse(await fs.readFile(path.join(input.resumeDirectory, `${id}-checkpoint.json`), "utf8"));
@@ -214,12 +203,7 @@ export async function readingV3Benchmark(input: {
           },
           async () => {
             const signal = AbortSignal.timeout(1500000);
-            await (job.version === 3 ? runReadingV3 : runReconstruction)(
-              page,
-              config,
-              signal,
-              hooks,
-            );
+            await runReadingV3(page, config, signal, hooks);
             if (job.image) {
               const imageConfig = resolveImageGenConfig();
               if (!imageConfig) throw new Error("生图模型未配置");
@@ -236,25 +220,22 @@ export async function readingV3Benchmark(input: {
               );
             }
             await compileReadingVisuals(page, signal, checkpoint, () => {});
-            if (job.version === 3) {
-              const fault = await probeReadingPage(page);
-              if (fault) {
-                for (const s of page.design.scripts ?? []) {
-                  s.status = "failed";
-                  s.error = fault;
-                }
-                page.warnings.push(fault);
+            const fault = await probeReadingPage(page);
+            if (fault) {
+              for (const s of page.design.scripts ?? []) {
+                s.status = "failed";
+                s.error = fault;
               }
+              page.warnings.push(fault);
             }
             await fs.writeFile(
               path.join(directory, `${id}.html`),
               await exportThemedReadingHtml(page),
             );
-            if (job.version === 3)
-              await fs.writeFile(
-                path.join(directory, `${id}-static.html`),
-                await exportThemedReadingHtml(page, false, true),
-              );
+            await fs.writeFile(
+              path.join(directory, `${id}-static.html`),
+              await exportThemedReadingHtml(page, false, true),
+            );
             if (input.anomalyLedger) {
               // 第十次先完成与短文基线相同的离线页面；随后只为同一页补图，不重新调用页面设计。
               result.coreElapsedMs = Date.now() - result.startedAt;

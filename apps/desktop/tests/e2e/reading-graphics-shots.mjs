@@ -143,9 +143,4 @@ export default async ({ win, app, shot, outDir, mainEntry }) => {
   assert.equal(await staticFrame.locator('[data-reading-visual="chart"] path').last().evaluate(el => getComputedStyle(el).animationName), 'none');
   assert.deepEqual(requests, []); assert.deepEqual(errors, []);
   await fs.writeFile(path.join(outDir, 'evidence.json'), JSON.stringify({ success: true, fixtureOnly: true, modelVerified: false, compilation: result, cases, animationPauseResumeReplay: true, backgroundPause: true, manualPausePreserved: true, autoplayOnce: true, printStatic: true, scriptDisabledStatic: true, fontScaling: true, animationEvidence, chartAnimationEvidence: { chartRunning, chartPaused }, requests, errors }, null, 2));
-  if (process.env.GUIZHI_GRAPHICS_LIVE_CONFIG) {
-    console.log('开始当前配置模型的端到端生成验收（合成教学材料，不联网搜索）');
-    const live = await app.evaluate(async (_electron, { directory, config }) => globalThis.readingGraphicsLiveFixture(directory, config), { directory: outDir, config: process.env.GUIZHI_GRAPHICS_LIVE_CONFIG });
-    console.log(JSON.stringify(live)); assert.deepEqual(live.errors, []);
-  }
 };

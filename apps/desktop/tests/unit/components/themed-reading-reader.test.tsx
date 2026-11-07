@@ -139,26 +139,30 @@ describe("安静阅读与任务恢复", () => {
     expect(screen.getByRole("button", { name: "复制详细原因" })).toBeEnabled();
   });
 
-  it("补查已达上限不再提供会重复计费的恢复入口", () => {
-    const resume = vi.fn(),
-      offline = vi.fn();
+  it("旧格式任务不再提供继续与不联网继续入口，并说明可以重新生成", () => {
     render(
       <ThemedReadingStatus
         task={{
           ...failed,
-          error: "补充查证仍未完成，已达到本次自动补查上限：标准条文缺失",
+          legacyFormat: true,
+          error: "旧格式任务不再支持继续，请重新生成新版阅读页",
         }}
-        onResume={resume}
+        hasPage
+        onResume={vi.fn()}
         onCancel={vi.fn()}
-        onOffline={offline}
+        onOffline={vi.fn()}
       />,
     );
     expect(
-      screen.queryByRole("button", { name: "补查资料并继续" }),
+      screen.getByText("旧格式任务不再支持继续，可重新生成新版阅读页。"),
+    ).toBeVisible();
+    for (const name of ["补查资料并继续", "继续生成", "不联网继续生成"])
+      expect(
+        screen.queryByRole("button", { name, hidden: true }),
+      ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("当前显示上次生成的版本。"),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "不联网继续生成" }));
-    expect(offline).toHaveBeenCalledOnce();
-    expect(resume).not.toHaveBeenCalled();
   });
 
   it("版本、编辑与阅读页设置集中到父工具栏，阅读区不再新增工具栏", async () => {

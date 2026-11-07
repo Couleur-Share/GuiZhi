@@ -15,6 +15,8 @@
 
 ## 数据与生成
 
+本节描述 formatVersion 2 页面的数据格式与当时的生成机制。这类页面现在只读：重新打开、导出与备份恢复仍按下文校验和组装，但不再生成、调整或续跑。
+
 设计响应新增可选 `visuals`、`animations`。视觉扩展版本为 1，沿用阅读页格式版本 2，不修改 SQLite 表。旧页没有这些字段时保持原行为。
 
 `visuals` 对应唯一的 `data-reading-visual` 容器与文字说明；Mermaid 接受固定图类型的描述，图表接受分类、系列、单位和编辑稿中的原句依据。数值必须在依据原句中出现，不开放任意图表 option 或执行函数。
@@ -37,7 +39,7 @@
 
 - 单元测试：reading-visuals、reading-visual-document、reading-visual-recovery，以及已有阅读页、备份和任务测试。
 - UI：设置 `GUIZHI_GRAPHICS_VALIDATION=1`，运行根目录 `pnpm shot`，steps 使用 `apps/desktop/tests/e2e/reading-graphics-shots.mjs` 的绝对路径。
-- 可选真实模型验收：设置 `GUIZHI_GRAPHICS_LIVE_CONFIG` 为现有模型配置文件路径。仅只读取得当前文本模型参数，不复制配置、不连接正式库；使用明确标记为虚构的教学材料，最多十二次文本请求，不联网搜索。
+- 这些图形属于 formatVersion 2 页面。旧格式页面只读保留，不再调用模型生成，原有的真实模型图形验收已移除；新版阅读页的真实生成验收见 [AI 阅读页 v3](./ai-reading-v3.md)。
 - 测试入口由构建常量控制，只在隔离验收构建中存在，正式构建删除入口及测试模块。
 
 截图、状态断言、真实模型结果与体积记录应分别报告，不能把固定样例验收当成真实模型生成成功。

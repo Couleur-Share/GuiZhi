@@ -2,7 +2,6 @@
 import { describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
 import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
-import { THEMED_READING_DESIGN_GUIDANCE } from "../../src/main/services/themed-reading/design-guidance";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 describe("内容关系阅读组件", () => {
@@ -22,11 +21,5 @@ describe("内容关系阅读组件", () => {
     expect(parseHTML(themedReadingDocument(page)).document.querySelector("style").textContent).not.toContain("--reader-panel-surface");
     page.design.html = '<article class="reading-page"><details class="reading-contents"><summary>文章目录</summary><div data-source-block="b0"></div><div data-source-block="b1"></div></details></article>';
     expect(parseHTML(themedReadingDocument(page)).document.querySelector("details").hasAttribute("open")).toBe(true);
-  });
-
-  it("生成器知道组件含义及适用条件，不强迫所有文章使用同一结构", () => {
-    for (const component of ["reading-page", "reading-title", "reading-comparison", "reading-synthesis", "reading-dimensions", "reading-checklist"]) expect(THEMED_READING_DESIGN_GUIDANCE).toContain(component);
-    expect(THEMED_READING_DESIGN_GUIDANCE).toContain("不适合这些组件时继续自由设计");
-    expect(THEMED_READING_DESIGN_GUIDANCE).toContain("正文不能放入该折叠");
   });
 });

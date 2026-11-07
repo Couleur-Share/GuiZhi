@@ -9,7 +9,7 @@ export function completeReadingCopy(
   draft: ReadingDraftSection[],
   generation: ReadingGeneration,
 ): void {
-  const copy = prepareDesignCopy(draft, true),
+  const copy = prepareDesignCopy(draft),
     used = new Set<string>();
   for (const section of generation.sections) {
     const doc = parseHTML(`<html><body>${section.html}</body></html>`).document;

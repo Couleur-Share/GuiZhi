@@ -5,7 +5,7 @@ import { useToast } from "../ui/Toast";
 import { useTranslation } from "react-i18next";
 
 export const isThemeTaskActive = (task?: ThemedReadingTask | null) => Boolean(task && ["queued", "running"].includes(task.state));
-export const canResumeThemeTask = (task?: ThemedReadingTask | null) => Boolean(task && ["partial", "failed", "cancelled", "interrupted"].includes(task.state));
+export const canResumeThemeTask = (task?: ThemedReadingTask | null) => Boolean(task && !task.legacyFormat && ["partial", "failed", "cancelled", "interrupted"].includes(task.state));
 
 /** 主进程持有任务；关闭面板只退订，绝不隐式取消已付费的生成。 */
 export function useThemedReading(itemId: string, sourceKind: ThemedReadingSourceKind, content: string, showPage = true) {

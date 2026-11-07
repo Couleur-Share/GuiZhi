@@ -431,7 +431,7 @@ describe("主题页隔离阅读", () => {
       await screen.findByRole("button", { name: "阅读页设置", exact: true }),
     );
     expect(
-      screen.getByRole("menuitem", { name: "重新设计阅读页", exact: true }),
+      screen.getByRole("menuitem", { name: "调整阅读页", exact: true }),
     ).toBeDisabled();
     expect(
       screen.getByRole("menuitem", { name: "按最新原文重新生成", exact: true }),
@@ -448,6 +448,64 @@ describe("主题页隔离阅读", () => {
     expect(
       screen.getByRole("menuitem", { name: "导出 HTML", exact: true }),
     ).toBeEnabled();
+  });
+  it("旧格式页面只读：隐藏调整与单图重做入口，说明可以重新生成新版", async () => {
+    vi.mocked(window.api.themedReading.get).mockResolvedValue({
+      success: true,
+      page: {
+        ...page,
+        formatVersion: 2,
+        warnings: [],
+        options: { style: "", generateImages: false, maxImages: 3 },
+        assets: [
+          {
+            id: "g0",
+            role: "generated",
+            purpose: "主题插画",
+            prompt: "麦穗",
+            alt: "麦穗插画",
+            aspectRatio: "16:9",
+            status: "failed",
+            error: "上游超时",
+          },
+        ],
+      },
+      models,
+      document: "<p>保存的旧格式主题页</p>",
+    });
+    render(
+      <ToastProvider>
+        <ThemedReadingPane
+          item={{ id: "a", content: "正文" } as KnowledgeItem}
+          sourceKind="body"
+          findQuery=""
+          findIndex={0}
+          onFindCount={() => {}}
+          onFindOpen={() => {}}
+        />
+      </ToastProvider>,
+    );
+    const notice =
+      "旧格式阅读页只读，仍可阅读和导出；如需调整，请重新生成新版。";
+    expect(await screen.findByText(notice)).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "阅读页设置", exact: true }),
+    );
+    expect(
+      screen.queryByRole("menuitem", { name: "调整阅读页", exact: true }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "按最新原文重新生成", exact: true }),
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "页面图片", exact: true }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(notice)).toBeVisible();
+    expect(within(dialog).getByText("上游超时")).toBeVisible();
+    expect(
+      within(dialog).queryByRole("button", { name: "重做这张图" }),
+    ).not.toBeInTheDocument();
   });
   it("首次进入无页面时自动显示带来源的设置，关闭后不重复弹出", async () => {
     const user = userEvent.setup();

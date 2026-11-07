@@ -943,7 +943,6 @@ void app.whenReady().then(async () => {
     (globalThis as any).readingV3Benchmark=benchmark.readingV3Benchmark;
     const fixture = await import("../../scripts/reading-graphics-fixture");
     (globalThis as unknown as { readingGraphicsFixture: typeof fixture.createGraphicsFixtures }).readingGraphicsFixture = fixture.createGraphicsFixtures;
-    (globalThis as unknown as { readingGraphicsLiveFixture: typeof fixture.createLiveGraphicsFixture }).readingGraphicsLiveFixture = fixture.createLiveGraphicsFixture;
   }
   try {
     // A second packaged instance on Windows may still reach whenReady() before quit
