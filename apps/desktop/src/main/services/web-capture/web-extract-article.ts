@@ -24,6 +24,8 @@ export interface WebArticle {
 const MARKDOWN_LIMIT = 200_000;
 // Readability 的正文字数门槛；所有尝试都不达标时它退回整页 body（并去掉 class），页框会混进正文。
 const READABILITY_MIN_CHARS = 100;
+// 与 Readability 判断可见性的规则一致：内联样式隐藏的元素不算正文。
+const INVISIBLE_STYLE = /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\s*(?:;|$|!)/i;
 // Readability 取到的段落文字不足语义区域的 60% 视为截断或选错；区域段落不足 500 字时差值不可靠，不回退。
 // 59 页评估样本与 47 页留出样本：截断页 ≤0.52，正常页 ≥0.85（区域段落 500 字以上的页面）。
 const FALLBACK_RATIO = 0.6;
@@ -377,6 +379,8 @@ export function extractWebArticle(html: string, url: string, status: number): We
         // 极短页面：按语义区域的规则清理整页的导航、页眉页脚与边栏；清理后没有文字时仍用 Readability 的结果。
         const page = parsePage(html || "");
         prepare(page);
+        for (const node of Array.from(page.querySelectorAll("[style]")))
+          if (INVISIBLE_STYLE.test(node.getAttribute("style") ?? "")) node.remove();
         const body = page.body ? cleanRegion(page.body) : null;
         if (body && textLength(body) > 0) {
           root = body;

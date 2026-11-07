@@ -149,7 +149,8 @@ describe("R5 语义区域回退", () => {
     const article = extract(
       page(
         '<nav>广告导航</nav><main><h1>组件配置</h1><p>动态正文支持中文知识管理。</p><div class="sidebar">推广位</div>' +
-          '<pre><code>print("归知")</code></pre></main><footer>版权所有</footer>',
+          '<pre><code>print("归知")</code></pre><div style="display: none">隐藏弹层</div>' +
+          '<p style="color:red;visibility:hidden">隐藏提示</p></main><footer>版权所有</footer>',
       ),
     );
     expect(article.source).toBe("page");
@@ -157,7 +158,7 @@ describe("R5 语义区域回退", () => {
     expect(markdown).toContain("# 组件配置");
     expect(markdown).toContain("动态正文支持中文知识管理。");
     expect(markdown).toContain('print("归知")');
-    for (const chrome of ["广告导航", "推广位", "版权所有"]) expect(markdown).not.toContain(chrome);
+    for (const chrome of ["广告导航", "推广位", "版权所有", "隐藏弹层", "隐藏提示"]) expect(markdown).not.toContain(chrome);
     // 没有页框的短文照常保留全文。
     const short = extract(page("<article><p>今天发布了一个小更新。</p></article>", "<title>短文</title>"));
     expect(short.result.markdown).toBe("今天发布了一个小更新。");
