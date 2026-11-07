@@ -221,7 +221,7 @@ export function TooltipLayer() {
     <div
       ref={bubbleRef}
       role="tooltip"
-      className="pointer-events-none fixed z-[100000] max-w-xs -translate-x-1/2 whitespace-pre-line break-words rounded-md border border-border bg-popover px-2 py-1 text-xs leading-relaxed text-popover-foreground shadow-lg animate-in fade-in-0 duration-quick"
+      className="pointer-events-none fixed z-[100000] w-max max-w-xs -translate-x-1/2 whitespace-pre-line break-words rounded-md border border-border bg-popover px-2 py-1 text-xs leading-relaxed text-popover-foreground shadow-lg animate-in fade-in-0 duration-quick"
       style={{ top: tooltip.top, left: tooltip.left }}
     >
       {tooltip.text}

@@ -511,8 +511,8 @@ body {
   background: var(--app-ui-toolbar-highlight) !important;
 }
 
+/* 不指定 position：顶栏里它是 absolute 铺底层，未分层的 relative 会压过 Tailwind 的 absolute */
 .app-wallpaper-search {
-  position: relative;
   overflow: hidden;
   background: var(--app-ui-search-bg) !important;
   border-color: var(--app-ui-search-border) !important;

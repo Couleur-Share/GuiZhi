@@ -272,7 +272,9 @@ export function Modal({
               {headerActions}
               {showCloseButton ? (
                 <>
-                  <div className="w-[1px] h-4 bg-border mx-1" />
+                  {headerActions ? (
+                    <div className="w-[1px] h-4 bg-border mx-1" />
+                  ) : null}
                   <button
                     type="button"
                     onClick={onClose}

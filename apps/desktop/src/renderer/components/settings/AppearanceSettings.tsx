@@ -61,7 +61,7 @@ function BackgroundPreviewStage({
         <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2.5 app-wallpaper-toolbar">
           <div className="h-5 w-5 shrink-0 rounded-md app-wallpaper-surface" />
           <div className="flex-1">
-            <div className="h-5 rounded-md border border-border app-wallpaper-search" />
+            <div className="relative h-5 rounded-md border border-border app-wallpaper-search" />
           </div>
           <div className="h-5 w-5 shrink-0 rounded-md app-wallpaper-surface" />
         </div>
