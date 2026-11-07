@@ -49,12 +49,31 @@ it('新建在途时继续编辑，保存失败仍停在原草稿', async () => {
   expect(library.getState().saveError).toBe('磁盘已满');
 });
 
-it('重开全库会话再保存，未被最终引用的已读证据仍完整保留', async () => {
+it('重开全库会话：未改动不重写；改动后保存，未被最终引用的已读证据仍完整保留', async () => {
   const evidenceSources = [{ ordinal: 2, kind: 'item', refId: 'read-only', title: '实际读过的来源', evidence: { version: 1, text: '当时读到的片段', fingerprint: 'historical' } }];
   window.api.askSession.get = async id => ({ id, title: '历史会话', createdAt: 1, updatedAt: 2,
     messagesJson: JSON.stringify([{ id: 'm', question: '问题', answer: '答案', status: 'done', sources: [], evidenceSources }]) });
-  await ask.getState().switchSession('B'); await ask.getState().persist();
-  expect(JSON.parse(vi.mocked(window.api.askSession.save).mock.calls.at(-1)![0].messagesJson)[0].evidenceSources).toEqual(evidenceSources);
+  await ask.getState().switchSession('B');
+  const save = vi.mocked(window.api.askSession.save);
+  const savesAfterSwitch = save.mock.calls.length;
+  await ask.getState().persist();
+  expect(save.mock.calls.length).toBe(savesAfterSwitch);
+  ask.setState(state => ({ messages: [...state.messages, { id: 'm2', question: '追问', answer: '补充', status: 'done', sources: [], steps: [] }] }));
+  await ask.getState().persist();
+  expect(save.mock.calls.at(-1)![0].id).toBe('B');
+  expect(JSON.parse(save.mock.calls.at(-1)![0].messagesJson)[0].evidenceSources).toEqual(evidenceSources);
+});
+
+it('切换会话不重存内容未变的上一个会话', async () => {
+  window.api.askSession.get = async id => ({ id, title: '历史会话', createdAt: 1, updatedAt: 2,
+    messagesJson: JSON.stringify([{ id: 'm', question: '问题', answer: '答案', status: 'done', sources: [], steps: [] }]) });
+  ask.setState({ messages: [{ id: 'a-edit', question: '本轮新问的问题', answer: '尚未保存的回答', status: 'done', sources: [], steps: [] }] });
+  const save = vi.mocked(window.api.askSession.save);
+  await ask.getState().switchSession('B');
+  expect(save.mock.calls.map(([input]) => input.id)).toEqual(['A']);
+  await ask.getState().switchSession('C');
+  await ask.getState().switchSession('B');
+  expect(save.mock.calls.map(([input]) => input.id)).toEqual(['A']);
 });
 
 it.each(['{broken', '{}', '[null]', '[{"question":2}]'])('损坏历史 %s 显示读取错误并保留当前回答', async messagesJson => {

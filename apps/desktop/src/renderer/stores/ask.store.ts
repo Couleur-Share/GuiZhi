@@ -73,6 +73,12 @@ let abortController: AbortController | null = null;
 let initialized = false;
 let sessionGeneration = 0;
 let failedSessionId: string | null = null;
+/** 各会话最近一次读入或落盘的消息快照：内容没变就不再保存，否则切换会话会刷新旧会话的更新时间 */
+const persistedSnapshots = new Map<string, string>();
+
+function rememberPersisted(id: string, messages: AskMessage[]): void {
+  persistedSnapshots.set(id, JSON.stringify(messages));
+}
 
 function createMessageId(): string {
   return `ask-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -149,13 +155,18 @@ export const useAskStore = create<AskState>()((set, get) => {
     if (!activeSessionId || messages.length === 0 || !window.api?.askSession) {
       return true;
     }
+    const messagesJson = JSON.stringify(messages);
+    if (persistedSnapshots.get(activeSessionId) === messagesJson) {
+      return true;
+    }
     try {
       const input = {
         id: activeSessionId,
         title: buildSessionTitle(messages),
-        messagesJson: JSON.stringify(messages),
+        messagesJson,
       };
       const saved = await queueConversationSave(activeSessionId, () => window.api.askSession.save(input));
+      persistedSnapshots.set(activeSessionId, messagesJson);
       set((state) => {
         const meta: AskSessionMeta = {
           id: saved.id,
@@ -210,7 +221,10 @@ export const useAskStore = create<AskState>()((set, get) => {
           if (record) {
             activeSessionId = record.id;
             if (record.scope === "article") articleSession = record;
-            else messages = parseStoredMessages(record.messagesJson);
+            else {
+              messages = parseStoredMessages(record.messagesJson);
+              rememberPersisted(record.id, messages);
+            }
           }
         }
         if (!activeSessionId) {
@@ -259,6 +273,7 @@ export const useAskStore = create<AskState>()((set, get) => {
         if (!record) throw new Error("会话不存在或已被删除");
         // 先完整解析再切换，包括记忆的会话 ID；损坏记录不能变成可覆盖的空会话。
         const messages = record.scope === "article" ? [] : parseStoredMessages(record.messagesJson);
+        if (record.scope !== "article") rememberPersisted(record.id, messages);
         failedSessionId = null;
         rememberActiveSession(record.id);
         set({
@@ -281,6 +296,7 @@ export const useAskStore = create<AskState>()((set, get) => {
       if (get().activeSessionId === id) { get().stop(); if (!(await persistActiveSession())) return; }
       const ok = await queueConversationSave(id, () => runGuardedMutation('ask.delete', translate('ask.deleteSession', '删除会话'), async () => { await window.api.askSession.delete(id); }));
       if (!ok) return;
+      persistedSnapshots.delete(id);
       if (useArticleAskStore.getState().sessionId === id) useArticleAskStore.setState({ sessionId: null, itemId: null, messages: [] });
       set(state => ({ sessions: state.sessions.filter(session => session.id !== id) }));
       if (get().activeSessionId === id) {

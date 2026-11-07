@@ -31,6 +31,10 @@ let controller: AbortController | null = null;
 let loadingGeneration = 0;
 const makeId = () => crypto.randomUUID();
 const errorText = (e: unknown) => e instanceof Error ? e.message : String(e);
+/** 各本文会话最近一次读入或落盘的内容签名：没变就不再保存，否则打开文章会刷新会话的更新时间 */
+const persistedSignatures = new Map<string, string>();
+const signatureOf = (input: { messagesJson: string; target: unknown; webEnabled: boolean; articleTitle: string }) =>
+  JSON.stringify([input.messagesJson, input.target, input.webEnabled, input.articleTitle]);
 
 export function parseArticleMessages(json: string): ArticleMessage[] {
   const messages: unknown = JSON.parse(json);
@@ -51,9 +55,12 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
     const input = { id: snapshot.sessionId, scope: "article" as const, itemId: snapshot.itemId!, articleTitle: snapshot.title,
       title: snapshot.messages[0].question.slice(0, 30), messagesJson: JSON.stringify(snapshot.messages),
       target: snapshot.target, webEnabled: snapshot.webEnabled };
+    const signature = signatureOf(input);
+    if (persistedSignatures.get(input.id) === signature) return true;
     const job = queueConversationSave(input.id, async () => {
       const ok = await runGuardedMutation("articleAsk.save", translate("articleAsk.save", "保存本文问答"), async () => {
         const saved = await window.api.askSession.save(input);
+        persistedSignatures.set(input.id, signature);
         if (get().sessionId === input.id) set({ saveError: null, sessions: [saved, ...get().sessions.filter(s => s.id !== saved.id)] });
         window.dispatchEvent(new Event("article-ask-saved"));
       });
@@ -79,6 +86,11 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
         title: item?.title ?? record?.articleTitle ?? translate("articleAsk.articleDeleted", "文章已删除"), sessions,
         messages: record ? parseArticleMessages(record.messagesJson) : [], webEnabled: record?.webEnabled !== false,
         loading: false, running: false, saveError: null });
+      const loaded = get();
+      if (record && loaded.sessionId && loaded.messages.length) {
+        persistedSignatures.set(loaded.sessionId, signatureOf({ messagesJson: JSON.stringify(loaded.messages), target: loaded.target,
+          webEnabled: loaded.webEnabled, articleTitle: record.articleTitle ?? loaded.title }));
+      }
     } catch (e) {
       if (generation === loadingGeneration) set({ loading: false, loadError: errorText(e) });
       void window.api.log.appError({ scope: "articleAsk", action: "加载会话", message: errorText(e) });
