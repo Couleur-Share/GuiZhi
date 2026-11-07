@@ -1262,7 +1262,7 @@
     "deleteCollectionDesc": "Items inside are kept",
     "collectionDeleted": "Deleted collection \"{{name}}\"; its items were kept",
     "deleteTag": "Delete tag",
-    "deleteTagConfirm": "Delete tag \"{{name}}\"? Related items are not deleted.",
+    "tagDeleted": "Deleted tag \"{{name}}\"; related items were kept",
     "aiSummary": "AI Summary",
     "aiSummaryExpand": "Expand AI summary",
     "aiSummaryCollapse": "Collapse AI summary",

@@ -17,7 +17,6 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useCollectionStore } from "../../stores/collection.store";
 import { useTagStore } from "../../stores/tag.store";
 import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
-import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Modal } from "../ui/Modal";
 import { Input } from "../ui/Input";
 import { useToast } from "../ui/Toast";
@@ -32,10 +31,6 @@ type EditModalState =
   | { kind: "create-collection" }
   | { kind: "rename-collection"; collection: Collection }
   | { kind: "rename-tag"; tag: Tag }
-  | null;
-
-type ConfirmDeleteState =
-  | { kind: "tag"; tag: Tag }
   | null;
 
 /** 菜单锚点：鼠标触发用光标位置，键盘触发用按钮左下角 */
@@ -98,7 +93,7 @@ export function SidebarLibraryPanel() {
   );
   const tags = useTagStore((state) => state.tags);
   const updateTag = useTagStore((state) => state.updateTag);
-  const deleteTag = useTagStore((state) => state.deleteTag);
+  const scheduleDeleteTag = useTagStore((state) => state.scheduleDeleteTag);
   const refreshAll = useKnowledgeStore((state) => state.refreshAll);
 
   const menuTriggerRef = useRef<HTMLElement | null>(null);
@@ -110,7 +105,6 @@ export function SidebarLibraryPanel() {
   const [editModal, setEditModal] = useState<EditModalState>(null);
   const [editName, setEditName] = useState("");
   const [editIcon, setEditIcon] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState<ConfirmDeleteState>(null);
   const [showUnusedTags, setShowUnusedTags] = useState(false);
 
   const isTrashActive =
@@ -238,6 +232,19 @@ export function SidebarLibraryPanel() {
     ]);
   };
 
+  // 删标签只摘掉标签本身，条目保留：先隐藏、8 秒内可撤销，不再弹确认。
+  const deleteTagWithUndo = (tag: Tag) => {
+    const deletion = scheduleDeleteTag(tag.id);
+    if (!deletion) return;
+    if (activeTagId === tag.id) setScope("all");
+    showUndoToast(
+      t("library.tagDeleted", "已删除标签「{{name}}」，相关条目已保留", {
+        name: tag.name,
+      }),
+      deletion.undo,
+    );
+  };
+
   const openTagMenu = (event: React.MouseEvent, tag: Tag) => {
     openRowMenu(event, [
       {
@@ -265,7 +272,7 @@ export function SidebarLibraryPanel() {
         label: t("library.deleteTag", "删除标签"),
         icon: <XCircleIcon className="h-4 w-4" aria-hidden="true" />,
         variant: "destructive",
-        onClick: () => setConfirmDelete({ kind: "tag", tag }),
+        onClick: () => deleteTagWithUndo(tag),
       },
     ]);
   };
@@ -450,31 +457,6 @@ export function SidebarLibraryPanel() {
           </div>
         </form>
       </Modal>
-
-      <ConfirmDialog
-        isOpen={confirmDelete !== null}
-        onClose={() => setConfirmDelete(null)}
-        onConfirm={() => {
-          if (confirmDelete?.kind === "tag") {
-            void deleteTag(confirmDelete.tag.id).then(() => {
-              if (activeTagId === confirmDelete.tag.id) {
-                setScope("all");
-              }
-              void refreshAll();
-            });
-          }
-          setConfirmDelete(null);
-        }}
-        title={t("library.deleteTag", "删除标签")}
-        message={t(
-          "library.deleteTagConfirm",
-          "删除标签「{{name}}」？相关条目不会被删除。",
-          { name: confirmDelete?.tag.name ?? "" },
-        )}
-        confirmText={t("common.confirm", "确认")}
-        cancelText={t("common.cancel", "取消")}
-        variant="destructive"
-      />
     </div>
   );
 }
