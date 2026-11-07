@@ -89,7 +89,7 @@
 6. 惰性图片探测：`scripts/web-inert-probe-steps.mjs`。
 7. web-capture-runtime 集成测试：`GUIZHI_TEST_WEB_CAPTURE=1 pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts`（真实 Electron + 正文提取线程；只能在独立副本运行）。
 8. AI 阅读：`GUIZHI_GRAPHICS_VALIDATION=1 pnpm shot --steps apps/desktop/tests/e2e/reading-v3-acceptance.mjs`（隔离进程、网络与开窗拦截、死循环故障）和 `reading-graphics-shots.mjs`（console-message 失败判定）。
-9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿）。
+9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿；须加 `--gpu`：`pnpm shot --gpu --steps apps/desktop/tests/e2e/heavy-user-index-shots.mjs`，软件渲染下脚本直接失败）。
 10. `pnpm check:linux`：锁文件必然变化，按 `docs/agents/linux-preflight.md` 走德国共享构建器。
 11. 打包：在 `apps/desktop` 执行 `pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --x64 --publish never`，再执行 `node scripts/check-package-size.mjs --installer <安装包>`。不要用 `electron:build:win`，它会同时打 arm64。
 12. `pnpm shot --executable <win-unpacked 或安装后的 GuiZhi.exe> --steps <任一步骤脚本>`：确认打包产物启动、asar 内外资源与 MCP 资源可读。
@@ -173,7 +173,9 @@
 
 `heavy-user-index-shots` 测量 5 万分块检索期间“输入事件到下一帧”的 P95（阈值 100 ms）：45 上四次为 103.1、71.9、111.4、68.8 ms，33 上三次为 18.9、16.8、15.9 ms。不跑检索时 45 三次的 p50 为 42–74 ms、p95 为 125–164 ms，33 为 11–13 ms、36–55 ms；页面上临时插入的原生 `<input>` 两边接近；输入后的同步更新 45 为 3.3/5.4 ms、33 为 5.6/8.4 ms（p50/p95），时间耗在出帧阶段。检索让出事件循环的方式从 `setImmediate` 换成 `setTimeout(0)` 不改善（P95 约 68 ms），已撤回。改走 e2e 路径（`file://`、默认 GPU 合成）时，45 为 p50 3.6 ms、p95 6.0 ms，33 为 3.9 ms、23.4 ms。
 
-结论：变慢只出现在 `pnpm shot` 固定使用的 SwiftShader 软件渲染下，GPU 路径没有变慢。没有 GPU 加速、靠软件渲染的用户机器是否受影响，未验证。门禁如何处理（调整阈值、换测量路径或继续追查 SwiftShader）待决定。
+结论：变慢只出现在 `pnpm shot` 固定使用的 SwiftShader 软件渲染下，GPU 路径没有变慢。没有 GPU 加速、靠软件渲染的用户机器是否受影响，未验证。
+
+处理（用户决定，2026-11-07）：这项门禁改在 GPU 渲染下测量，阈值 100 ms 不变，其他截图仍用 SwiftShader。`pnpm shot` 新增 `--gpu`，脚本按 GPU 进程实际的 GL 实现判断渲染路径，软件渲染时在测量前失败，证据记录 `rendering`。本机（Intel Arc，`ANGLE_D3D11`）复测 4 次 P95 为 5.0、5.1、5.2、5.0 ms，步骤执行期间整机 CPU 平均 22%–37%；按文档命令直接运行一次为 5.0 ms。不加 `--gpu` 时脚本在测量前失败并报出 `ANGLE_SWIFTSHADER`。
 
 ### 安装包体积
 
@@ -196,10 +198,30 @@
 
 “未确认事项”中，第 1、2、5 条已有实测结果；第 4、8、9 条部分有结果（本机网络下 `install-electron` 用 26 s 下载成功；electron-builder 26.15.7 能打包 45；vite-plugin-electron 的开发模式与 electron-updater 未跑）；第 3、6、7 条仍未确认。
 
-### 既有问题（33 上同样出现，本分支未修复）
+### 既有问题（33 上同样出现，已在评审后续修复）
 
-- 新用户首次启动的界面语言可能是英文。`settings-defaults.ts` 的默认 `language` 读取 `i18n.language`，而 `main.tsx` 并行加载 App 与语言资源；探测中 `navigator.language` 为 `zh-CN`，`guizhi-settings` 里保存的却是 `en`，离屏实例与打包产物首次启动都显示英文。机制来自代码阅读与探测结果，未单独证实。这也是 accessibility 用例失败的原因之一：“处理中心”的匹配正则不含英文的 `Inbox`。
-- web-capture-runtime 集成测试仍断言跨源子框架会被请求，与默认不加载跨源子框架的策略矛盾。
+- 新用户首次启动的界面语言是英文：离屏插桩确认，`settings.store` 随 App 分包求值时创建，比语言包加载与 `i18n.init()` 早约 9 ms，默认值读到的 `i18n.language` 为 `undefined`，归一成 `en`；App 启动时以 store 为准同步语言，把 `en` 写入 `guizhi-settings` 并同步到主进程。现在默认语言取 i18n 导出的启动语言（已存设置优先，否则跟随系统）。已经存成 `en` 的老用户数据无法与主动选择区分，不改写。
+- accessibility 用例写死中英正则，“处理中心”的英文备选写成了未翻译键 `nav.inbox`：改为按设置按钮的可访问名认出当前语言包，从中取按钮名。复验时另发现快速采集弹窗淡入期间运行 axe 会误报对比度，改为等弹窗 opacity 为 1。
+- web-capture-runtime 集成测试断言跨源子框架会被请求：默认策略是有意设计，不改；子框架场景改为按场景显式设置策略，默认策略断言跨源子框架不被请求，`allow` 断言被请求。
+
+### 评审后续复验（2026-11-07）
+
+在 `chore/review-followups` 工作副本中执行，全部是源码与隔离测试；本机同时有另一代理在跑测试与打包。
+
+| 检查 | 结果 |
+| --- | --- |
+| typecheck、lint、test:unit | 通过；vitest 303 个文件、2604 项，node --test 22/22 |
+| test:e2e | 6 项全部通过（运行前 CPU 52%） |
+| accessibility 英文界面（`--lang=en-US`，临时改启动参数） | 通过 |
+| web-capture-runtime 集成测试 | 默认环境与 `GUIZHI_WEB_SUBFRAMES=allow` 各一次通过；把默认那一步临时改成放行时新增断言失败 |
+| article-ask-frames-shots | 修复后连续 5 次通过（运行前 CPU 15%–77%），12 张截图与两份 JSON 齐全 |
+| article-ask-shots 单独运行 | 通过；修复前收尾时 Playwright 报 "No dialog is showing" 后进程崩溃 |
+| heavy-user-index-shots（`--gpu`） | 见上文“SwiftShader 下的输入延迟” |
+| 默认 `pnpm shot` | 首次启动为中文界面；`guizhi-settings` 与主进程保存的语言均为 `zh` |
+
+article-ask 两个截图脚本自 2026-09-12 关闭前保存开始拦截问答消息起就跑不通：刷新与截图脚本收尾的 `app.close()` 都撞上这项拦截（产品行为，不改）。脚本改为刷新前点“新对话”、结束时走用户点关闭再选退出的路径。另修两处时序：选段前等正文渲染；iframe 上方的选段菜单要等按钮收到指针（`:hover`）再点击，否则点击可能按上一帧的命中区域落进 iframe 并清空选区。
+
+截图脚本失败时，收尾的 `app.close()` 同样会撞上这项拦截：没有 dialog 监听时 Playwright 自动处理一个并未弹出的对话框，报错后进程崩溃，原始错误被掩盖。`screenshot.mjs` 现在关闭前挂空的 dialog 监听，以进程真正退出为准，20 秒内未退出就按 PID 结束本次启动的进程树，临时配置删除失败只警告；用「问答有消息时步骤抛错」的复现脚本验证，修改后输出原始错误且无残留进程。
 
 ### 本次未验证
 

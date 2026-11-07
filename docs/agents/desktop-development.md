@@ -212,6 +212,14 @@ electron-deck 为了截图走的是同一套（`setPosition(-3000, -3000)` +
 立刻截的**第一张**会抓到淡入过渡的中间态——实测同一界面连截三张，默认选项下
 首张与后两张不一致，加上之后三张逐字节相同，耗时不变（Electron 45 复测：加上之后三张仍逐字节相同）。
 
+渲染默认固定用 Electron 自带的 SwiftShader（`--use-gl=angle --use-angle=swiftshader`），
+不依赖主机显卡，不同机器的栅格化结果更接近。`--gpu` 改走本机显卡，只给必须在 GPU 渲染下
+测量的门禁用，截图不保证跨机器一致；屏幕外窗口与临时 userData 不变。目前只有重度索引的
+输入延迟（`heavy-user-index-shots.mjs`）需要它：Electron 45 的 SwiftShader 出帧变慢，P95
+在 100 ms 阈值上下波动，GPU 下约 5 ms。该脚本读取 GPU 进程实际的 GL 实现，检测到软件渲染
+（SwiftShader、WARP、llvmpipe）就在测量前失败，`index-runtime.json` 的 `rendering` 记录实际路径。
+特性状态 `gpu_compositing` 在 SwiftShader 下同样是 `enabled`，不能用来判断。
+
 将来做 macOS 时这套要重新验证：`showInactive()` 在那边虽不给焦点，却硬编码
 把窗口带到前台（electron#49393，2026-01 仍未合入可选项），全屏状态下还会
 触发切换桌面（electron#24703）。窗口在屏幕外时未必看得出来，但别假设它同样安静。

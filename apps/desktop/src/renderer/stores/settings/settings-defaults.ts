@@ -1,14 +1,11 @@
 import { DEFAULT_NETWORK_PROXY_SETTINGS } from "@guizhi/shared/types";
 import { DEFAULT_FLARESOLVERR_SETTINGS } from "@guizhi/shared/utils/flaresolverr";
-import i18n from "../../i18n";
+import { initialLanguage } from "../../i18n";
 import {
   DEFAULT_BACKGROUND_IMAGE_BLUR,
   DEFAULT_BACKGROUND_IMAGE_OPACITY,
 } from "./settings-appearance";
-import {
-  DEFAULT_SHORTCUT_MODES,
-  normalizeLanguage,
-} from "./settings-normalizers";
+import { DEFAULT_SHORTCUT_MODES } from "./settings-normalizers";
 import type { SettingsActions, SettingsValues } from "./settings-types";
 
 function createDefaultAppearanceValues() {
@@ -43,7 +40,7 @@ function createDefaultAppearanceValues() {
 
 function createDefaultWorkspaceValues() {
   return {
-    language: normalizeLanguage(i18n.language),
+    language: initialLanguage,
     dataPath: "",
     autoCheckUpdate: true,
     useUpdateMirror: false,

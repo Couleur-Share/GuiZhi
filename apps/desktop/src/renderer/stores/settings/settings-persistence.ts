@@ -35,20 +35,13 @@ import type { SettingsState } from "./settings-types";
  *
  * 用默认值的键集合做白名单，读写两个方向都过一遍，未知字段自然消失。
  */
-let knownSettingsKeys: Set<string> | null = null;
-
-function getKnownSettingsKeys(): Set<string> {
-  // 懒求值：默认值会读 i18n.language，模块加载期取值时它可能还没初始化
-  knownSettingsKeys ??= new Set(Object.keys(createDefaultSettingsValues()));
-  return knownSettingsKeys;
-}
+const knownSettingsKeys = new Set(Object.keys(createDefaultSettingsValues()));
 
 function pickKnownSettings<T extends object>(state: T): T {
-  const known = getKnownSettingsKeys();
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(state)) {
     // 保留 actions（函数）：它们不参与序列化，但 merge 后的对象仍需可用
-    if (known.has(key) || typeof value === "function") {
+    if (knownSettingsKeys.has(key) || typeof value === "function") {
       result[key] = value;
     }
   }

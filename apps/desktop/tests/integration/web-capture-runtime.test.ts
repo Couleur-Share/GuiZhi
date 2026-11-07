@@ -8,6 +8,7 @@ import { build } from "vite";
 import { _electron, type ElectronApplication } from "playwright";
 import type { WebCaptureRequest } from "@guizhi/shared/types";
 import { readingLibrariesPlugin } from "../../scripts/reading-libraries-plugin.mjs";
+import { WEB_SUBFRAMES_ENV } from "../../src/main/services/web-capture/web-subframe-policy";
 import type { fixture } from "./fixtures/web-runtime-main";
 
 declare global {
@@ -28,6 +29,15 @@ const running = () =>
   application!.evaluate(() => globalThis.runtimeFixture.running);
 const closeCapture = () =>
   application!.evaluate(() => globalThis.runtimeFixture?.close());
+/** 子框架策略每次判断时读取主进程环境变量；undefined 表示默认策略。 */
+const setSubframePolicy = (value: string | undefined) =>
+  application!.evaluate(
+    (_electron, args) => {
+      if (args.value === undefined) delete process.env[args.name];
+      else process.env[args.name] = args.value;
+    },
+    { name: WEB_SUBFRAMES_ENV, value },
+  );
 afterAll(async () => {
   if (application) {
     try {
@@ -199,6 +209,17 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
       }),
     ).rejects.toThrow(/范围/);
     expect(await calls()).not.toContain("https://outside.example/short");
+    // 默认策略不加载跨源子框架；主框架脚本与同源请求照常完成。
+    await setSubframePolicy(undefined);
+    const unframed = await capture({
+      taskId: "frames-default",
+      purpose: "import",
+      url: "https://fixture.example/frame-root",
+    });
+    expect(unframed.markdown).toContain("动态请求完成");
+    expect(await calls()).not.toContain("https://frame.example/short");
+    // 需要子框架的场景显式放行；同一页面放行后会请求子框架，可见上面没有请求是策略所致。
+    await setSubframePolicy("allow");
     const framed = await capture({
       taskId: "frames",
       purpose: "import",
@@ -206,6 +227,7 @@ try { require("./main.cjs"); } catch (error) { console.error(error); process.exi
     });
     expect(framed.markdown).toContain("动态请求完成");
     expect(await calls()).toContain("https://frame.example/short");
+    await setSubframePolicy(process.env[WEB_SUBFRAMES_ENV]);
     await expect(
       capture(
         {

@@ -4,6 +4,30 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+type Locale = Record<string, unknown>;
+
+const LOCALES: Locale[] = ["zh", "en"].map((name) =>
+  JSON.parse(
+    fs.readFileSync(path.join(__dirname, `../../src/renderer/i18n/locales/${name}.json`), "utf8"),
+  ),
+);
+
+function message(locale: Locale, key: string): string {
+  const value = key
+    .split(".")
+    .reduce<unknown>((node, part) => (node as Locale | undefined)?.[part], locale);
+  if (typeof value !== "string") throw new Error(`语言包缺少文案：${key}`);
+  return value;
+}
+
+/** 界面语言跟随系统，按设置按钮的可访问名认出当前语言包，按钮名称从同一语言包取。 */
+async function currentLocale(page: Page): Promise<Locale> {
+  const label = await page.getByTestId("rail-settings").getAttribute("aria-label");
+  const locale = LOCALES.find((candidate) => message(candidate, "header.settings") === label);
+  if (!locale) throw new Error(`无法按设置按钮的可访问名判断界面语言：${label}`);
+  return locale;
+}
+
 async function expectNoSeriousViolations(page: Page, surface: string): Promise<void> {
   if (!(await page.evaluate(() => Boolean((window as typeof window & { axe?: unknown }).axe)))) {
     await page.evaluate(axe.source);
@@ -46,7 +70,8 @@ test("核心工作流通过 axe WCAG A/AA 检查", async () => {
     const page = await app.firstWindow();
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByTestId("topbar-search")).toBeVisible({ timeout: 20_000 });
-    const setupLater = page.getByRole("button", { name: /稍后再说|maybe later/i });
+    const locale = await currentLocale(page);
+    const setupLater = page.getByRole("button", { name: message(locale, "setup.later"), exact: true });
     if (
       await setupLater
         .waitFor({ state: "visible", timeout: 3_000 })
@@ -107,19 +132,19 @@ test("核心工作流通过 axe WCAG A/AA 检查", async () => {
     });
 
     await page.getByTestId("topbar-new").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    // 弹窗以 opacity 过渡淡入，opacity 为 0 时也算可见；axe 须检查淡入结束后的配色，
+    // 否则会把半透明的中间态文字误判成对比度不足。
+    await expect(dialog).toHaveCSS("opacity", "1");
     await expectNoSeriousViolations(page, "快速采集");
     await page.keyboard.press("Escape");
 
-    for (const { label, name } of [
-      { label: "AI 问答", name: /^(AI 问答|Ask AI)$/ },
-      { label: "Wiki", name: /^Wiki$/ },
-      { label: "导入", name: /^(导入|Imports)$/ },
-      { label: "处理中心", name: /^(处理中心|nav\.inbox)$/ },
-    ]) {
-      await page.getByRole("button", { name }).click();
+    for (const key of ["nav.ask", "nav.wiki", "nav.imports", "nav.inbox"]) {
+      const name = message(locale, key);
+      await page.getByRole("button", { name, exact: true }).click();
       await page.waitForTimeout(100);
-      await expectNoSeriousViolations(page, label);
+      await expectNoSeriousViolations(page, name);
     }
 
     await page.getByTestId("rail-settings").click();

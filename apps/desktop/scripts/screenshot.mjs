@@ -9,6 +9,7 @@
  *   node scripts/screenshot.mjs --steps my-steps.mjs  # 按脚本走到指定界面再截
  *   node scripts/screenshot.mjs --data-db path/to/knowledge.db # 从数据库副本截图
  *   node scripts/screenshot.mjs --visible             # 让窗口正常显示（人工盯着看时用）
+ *   node scripts/screenshot.mjs --gpu --steps my-steps.mjs # 改用本机显卡渲染（只用于须在 GPU 下测量的门禁）
  *
  * steps 文件默认导出一个函数，拿到 Playwright 的窗口对象与 shot()：
  *
@@ -17,6 +18,7 @@
  *     await shot("settings");
  *   };
  */
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -37,6 +39,18 @@ const RENDERER_ROOT = path.dirname(RENDERER_ENTRY);
 /** 首屏就绪的判据：顶栏搜索框出现即说明渲染进程与数据库都通了 */
 const READY_TEST_ID = "topbar-search";
 const READY_TIMEOUT_MS = 30_000;
+const CLOSE_TIMEOUT_MS = 20_000;
+
+/** promise 在 ms 内完成则返回 true；无论结果如何都清掉计时器，免得拖住进程退出 */
+function settlesWithin(promise, ms) {
+  let timer;
+  return Promise.race([
+    promise.then(() => true, () => true),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(false), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
 /**
  * 关动画、藏光标——不加这两项，界面就绪后立刻截的第一张会抓到淡入过渡的中间态：
  * 实测同一界面连截三张，默认选项下首张与后两张不一致，加上之后三张逐字节相同。
@@ -121,6 +135,7 @@ function parseArgs(argv) {
     steps: null,
     dataDb: null,
     visible: false,
+    gpu: false,
     staleOk: false,
     executable: null,
     rendererRoot: null,
@@ -132,6 +147,7 @@ function parseArgs(argv) {
     else if (arg === "--steps") args.steps = path.resolve(argv[++i]);
     else if (arg === "--data-db") args.dataDb = path.resolve(argv[++i]);
     else if (arg === "--visible") args.visible = true;
+    else if (arg === "--gpu") args.gpu = true;
     else if (arg === "--stale-ok") args.staleOk = true;
     else if (arg === "--executable") args.executable = path.resolve(argv[++i]);
     else if (arg === "--renderer-root")
@@ -287,12 +303,13 @@ async function main() {
     app = await electron.launch({
       cwd: DESKTOP_ROOT,
       ...(args.executable ? { executablePath: args.executable } : {}),
-      // 离屏实例固定使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
-      // 也让不同机器上的截图栅格化结果更接近。
+      // 离屏实例默认使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
+      // 也让不同机器上的截图栅格化结果更接近。--gpu 改走本机显卡，供必须在 GPU 渲染下
+      // 测量的门禁使用；这时截图不保证跨机器一致。
       args: [
-        "--use-gl=angle",
-        "--use-angle=swiftshader",
-        "--disable-gpu-sandbox",
+        ...(args.gpu
+          ? []
+          : ["--use-gl=angle", "--use-angle=swiftshader", "--disable-gpu-sandbox"]),
         ...(args.executable ? [] : [MAIN_ENTRY]),
       ],
       env: {
@@ -337,7 +354,7 @@ async function main() {
 
     if (stepsFn) {
       await stepsFn({
-        win, app, shot, outDir: args.out, userDataDir, mainEntry: MAIN_ENTRY,
+        win, app, shot, outDir: args.out, userDataDir, mainEntry: MAIN_ENTRY, gpu: args.gpu,
       });
       // steps 一张都没截时兜一张，免得跑完只得到一个空目录
       if (taken.length === 0 && !win.isClosed()) await shot("final");
@@ -359,7 +376,23 @@ async function main() {
   } finally {
     // 步骤可能已完成真实重启，不能再次关闭已经退出的旧实例。
     if (app && !appClosed) {
-      await app.close().catch(() => {});
+      // 步骤失败时问答可能仍有消息，关闭会触发关闭前保存。没有 dialog 监听时 Playwright 会自动处理
+      // 一个并未弹出的对话框并让进程崩溃，掩盖原始错误。以进程真正退出为准，超时只结束本次启动的进程树。
+      const ignoreDialog = () => {};
+      for (const page of app.windows()) page.on("dialog", ignoreDialog);
+      app.on("window", (page) => page.on("dialog", ignoreDialog));
+      const child = app.process();
+      const exited = new Promise((resolve) => {
+        if (child.exitCode !== null || child.signalCode !== null) resolve();
+        else child.once("exit", resolve);
+      });
+      app.close().catch(() => {});
+      if (!(await settlesWithin(exited, CLOSE_TIMEOUT_MS))) {
+        if (process.platform === "win32") {
+          spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+        } else child.kill("SIGKILL");
+        await settlesWithin(exited, 5_000);
+      }
     }
     if (renderer)
       await new Promise((resolve) => renderer.server.close(resolve));
@@ -372,7 +405,14 @@ async function main() {
           2,
         ),
       );
-    } else fs.rmSync(userDataDir, { recursive: true, force: true });
+    } else {
+      try {
+        fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      } catch (error) {
+        // 清理失败不能盖住步骤本身的错误
+        console.warn(`临时配置目录删除失败，请稍后手动清理：${userDataDir}（${error.message}）`);
+      }
+    }
   }
 
   for (const file of taken) {
