@@ -148,8 +148,8 @@ C＝随包 Crawl4AI，N＝新提取器，二者吃同一输入（按产品分流
 - 单条「更新来源（保留编辑正文）」走 `saveSourceRevision`，生成待采用修订，不改正文。
 - 调研结论：存在由用户一次操作触发的批量重采，需要产品决定。
 - 决定：本次与基线版本的 `engineVersion` 不同时，只保存新版本并标为待采用，不改正文；引擎相同时行为不变；采用只能逐条进行，不新增批量采用入口。
-- 实施（`packages/db/src/web-source.ts` 的 `check()`）：比较对象是当前正文所依据的基线版本，找不到时退回上一个远端版本；`engineVersion` 按完整字符串比较，含 `-static`、`-electron` 等路由后缀，所以同一提取器下静态与渲染之间切换也只留待采用版本。正文、基线、向量与 Wiki 摄取都不动。
-- 单测（`tests/unit/web-capture/web-storage.test.ts`）：引擎相同时，未编辑且无快照的条目返回 updated 并改写正文，编辑过的返回 pending-version、正文不变；引擎变化时，未编辑条目也返回 pending-version，第二次同引擎重采仍是 pending-version，正文、基线版本、`summary_stale`、`knowledge_embeddings` 与 `wiki_ingestions` 都不变，最新远端版本是新引擎结果；逐条采用后，同引擎重采恢复自动更新。
+- 实施（`packages/db/src/web-source.ts` 的 `check()`）：比较对象是当前正文所依据的基线版本，找不到时退回上一个远端版本；只比较 `engineVersion` 的提取器部分，去掉 `-static`、`-electron`、`-verified-electron` 等路由后缀（用户后续决定，最初按完整字符串比较）。正文、基线、向量与 Wiki 摄取都不动。
+- 单测（`tests/unit/web-capture/web-storage.test.ts`）：引擎相同时，未编辑且无快照的条目返回 updated 并改写正文，编辑过的返回 pending-version、正文不变；引擎变化时，未编辑条目也返回 pending-version，第二次同引擎重采仍是 pending-version，正文、基线版本、`summary_stale`、`knowledge_embeddings` 与 `wiki_ingestions` 都不变，最新远端版本是新引擎结果；逐条采用后，同引擎重采恢复自动更新；同一提取器只换路由（静态、渲染、人工验证）照常自动更新，提取器版本变化仍只待采用。
 
 ### 移除清单
 

@@ -63,7 +63,8 @@ packages/
   堆 1 GiB 上限，空闲 60 s 退出。生产构建把它打成只引用 Node 内置模块的单文件
   `out/web-extract-worker/web-extract-worker.js`，主进程读出源码后以 `eval` 方式启动（asar 内的文件
   不能直接作为 worker 入口）。`engineVersion` 为 `readability/1-<static|electron>`：规则或依赖升级
-  使同一页面的正文输出变化时提升版本号，重复导入的“检查更新”据此只保存待采用版本、不改写正文。
+  使同一页面的正文输出变化时提升版本号，重复导入的“检查更新”据此只保存待采用版本、不改写正文
+  （比较时去掉路由后缀，只看 `readability/1` 这一段）。
   规则、回归口径与已知差异见 [网页采集](../web-capture.md)。
 - 渲染页加载后的沉降等待（`web-settle.ts`）：事件驱动，替代固定的 1.2 s + 3×(滚动 + 0.2 s)。
   网络、DOM（MutationObserver）与可见文字都静止约 300 ms 即结束；可见文字不足 200 字的空壳页

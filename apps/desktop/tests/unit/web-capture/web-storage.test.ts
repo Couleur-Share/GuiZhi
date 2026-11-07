@@ -185,6 +185,20 @@ describe("网页版本与持久队列", () => {
     expect(source.check(item.id, captured("readability/1-static", "新引擎正文第三版"))).toBe("updated");
     expect(items.get(item.id)?.content).toBe("新引擎正文第三版");
   });
+  it("同一提取器只换采集路由（静态、渲染、人工验证）不算换引擎：未编辑条目照常自动更新", () => {
+    const db = fixture(),
+      items = new KnowledgeItemDB(db),
+      source = new WebSourceDB(db),
+      item = items.create({ title: "原标题", content: "原始正文" });
+    source.initialize(item.id, captured("readability/1-static"));
+    expect(source.check(item.id, captured("readability/1-electron", "渲染后的正文"))).toBe("updated");
+    expect(items.get(item.id)?.content).toBe("渲染后的正文");
+    expect(source.check(item.id, captured("readability/1-verified-electron", "验证后的正文"))).toBe("updated");
+    expect(items.get(item.id)?.content).toBe("验证后的正文");
+    // 提取器本身变化（版本号或引擎名）仍只留待采用版本。
+    expect(source.check(item.id, captured("readability/2-electron", "新规则正文"))).toBe("pending-version");
+    expect(items.get(item.id)?.content).toBe("验证后的正文");
+  });
   it("发现预算与 URL 唯一约束持久化；重启不会自行继续", () => {
     const db = fixture(),
       jobs = new CrawlJobDB(db),

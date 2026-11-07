@@ -9,6 +9,9 @@ import type {
 
 export const webContentHash = (text: string): string =>
   createHash("sha256").update(text).digest("hex");
+/** engineVersion 里的提取器部分：去掉末尾的采集路由（readability/1-static → readability/1）。 */
+const extractorOf = (engineVersion: string | undefined) =>
+  engineVersion?.replace(/^([^/]*\/[^-]*)-.*$/, "$1");
 interface Baseline {
   content_hash: string;
   title: string;
@@ -115,9 +118,10 @@ export class WebSourceDB {
         version = this.remote(itemId, result),
         versions = this.versions(itemId);
       const previousRemote = versions.find((v) => v.kind === "remote");
-      // 当前正文所依据的版本（基线）与本次提取引擎不同（如随包 Crawl4AI 换成 Readability）时，
+      // 当前正文所依据的版本（基线）与本次提取器不同（如随包 Crawl4AI 换成 Readability）时，
       // Markdown 整体变化不代表原文更新：只留待采用版本，不改正文。以基线版本而不是最近一次抓取为准，
-      // 否则第一次重采留下待采用版本后，第二次同引擎的重采会直接改写正文。
+      // 否则第一次重采留下待采用版本后，第二次同引擎的重采会直接改写正文。静态获取与渲染等路由
+      // 之间切换不算换提取器。
       const basis = versions.find((v) => v.id === baseline?.version_id) ?? previousRemote;
       if (
         previousRemote?.contentHash === version.contentHash &&
@@ -138,7 +142,7 @@ export class WebSourceDB {
         version.snapshot ||
         !baseline ||
         webContentHash(item.content) !== baseline.content_hash ||
-        basis?.engineVersion !== version.engineVersion
+        extractorOf(basis?.engineVersion) !== extractorOf(version.engineVersion)
       )
         return "pending-version" as const;
       this.snapshot(itemId, item.title, item.content, version.sourceUrl);
