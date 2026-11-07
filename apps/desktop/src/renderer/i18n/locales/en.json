@@ -1771,7 +1771,7 @@
   "capture": {
     "title": "Quick Capture",
     "placeholder": "Paste text, a link or a share message, or drop text / image / audio / video files here…",
-    "hint": "Supports text, links, images and audio/video files (Bilibili / YouTube / Douyin videos and V2EX / NGA / LINUX DO / Appinn / 2Libra threads are parsed automatically; share messages can be pasted as-is)",
+    "hint": "Supports text, links, images and audio/video; common video and forum links are parsed automatically, share messages can be pasted as-is",
     "detectedUrl": "Detected as a web link, the article will be fetched",
     "detectedUrls": "Detected {{count}} links, each will be fetched",
     "extractedUrl": "Extracted link: {{url}}",
@@ -2159,7 +2159,7 @@
     "wikiCandidates": "Wiki compile: {{parts}}",
     "wikiPartReady": "{{count}} ready to compile",
     "wikiPartReview": "{{count}} need review first",
-    "wikiPartWaiting": "{{count}} waiting to retry",
+    "wikiPartWaiting": "{{count}} waiting to retry or for a model",
     "wikiPartUpgrade": "{{count}} can upgrade compile mode",
     "wikiCandidatesView": "View scope and tasks",
     "wikiStatusFailed": "Couldn't load Wiki status: {{error}}",

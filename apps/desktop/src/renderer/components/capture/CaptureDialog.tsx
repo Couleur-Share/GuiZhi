@@ -294,7 +294,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
                   aria-hidden="true"
                 />
               ) : null}
-              <span className="truncate">{hintText}</span>
+              <span className="line-clamp-2">{hintText}</span>
             </span>
             {parsedDraft.kind === "mixed" ? (
               <button

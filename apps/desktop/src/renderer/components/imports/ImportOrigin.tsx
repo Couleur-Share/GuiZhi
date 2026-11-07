@@ -21,7 +21,7 @@ export function ImportOriginFilter() {
   const setOrigin = useImportStore((state) => state.setOrigin);
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-5 py-2">
-      <div role="group" aria-label={t("imports.originFilter", "提交来源")} className="inline-flex gap-1 rounded-lg bg-muted/40 p-1">
+      <div role="group" aria-label={t("imports.originFilter", "提交来源")} title={t("imports.originScopeHint", "状态计数与当前清理跟随来源筛选")} className="inline-flex gap-1 rounded-lg bg-muted/40 p-1">
         {(["all", "desktop", "mobile"] as const).map((value) => (
           <button key={value} type="button" aria-pressed={origin === value} onClick={() => setOrigin(value)}
             className={`rounded-md px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${origin === value ? "bg-primary/15 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}>
@@ -29,9 +29,6 @@ export function ImportOriginFilter() {
           </button>
         ))}
       </div>
-      <span className="text-xs text-muted-foreground">
-        {t("imports.originScopeHint", "状态计数与当前清理跟随来源筛选")}
-      </span>
     </div>
   );
 }

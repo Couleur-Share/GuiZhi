@@ -4,6 +4,7 @@ import {
   PauseIcon,
   PlayIcon,
   CompassIcon,
+  GlobeIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -41,7 +42,6 @@ function isRunning(task: ImportTask): boolean {
  * 打开结果条目，重复任务支持「打开已有条目」与「仍要创建副本」。
  */
 export function ImportsWorkspace() {
-  const { t } = useTranslation();
   const [view, setView] = useState<"tasks" | "discovery" | "documents">(() =>
     sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ||
     sessionStorage.getItem(DISCOVERY_OPEN_VIEW_KEY)
@@ -56,10 +56,16 @@ export function ImportsWorkspace() {
   if (view === "documents") return <DocumentSitePanel onBack={() => setView("tasks")} />;
   return view === "discovery"
     ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
-    : <div className="flex h-full flex-col"><button className="self-start m-3 rounded-lg border border-border px-3 py-1.5 text-sm" onClick={() => setView("documents")}>{t("webCapture.importSite", "采集文档站")}</button><div className="min-h-0 flex-1"><ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} /></div></div>;
+    : <ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} onOpenDocuments={() => setView("documents")} />;
 }
 
-function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
+function ImportTasksWorkspace({
+  onOpenDiscovery,
+  onOpenDocuments,
+}: {
+  onOpenDiscovery: () => void;
+  onOpenDocuments: () => void;
+}) {
   const { t } = useTranslation();
   // 平台发现属冻结功能：只有已保存过发现视图的用户才在工具栏看到入口，
   // 其余用户经命令面板或快速采集的「浏览博主」进入。
@@ -255,6 +261,14 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
             })}
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={onOpenDocuments}
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
+        >
+          <GlobeIcon className="h-4 w-4" aria-hidden="true" />
+          {t("webCapture.importSite", "采集文档站")}
+        </button>
         {hasDiscoveryViews ? (
           <button
             type="button"
