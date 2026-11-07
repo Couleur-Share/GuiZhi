@@ -1,8 +1,21 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-export default async ({ win, shot, outDir, userDataDir }) => {
+/** GPU 进程实际使用的渲染路径；特性状态在 SwiftShader 下同样报 enabled，只能看 GL 实现与渲染器。 */
+async function renderingPath(app, gpu) {
+  const { featureStatus, aux } = await app.evaluate(async ({ app }) => {
+    const { auxAttributes = {} } = await app.getGPUInfo('complete');
+    return { featureStatus: app.getGPUFeatureStatus(), aux: { displayType: auxAttributes.displayType, glImplementationParts: auxAttributes.glImplementationParts, glRenderer: auxAttributes.glRenderer } };
+  });
+  const software = !aux.glRenderer || /swiftshader|basic render driver|llvmpipe|softpipe/i.test(`${aux.displayType} ${aux.glRenderer}`);
+  return { requested: gpu ? 'gpu' : 'swiftshader', hardware: !software && featureStatus.gpu_compositing === 'enabled', gpuCompositing: featureStatus.gpu_compositing, rasterization: featureStatus.rasterization, ...aux };
+}
+export default async ({ win, app, shot, outDir, userDataDir, gpu }) => {
   assert.ok(path.basename(userDataDir).startsWith('guizhi-shot-'));
+  // 输入延迟门禁在 GPU 渲染下测量：pnpm shot 默认的 SwiftShader 在 Electron 45 上出帧变慢，P95 在阈值上下波动，
+  // 不代表有显卡的用户。须加 --gpu，实际渲染路径写进证据；软件渲染下不测。
+  const rendering = await renderingPath(app, gpu);
+  assert.ok(rendering.hardware, `输入延迟门禁须在 GPU 渲染下测量（pnpm shot --gpu），本次渲染路径：${JSON.stringify(rendering)}`);
   const item = await win.evaluate(async () => {
     const settings = { autoSave:false, wikiCompileEnabled:false, language:'zh' };
     localStorage.setItem('guizhi-settings',JSON.stringify({state:settings,version:0})); await window.api.settings.set(settings);
@@ -37,7 +50,7 @@ export default async ({ win, shot, outDir, userDataDir }) => {
   const result=await win.evaluate(async()=>({hits:await globalThis.__indexResult,status:await window.api.semantic.status('fixture')}));
   const inputSamples=await win.evaluate(()=>globalThis.__inputFrameSamples);
   const inputP95=[...inputSamples].sort((a,b)=>a-b)[18];
-  await fs.writeFile(path.join(outDir,'index-runtime.json'),JSON.stringify({vectors:50000,dims:64,cancellation,inputP95,inputSamples,driverSamples,...result},null,2));
+  await fs.writeFile(path.join(outDir,'index-runtime.json'),JSON.stringify({vectors:50000,dims:64,rendering,cancellation,inputP95,inputSamples,driverSamples,...result},null,2));
   await title.press('Control+s');
   await win.waitForFunction(async id=>(await window.api.knowledge.get(id)).title==='后台索引中继续输入 19',item.id);
   assert.equal(inputSamples.length,20);

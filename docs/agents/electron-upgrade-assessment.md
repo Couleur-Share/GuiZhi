@@ -89,7 +89,7 @@
 6. 惰性图片探测：`scripts/web-inert-probe-steps.mjs`。
 7. web-capture-runtime 集成测试：`GUIZHI_TEST_BUNDLED_CRAWLER=1 pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts`（真实 Electron + 随包 Python；只能在独立副本运行）。
 8. AI 阅读：`GUIZHI_GRAPHICS_VALIDATION=1 pnpm shot --steps apps/desktop/tests/e2e/reading-v3-acceptance.mjs`（隔离进程、网络与开窗拦截、死循环故障）和 `reading-graphics-shots.mjs`（console-message 失败判定）。
-9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿）。
+9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿；须加 `--gpu`：`pnpm shot --gpu --steps apps/desktop/tests/e2e/heavy-user-index-shots.mjs`，软件渲染下脚本直接失败）。
 10. `pnpm check:linux`：锁文件必然变化，按 `docs/agents/linux-preflight.md` 走德国共享构建器。
 11. 打包：在 `apps/desktop` 执行 `pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --x64 --publish never`，再执行 `node scripts/check-package-size.mjs --installer <安装包>`。不要用 `electron:build:win`，它会同时打 arm64。
 12. `pnpm shot --executable <win-unpacked 或安装后的 GuiZhi.exe> --steps <任一步骤脚本>`：确认打包产物启动、asar 内外资源与 MCP 资源可读。
@@ -173,7 +173,9 @@
 
 `heavy-user-index-shots` 测量 5 万分块检索期间“输入事件到下一帧”的 P95（阈值 100 ms）：45 上四次为 103.1、71.9、111.4、68.8 ms，33 上三次为 18.9、16.8、15.9 ms。不跑检索时 45 三次的 p50 为 42–74 ms、p95 为 125–164 ms，33 为 11–13 ms、36–55 ms；页面上临时插入的原生 `<input>` 两边接近；输入后的同步更新 45 为 3.3/5.4 ms、33 为 5.6/8.4 ms（p50/p95），时间耗在出帧阶段。检索让出事件循环的方式从 `setImmediate` 换成 `setTimeout(0)` 不改善（P95 约 68 ms），已撤回。改走 e2e 路径（`file://`、默认 GPU 合成）时，45 为 p50 3.6 ms、p95 6.0 ms，33 为 3.9 ms、23.4 ms。
 
-结论：变慢只出现在 `pnpm shot` 固定使用的 SwiftShader 软件渲染下，GPU 路径没有变慢。没有 GPU 加速、靠软件渲染的用户机器是否受影响，未验证。门禁如何处理（调整阈值、换测量路径或继续追查 SwiftShader）待决定。
+结论：变慢只出现在 `pnpm shot` 固定使用的 SwiftShader 软件渲染下，GPU 路径没有变慢。没有 GPU 加速、靠软件渲染的用户机器是否受影响，未验证。
+
+处理（用户决定，2026-11-07）：这项门禁改在 GPU 渲染下测量，阈值 100 ms 不变，其他截图仍用 SwiftShader。`pnpm shot` 新增 `--gpu`，脚本按 GPU 进程实际的 GL 实现判断渲染路径，软件渲染时在测量前失败，证据记录 `rendering`。本机（Intel Arc，`ANGLE_D3D11`）复测 4 次 P95 为 5.0、5.1、5.2、5.0 ms，步骤执行期间整机 CPU 平均 22%–37%；按文档命令直接运行一次为 5.0 ms。不加 `--gpu` 时脚本在测量前失败并报出 `ANGLE_SWIFTSHADER`。
 
 ### 安装包体积
 

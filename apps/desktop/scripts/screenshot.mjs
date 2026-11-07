@@ -9,6 +9,7 @@
  *   node scripts/screenshot.mjs --steps my-steps.mjs  # 按脚本走到指定界面再截
  *   node scripts/screenshot.mjs --data-db path/to/knowledge.db # 从数据库副本截图
  *   node scripts/screenshot.mjs --visible             # 让窗口正常显示（人工盯着看时用）
+ *   node scripts/screenshot.mjs --gpu --steps my-steps.mjs # 改用本机显卡渲染（只用于须在 GPU 下测量的门禁）
  *
  * steps 文件默认导出一个函数，拿到 Playwright 的窗口对象与 shot()：
  *
@@ -121,6 +122,7 @@ function parseArgs(argv) {
     steps: null,
     dataDb: null,
     visible: false,
+    gpu: false,
     staleOk: false,
     executable: null,
     rendererRoot: null,
@@ -132,6 +134,7 @@ function parseArgs(argv) {
     else if (arg === "--steps") args.steps = path.resolve(argv[++i]);
     else if (arg === "--data-db") args.dataDb = path.resolve(argv[++i]);
     else if (arg === "--visible") args.visible = true;
+    else if (arg === "--gpu") args.gpu = true;
     else if (arg === "--stale-ok") args.staleOk = true;
     else if (arg === "--executable") args.executable = path.resolve(argv[++i]);
     else if (arg === "--renderer-root")
@@ -287,12 +290,13 @@ async function main() {
     app = await electron.launch({
       cwd: DESKTOP_ROOT,
       ...(args.executable ? { executablePath: args.executable } : {}),
-      // 离屏实例固定使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
-      // 也让不同机器上的截图栅格化结果更接近。
+      // 离屏实例默认使用 Electron 自带的 SwiftShader，避免依赖主机显卡驱动，
+      // 也让不同机器上的截图栅格化结果更接近。--gpu 改走本机显卡，供必须在 GPU 渲染下
+      // 测量的门禁使用；这时截图不保证跨机器一致。
       args: [
-        "--use-gl=angle",
-        "--use-angle=swiftshader",
-        "--disable-gpu-sandbox",
+        ...(args.gpu
+          ? []
+          : ["--use-gl=angle", "--use-angle=swiftshader", "--disable-gpu-sandbox"]),
         ...(args.executable ? [] : [MAIN_ENTRY]),
       ],
       env: {
@@ -337,7 +341,7 @@ async function main() {
 
     if (stepsFn) {
       await stepsFn({
-        win, app, shot, outDir: args.out, userDataDir, mainEntry: MAIN_ENTRY,
+        win, app, shot, outDir: args.out, userDataDir, mainEntry: MAIN_ENTRY, gpu: args.gpu,
       });
       // steps 一张都没截时兜一张，免得跑完只得到一个空目录
       if (taken.length === 0 && !win.isClosed()) await shot("final");
