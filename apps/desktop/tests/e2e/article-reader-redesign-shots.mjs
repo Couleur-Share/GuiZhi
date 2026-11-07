@@ -2,7 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import assert from "node:assert/strict";
-import { require as tsRequire } from "tsx/cjs/api";
+import { requireMainSource as tsRequire } from "./main-source.mjs";
 
 const title = "一篇文章，三个阅读视角：内容、来源与自己的判断";
 const body = `# 留下值得反复阅读的内容

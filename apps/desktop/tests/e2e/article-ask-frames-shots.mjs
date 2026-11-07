@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { require as tsRequire } from "tsx/cjs/api";
+import { requireMainSource as tsRequire } from "./main-source.mjs";
 import basic from "./article-ask-shots.mjs";
 import { makePage } from "./article-reader-redesign-shots.mjs";
 
