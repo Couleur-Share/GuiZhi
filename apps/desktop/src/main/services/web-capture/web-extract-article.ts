@@ -49,7 +49,10 @@ const CHROME_NAMES = new Set([
 const CHROME_TOKENS =
   /(?:^|[\s_-])(?:sidebar|widget|comments?|comment-list|respond|disqus|related|recommend(?:ed|ation)?s?|share|sharing|social|newsletter|subscribe|promo|advert(?:isement)?|ads?|breadcrumbs?|pagination|pager|toc|cookie|consent|feedback)(?:$|[\s_-])/i;
 const PERMALINK_TEXT = /^[\s\u200b#¶§🔗∞]*$/u;
-const HEADING_ANCHORS = ["h1", "h2", "h3", "h4", "h5", "h6"].map((tag) => `${tag} a[href^="#"]`).join(", ");
+const PERMALINK_ANCHORS = [
+  ...["h1", "h2", "h3", "h4", "h5", "h6", "dt"].map((tag) => `${tag} a[href^="#"]`),
+  'a.headerlink[href^="#"]',
+].join(", ");
 const LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:", "tel:"]);
 
 function parsePage(html: string): Document {
@@ -208,8 +211,8 @@ function prepare(document: Document): void {
     if (language) pre.setAttribute(CODE_LANGUAGE_ATTRIBUTE, language);
   }
   for (const heading of Array.from(document.querySelectorAll("h1"))) heading.setAttribute(HEADING_MARK, "");
-  // 标题里的段落锚点（¶、#、零宽字符或空文字）只是页面跳转按钮，转成 Markdown 后是噪声。
-  for (const anchor of Array.from(document.querySelectorAll(HEADING_ANCHORS)))
+  // 标题与定义项（如 Sphinx 的接口条目）里的段落锚点（¶、#、§、零宽字符或空文字）只是页面跳转按钮，转成 Markdown 后是噪声。
+  for (const anchor of Array.from(document.querySelectorAll(PERMALINK_ANCHORS)))
     if (PERMALINK_TEXT.test(anchor.textContent ?? "") && !anchor.querySelector("img")) anchor.remove();
 }
 

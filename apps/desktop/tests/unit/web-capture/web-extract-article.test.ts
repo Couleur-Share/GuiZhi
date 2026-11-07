@@ -230,6 +230,26 @@ describe("回归中补充的正文规则", () => {
     expect(markdown).toContain("主体第 8 段");
     expect(markdown).not.toContain("已经稳定可用很多年");
   });
+
+  it("标题与 Sphinx 接口定义项里的段落锚点（¶、§）不进正文，带文字的页内链接保留", () => {
+    const { markdown } = extract(
+      page(
+        `<article>${prose(3)}<h2 id="constants">字符串常量<a class="headerlink" href="#constants" title="Link to this heading">¶</a></h2>` +
+          '<dl class="py data"><dt class="sig sig-object py" id="string.ascii_letters"><span class="sig-prename descclassname">string.</span>' +
+          '<span class="sig-name descname">ascii_letters</span><a class="headerlink" href="#string.ascii_letters" title="Link to this definition">¶</a></dt>' +
+          "<dd><p>下面描述的小写与大写字母常量的拼接，这个值不依赖当前的区域设置。</p></dd>" +
+          '<dt id="string.digits"><span>string.digits</span><a href="#string.digits">§</a></dt>' +
+          "<dd><p>字符串 0123456789，也就是从零到九的十个阿拉伯数字。</p></dd></dl>" +
+          '<p>其余常量见 <a href="#constants">字符串常量</a> 一节的说明。</p>' +
+          `${prose(2, "结尾")}</article>`,
+      ),
+    ).result;
+    expect(markdown).not.toContain("¶");
+    expect(markdown).not.toContain("§");
+    expect(markdown).toMatch(/string\.ascii\\?_letters/);
+    expect(markdown).toContain("string.digits");
+    expect(markdown).toContain("[字符串常量](https://example.com/docs/guide/page.html#constants)");
+  });
 });
 
 describe("R7 结果字段与错误分类", () => {
