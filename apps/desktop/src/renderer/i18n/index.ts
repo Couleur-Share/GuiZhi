@@ -80,7 +80,12 @@ async function loadInitialResources(lang: string): Promise<InitialResources> {
   return { language: normalized, resources };
 }
 
-const initialLanguage = normalizeLanguage(getSavedLanguage() || getSystemLanguage());
+/**
+ * 启动时的界面语言：已保存的设置优先，否则跟随系统语言。
+ * 设置 store 的默认语言必须取这个值，不能读 i18n.language：main.tsx 并行加载 App 与语言包，
+ * store 可能在 i18n 初始化之前创建，此时 i18n.language 为 undefined，会被归一成 en 并持久化。
+ */
+export const initialLanguage = normalizeLanguage(getSavedLanguage() || getSystemLanguage());
 
 export const i18nReady = (async () => {
   const { language, resources } = await loadInitialResources(initialLanguage);
