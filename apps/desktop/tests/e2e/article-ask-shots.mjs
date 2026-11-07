@@ -57,7 +57,10 @@ export async function runArticleAskBasics({ win, app, shot, outDir }) {
   const selectItem = async item => win.getByTestId("item-list").getByText(item.title, { exact: true }).click();
   const panel = win.getByTestId("article-ask-panel");
   const selectText = async text => {
-    await win.locator("[data-article-reader]").evaluate((root, text) => {
+    const reader = win.locator("[data-article-reader]");
+    // 切换条目或页签后正文异步渲染，先等目标文字可见再选中
+    await reader.getByText(text).first().waitFor();
+    await reader.evaluate((root, text) => {
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let node;
       while ((node = walker.nextNode())) { const at = node.textContent.indexOf(text); if (at < 0 || !node.parentElement.getClientRects().length) continue;
         const range = document.createRange(); range.setStart(node, at); range.setEnd(node, at + text.length);
