@@ -91,7 +91,7 @@
 8. AI 阅读：`GUIZHI_GRAPHICS_VALIDATION=1 pnpm shot --steps apps/desktop/tests/e2e/reading-v3-acceptance.mjs`（隔离进程、网络与开窗拦截、死循环故障）和 `reading-graphics-shots.mjs`（console-message 失败判定）。
 9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿；须加 `--gpu`：`pnpm shot --gpu --steps apps/desktop/tests/e2e/heavy-user-index-shots.mjs`，软件渲染下脚本直接失败）。
 10. `pnpm check:linux`：锁文件必然变化，按 `docs/agents/linux-preflight.md` 走德国共享构建器。
-11. 打包：在 `apps/desktop` 执行 `pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --x64 --publish never`，再执行 `node scripts/check-package-size.mjs --installer <安装包>`。不要用 `electron:build:win`，它会同时打 arm64。
+11. 打包：在 `apps/desktop` 执行 `pnpm build && pnpm electron-builder --config electron-builder.config.cjs --win --x64 --publish never`，再执行 `node scripts/check-package-size.mjs --installer <安装包>`。`electron:build:win` 原先会同时打 arm64 与合并安装包；v0.27.0 起只打 x64，与这条命令等价。
 12. `pnpm shot --executable <win-unpacked 或安装后的 GuiZhi.exe> --steps <任一步骤脚本>`：确认打包产物启动、asar 内外资源与 MCP 资源可读。
 
 **建议跑：**
