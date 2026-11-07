@@ -1,11 +1,45 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const lookup = vi.hoisted(() => vi.fn());
+vi.mock("dns/promises", () => ({ lookup }));
 
 import {
   isBlockedHostname,
   isForbiddenAIEndpointAddress,
   isPrivateIPv4,
   isPrivateIPv6,
+  resolvePublicAddress,
 } from "../../../src/main/services/net-safety";
+
+describe("resolvePublicAddress", () => {
+  beforeEach(() => lookup.mockReset());
+
+  it("只解析到代理 fake-ip 段且未走代理时，说明原因和配置代理的位置", async () => {
+    lookup.mockResolvedValue([{ address: "198.18.0.12", family: 4 }]);
+    await expect(resolvePublicAddress("docs.python.org")).rejects.toThrow(
+      /「docs\.python\.org」解析到 198\.18\.0\.12.*fake-ip.*设置 → 网络设置/,
+    );
+  });
+
+  it("走代理时放行 fake-ip 段", async () => {
+    lookup.mockResolvedValue([{ address: "198.18.0.12", family: 4 }]);
+    await expect(
+      resolvePublicAddress("docs.python.org", { allowProxyCompatibilityAddress: true }),
+    ).resolves.toEqual({ address: "198.18.0.12", family: 4 });
+  });
+
+  it("解析结果混有真实内网地址时，即使允许代理地址也照常拦截", async () => {
+    lookup.mockResolvedValue([
+      { address: "198.18.0.12", family: 4 },
+      { address: "192.168.1.10", family: 4 },
+    ]);
+    for (const options of [{}, { allowProxyCompatibilityAddress: true }]) {
+      await expect(resolvePublicAddress("mixed.example", options)).rejects.toThrow(
+        "Access to internal network addresses is not allowed",
+      );
+    }
+  });
+});
 
 describe("isPrivateIPv4", () => {
   it.each([

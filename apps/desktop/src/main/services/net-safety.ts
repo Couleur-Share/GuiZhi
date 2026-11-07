@@ -316,6 +316,11 @@ export async function resolvePublicAddress(
     !options.allowPrivateNetwork &&
     addresses.some((entry) => isPrivateAddress(entry.address))
   ) {
+    if (trustedCompatibilityAddresses.length === addresses.length) {
+      throw new Error(
+        `「${hostname}」解析到 ${addresses[0].address}，这是 Clash、Mihomo 等代理在 TUN（fake-ip）模式下返回的虚拟地址，未经代理直连会被内网访问防护拦截。请在「设置 → 网络设置」中配置代理，或开启系统代理后重试。`,
+      );
+    }
     throw new Error("Access to internal network addresses is not allowed");
   }
 
