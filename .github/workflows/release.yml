@@ -70,6 +70,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Electron 42 起安装依赖不再下载二进制，首次启动时才按需下载；预先下载让离线夹具测试不受下载时机影响
+      - name: Download Electron binary
+        run: pnpm --filter @guizhi/desktop exec install-electron --no
+
       - name: Verify web capture offline fixtures
         run: pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts
         env:
