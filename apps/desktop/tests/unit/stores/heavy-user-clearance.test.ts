@@ -27,6 +27,28 @@ it('仅成功清除的来源同步移除两种问答缓存，迟到证据也不�
   expect(sanitizeCachedMessages([message])[0].sources[0].cleared).toBe(true);
 });
 
+it('单条删除成功不弹结果栏；选中项已删除时清空选中，不再读取失败', async () => {
+  useKnowledgeStore.setState({ selectedId: 'gone', selectedItem: null, selectionIds: [], entries: [], page: 1, detailError: null });
+  useLibraryWorkflowStore.setState({ busy: false, results: [], notice: '上一次批量操作的结果' });
+  const get = vi.fn(async () => null);
+  window.api.knowledge = { ...window.api.knowledge, get, list: async () => ({ entries: [], total: 0 }), counts: async () => ({}), selection: vi.fn(async () => ({ ok: true, results: [{ id: 'gone', ok: true }] })) };
+  expect(await useLibraryWorkflowStore.getState().execute(['gone'], { kind: 'delete' })).toBe(true);
+  expect(useLibraryWorkflowStore.getState().notice).toBeNull();
+  expect(useLibraryWorkflowStore.getState().results).toEqual([]);
+  expect(useKnowledgeStore.getState().selectedId).toBeNull();
+  expect(useKnowledgeStore.getState().detailError).toBeNull();
+  expect(get).not.toHaveBeenCalled();
+});
+
+it('多条操作照常汇总成功与失败', async () => {
+  useKnowledgeStore.setState({ selectedId: null, selectedItem: null, selectionIds: [], entries: [], page: 1 });
+  useLibraryWorkflowStore.setState({ busy: false, results: [], notice: null });
+  window.api.knowledge = { ...window.api.knowledge, list: async () => ({ entries: [], total: 0 }), counts: async () => ({}), selection: vi.fn(async () => ({ ok: true, results: [{ id: 'a', ok: true }, { id: 'b', ok: false, error: '被占用' }] })) };
+  expect(await useLibraryWorkflowStore.getState().execute(['a', 'b'], { kind: 'trash' })).toBe(false);
+  expect(useLibraryWorkflowStore.getState().notice).toContain('1');
+  expect(useLibraryWorkflowStore.getState().results.map(row => row.ok)).toEqual([true, false]);
+});
+
 it('批量执行中改变筛选，迟到失败回执不重新选中旧范围', async () => {
   const pending = deferred<any>();
   useKnowledgeStore.setState({ selectedId: null, selectedItem: null, selectionIds: ['batch-item'], searchQuery: '' });

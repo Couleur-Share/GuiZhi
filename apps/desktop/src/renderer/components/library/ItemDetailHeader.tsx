@@ -25,6 +25,7 @@ import { useSettingsStore } from "../../stores/settings.store";
 import { useUIStore } from "../../stores/ui.store";
 import { useSourceComments } from "./SourceCommentsContext";
 import { ContextMenu } from "../ui/ContextMenu";
+import { useToast } from "../ui/Toast";
 import { SourceChip } from "./SourceChip";
 import { CHIP_BASE } from "./detail-chips";
 import { formatItemTime } from "./type-meta";
@@ -109,6 +110,16 @@ function MoreActionsButton({
   const setStatus = useKnowledgeStore((state) => state.setStatus);
   const togglePinned = useKnowledgeStore((state) => state.togglePinned);
   const moveToTrash = useKnowledgeStore((state) => state.moveToTrash);
+  const restoreItems = useKnowledgeStore((state) => state.restoreItems);
+  const { showUndoToast } = useToast();
+  const trashWithUndo = async () => {
+    const ids = [item.id];
+    if (!(await moveToTrash(ids))) return;
+    showUndoToast(
+      t("library.movedToTrash", "已移到回收站（{{count}} 项）", { count: ids.length }),
+      () => void restoreItems(ids),
+    );
+  };
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);
 
@@ -197,7 +208,7 @@ function MoreActionsButton({
               label: t("library.moveToTrash", "移到回收站"),
               icon: <Trash2Icon className="h-4 w-4" aria-hidden="true" />,
               variant: "destructive",
-              onClick: () => void moveToTrash([item.id]),
+              onClick: () => void trashWithUndo(),
             },
           ]}
         />

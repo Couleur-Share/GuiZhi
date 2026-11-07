@@ -74,11 +74,15 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
   execute: async (ids, command, retry = false) => {
     if (get().busy) return false;
     set({ busy: true });
+    let outcome: KnowledgeBatchResult[] = [];
     try {
       const ok = await runGuardedMutation('library.batch', translate('library.actionBatch', '批量操作'), async () => {
         if (!(await useKnowledgeStore.getState().flushPendingSave())) throw new Error('请先处理草稿保存错误');
         const targets = [...new Set(ids)], query = currentQuery();
-        if (!retry) set({ results: [], command, batchId: crypto.randomUUID() });
+        // 单条移入回收站有撤销提示、单条彻底删除有确认框，成功时不再弹「成功 1 项」结果栏
+        const single = targets.length === 1 && !retry && (command.kind === 'trash' || command.kind === 'delete');
+        const collected: KnowledgeBatchResult[] = [];
+        if (!retry) set({ results: [], notice: null, command, batchId: crypto.randomUUID() });
         for (let offset = 0; offset < targets.length; offset += 50) {
           const chunk = targets.slice(offset, offset + 50);
           let results: KnowledgeBatchResult[];
@@ -88,16 +92,24 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
             results = chunk.map(id => reply.results!.find(result => result.id === id) ?? { id, ok: false, error: translate('library.workflowNoResult', '未返回此条结果') });
           } catch (error) { results = chunk.map(id => ({ id, ok: false, error: String(error) })); }
           if (command.kind === 'delete' && command.clearEvidence) clearCachedConversationEvidence(results.filter(row => row.ok).map(row => row.id));
-          set(s => ({ results: [...s.results.filter(row => !chunk.includes(row.id)), ...results] }));
+          if (single) collected.push(...results);
+          else set(s => ({ results: [...s.results.filter(row => !chunk.includes(row.id)), ...results] }));
         }
-        const failures = get().results.filter(row => !row.ok);
+        outcome = single ? collected : get().results;
+        const failures = outcome.filter(row => !row.ok);
         if (JSON.stringify(query) === JSON.stringify(currentQuery())) useKnowledgeStore.getState().setSelection(failures.map(row => row.id));
         await useKnowledgeStore.getState().refreshAll();
         const selected = useKnowledgeStore.getState().selectedId;
-        if (selected && targets.includes(selected)) await useKnowledgeStore.getState().selectItem(selected);
-        set({ notice: translate('library.workflowSummary', '成功 {{succeeded}} 项，失败 {{failed}} 项', { succeeded: get().results.length - failures.length, failed: failures.length }) });
+        if (selected && targets.includes(selected)) {
+          // 删除、移入回收站、恢复成功后条目已离开当前视图，重新选中只会得到「读取失败」
+          const leftView = (command.kind === 'delete' || command.kind === 'trash' || command.kind === 'restore') &&
+            outcome.some(row => row.id === selected && row.ok);
+          await useKnowledgeStore.getState().selectItem(leftView ? null : selected);
+        }
+        if (single && failures.length === 0) return;
+        set({ results: outcome, notice: translate('library.workflowSummary', '成功 {{succeeded}} 项，失败 {{failed}} 项', { succeeded: outcome.length - failures.length, failed: failures.length }) });
       });
-      return ok && get().results.every(row => row.ok);
+      return ok && outcome.every(row => row.ok);
     } finally { set({ busy: false }); }
   },
   retryFailed: () => {

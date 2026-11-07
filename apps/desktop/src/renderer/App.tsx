@@ -7,13 +7,14 @@ import { useSettingsStore } from "./stores/settings.store";
 import { useUIStore } from "./stores/ui.store";
 import { useImportStore } from "./stores/import.store";
 import { useInboxStore } from "./stores/inbox.store";
+import { useKnowledgeStore } from "./stores/knowledge.store";
 import {
   getRenderedBackgroundImageBlur,
   getRenderedBackgroundImageOpacity,
   loadSettingsFromMainProcess,
 } from "./stores/settings.store";
-import i18n from "./i18n";
 import type { MotionPreference } from "./stores/settings.store";
+import i18n from "./i18n";
 import type { UpdateStatus } from "./components/UpdateDialog";
 import { BackgroundImageBackdrop } from "./components/ui/BackgroundImageBackdrop";
 import { isWebRuntime } from "./runtime";
@@ -195,6 +196,18 @@ function App() {
     void store.fetchTasks();
     void useInboxStore.getState().refresh();
     return unsubscribe;
+  }, []);
+
+  // 知识库新建、删除、归类会改变处理中心的待处理数；计数变化后合并刷新角标
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = useKnowledgeStore.subscribe((state, previous) => {
+      const next = state.counts, prev = previous.counts;
+      if (!next || !prev || (next.uncategorized === prev.uncategorized && next.all === prev.all && next.trash === prev.trash)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; void useInboxStore.getState().refresh(); }, 600);
+    });
+    return () => { unsubscribe(); if (timer) clearTimeout(timer); };
   }, []);
 
   // 应用菜单「导入 / 导出」（macOS 菜单栏）
