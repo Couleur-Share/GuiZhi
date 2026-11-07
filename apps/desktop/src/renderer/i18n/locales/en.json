@@ -2157,6 +2157,8 @@
     "stopClassify": "Stop classifying {{completed}}/{{total}}",
     "smartClassify": "AI classify {{count}}",
     "wikiCandidates": "Wiki compile: {{parts}}",
+    "wikiNeedsModel": "No text model is configured, so {{count}} items cannot be compiled into Wiki yet.",
+    "wikiConfigureModel": "Configure model",
     "wikiPartReady": "{{count}} ready to compile",
     "wikiPartReview": "{{count}} need review first",
     "wikiPartWaiting": "{{count}} waiting to retry or for a model",

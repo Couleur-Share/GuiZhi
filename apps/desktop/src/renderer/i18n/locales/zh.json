@@ -2157,6 +2157,8 @@
     "stopClassify": "停止归类 {{completed}}/{{total}}",
     "smartClassify": "AI 智能归类 {{count}}",
     "wikiCandidates": "Wiki 编译：{{parts}}",
+    "wikiNeedsModel": "尚未配置文本模型，{{count}} 条内容暂时无法编译为 Wiki。",
+    "wikiConfigureModel": "去配置模型",
     "wikiPartReady": "{{count}} 条可编译",
     "wikiPartReview": "{{count}} 条需先复核",
     "wikiPartWaiting": "{{count}} 条等待重试或配置模型",

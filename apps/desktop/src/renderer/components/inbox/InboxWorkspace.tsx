@@ -17,6 +17,8 @@ import { useCollectionStore } from "../../stores/collection.store";
 import { useImportStore } from "../../stores/import.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
+import { useSettingsStore } from "../../stores/settings.store";
+import { isScenarioConfigured } from "../../services/knowledge-ai/ai-invoke";
 import { Select } from "../ui/Select";
 import { Spinner } from "../ui/Spinner";
 import { LoadErrorState } from "../ui/LoadErrorState";
@@ -50,6 +52,11 @@ export function InboxWorkspace() {
   const isLoading = useInboxStore((state) => state.isLoading);
   const loadError = useInboxStore((state) => state.loadError);
   const wikiCandidates = useInboxStore(s => s.wikiCandidates);
+  // 没配 Wiki 文本模型时，所有候选都会被计入「等待」；这时直接说明原因并给出配置入口，
+  // 而不是显示一个像是出了故障的「等待重试」。订阅 settings 让配置后立刻刷新。
+  const wikiModelReady = useSettingsStore(() => isScenarioConfigured("wiki"));
+  const wikiNeedsModel =
+    !wikiModelReady && (wikiCandidates?.waiting ?? 0) > 0;
   // 只列出非零项，并用日常用语描述各状态，避免一行内部计数
   const wikiCandidateParts = wikiCandidates
     ? [
@@ -372,7 +379,7 @@ export function InboxWorkspace() {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {wikiCandidates && wikiCandidateParts.length > 0 ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiCandidates", "Wiki 编译：{{parts}}", { parts: wikiCandidateParts.join(t("inbox.nameSeparator", "、")) })} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>{t("inbox.wikiCandidatesView", "查看范围和任务")}</button></div> : null}
+        {wikiNeedsModel ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiNeedsModel", "尚未配置文本模型，{{count}} 条内容暂时无法编译为 Wiki。", { count: wikiCandidates?.waiting ?? 0 })} <button className="text-primary hover:underline" onClick={() => requestSettingsSection("ai")}>{t("inbox.wikiConfigureModel", "去配置模型")}</button></div> : wikiCandidates && wikiCandidateParts.length > 0 ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiCandidates", "Wiki 编译：{{parts}}", { parts: wikiCandidateParts.join(t("inbox.nameSeparator", "、")) })} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>{t("inbox.wikiCandidatesView", "查看范围和任务")}</button></div> : null}
         {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="mb-2 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? t("inbox.wikiStatusFailed", "Wiki状态读取失败：{{error}}", { error }) : t("inbox.semanticStatusFailed", "语义索引状态读取失败：{{error}}", { error })} <button className="text-primary hover:underline" onClick={() => void refresh()}>{t("common.retry", "重试")}</button></div>)}
         {isLoading && items.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
