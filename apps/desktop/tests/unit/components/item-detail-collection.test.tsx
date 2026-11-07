@@ -89,7 +89,7 @@ describe("详情页的分类 chip", () => {
     });
   });
 
-  it("选中知识库后立即落盘，并重取侧栏计数", async () => {
+  it("选中合集后立即落盘，并重取侧栏计数", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -97,7 +97,7 @@ describe("详情页的分类 chip", () => {
       </ToastProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: /未分类/ }));
+    await user.click(screen.getByRole("button", { name: /未归合集/ }));
     await user.click(screen.getByRole("menuitem", { name: "心理情感" }));
 
     // 混进正文的防抖保存队列时，这里要等 800ms 才落盘、且永远不刷新计数
@@ -108,7 +108,7 @@ describe("详情页的分类 chip", () => {
     expect(useKnowledgeStore.getState().counts?.byCollection["col-1"]).toBe(1);
   });
 
-  it("移回未分类同样立即落盘", async () => {
+  it("移回未归合集同样立即落盘", async () => {
     const user = userEvent.setup();
     render(
       <ToastProvider>
@@ -120,7 +120,7 @@ describe("详情页的分类 chip", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /心理情感/ }));
-    await user.click(screen.getByRole("menuitem", { name: "未分类" }));
+    await user.click(screen.getByRole("menuitem", { name: "未归合集" }));
 
     expect(bulkUpdateCalls).toEqual([
       { ids: ["item-1"], patch: { collectionId: null } },

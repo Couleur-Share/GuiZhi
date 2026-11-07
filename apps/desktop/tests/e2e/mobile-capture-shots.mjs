@@ -142,7 +142,7 @@ export default async ({ win, app, shot }) => {
   );
   await page.getByRole("button", { name: "恢复取件", exact: true }).click();
   await page
-    .getByRole("button", { name: "默认目标知识库", exact: true })
+    .getByRole("button", { name: "默认目标合集", exact: true })
     .click();
   await win.getByRole("option", { name: "手机灵感", exact: true }).click();
   assert.equal(

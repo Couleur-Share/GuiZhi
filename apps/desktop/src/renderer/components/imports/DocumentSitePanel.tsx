@@ -150,7 +150,7 @@ export function DocumentSitePanel({ onBack }: { onBack: () => void }) {
           value={collection}
           onChange={setCollection}
           options={[
-            { value: "", label: t("webCapture.unfiled", "未分类") },
+            { value: "", label: t("webCapture.unfiled", "未归合集") },
             ...collections.map((c) => ({ value: c.id, label: c.name })),
           ]}
         />

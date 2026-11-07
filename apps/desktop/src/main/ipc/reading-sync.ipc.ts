@@ -22,7 +22,7 @@ export function registerReadingSyncIPC(db: Database.Database) {
             if (typeof args.origin !== 'string' || typeof args.invite !== 'string') throw new Error('阅读同步激活参数无效');
             return controller.activate(args.origin, args.invite);
           case 'configure':
-            if (!Array.isArray(args.collectionIds) || args.collectionIds.some(id => typeof id !== 'string')) throw new Error('知识库选择无效');
+            if (!Array.isArray(args.collectionIds) || args.collectionIds.some(id => typeof id !== 'string')) throw new Error('合集选择无效');
             return controller.configure(args.collectionIds as string[]);
           case 'sync': return controller.sync();
           case 'pair': return controller.pair();

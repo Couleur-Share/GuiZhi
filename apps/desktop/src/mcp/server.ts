@@ -87,7 +87,7 @@ server.registerTool(
       collection: z
         .string()
         .optional()
-        .describe("只看某个知识库（按名字精确匹配）"),
+        .describe("只看某个合集（按名字精确匹配）"),
     }),
   },
   async ({ query, limit, platform, collection }) => {

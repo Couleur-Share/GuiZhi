@@ -35,13 +35,13 @@ function describeMcpScope(
     return t("settings.configImportRowMcpAbsent", "文件未包含，保持本机现状");
   }
   if (scope.mode === "all") {
-    return t("settings.configImportRowMcpAll", "全部知识库");
+    return t("settings.configImportRowMcpAll", "全部合集");
   }
-  const base = t("settings.configImportRowMcpSelected", "{{count}} 个知识库", {
+  const base = t("settings.configImportRowMcpSelected", "{{count}} 个合集", {
     count: scope.collectionCount,
   });
   return scope.allowUncategorized
-    ? t("settings.configImportRowMcpWithUncategorized", "{{base}} · 含未分类", {
+    ? t("settings.configImportRowMcpWithUncategorized", "{{base}} · 含未归合集", {
         base,
       })
     : base;

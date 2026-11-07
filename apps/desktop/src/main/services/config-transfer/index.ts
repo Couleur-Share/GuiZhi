@@ -191,7 +191,7 @@ export function applyMainConfigParts(
         // 范围存的是知识库 id，这台机器若还没恢复备份，勾中的库可能一个都不存在，
         // 表现是 MCP 什么都搜不到——不说出来没人会想到去设置页核对
         warnings.push(
-          `MCP 可访问范围已收紧到 ${file.mcpScope.allowedCollectionIds.length} 个知识库，请在「设置 → MCP 接入」确认这些知识库在本机存在`,
+          `MCP 可访问范围已收紧到 ${file.mcpScope.allowedCollectionIds.length} 个合集，请在「设置 → MCP 接入」确认这些合集在本机存在`,
         );
       }
     } catch (error) {

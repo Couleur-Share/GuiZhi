@@ -119,7 +119,7 @@ export function useItemMenus({
 
   const buildMoveMenu = (): ContextMenuItem[] => [
     {
-      label: t("library.noCollection", "未分类"),
+      label: t("library.noCollection", "未归合集"),
       onClick: () => void bulkMoveToCollection(selectionIds, null),
     },
     ...collections.map((collection) => ({

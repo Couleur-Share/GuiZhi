@@ -233,7 +233,7 @@ export function ItemTableRow({
         return (
           <td key={column.id} className={CELL} style={style}>
             <span className="block truncate text-xs text-muted-foreground">
-              {collectionName ?? t("library.noCollection", "未分类")}
+              {collectionName ?? t("library.noCollection", "未归合集")}
             </span>
           </td>
         );

@@ -13,18 +13,18 @@ export function readSelectedLibrary(db: Database.Database, collections: string[]
 }
 function projectSelectedLibrary(db: Database.Database, collections: string[], imageRoot: string, idKey: Buffer) {
   if (collections.length > 100 || new Set(collections).size !== collections.length || collections.some(id => typeof id !== 'string' || id.length > 128)) {
-    throw new Error('同步知识库选择无效');
+    throw new Error('同步合集选择无效');
   }
   const objects: ReadingObjectInput[] = [], sourceHash = createHash('sha256');
   const syncId = (type: string, value: string) => createHmac('sha256', idKey).update(`${type}:${value}`).digest('base64url');
   if (collections.length === 0) return { objects, sourceDigest: sourceHash.update('empty').digest('hex') };
   const marks = collections.map(() => '?').join(',');
   const selected = db.prepare(`SELECT id FROM collections WHERE id IN (${marks})`).all(...collections) as { id: string }[];
-  if (selected.length !== collections.length) throw new Error('所选知识库已不存在，请重新选择');
+  if (selected.length !== collections.length) throw new Error('所选合集已不存在，请重新选择');
   const rows = db.prepare(`SELECT i.id,i.title,i.content,i.summary,i.item_type,i.status,c.name collection_name
     FROM knowledge_items i JOIN collections c ON c.id=i.collection_id WHERE i.deleted_at IS NULL
     AND i.collection_id IN (${marks}) ORDER BY i.id LIMIT 10001`).all(...collections) as Row[];
-  if (rows.length > 10000) throw new Error('当前阅读试点最多同步 10000 个对象，请缩小知识库范围');
+  if (rows.length > 10000) throw new Error('当前阅读试点最多同步 10000 个对象，请缩小合集范围');
   const assets = new Map<string, ReadingObjectInput>();
   let totalBytes = 0;
   const account = (bytes: number) => { totalBytes += bytes; if (totalBytes > 40 * 1024 * 1024) throw new Error('当前阅读试点单次正文与图片超过 40 MiB，请缩小范围'); };

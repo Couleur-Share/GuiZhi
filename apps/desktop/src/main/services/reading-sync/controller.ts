@@ -94,7 +94,7 @@ export class ReadingController {
   }
   async pair() {
     const config = this.connection();
-    if (this.outbox(config).status().sequence === 0) throw new Error('请先同步一次所选知识库');
+    if (this.outbox(config).status().sequence === 0) throw new Error('请先同步一次所选合集');
     if (!config.invitation || (config.invitationExpiresAt ?? 0) <= Date.now()) {
       config.invitation = createReadingInvitation(config.origin, config.libraryId, config.generation);
       config.invitationExpiresAt = Date.now() + 300000;

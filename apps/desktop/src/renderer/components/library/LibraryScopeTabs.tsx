@@ -36,7 +36,7 @@ export function LibraryScopeTabs() {
   const tabs: ScopeTab[] = [
     {
       scope: "uncategorized",
-      label: t("library.scopeUncategorized", "未分类"),
+      label: t("library.scopeUncategorized", "未归合集"),
       icon: <InboxIcon className="mb-1 h-4 w-4" aria-hidden="true" />,
       count: counts?.uncategorized ?? 0,
     },

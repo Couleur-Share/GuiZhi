@@ -229,8 +229,8 @@ export function InboxWorkspace() {
       const summary =
         result.classified > 0
           ? created.length > 0
-            ? t("inbox.classifiedWithNew", "已智能归类 {{count}} 条，新建 {{created}} 个知识库", { count: result.classified, created: created.length })
-            : t("inbox.classifiedReused", "已智能归类 {{count}} 条，全部复用现有知识库", { count: result.classified })
+            ? t("inbox.classifiedWithNew", "已智能归类 {{count}} 条，新建 {{created}} 个合集", { count: result.classified, created: created.length })
+            : t("inbox.classifiedReused", "已智能归类 {{count}} 条，全部复用现有合集", { count: result.classified })
           : t("inbox.nothingToClassify", "没有仍需归类的内容");
       showToast(
         result.skipped > 0
@@ -310,8 +310,8 @@ export function InboxWorkspace() {
           <Select
             value={collectionId}
             onChange={setCollectionId}
-            placeholder={t("inbox.moveToCollection", "归入知识库")}
-            ariaLabel={t("inbox.moveToCollection", "归入知识库")}
+            placeholder={t("inbox.moveToCollection", "归入合集")}
+            ariaLabel={t("inbox.moveToCollection", "归入合集")}
             options={collections.map((collection) => ({
               value: collection.id,
               label: `${collection.icon ?? "📚"} ${collection.name}`,
@@ -452,7 +452,7 @@ export function InboxWorkspace() {
                       {item.kind === "review-required"
                         ? item.reasons.join("；") || t("inbox.reviewRequiredReason", "采集结果需要人工复核")
                         : item.kind === "unclassified"
-                          ? t("inbox.unclassifiedReason", "尚未归入任何知识库")
+                          ? t("inbox.unclassifiedReason", "尚未归入任何合集")
                           : item.kind === "import-issue"
                             ? item.message
                             : t("inbox.discoveryReason", "定时发现的新候选，尚未导入")}

@@ -434,11 +434,11 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
           </button>
           <span className="min-w-0 flex-1" />
           <Select
-            ariaLabel={t("library.collection", "知识库")}
+            ariaLabel={t("library.collection", "合集")}
             value={collectionId}
             onChange={setCollectionId}
             options={[
-              { value: "", label: t("library.noCollection", "未分类") },
+              { value: "", label: t("library.noCollection", "未归合集") },
               ...collections.map((collection) => ({
                 value: collection.id,
                 label: collection.name,

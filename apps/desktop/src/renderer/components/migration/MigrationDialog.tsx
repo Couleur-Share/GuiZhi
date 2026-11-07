@@ -83,7 +83,7 @@ export function MigrationDialog({
               <p className="text-xs text-muted-foreground">
                 {t(
                   "migration.scope",
-                  "可一键迁入：知识条目、知识库、标签、来源记录与 Wiki 页面。原数据文件保持不变。",
+                  "可一键迁入：知识条目、合集、标签、来源记录与 Wiki 页面。原数据文件保持不变。",
                 )}
               </p>
             </div>
@@ -134,7 +134,7 @@ export function MigrationDialog({
               <p className="text-xs text-muted-foreground">
                 {t(
                   "migration.doneStats",
-                  "条目 {{items}} · 知识库 {{collections}} · 标签 {{tags}} · 来源 {{sources}} · Wiki 页面 {{wikiPages}}",
+                  "条目 {{items}} · 合集 {{collections}} · 标签 {{tags}} · 来源 {{sources}} · Wiki 页面 {{wikiPages}}",
                   {
                     items: stats.items,
                     collections: stats.collections,

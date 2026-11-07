@@ -77,7 +77,7 @@ describe("MCP 工具", () => {
   });
 
   describe("search_knowledge", () => {
-    it("命中的条目带上 id、类型、平台与知识库", () => {
+    it("命中的条目带上 id、类型、平台与合集", () => {
       const output = searchKnowledge(db, { query: "Zustand" }, ALL_SCOPE);
 
       expect(output).toContain(`id=${videoId}`);
@@ -104,7 +104,7 @@ describe("MCP 工具", () => {
       );
     });
 
-    it("按知识库名筛选；名字不存在时列出现有的", () => {
+    it("按合集名筛选；名字不存在时列出现有的", () => {
       expect(searchKnowledge(db, { query: "Zustand", collection: "前端" }, ALL_SCOPE)).toContain(
         videoId,
       );
@@ -114,7 +114,7 @@ describe("MCP 工具", () => {
         { query: "Zustand", collection: "不存在的库" },
         ALL_SCOPE,
       );
-      expect(missing).toContain("没有名为「不存在的库」的知识库");
+      expect(missing).toContain("没有名为「不存在的库」的合集");
       expect(missing).toContain("前端");
     });
 
@@ -177,7 +177,7 @@ describe("MCP 工具", () => {
   });
 
   describe("可访问范围", () => {
-    /** 只放行「前端」库；未分类不放行 */
+    /** 只放行「前端」库；未归合集不放行 */
     function frontendOnly(): McpScope {
       const frontend = new CollectionDB(db)
         .list()
@@ -190,7 +190,7 @@ describe("MCP 工具", () => {
     }
 
     it("范围外的条目搜不到", () => {
-      // 「煮咖啡的水温」是未分类的，不在放行范围里
+      // 「煮咖啡的水温」是未归合集的，不在放行范围里
       const output = searchKnowledge(db, { query: "咖啡" }, frontendOnly());
       expect(output).toContain("没有找到");
       expect(output).not.toContain(noteId);
@@ -202,12 +202,12 @@ describe("MCP 工具", () => {
       );
     });
 
-    it("放行未分类后，未分类条目又可见", () => {
+    it("放行未归合集后，未归合集条目又可见", () => {
       const scope: McpScope = { ...frontendOnly(), allowUncategorized: true };
       expect(searchKnowledge(db, { query: "咖啡" }, scope)).toContain(noteId);
     });
 
-    it("范围外的知识库名字不出现在「现有知识库」提示里", () => {
+    it("范围外的合集名字不出现在「现有合集」提示里", () => {
       const scope: McpScope = {
         mode: "selected",
         allowedCollectionIds: [],
@@ -215,7 +215,7 @@ describe("MCP 工具", () => {
       };
       expect(
         searchKnowledge(db, { query: "Zustand", collection: "前端" }, scope),
-      ).toContain("没有名为「前端」的知识库");
+      ).toContain("没有名为「前端」的合集");
     });
 
     it("范围外的条目 read_item 明说在范围外，不伪装成不存在", () => {
@@ -233,7 +233,7 @@ describe("MCP 工具", () => {
         allowUncategorized: false,
       };
       expect(searchKnowledge(db, { query: "Zustand" }, empty)).toContain(
-        "没有向 MCP 开放任何知识库",
+        "没有向 MCP 开放任何合集",
       );
     });
   });

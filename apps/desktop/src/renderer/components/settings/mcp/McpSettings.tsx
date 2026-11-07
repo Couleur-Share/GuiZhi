@@ -156,12 +156,12 @@ export function McpSettings() {
 
       {config.available ? (
         <>
-          <SettingSection title={t("settings.mcpScopeTitle", "可访问的知识库")}>
+          <SettingSection title={t("settings.mcpScopeTitle", "可访问的合集")}>
             <div className={CARD_BODY}>
               <p className="mb-3 text-xs text-muted-foreground">
                 {t(
                   "settings.mcpScopeDesc",
-                  "AI 只看得见这里放行的知识库，改完立即生效，不用重启 IDE。",
+                  "AI 只看得见这里放行的合集，改完立即生效，不用重启 IDE。",
                 )}
               </p>
               <McpScopePicker

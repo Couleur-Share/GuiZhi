@@ -53,7 +53,7 @@ export function searchKnowledge(
   // 「选了指定范围但一个都没勾」是有效配置，只是什么都搜不到。不点破的话
   // 用户看到的是「归知里明明有却搜不出来」，只会怀疑检索坏了
   if (isMcpScopeEmpty(scope)) {
-    return "归知当前没有向 MCP 开放任何知识库。请在归知的「设置 → MCP 接入」里调整可访问范围。";
+    return "归知当前没有向 MCP 开放任何合集。请在归知的「设置 → MCP 接入」里调整可访问范围。";
   }
 
   const allCollections = new CollectionDB(db).list();
@@ -71,8 +71,8 @@ export function searchKnowledge(
       (collection) => collection.name.toLowerCase() === wanted,
     );
     if (!matched) {
-      const names = collections.map((c) => c.name).join("、") || "（还没有知识库）";
-      return `没有名为「${input.collection}」的知识库。现有：${names}`;
+      const names = collections.map((c) => c.name).join("、") || "（还没有合集）";
+      return `没有名为「${input.collection}」的合集。现有：${names}`;
     }
     collectionId = matched.id;
   }

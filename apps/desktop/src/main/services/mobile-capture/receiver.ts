@@ -48,7 +48,7 @@ export class CaptureReceiver {
   }
   configure(paused: boolean, collectionId: string | null) {
     if (!this.connection) throw new Error("请先激活手机收集");
-    if (collectionId && !this.db.get("SELECT id FROM collections WHERE id=?", collectionId)) throw new Error("目标知识库不存在");
+    if (collectionId && !this.db.get("SELECT id FROM collections WHERE id=?", collectionId)) throw new Error("目标合集不存在");
     this.connection.paused = paused; this.connection.collectionId = collectionId; this.connection.notice = undefined;
     this.credentials.write(this.connection);
     if (paused) { this.controller.abort(); clearTimeout(this.timer); }
@@ -96,7 +96,7 @@ export class CaptureReceiver {
       const connection = this.connection!;
       const relayKey = `${connection.origin}|${connection.mailboxId}`;
       if (connection.collectionId && !this.db.get("SELECT id FROM collections WHERE id=?", connection.collectionId)) {
-        connection.collectionId = null; connection.notice = "目标知识库已删除，本次及后续收集将保存到未分类"; this.credentials.write(connection);
+        connection.collectionId = null; connection.notice = "目标合集已删除，本次及后续收集将保存到未归合集"; this.credentials.write(connection);
       } else this.error = undefined;
       const deliveries = await this.request<CaptureDelivery[]>("/v1/deliveries"); signal.throwIfAborted();
       if (!Array.isArray(deliveries) || deliveries.length > 50) throw new Error("手机收集响应无效");

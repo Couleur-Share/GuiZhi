@@ -217,7 +217,7 @@ export function SidebarLibraryPanel() {
         onClick: () => openEditModal({ kind: "rename-collection", collection }),
       },
       {
-        label: t("library.deleteCollection", "删除知识库"),
+        label: t("library.deleteCollection", "删除合集"),
         description: t("library.deleteCollectionDesc", "不会删除其中的条目"),
         icon: <XCircleIcon className="h-4 w-4" aria-hidden="true" />,
         variant: "destructive",
@@ -269,14 +269,14 @@ export function SidebarLibraryPanel() {
 
       {/* 集合 */}
       <SectionHeading
-        label={t("library.collections", "知识库")}
+        label={t("library.collections", "合集")}
         action={
           <button
             type="button"
             onClick={() => openEditModal({ kind: "create-collection" })}
             className="rounded-lg p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-primary"
-            title={t("library.newCollection", "新建知识库")}
-            aria-label={t("library.newCollection", "新建知识库")}
+            title={t("library.newCollection", "新建合集")}
+            aria-label={t("library.newCollection", "新建合集")}
           >
             <FolderPlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
@@ -284,7 +284,7 @@ export function SidebarLibraryPanel() {
       />
       {collections.length === 0 ? (
         <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
-          {t("library.noCollections", "还没有知识库")}
+          {t("library.noCollections", "还没有合集")}
         </p>
       ) : (
         collections.map((collection) => (
@@ -397,7 +397,7 @@ export function SidebarLibraryPanel() {
         onClose={() => setEditModal(null)}
         title={
           editModal?.kind === "create-collection"
-            ? t("library.newCollection", "新建知识库")
+            ? t("library.newCollection", "新建合集")
             : t("library.rename", "重命名")
         }
         // 带图标选择器时要放得下一组十个图标；只改名字的标签仍用窄弹窗，
@@ -462,14 +462,14 @@ export function SidebarLibraryPanel() {
         }}
         title={
           confirmDelete?.kind === "collection"
-            ? t("library.deleteCollection", "删除知识库")
+            ? t("library.deleteCollection", "删除合集")
             : t("library.deleteTag", "删除标签")
         }
         message={
           confirmDelete?.kind === "collection"
             ? t(
                 "library.deleteCollectionConfirm",
-                "删除知识库「{{name}}」？其中的条目会保留并变为未分类。",
+                "删除合集「{{name}}」？其中的条目会保留并变为未归合集。",
                 { name: confirmDelete.collection.name },
               )
             : t(

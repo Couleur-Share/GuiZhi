@@ -313,7 +313,7 @@ export function applyInboxAiClassification(
     }
     if (!isValidAiCollectionName(collectionName)) {
       throw new Error(
-        `AI 生成了无效的知识库名称：${collectionName || "空名称"}`,
+        `AI 生成了无效的合集名称：${collectionName || "空名称"}`,
       );
     }
     seenIds.add(itemId);
@@ -365,7 +365,7 @@ export function applyInboxAiClassification(
   }
   if (missingNames.length > INBOX_AI_CLASSIFICATION_MAX_NEW_COLLECTIONS) {
     throw new Error(
-      `AI 计划新建 ${missingNames.length} 个知识库，超过安全上限 ${INBOX_AI_CLASSIFICATION_MAX_NEW_COLLECTIONS}`,
+      `AI 计划新建 ${missingNames.length} 个合集，超过安全上限 ${INBOX_AI_CLASSIFICATION_MAX_NEW_COLLECTIONS}`,
     );
   }
 
@@ -383,7 +383,7 @@ export function applyInboxAiClassification(
         aiCollectionNameKey(assignment.collectionName),
       );
       if (!collection) {
-        throw new Error(`无法解析知识库：${assignment.collectionName}`);
+        throw new Error(`无法解析合集：${assignment.collectionName}`);
       }
       const itemIds = itemIdsByCollection.get(collection.id) ?? [];
       itemIds.push(assignment.itemId);

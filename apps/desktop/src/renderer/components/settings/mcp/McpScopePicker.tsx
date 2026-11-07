@@ -94,10 +94,10 @@ export function McpScopePicker({
           }`}
         >
           <span className="block text-sm font-medium text-foreground">
-            {t("settings.mcpScopeAll", "全部知识库")}
+            {t("settings.mcpScopeAll", "全部合集")}
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
-            {t("settings.mcpScopeAllDesc", "以后新建的知识库自动包含在内")}
+            {t("settings.mcpScopeAllDesc", "以后新建的合集自动包含在内")}
           </span>
         </button>
         <button
@@ -111,7 +111,7 @@ export function McpScopePicker({
           }`}
         >
           <span className="block text-sm font-medium text-foreground">
-            {t("settings.mcpScopeSelected", "指定知识库")}
+            {t("settings.mcpScopeSelected", "指定合集")}
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground">
             {t("settings.mcpScopeSelectedDesc", "只有勾选的才对 AI 可见")}
@@ -123,10 +123,10 @@ export function McpScopePicker({
         <div className="space-y-1.5">
           <ScopeRow
             icon={<InboxIcon className="h-3.5 w-3.5" />}
-            label={t("settings.mcpScopeUncategorized", "未分类")}
+            label={t("settings.mcpScopeUncategorized", "未归合集")}
             hint={t(
               "settings.mcpScopeUncategorizedHint",
-              "没归入任何知识库的条目",
+              "没归入任何合集的条目",
             )}
             selected={scope.allowUncategorized}
             onToggle={() =>

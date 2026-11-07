@@ -325,7 +325,7 @@ export function ImportTaskDetailModal({
               {t("imports.refreshComparison", "来源刷新待确认")}
             </div>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              {t("imports.refreshComparisonHint", "刷新结果保留为未分类副本，原条目没有被覆盖。确认内容后再移动或删除副本。")}
+              {t("imports.refreshComparisonHint", "刷新结果保留为未归合集的副本，原条目没有被覆盖。确认内容后再移动或删除副本。")}
             </p>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-md bg-background/60 p-2">

@@ -151,7 +151,7 @@ export function ItemBulkBar({
             onClick={(event) =>
               setMoveAnchor({ x: event.clientX, y: event.clientY })
             }
-            label={t("library.bulkMoveTitle", "移动到知识库")}
+            label={t("library.bulkMoveTitle", "移动到合集")}
           >
             <FolderInputIcon className="h-4 w-4" aria-hidden="true" />
           </BulkAction>

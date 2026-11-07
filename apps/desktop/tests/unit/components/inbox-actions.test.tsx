@@ -84,7 +84,7 @@ function renderWorkspace() {
 }
 
 describe("处理中心聚合任务", () => {
-  it("对已选未分类条目执行 AI 智能归类，并回执新建知识库", async () => {
+  it("对已选未归合集条目执行 AI 智能归类，并回执新建合集", async () => {
     const smartClassify = vi.fn(async (_ids, _names, options) => {
       options?.onProgress?.(1, 1);
       return {
@@ -139,7 +139,7 @@ describe("处理中心聚合任务", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(
-      await screen.findByText("已智能归类 1 条，新建 1 个知识库"),
+      await screen.findByText("已智能归类 1 条，新建 1 个合集"),
     ).toBeTruthy();
   });
 

@@ -359,7 +359,7 @@ export function DataSettings() {
           label={t("settings.exportMarkdown", "导出为 Markdown")}
           description={t(
             "settings.exportMarkdownDesc",
-            "全部条目导出为带元信息的 .md 文件，按知识库分文件夹，可导入 Obsidian 等工具",
+            "全部条目导出为带元信息的 .md 文件，按合集分文件夹，可导入 Obsidian 等工具",
           )}
         >
           <button

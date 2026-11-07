@@ -251,7 +251,7 @@ export function MobileCaptureSettings() {
                 <FolderOpen className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">
-                    {text("默认目标知识库", "Default collection")}
+                    {text("默认目标合集", "Default collection")}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {text(
@@ -263,11 +263,11 @@ export function MobileCaptureSettings() {
               </div>
               <Select
                 className="w-full sm:w-60"
-                ariaLabel={text("默认目标知识库", "Default collection")}
+                ariaLabel={text("默认目标合集", "Default collection")}
                 value={settings.collectionId ?? ""}
                 disabled={busy}
                 options={[
-                  { value: "", label: text("未分类", "Unfiled") },
+                  { value: "", label: text("未归合集", "Unfiled") },
                   ...collections.map((collection) => ({
                     value: collection.id,
                     label: collection.name,

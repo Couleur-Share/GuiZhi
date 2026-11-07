@@ -104,7 +104,7 @@ export const DEFAULT_LIBRARY_COLUMNS: LibraryColumn[] = [
   {
     id: "collection",
     labelKey: "library.columnCollection",
-    fallback: "知识库",
+    fallback: "合集",
     visible: false,
     width: 140,
     minWidth: 100,

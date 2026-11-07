@@ -228,7 +228,7 @@ export function WikiWorkspace() {
           <p className="max-w-md text-xs text-muted-foreground">
             {t(
               "wiki.emptyHint",
-              "AI 会把知识条目编译成互相链接的 Wiki 页面。点击「立即编译」开始，或在「设置 → 通用 → Wiki」里打开自动编译，让它在后台持续更新。",
+              "AI 会把知识条目编译成互相链接的 Wiki 页面。点击「立即编译」开始，或在「设置 → 应用设置 → Wiki」里打开自动编译，让它在后台持续更新。",
             )}
           </p>
         </div>

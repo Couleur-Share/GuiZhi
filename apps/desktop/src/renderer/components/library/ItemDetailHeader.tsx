@@ -266,7 +266,7 @@ function CollectionChip({
           {emoji ?? <FolderIcon className="h-3.5 w-3.5" />}
         </span>
         <span className="max-w-[8rem] truncate">
-          {current?.name ?? t("library.noCollection", "未分类")}
+          {current?.name ?? t("library.noCollection", "未归合集")}
         </span>
         <ChevronDownIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
       </button>
@@ -278,7 +278,7 @@ function CollectionChip({
           onClose={() => setAnchor(null)}
           items={[
             {
-              label: t("library.noCollection", "未分类"),
+              label: t("library.noCollection", "未归合集"),
               onClick: () => void bulkMoveToCollection([item.id], null),
             },
             ...collections.map((collection) => ({

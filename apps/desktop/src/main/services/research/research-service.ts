@@ -105,7 +105,7 @@ export class ResearchService {
   }
 
   createAndRun(input: CreateResearchRunInput): ResearchRun {
-    if (input.knowledgeScope?.kind === "collection" && !this.db.get("SELECT id FROM collections WHERE id=?", input.knowledgeScope.collectionId)) throw new Error("所选知识库不存在");
+    if (input.knowledgeScope?.kind === "collection" && !this.db.get("SELECT id FROM collections WHERE id=?", input.knowledgeScope.collectionId)) throw new Error("所选合集不存在");
     const rangeTo = Date.now();
     const rangeFrom = rangeTo - input.dayRange * DAY_MS;
     const run = this.store.create(input, rangeFrom, rangeTo);

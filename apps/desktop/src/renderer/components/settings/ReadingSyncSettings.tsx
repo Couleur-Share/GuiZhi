@@ -44,7 +44,7 @@ export function ReadingSyncSettings() {
   const selectionChanged = [...selected].sort().join(',') !== [...status.collectionIds].sort().join(',');
   return <section className="space-y-4 rounded-2xl border border-border bg-card p-6" data-testid="reading-sync-settings">
     <div><h3 className="text-base font-semibold">手机阅读同步 · 试用</h3>
-      <p className="mt-1 text-sm text-muted-foreground">将所选知识库的加密阅读副本保存到你的同步服务。手机阅读仅在独立鸿蒙开发包中试用，支持下载正文、离线搜索和按需保存图片。</p></div>
+      <p className="mt-1 text-sm text-muted-foreground">将所选合集的加密阅读副本保存到你的同步服务。手机阅读仅在独立鸿蒙开发包中试用，支持下载正文、离线搜索和按需保存图片。</p></div>
     {error && <LoadErrorState message={error} onRetry={() => { void perform(refresh); }} />}
     {status.error && <p role="status" className="text-sm text-destructive">{status.error}</p>}
     {!status.configured ? <div className="space-y-3">
@@ -55,8 +55,8 @@ export function ReadingSyncSettings() {
       <Button disabled={busy || !origin || !invite} onClick={() => { void perform(async () => { await window.api.readingSync.activate(origin, invite); setInvite(''); }); }}>开启阅读同步</Button>
     </div> : <>
       <p className="text-sm text-muted-foreground">{status.origin} · 已同步版本 {status.sequence}{status.pending ? ' · 有待重试快照' : ''}</p>
-      <fieldset className="space-y-2" disabled={busy || status.pending}><legend className="mb-2 text-sm font-medium">选择阅读知识库</legend>
-        {collections.length === 0 && <p className="text-sm text-muted-foreground">还没有知识库，请先创建。</p>}
+      <fieldset className="space-y-2" disabled={busy || status.pending}><legend className="mb-2 text-sm font-medium">选择阅读合集</legend>
+        {collections.length === 0 && <p className="text-sm text-muted-foreground">还没有合集，请先创建。</p>}
         {collections.map(collection => <Checkbox key={collection.id} label={collection.name} checked={selected.includes(collection.id)}
           disabled={busy || status.pending} onChange={checked => setSelected(ids => checked ? [...ids, collection.id] : ids.filter(id => id !== collection.id))} />)}
       </fieldset>

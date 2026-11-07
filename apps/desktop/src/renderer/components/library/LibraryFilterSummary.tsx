@@ -40,10 +40,10 @@ export function LibraryFilterSummary({
   const filters: FilterEntry[] = [];
   if (collectionId) {
     filters.push({
-      kind: t("library.collection", "知识库"),
+      kind: t("library.collection", "合集"),
       name:
         collections.find((entry) => entry.id === collectionId)?.name ??
-        t("library.collection", "知识库"),
+        t("library.collection", "合集"),
       remove: () => selectCollection(null),
     });
   }

@@ -430,7 +430,7 @@ export function PlatformDiscoveryPanel({ onBack }: { onBack: () => void }) {
                   value={collectionId}
                   onChange={setCollectionId}
                   options={[
-                    { value: "", label: t("library.noCollection", "未分类") },
+                    { value: "", label: t("library.noCollection", "未归合集") },
                     ...collections.map((entry) => ({
                       value: entry.id,
                       label: entry.name,
