@@ -3,7 +3,26 @@ import type { WikiCatalogEntry } from "@guizhi/shared/types";
 import {
   countCatalogByFilter,
   selectVisibleCatalog,
+  wikiCompileButtonState,
 } from "../../../src/renderer/stores/wiki.store";
+
+describe("wikiCompileButtonState", () => {
+  const counts = { ready: 0, review: 0, waiting: 0, upgrade: 0, current: 0, excluded: 0 };
+
+  it("数字只算可执行资料，与全文编译对话框一致", () => {
+    expect(wikiCompileButtonState({ ...counts, ready: 3, upgrade: 2 })).toEqual({ pending: 3, actionable: true });
+  });
+
+  it("只有待升级、待复核或等待中的资料时仍可打开对话框", () => {
+    expect(wikiCompileButtonState({ ...counts, upgrade: 1 })).toEqual({ pending: 0, actionable: true });
+    expect(wikiCompileButtonState({ ...counts, waiting: 1 })).toEqual({ pending: 0, actionable: true });
+  });
+
+  it("全部已是当前版本时禁用；预览未知时不拦", () => {
+    expect(wikiCompileButtonState({ ...counts, current: 5, excluded: 1 })).toEqual({ pending: 0, actionable: false });
+    expect(wikiCompileButtonState(null)).toEqual({ pending: 0, actionable: true });
+  });
+});
 
 function entry(patch: Partial<WikiCatalogEntry>): WikiCatalogEntry {
   return {

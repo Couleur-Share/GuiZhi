@@ -4,14 +4,35 @@
  * 只加密机密字段而不是整份文件：这样导出的 JSON 仍然打得开、看得懂——里面有
  * 哪些服务商、哪些模型、什么路由一目了然，只有 apiKey 与代理密码是 `ENC::` 密文。
  * 忘了密码也不是灾难，其余配置照常导入，手填几个 Key 就能用。
- *
- * 算法复用 `main/security.ts` 的 AES-256-GCM 实现（在此之前它零调用方）。
  */
 import crypto from "crypto";
 import type { ConfigTransferFile } from "@guizhi/shared/types";
 import { CONFIG_TRANSFER_CANARY } from "@guizhi/shared/types";
 import { mapConfigSecrets } from "@guizhi/shared/utils/config-transfer";
-import { decryptText, encryptText } from "../../security";
+
+const ALGO = "aes-256-gcm";
+
+/** 已导出的配置文件依赖 `ENC::` + base64(iv 12B | tag 16B | 密文) 这一格式，不能改。 */
+function encryptText(plain: string, key: Buffer): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(ALGO, key, iv);
+  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `ENC::${Buffer.concat([iv, tag, enc]).toString("base64")}`;
+}
+
+function decryptText(data: string, key: Buffer): string | null {
+  if (!data || !data.startsWith("ENC::")) return data;
+  try {
+    const buf = Buffer.from(data.slice(5), "base64");
+    const decipher = crypto.createDecipheriv(ALGO, key, buf.subarray(0, 12));
+    decipher.setAuthTag(buf.subarray(12, 28));
+    return Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString("utf8");
+  } catch (e) {
+    console.error("Decrypt failed", e);
+    return null;
+  }
+}
 
 /**
  * scrypt 代价参数。N=16384 / r=8 约占 16MB 内存、单次派生百毫秒量级；

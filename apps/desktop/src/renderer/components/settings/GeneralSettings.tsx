@@ -159,26 +159,6 @@ export function GeneralSettings() {
             onChange={settings.setEnableNotifications}
           />
         </SettingItem>
-        <SettingItem
-          label={t("settings.copyNotification")}
-          description={t("settings.copyNotificationDesc")}
-        >
-          <ToggleSwitch
-            ariaLabel={t("settings.copyNotification")}
-            checked={settings.showCopyNotification}
-            onChange={settings.setShowCopyNotification}
-          />
-        </SettingItem>
-        <SettingItem
-          label={t("settings.saveNotification")}
-          description={t("settings.saveNotificationDesc")}
-        >
-          <ToggleSwitch
-            ariaLabel={t("settings.saveNotification")}
-            checked={settings.showSaveNotification}
-            onChange={settings.setShowSaveNotification}
-          />
-        </SettingItem>
       </SettingSection>
     </div>
   );

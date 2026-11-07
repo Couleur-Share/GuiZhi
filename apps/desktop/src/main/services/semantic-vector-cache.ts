@@ -3,9 +3,6 @@
  *
  * 每次搜索都从 SQLite 读 BLOB 并解码，wasm 边界成本往往高于点积本身。
  * 按 Database 实例 + model 缓存；写入（apply / clear）必须显式失效。
- *
- * ANN 门槛（未达前不做）：totalChunks >= 50_000，或缓存命中后
- * lastSearchMs 中位仍 > 500ms。届时倾向纯 JS/WASM HNSW 侧车文件。
  */
 import type { SemanticIndexDB } from "@guizhi/db";
 

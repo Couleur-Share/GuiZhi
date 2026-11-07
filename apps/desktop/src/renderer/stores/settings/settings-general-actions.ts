@@ -45,8 +45,6 @@ type GeneralActionKey =
   | "setDebugMode"
   | "setShortcutMode"
   | "setEnableNotifications"
-  | "setShowCopyNotification"
-  | "setShowSaveNotification"
   | "setLanguage"
   | "setDataPath"
   | "setAutoCheckUpdate"
@@ -221,25 +219,21 @@ function createAppearanceActions(context: SettingsActionContext) {
 }
 
 function createEditorActions(context: SettingsActionContext) {
-  const { setTouched } = context;
+  const { setTouched, syncSettingsToMain } = context;
   return {
     setAutoSave: (autoSave) => setTouched({ autoSave }),
     setShowLineNumbers: (showLineNumbers) => setTouched({ showLineNumbers }),
     setWikiCompileEnabled: (wikiCompileEnabled) =>
       setTouched({ wikiCompileEnabled }),
-    setEnableNotifications: (enableNotifications) =>
-      setTouched({ enableNotifications }),
-    setShowCopyNotification: (showCopyNotification) =>
-      setTouched({ showCopyNotification }),
-    setShowSaveNotification: (showSaveNotification) =>
-      setTouched({ showSaveNotification }),
+    setEnableNotifications: (enableNotifications) => {
+      setTouched({ enableNotifications });
+      void syncSettingsToMain({ enableNotifications });
+    },
   } satisfies SettingsActionGroup<
     | "setAutoSave"
     | "setShowLineNumbers"
     | "setWikiCompileEnabled"
     | "setEnableNotifications"
-    | "setShowCopyNotification"
-    | "setShowSaveNotification"
   >;
 }
 

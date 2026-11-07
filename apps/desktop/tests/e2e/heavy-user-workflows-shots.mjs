@@ -3,22 +3,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 export default async ({ win, app, shot, outDir }) => {
   const errors = []; win.on('pageerror', error => errors.push(error.message));
-  const workerResult = await app.evaluate(async ({ app }) => {
-    try {
-    const { Worker } = process.getBuiltinModule('node:worker_threads'), path = process.getBuiltinModule('node:path');
-    const file = path.join(app.getAppPath(), '../semantic-worker/semantic-worker.js');
-    const worker = new Worker(file);
-    try {
-      const result = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('工作线程启动超时')), 30000);
-        worker.once('message', message => { clearTimeout(timer); resolve(message); }); worker.once('error', error => { clearTimeout(timer); reject(error); });
-        worker.postMessage({ id: 1, action: 'init', input: { model: 'fixture', generation: 'fixture', rootDir: path.join(app.getPath('userData'), 'isolated-index'), cache: { model: 'fixture', dims: 2, vectors: new Float32Array([1,0]), itemIds: ['fixture'], chunkIndexes: [0] } } });
-      }); return result;
-    } finally { await worker.terminate(); }
-    } catch (error) { return { fatal: String(error), stack: error.stack, appPath: app.getAppPath() }; }
-  });
-  await fs.writeFile(path.join(outDir, 'worker-runtime.json'), JSON.stringify(workerResult, null, 2));
-  assert.ok(workerResult.ready || workerResult.incompatible, JSON.stringify(workerResult));
   await app.evaluate(({ ipcMain }) => {
     ipcMain.removeHandler('ai:httpRequest');
     ipcMain.handle('ai:httpRequest', () => ({ ok: true, status: 200, statusText: 'OK', headers: {}, body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ pages: [{ title: '全文验收知识', kind: 'topic', summary: '合成来源', body: '知识来自本次合成分块。', aliases: [] }] }) }, finish_reason: 'stop' }] }) }));

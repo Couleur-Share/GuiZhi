@@ -43,7 +43,6 @@ export default async ({ win, shot, outDir, userDataDir }) => {
   assert.equal(inputSamples.length,20);
   assert.ok(cancellation.cancelled,JSON.stringify(cancellation)); assert.ok(cancellation.elapsed<=100,JSON.stringify(cancellation));
   assert.equal(result.hits[0].itemId,item.id); assert.ok(inputP95<=100,`input P95 ${inputP95}`);
-  assert.ok(['hnsw','exact'].includes(result.status.lastBackend));
-  if(result.status.lastBackend==='exact')assert.ok(result.status.fallbackReason);
+  assert.ok(result.status.lastScannedChunks>=50000,JSON.stringify(result.status));
   await shot('13-input-during-50k-index');
 };

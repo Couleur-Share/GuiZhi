@@ -14,7 +14,7 @@ const acceptAny = () => true;
 
 describe("isPersistedSettingKey", () => {
   it("放行用户设置字段", () => {
-    for (const key of ["theme", "language", "networkProxy", "ytDlpPath"]) {
+    for (const key of ["theme", "language", "networkProxy", "ytDlpPath", "enableNotifications"]) {
       expect(isPersistedSettingKey(key)).toBe(true);
     }
   });

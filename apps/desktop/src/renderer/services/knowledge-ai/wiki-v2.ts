@@ -3,6 +3,19 @@ import { WIKI_COMPILER_VERSION, type WikiCompileJob } from '@guizhi/shared/types
 import { resolveConfig, runScenarioChat, AiNotConfiguredError } from './ai-invoke';
 import { parseWikiResponse, sanitizePages, buildLinkResolver, cleanWikiLinks } from './wiki-compile';
 
+/** 单条目编译失败的记录：只有条目名和「为什么没编出来」才是可据以行动的 */
+export interface WikiCompileFailure {
+  title: string;
+  reason: string;
+}
+
+export interface WikiCompileRoundResult {
+  compiled: number;
+  pending: number;
+  skipped: number;
+  failures: WikiCompileFailure[];
+}
+
 let active: { id: string; controller: AbortController } | null = null;
 export function wikiModelIdentity(): string {
   const config = resolveConfig('wiki');
@@ -65,7 +78,8 @@ export async function runWikiJob(job: WikiCompileJob, progress?: (job: WikiCompi
     throw error;
   } finally { window.dispatchEvent(new Event("wiki-contributions-updated")); signal?.removeEventListener('abort', cancel); active = null; }
 }
-export async function compileReadyWiki(onProgress?: (title: string, current: number, total: number) => void, signal?: AbortSignal) {
+/** 后台轮次只取「可执行」条目、每轮最多 10 条；历史升级必须由用户在预览里主动选择。 */
+export async function compileReadyWiki(onProgress?: (title: string, current: number, total: number) => void, signal?: AbortSignal): Promise<WikiCompileRoundResult> {
   if (!wikiModelIdentity()) throw new AiNotConfiguredError();
   const preview = await wikiPreview();
   const selected = preview.entries.filter(e => e.state === 'ready').slice(0, 10);

@@ -24,7 +24,10 @@ import fs from "fs";
 import Database from "./database/sqlite";
 import { initDatabase, closeDatabase, getDatabase } from "./database";
 import { registerAllIPC } from "./ipc";
-import { getMinimizeOnLaunchSetting } from "./settings/settings-readers";
+import {
+  getDesktopNotificationsEnabled,
+  getMinimizeOnLaunchSetting,
+} from "./settings/settings-readers";
 import { readLanguageSetting } from "./settings/language-setting";
 import { createMenu } from "./menu";
 import {
@@ -482,10 +485,6 @@ ipcMain.on("window:close", () => {
 
 // Fullscreen control
 // 全屏控制
-ipcMain.on("window:enterFullscreen", () => {
-  mainWindow?.setFullScreen(true);
-});
-
 ipcMain.on("window:exitFullscreen", () => {
   mainWindow?.setFullScreen(false);
 });
@@ -501,12 +500,6 @@ ipcMain.handle("window:isVisible", () => {
 ipcMain.on("window:toggleVisibility", () => {
   if (mainWindow) {
     toggleWindowForShowApp(mainWindow, emitWindowVisibility);
-  }
-});
-
-ipcMain.on("window:toggleFullscreen", () => {
-  if (mainWindow) {
-    mainWindow.setFullScreen(!mainWindow.isFullScreen());
   }
 });
 
@@ -574,16 +567,6 @@ ipcMain.on(
 // 设置调试模式
 ipcMain.on("app:setDebugMode", (_event, enabled: boolean) => {
   isDebugMode = enabled;
-});
-
-// Toggle DevTools
-// 切换开发者工具。与 F12 快捷键同样受调试模式约束：这条通道任何渲染进程代码
-// 都能调用，不设门槛等于给注入脚本留了一个绕过快捷键限制的后门。
-ipcMain.on("window:toggleDevTools", () => {
-  if (!isDebugMode && !isDev) {
-    return;
-  }
-  mainWindow?.webContents.toggleDevTools();
 });
 
 // Handle close dialog result
@@ -938,39 +921,6 @@ ipcMain.handle("shell:openPath", async (_event, folderPath: string) => {
   });
 });
 
-// Show system notification
-// 发送系统通知
-ipcMain.handle(
-  "notification:show",
-  async (_event, options: { title: string; body: string }) => {
-    if (!options || typeof options !== "object") {
-      throw new Error("notification:show requires a non-null options object");
-    }
-    if (typeof options.title !== "string" || typeof options.body !== "string") {
-      throw new Error(
-        "notification:show requires title and body to be strings",
-      );
-    }
-    if (Notification.isSupported()) {
-      let iconPath: string;
-      if (isDev) {
-        iconPath = path.join(__dirname, "../../resources/icon.png");
-      } else {
-        iconPath = path.join(process.resourcesPath, "icon.png");
-      }
-
-      const notification = new Notification({
-        title: options.title,
-        body: options.body,
-        icon: iconPath,
-      });
-      notification.show();
-      return true;
-    }
-    return false;
-  },
-);
-
 // 每个 webContents（主窗口、未来可能的子窗口）统一装上导航与开窗拦截
 app.on("web-contents-created", (_event, contents) => {
   // 平台采集独立窗口运行在专用 partition 隔离会话中，由 electron-capture-runtime 自行管控网络与导航；
@@ -1094,7 +1044,7 @@ void app.whenReady().then(async () => {
         backgroundJobs: backgroundJobRuntime,
         discoveryOptions: {
           notify: (view, count, loginRequired) => {
-            if (!Notification.isSupported()) return;
+            if (!Notification.isSupported() || !getDesktopNotificationsEnabled(appDb ?? db)) return;
             const notification = new Notification({
               title: loginRequired
                 ? `${view.name} 需要重新登录`

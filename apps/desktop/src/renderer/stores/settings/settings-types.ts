@@ -104,9 +104,8 @@ export interface SettingsState {
   debugMode: boolean;
   closeAction: "ask" | "minimize" | "exit";
   shortcutModes: Record<string, "global" | "local">;
+  /** 桌面通知总开关；同步到主进程，由主进程在发通知前读取 */
   enableNotifications: boolean;
-  showCopyNotification: boolean;
-  showSaveNotification: boolean;
   language: SupportedLanguage;
   dataPath: string;
   autoCheckUpdate: boolean;
@@ -155,8 +154,6 @@ export interface SettingsState {
   setEnableNotifications: (enabled: boolean) => void;
   setCloseAction: (action: "ask" | "minimize" | "exit") => void;
   setShortcutMode: (key: string, mode: "global" | "local") => void;
-  setShowCopyNotification: (enabled: boolean) => void;
-  setShowSaveNotification: (enabled: boolean) => void;
   setLanguage: (lang: string) => void;
   setDataPath: (path: string) => void;
   setAutoCheckUpdate: (enabled: boolean) => void;

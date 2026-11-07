@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDefaultSettingsValues } from "../../../src/renderer/stores/settings/settings-defaults";
 import {
   mergeSettingsState,
   migrateSettingsState,
+  rehydrateSettingsState,
   stripEphemeralSettings,
 } from "../../../src/renderer/stores/settings/settings-persistence";
 import type { SettingsState } from "../../../src/renderer/stores/settings/settings-types";
@@ -79,6 +80,15 @@ describe("settings 持久化白名单（清理已下线字段）", () => {
     }
   });
 
+  it("已撤下的复制/保存提示开关从老快照中清除", () => {
+    const merged = mergeSettingsState(
+      { showCopyNotification: false, showSaveNotification: false },
+      currentDefaults(),
+    );
+    expect(merged).not.toHaveProperty("showCopyNotification");
+    expect(merged).not.toHaveProperty("showSaveNotification");
+  });
+
   it("保留 actions：过滤只针对数据字段", () => {
     const noop = () => {};
     const stripped = stripEphemeralSettings({
@@ -90,6 +100,27 @@ describe("settings 持久化白名单（清理已下线字段）", () => {
     expect(stripped).not.toHaveProperty("webdavPassword");
     expect((stripped as unknown as { setThemeColor: unknown }).setThemeColor).toBe(
       noop,
+    );
+  });
+});
+
+describe("桌面通知开关同步到主进程", () => {
+  it("启动时把用户关掉的通知开关交给主进程", () => {
+    const sync = vi.fn(async () => undefined);
+    rehydrateSettingsState(
+      { ...currentDefaults(), enableNotifications: false },
+      sync,
+    );
+    expect(sync).toHaveBeenCalledWith(
+      expect.objectContaining({ enableNotifications: false }),
+    );
+  });
+
+  it("没有本地快照时按默认开启同步", () => {
+    const sync = vi.fn(async () => undefined);
+    rehydrateSettingsState(undefined, sync);
+    expect(sync).toHaveBeenCalledWith(
+      expect.objectContaining({ enableNotifications: true }),
     );
   });
 });

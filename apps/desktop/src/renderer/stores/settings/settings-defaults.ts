@@ -38,8 +38,6 @@ function createDefaultAppearanceValues() {
     closeAction: "ask",
     shortcutModes: { ...DEFAULT_SHORTCUT_MODES },
     enableNotifications: true,
-    showCopyNotification: true,
-    showSaveNotification: true,
   } satisfies Partial<SettingsValues>;
 }
 

@@ -7,21 +7,14 @@ import type {
   WikiPageDetail,
   WikiPageRevision,
 } from "@guizhi/shared/types";
+import type { WikiCompilePreview } from "@guizhi/shared/types/wiki-compiler";
 import {
   buildLinkResolver,
   cleanWikiLinks,
-  compilePendingItems,
   normalizeWikiTitle,
   parseAliases,
 } from "../services/knowledge-ai/wiki-compile";
-import { AiNotConfiguredError } from "../services/knowledge-ai/ai-invoke";
 import { describeLoadError } from "./load-error";
-
-export interface WikiCompileProgress {
-  currentTitle: string;
-  current: number;
-  total: number;
-}
 
 /**
  * 页面写操作的结果。
@@ -39,13 +32,21 @@ function describeMutationError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** 逐条编译失败，一行一条挂进 toast 的「查看详情」 */
-function formatCompileFailures(
-  failures: { title: string; reason: string }[],
-): string | undefined {
-  return failures.length > 0
-    ? failures.map((entry) => `${entry.title}：${entry.reason}`).join("\n")
-    : undefined;
+export type WikiCompileCounts = WikiCompilePreview["counts"];
+
+/**
+ * 工具栏编译按钮与全文编译对话框共用预览口径：数字只算「可执行」，
+ * 只要还有待升级、待复核或等待中的资料就允许打开对话框；预览未知时不拦。
+ */
+export function wikiCompileButtonState(counts: WikiCompileCounts | null): {
+  pending: number;
+  actionable: boolean;
+} {
+  if (!counts) return { pending: 0, actionable: true };
+  return {
+    pending: counts.ready,
+    actionable: counts.ready + counts.upgrade + counts.review + counts.waiting > 0,
+  };
 }
 
 export type WikiViewMode = "catalog" | "graph";
@@ -182,15 +183,10 @@ interface WikiState {
   loadError: string | null;
   /** 搜索失败的原因；不区分的话失败会显示成「无结果」，最容易误导 */
   searchError: string | null;
+  /** 后台自动编译轮次进行中（手动编译的进度在编译对话框里） */
   isCompiling: boolean;
-  compileProgress: WikiCompileProgress | null;
-  /** 编译结果提示（完成/部分失败/停止/失败后一次性展示） */
-  compileNotice: {
-    kind: "done" | "partial" | "cancelled" | "error" | "not-configured";
-    message: string;
-    /** 逐条失败原因，进 toast 的「查看详情」 */
-    detail?: string;
-  } | null;
+  /** 全文编译预览的分类计数；读取失败为 null */
+  compileCounts: WikiCompileCounts | null;
   /** 目录视图 / 关系图谱 */
   viewMode: WikiViewMode;
   graph: WikiGraph | null;
@@ -212,16 +208,11 @@ interface WikiState {
   deletePage: (pageId: string) => Promise<WikiMutationResult>;
   /** 按 [[链接]] 目标跳转：标题精确匹配优先，其次别名 */
   openByLinkTarget: (target: string) => Promise<boolean>;
-  compileNow: () => Promise<void>;
-  /** 中断在途编译：已落库的条目保留，本轮剩余条目下轮续跑 */
-  cancelCompile: () => void;
-  rebuildAll: () => Promise<void>;
-  dismissNotice: () => void;
+  /** 打开全文编译对话框：预览范围、启动、暂停与继续都在对话框里完成 */
+  openCompileDialog: () => void;
   setViewMode: (mode: WikiViewMode) => void;
   loadGraph: () => Promise<void>;
 }
-
-let compileAbort: AbortController | null = null;
 
 export const useWikiStore = create<WikiState>()((set, get) => ({
   catalog: [],
@@ -239,8 +230,7 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
   loadError: null,
   searchError: null,
   isCompiling: false,
-  compileProgress: null,
-  compileNotice: null,
+  compileCounts: null,
   viewMode: "catalog",
   graph: null,
 
@@ -292,6 +282,11 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
 
   refresh: async () => {
     set({ loadError: null });
+    // 预览要逐条算指纹，大库较慢；与目录并行读取，不挡住目录渲染
+    void import("../services/knowledge-ai/wiki-v2")
+      .then(({ wikiPreview }) => wikiPreview())
+      .then((preview) => set({ compileCounts: preview.counts }))
+      .catch(() => set({ compileCounts: null }));
     try {
       const [catalog, status, backlinkCounts] = await Promise.all([
         window.api.wiki.catalog(),
@@ -419,70 +414,9 @@ export const useWikiStore = create<WikiState>()((set, get) => ({
     return false;
   },
 
-  compileNow: async () => {
-    if (window.api.wiki.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
-    if (get().isCompiling) {
-      return;
-    }
-    set({ isCompiling: true, compileProgress: null, compileNotice: null });
-    const controller = new AbortController();
-    compileAbort = controller;
-    try {
-      const result = await compilePendingItems((currentTitle, current, total) => {
-        set({ compileProgress: { currentTitle, current, total } });
-      }, controller.signal);
-      const progress = `${result.compiled}/${result.pending}`;
-      const detail = formatCompileFailures(result.failures);
-      set({
-        compileNotice: controller.signal.aborted
-          ? { kind: "cancelled", message: progress, detail }
-          : result.pending === 0
-            ? { kind: "done", message: "" }
-            : // 10 条只编出 3 条此前照样报绿色的「编译完成（3/10）」，
-              // 得自己做减法才知道有 7 条失败，而且没有任何原因
-              {
-                kind: result.skipped > 0 ? "partial" : "done",
-                message: progress,
-                detail,
-              },
-      });
-    } catch (error) {
-      if (controller.signal.aborted) {
-        // 中断落在在途请求上时抛的是 AbortError，不是失败
-        set({ compileNotice: { kind: "cancelled", message: "" } });
-      } else if (error instanceof AiNotConfiguredError) {
-        set({ compileNotice: { kind: "not-configured", message: "" } });
-      } else {
-        set({
-          compileNotice: {
-            kind: "error",
-            message: error instanceof Error ? error.message : String(error),
-          },
-        });
-      }
-    } finally {
-      compileAbort = null;
-      set({ isCompiling: false, compileProgress: null });
-      await get().refresh();
-    }
+  openCompileDialog: () => {
+    window.dispatchEvent(new Event("wiki-compile-preview"));
   },
-
-  cancelCompile: () => {
-    if (window.api.wiki.compiler) window.dispatchEvent(new Event("wiki-compile-preview"));
-    compileAbort?.abort();
-  },
-
-  rebuildAll: async () => {
-    if (window.api.wiki.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
-    if (get().isCompiling) {
-      return;
-    }
-    await window.api.wiki.clear();
-    set({ selectedPageId: null, pageDetail: null });
-    await get().compileNow();
-  },
-
-  dismissNotice: () => set({ compileNotice: null }),
 }));
 
 /** 后台自动编译：静默执行；统一调度器可要求把失败抛回以进入持久化退避。 */
@@ -495,7 +429,8 @@ export async function runBackgroundWikiCompile(options?: {
   }
   useWikiStore.setState({ isCompiling: true });
   try {
-    const result = await compilePendingItems();
+    const { compileReadyWiki } = await import("../services/knowledge-ai/wiki-v2");
+    const result = await compileReadyWiki();
     // 后台轮次不弹提示，但逐条失败要留痕，否则「为什么这条一直没进 Wiki」无从查起
     for (const failure of result.failures) {
       window.api?.log?.appError({

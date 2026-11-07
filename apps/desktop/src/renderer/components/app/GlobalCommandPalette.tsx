@@ -83,7 +83,7 @@ export function GlobalCommandPalette() {
         showToast(result.success ? "完整备份已完成" : result.error || "备份失败", result.success ? "success" : "error");
       }) },
       { key: "action:index", group: "常用动作", title: "立即建立语义索引", run: closeAnd(() => void useSemanticStore.getState().runIndexing()) },
-      { key: "action:wiki", group: "常用动作", title: "立即编译 Wiki", run: closeAnd(() => void useWikiStore.getState().compileNow()) },
+      { key: "action:wiki", group: "常用动作", title: "立即编译 Wiki", run: closeAnd(() => useWikiStore.getState().openCompileDialog()) },
       { key: "action:research", group: "常用动作", title: "新建近期研究", run: closeAnd(() => useUIStore.getState().setAppModule("research")) },
     ].filter((item) => !normalized || item.title.toLowerCase().includes(normalized));
     for (const item of remote.knowledge) items.push({ key: `knowledge:${item.id}`, group: "知识条目", title: item.title, subtitle: item.snippet, run: closeAnd(async () => { useUIStore.getState().setAppModule("library"); useKnowledgeStore.getState().setScope("all"); await useKnowledgeStore.getState().selectItem(item.id); }) });

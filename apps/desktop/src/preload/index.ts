@@ -152,22 +152,12 @@ contextBridge.exposeInMainWorld("electron", {
   toggleVisibility: () => ipcRenderer.send("window:toggleVisibility"),
   // Fullscreen control
   // 全屏控制
-  enterFullscreen: () => ipcRenderer.send("window:enterFullscreen"),
   exitFullscreen: () => ipcRenderer.send("window:exitFullscreen"),
-  toggleFullscreen: () => ipcRenderer.send("window:toggleFullscreen"),
   isFullscreen: () => ipcRenderer.invoke("window:isFullscreen"),
   isVisible: () => ipcRenderer.invoke("window:isVisible"),
   setAutoLaunch: (enabled: boolean, minimizeOnLaunch?: boolean) =>
     ipcRenderer.send("app:setAutoLaunch", enabled, minimizeOnLaunch),
   relaunchApp: () => ipcRenderer.invoke(IPC_CHANNELS.APP_RELAUNCH),
-  getCacheSize: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.APP_GET_CACHE_SIZE) as Promise<{
-      size: number;
-    }>,
-  clearCache: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.APP_CLEAR_CACHE) as Promise<{
-      success: boolean;
-    }>,
   getRuntimePaths: () =>
     ipcRenderer.invoke(IPC_CHANNELS.APP_GET_RUNTIME_PATHS) as Promise<{
       userDataPath: string;
@@ -178,7 +168,6 @@ contextBridge.exposeInMainWorld("electron", {
     }>,
   setDebugMode: (enabled: boolean) =>
     ipcRenderer.send("app:setDebugMode", enabled),
-  toggleDevTools: () => ipcRenderer.send("window:toggleDevTools"),
   setMinimizeToTray: (enabled: boolean) =>
     ipcRenderer.send("app:setMinimizeToTray", enabled),
   setCloseAction: (action: "ask" | "minimize" | "exit") =>
@@ -201,8 +190,6 @@ contextBridge.exposeInMainWorld("electron", {
   selectFolder: () => ipcRenderer.invoke("dialog:selectFolder"),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   openPath: (path: string) => ipcRenderer.invoke("shell:openPath", path),
-  showNotification: (title: string, body: string) =>
-    ipcRenderer.invoke("notification:show", { title, body }),
   // Data directory
   // 数据目录
   getDataPath: () => ipcRenderer.invoke("data:getPath"),
@@ -253,22 +240,11 @@ contextBridge.exposeInMainWorld("electron", {
   },
   // Images
   // 图片
-  selectImage: () => ipcRenderer.invoke("dialog:selectImage"),
-  saveImage: (paths: string[]) => ipcRenderer.invoke("image:save", paths),
-  saveImageBuffer: (buffer: ArrayBuffer) =>
-    ipcRenderer.invoke("image:save-buffer", Buffer.from(buffer)),
-  downloadImage: (url: string) => ipcRenderer.invoke("image:download", url),
-  openImage: (fileName: string) => ipcRenderer.invoke("image:open", fileName),
-  listImages: () => ipcRenderer.invoke("image:list"),
-  getImageSize: (fileName: string) =>
-    ipcRenderer.invoke("image:getSize", fileName),
+  selectImage: () => ipcRenderer.invoke(IPC_CHANNELS.DIALOG_SELECT_IMAGE),
+  saveImage: (paths: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.IMAGE_SAVE, paths),
   readImageBase64: (fileName: string) =>
-    ipcRenderer.invoke("image:readBase64", fileName),
-  saveImageBase64: (fileName: string, base64: string) =>
-    ipcRenderer.invoke("image:saveBase64", fileName, base64),
-  imageExists: (fileName: string) =>
-    ipcRenderer.invoke("image:exists", fileName),
-  clearImages: () => ipcRenderer.invoke("image:clear"),
+    ipcRenderer.invoke(IPC_CHANNELS.IMAGE_READ_BASE64, fileName),
   // Shortcuts
   // 快捷键
   getShortcuts: () => ipcRenderer.invoke("shortcuts:get"),
@@ -303,23 +279,6 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.removeListener("shortcuts:updated", listener);
     };
   },
-  // Videos
-  // 视频
-  selectVideo: () => ipcRenderer.invoke("dialog:selectVideo"),
-  saveVideo: (paths: string[]) => ipcRenderer.invoke("video:save", paths),
-  openVideo: (fileName: string) => ipcRenderer.invoke("video:open", fileName),
-  listVideos: () => ipcRenderer.invoke("video:list"),
-  getVideoSize: (fileName: string) =>
-    ipcRenderer.invoke("video:getSize", fileName),
-  readVideoBase64: (fileName: string) =>
-    ipcRenderer.invoke("video:readBase64", fileName),
-  saveVideoBase64: (fileName: string, base64: string) =>
-    ipcRenderer.invoke("video:saveBase64", fileName, base64),
-  videoExists: (fileName: string) =>
-    ipcRenderer.invoke("video:exists", fileName),
-  getVideoPath: (fileName: string) =>
-    ipcRenderer.invoke("video:getPath", fileName),
-  clearVideos: () => ipcRenderer.invoke("video:clear"),
 });
 
 // Type declarations
@@ -334,15 +293,11 @@ declare global {
       maximize?: () => void;
       close?: () => void;
       toggleVisibility?: () => void;
-      enterFullscreen?: () => void;
       exitFullscreen?: () => void;
       isFullscreen?: () => Promise<boolean>;
       isVisible?: () => Promise<boolean>;
-      toggleFullscreen?: () => void;
       setAutoLaunch?: (enabled: boolean, minimizeOnLaunch?: boolean) => void;
       relaunchApp?: () => Promise<{ success: boolean }>;
-      getCacheSize?: () => Promise<{ size: number }>;
-      clearCache?: () => Promise<{ success: boolean }>;
       getRuntimePaths?: () => Promise<{
         userDataPath: string;
         dataDir: string;
@@ -351,7 +306,6 @@ declare global {
         logsDir: string;
       }>;
       setDebugMode?: (enabled: boolean) => void;
-      toggleDevTools?: () => void;
       setMinimizeToTray?: (enabled: boolean) => void;
       setCloseAction?: (action: "ask" | "minimize" | "exit") => void;
       onShowCloseDialog?: (callback: () => void) => void | (() => void);
@@ -365,7 +319,6 @@ declare global {
       openPath?: (
         path: string,
       ) => Promise<{ success: boolean; error?: string }>;
-      showNotification?: (title: string, body: string) => Promise<boolean>;
       getDataPath?: () => Promise<string>;
       getDataPathStatus?: () => Promise<{
         currentPath: string;
@@ -419,15 +372,7 @@ declare global {
       };
       selectImage?: () => Promise<string[]>;
       saveImage?: (paths: string[]) => Promise<string[]>;
-      saveImageBuffer?: (buffer: ArrayBuffer) => Promise<string | null>;
-      downloadImage?: (url: string) => Promise<string | null>;
-      openImage?: (fileName: string) => Promise<boolean>;
-      listImages?: () => Promise<string[]>;
-      getImageSize?: (fileName: string) => Promise<number | null>;
       readImageBase64?: (fileName: string) => Promise<string | null>;
-      saveImageBase64?: (fileName: string, base64: string) => Promise<boolean>;
-      imageExists?: (fileName: string) => Promise<boolean>;
-      clearImages?: () => Promise<boolean>;
       getShortcuts?: () => Promise<Record<string, string> | null>;
       setShortcuts?: (shortcuts: Record<string, string>) => Promise<boolean>;
       setShortcutMode?: (modes: Record<string, "global" | "local">) => void;
@@ -440,16 +385,6 @@ declare global {
       onShortcutsUpdated?: (
         callback: (shortcuts: Record<string, string>) => void,
       ) => void | (() => void);
-      selectVideo?: () => Promise<string[]>;
-      saveVideo?: (paths: string[]) => Promise<string[]>;
-      openVideo?: (fileName: string) => Promise<boolean>;
-      listVideos?: () => Promise<string[]>;
-      getVideoSize?: (fileName: string) => Promise<number | null>;
-      readVideoBase64?: (fileName: string) => Promise<string | null>;
-      saveVideoBase64?: (fileName: string, base64: string) => Promise<boolean>;
-      videoExists?: (fileName: string) => Promise<boolean>;
-      getVideoPath?: (fileName: string) => Promise<string | null>;
-      clearVideos?: () => Promise<boolean>;
     };
   }
 }

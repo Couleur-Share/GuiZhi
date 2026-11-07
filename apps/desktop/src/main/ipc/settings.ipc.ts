@@ -93,6 +93,7 @@ const PERSISTED_SETTINGS_KEYS = new Set<string>([
   "launchAtStartup",
   "minimizeOnLaunch",
   "backgroundTasksEnabled",
+  "enableNotifications",
   "networkProxy",
   "flareSolverr",
   "backupAutoEnabled",

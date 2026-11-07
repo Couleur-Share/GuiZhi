@@ -6,8 +6,12 @@ const { classifyInboxItems } = vi.hoisted(() => ({
   classifyInboxItems: vi.fn(),
 }));
 
-vi.mock("../../../src/renderer/services/knowledge-ai/wiki-compile", () => ({
-  countPendingWikiItems: vi.fn(async () => wikiPending),
+vi.mock("../../../src/renderer/services/knowledge-ai/wiki-v2", () => ({
+  wikiPreview: vi.fn(async () => ({
+    entries: [],
+    counts: { ready: wikiPending, review: 0, waiting: 0, upgrade: 0, current: 0, excluded: 0 },
+    requests: { min: 0, max: 0 },
+  })),
 }));
 vi.mock(
   "../../../src/renderer/services/knowledge-ai/classify-collections",

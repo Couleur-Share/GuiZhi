@@ -81,7 +81,6 @@ export default defineConfig(async () => ({
   plugins: [
     react(),
     electron([
-      { entry: "src/main/services/semantic-worker.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/semantic-worker", emptyOutDir: true, rollupOptions: { external: ["hnswlib-wasm", "hnswlib-wasm/dist/hnswlib.js"] } } } },
       { entry: "src/preload/reading-view.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-view-preload", emptyOutDir: true } } },
       { entry: "src/preload/reading-graphics.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-graphics-preload", emptyOutDir: true } } },
       {

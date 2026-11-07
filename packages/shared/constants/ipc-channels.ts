@@ -105,13 +105,8 @@ export const IPC_CHANNELS = {
   WIKI_UPDATE_PAGE: "wiki:updatePage",
   WIKI_DELETE_PAGE: "wiki:deletePage",
   WIKI_GET_PAGE: "wiki:getPage",
-  WIKI_APPLY_COMPILATION: "wiki:applyCompilation",
-  WIKI_LIST_COMPILABLE: "wiki:listCompilable",
-  WIKI_LIST_INGESTIONS: "wiki:listIngestions",
   WIKI_STATUS: "wiki:status",
-  WIKI_CLEAR: "wiki:clear",
   WIKI_GRAPH: "wiki:graph",
-  WIKI_RECORD_FAILURE: "wiki:recordCompilationFailure",
   WIKI_LIST_REVISIONS: "wiki:listRevisions",
   WIKI_RESTORE_REVISION: "wiki:restoreRevision",
 
@@ -270,8 +265,6 @@ export const IPC_CHANNELS = {
 
   // App runtime
   APP_RELAUNCH: "app:relaunch",
-  APP_GET_CACHE_SIZE: "app:getCacheSize",
-  APP_CLEAR_CACHE: "app:clearCache",
   APP_GET_RUNTIME_PATHS: "app:getRuntimePaths",
   APP_COMMAND: "app:command",
   /** 渲染进程 → 主进程：把业务失败记进 logs/error.log */
@@ -305,42 +298,15 @@ export const IPC_CHANNELS = {
   RESEARCH_DELETE: "research:delete",
   RESEARCH_CLONE: "research:clone",
   RESEARCH_VERIFY_AND_RETRY_SOURCE: "research:verifyAndRetrySource",
-  RESEARCH_BEGIN_REPORT: "research:beginReport",
-  RESEARCH_SAVE_REPORT: "research:saveReport",
-  RESEARCH_FAIL_REPORT: "research:failReport",
   RESEARCH_ENQUEUE_CANDIDATES: "research:enqueueCandidates",
   RESEARCH_SAVE_TO_KNOWLEDGE: "research:saveToKnowledge",
   RESEARCH_CHANGED: "research:changed",
 
-  // Dialogs
+  // 本地图片：背景图选择与 OCR 读图
   DIALOG_SELECT_IMAGE: "dialog:selectImage",
-  DIALOG_SELECT_VIDEO: "dialog:selectVideo",
-
-  // Images
   IMAGE_SAVE: "image:save",
-  IMAGE_SAVE_BUFFER: "image:save-buffer",
-  IMAGE_DOWNLOAD: "image:download",
-  IMAGE_OPEN: "image:open",
-  IMAGE_LIST: "image:list",
-  IMAGE_GET_SIZE: "image:getSize",
   IMAGE_READ_BASE64: "image:readBase64",
-  IMAGE_SAVE_BASE64: "image:saveBase64",
-  IMAGE_EXISTS: "image:exists",
-  IMAGE_CLEAR: "image:clear",
 
-  // Videos
-  VIDEO_SAVE: "video:save",
-  VIDEO_OPEN: "video:open",
-  VIDEO_LIST: "video:list",
-  VIDEO_GET_SIZE: "video:getSize",
-  VIDEO_READ_BASE64: "video:readBase64",
-  VIDEO_SAVE_BASE64: "video:saveBase64",
-  VIDEO_EXISTS: "video:exists",
-  VIDEO_GET_PATH: "video:getPath",
-  VIDEO_CLEAR: "video:clear",
-
-  // Data path
-  DATA_PREVIEW_RECOVERY: "data:previewRecovery",
   WEB_STATUS: "web:status",
   WEB_SOLVER_CHECK: "web:solverCheck",
   WEB_REPAIR: "web:repair",

@@ -49,7 +49,6 @@ const SETTINGS_MENU = [
 
 const loadGeneralSettings = () => import("./GeneralSettings");
 const loadAppearanceSettings = () => import("./AppearanceSettings");
-const loadLanguageSettings = () => import("./LanguageSettings");
 const loadShortcutsSettings = () => import("./ShortcutsSettings");
 const loadAboutSettings = () => import("./AboutSettings");
 const loadDataSettings = () => import("./DataSettings");
@@ -68,11 +67,6 @@ const GeneralSettings = lazy(() =>
 const AppearanceSettings = lazy(() =>
   loadAppearanceSettings().then((module) => ({
     default: module.AppearanceSettings,
-  })),
-);
-const LanguageSettings = lazy(() =>
-  loadLanguageSettings().then((module) => ({
-    default: module.LanguageSettings,
   })),
 );
 const ShortcutsSettings = lazy(() =>
@@ -122,7 +116,6 @@ export function prefetchSettingsSections(): void {
   for (const loadSection of [
     loadGeneralSettings,
     loadAppearanceSettings,
-    loadLanguageSettings,
     loadShortcutsSettings,
     loadAboutSettings,
     loadDataSettings,
@@ -195,8 +188,6 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <IllustrationSettings />;
       case "mcp":
         return <McpSettings />;
-      case "language":
-        return <LanguageSettings />;
       case "shortcuts":
         return <ShortcutsSettings />;
       case "about":

@@ -93,7 +93,6 @@ export function createWindowElectronMock(overrides?: DeepPartial<MockRecord>) {
       sendCloseDialogCancel: vi.fn(),
       selectFolder: vi.fn().mockResolvedValue(null),
       openPath: vi.fn().mockResolvedValue({ success: true }),
-      showNotification: vi.fn().mockResolvedValue(true),
       getDataPath: vi.fn().mockResolvedValue(""),
       getDataPathStatus: vi.fn().mockResolvedValue({
         currentPath: "",
@@ -114,9 +113,6 @@ export function createWindowElectronMock(overrides?: DeepPartial<MockRecord>) {
       },
       selectImage: vi.fn().mockResolvedValue([]),
       saveImage: vi.fn().mockResolvedValue([]),
-      listImages: vi.fn().mockResolvedValue([]),
-      imageExists: vi.fn().mockResolvedValue(false),
-      clearImages: vi.fn().mockResolvedValue(true),
     },
     overrides,
   );

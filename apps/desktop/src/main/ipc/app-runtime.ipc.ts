@@ -1,5 +1,5 @@
 import path from "path";
-import { app, ipcMain, session } from "electron";
+import { app, ipcMain } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import { getDataDir, getDatabasePath } from "../runtime-paths";
 import { logAppError } from "../diagnostic-log";
@@ -37,16 +37,6 @@ function registerErrorLogHandler(): void {
   });
 }
 
-function registerCacheHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.APP_GET_CACHE_SIZE, async () => ({
-    size: await session.defaultSession.getCacheSize(),
-  }));
-  ipcMain.handle(IPC_CHANNELS.APP_CLEAR_CACHE, async () => {
-    await session.defaultSession.clearCache();
-    return { success: true };
-  });
-}
-
 function registerRuntimePathHandler(): void {
   ipcMain.handle(IPC_CHANNELS.APP_GET_RUNTIME_PATHS, async () => ({
     userDataPath: app.getPath("userData"),
@@ -57,9 +47,8 @@ function registerRuntimePathHandler(): void {
   }));
 }
 
-/** Register app cache, runtime-path and error-log handlers. */
+/** Register runtime-path and error-log handlers. */
 export function registerAppRuntimeIPC(): void {
-  registerCacheHandlers();
   registerRuntimePathHandler();
   registerErrorLogHandler();
 }

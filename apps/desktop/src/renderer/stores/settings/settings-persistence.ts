@@ -141,6 +141,7 @@ export function rehydrateSettingsState(
   });
   const mainProcessSettings: Partial<Settings> = {
     networkProxy: normalizeNetworkProxySettings(state?.networkProxy),
+    enableNotifications: state?.enableNotifications !== false,
   };
   if (state?.language) {
     mainProcessSettings.language = state.language;

@@ -103,7 +103,6 @@ function SemanticIndexCard() {
             : t("ask.semanticCacheCold", " · 向量缓存已加载")
           : null}
       </p>
-      {status.fallbackReason ? <p className="mt-1 text-xs text-muted-foreground">{status.fallbackReason}</p> : null}
       {pending > 0 || isIndexing ? (
         <button
           type="button"

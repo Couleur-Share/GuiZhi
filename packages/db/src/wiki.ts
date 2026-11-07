@@ -10,7 +10,6 @@ import type {
   WikiApplyCompilationInput,
   WikiBacklinkCounts,
   WikiCatalogEntry,
-  WikiCompilableItem,
   WikiCompilationStatus,
   WikiGraph,
   WikiIngestion,
@@ -241,18 +240,6 @@ export class WikiDB {
       normalizedTitle,
     ) as { id: string } | undefined;
     return row?.id ?? null;
-  }
-
-  /** 可编译条目：未删除且正文非空（含归档——归档 ≠ 移出知识） */
-  listCompilableItems(): WikiCompilableItem[] {
-    const rows = this.db.all(
-      "SELECT id, title, content FROM knowledge_items WHERE deleted_at IS NULL AND review_status != 'needs_review' AND content != ''",
-    ) as { id: string; title: string; content: string }[];
-    return rows.map((row) => ({
-      id: row.id,
-      title: row.title || "无标题",
-      content: row.content,
-    }));
   }
 
   listIngestions(): WikiIngestion[] {

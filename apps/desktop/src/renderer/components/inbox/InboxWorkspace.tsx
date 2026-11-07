@@ -65,9 +65,9 @@ export function InboxWorkspace() {
   );
   const [collectionId, setCollectionId] = useState("");
   const [tagText, setTagText] = useState("");
-  const [runningKind, setRunningKind] = useState<
-    "semantic-pending" | "wiki-pending" | null
-  >(null);
+  const [runningKind, setRunningKind] = useState<"semantic-pending" | null>(
+    null,
+  );
   const [acknowledgingTaskId, setAcknowledgingTaskId] = useState<string | null>(
     null,
   );
@@ -173,59 +173,8 @@ export function InboxWorkspace() {
     }
   };
 
-  const runWiki = async () => {
-    if (window.api?.wiki?.compiler) { window.dispatchEvent(new Event("wiki-compile-preview")); return; }
-    setRunningKind("wiki-pending");
-    try {
-      const { useWikiStore } = await import("../../stores/wiki.store");
-      const store = useWikiStore.getState();
-      if (store.isCompiling) {
-        showToast("Wiki 正在编译", "info");
-        return;
-      }
-
-      await store.compileNow();
-      const notice = useWikiStore.getState().compileNotice;
-      if (!notice) {
-        showToast("Wiki 编译未能启动，请稍后重试", "error");
-      } else if (notice.kind === "done") {
-        showToast(
-          notice.message
-            ? `Wiki 编译完成（${notice.message}）`
-            : "没有需要编译的条目",
-          "success",
-        );
-      } else if (notice.kind === "partial") {
-        const failed = notice.detail?.split("\n").length ?? 0;
-        showToast(
-          `Wiki 编译完成 ${notice.message}，${failed} 条未能生成`,
-          "warning",
-          notice.detail ? { detail: notice.detail } : undefined,
-        );
-      } else if (notice.kind === "cancelled") {
-        showToast(
-          notice.message
-            ? `已停止 Wiki 编译（已完成 ${notice.message}）`
-            : "已停止 Wiki 编译",
-          "info",
-          notice.detail ? { detail: notice.detail } : undefined,
-        );
-      } else if (notice.kind === "not-configured") {
-        showToast("尚未配置 AI 服务", "error");
-        requestSettingsSection("ai");
-      } else {
-        showToast(`Wiki 编译失败：${notice.message}`, "error");
-      }
-      useWikiStore.getState().dismissNotice();
-      await refresh();
-    } catch (error) {
-      showToast(
-        `Wiki 编译执行失败：${error instanceof Error ? error.message : String(error)}`,
-        "error",
-      );
-    } finally {
-      setRunningKind(null);
-    }
+  const runWiki = () => {
+    window.dispatchEvent(new Event("wiki-compile-preview"));
   };
 
   const acknowledgeWarning = async (taskId: string) => {

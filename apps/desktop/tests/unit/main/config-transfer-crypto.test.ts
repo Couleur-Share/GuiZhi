@@ -1,9 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ConfigTransferFile } from "@guizhi/shared/types";
 import { CONFIG_TRANSFER_KIND, CONFIG_TRANSFER_VERSION } from "@guizhi/shared/types";
-
-// security.ts 只用到 node crypto，但链路上的 Database 类型经 electron 侧导入
-vi.mock("electron", () => ({ app: {}, session: { defaultSession: {} } }));
 
 import {
   decryptConfigSecrets,

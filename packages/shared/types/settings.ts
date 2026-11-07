@@ -29,6 +29,8 @@ export interface Settings {
   minimizeOnLaunch?: boolean;
   /** 已明确授权应用在隐藏窗口/托盘状态继续执行后台任务 */
   backgroundTasksEnabled?: boolean;
+  /** 桌面通知总开关（主进程发系统通知前读取；缺省视为开启） */
+  enableNotifications?: boolean;
   // Global desktop network proxy.
   networkProxy?: NetworkProxySettings;
   flareSolverr?: import("../utils/flaresolverr").FlareSolverrSettings;

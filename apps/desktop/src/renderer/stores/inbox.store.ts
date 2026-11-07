@@ -89,14 +89,11 @@ export const useInboxStore = create<InboxState>()((set, get) => ({
       })(),
       (async () => {
         try {
-          if (window.api?.wiki?.compiler) {
-            const { wikiPreview } = await import("../services/knowledge-ai/wiki-v2");
-            const preview = await wikiPreview();
-            if (generation === refreshGeneration) set({ wikiCandidates: preview.counts });
-            aggregate("wiki-pending", preview.counts.ready); return;
-          }
-          const { countPendingWikiItems } = await import("../services/knowledge-ai/wiki-compile"); aggregate("wiki-pending", await countPendingWikiItems()); }
-        catch (e) { aggregate("wiki-pending", 0); if (generation === refreshGeneration) set(s => ({ sectionErrors: { ...s.sectionErrors, wiki: describeLoadError(e) } })); }
+          const { wikiPreview } = await import("../services/knowledge-ai/wiki-v2");
+          const preview = await wikiPreview();
+          if (generation === refreshGeneration) set({ wikiCandidates: preview.counts });
+          aggregate("wiki-pending", preview.counts.ready);
+        } catch (e) { aggregate("wiki-pending", 0); if (generation === refreshGeneration) set(s => ({ sectionErrors: { ...s.sectionErrors, wiki: describeLoadError(e) } })); }
       })(),
       (async () => {
         try {

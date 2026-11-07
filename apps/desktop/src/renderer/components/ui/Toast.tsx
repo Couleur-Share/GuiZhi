@@ -10,7 +10,6 @@ import {
   CopyIcon,
   XIcon,
 } from 'lucide-react';
-import { useSettingsStore } from '../../stores/settings.store';
 import { MOTION_DURATION } from '../../styles/motion-tokens';
 import { copyTextToClipboard } from '../../utils/clipboard';
 
@@ -31,8 +30,6 @@ export interface ShowToastOptions {
    * 展开能读、能复制去搜。批量操作把逐条失败明细放这儿最合适。
    */
   detail?: string;
-  /** 同时发一条系统通知（需在设置里开启通知） */
-  systemNotification?: boolean;
 }
 
 interface Toast {
@@ -172,7 +169,6 @@ function ToastDetail({ detail }: { detail: string }) {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const enableNotifications = useSettingsStore((state) => state.enableNotifications);
   // Track timers so React strict-mode double-mount and rapid replacements
   // do not orphan setTimeout callbacks. Indexed by toast id.
   // 用 ref 记录定时器，避免 React strict-mode 双挂载与快速替换造成游离
@@ -214,20 +210,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       trimToasts([...prev, { id, message, type, detail: options?.detail }]),
     );
 
-    // Send system notification (if enabled and requested)
-    // 发送系统通知（如果启用且请求）
-    if (options?.systemNotification && enableNotifications && window.electron?.showNotification) {
-      const title =
-        type === 'success'
-          ? t('common.success', 'Success')
-          : type === 'error'
-            ? t('common.error', 'Error')
-            : type === 'warning'
-              ? t('common.warning', 'Warning')
-              : t('common.info', 'Info');
-      void window.electron.showNotification(`GuiZhi - ${title}`, message);
-    }
-
     if (isPersistent(type)) {
       return id;
     }
@@ -240,7 +222,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }, AUTO_DISMISS_MS);
     autoDismissTimers.current.set(id, dismiss);
     return id;
-  }, [enableNotifications, removeToast, t]);
+  }, [removeToast]);
 
   const showUndoToast = useCallback((message: string, onUndo: () => void) => {
     idCounter.current += 1;

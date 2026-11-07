@@ -27,7 +27,6 @@ export type SettingsSectionId = "mobile-capture"
   | "ai"
   | "illustration"
   | "mcp"
-  | "language"
   | "shortcuts"
   | "about";
 

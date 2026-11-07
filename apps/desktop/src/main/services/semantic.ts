@@ -4,9 +4,8 @@
  * 哈希是判定与落库的唯一锚点：listPending 计算并下发 contentHash，
  * 渲染进程完成嵌入后原样回传，避免两端标准化算法漂移。
  *
- * 检索走进程内向量缓存（见 semantic-vector-cache），避免每次全表解码 BLOB。
- * 小库精确扫描；达到规模、内存或实测耗时阈值后尝试 HNSW 侧车，运行时不兼容
- * 会自动保留精确扫描，不中断问答。
+ * 检索走进程内向量缓存（见 semantic-vector-cache），避免每次全表解码 BLOB，
+ * 再做精确余弦扫描。
  */
 import { abortable } from "@guizhi/shared/utils/abortable";
 import { SemanticIndexDB } from "@guizhi/db";
@@ -22,9 +21,7 @@ import {
   ensureSemanticVectorCacheAsync,
   getSemanticVectorCache,
 } from "./semantic-vector-cache";
-import { resolveSemanticSearchBackend } from "./semantic-search-backend";
-import { getDataDir } from "../runtime-paths";
-import path from "node:path";
+import { ExactSemanticSearchBackend } from "./semantic-search-backend";
 
 const SNIPPET_MAX_LENGTH = 160;
 /** 缓存命中后仍超过该耗时才记一条诊断（节流） */
@@ -158,17 +155,7 @@ export function listPendingSemanticItems(
 let lastSearchMs: number | null = null;
 let lastScannedChunks: number | null = null;
 let lastSearchCacheHit: boolean | null = null;
-let fallbackReason: string | undefined;
-let lastBackend: "exact" | "hnsw" | null = null;
 let lastSlowLogAt = 0;
-const warmSearchSamples = new Map<string, number[]>();
-
-function warmMedian(model: string): number | null {
-  const samples = warmSearchSamples.get(model);
-  if (!samples?.length) return null;
-  const sorted = [...samples].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-}
 
 /**
  * 索引进度。
@@ -195,16 +182,12 @@ export function getSemanticStatus(
     lastSearchMs,
     lastScannedChunks,
     lastSearchCacheHit,
-    ...(lastBackend ? { lastBackend } : {}), fallbackReason,
   };
 }
 
 /**
  * 余弦 top-k：向量均已 L2 归一化，点积即余弦相似度；
  * 条目分数取其分块最高分，返回按分数倒序的前 limit 个条目。
- *
- * 后端由规模与实测耗时动态选择。精确扫描会分批让出事件循环；HNSW 侧车按
- * 模型、维度与数据代际隔离，构建或加载失败时透明回退。
  */
 export async function searchSemanticByVector(
   db: Database.Database,
@@ -218,16 +201,11 @@ export async function searchSemanticByVector(
   const cacheHit = Boolean(getSemanticVectorCache(db, model));
   signal?.throwIfAborted();
   const cache = await abortable(ensureSemanticVectorCacheAsync(db, index, model), signal);
-  const chunkCount = cache.itemIds.length;
-  const backend = await abortable(resolveSemanticSearchBackend({
-    cache,
-    model,
-    generation: index.generation(model),
-    rootDir: path.join(getDataDir(), "indexes", "semantic"),
-    warmMedianMs: warmMedian(model),
-  }), signal);
-  const top = await abortable(backend.search(queryVector, Math.max(1, limit), signal), signal);
-  const scanned = backend.name === "exact" ? chunkCount : Math.min(chunkCount, Math.max(limit * 8, 64));
+  const scanned = cache.itemIds.length;
+  const top = await abortable(
+    new ExactSemanticSearchBackend(cache).search(queryVector, Math.max(1, limit), signal),
+    signal,
+  );
 
   const snippets = new Map(
     index
@@ -254,11 +232,6 @@ export async function searchSemanticByVector(
   lastSearchMs = Date.now() - started;
   lastScannedChunks = scanned;
   lastSearchCacheHit = cacheHit;
-  lastBackend = backend.name; fallbackReason = backend.fallbackReason;
-  if (cacheHit) {
-    const samples = [...(warmSearchSamples.get(model) ?? []), lastSearchMs].slice(-9);
-    warmSearchSamples.set(model, samples);
-  }
   if (
     lastSearchMs >= SLOW_SEARCH_MS &&
     Date.now() - lastSlowLogAt >= SLOW_LOG_COOLDOWN_MS
@@ -271,7 +244,6 @@ export async function searchSemanticByVector(
       lastSearchMs,
       lastScannedChunks: scanned,
       model,
-      backend: backend.name,
     });
   }
 
@@ -283,7 +255,5 @@ export function resetSemanticSearchTelemetryForTests(): void {
   lastSearchMs = null;
   lastScannedChunks = null;
   lastSearchCacheHit = null;
-  lastBackend = null;
   lastSlowLogAt = 0;
-  warmSearchSamples.clear();
 }

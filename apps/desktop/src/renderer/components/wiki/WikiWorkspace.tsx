@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
 import {
   ListIcon,
   Loader2Icon,
@@ -9,7 +9,7 @@ import {
   TimerIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useWikiStore } from "../../stores/wiki.store";
+import { useWikiStore, wikiCompileButtonState } from "../../stores/wiki.store";
 import { useSettingsStore } from "../../stores/settings.store";
 import {
   WIKI_CATALOG_PANE_WIDTH_DEFAULT,
@@ -17,9 +17,7 @@ import {
   WIKI_CATALOG_PANE_WIDTH_MIN,
   useUIStore,
 } from "../../stores/ui.store";
-import { useToast } from "../ui/Toast";
 import { ColumnResizer } from "../ui/ColumnResizer";
-import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 import { WikiCatalogList } from "./WikiCatalogList";
@@ -102,87 +100,25 @@ function ViewModeToggle() {
  */
 export function WikiWorkspace() {
   const { t } = useTranslation();
-  const { showToast } = useToast();
   const status = useWikiStore((state) => state.status);
   const catalog = useWikiStore((state) => state.catalog);
   const hasLoaded = useWikiStore((state) => state.hasLoaded);
   const loadError = useWikiStore((state) => state.loadError);
   const isCompiling = useWikiStore((state) => state.isCompiling);
-  const compileProgress = useWikiStore((state) => state.compileProgress);
-  const compileNotice = useWikiStore((state) => state.compileNotice);
-  const dismissNotice = useWikiStore((state) => state.dismissNotice);
+  const compileCounts = useWikiStore((state) => state.compileCounts);
   const refresh = useWikiStore((state) => state.refresh);
-  const compileNow = useWikiStore((state) => state.compileNow);
-  const cancelCompile = useWikiStore((state) => state.cancelCompile);
-  const rebuildAll = useWikiStore((state) => state.rebuildAll);
+  const openCompileDialog = useWikiStore((state) => state.openCompileDialog);
   const viewMode = useWikiStore((state) => state.viewMode);
-  const requestSettingsSection = useUIStore(
-    (state) => state.requestSettingsSection,
-  );
   const catalogPaneWidth = useUIStore((state) => state.wikiCatalogPaneWidth);
   const setCatalogPaneWidth = useUIStore(
     (state) => state.setWikiCatalogPaneWidth,
   );
-  const [showRebuildConfirm, setShowRebuildConfirm] = useState(false);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // 编译结果提示
-  useEffect(() => {
-    if (!compileNotice) {
-      return;
-    }
-    const detail = compileNotice.detail
-      ? { detail: compileNotice.detail }
-      : undefined;
-    if (compileNotice.kind === "done") {
-      showToast(
-        compileNotice.message
-          ? t("wiki.compileDone", "编译完成（{{result}}）", {
-              result: compileNotice.message,
-            })
-          : t("wiki.compileNothing", "没有需要编译的条目"),
-        "success",
-      );
-    } else if (compileNotice.kind === "partial") {
-      // 有条目没编出来就不能报绿色，原因逐条挂在详情里
-      showToast(
-        t("wiki.compilePartial", "编译完成 {{result}}，{{failed}} 条未能生成", {
-          result: compileNotice.message,
-          failed: compileNotice.detail?.split("\n").length ?? 0,
-        }),
-        "warning",
-        detail,
-      );
-    } else if (compileNotice.kind === "cancelled") {
-      showToast(
-        compileNotice.message
-          ? t("wiki.compileStoppedPartial", "已停止编译（已完成 {{result}}）", {
-              result: compileNotice.message,
-            })
-          : t("wiki.compileStopped", "已停止编译"),
-        "info",
-        detail,
-      );
-    } else if (compileNotice.kind === "not-configured") {
-      showToast(t("ask.notConfigured", "尚未配置 AI 服务"), "error");
-      requestSettingsSection("ai");
-    } else {
-      showToast(
-        t("wiki.compileFailed", "编译失败：{{message}}", {
-          message: compileNotice.message,
-        }),
-        "error",
-      );
-    }
-    dismissNotice();
-  }, [compileNotice, dismissNotice, requestSettingsSection, showToast, t]);
-
-  const pendingCount = status
-    ? Math.max(0, status.eligibleItemCount - status.compiledItemCount)
-    : 0;
+  const { pending: pendingCount, actionable } = wikiCompileButtonState(compileCounts);
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
@@ -218,20 +154,13 @@ export function WikiWorkspace() {
                     className="h-3.5 w-3.5 shrink-0 animate-spin"
                     aria-hidden="true"
                   />
-                  {/* 条目标题长度不可控，不截断会把整条工具栏挤变形 */}
                   <span className="truncate">
-                    {compileProgress
-                      ? t("wiki.compiling", "编译中（{{current}}/{{total}}）：{{title}}", {
-                          current: compileProgress.current,
-                          total: compileProgress.total,
-                          title: compileProgress.currentTitle,
-                        })
-                      : t("wiki.compilingShort", "编译中…")}
+                    {t("wiki.compilingShort", "编译中…")}
                   </span>
                 </span>
                 <button
                   type="button"
-                  onClick={cancelCompile}
+                  onClick={openCompileDialog}
                   title={t("wiki.stopCompile", "停止编译")}
                   aria-label={t("wiki.stopCompile", "停止编译")}
                   className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
@@ -244,10 +173,10 @@ export function WikiWorkspace() {
                 {/* 没有待编译条目时点了也只会弹「没有需要编译的条目」，直接置灰 */}
                 <button
                   type="button"
-                  onClick={() => void compileNow()}
-                  disabled={pendingCount === 0}
+                  onClick={openCompileDialog}
+                  disabled={!actionable}
                   title={
-                    pendingCount === 0
+                    !actionable
                       ? t("wiki.compileUpToDate", "所有条目都已编译进 Wiki")
                       : undefined
                   }
@@ -263,9 +192,9 @@ export function WikiWorkspace() {
                 {catalog.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => window.api.wiki.compiler ? window.dispatchEvent(new Event("wiki-compile-preview")) : setShowRebuildConfirm(true)}
-                    title={t("wiki.rebuild", "全量重建")}
-                    aria-label={t("wiki.rebuild", "全量重建")}
+                    onClick={openCompileDialog}
+                    title={t("wiki.compileDialog", "全文编译与历史升级")}
+                    aria-label={t("wiki.compileDialog", "全文编译与历史升级")}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                   >
                     <RefreshCwIcon className="h-4 w-4" aria-hidden="true" />
@@ -328,24 +257,6 @@ export function WikiWorkspace() {
           <WikiPageDetail />
         </div>
       )}
-
-      {showRebuildConfirm ? (
-        <ConfirmDialog
-          isOpen={showRebuildConfirm}
-          title={t("wiki.rebuild", "全量重建")}
-          message={t(
-            "wiki.rebuildConfirm",
-            "将清空现有全部 Wiki 页面并重新编译所有条目（清理已删除条目残留知识的唯一方式）。编译会消耗较多 AI 调用，确定继续？",
-          )}
-          confirmText={t("wiki.rebuild", "全量重建")}
-          variant="destructive"
-          onConfirm={() => {
-            setShowRebuildConfirm(false);
-            void rebuildAll();
-          }}
-          onClose={() => setShowRebuildConfirm(false)}
-        />
-      ) : null}
     </div>
   );
 }

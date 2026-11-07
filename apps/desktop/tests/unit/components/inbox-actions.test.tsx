@@ -66,7 +66,6 @@ beforeEach(() => {
   });
   useWikiStore.setState({
     isCompiling: false,
-    compileNotice: null,
   });
 });
 
@@ -251,30 +250,18 @@ describe("处理中心聚合任务", () => {
     expect(useInboxStore.getState().selectionIds).toEqual([]);
   });
 
-  it("Wiki 编译点击后立即显示运行态，结束后给出回执", async () => {
-    const gate = deferred();
-    useWikiStore.setState({
-      compileNow: vi.fn(async () => {
-        useWikiStore.setState({ isCompiling: true });
-        await gate.promise;
-        useWikiStore.setState({
-          isCompiling: false,
-          compileNotice: { kind: "done", message: "2/2" },
-        });
-      }),
-    });
+  it("Wiki 待编译卡片打开全文编译对话框，由对话框确认范围后才调用模型", async () => {
+    const opened = vi.fn();
+    window.addEventListener("wiki-compile-preview", opened);
     const user = userEvent.setup();
     renderWorkspace();
 
     await user.click(actionButton("Wiki 待编译"));
-    expect(actionButton("Wiki 待编译")).toHaveTextContent("编译中…");
-    expect(actionButton("Wiki 待编译")).toBeDisabled();
 
-    await act(async () => gate.resolve());
-    await waitFor(() =>
-      expect(screen.getByText("Wiki 编译完成（2/2）")).toBeTruthy(),
-    );
+    window.removeEventListener("wiki-compile-preview", opened);
+    expect(opened).toHaveBeenCalledTimes(1);
     expect(actionButton("Wiki 待编译")).toHaveTextContent("立即执行");
+    expect(actionButton("Wiki 待编译")).not.toBeDisabled();
   });
 
   it("语义索引点击后立即显示运行态，失败原因不会静默", async () => {

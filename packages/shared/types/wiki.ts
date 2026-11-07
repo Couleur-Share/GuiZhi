@@ -80,13 +80,6 @@ export interface WikiPageDetail {
   sources: WikiSourceRef[];
 }
 
-/** 待编译条目投影 */
-export interface WikiCompilableItem {
-  id: string;
-  title: string;
-  content: string;
-}
-
 /** 编译指纹（素材哈希 + 提示词版本；模型仅作出处不触发重编） */
 export interface WikiIngestion {
   itemId: string;
