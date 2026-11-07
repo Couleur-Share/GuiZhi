@@ -17,11 +17,12 @@
 - **链接与图片**：按最终网址解析为绝对地址；只保留 http(s)、mailto、tel 链接和 http(s) 图片（含 `data-src`、`srcset` 等懒加载写法），其余移除。
 - **标题与导语**：保留 h1；正文开头的标题区被当作页框删掉时补回 h1 与导语。标签页面板和 `<details>` 里的内容一并展开（各标签之间没有标签名）。
 - **语义区域回退**：Readability 取到的段落文字不足语义区域的 60%、且该区域段落文字至少 500 字时，改用清理后的语义区域（先按 `entry-content`、`post-content`、`article-content`、`post-body` 等内容类名与 `itemprop=articleBody` 匹配，其次 `main`、`article`、`[role=main]`）。比例只统计表格之外 `<p>` 里的文字，章节目录、菜单和大表格不左右判断。回归样本里截断页的比例都不高于 0.52，正常页不低于 0.85。
+- **极短页面**：Readability 取到的正文不足 100 字时（它找不到达标正文会退回整页，并去掉 class），改用按上一条规则清理掉导航、页眉页脚和边栏之后的整页。
 - **结果与错误**：401、407 与登录页记为需要登录；403、429 记为访问受限；其余 4xx/5xx 记为可重试的网络失败；验证码页与空正文分别报告。正文超过 200,000 个字符时截断并给出警告。微信公众号的单条导入走 `wechat-html/1` 专用路径；经网页采集到达的公众号页面由本提取器直接取 `#js_content`。
 
 每个原文版本记录 `engineVersion`：本提取器为 `readability/1-<路由>`，路由是 `static`、`electron`、`verified-electron` 或 `flaresolverr`。规则或依赖升级使同一页面的输出变化时，提升 `readability/<版本>`，让「检查更新」走下文的引擎变化保护。
 
-已知差异：MDN 浏览器兼容表在走 Readability 的页面里只剩表格结构，走区域回退的页面保留数据；shadow DOM 里的 CodeMirror 只能拿到已渲染的行，长代码可能不全；Python asyncio 模块索引这类索引页会截掉部分条目；正文不足约 100 字的极短页面，Readability 会退回整页，页面导航与边栏文字可能混入正文。
+已知差异：MDN 浏览器兼容表在走 Readability 的页面里只剩表格结构，走区域回退的页面保留数据；shadow DOM 里的 CodeMirror 只能拿到已渲染的行，长代码可能不全；Python asyncio 模块索引这类索引页会截掉部分条目。
 
 ## 单页采集
 

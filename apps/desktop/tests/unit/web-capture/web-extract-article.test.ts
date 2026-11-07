@@ -145,6 +145,25 @@ describe("R5 语义区域回退", () => {
     expect(article.result.markdown).not.toContain("组件与状态");
   });
 
+  it("Readability 取不到 100 字时改用清理页框后的整页：main 外的导航与 main 内的边栏不进正文", () => {
+    const article = extract(
+      page(
+        '<nav>广告导航</nav><main><h1>组件配置</h1><p>动态正文支持中文知识管理。</p><div class="sidebar">推广位</div>' +
+          '<pre><code>print("归知")</code></pre></main><footer>版权所有</footer>',
+      ),
+    );
+    expect(article.source).toBe("page");
+    const { markdown } = article.result;
+    expect(markdown).toContain("# 组件配置");
+    expect(markdown).toContain("动态正文支持中文知识管理。");
+    expect(markdown).toContain('print("归知")');
+    for (const chrome of ["广告导航", "推广位", "版权所有"]) expect(markdown).not.toContain(chrome);
+    // 没有页框的短文照常保留全文。
+    const short = extract(page("<article><p>今天发布了一个小更新。</p></article>", "<title>短文</title>"));
+    expect(short.result.markdown).toBe("今天发布了一个小更新。");
+    expect(short.result.error).toBeUndefined();
+  });
+
   it("正文区域只按 class 认定：id 为 article-content 的短标签块不会被当成正文", () => {
     const html = page(
       `<main>${prose(6)}</main><div id="article-content" class="c-article-meta"><a href="/t/1">标签一</a> <a href="/t/2">标签二</a></div>`,

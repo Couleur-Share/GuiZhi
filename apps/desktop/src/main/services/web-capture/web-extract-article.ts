@@ -1,6 +1,6 @@
 /**
  * 网页正文提取（纯函数，在 worker 线程中运行，不访问网络与文件）。
- * Readability 选正文；它明显截断或选错时回退到清洗后的语义正文区域。
+ * Readability 选正文；它明显截断或选错时回退到清洗后的语义正文区域，取不到达标正文时改用清理页框后的整页。
  * 结果字段、错误分类与 20 万字符截断沿用此前随包提取器的约定，已入库的原文版本按同一契约比较。
  */
 import { createHash } from "node:crypto";
@@ -16,12 +16,14 @@ export type WebExtracted = Omit<
 /** 提取结果与正文来源；来源与段落字数只供回归和诊断，不进入采集结果。 */
 export interface WebArticle {
   result: WebExtracted;
-  source: "readability" | "region" | "wechat" | "none";
+  source: "readability" | "region" | "page" | "wechat" | "none";
   readabilityChars: number;
   regionChars: number;
 }
 
 const MARKDOWN_LIMIT = 200_000;
+// Readability 的正文字数门槛；所有尝试都不达标时它退回整页 body（并去掉 class），页框会混进正文。
+const READABILITY_MIN_CHARS = 100;
 // Readability 取到的段落文字不足语义区域的 60% 视为截断或选错；区域段落不足 500 字时差值不可靠，不回退。
 // 59 页评估样本与 47 页留出样本：截断页 ≤0.52，正常页 ≥0.85（区域段落 500 字以上的页面）。
 const FALLBACK_RATIO = 0.6;
@@ -229,7 +231,7 @@ function semanticRegion(document: Document): Element | null {
   return null;
 }
 
-/** 清理语义区域里的模板容器：边栏、评论、推荐、订阅、分享，以及正文之外的导航与页眉页脚。 */
+/** 清理语义区域（极短页面为整页）里的模板容器：边栏、评论、推荐、订阅、分享，以及正文之外的导航与页眉页脚。 */
 function cleanRegion(region: Element): Element {
   // 可展开的数据表把单元格内容包在 <button> 里（如 MDN 兼容表）：拆成普通文字后再清理按钮。
   // 只在区域回退里做：交给 Readability 的文档若保留这些文字，单元格得分会让它把表格内部当成正文。
@@ -303,7 +305,7 @@ function restoreHeadings(root: Element): void {
 function readabilityContent(document: Document): Element | null {
   try {
     const reader = new Readability<Node>(document, {
-      charThreshold: 100,
+      charThreshold: READABILITY_MIN_CHARS,
       serializer: (node) => node,
       linkDensityModifier: LINK_DENSITY_MODIFIER,
     } as ConstructorParameters<typeof Readability<Node>>[1]);
@@ -371,6 +373,16 @@ export function extractWebArticle(html: string, url: string, status: number): We
       source = "region";
     } else {
       root = article;
+      if (article && textLength(article) < READABILITY_MIN_CHARS) {
+        // 极短页面：按语义区域的规则清理整页的导航、页眉页脚与边栏；清理后没有文字时仍用 Readability 的结果。
+        const page = parsePage(html || "");
+        prepare(page);
+        const body = page.body ? cleanRegion(page.body) : null;
+        if (body && textLength(body) > 0) {
+          root = body;
+          source = "page";
+        }
+      }
       if (root) restoreTitleBlock(root, block);
     }
   }
