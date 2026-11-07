@@ -6,6 +6,7 @@ vi.mock("electron", () => ({
   app: {},
 }));
 
+import { decodeNgaSubject } from "../../../src/main/services/import/nga-entities";
 import {
   escapeControlCharsInJsonStrings,
   extractGuestJs,
@@ -165,6 +166,15 @@ describe("detectForumPlatform · NGA", () => {
 });
 
 describe("NGA 解析工具", () => {
+  it("decodeNgaSubject 解开被转义两次的标题与数字实体", () => {
+    expect(
+      decodeNgaSubject("[分享]网配&amp;线上配镜&amp;amp;如何获得高质量验光"),
+    ).toBe("[分享]网配&线上配镜&如何获得高质量验光");
+    expect(decodeNgaSubject("Q&amp;amp;A &#8212; &#x4e2d;文")).toBe("Q&A — 中文");
+    expect(decodeNgaSubject("无效 &#99999999; 保留")).toBe("无效 &#99999999; 保留");
+    expect(decodeNgaSubject("普通标题")).toBe("普通标题");
+  });
+
   it("extractGuestJs 从挑战正文抠值", () => {
     expect(
       extractGuestJs("document.cookie = 'guestJs=1785489313_1eb3xt6;domain='"),

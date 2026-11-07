@@ -25,6 +25,7 @@ import {
   mediaProtocolUrl,
   saveMediaAsset,
 } from "./media-files";
+import { decodeHtmlEntities, decodeNgaSubject } from "./nga-entities";
 import {
   downloadToTempFile,
   fetchRawText,
@@ -332,16 +333,6 @@ export function mergeNgaCookies(
     jar.set("guestJs", guestJs);
   }
   return [...jar.entries()].map(([key, value]) => `${key}=${value}`).join("; ");
-}
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ");
 }
 
 function asPostList(raw: NgaPageData["__R"]): NgaPost[] {
@@ -1382,7 +1373,7 @@ async function finalizeThread(input: {
   };
 
   const title =
-    decodeHtmlEntities(topic.subject ?? opPost.subject ?? "").trim() ||
+    decodeNgaSubject(topic.subject ?? opPost.subject ?? "").trim() ||
     `NGA 帖子 ${topicId}`;
   const author = resolveAuthor(opPost, users, topic.author);
   const content = formatPost(opPost.content ?? "", opPost);
