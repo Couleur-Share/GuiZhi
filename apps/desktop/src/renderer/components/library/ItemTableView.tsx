@@ -194,7 +194,10 @@ export function ItemTableView() {
               : t("library.listEmpty", "暂无条目，点击右上角「新建」开始")}
           </div>
         ) : (
-          <div className="app-wallpaper-panel w-max min-w-full overflow-clip rounded-xl border border-border">
+          <div
+            className="app-wallpaper-panel w-full overflow-clip rounded-xl border border-border"
+            style={{ minWidth: tableMinWidth }}
+          >
             {/* 此层不能用 overflow-x-auto：它会成为滚动容器，表头 sticky 只相对这一层，
                 纵向滚动时不吸顶。横向滚动交给外层 item-table，这里只撑宽并裁圆角。 */}
             {/* table-fixed：列宽严格按配置生效，单元格靠自身溢出隐藏截断 */}
@@ -202,7 +205,7 @@ export function ItemTableView() {
               className="w-full table-fixed border-collapse text-sm"
               style={{ minWidth: tableMinWidth }}
             >
-              <thead className="sticky top-0 z-30">
+              <thead className="sticky -top-3 z-30 bg-card">
                 <tr className="border-b border-border bg-muted/40">
                   {visibleColumns.map((column) => {
                     if (column.id === "checkbox") {
