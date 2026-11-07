@@ -46,6 +46,11 @@ export default async ({ win, app, shot }) => {
   await win.getByText(/补充一个经验/).waitFor();
   assert.deepEqual(await app.evaluate(() => globalThis.commentPreview.calls), [{ itemId: rows[0].id, limit: 20 }]);
   await list.getByText(rows[1].title, { exact: true }).click();
+  // 工具区按需展开（v0.24.0 起）：先从「更多操作」打开「文章信息与工具」，来源评论卡才可见
+  await win.waitForFunction((title) => document.querySelector('[data-testid="item-title-input"]')?.value === title, rows[1].title);
+  await win.waitForTimeout(600);
+  await win.getByRole("button", { name: "更多操作", exact: true }).click();
+  await win.getByRole("menuitem", { name: "文章信息与工具", exact: true }).click();
   const toggle = win.getByRole("button", { name: /来源评论/ });
   await toggle.waitFor();
   assert.equal(await toggle.getAttribute("aria-expanded"), "false");
