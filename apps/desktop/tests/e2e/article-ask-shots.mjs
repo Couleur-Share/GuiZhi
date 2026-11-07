@@ -3,7 +3,21 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export default async ({ win, app, shot, outDir }) => {
+/**
+ * 问答仍有消息时收尾：截图脚本的 app.close() 走 app.quit()，数据库先于 beforeunload 关闭，关闭前保存
+ * 失败后窗口不关。这里走用户点关闭再选退出的路径，保存成功才会关窗退出。beforeunload 会让 CDP 报一个
+ * 随即被 Electron 撤销的对话框，挂空监听免得 Playwright 自动处理时扑空报错（同 persistence.spec.ts）。
+ */
+export async function exitAfterSave({ win, app }) {
+  win.on("dialog", () => {});
+  const exited = new Promise(resolve => app.once("close", resolve));
+  await win.evaluate(() => window.electron.close());
+  await win.getByTestId("close-dialog-exit").click();
+  let timer;
+  await Promise.race([exited, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("关闭前保存后应用未在 30 秒内退出")), 30_000); })]).finally(() => clearTimeout(timer));
+}
+
+export async function runArticleAskBasics({ win, app, shot, outDir }) {
   const errors = [];
   win.on("pageerror", error => errors.push(error.message));
   await app.evaluate(({ ipcMain }) => {
@@ -95,4 +109,10 @@ export default async ({ win, app, shot, outDir }) => {
   assert.deepEqual(errors, []);
   await fs.writeFile(path.join(outDir, "evidence.json"), JSON.stringify({ success: true, isolated: true, realThirdParty: false, plainTextSelection: true, transcriptOcrDiscussion: true, persistence: true, searchFailure: true, errors }, null, 2));
   return { items, errors };
+}
+
+export default async context => {
+  const result = await runArticleAskBasics(context);
+  await exitAfterSave(context);
+  return result;
 };

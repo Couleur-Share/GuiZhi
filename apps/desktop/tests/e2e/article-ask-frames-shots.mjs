@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { requireMainSource as tsRequire } from "./main-source.mjs";
-import basic from "./article-ask-shots.mjs";
+import { exitAfterSave, runArticleAskBasics } from "./article-ask-shots.mjs";
 import { makePage } from "./article-reader-redesign-shots.mjs";
 
 export default async context => {
-  const { items, errors } = await basic(context), { win, app, shot, outDir } = context;
+  const { items, errors } = await runArticleAskBasics(context), { win, app, shot, outDir } = context;
   const { buildThemedReadingSource } = tsRequire("../../src/main/services/themed-reading/content.ts", import.meta.url);
   const { themedReadingDocument } = tsRequire("../../src/main/services/themed-reading/document.ts", import.meta.url);
   const { snapshotDocument } = tsRequire("../../src/main/services/web-capture/snapshot-document.ts", import.meta.url);
@@ -31,9 +31,13 @@ export default async context => {
     });
     globalThis.__articleAskFixture.searchFail = false;
   }, { itemId: items[0].id, page, snapshot, snapshotHtml });
+  const panel = win.getByTestId("article-ask-panel");
+  // 问答有消息时刷新会被关闭前保存拦截（保存后关窗）。新对话只清空内存中的消息：原会话已保存，
+  // 空会话不落库，刷新后打开本文仍恢复原会话。
+  await panel.getByRole("button", { name: "新对话", exact: true }).click();
+  await panel.getByTestId("article-ask-message").first().waitFor({ state: "detached" });
   await win.reload(); await win.setViewportSize({ width: 1680, height: 1000 });
   await win.getByTestId("item-list").getByText(items[0].title, { exact: true }).click();
-  const panel = win.getByTestId("article-ask-panel");
   const selectInFrame = async text => {
     const locator = win.locator('iframe[data-article-instance]:visible').first(); await locator.waitFor();
     assert.equal(await locator.getAttribute("sandbox"), "allow-scripts");
@@ -82,5 +86,6 @@ export default async context => {
   await win.getByRole("button", { name: "返回文章", exact: true }).click();
   await win.getByTestId("article-content").waitFor();
   assert.deepEqual(errors, []);
-  await fs.writeFile(path.join(outDir, "frames-evidence.json"), JSON.stringify({ success: true, isolated: true, realThirdParty: false, iframeSelection: true, exactVersions: true, sharedGlobalHistory: true, errors }, null, 2));
+  await exitAfterSave(context);
+  await fs.writeFile(path.join(outDir, "frames-evidence.json"), JSON.stringify({ success: true, isolated: true, realThirdParty: false, iframeSelection: true, exactVersions: true, sharedGlobalHistory: true, exitedAfterSave: true, errors }, null, 2));
 };
