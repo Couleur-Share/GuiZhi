@@ -83,11 +83,11 @@
 
 1. `pnpm typecheck`、`pnpm lint`、`pnpm test:unit`、`pnpm build:isolated`。单测中 Electron 全部被 mock，只能验证改动本身。
 2. `pnpm test:e2e`：smoke、security（CSP、外部导航）、persistence（关闭前保存、重启后数据仍在）、accessibility，页面经 `file://` 生产路径加载。
-3. 出口探测：`pnpm shot --steps scripts/web-egress-probe-steps.mjs --out <新目录>`，再加 `GUIZHI_WEB_SUBFRAMES=allow` 跑一次。离线，但需要被 Git 忽略的 `apps/desktop/resources/crawl4ai`。
+3. 出口探测：`pnpm shot --steps scripts/web-egress-probe-steps.mjs --out <新目录>`，再加 `GUIZHI_WEB_SUBFRAMES=allow` 跑一次。离线。
 4. 沉降夹具：`scripts/web-settle-fixtures-steps.mjs`。
 5. 请求身份探测：`scripts/web-identity-probe-steps.mjs`，再以 `GUIZHI_WEB_IDENTITY=none` 跑基线；`Accept` 变化时更新 `DOCUMENT_ACCEPT` 后重跑 4、5。
 6. 惰性图片探测：`scripts/web-inert-probe-steps.mjs`。
-7. web-capture-runtime 集成测试：`GUIZHI_TEST_BUNDLED_CRAWLER=1 pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts`（真实 Electron + 随包 Python；只能在独立副本运行）。
+7. web-capture-runtime 集成测试：`GUIZHI_TEST_WEB_CAPTURE=1 pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts`（真实 Electron + 正文提取线程；只能在独立副本运行）。
 8. AI 阅读：`GUIZHI_GRAPHICS_VALIDATION=1 pnpm shot --steps apps/desktop/tests/e2e/reading-v3-acceptance.mjs`（隔离进程、网络与开窗拦截、死循环故障）和 `reading-graphics-shots.mjs`（console-message 失败判定）。
 9. `apps/desktop/tests/e2e/heavy-user-workflows-shots.mjs`（Wiki 编译流程）与 `heavy-user-index-shots.mjs`（5 万分块语义检索期间输入不卡顿）。
 10. `pnpm check:linux`：锁文件必然变化，按 `docs/agents/linux-preflight.md` 走德国共享构建器。
@@ -98,7 +98,7 @@
 
 - 升级前先在 33 上跑一轮 `scripts/web-trace-steps.mjs` 公网基线（需本机代理，设 `GUIZHI_TRACE_SAVE_CONTENT=1`），升级后用 `GUIZHI_TRACE_BASELINE` 逐页对照。
 - `scripts/nodeseek-ui-steps.mjs`、公众号快照（`wechat-snapshot-shots.mjs` 加 `wechat-snapshot-restore` 集成测试）：需要公网与本机代理。
-- Windows Sandbox 安装验收包 `scripts/crawl4ai-acceptance/`：旧版覆盖升级、卸载重装；`rollback.mjs` 里写死的旧版本号需改为当前发布版。
+- 旧版覆盖升级、卸载重装：原 Windows Sandbox 验收包 `scripts/crawl4ai-acceptance/` 只服务于随包 Crawl4AI，已随之移除（2026-11-07），需要时手工在 Sandbox 中执行。
 - 手工：平台登录（抖音、小红书、LINUX DO、NodeSeek）、网站验证窗口、开机隐藏启动与托盘、系统通知、7 处对话框默认目录、MCP、safeStorage 已存凭据（手机收集、阅读同步、搜索服务 Key、备份仓库解锁）、数据目录迁移、四种代理模式下的 AI 请求与采集。
 
 **覆盖缺口：** `local-image://`/`local-video://` 没有离线且纳入版本库的回归；隐藏窗口 rAF 停摆没有脚本；跨版本 Chromium 用户数据与 safeStorage 数据的升级/回滚没有自动化。
@@ -107,7 +107,7 @@
 
 1. 确认用户开发实例状态，不关闭用户应用；确认要带进升级分支的未提交改动。
 2. 在 33 上取基线：跑必须清单第 3–6、8–9 项与公网 web-trace，保留结果目录。
-3. `git worktree add <路径> -b chore/electron-45`，准备 `resources/crawl4ai` 与所需 `/artifacts` 夹具。
+3. `git worktree add <路径> -b chore/electron-45`，准备所需 `/artifacts` 夹具（当时还需要 `resources/crawl4ai`，该运行包已于 2026-11-07 移除）。
 4. 把 `apps/desktop/package.json` 的 `electron` 改为精确的 `45.2.3`，其余工具链不动；`pnpm install` 后预下载并核对 Electron 二进制。
 5. 改代码：登录项字段、`console-message`；可选为对话框记住上次目录。
 6. 跑必须清单。只在 45 上失败的项目，用 44.10.2（同为 Node 24.22.2）复跑，区分 Chromium 152→156 与 45 专属变化。

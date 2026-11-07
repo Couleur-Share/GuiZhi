@@ -1,6 +1,8 @@
 # Crawl4AI 实施与验收记录
 
-2026-09-26 更新：开发源码已改为静态获取 / Electron 隔离渲染 + Python 正文提取。当前行为见 [网页采集说明](crawl4ai.md)，体积和整进程内存见 [内存验证记录](crawl4ai-memory-validation.md)；以下独立 Chromium 的安装包、性能与发布数据是历史记录，不代表新路径的安装包验收。
+> 历史记录：随包 Crawl4AI 已于 2026-11-07 移除，网页正文改由 Node 线程用 Readability 提取。现行说明见 [网页采集](web-capture.md)，移除依据与回归数据见 [评估与移除记录](agents/crawl4ai-evaluation.md)；下文涉及的运行包、构建脚本、验收包与设置入口均已不存在。
+
+2026-09-26 更新：开发源码已改为静态获取 / Electron 隔离渲染 + Python 正文提取。当前行为见 [网页采集说明](web-capture.md)，体积和整进程内存见 [内存验证记录](crawl4ai-memory-validation.md)；以下独立 Chromium 的安装包、性能与发布数据是历史记录，不代表新路径的安装包验收。
 
 日期：2026-09-06。范围调整：用户明确将本次验收收敛为 Windows x64，以联网真实流程验证作为最后一步；Windows ARM64、macOS 和 Linux 验收暂缓，不再作为本次工作的完成条件。其他平台的构建配置保留，但不得宣传为已经验收。源码、干净 Windows 沙盒及联网流程的分项结论见 [Windows 验收记录](crawl4ai-p5-windows.md)；本次不公开发布。
 

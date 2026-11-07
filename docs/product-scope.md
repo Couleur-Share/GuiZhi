@@ -26,7 +26,7 @@
 | FlareSolverr 后备采集（含 SSH 隧道）、NodeSeek 专用采集 | 冻结 | 默认关闭，不扩展到其他站点 |
 | 正文配图 | 冻结 | 已生成的图片留在正文中 |
 | 近期研究、平台发现 | 冻结 | 已保存到知识库的报告与摘录不受影响 |
-| 随包 Crawl4AI 正文提取 | 评估完成，待决定 | 建议补齐 Readability 路径规则并回归后移除，见 [评估](./agents/crawl4ai-evaluation.md) |
+| 随包 Crawl4AI 正文提取 | 已移除（2026-11-07） | 网页正文改由主进程旁的 Node 线程用 Readability 提取，见 [网页采集](./web-capture.md)；回归数据与移除清单见 [评估](./agents/crawl4ai-evaluation.md) |
 | AI 重构阅读 v1/v2 旧格式 | 只读 | 旧页可阅读、导出、备份恢复，不再生成或续跑；新页只用 v3 |
 | HNSW 加速检索 | 已移除（2026-11-07） | `hnswlib-wasm` 在 Electron 主进程无法加载，官方平台始终回退精确检索 |
 

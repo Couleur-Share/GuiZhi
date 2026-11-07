@@ -57,6 +57,14 @@ packages/
   `GUIZHI_TEST_PROXY` 提供，默认见 `scripts/lib/test-proxy.mjs`）。
   渲染后的快照会把开放 shadow root 的内容展开进快照副本（`web-rendered-document.ts`）；
   闭合 root 不可见，shadow 内的 CodeMirror 编辑器不做还原。
+- 正文提取（`web-extract-article.ts` + `web-extract-markdown.ts`）在独立的 worker 线程里运行
+  （`web-extract-worker.ts`；主进程侧 `web-node-extractor.ts`）：linkedom 解析、Readability 取正文、
+  turndown 转 Markdown。线程内禁用全部网络 API，串行处理，单页 45 s 超时，输入与输出各 16 MiB、
+  堆 1 GiB 上限，空闲 60 s 退出。生产构建把它打成只引用 Node 内置模块的单文件
+  `out/web-extract-worker/web-extract-worker.js`，主进程读出源码后以 `eval` 方式启动（asar 内的文件
+  不能直接作为 worker 入口）。`engineVersion` 为 `readability/1-<static|electron>`：规则或依赖升级
+  使同一页面的正文输出变化时提升版本号，重复导入的“检查更新”据此只保存待采用版本、不改写正文。
+  规则、回归口径与已知差异见 [网页采集](../web-capture.md)。
 - 渲染页加载后的沉降等待（`web-settle.ts`）：事件驱动，替代固定的 1.2 s + 3×(滚动 + 0.2 s)。
   网络、DOM（MutationObserver）与可见文字都静止约 300 ms 即结束；可见文字不足 200 字的空壳页
   等满。各段上限之和等于旧的固定等待，命中上限时与旧行为等价；首段上限从沉降开始（安装探针之前）
@@ -108,7 +116,7 @@ packages/
   主文档请求会带，这是有意保留的差异：它是能力声明而非身份，静态请求发出去只会让 http 站点多一次
   重定向）。**这不是 403 之后的重试**：
   静态遇到 403/429 仍保持失败状态、不回退到渲染窗口——那等于遇到访问限制后升级手段
-  （`docs/crawl4ai.md`：已经遇到的访问限制不能通过回退绕过；公开样例 `httpbin.org/status/403`
+  （`docs/web-capture.md`：已经遇到的访问限制不能通过回退绕过；公开样例 `httpbin.org/status/403`
   期望 `restricted`）。`GUIZHI_WEB_IDENTITY=none` 恢复旧行为。回归：
   `scripts/web-identity-probe-steps.mjs`（`pnpm shot --steps`，本机夹具，不依赖公网）断言静态与
   渲染的 UA/Accept 一致、仅凭 UA 放行的站点可采集；公网对照用 `GUIZHI_TRACE_VARIANT=identity`
