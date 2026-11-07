@@ -52,6 +52,7 @@ pnpm electron:build:win
 
 - 改架构、IPC、错误处理或截图工具时，查阅 [桌面开发细节](docs/agents/desktop-development.md) 中对应章节；其中源码路径相对于仓库根目录。
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
+- 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。
 
 ## Linux 收集服务预检（默认德国共享构建器）

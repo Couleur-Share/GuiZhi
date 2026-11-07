@@ -26,6 +26,7 @@
 | [手机收集运维](./mobile-capture-ops.md) / [验证记录](./mobile-capture-validation.md) | 中转部署、备份恢复、已验证与待验收范围 |
 | [手机阅读与加密同步方案](./mobile-reading-sync.md) / [实施计划](./mobile-reading-implementation.md) / [协议与验证](./mobile-reading-protocol.md) / [阶段 3 开发包](./mobile-reading-phase3.md) | PC 主库、云端密文副本、鸿蒙离线阅读；当前实现阶段与验收边界 |
 | [主题排版验收](./themed-reading-validation.md) | 自动化、离屏界面、真实模型与离线导出证据 |
+| [产品边界](./product-scope.md) | 核心范围、外围功能状态（冻结/评估/只读）与新功能准入 |
 | [从源码构建](./building.md) | 依赖、常用命令、仓库结构 |
 | [AGENTS.md](../AGENTS.md) | 架构约定、里程碑与给 AI 助手的完整指南 |
 | [SQLite 与主进程](./sqlite-main-process.md) | 为何数据库留在主进程（实测结论） |
