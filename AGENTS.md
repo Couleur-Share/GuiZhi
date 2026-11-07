@@ -54,6 +54,7 @@ pnpm electron:build:win
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
 - 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。
+- 手机收集中转服务在服务器上的部署、入口与镜像升级约束，以 GatewaySentry 文档站 `services/projects/guizhi-capture` 为准（源文件 `E:\Tools\Gatewaysentry-SSH\docs-site\docs\services\projects\guizhi-capture.md`），经 skill `gatewaysentry-docs-lookup` 查阅；对共享服务器做了持久变更后，按 skill `gatewaysentry-ops-docs` 写回。
 
 ## Linux 收集服务预检（默认德国共享构建器）
 
