@@ -132,7 +132,11 @@ test("核心工作流通过 axe WCAG A/AA 检查", async () => {
     });
 
     await page.getByTestId("topbar-new").click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    // 弹窗以 opacity 过渡淡入，opacity 为 0 时也算可见；axe 须检查淡入结束后的配色，
+    // 否则会把半透明的中间态文字误判成对比度不足。
+    await expect(dialog).toHaveCSS("opacity", "1");
     await expectNoSeriousViolations(page, "快速采集");
     await page.keyboard.press("Escape");
 
