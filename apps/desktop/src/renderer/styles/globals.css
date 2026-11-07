@@ -1028,6 +1028,10 @@ body {
   margin: 0;
   margin-bottom: 0;
 }
+/* 语言标签与复制按钮浮在代码块右上角：首行下移让出这块，避免长行从标签下穿过 */
+.prose pre[data-code-label] {
+  padding-top: 2.25rem;
+}
 .prose pre code {
   background: transparent;
   padding: 0;

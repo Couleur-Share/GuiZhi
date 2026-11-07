@@ -100,7 +100,7 @@ function CodeBlock({
           )}
         </button>
       </div>
-      <pre className={className}>{children}</pre>
+      <pre className={className} data-code-label={language ? "" : undefined}>{children}</pre>
     </div>
   );
 }
