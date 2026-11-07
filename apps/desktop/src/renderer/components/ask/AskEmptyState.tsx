@@ -1,6 +1,8 @@
 import { MessagesSquareIcon, SparklesIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSemanticStore } from "../../stores/semantic.store";
+import { useSettingsStore } from "../../stores/settings.store";
+import { isScenarioConfigured } from "../../services/knowledge-ai/ai-invoke";
 import { useUIStore } from "../../stores/ui.store";
 
 /**
@@ -20,6 +22,8 @@ export function AskEmptyState({ onPick }: { onPick: (text: string) => void }) {
   const requestSettingsSection = useUIStore(
     (state) => state.requestSettingsSection,
   );
+  // 没有文本模型时，示例问题点了也只会失败：改为直接引导去配置
+  const isModelReady = useSettingsStore(() => isScenarioConfigured("qa"));
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 px-6 text-center">
@@ -42,8 +46,24 @@ export function AskEmptyState({ onPick }: { onPick: (text: string) => void }) {
         </p>
       </div>
 
+      {!isModelReady ? (
+        <div className="flex w-full max-w-md flex-col items-center gap-2 rounded-xl border border-border/70 bg-background/50 px-4 py-4">
+          <p className="text-xs text-muted-foreground">
+            {t("ask.needModel", "还没有配置文本模型，配置后才能提问。")}
+          </p>
+          <button
+            type="button"
+            onClick={() => requestSettingsSection("ai")}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("ask.goConfigure", "去配置模型")}
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex w-full max-w-md flex-col gap-1.5">
-        {EXAMPLE_KEYS.map((example) => (
+        {(isModelReady ? EXAMPLE_KEYS : []).map((example) => (
           <button
             key={example.key}
             type="button"
@@ -58,7 +78,7 @@ export function AskEmptyState({ onPick }: { onPick: (text: string) => void }) {
       {/* 没配 embedding 时检索只有 FTS，答不上来往往是这个原因，不该让用户自己猜。
           等状态查完再决定画不画：配好的用户否则会先看到提示、再看它消失，
           整列还要跟着重新垂直居中一次 */}
-      {!hasCheckedSemantic || isSemanticConfigured ? null : (
+      {!isModelReady || !hasCheckedSemantic || isSemanticConfigured ? null : (
         <button
           type="button"
           onClick={() => requestSettingsSection("ai")}

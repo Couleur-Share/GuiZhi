@@ -18,9 +18,12 @@ import {
   PlugIcon,
   WifiIcon,
   RadioTowerIcon,
+  SmartphoneIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type SettingsSectionId } from "../../stores/ui.store";
+import { useSettingsStore } from "../../stores/settings.store";
+import { resolveRouteModel } from "../../services/ai-defaults";
 // 直接指向文件而不走 ui 的桶文件：桶文件会把 ModelIcons 连同二十来个
 // provider SVG 一起拖进设置页的首屏依赖，dev 下每个都是一次单独请求
 import { Spinner } from "../ui/Spinner";
@@ -36,7 +39,7 @@ const SETTINGS_MENU = [
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
-  { id: "mobile-capture", labelKey: "settings.mobileCapture", icon: RadioTowerIcon },
+  { id: "mobile-capture", labelKey: "settings.mobileCapture", icon: SmartphoneIcon },
   { id: "capture", labelKey: "settings.captureAndTranscription", icon: RadioTowerIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
   { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
@@ -148,6 +151,23 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     useState<SettingsSectionId>("general");
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
+  // 正文配图属于冻结功能：已配置文生图模型（说明在用）或正被打开时才进导航，
+  // 其余用户不在一级导航里看到它。
+  const illustrationInUse = useSettingsStore(
+    (state) =>
+      resolveRouteModel(
+        state.aiModels,
+        state.modelRouteDefaults,
+        "imageGen",
+        state.aiProviders,
+      ) !== null,
+  );
+  const menuItems = SETTINGS_MENU.filter(
+    (item) =>
+      item.id !== "illustration" ||
+      illustrationInUse ||
+      activeSection === "illustration",
+  );
 
   useEffect(() => {
     if (!pendingSettingsSection) {
@@ -214,7 +234,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
 
         {/* 菜单列表 */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-          {SETTINGS_MENU.map((item) => (
+          {menuItems.map((item) => (
             <button
               key={item.id}
               type="button"

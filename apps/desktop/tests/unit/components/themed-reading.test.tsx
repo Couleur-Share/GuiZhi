@@ -501,7 +501,8 @@ describe("主题页隔离阅读", () => {
       screen.getByRole("menuitem", { name: "页面图片", exact: true }),
     );
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(notice)).toBeVisible();
+    // 只读提示由阅读区常驻显示一次，页面图片面板里不再重复
+    expect(within(dialog).queryByText(notice)).not.toBeInTheDocument();
     expect(within(dialog).getByText("上游超时")).toBeVisible();
     expect(
       within(dialog).queryByRole("button", { name: "重做这张图" }),

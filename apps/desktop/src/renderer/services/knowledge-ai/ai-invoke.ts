@@ -24,6 +24,11 @@ export function isAiConfiguredForScenario(scenario: AIUsageScenario): boolean {
   return resolveConfig(scenario) !== null;
 }
 
+/** 该场景当前是否已有可用模型：界面据此决定是展示入口，还是引导先去配置 */
+export function isScenarioConfigured(scenario: AIUsageScenario): boolean {
+  return resolveConfig(scenario) !== null;
+}
+
 export function resolveConfig(scenario: AIUsageScenario) {
   const state = useSettingsStore.getState();
   return resolveScenarioAIConfig({

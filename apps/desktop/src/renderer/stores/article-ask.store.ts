@@ -47,7 +47,7 @@ export function parseArticleMessages(json: string): ArticleMessage[] {
 }
 
 export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
-  sessionId: null, itemId: null, title: "", target: null, sessions: [], messages: [], webEnabled: true,
+  sessionId: null, itemId: null, title: "", target: null, sessions: [], messages: [], webEnabled: false,
   loading: false, running: false, loadError: null, saveError: null,
   persist: async () => {
     const snapshot = get();
@@ -100,7 +100,7 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
     get().stop();
     if (!(await get().persist())) return;
     ++loadingGeneration;
-    set({ sessionId: makeId(), itemId: target.itemId, target, messages: [], webEnabled: true, loadError: null, loading: false, saveError: null });
+    set({ sessionId: makeId(), itemId: target.itemId, target, messages: [], webEnabled: false, loadError: null, loading: false, saveError: null });
   },
   setWeb: enabled => { set({ webEnabled: enabled }); void get().persist(); },
   stop: () => {

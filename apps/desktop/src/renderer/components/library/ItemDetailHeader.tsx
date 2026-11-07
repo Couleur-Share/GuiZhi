@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArchiveIcon,
   ArchiveRestoreIcon,
+  CheckIcon,
   ChevronDownIcon,
   ClockIcon,
   FolderIcon,
@@ -330,10 +331,32 @@ export function ItemDetailHeader({
   const toggleFocusReadingMode = useUIStore(
     (state) => state.toggleFocusReadingMode,
   );
+  const titleFocusItemId = useKnowledgeStore((state) => state.titleFocusItemId);
+  const clearTitleFocus = useKnowledgeStore((state) => state.clearTitleFocus);
 
   // 长标题（AI 拟题偶尔较长、导入条目更是整句文案）单行输入框只能看到开头，
   // 这里让标题随内容增高，超过三行再滚动
   const titleRef = useRef<HTMLTextAreaElement>(null);
+
+  // 刚新建的空白条目：光标直接落进标题，不让用户先去点一下才能开始写
+  useEffect(() => {
+    if (titleFocusItemId !== item.id) return;
+    titleRef.current?.focus();
+    clearTitleFocus();
+  }, [titleFocusItemId, item.id, clearTitleFocus]);
+
+  // 保存完成后短暂亮一下「已保存」：平时不占位，否则用户看不出改动是否落盘
+  const [justSaved, setJustSaved] = useState(false);
+  const wasSavingRef = useRef(false);
+  useEffect(() => setJustSaved(false), [item.id]);
+  useEffect(() => {
+    const finished = wasSavingRef.current && !isSaving && !saveError && !hasUnsavedChanges;
+    wasSavingRef.current = isSaving;
+    if (!finished) return;
+    setJustSaved(true);
+    const timer = setTimeout(() => setJustSaved(false), 2500);
+    return () => clearTimeout(timer);
+  }, [isSaving, saveError, hasUnsavedChanges]);
   useLayoutEffect(() => {
     const node = titleRef.current;
     if (!node) {
@@ -389,10 +412,13 @@ export function ItemDetailHeader({
         data-testid="item-title-input"
         value={item.title}
         onChange={(event) => updateSelected({ title: event.target.value })}
-        // 标题是单行语义，回车不该在里面换行
+        // 标题是单行语义，回车不该在里面换行，而是把光标交给正文编辑器
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
             event.preventDefault();
+            document
+              .querySelector<HTMLElement>('[data-testid="markdown-editor"] .cm-content')
+              ?.focus();
           }
         }}
         readOnly={isTrashed}
@@ -428,6 +454,11 @@ export function ItemDetailHeader({
               icon={<ArchiveIcon className="h-3.5 w-3.5" aria-hidden="true" />}
             >
               {t("library.archivedBadge", "已归档")}
+            </MetaChip>
+          ) : null}
+          {justSaved && !isDirty && !isSaving && !saveError ? (
+            <MetaChip icon={<CheckIcon className="h-3.5 w-3.5" aria-hidden="true" />}>
+              {t("library.saved", "已保存")}
             </MetaChip>
           ) : null}
           {isDirty || isSaving || saveError ? (

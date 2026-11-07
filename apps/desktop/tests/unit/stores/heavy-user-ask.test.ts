@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const engine = vi.hoisted(() => vi.fn());
 vi.mock('../../../src/renderer/services/knowledge-ai/qa', () => ({ askKnowledgeBase: engine, createQaDeps: () => ({}), QaNoSourceError: class extends Error {} }));
+vi.mock('../../../src/renderer/services/knowledge-ai/ai-invoke', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../src/renderer/services/knowledge-ai/ai-invoke')>()), isScenarioConfigured: () => true }));
 import { useAskStore as store } from '../../../src/renderer/stores/ask.store';
 import { useArticleAskStore } from '../../../src/renderer/stores/article-ask.store';
 import { deferred } from '../../helpers/heavy-user';

@@ -27,7 +27,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={error ? true : ariaInvalid}
           className={clsx(
             'w-full h-10 px-4 rounded-xl',
-            'bg-muted/50 border-0',
+            'bg-muted/50 border border-border/70',
             'text-sm placeholder:text-muted-foreground',
             'focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-background',
             'transition-all duration-base',

@@ -1,6 +1,6 @@
 import { onConversationEvidenceCleared, sanitizeCachedMessages, sanitizeCachedTarget } from "./conversation-evidence";
 import { translate } from "../i18n";
-import { runGuardedMutation } from "./operation-error.store";
+import { reportOperationError, runGuardedMutation } from "./operation-error.store";
 import { queueConversationSave } from "./conversation-persistence";
 import { useArticleAskStore } from "./article-ask.store";
 import { create } from "zustand";
@@ -12,7 +12,7 @@ import {
   type QaSourceRef,
   type QaTurn,
 } from "../services/knowledge-ai/qa";
-import { AiNotConfiguredError } from "../services/knowledge-ai/ai-invoke";
+import { AiNotConfiguredError, isScenarioConfigured } from "../services/knowledge-ai/ai-invoke";
 
 export type AskErrorKind = "not-configured" | "no-source" | "generic";
 
@@ -309,6 +309,15 @@ export const useAskStore = create<AskState>()((set, get) => {
     ask: async (question) => {
       const trimmed = question.trim();
       if (!trimmed || get().isRunning) {
+        return;
+      }
+      // 没有文本模型时直接提示，不把一条注定失败的提问写进历史
+      if (!isScenarioConfigured("qa")) {
+        reportOperationError(
+          "ask.send",
+          translate("ask.send", "提问"),
+          new Error(translate("ask.notConfigured", "尚未配置 AI 服务")),
+        );
         return;
       }
 

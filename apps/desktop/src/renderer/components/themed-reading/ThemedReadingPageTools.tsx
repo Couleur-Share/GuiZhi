@@ -184,14 +184,7 @@ export function ThemedReadingPageTools({
                 ))}
               </>
             ) : null}
-            {panel === "assets" && legacy && page.assets.length ? (
-              <p className="text-sm text-muted-foreground">
-                {t(
-                  "themedReading.readerLegacyReadOnly",
-                  "旧格式阅读页只读，仍可阅读和导出；如需调整，请重新生成新版。",
-                )}
-              </p>
-            ) : null}
+
             {panel === "assets" ? (
               page.assets.length ? (
                 page.assets.map((asset) => (

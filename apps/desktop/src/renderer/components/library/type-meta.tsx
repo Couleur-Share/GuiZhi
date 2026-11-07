@@ -144,9 +144,11 @@ export function formatItemTime(timestamp: number): string {
     });
   }
   const sameYear = date.getFullYear() === now.getFullYear();
-  return date.toLocaleDateString(undefined, {
-    year: sameYear ? undefined : "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  // 跨年用全数字格式（如 2025/11/7），比「2025年11月7日」短，表格窄列里不会被截断
+  return date.toLocaleDateString(
+    undefined,
+    sameYear
+      ? { month: "short", day: "numeric" }
+      : { year: "numeric", month: "numeric", day: "numeric" },
+  );
 }

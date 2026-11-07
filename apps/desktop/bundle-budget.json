@@ -38,8 +38,8 @@
     {
       "name": "settings ai section",
       "pattern": "assets/AISettingsPrototype-*.js",
-      "maxGzipBytes": 32768,
-      "$baseline": "27.07 KB after 2026-06-06 route-level settings section lazy loading."
+      "maxGzipBytes": 33792,
+      "$baseline": "27.07 KB after 2026-06-06 route-level settings section lazy loading; budget raised 32 KB → 33 KB on 2026-11-07 (actual 32.02 KB after model-service status card / primary-action emphasis changes)."
     },
     {
       "name": "ui vendor (dnd-kit)",

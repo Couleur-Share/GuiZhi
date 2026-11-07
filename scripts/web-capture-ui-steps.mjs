@@ -25,7 +25,7 @@ export default async function ({ win, app, shot }) {
     BrowserWindow.getAllWindows()[0].setSize(900, 740),
   );
   await shot("documents-narrow");
-  await win.getByRole("button", { name: "研究", exact: true }).click();
+  await win.keyboard.press("Alt+Shift+F"); await win.getByPlaceholder("搜索知识、Wiki、任务、设置或动作…").fill("新建近期研究"); await win.keyboard.press("Enter");
   for (const label of ["小红书", "抖音", "哔哩哔哩"]) {
     const control = win.getByRole("checkbox", { name: label, exact: true });
     if (await control.isChecked())

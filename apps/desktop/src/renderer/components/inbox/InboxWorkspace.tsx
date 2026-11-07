@@ -50,6 +50,15 @@ export function InboxWorkspace() {
   const isLoading = useInboxStore((state) => state.isLoading);
   const loadError = useInboxStore((state) => state.loadError);
   const wikiCandidates = useInboxStore(s => s.wikiCandidates);
+  // 只列出非零项，并用日常用语描述各状态，避免一行内部计数
+  const wikiCandidateParts = wikiCandidates
+    ? [
+        wikiCandidates.ready > 0 && t("inbox.wikiPartReady", "{{count}} 条可编译", { count: wikiCandidates.ready }),
+        wikiCandidates.review > 0 && t("inbox.wikiPartReview", "{{count}} 条需先复核", { count: wikiCandidates.review }),
+        wikiCandidates.waiting > 0 && t("inbox.wikiPartWaiting", "{{count}} 条等待重试", { count: wikiCandidates.waiting }),
+        wikiCandidates.upgrade > 0 && t("inbox.wikiPartUpgrade", "{{count}} 条可升级编译方式", { count: wikiCandidates.upgrade }),
+      ].filter((part): part is string => typeof part === "string")
+    : [];
   const sectionErrors = useInboxStore(s => s.sectionErrors);
   const collections = useCollectionStore((state) => state.collections);
   const fetchCollections = useCollectionStore(
@@ -363,7 +372,7 @@ export function InboxWorkspace() {
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {wikiCandidates ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiCandidates", "Wiki：可执行 {{ready}} · 需复核 {{review}} · 等待重试/继续 {{waiting}} · 待选择升级 {{upgrade}}", { ready: wikiCandidates.ready, review: wikiCandidates.review, waiting: wikiCandidates.waiting, upgrade: wikiCandidates.upgrade })} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>{t("inbox.wikiCandidatesView", "查看范围和任务")}</button></div> : null}
+        {wikiCandidates && wikiCandidateParts.length > 0 ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiCandidates", "Wiki 编译：{{parts}}", { parts: wikiCandidateParts.join(t("inbox.nameSeparator", "、")) })} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>{t("inbox.wikiCandidatesView", "查看范围和任务")}</button></div> : null}
         {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="mb-2 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? t("inbox.wikiStatusFailed", "Wiki状态读取失败：{{error}}", { error }) : t("inbox.semanticStatusFailed", "语义索引状态读取失败：{{error}}", { error })} <button className="text-primary hover:underline" onClick={() => void refresh()}>{t("common.retry", "重试")}</button></div>)}
         {isLoading && items.length === 0 ? (
           <div className="flex h-32 items-center justify-center">

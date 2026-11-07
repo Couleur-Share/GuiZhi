@@ -11,7 +11,7 @@ export function StatusCard({
 }: {
   title: string;
   value: string;
-  detail: string;
+  detail?: string;
   tone: "ready" | "warning";
   icon: typeof BrainIcon;
 }) {
@@ -35,9 +35,11 @@ export function StatusCard({
           {value}
         </div>
       </div>
-      <div className="mt-3 text-[11px] text-muted-foreground line-clamp-1">
-        {detail}
-      </div>
+      {detail ? (
+        <div className="mt-3 text-[11px] text-muted-foreground line-clamp-1">
+          {detail}
+        </div>
+      ) : null}
     </div>
   );
 }

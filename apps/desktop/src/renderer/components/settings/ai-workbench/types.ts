@@ -78,7 +78,7 @@ export type ModelOption = {
 export type StatusCardData = {
   title: string;
   value: string;
-  detail: string;
+  detail?: string;
   tone: "ready" | "warning";
   icon: LucideIcon;
 };

@@ -387,7 +387,7 @@ export function AISettingsPrototype() {
           t("settings.aiWorkbenchNotConfigured"),
           settings.aiProviders,
         ),
-        detail: t(item.descKey),
+        // 说明文字在下方「模型路由」每一行里已有，卡片只说当前用的是哪个模型
         tone: resolvedRouteModels[item.key] ? "ready" : "warning",
         icon: item.icon,
       })),
@@ -931,7 +931,11 @@ export function AISettingsPrototype() {
         <button
           type="button"
           onClick={() => setShowQuickSetup(true)}
-          className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground"
+          className={`inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-medium leading-none shadow-sm transition-colors ${
+            aiModels.length === 0
+              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+              : "border border-primary/30 bg-primary/5 text-foreground"
+          }`}
         >
           <SparklesIcon className="h-4 w-4" aria-hidden="true" />
           {t("settings.quickSetupOpen", "快速配置")}
@@ -970,7 +974,11 @@ export function AISettingsPrototype() {
               { lockEndpoint: true },
             );
           }}
-          className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium leading-none text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          className={`inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-medium leading-none shadow-sm transition-colors ${
+            aiModels.length === 0
+              ? "border border-border bg-background hover:bg-accent hover:text-accent-foreground"
+              : "bg-primary text-primary-foreground hover:bg-primary/90"
+          }`}
         >
           {t("settings.addModel")}
         </button>

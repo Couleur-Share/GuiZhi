@@ -19,7 +19,7 @@ export default async function researchShots({ win, app, shot }) {
   }, { "research:list": [run], "research:get": detail, "research:evidence": packet, "research:baselines": [{ ...run, id: "baseline-ui", rangeTo: now - 86400000 }], "research:compare": { runId: run.id, baselineRunId: "baseline-ui", warnings: ["coverage_incomparable"], changes: [{ kind: "new", current: candidate }, { kind: "unknown", previous: { ...candidate, id: "previous-ui", title: "上轮出现的离线工具实践" } }] } });
   const later = win.getByRole("button", { name: /稍后再说|maybe later/i });
   if (await later.waitFor({ state: "visible", timeout: 3000 }).then(() => true).catch(() => false)) await later.click();
-  await win.getByRole("button", { name: "研究", exact: true }).click();
+  await win.keyboard.press("Alt+Shift+F"); await win.getByPlaceholder("搜索知识、Wiki、任务、设置或动作…").fill("新建近期研究"); await win.keyboard.press("Enter");
   await win.getByText("关联已有知识", { exact: true }).click();
   await win.getByLabel("研究主题", { exact: true }).fill("本地 AI 知识库");
   if (await win.getByRole("button", { name: "开始研究", exact: true }).isEnabled()) throw new Error("Scope must be selected after opting in");

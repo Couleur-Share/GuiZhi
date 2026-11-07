@@ -285,6 +285,17 @@ export function ContentPanel({
   };
   const activeTab: PanelTab = availableTabs[tab] ? tab : "body";
   const themed = useThemedReadingMode(item.id, activeTab, !snapshotView);
+  // 空白笔记没有可阅读的内容：打开时直接进编辑态，免得用户面对一块空白阅读区不知从何下手。
+  // 只在切换到该条目时判断一次，输入第一个字后不会被切回阅读态。
+  const startBlankNoteEditing = useRef(themed.startEditing);
+  startBlankNoteEditing.current = themed.startEditing;
+  const isBlankNote =
+    item.itemType === "note" && !isTrashed && item.content.trim() === "";
+  const isBlankNoteRef = useRef(isBlankNote);
+  isBlankNoteRef.current = isBlankNote;
+  useEffect(() => {
+    if (isBlankNoteRef.current) startBlankNoteEditing.current();
+  }, [item.id]);
   const selectThemedForAsk = themed.select;
   useEffect(() => {
     const navigate = (event: Event) => {

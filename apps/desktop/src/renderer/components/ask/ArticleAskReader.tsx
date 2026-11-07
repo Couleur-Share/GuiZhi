@@ -82,7 +82,8 @@ export function ArticleAskReader({ itemId, open, onOpen, onClose, children }: { 
     {selection ? <div data-article-selection-tools role="toolbar" aria-label={t("articleAsk.selectionTools", "选段提问")} onMouseDown={e => e.preventDefault()} className="absolute z-40 flex gap-2 rounded-lg border border-border bg-popover p-2 text-xs shadow-lg" style={{ left: selection.x, top: selection.y }}>
       <button type="button" onClick={() => void askSelection(true)}>{t("articleAsk.explain", "解释这段")}</button><button type="button" onClick={() => void askSelection(false)}>{t("articleAsk.askSelection", "围绕这段提问")}</button>
     </div> : null}
-    {open ? <aside className={wide ? "h-full w-[400px] shrink-0 border-l border-border" : "absolute inset-y-0 right-0 z-30 w-[400px] max-w-full border-l border-border shadow-xl"}>
+    {/* 面板始终与正文并排、让出宽度，不再盖在正文上把句子从中间截断 */}
+    {open ? <aside className={wide ? "h-full w-[400px] shrink-0 border-l border-border" : "h-full w-[min(400px,48%)] min-w-[280px] shrink-0 border-l border-border"}>
       <ArticleConversation target={target} prompt={prompt.text} promptKey={prompt.key} resolveTarget={resolveTarget} onSubmitted={() => { if (root.current) setTarget(readerTarget(root.current, itemId)); setPrompt(p => ({ text: "", key: p.key + 1 })); }} onLocate={source => root.current ? locateArticleSource(root.current, source) : Promise.resolve(false)} onClose={onClose} />
     </aside> : null}
   </div>;

@@ -128,5 +128,5 @@ export function MarkdownEditor({
     });
   }, [showLineNumbers]);
 
-  return <div ref={containerRef} className="h-full min-h-0" />;
+  return <div ref={containerRef} data-testid="markdown-editor" className="h-full min-h-0" />;
 }

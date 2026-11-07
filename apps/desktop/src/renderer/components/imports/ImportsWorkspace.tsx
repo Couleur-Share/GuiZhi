@@ -61,6 +61,21 @@ export function ImportsWorkspace() {
 
 function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void }) {
   const { t } = useTranslation();
+  // 平台发现属冻结功能：只有已保存过发现视图的用户才在工具栏看到入口，
+  // 其余用户经命令面板或快速采集的「浏览博主」进入。
+  const [hasDiscoveryViews, setHasDiscoveryViews] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.platformCapture
+      .listDiscoveryViews()
+      .then((views) => {
+        if (!cancelled) setHasDiscoveryViews(views.length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const tasks = useImportStore((state) => state.tasks);
   const total = useImportStore((state) => state.total);
   const nextCursor = useImportStore((state) => state.nextCursor);
@@ -240,14 +255,16 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
             })}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={onOpenDiscovery}
-          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
-        >
-          <CompassIcon className="h-4 w-4" aria-hidden="true" />
-          {t("imports.platformDiscovery", "平台发现")}
-        </button>
+        {hasDiscoveryViews ? (
+          <button
+            type="button"
+            onClick={onOpenDiscovery}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
+          >
+            <CompassIcon className="h-4 w-4" aria-hidden="true" />
+            {t("imports.platformDiscovery", "平台发现")}
+          </button>
+        ) : null}
         {queueState.pendingCount > 0 || queueState.paused ? (
           <button
             type="button"

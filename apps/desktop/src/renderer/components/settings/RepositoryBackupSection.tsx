@@ -187,9 +187,10 @@ export function RepositoryBackupSection() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label={t("settings.fullBackupSetPassword", "设置恢复口令")} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="new-password" />
-            <Input label={t("settings.fullBackupConfirmPassword", "再次输入")} type="password" value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} autoComplete="new-password" />
+            <Input label={t("settings.fullBackupConfirmPassword", "再次输入")} type="password" value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} autoComplete="new-password" error={passwordConfirm && password !== passwordConfirm ? t("settings.fullBackupPasswordMismatch", "两次输入的恢复口令不一致") : undefined} />
           </div>
-          <button type="button" disabled={busy !== null} onClick={() => void initialize()} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
+          <p className="text-xs text-muted-foreground">{t("settings.fullBackupPasswordHint", "口令至少 12 个字符，两次输入一致后才能启用。")}</p>
+          <button type="button" disabled={busy !== null || password.length < 12 || password !== passwordConfirm} onClick={() => void initialize()} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
             {busy === "init" ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <KeyRoundIcon className="h-4 w-4" />}
             {t("settings.fullBackupEnable", "启用完整备份")}
           </button>

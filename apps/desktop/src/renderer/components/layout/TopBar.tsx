@@ -5,6 +5,7 @@ import type { UpdateStatus } from "../UpdateDialog";
 import { useUIStore } from "../../stores/ui.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { getRuntimeCapabilities } from "../../runtime";
+import { useShortcutLabel } from "../../hooks/useShortcutLabel";
 import { NewItemButton } from "./NewItemButton";
 import { WindowControls } from "./WindowControls";
 import { useSidebarCollapse } from "./use-sidebar-collapse";
@@ -33,6 +34,8 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
     (state) => state.setSearchQuery,
   );
   const runtimeCapabilities = getRuntimeCapabilities();
+  // 读主进程实际生效的组合键，不再写死一个并不存在的 Ctrl+K
+  const searchShortcut = useShortcutLabel("search");
 
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -124,7 +127,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
               }
             }}
             className={`relative z-10 h-9 w-full rounded-lg border border-transparent bg-transparent pl-9 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow duration-quick ${
-              isLibrarySearch ? "pr-20" : "pr-16"
+              isLibrarySearch ? "pr-32" : "pr-28"
             } ${isLibrarySearch ? "" : "cursor-pointer"}`}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           />
@@ -152,7 +155,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
               title={t("header.openCommandPalette", "打开命令面板")}
               aria-label={t("header.openCommandPalette", "打开命令面板")}
             >
-              Ctrl+K
+              {searchShortcut}
             </button>
           </div>
         </div>

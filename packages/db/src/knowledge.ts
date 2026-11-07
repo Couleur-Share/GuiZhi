@@ -75,6 +75,10 @@ const SNIPPET_MAX_LENGTH = 160;
  * 余量不足就真的不剩几个字了。
  */
 const SNIPPET_SOURCE_LENGTH = 2000;
+/** 搜索态要在正文里找命中处，取得更靠后一些；只在有搜索词时使用 */
+const SEARCH_SNIPPET_SOURCE_LENGTH = 12000;
+/** 命中词前面保留的上下文字数 */
+const SEARCH_SNIPPET_LEAD = 30;
 const COUNT_CACHE_TTL_MS = 5_000;
 const COUNT_CACHE_MAX_ENTRIES = 128;
 
@@ -103,7 +107,7 @@ function mapTagRow(row: TagRow): Tag {
  * 一起占满整段摘要，正文一个字都露不出来。剥在压平**之前**：这时换行还在，
  * 边界交给现成的解析器判断，不必在压平后的文本里猜（猜错会吃掉正文开头）。
  */
-export function makeSnippet(content: string): string {
+function toPlainText(content: string): string {
   const meta = parseVideoMetaBlock(content ?? "");
   // 剥完不剩东西的（只采到元数据、正文还没生成）回退到原文：
   // 列表上显示「平台：抖音 · 作者：…」也好过一片空白
@@ -119,9 +123,33 @@ export function makeSnippet(content: string): string {
     .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
+  return plain;
+}
+
+export function makeSnippet(content: string): string {
+  const plain = toPlainText(content);
   return plain.length > SNIPPET_MAX_LENGTH
     ? `${plain.slice(0, SNIPPET_MAX_LENGTH)}…`
     : plain;
+}
+
+/**
+ * 搜索结果的摘要：以第一处命中为中心截取，让用户一眼看到「为什么命中」。
+ * 命中在标题或标签里、正文里找不到搜索词时，退回正文开头的普通摘要。
+ */
+export function makeSearchSnippet(content: string, searchTerm: string): string {
+  const plain = toPlainText(content);
+  const lower = plain.toLowerCase();
+  let hit = -1;
+  for (const token of searchTerm.toLowerCase().split(/\s+/)) {
+    if (!token) continue;
+    const at = lower.indexOf(token);
+    if (at >= 0 && (hit < 0 || at < hit)) hit = at;
+  }
+  if (hit < 0 || hit <= SEARCH_SNIPPET_LEAD) return makeSnippet(content);
+  const start = hit - SEARCH_SNIPPET_LEAD;
+  const end = start + SNIPPET_MAX_LENGTH;
+  return `…${plain.slice(start, end)}${end < plain.length ? "…" : ""}`;
 }
 
 function buildOrderClause(
@@ -504,7 +532,7 @@ export class KnowledgeItemDB {
     const rows = this.db.all(
       `SELECT i.id, i.title, i.item_type, i.status, i.collection_id,
               i.is_favorite, i.is_pinned, i.deleted_at, i.created_at, i.updated_at, i.review_status, i.review_reasons,
-              substr(i.content, 1, ${SNIPPET_SOURCE_LENGTH}) AS content,
+              substr(i.content, 1, ${matchQuery ? SEARCH_SNIPPET_SOURCE_LENGTH : SNIPPET_SOURCE_LENGTH}) AS content,
               ${platformProjection} AS platform,
               ${matchQuery ? "f.fts_rank" : "NULL"} AS fts_rank,
               ${sortColumn} AS sort_value
@@ -522,7 +550,7 @@ export class KnowledgeItemDB {
     const entries: KnowledgeItemListEntry[] = rows.map((row) => ({
       id: row.id,
       title: row.title,
-      snippet: makeSnippet(row.content),
+      snippet: matchQuery ? makeSearchSnippet(row.content, searchTerm) : makeSnippet(row.content),
       reviewStatus: row.review_status ?? "clear", reviewReasons: parseReviewReasons(row.review_reasons),
       itemType: row.item_type,
       status: row.status,

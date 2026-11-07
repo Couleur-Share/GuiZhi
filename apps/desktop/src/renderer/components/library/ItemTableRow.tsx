@@ -19,6 +19,7 @@ import {
   getItemTypeMeta,
 } from "./type-meta";
 import { getSourcePlatformMeta, PlatformIcon } from "./platform-meta";
+import { highlightText } from "./highlight-text";
 
 const CELL = "px-4 py-2.5 align-middle";
 
@@ -82,6 +83,8 @@ export function ItemTableRow({
 }) {
   const { t } = useTranslation();
   const scope = useKnowledgeStore((state) => state.scope);
+  // 搜索时在标题与摘要里标出命中词
+  const searchQuery = useKnowledgeStore((state) => state.searchQuery);
   const toggleFavorite = useKnowledgeStore((state) => state.toggleFavorite);
   const restoreItems = useKnowledgeStore((state) => state.restoreItems);
   const collectionName = useCollectionStore(
@@ -149,7 +152,7 @@ export function ItemTableRow({
                 }}
                 className="min-w-0 line-clamp-2 break-words text-left text-sm font-medium text-primary transition-colors hover:text-primary/80 hover:underline"
               >
-                {title}
+                {searchQuery ? highlightText(title, searchQuery) : title}
               </button>
               {entry.isFavorite ? (
                 <StarIcon
@@ -165,7 +168,9 @@ export function ItemTableRow({
         return (
           <td key={column.id} className={CELL} style={style}>
             <span className="block truncate text-xs text-muted-foreground">
-              {entry.snippet || (
+              {(searchQuery && entry.snippet
+                ? highlightText(entry.snippet, searchQuery)
+                : entry.snippet) || (
                 <span className="text-muted-foreground/40">-</span>
               )}
             </span>

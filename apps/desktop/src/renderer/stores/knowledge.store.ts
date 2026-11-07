@@ -125,6 +125,9 @@ interface KnowledgeState {
   selectedItem: KnowledgeItem | null;
   detailLoading: boolean;
   detailError: string | null;
+  /** 刚新建的空白条目 id：详情头部据此把光标放进标题，消费后清空 */
+  titleFocusItemId: string | null;
+  clearTitleFocus: () => void;
   saveConflict: { itemId: string; result: SaveKnowledgeDraftResult } | null;
   resolveSaveConflict: (choice: "local" | "server") => Promise<boolean>;
   isSaving: boolean;
@@ -393,6 +396,8 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     selectedId: null,
     selectedItem: null,
     detailLoading: false, detailError: null, saveConflict: null,
+    titleFocusItemId: null,
+    clearTitleFocus: () => set({ titleFocusItemId: null }),
     resolveSaveConflict: async choice => {
       const conflict = get().saveConflict;
       if (!conflict?.result.item) return false;
@@ -444,7 +449,14 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
         selectionIds: [],
         selectionAnchorId: null,
       });
-      void get().refreshAll();
+      void get().refreshAll().then(() => {
+        // 搜索结果出来后，右侧详情若还停在一条不在结果里的条目上，会让人以为那就是命中项
+        const state = get();
+        if (state.searchQuery !== query || !query.trim()) return;
+        if (state.selectedId && !state.entries.some((entry) => entry.id === state.selectedId)) {
+          void state.selectItem(null);
+        }
+      });
     },
 
     setSort: (sortBy, sortOrder) => {
@@ -638,7 +650,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       if (!(await get().flushPendingSave())) throw new Error("请先保存当前草稿");
       const created = await window.api.knowledge.create(input ?? {});
       await get().refreshAll();
-      if (seq === detailRequestSeq && await get().flushPendingSave() && seq === detailRequestSeq) set({ selectedId: created.id, selectedItem: created, detailLoading: false, detailError: null });
+      if (seq === detailRequestSeq && await get().flushPendingSave() && seq === detailRequestSeq) set({ selectedId: created.id, selectedItem: created, detailLoading: false, detailError: null, titleFocusItemId: created.id });
       return created;
     },
 

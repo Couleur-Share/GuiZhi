@@ -15,6 +15,7 @@ import { ItemConfirmDialog, useItemMenus } from "./item-menus";
 import { ItemListToolbar } from "./ItemListToolbar";
 import { ItemPagination } from "./ItemPagination";
 import { getItemTypeMeta } from "./type-meta";
+import { highlightText } from "./highlight-text";
 import { useItemListKeyboard } from "./use-item-keyboard";
 
 /** 卡片预估高度（含行间距）：标题最多两行 */
@@ -24,10 +25,13 @@ function ItemRow({
   entry,
   isSelected,
   isChecked,
+  searchQuery,
   onSelect,
   onContextMenu,
 }: {
   entry: KnowledgeItemListEntry;
+  /** 非空时在标题里标出命中词，并多显示一段以命中处为中心的摘要 */
+  searchQuery: string;
   isSelected: boolean;
   isChecked: boolean;
   onSelect: (event: React.MouseEvent) => void;
@@ -56,8 +60,21 @@ function ItemRow({
           aria-hidden="true"
         />
       ) : null}
-      <span className="min-w-0 flex-1 text-sm font-medium leading-snug line-clamp-2">
-        {entry.title || t("library.untitled", "无标题")}
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium leading-snug line-clamp-2">
+          {searchQuery && entry.title
+            ? highlightText(entry.title, searchQuery)
+            : entry.title || t("library.untitled", "无标题")}
+        </span>
+        {searchQuery && entry.snippet ? (
+          <span
+            className={`mt-0.5 block text-xs leading-snug line-clamp-2 ${
+              isSelected ? "text-primary-foreground/80" : "text-muted-foreground"
+            }`}
+          >
+            {highlightText(entry.snippet, searchQuery)}
+          </span>
+        ) : null}
       </span>
       <span className="mt-0.5 flex shrink-0 items-center gap-1">
         {entry.isFavorite ? (
@@ -94,6 +111,7 @@ export function ItemList() {
   const scope = useKnowledgeStore((state) => state.scope);
   const selectedId = useKnowledgeStore((state) => state.selectedId);
   const selectItem = useKnowledgeStore((state) => state.selectItem);
+  const searchQuery = useKnowledgeStore((state) => state.searchQuery.trim());
   const selectionIds = useKnowledgeStore((state) => state.selectionIds);
   const toggleSelection = useKnowledgeStore((state) => state.toggleSelection);
   const rangeSelectTo = useKnowledgeStore((state) => state.rangeSelectTo);
@@ -225,6 +243,7 @@ export function ItemList() {
                     entry={entry}
                     isSelected={entry.id === selectedId}
                     isChecked={selectionIds.includes(entry.id)}
+                    searchQuery={searchQuery}
                     onSelect={(event) => handleRowClick(entry, event)}
                     onContextMenu={(event) => {
                       event.preventDefault();

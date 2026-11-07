@@ -54,7 +54,7 @@ export default async ({ win, app, shot }) => {
   await toggle.click();
   await win.getByText(/补充一个经验/).waitFor();
   await shot("source-comments-existing-expanded");
-  await win.getByRole("button", { name: "研究", exact: true }).click();
+  await win.keyboard.press("Alt+Shift+F"); await win.getByPlaceholder("搜索知识、Wiki、任务、设置或动作…").fill("新建近期研究"); await win.keyboard.press("Enter");
   const checkbox = win.getByRole("checkbox", { name: "精读时采集评论", exact: true });
   await checkbox.waitFor({ state: "attached" });
   assert.equal(await checkbox.isChecked(), false);

@@ -84,25 +84,6 @@ function SemanticIndexCard() {
           eligible: status.eligibleItems,
         })}
       </p>
-      <p className="mt-0.5 text-[11px] text-sidebar-foreground/45">
-        {status.lastSearchMs == null
-          ? t("ask.semanticChunks", "{{chunks}} 个分块", {
-              chunks: status.totalChunks,
-            })
-          : t(
-              "ask.semanticPerf",
-              "{{chunks}} 个分块 · 最近检索 {{ms}}ms",
-              {
-                chunks: status.totalChunks,
-                ms: status.lastSearchMs,
-              },
-            )}
-        {status.lastSearchMs != null
-          ? status.lastSearchCacheHit
-            ? t("ask.semanticCacheWarm", " · 向量缓存命中")
-            : t("ask.semanticCacheCold", " · 向量缓存已加载")
-          : null}
-      </p>
       {pending > 0 || isIndexing ? (
         <button
           type="button"

@@ -87,7 +87,8 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
           toolsOpen={toolsOpen}
           onToggleTools={() => { setAskItemId(null); setToolsItemId(toolsOpen ? null : item.id); }}
           askOpen={askItemId === item.id}
-          onToggleAsk={() => { setToolsItemId(null); setAskItemId(askItemId === item.id ? null : item.id); }}
+          // 空白笔记没有可提问的正文，不摆这个入口
+          onToggleAsk={item.itemType === "note" && !item.content.trim() ? undefined : () => { setToolsItemId(null); setAskItemId(askItemId === item.id ? null : item.id); }}
         />
 
         {!isTrashed ? (
