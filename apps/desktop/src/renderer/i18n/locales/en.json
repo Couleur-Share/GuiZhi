@@ -1260,7 +1260,7 @@
     "namePlaceholder": "Name",
     "deleteCollection": "Delete collection",
     "deleteCollectionDesc": "Items inside are kept",
-    "deleteCollectionConfirm": "Delete collection \"{{name}}\"? Items inside are kept and become unfiled.",
+    "collectionDeleted": "Deleted collection \"{{name}}\"; its items were kept",
     "deleteTag": "Delete tag",
     "deleteTagConfirm": "Delete tag \"{{name}}\"? Related items are not deleted.",
     "aiSummary": "AI Summary",

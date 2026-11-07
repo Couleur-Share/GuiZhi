@@ -35,7 +35,6 @@ type EditModalState =
   | null;
 
 type ConfirmDeleteState =
-  | { kind: "collection"; collection: Collection }
   | { kind: "tag"; tag: Tag }
   | null;
 
@@ -77,7 +76,7 @@ function collectionIcon(icon: string | null | undefined): React.ReactNode {
  */
 export function SidebarLibraryPanel() {
   const { t } = useTranslation();
-  const { showToast } = useToast();
+  const { showToast, showUndoToast } = useToast();
   const scope = useKnowledgeStore((state) => state.scope);
   const activeCollectionId = useKnowledgeStore((state) => state.collectionId);
   const activeTagId = useKnowledgeStore((state) => state.tagId);
@@ -94,8 +93,8 @@ export function SidebarLibraryPanel() {
   const updateCollection = useCollectionStore(
     (state) => state.updateCollection,
   );
-  const deleteCollection = useCollectionStore(
-    (state) => state.deleteCollection,
+  const scheduleDeleteCollection = useCollectionStore(
+    (state) => state.scheduleDeleteCollection,
   );
   const tags = useTagStore((state) => state.tags);
   const updateTag = useTagStore((state) => state.updateTag);
@@ -206,6 +205,19 @@ export function SidebarLibraryPanel() {
     setMenuState({ ...menuAnchor(event), items });
   };
 
+  // 删合集只丢合集本身，条目留作未归合集：先隐藏、8 秒内可撤销，不再弹确认。
+  const deleteCollectionWithUndo = (collection: Collection) => {
+    const deletion = scheduleDeleteCollection(collection.id);
+    if (!deletion) return;
+    if (activeCollectionId === collection.id) setScope("all");
+    showUndoToast(
+      t("library.collectionDeleted", "已删除合集「{{name}}」，其中的条目已保留", {
+        name: collection.name,
+      }),
+      deletion.undo,
+    );
+  };
+
   const openCollectionMenu = (
     event: React.MouseEvent,
     collection: Collection,
@@ -221,7 +233,7 @@ export function SidebarLibraryPanel() {
         description: t("library.deleteCollectionDesc", "不会删除其中的条目"),
         icon: <XCircleIcon className="h-4 w-4" aria-hidden="true" />,
         variant: "destructive",
-        onClick: () => setConfirmDelete({ kind: "collection", collection }),
+        onClick: () => deleteCollectionWithUndo(collection),
       },
     ]);
   };
@@ -443,14 +455,7 @@ export function SidebarLibraryPanel() {
         isOpen={confirmDelete !== null}
         onClose={() => setConfirmDelete(null)}
         onConfirm={() => {
-          if (confirmDelete?.kind === "collection") {
-            void deleteCollection(confirmDelete.collection.id).then(() => {
-              if (activeCollectionId === confirmDelete.collection.id) {
-                setScope("all");
-              }
-              void refreshAll();
-            });
-          } else if (confirmDelete?.kind === "tag") {
+          if (confirmDelete?.kind === "tag") {
             void deleteTag(confirmDelete.tag.id).then(() => {
               if (activeTagId === confirmDelete.tag.id) {
                 setScope("all");
@@ -460,27 +465,12 @@ export function SidebarLibraryPanel() {
           }
           setConfirmDelete(null);
         }}
-        title={
-          confirmDelete?.kind === "collection"
-            ? t("library.deleteCollection", "删除合集")
-            : t("library.deleteTag", "删除标签")
-        }
-        message={
-          confirmDelete?.kind === "collection"
-            ? t(
-                "library.deleteCollectionConfirm",
-                "删除合集「{{name}}」？其中的条目会保留并变为未归合集。",
-                { name: confirmDelete.collection.name },
-              )
-            : t(
-                "library.deleteTagConfirm",
-                "删除标签「{{name}}」？相关条目不会被删除。",
-                {
-                  name:
-                    confirmDelete?.kind === "tag" ? confirmDelete.tag.name : "",
-                },
-              )
-        }
+        title={t("library.deleteTag", "删除标签")}
+        message={t(
+          "library.deleteTagConfirm",
+          "删除标签「{{name}}」？相关条目不会被删除。",
+          { name: confirmDelete?.tag.name ?? "" },
+        )}
         confirmText={t("common.confirm", "确认")}
         cancelText={t("common.cancel", "取消")}
         variant="destructive"

@@ -1260,7 +1260,7 @@
     "namePlaceholder": "名称",
     "deleteCollection": "删除合集",
     "deleteCollectionDesc": "不会删除其中的条目",
-    "deleteCollectionConfirm": "删除合集「{{name}}」？其中的条目会保留并变为未归合集。",
+    "collectionDeleted": "已删除合集「{{name}}」，其中的条目已保留",
     "deleteTag": "删除标签",
     "deleteTagConfirm": "删除标签「{{name}}」？相关条目不会被删除。",
     "aiSummary": "AI 摘要",
