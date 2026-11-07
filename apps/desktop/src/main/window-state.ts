@@ -138,6 +138,38 @@ export function resolveWindowLaunchState(
   };
 }
 
+export interface LaunchVisibilityInput {
+  argv: readonly string[];
+  /** macOS 登录项拉起时为 true；其他平台的登录项改用 `--hidden` 参数标记 */
+  openedAtLogin: boolean;
+  minimizeOnLaunch: boolean;
+  shouldMaximize: boolean;
+}
+
+export interface LaunchVisibility {
+  startHidden: boolean;
+  maximizeNow: boolean;
+  /** 隐藏启动时推迟到首次显示：maximize() 会把隐藏窗口直接显示出来 */
+  maximizeOnFirstShow: boolean;
+}
+
+/**
+ * 只有系统登录项拉起时才驻留托盘。用户手动打开必须看到窗口，
+ * 否则「启动时最小化」一旦为真，点击应用图标就毫无反应。
+ */
+export function resolveLaunchVisibility(
+  input: LaunchVisibilityInput,
+): LaunchVisibility {
+  const startHidden =
+    input.argv.includes("--hidden") ||
+    (input.openedAtLogin && input.minimizeOnLaunch);
+  return {
+    startHidden,
+    maximizeNow: input.shouldMaximize && !startHidden,
+    maximizeOnFirstShow: input.shouldMaximize && startHidden,
+  };
+}
+
 export function readWindowLaunchState(
   stateFile: string,
   displayWorkAreas: readonly WindowBounds[],

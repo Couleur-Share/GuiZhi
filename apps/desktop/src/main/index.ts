@@ -81,6 +81,7 @@ import {
   DEFAULT_WINDOW_BOUNDS,
   MIN_WINDOW_BOUNDS,
   readWindowLaunchState,
+  resolveLaunchVisibility,
 } from "./window-state";
 
 let mainWindow: BrowserWindow | null = null;
@@ -349,23 +350,20 @@ async function createWindow() {
       return;
     }
 
-    const launchArgs = Array.isArray(process.argv) ? process.argv : [];
-    const osRequestedHidden = launchArgs.includes("--hidden");
+    const visibility = resolveLaunchVisibility({
+      argv: Array.isArray(process.argv) ? process.argv : [],
+      openedAtLogin: isMac && app.getLoginItemSettings().wasOpenedAtLogin === true,
+      minimizeOnLaunch: appDb ? getMinimizeOnLaunchSetting(appDb) : false,
+      shouldMaximize: launchState.shouldMaximize,
+    });
 
-    const shouldMinimize =
-      osRequestedHidden || (appDb ? getMinimizeOnLaunchSetting(appDb) : false);
-
-    if (launchState.shouldMaximize) {
+    if (visibility.maximizeNow) {
       mainWindow?.maximize();
+    } else if (visibility.maximizeOnFirstShow) {
+      mainWindow?.once("show", () => mainWindow?.maximize());
     }
 
-    if (!appDb && !osRequestedHidden) {
-      mainWindow?.show();
-      emitWindowVisibility(true);
-      return;
-    }
-
-    if (shouldMinimize) {
+    if (visibility.startHidden) {
       createTray();
       emitWindowVisibility(false);
     } else {

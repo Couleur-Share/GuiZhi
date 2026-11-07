@@ -29,7 +29,7 @@ function createDefaultAppearanceValues() {
     showLineNumbers: false,
     wikiCompileEnabled: false,
     launchAtStartup: false,
-    minimizeOnLaunch: true,
+    minimizeOnLaunch: false,
     backgroundTasksEnabled: false,
     debugMode: false,
     closeAction: "ask",

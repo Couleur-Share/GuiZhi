@@ -6,6 +6,7 @@ import {
   captureWindowState,
   fitBoundsToDisplays,
   readWindowLaunchState,
+  resolveLaunchVisibility,
   resolveWindowLaunchState,
   writeWindowState,
 } from "../../../src/main/window-state";
@@ -89,6 +90,53 @@ describe("window state", () => {
       bounds: { x: 80, y: 40, width: 1280, height: 800 },
       isMaximized: true,
     });
+  });
+
+  it("shows the window on a manual launch even when minimizeOnLaunch is on", () => {
+    expect(
+      resolveLaunchVisibility({
+        argv: ["GuiZhi.exe"],
+        openedAtLogin: false,
+        minimizeOnLaunch: true,
+        shouldMaximize: false,
+      }),
+    ).toEqual({ startHidden: false, maximizeNow: false, maximizeOnFirstShow: false });
+  });
+
+  it("starts hidden when the login item passes --hidden", () => {
+    expect(
+      resolveLaunchVisibility({
+        argv: ["GuiZhi.exe", "--hidden"],
+        openedAtLogin: false,
+        minimizeOnLaunch: false,
+        shouldMaximize: false,
+      }).startHidden,
+    ).toBe(true);
+  });
+
+  it("starts hidden for a macOS login launch only when the setting is on", () => {
+    const base = { argv: ["GuiZhi"], openedAtLogin: true, shouldMaximize: false };
+    expect(resolveLaunchVisibility({ ...base, minimizeOnLaunch: true }).startHidden).toBe(true);
+    expect(resolveLaunchVisibility({ ...base, minimizeOnLaunch: false }).startHidden).toBe(false);
+  });
+
+  it("defers maximize until first show when starting hidden", () => {
+    expect(
+      resolveLaunchVisibility({
+        argv: ["GuiZhi.exe", "--hidden"],
+        openedAtLogin: false,
+        minimizeOnLaunch: true,
+        shouldMaximize: true,
+      }),
+    ).toEqual({ startHidden: true, maximizeNow: false, maximizeOnFirstShow: true });
+    expect(
+      resolveLaunchVisibility({
+        argv: ["GuiZhi.exe"],
+        openedAtLogin: false,
+        minimizeOnLaunch: true,
+        shouldMaximize: true,
+      }),
+    ).toEqual({ startHidden: false, maximizeNow: true, maximizeOnFirstShow: false });
   });
 
   it("round-trips a valid state file", () => {
