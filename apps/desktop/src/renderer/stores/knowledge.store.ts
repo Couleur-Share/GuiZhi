@@ -15,6 +15,7 @@ import type {
   Tag,
   UpdateKnowledgeItemInput,
 } from "@guizhi/shared/types";
+import { translate } from "../i18n";
 import { runGuardedMutation } from "./operation-error.store";
 import { describeLoadError } from "./load-error";
 import { useSettingsStore } from "./settings.store";
@@ -525,7 +526,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       await runGuardedMutation(
         "library.actionBulkUpdate",
-        "批量更新",
+        translate("library.actionBulkUpdate", "批量更新"),
         async () => {
           await window.api.knowledge.bulkUpdate(ids, patch);
           await get().refreshAll();
@@ -697,7 +698,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       await runGuardedMutation(
         "library.actionSetTags",
-        "更新标签",
+        translate("library.actionSetTags", "更新标签"),
         async () => {
           const updated = await window.api.knowledge.update(id, { tagNames });
           if (!updated) {
@@ -721,7 +722,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       await runGuardedMutation(
         "library.actionSetStatus",
-        "更新状态",
+        translate("library.actionSetStatus", "更新状态"),
         async () => {
           await window.api.knowledge.setStatus(ids, status);
           const { selectedId } = get();
@@ -734,13 +735,13 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     },
 
     toggleFavorite: async (id) => {
-      await runGuardedMutation("library.actionSetFlag", "更新标记", () =>
+      await runGuardedMutation("library.actionSetFlag", translate("library.actionSetFlag", "更新标记"), () =>
         toggleFlag(id, "isFavorite"),
       );
     },
 
     togglePinned: async (id) => {
-      await runGuardedMutation("library.actionSetFlag", "更新标记", () =>
+      await runGuardedMutation("library.actionSetFlag", translate("library.actionSetFlag", "更新标记"), () =>
         toggleFlag(id, "isPinned"),
       );
     },
@@ -754,7 +755,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       return runGuardedMutation(
         "library.actionMoveToTrash",
-        "移到回收站",
+        translate("library.actionMoveToTrash", "移到回收站"),
         async () => {
           if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
           await window.api.knowledge.moveToTrash(ids);
@@ -773,7 +774,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       await runGuardedMutation(
         "library.actionRestore",
-        "恢复条目",
+        translate("library.actionRestore", "恢复条目"),
         async () => {
           await window.api.knowledge.restore(ids);
           if (ids.includes(get().selectedId ?? "")) {
@@ -791,7 +792,7 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
       }
       return runGuardedMutation(
         "library.actionDeleteForever",
-        "彻底删除",
+        translate("library.actionDeleteForever", "彻底删除"),
         async () => {
           if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
           await window.api.knowledge.deleteForever(ids, options);
@@ -806,12 +807,12 @@ export const useKnowledgeStore = create<KnowledgeState>()((set, get) => {
     emptyTrash: async (options) => {
       if (window.api.knowledge.selection) {
         const result = await window.api.knowledge.selection({ action: "freeze", query: { scope: "trash" } });
-        if (!result.ok || !result.ids) return runGuardedMutation("library.emptyTrash", "清空回收站", async () => { throw new Error(result.error || "读取回收站失败"); });
+        if (!result.ok || !result.ids) return runGuardedMutation("library.emptyTrash", translate("library.emptyTrash", "清空回收站"), async () => { throw new Error(result.error || "读取回收站失败"); });
         return get().deleteForever(result.ids, options);
       }
       return runGuardedMutation(
         "library.actionEmptyTrash",
-        "清空回收站",
+        translate("library.actionEmptyTrash", "清空回收站"),
         async () => {
           if (!(await get().flushPendingSave())) throw new Error(get().saveError || "请先保存草稿");
           await window.api.knowledge.emptyTrash(options);

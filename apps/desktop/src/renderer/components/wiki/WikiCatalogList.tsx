@@ -10,18 +10,18 @@ import {
 import { LoadErrorState } from "../ui/LoadErrorState";
 import { Spinner } from "../ui/Spinner";
 
-const KIND_LABEL_KEYS: Record<WikiPageKind, [string, string]> = {
-  topic: ["wiki.kindTopic", "主题"],
-  entity: ["wiki.kindEntity", "实体"],
-  concept: ["wiki.kindConcept", "概念"],
+const KIND_LABEL_KEYS: Record<WikiPageKind, { labelKey: string; fallback: string }> = {
+  topic: { labelKey: "wiki.kindTopic", fallback: "主题" },
+  entity: { labelKey: "wiki.kindEntity", fallback: "实体" },
+  concept: { labelKey: "wiki.kindConcept", fallback: "概念" },
 };
 
 export function WikiKindBadge({ kind }: { kind: WikiPageKind }) {
   const { t } = useTranslation();
-  const [key, fallback] = KIND_LABEL_KEYS[kind];
+  const { labelKey, fallback } = KIND_LABEL_KEYS[kind];
   return (
     <span className="inline-flex shrink-0 items-center rounded-full bg-muted/70 px-1.5 py-0.5 text-[10px] text-muted-foreground">
-      {t(key, fallback)}
+      {t(labelKey, fallback)}
     </span>
   );
 }

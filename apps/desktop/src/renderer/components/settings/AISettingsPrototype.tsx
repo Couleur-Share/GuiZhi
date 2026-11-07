@@ -40,6 +40,7 @@ import {
   getModelDisplayName,
   getEndpointDisplayName,
   getProviderInfo,
+  getProviderOptionLabel,
   inferModelAttributes,
 } from "./ai-workbench/helpers";
 import { ModelFetchModal } from "./ai-workbench/ModelFetchModal";
@@ -753,7 +754,7 @@ export function AISettingsPrototype() {
     setEndpointDraft({
       key: "",
       providerConfigId: undefined,
-      name: providerInfo?.name || EMPTY_FORM.provider,
+      name: getProviderOptionLabel(providerInfo) || EMPTY_FORM.provider,
       provider: EMPTY_FORM.provider,
       apiProtocol: providerInfo?.recommendedProtocol || EMPTY_FORM.apiProtocol,
       apiKey: "",
@@ -933,7 +934,7 @@ export function AISettingsPrototype() {
           className="inline-flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-primary/30 bg-primary/5 px-4 text-sm font-medium text-foreground"
         >
           <SparklesIcon className="h-4 w-4" aria-hidden="true" />
-          快速配置
+          {t("settings.quickSetupOpen", "快速配置")}
         </button>
         <button
           type="button"

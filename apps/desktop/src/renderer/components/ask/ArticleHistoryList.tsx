@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AskSessionMeta } from '@guizhi/shared/types';
 import { Button } from '../ui/Button';
 /** 本文历史独立分页，不改变侧栏全局会话的筛选条件。 */
 export function ArticleHistoryList({ itemId, onOpen }: { itemId: string; onOpen: (id: string) => Promise<void> }) {
+  const { t } = useTranslation();
   const [entries, setEntries] = useState<AskSessionMeta[]>([]), [query, setQuery] = useState('');
   const [cursor, setCursor] = useState<string | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false), [retry, setRetry] = useState(0);
   useEffect(() => {
@@ -22,11 +24,11 @@ export function ArticleHistoryList({ itemId, onOpen }: { itemId: string; onOpen:
     catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
   return <div className="max-h-56 shrink-0 overflow-auto border-b border-border p-2">
-    <input value={query} onChange={e => setQuery(e.target.value)} aria-label="搜索本文历史" placeholder="搜索问题、回答或标题" className="mb-2 w-full rounded border border-border bg-background px-2 py-1 text-xs" />
+    <input value={query} onChange={e => setQuery(e.target.value)} aria-label={t('articleAsk.historySearch', '搜索本文历史')} placeholder={t('articleAsk.historySearchPlaceholder', '搜索问题、回答或标题')} className="mb-2 w-full rounded border border-border bg-background px-2 py-1 text-xs" />
     {entries.map(s => <Button key={s.id} size="sm" variant="ghost" className="w-full justify-start truncate" disabled={busy} onClick={() => void onOpen(s.id)}>{s.title}</Button>)}
-    {!busy && !entries.length && !error && <p className="text-xs text-muted-foreground">暂无匹配的本文历史</p>}
-    {error && <p role="alert" className="text-xs text-destructive">{error}<Button size="sm" variant="ghost" onClick={() => setRetry(n => n+1)}>重试</Button></p>}
-    {cursor && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void more()}>加载更多</Button>}
-    {busy && <p role="status" className="text-xs">加载中…</p>}
+    {!busy && !entries.length && !error && <p className="text-xs text-muted-foreground">{t('articleAsk.historyNoMatch', '暂无匹配的本文历史')}</p>}
+    {error && <p role="alert" className="text-xs text-destructive">{error}<Button size="sm" variant="ghost" onClick={() => setRetry(n => n+1)}>{t('common.retry', '重试')}</Button></p>}
+    {cursor && <Button size="sm" variant="secondary" disabled={busy} onClick={() => void more()}>{t('imports.loadMore', '加载更多')}</Button>}
+    {busy && <p role="status" className="text-xs">{t('common.loading', '加载中…')}</p>}
   </div>;
 }

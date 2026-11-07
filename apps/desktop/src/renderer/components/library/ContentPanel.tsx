@@ -564,7 +564,9 @@ export function ContentPanel({
                   setFindMatchCount(0);
                 }}
               >
-                {snapshotView ? "返回阅读" : "网页快照"}
+                {snapshotView
+                  ? t("library.backToReading", "返回阅读")
+                  : t("articleAsk.view.snapshot", "网页快照")}
               </TabButton>
             ) : null}
             {isWechatPreview && !themed.active ? (
@@ -976,10 +978,10 @@ function filterIncludesFloor(
   return filterForumReplies([reply], query).length > 0;
 }
 
-const STAGE_LABELS: Record<TranscribeStage, { key: string; text: string }> = {
-  transcribing: { key: "library.stageTranscribing", text: "正在转写" },
-  formatting: { key: "library.stageFormatting", text: "正在排版文字稿" },
-  summarizing: { key: "library.stageSummarizing", text: "正在生成总结" },
+const STAGE_LABELS: Record<TranscribeStage, { labelKey: string; fallback: string }> = {
+  transcribing: { labelKey: "library.stageTranscribing", fallback: "正在转写" },
+  formatting: { labelKey: "library.stageFormatting", fallback: "正在排版文字稿" },
+  summarizing: { labelKey: "library.stageSummarizing", fallback: "正在生成总结" },
 };
 
 function transcribeStatusText(
@@ -990,7 +992,7 @@ function transcribeStatusText(
     return t("library.transcribeRunning", "正在转写（可能需要几分钟）…");
   }
   const label = STAGE_LABELS[progress.stage] ?? STAGE_LABELS.transcribing;
-  const stage = t(label.key, label.text);
+  const stage = t(label.labelKey, label.fallback);
   const elapsed = formatClock(progress.elapsedMs);
   if (progress.stalledMs !== undefined && progress.stalledMs >= 60_000) {
     return t(

@@ -16,7 +16,8 @@ import type {
 export const PROVIDER_OPTIONS: ProviderOption[] = [
   {
     id: "custom",
-    name: "自定义",
+    labelKey: "settings.aiProviderCustom",
+    fallback: "自定义",
     defaultUrl: "",
     recommendedProtocol: "openai",
     allowsCustomProtocol: true,
@@ -24,7 +25,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "openai",
-    name: "OpenAI",
+    fallback: "OpenAI",
     defaultUrl: "https://api.openai.com",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -32,7 +33,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "openai-responses",
-    name: "OpenAI-Response",
+    fallback: "OpenAI-Response",
     defaultUrl: "https://api.openai.com",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -40,7 +41,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "google",
-    name: "Gemini",
+    fallback: "Gemini",
     defaultUrl: "https://generativelanguage.googleapis.com",
     recommendedProtocol: "gemini",
     allowsCustomProtocol: false,
@@ -48,7 +49,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "anthropic",
-    name: "Anthropic",
+    fallback: "Anthropic",
     defaultUrl: "https://api.anthropic.com",
     recommendedProtocol: "anthropic",
     allowsCustomProtocol: false,
@@ -56,7 +57,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "azure-openai",
-    name: "Azure OpenAI",
+    fallback: "Azure OpenAI",
     defaultUrl: "",
     recommendedProtocol: "openai",
     allowsCustomProtocol: true,
@@ -64,7 +65,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "new-api",
-    name: "New API",
+    fallback: "New API",
     defaultUrl: "",
     recommendedProtocol: "openai",
     allowsCustomProtocol: true,
@@ -72,7 +73,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "ollama",
-    name: "Ollama",
+    fallback: "Ollama",
     defaultUrl: "http://localhost:11434/v1",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -80,7 +81,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "xai",
-    name: "xAI",
+    fallback: "xAI",
     defaultUrl: "https://api.x.ai",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -88,7 +89,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "deepseek",
-    name: "DeepSeek",
+    fallback: "DeepSeek",
     defaultUrl: "https://api.deepseek.com",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -96,7 +97,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "moonshot",
-    name: "Moonshot",
+    fallback: "Moonshot",
     defaultUrl: "https://api.moonshot.cn",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -104,7 +105,8 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "zhipu",
-    name: "智谱 AI",
+    labelKey: "settings.aiProviderZhipu",
+    fallback: "智谱 AI",
     defaultUrl: "https://open.bigmodel.cn/api/paas",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -112,7 +114,8 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "qwen",
-    name: "通义千问",
+    labelKey: "settings.aiProviderQwen",
+    fallback: "通义千问",
     defaultUrl: "https://dashscope.aliyuncs.com/compatible-mode",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,
@@ -120,7 +123,8 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   },
   {
     id: "doubao",
-    name: "豆包",
+    labelKey: "settings.aiProviderDoubao",
+    fallback: "豆包",
     defaultUrl: "https://ark.cn-beijing.volces.com/api",
     recommendedProtocol: "openai",
     allowsCustomProtocol: false,

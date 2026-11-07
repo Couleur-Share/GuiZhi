@@ -55,7 +55,7 @@ export function ItemDetail({ onClose }: { onClose?: () => void }) {
   }, [flushPendingSave]);
 
   if (detailError) return <LoadErrorState message={detailError} onRetry={() => void useKnowledgeStore.getState().selectItem(selectedId)} />;
-  if (detailLoading) return <div role="status" className="p-6 text-sm text-muted-foreground">正在加载条目…</div>;
+  if (detailLoading) return <div role="status" className="p-6 text-sm text-muted-foreground">{t("library.loadingItem", "正在加载条目…")}</div>;
   if (!item || item.id !== selectedId) {
     return (
       <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted-foreground">

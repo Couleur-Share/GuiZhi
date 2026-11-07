@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BookmarkPlusIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../ui/Modal";
 import { Input } from "../ui/Input";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
@@ -13,6 +14,7 @@ import { LibrarySidebarRow } from "./LibrarySidebarRow";
 
 /** 本机保存的智能视图。它们只记录结构化筛选，不保存转瞬即逝的搜索关键词。 */
 export function SmartViewsSection() {
+  const { t } = useTranslation();
   const [views, setViews] = useState<SavedLibraryView[]>(readSavedLibraryViews);
   const [isCreating, setCreating] = useState(false);
   const [name, setName] = useState("");
@@ -47,14 +49,14 @@ export function SmartViewsSection() {
     <>
       <div className="mb-1 mt-4 flex items-center justify-between gap-2 px-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/80">
-          智能视图
+          {t("library.smartViews", "智能视图")}
         </span>
         <button
           type="button"
           onClick={() => setCreating(true)}
           className="rounded-lg p-1 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-primary"
-          aria-label="保存当前筛选为智能视图"
-          title="保存当前筛选为智能视图"
+          aria-label={t("library.smartViewSaveCurrent", "保存当前筛选为智能视图")}
+          title={t("library.smartViewSaveCurrent", "保存当前筛选为智能视图")}
         >
           <BookmarkPlusIcon className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
@@ -75,13 +77,13 @@ export function SmartViewsSection() {
             event.preventDefault();
             remove(view.id);
           }}
-          moreLabel="删除智能视图"
+          moreLabel={t("library.smartViewDelete", "删除智能视图")}
         />
       ))}
       <Modal
         isOpen={isCreating}
         onClose={() => setCreating(false)}
-        title="保存智能视图"
+        title={t("library.smartViewSaveTitle", "保存智能视图")}
         size="sm"
       >
         <form
@@ -95,11 +97,11 @@ export function SmartViewsSection() {
             autoFocus
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="例如：工作库的收藏视频"
+            placeholder={t("library.smartViewNamePlaceholder", "例如：工作库的收藏视频")}
           />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setCreating(false)} className="h-9 rounded-lg border border-border px-3 text-sm hover:bg-muted/60">取消</button>
-            <button type="submit" disabled={!name.trim()} className="h-9 rounded-lg bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50">保存</button>
+            <button type="button" onClick={() => setCreating(false)} className="h-9 rounded-lg border border-border px-3 text-sm hover:bg-muted/60">{t("common.cancel", "取消")}</button>
+            <button type="submit" disabled={!name.trim()} className="h-9 rounded-lg bg-primary px-3 text-sm text-primary-foreground disabled:opacity-50">{t("common.save", "保存")}</button>
           </div>
         </form>
       </Modal>

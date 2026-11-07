@@ -282,7 +282,7 @@ export function ItemConfirmDialog({
                 "library.deleteForeverConfirm",
                 "该条目将被永久删除，无法恢复。",
               )
-      }</p><p>历史回答默认保留当时的引用片段。以下选项仅清除相关证据与链接，回答文本保持原样。</p><Checkbox checked={clearEvidence} onChange={setClearEvidence} label="同时清除历史问答中的相关证据" disabled={busy} /></div>}
+      }</p><p>{t("library.deleteEvidenceHint", "历史回答默认保留当时的引用片段。以下选项仅清除相关证据与链接，回答文本保持原样。")}</p><Checkbox checked={clearEvidence} onChange={setClearEvidence} label={t("library.deleteEvidenceClear", "同时清除历史问答中的相关证据")} disabled={busy} /></div>}
       confirmText={t("common.confirm", "确认")}
       cancelText={t("common.cancel", "取消")}
       variant="destructive"

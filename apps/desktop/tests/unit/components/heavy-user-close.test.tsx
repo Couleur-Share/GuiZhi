@@ -1,10 +1,12 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { changeLanguage, i18nReady } from '../../../src/renderer/i18n';
 import { SaveBeforeClose } from '../../../src/renderer/components/app/SaveBeforeClose';
 import { useKnowledgeStore } from '../../../src/renderer/stores/knowledge.store';
 import { useAskStore } from '../../../src/renderer/stores/ask.store';
 import { useArticleAskStore } from '../../../src/renderer/stores/article-ask.store';
 
+beforeAll(async () => { await i18nReady; await changeLanguage('zh'); });
 beforeEach(() => {
   cleanup();
   useKnowledgeStore.setState({ hasUnsavedChanges: true, isSaving: false, saveError: '磁盘已满', flushPendingSave: vi.fn(async () => false) });

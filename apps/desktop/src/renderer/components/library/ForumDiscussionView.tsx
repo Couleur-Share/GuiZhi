@@ -175,6 +175,7 @@ function ReplyCard({
   cardRef: (node: HTMLLIElement | null) => void;
   onReplyToClick?: (replyTo: NonNullable<ForumReplyEntry["replyTo"]>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <li
       ref={cardRef}
@@ -187,10 +188,10 @@ function ReplyCard({
     >
       <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[12px]">
         <span className="font-semibold text-foreground">
-          {highlightText(`${reply.floor} 楼`, query)}
+          {highlightText(t("library.forumFloor", "{{floor}} 楼", { floor: reply.floor }), query)}
         </span>
         <span className="text-muted-foreground">
-          {highlightText(reply.author || "匿名", query)}
+          {highlightText(reply.author || t("library.forumAnonymous", "匿名"), query)}
         </span>
       </div>
       {reply.replyTo ? (
@@ -202,18 +203,18 @@ function ReplyCard({
                 onClick={() => onReplyToClick(reply.replyTo!)}
                 className="text-left text-primary underline-offset-2 hover:underline"
               >
-                回复 @
+                {t("library.forumReplyTo", "回复 @")}
                 {highlightText(reply.replyTo.author, query)}
                 {reply.replyTo.floor != null
-                  ? highlightText(`（${reply.replyTo.floor} 楼）`, query)
+                  ? highlightText(t("library.forumReplyToFloor", "（{{floor}} 楼）", { floor: reply.replyTo.floor }), query)
                   : ""}
               </button>
             ) : (
               <>
-                回复 @
+                {t("library.forumReplyTo", "回复 @")}
                 {highlightText(reply.replyTo.author, query)}
                 {reply.replyTo.floor != null
-                  ? highlightText(`（${reply.replyTo.floor} 楼）`, query)
+                  ? highlightText(t("library.forumReplyToFloor", "（{{floor}} 楼）", { floor: reply.replyTo.floor }), query)
                   : ""}
               </>
             )}

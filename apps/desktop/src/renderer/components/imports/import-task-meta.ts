@@ -191,13 +191,13 @@ export function needsCaptureToolSetup(
 /** 与 i18n `imports.parseError.*` 对齐的中文兜底（测试 / 缺 key 时用） */
 export const PLATFORM_PARSE_ERROR_LABELS: Record<
   PlatformParseErrorCode,
-  string
+  { key: string; fallback: string }
 > = {
-  structure_missing: "平台页面结构可能已变更",
-  note_unavailable: "内容不可用或已删除",
-  token_invalid: "链接缺少访问令牌，请用分享面板复制完整链接",
-  guest_denied: "需要登录后才能查看，暂不支持",
-  network: "网络或站点暂时不可达",
+  structure_missing: { key: "imports.parseError.structure_missing", fallback: "平台页面结构可能已变更" },
+  note_unavailable: { key: "imports.parseError.note_unavailable", fallback: "内容不可用或已删除" },
+  token_invalid: { key: "imports.parseError.token_invalid", fallback: "链接缺少访问令牌，请用分享面板复制完整链接" },
+  guest_denied: { key: "imports.parseError.guest_denied", fallback: "需要登录后才能查看，暂不支持" },
+  network: { key: "imports.parseError.network", fallback: "网络或站点暂时不可达" },
 };
 
 type ErrorTranslate = (
@@ -230,8 +230,8 @@ export function formatImportTaskError(
     return error;
   }
   const label = t(
-    `imports.parseError.${code}`,
-    PLATFORM_PARSE_ERROR_LABELS[code],
+    PLATFORM_PARSE_ERROR_LABELS[code].key,
+    PLATFORM_PARSE_ERROR_LABELS[code].fallback,
   );
   if (!body || body === error) {
     return label;
@@ -271,7 +271,7 @@ export function formatImportTaskWarning(
   if (!warning) {
     return "";
   }
-  if (!warning.startsWith("文字稿生成失败：")) {
+  if (!/^文字稿生成失败：/.test(warning)) {
     return warning;
   }
   if (/HTTP\s*403/.test(warning)) {

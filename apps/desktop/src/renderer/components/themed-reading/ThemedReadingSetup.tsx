@@ -79,11 +79,11 @@ export function ThemedReadingSetup({
           <Select
             value={action}
             onChange={(v) => setAction(v as ThemedReadingOptions["action"])}
-            ariaLabel="调整方式"
+            ariaLabel={t("themedReading.readerAdjustMode", "调整方式")}
             options={[
-              { value: "redesign", label: "仅调整设计" },
-              { value: "revise", label: "调整内容与设计" },
-              { value: "refresh", label: "按最新原文重做" },
+              { value: "redesign", label: t("themedReading.readerAdjustDesign", "仅调整设计") },
+              { value: "revise", label: t("themedReading.readerAdjustContent", "调整内容与设计") },
+              { value: "refresh", label: t("themedReading.readerAdjustRefresh", "按最新原文重做") },
             ]}
           />
         ) : null}
@@ -116,10 +116,10 @@ export function ThemedReadingSetup({
                 )}
               </p>
             ) : null}
-            {research ? <Select value={researchDepth} onChange={v => setResearchDepth(v as "standard" | "deep")} ariaLabel="查证深度" options={[{value:"standard",label:"标准查证"},{value:"deep",label:"深度查证"}]} /> : null}
+            {research ? <Select value={researchDepth} onChange={v => setResearchDepth(v as "standard" | "deep")} ariaLabel={t("themedReading.readerResearchDepth", "查证深度")} options={[{value:"standard",label:t("themedReading.readerResearchStandard", "标准查证")},{value:"deep",label:t("themedReading.readerResearchDeep", "深度查证")}]} /> : null}
           </div>
         ) : null}
-        <Checkbox checked={enhancedInteraction} onChange={setEnhancedInteraction} label="增强交互" />
+        <Checkbox checked={enhancedInteraction} onChange={setEnhancedInteraction} label={t("themedReading.readerEnhancedInteraction", "增强交互")} />
         <label className="block space-y-2 text-sm">
           <span>{t("themedReading.style", "设计要求（可选）")}</span>
           <textarea

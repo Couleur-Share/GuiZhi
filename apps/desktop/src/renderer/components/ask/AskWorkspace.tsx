@@ -147,7 +147,7 @@ export function AskWorkspace() {
           onScroll={handleScroll}
           className="h-full overflow-y-auto px-5 py-4"
         >
-          {saveError ? <div role="alert" className="p-3 text-sm text-destructive">回答尚未保存：{saveError} <button onClick={() => void useAskStore.getState().persist()}>重试保存</button></div> : null}
+          {saveError ? <div role="alert" className="p-3 text-sm text-destructive">{t("ask.answerNotSaved", "回答尚未保存：{{message}}", { message: saveError })} <button onClick={() => void useAskStore.getState().persist()}>{t("articleAsk.retrySave", "重试保存")}</button></div> : null}
           {!hasLoaded ? (
             // 上次会话读出来之前不画空态：有历史记录的用户否则会先看到一整屏
             // 引导，再被消息列表整块换掉

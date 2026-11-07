@@ -9,7 +9,9 @@ import type {
 
 export type ProviderOption = {
   id: string;
-  name: string;
+  /** 只有需要翻译的名称才有；品牌名直接显示 fallback */
+  labelKey?: string;
+  fallback: string;
   defaultUrl: string;
   recommendedProtocol: AIProtocol;
   allowsCustomProtocol: boolean;

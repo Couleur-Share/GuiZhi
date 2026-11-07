@@ -1,0 +1,18 @@
+{
+  "apps/desktop/src/renderer/components/app/GlobalCommandPalette.tsx": 6,
+  "apps/desktop/src/renderer/components/imports/PlatformDiscoveryPanel.tsx": 2,
+  "apps/desktop/src/renderer/components/imports/SavedDiscoveryViewsPanel.tsx": 35,
+  "apps/desktop/src/renderer/components/library/AiOcrCard.tsx": 1,
+  "apps/desktop/src/renderer/components/research/research-presentation.ts": 28,
+  "apps/desktop/src/renderer/components/research/ResearchEvidencePanel.tsx": 2,
+  "apps/desktop/src/renderer/components/research/ResearchProgress.tsx": 14,
+  "apps/desktop/src/renderer/components/research/ResearchSourceTabs.tsx": 4,
+  "apps/desktop/src/renderer/components/research/ResearchWorkspace.tsx": 61,
+  "apps/desktop/src/renderer/components/settings/GeneralSettings.tsx": 1,
+  "apps/desktop/src/renderer/components/settings/MobileCapturePairing.tsx": 22,
+  "apps/desktop/src/renderer/components/settings/MobileCaptureSettings.tsx": 43,
+  "apps/desktop/src/renderer/components/settings/ReadingSyncSettings.tsx": 35,
+  "apps/desktop/src/renderer/components/settings/useMobileCaptureSettings.ts": 2,
+  "apps/desktop/src/renderer/components/ui/ErrorBoundary.tsx": 3,
+  "apps/desktop/src/renderer/stores/research.store.ts": 1
+}

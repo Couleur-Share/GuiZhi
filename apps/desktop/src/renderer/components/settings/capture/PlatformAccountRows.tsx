@@ -10,11 +10,11 @@ import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { useToast } from "../../ui/Toast";
 import { SettingItem } from "../shared";
 
-const NAMES: Record<PlatformCapturePlatform, string> = {
-  xiaohongshu: "小红书",
-  douyin: "抖音",
-  linuxdo: "LINUX DO",
-  nodeseek: "NodeSeek",
+const NAMES: Record<PlatformCapturePlatform, { labelKey: string; fallback: string }> = {
+  xiaohongshu: { labelKey: "settings.platform.xiaohongshu", fallback: "小红书" },
+  douyin: { labelKey: "settings.platform.douyin", fallback: "抖音" },
+  linuxdo: { labelKey: "settings.platform.linuxdo", fallback: "LINUX DO" },
+  nodeseek: { labelKey: "settings.platform.nodeseek", fallback: "NodeSeek" },
 };
 
 export function PlatformAccountRows() {
@@ -23,15 +23,17 @@ export function PlatformAccountRows() {
   const [statuses, setStatuses] = useState<PlatformSessionStatus[]>([]);
   const [active, setActive] = useState<PlatformCapturePlatform | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const platformName = (platform: PlatformCapturePlatform) =>
+    t(NAMES[platform].labelKey, NAMES[platform].fallback);
 
   const refresh = useCallback(async () => {
     if (!window.api.platformCapture) return;
     try {
       setStatuses(await window.api.platformCapture.getStatuses());
     } catch (error) {
-      reportOperationError("settings.platformCaptureStatus", "读取平台登录状态", error);
+      reportOperationError("settings.platformCaptureStatus", t("settings.platformCaptureStatus", "读取平台登录状态"), error);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void refresh();
@@ -47,13 +49,13 @@ export function PlatformAccountRows() {
       if (status.loggedIn) {
         showToast(
           t("settings.platformLoginSuccess", "{{platform}}登录成功", {
-            platform: NAMES[platform],
+            platform: platformName(platform),
           }),
           "success",
         );
       }
     } catch (error) {
-      reportOperationError("settings.platformCaptureLogin", `登录${NAMES[platform]}`, error);
+      reportOperationError("settings.platformCaptureLogin", t("settings.platformLoginAction", "登录{{platform}}", { platform: platformName(platform) }), error);
     } finally {
       setActive(null);
       await refresh();
@@ -65,7 +67,7 @@ export function PlatformAccountRows() {
     try {
       await window.api.platformCapture.logout(platform);
     } catch (error) {
-      reportOperationError("settings.platformCaptureLogout", `退出${NAMES[platform]}`, error);
+      reportOperationError("settings.platformCaptureLogout", t("settings.platformLogoutAction", "退出{{platform}}", { platform: platformName(platform) }), error);
     } finally {
       setActive(null);
       await refresh();
@@ -87,7 +89,7 @@ export function PlatformAccountRows() {
     } catch (error) {
       reportOperationError(
         "settings.platformClearData",
-        "清除平台登录数据",
+        t("settings.platformClearData", "清除平台登录数据"),
         error,
       );
     }
@@ -121,7 +123,7 @@ export function PlatformAccountRows() {
         return (
           <SettingItem
             key={platform}
-            label={t(`settings.platform.${platform}`, NAMES[platform])}
+            label={platformName(platform)}
             description={description}
           >
             <div className="flex shrink-0 items-center gap-2">

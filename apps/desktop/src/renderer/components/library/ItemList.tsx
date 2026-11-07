@@ -185,7 +185,7 @@ export function ItemList() {
       )}
 
       <LibraryBatchResults />
-      <div className="flex px-2"><Button size="sm" variant="ghost" onClick={() => useKnowledgeStore.getState().setSelection([...new Set([...selectionIds,...entries.map(e => e.id)])])}>本页</Button><Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>全部符合筛选</Button></div>
+      <div className="flex px-2"><Button size="sm" variant="ghost" onClick={() => useKnowledgeStore.getState().setSelection([...new Set([...selectionIds,...entries.map(e => e.id)])])}>{t("library.selectPage", "本页")}</Button><Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>{t("library.selectAllMatching", "全部符合筛选")}</Button></div>
       <div
         ref={scrollRef}
         data-testid="item-list"

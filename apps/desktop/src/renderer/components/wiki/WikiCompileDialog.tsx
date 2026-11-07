@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { WikiCompileJob, WikiCompilePreview } from '@guizhi/shared/types/wiki-compiler';
 import { wikiPreview, wikiModelIdentity, runWikiJob, controlWikiJob } from '../../services/knowledge-ai/wiki-v2';
 import { useWikiStore } from '../../stores/wiki.store';
@@ -6,8 +7,13 @@ import { Modal } from '../ui/Modal';
 import { Checkbox } from '../ui/Checkbox';
 import { Button } from '../ui/Button';
 
-const statusLabel = { running: '编译中', paused: '已暂停', cancelled: '已取消', interrupted: '上次中断', failed: '部分失败', completed: '全文完成' };
+const statusLabel = {
+  running: { labelKey: 'wiki.compileStatusRunning', fallback: '编译中' }, paused: { labelKey: 'wiki.compileStatusPaused', fallback: '已暂停' },
+  cancelled: { labelKey: 'wiki.compileStatusCancelled', fallback: '已取消' }, interrupted: { labelKey: 'wiki.compileStatusInterrupted', fallback: '上次中断' },
+  failed: { labelKey: 'wiki.compileStatusFailed', fallback: '部分失败' }, completed: { labelKey: 'wiki.compileStatusCompleted', fallback: '全文完成' },
+};
 export function WikiCompileDialog() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [preview, setPreview] = useState<WikiCompilePreview | null>(null), [selected, setSelected] = useState<string[]>([]);
   const [jobs, setJobs] = useState<WikiCompileJob[]>([]), [filter, setFilter] = useState(''), [limit, setLimit] = useState(50);
@@ -48,28 +54,28 @@ export function WikiCompileDialog() {
   const chosen = preview?.entries.filter(e => selected.includes(e.id)) ?? [];
   const requests = chosen.reduce((count, e) => count + e.blocks - e.reusable, 0);
   const visible = preview?.entries.filter(e => e.state !== 'current' && e.title.toLowerCase().includes(filter.toLowerCase())) ?? [];
-  return <Modal isOpen={open} onClose={() => setOpen(false)} title="全文编译与历史升级" size="xl">
+  return <Modal isOpen={open} onClose={() => setOpen(false)} title={t('wiki.compileDialog', '全文编译与历史升级')} size="xl">
     <div className="space-y-4 text-sm">
-      <p>历史 Wiki 保持可读。请选择本批资料，确认范围后才调用模型；默认选择 10 条。</p>
+      <p>{t('wiki.compileIntro', '历史 Wiki 保持可读。请选择本批资料，确认范围后才调用模型；默认选择 10 条。')}</p>
       {error ? <p role="alert" className="whitespace-pre-wrap text-destructive">{error}</p> : null}
       {preview ? <>
-        <p>可执行 {preview.counts.ready} · 需复核 {preview.counts.review} · 等待重试/继续 {preview.counts.waiting} · 待选择升级 {preview.counts.upgrade}</p>
-        {!wikiModelIdentity() ? <p>尚未配置 Wiki 模型，请先在 AI 设置中完成配置。</p> : null}
-        <input className="w-full rounded border border-border bg-background px-3 py-2" aria-label="筛选编译资料" placeholder="按标题筛选资料" value={filter} onChange={e => { setFilter(e.target.value); setLimit(50); }} />
+        <p>{t('wiki.compileCounts', '可执行 {{ready}} · 需复核 {{review}} · 等待重试/继续 {{waiting}} · 待选择升级 {{upgrade}}', { ready: preview.counts.ready, review: preview.counts.review, waiting: preview.counts.waiting, upgrade: preview.counts.upgrade })}</p>
+        {!wikiModelIdentity() ? <p>{t('wiki.compileNoModel', '尚未配置 Wiki 模型，请先在 AI 设置中完成配置。')}</p> : null}
+        <input className="w-full rounded border border-border bg-background px-3 py-2" aria-label={t('wiki.compileFilter', '筛选编译资料')} placeholder={t('wiki.compileFilterPlaceholder', '按标题筛选资料')} value={filter} onChange={e => { setFilter(e.target.value); setLimit(50); }} />
         <div className="max-h-60 space-y-2 overflow-auto rounded border border-border p-3">
           {visible.slice(0, limit).map(entry => <div key={entry.id}>
-            <Checkbox checked={selected.includes(entry.id)} onChange={checked => setSelected(ids => checked ? [...ids, entry.id] : ids.filter(id => id !== entry.id))} disabled={busy || !['ready','upgrade'].includes(entry.state)} label={`${entry.title || '无标题'} · ${entry.blocks} 块${entry.reusable ? `（复用 ${entry.reusable} 块）` : ''}`} />
+            <Checkbox checked={selected.includes(entry.id)} onChange={checked => setSelected(ids => checked ? [...ids, entry.id] : ids.filter(id => id !== entry.id))} disabled={busy || !['ready','upgrade'].includes(entry.state)} label={`${entry.title || t('library.untitled', '无标题')} · ${t('wiki.compileEntryBlocks', '{{count}} 块', { count: entry.blocks })}${entry.reusable ? t('wiki.compileEntryReusable', '（复用 {{count}} 块）', { count: entry.reusable }) : ''}`} />
             {entry.reason ? <p className="ml-6 text-xs text-muted-foreground">{entry.reason}</p> : null}
           </div>)}
-          {visible.length > limit ? <Button variant="ghost" onClick={() => setLimit(limit + 50)}>显示更多资料</Button> : null}
+          {visible.length > limit ? <Button variant="ghost" onClick={() => setLimit(limit + 50)}>{t('wiki.compileShowMore', '显示更多资料')}</Button> : null}
         </div>
-        <p>本批 {chosen.length} 条 · {chosen.reduce((count, e) => count + e.blocks, 0)} 块 · 预计 {requests}–{requests * 2} 次模型调用（含至多一次格式纠错）。</p>
-        <Button disabled={busy || !chosen.length || !wikiModelIdentity()} onClick={() => void start()}>开始所选资料</Button>
-      </> : <p role="status">正在计算编译范围…</p>}
-      {jobs.length ? <section className="space-y-3 border-t border-border pt-3"><p className="font-medium">编译任务</p>{jobs.slice(0, 10).map(job => <div key={job.id} className="space-y-2 rounded border border-border p-3">
-        <p>{statusLabel[job.status]} · 已完成 {job.completed}/{job.total} 块{job.failed ? ` · 失败 ${job.failed} 块` : ''}</p>
+        <p>{t('wiki.compileEstimate', '本批 {{items}} 条 · {{blocks}} 块 · 预计 {{min}}–{{max}} 次模型调用（含至多一次格式纠错）。', { items: chosen.length, blocks: chosen.reduce((count, e) => count + e.blocks, 0), min: requests, max: requests * 2 })}</p>
+        <Button disabled={busy || !chosen.length || !wikiModelIdentity()} onClick={() => void start()}>{t('wiki.compileStart', '开始所选资料')}</Button>
+      </> : <p role="status">{t('wiki.compilePreparing', '正在计算编译范围…')}</p>}
+      {jobs.length ? <section className="space-y-3 border-t border-border pt-3"><p className="font-medium">{t('wiki.compileJobs', '编译任务')}</p>{jobs.slice(0, 10).map(job => <div key={job.id} className="space-y-2 rounded border border-border p-3">
+        <p>{t(statusLabel[job.status].labelKey, statusLabel[job.status].fallback)} · {t('wiki.compileJobProgress', '已完成 {{completed}}/{{total}} 块', { completed: job.completed, total: job.total })}{job.failed ? ` · ${t('wiki.compileJobFailed', '失败 {{count}} 块', { count: job.failed })}` : ''}</p>
         {job.error ? <p className="text-destructive">{job.error}</p> : null}
-        {job.status === 'running' ? <div className="flex gap-2"><Button variant="secondary" onClick={() => void control(job, 'paused')}>暂停后续请求</Button><Button variant="ghost" onClick={() => void control(job, 'cancelled')}>取消任务</Button></div> : job.status !== 'completed' ? <Button variant="secondary" disabled={busy} onClick={() => void control(job, 'running')}>继续未完成分块</Button> : null}
+        {job.status === 'running' ? <div className="flex gap-2"><Button variant="secondary" onClick={() => void control(job, 'paused')}>{t('wiki.compilePause', '暂停后续请求')}</Button><Button variant="ghost" onClick={() => void control(job, 'cancelled')}>{t('wiki.compileCancel', '取消任务')}</Button></div> : job.status !== 'completed' ? <Button variant="secondary" disabled={busy} onClick={() => void control(job, 'running')}>{t('wiki.compileResume', '继续未完成分块')}</Button> : null}
       </div>)}</section> : null}
     </div>
   </Modal>;

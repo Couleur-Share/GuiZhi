@@ -167,8 +167,8 @@ export function ItemTableView() {
         className="min-h-0 flex-1 overflow-auto px-4 py-3"
       >
         <div className="mb-2 flex items-center justify-end gap-2">
-          <Button size="sm" variant="ghost" onClick={togglePageSelection}>本页</Button>
-          <Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>全部符合筛选</Button>
+          <Button size="sm" variant="ghost" onClick={togglePageSelection}>{t("library.selectPage", "本页")}</Button>
+          <Button size="sm" variant="ghost" onClick={() => void useLibraryWorkflowStore.getState().selectAllMatching()}>{t("library.selectAllMatching", "全部符合筛选")}</Button>
           <ColumnConfigMenu
             columns={columns}
             onToggle={toggleColumn}

@@ -315,7 +315,7 @@ export function ItemTableRow({
                       aria-hidden="true"
                     />
                   </RowAction>
-                  <button type="button" aria-label="更多操作" className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent" onClick={event => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); onContextMenu({ preventDefault() {}, clientX: rect.left, clientY: rect.bottom } as React.MouseEvent); }}><MoreHorizontalIcon className="h-4 w-4" /></button>
+                  <button type="button" aria-label={t("library.moreActions", "更多操作")} className="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent" onClick={event => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); onContextMenu({ preventDefault() {}, clientX: rect.left, clientY: rect.bottom } as React.MouseEvent); }}><MoreHorizontalIcon className="h-4 w-4" /></button>
                 </>
               )}
             </div>

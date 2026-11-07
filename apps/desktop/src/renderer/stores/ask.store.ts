@@ -1,4 +1,5 @@
 import { onConversationEvidenceCleared, sanitizeCachedMessages, sanitizeCachedTarget } from "./conversation-evidence";
+import { translate } from "../i18n";
 import { runGuardedMutation } from "./operation-error.store";
 import { queueConversationSave } from "./conversation-persistence";
 import { useArticleAskStore } from "./article-ask.store";
@@ -122,7 +123,7 @@ function parseStoredMessages(messagesJson: string): AskMessage[] {
       steps: Array.isArray(message.steps) ? message.steps : [],
       status: message.status === "done" ? "done" : "error",
       ...(message.status === "running"
-        ? { error: "会话在完成前被中断", errorKind: "generic" as const }
+        ? { error: translate("ask.sessionInterrupted", "会话在完成前被中断"), errorKind: "generic" as const }
         : {
             error: message.error,
             errorKind: message.errorKind,
@@ -137,7 +138,7 @@ function parseStoredMessages(messagesJson: string): AskMessage[] {
 
 function buildSessionTitle(messages: AskMessage[]): string {
   const firstQuestion = messages[0]?.question?.trim() ?? "";
-  return firstQuestion.slice(0, SESSION_TITLE_MAX_LENGTH) || "新对话";
+  return firstQuestion.slice(0, SESSION_TITLE_MAX_LENGTH) || translate("ask.untitledSession", "新对话");
 }
 
 export const useAskStore = create<AskState>()((set, get) => {
@@ -278,7 +279,7 @@ export const useAskStore = create<AskState>()((set, get) => {
       const article = useArticleAskStore.getState();
       if (article.sessionId === id) { article.stop(); if (!(await article.persist())) return; }
       if (get().activeSessionId === id) { get().stop(); if (!(await persistActiveSession())) return; }
-      const ok = await queueConversationSave(id, () => runGuardedMutation('ask.delete', '删除会话', async () => { await window.api.askSession.delete(id); }));
+      const ok = await queueConversationSave(id, () => runGuardedMutation('ask.delete', translate('ask.deleteSession', '删除会话'), async () => { await window.api.askSession.delete(id); }));
       if (!ok) return;
       if (useArticleAskStore.getState().sessionId === id) useArticleAskStore.setState({ sessionId: null, itemId: null, messages: [] });
       set(state => ({ sessions: state.sessions.filter(session => session.id !== id) }));
@@ -362,7 +363,7 @@ export const useAskStore = create<AskState>()((set, get) => {
         });
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
-          patchMessage({ status: "error", error: "已停止", errorKind: "generic" });
+          patchMessage({ status: "error", error: translate("ask.stopped", "已停止"), errorKind: "generic" });
         } else if (error instanceof AiNotConfiguredError) {
           patchMessage({ status: "error", errorKind: "not-configured" });
         } else if (error instanceof QaNoSourceError) {
@@ -412,7 +413,7 @@ export const useAskStore = create<AskState>()((set, get) => {
       const active = abortController;
       if (!active) return;
       abortController = null; active.abort();
-      set(state => ({ isRunning: false, messages: state.messages.map(m => m.status === "running" ? { ...m, status: "error", error: "已停止", errorKind: "generic" } : m) }));
+      set(state => ({ isRunning: false, messages: state.messages.map(m => m.status === "running" ? { ...m, status: "error", error: translate("ask.stopped", "已停止"), errorKind: "generic" } : m) }));
       void persistActiveSession();
     },
   };

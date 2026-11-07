@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import type { ThemedReadingVersion } from "@guizhi/shared/types/themed-reading";
 import type { ReadingViewCommand } from "@guizhi/shared/types/reading-page-v3";
 import { ImageLightbox } from "../library/ImageLightbox";
@@ -7,6 +8,7 @@ import { SnapshotToc } from "../library/SnapshotToc";
 import { themeButton } from "./ThemedReadingSetup";
 import { useUIStore } from "../../stores/ui.store";
 import { MarkdownPreview } from "../library/MarkdownPreview";
+import { translate } from "../../i18n";
 
 /** 原生子视图只接收主进程保存的版本 ID；页面字符串不会从 React 送入执行环境。 */
 export function NativeReadingView({
@@ -28,6 +30,7 @@ export function NativeReadingView({
   onFindCount: (n: number) => void;
   onFindOpen: () => void;
 }) {
+  const { t } = useTranslation();
   const host = useRef<HTMLDivElement>(null),
     viewId = useRef<string>(),
     top = useRef(0);
@@ -95,7 +98,7 @@ export function NativeReadingView({
     const unsubscribe = window.api.themedReading.onViewEvent((event) => {
       if (event.viewId !== id) return;
       const v = event.value as any;
-      if (event.type === "fault") setFault(v?.message || "交互运行失败");
+      if (event.type === "fault") setFault(v?.message || translate("themedReading.readerInteractionFailed", "交互运行失败"));
       if (event.type === "key" && v === "find") onFindOpen();
       if (event.type === "key" && v === "escape")
         useUIStore.getState().setFocusReadingMode(false);
@@ -156,7 +159,7 @@ export function NativeReadingView({
       })
       .then(async (r) => {
         if (!r.success || !r.viewId) {
-          if (!disposed) setFault(r.error || "阅读视图创建失败");
+          if (!disposed) setFault(r.error || translate("themedReading.readerViewFailed", "阅读视图创建失败"));
           return;
         }
         id = r.viewId;
@@ -258,11 +261,13 @@ export function NativeReadingView({
   const navigation = (
     <>
       <button className={themeButton} onClick={() => setCatalog(!catalog)}>
-        目录
+        {t("library.catalog", "目录")}
       </button>
       {!preview && page.design?.scripts?.length ? (
         <button className={themeButton} onClick={() => setEnabled(!enabled)}>
-          {enabled ? "暂停交互" : "启用交互"}
+          {enabled
+            ? t("themedReading.readerPauseInteraction", "暂停交互")
+            : t("themedReading.readerEnableInteraction", "启用交互")}
         </button>
       ) : null}
     </>
@@ -283,7 +288,7 @@ export function NativeReadingView({
               setRetry((n) => n + 1);
             }}
           >
-            重新启用交互
+            {t("themedReading.readerReenableInteraction", "重新启用交互")}
           </button>
         </div>
       ) : null}

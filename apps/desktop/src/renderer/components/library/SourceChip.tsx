@@ -107,7 +107,7 @@ export function SourceChip({ item }: { item: KnowledgeItem }) {
                     refreshOfItemId: item.id,
                     tagNames: [
                       ...item.tags.map((tag) => tag.name),
-                      "待确认来源更新",
+                      t("library.sourceRefreshTag", "待确认来源更新"),
                     ],
                     // URI 去重会把“来源内容后来更新了”的情况误判成旧条目；这里刻意
                     // 创建副本，保住原文和用户手改，待用户在导入队列确认后再决定替换。

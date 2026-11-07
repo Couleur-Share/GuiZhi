@@ -320,7 +320,7 @@ export function ImportTaskRow({
     } catch (error) {
       reportOperationError(
         "imports.authenticatedRetry",
-        "使用登录态重试",
+        t("imports.authenticatedRetry", "使用登录态重试"),
         error,
       );
     }
@@ -460,7 +460,7 @@ export function ImportTaskRow({
           </RowAction>
         ) : null}
 
-        {task.status === "duplicate" && task.duplicateItemId ? <RowAction label="更新来源（保留编辑正文）" onClick={() => void useImportStore.getState().enqueue([{ kind: task.sourceKind, input: task.sourceInput, refreshOfItemId: task.duplicateItemId!, forceDuplicate: true }])}><RefreshCwIcon className="h-3.5 w-3.5" /></RowAction> : null}
+        {task.status === "duplicate" && task.duplicateItemId ? <RowAction label={t("imports.refreshSourceKeepEdits", "更新来源（保留编辑正文）")} onClick={() => void useImportStore.getState().enqueue([{ kind: task.sourceKind, input: task.sourceInput, refreshOfItemId: task.duplicateItemId!, forceDuplicate: true }])}><RefreshCwIcon className="h-3.5 w-3.5" /></RowAction> : null}
         {task.status === "duplicate" ? (
           <RowAction
             label={t("imports.createCopy", "仍要创建副本")}

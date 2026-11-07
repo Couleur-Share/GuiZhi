@@ -74,6 +74,9 @@ export class ErrorBoundary extends Component<
           <p className="text-sm text-muted-foreground">
             数据没有丢失，只是这次渲染出了错。重新加载通常就能恢复；如果每次打开都这样，请连同下面的错误信息一起反馈。
           </p>
+          <p className="text-sm text-muted-foreground">
+            Your data is safe; only this render failed. Reloading usually fixes it. If it happens every time, please report it with the error details below.
+          </p>
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/50 p-3 text-xs leading-relaxed">
             {detail}
           </pre>

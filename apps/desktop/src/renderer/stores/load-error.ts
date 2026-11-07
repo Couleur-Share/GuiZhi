@@ -1,3 +1,5 @@
+import { translate } from "../i18n";
+
 /**
  * 列表加载失败的原因文本。
  *
@@ -7,5 +9,5 @@
  */
 export function describeLoadError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.trim() || "未知错误";
+  return message.trim() || translate("common.unknownError", "未知错误");
 }

@@ -8,6 +8,7 @@ import type {
   ImportTaskClearQuery,
   ImportTaskOrigin,
 } from "@guizhi/shared/types";
+import { translate } from "../i18n";
 import { useKnowledgeStore } from "./knowledge.store";
 import {
   reportOperationError,
@@ -401,7 +402,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
       });
     } catch (error) {
       if (!current()) return;
-      reportOperationError("imports.actionLoadMore", "加载更多任务", error);
+      reportOperationError("imports.actionLoadMore", translate("imports.actionLoadMore", "加载更多任务"), error);
     } finally {
       if (current()) set({ isLoadingMore: false });
     }
@@ -410,7 +411,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   toggleQueuePaused: async () => {
     await runGuardedMutation(
       "imports.actionToggleQueue",
-      "切换队列状态",
+      translate("imports.actionToggleQueue", "切换队列状态"),
       async () => {
         const queueState = get().queueState.paused
           ? await window.api.import.resume()
@@ -427,14 +428,14 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   cancelTask: async (id) => {
-    await runGuardedMutation("imports.actionCancel", "取消任务", async () => {
+    await runGuardedMutation("imports.actionCancel", translate("imports.actionCancel", "取消任务"), async () => {
       await window.api.import.cancel(id);
       await get().fetchTasks();
     });
   },
 
   retryTask: async (id, options) => {
-    return runGuardedMutation("imports.actionRetry", "重试任务", async () => {
+    return runGuardedMutation("imports.actionRetry", translate("imports.actionRetry", "重试任务"), async () => {
       const retryOptions = typeof options === "boolean"
         ? { forceDuplicate: options }
         : options;
@@ -448,14 +449,14 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   removeTask: async (id) => {
-    await runGuardedMutation("imports.actionRemove", "移除任务", async () => {
+    await runGuardedMutation("imports.actionRemove", translate("imports.actionRemove", "移除任务"), async () => {
       await window.api.import.remove(id);
       await get().fetchTasks();
     });
   },
 
   cancelTasks: async (ids) => {
-    await runTaskBatch(get, ids, "imports.actionCancel", "取消任务", (id) =>
+    await runTaskBatch(get, ids, "imports.actionCancel", translate("imports.actionCancel", "取消任务"), (id) =>
       window.api.import.cancel(id),
     );
     set({ selectionIds: [] });
@@ -463,7 +464,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   retryTasks: async (ids) => {
-    await runTaskBatch(get, ids, "imports.actionRetry", "重试任务", (id) =>
+    await runTaskBatch(get, ids, "imports.actionRetry", translate("imports.actionRetry", "重试任务"), (id) =>
       window.api.import.retry(id),
     );
     set({ selectionIds: [] });
@@ -471,7 +472,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   },
 
   removeTasks: async (ids) => {
-    await runTaskBatch(get, ids, "imports.actionRemove", "移除任务", (id) =>
+    await runTaskBatch(get, ids, "imports.actionRemove", translate("imports.actionRemove", "移除任务"), (id) =>
       window.api.import.remove(id),
     );
     set({ selectionIds: [] });
@@ -481,7 +482,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
   clearFinished: async () => {
     await runGuardedMutation(
       "imports.actionClearFinished",
-      "清理已完成任务",
+      translate("imports.actionClearFinished", "清理已完成任务"),
       async () => {
         await window.api.import.clearFinished();
         await get().fetchTasks();
@@ -496,7 +497,7 @@ export const useImportStore = create<ImportState>()((set, get) => ({
 
   clearTerminal: async (query) => {
     let count = 0;
-    const ok = await runGuardedMutation("imports.clearConfirmTitle", "清理导入任务历史", async () => {
+    const ok = await runGuardedMutation("imports.clearConfirmTitle", translate("imports.clearConfirmTitle", "清理导入任务历史"), async () => {
       count = (await window.api.import.clearTerminal(query)).count;
       set({ selectionIds: [] });
       await get().fetchTasks();

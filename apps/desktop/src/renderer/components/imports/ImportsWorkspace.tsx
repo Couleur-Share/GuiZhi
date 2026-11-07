@@ -115,7 +115,7 @@ function ImportTasksWorkspace({ onOpenDiscovery }: { onOpenDiscovery: () => void
       const count = await previewClearTerminal(clearQuery);
       setClearConfirm({ query: clearQuery, label, count });
     } catch (error) {
-      reportOperationError("imports.clearPreviewFailed", "无法预览清理范围", error);
+      reportOperationError("imports.clearPreviewFailed", t("imports.clearPreviewFailed", "无法预览清理范围"), error);
     }
   };
 

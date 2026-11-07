@@ -1,9 +1,11 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SourceCaptureRevisions } from '../../../src/renderer/components/library/SourceCaptureRevisions';
+import { changeLanguage, i18nReady } from '../../../src/renderer/i18n';
 import { useKnowledgeStore } from '../../../src/renderer/stores/knowledge.store';
 import { heavyItem } from '../../helpers/heavy-user';
 const updateDraft = vi.fn();
+beforeAll(async () => { await i18nReady; await changeLanguage('zh'); });
 beforeEach(() => {
   updateDraft.mockReset();
   useKnowledgeStore.setState({ selectedId:'a', selectedItem:heavyItem('a'), entries:[], flushPendingSave:vi.fn(async()=>true), updateSelected:updateDraft });

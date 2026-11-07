@@ -67,7 +67,7 @@ export function ThemedReadingPageTools({
       disabled: view.busy,
       onClick: () => void view.exportHtml(true),
     },
-    ...(page.formatVersion === 3 ? [{label:"导出静态 HTML",disabled:view.busy,onClick:()=>void view.exportHtml(false,true)}] : []),
+    ...(page.formatVersion === 3 ? [{label:t("themedReading.readerExportStatic","导出静态 HTML"),disabled:view.busy,onClick:()=>void view.exportHtml(false,true)}] : []),
     ...(view.result?.previous
       ? [
           {

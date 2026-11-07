@@ -3,6 +3,7 @@ import type { ThemedReadingOptions, ThemedReadingResult, ThemedReadingSourceKind
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useToast } from "../ui/Toast";
 import { useTranslation } from "react-i18next";
+import { translate } from "../../i18n";
 
 export const isThemeTaskActive = (task?: ThemedReadingTask | null) => Boolean(task && ["queued", "running"].includes(task.state));
 export const canResumeThemeTask = (task?: ThemedReadingTask | null) => Boolean(task && !task.legacyFormat && ["partial", "failed", "cancelled", "interrupted"].includes(task.state));
@@ -32,7 +33,7 @@ export function useThemedReading(itemId: string, sourceKind: ThemedReadingSource
     try {
       const next = await window.api.themedReading.get({ itemId, sourceKind, instanceId, ...(!showPage ? { metadataOnly: true } : {}) });
       if (!mounted.current || request !== revision.current) return;
-      if (!next.success) throw new Error(next.error || "主题页读取失败");
+      if (!next.success) throw new Error(next.error || translate("themedReading.loadFailed", "主题页读取失败"));
       if(!pinned.current&&next.page&&isThemeTaskActive(next.task))pinned.current=next;
       if (pinned.current?.page && next.page && pinned.current.page.id !== next.page.id) {
         setLatest(next);
@@ -57,7 +58,7 @@ export function useThemedReading(itemId: string, sourceKind: ThemedReadingSource
     setBusy(true);
     try {
       const next = await action();
-      if (!next.success) throw new Error(next.error || `${label}失败`);
+      if (!next.success) throw new Error(next.error || translate("themedReading.actionFailed", "{{action}}失败", { action: label }));
       if (mounted.current) {
         if (next.task) { taskRevision.current += 1; setTask(next.task); }
         await reload();
@@ -75,7 +76,7 @@ export function useThemedReading(itemId: string, sourceKind: ThemedReadingSource
   };
   const generate = (options: ThemedReadingOptions) => run(t("themedReading.generate", "生成主题页"), async () => {
     if (!(await useKnowledgeStore.getState().flushPendingSave())) return;
-    if (useKnowledgeStore.getState().hasUnsavedChanges) throw new Error("当前编辑尚未保存，请先保存后重试");
+    if (useKnowledgeStore.getState().hasUnsavedChanges) throw new Error(translate("themedReading.saveEditFirst", "当前编辑尚未保存，请先保存后重试"));
     pinned.current = result?.page ? result : null;
     return window.api.themedReading.generate({ itemId, sourceKind, options });
   });
@@ -83,7 +84,7 @@ export function useThemedReading(itemId: string, sourceKind: ThemedReadingSource
   return { result, task, instanceId, busy, loadError, reload, generate, latest,
     adoptLatest: () => { pinned.current = null; if (latest) setResult(latest); setLatest(null); },
     cancel: () => task ? run(t("themedReading.stop", "停止生成"), () => window.api.themedReading.cancel(task.id)) : Promise.resolve(false),
-    continueOffline: () => task ? run("改为不联网生成", () => window.api.themedReading.continueOffline(task.id)) : Promise.resolve(false),
+    continueOffline: () => task ? run(t("themedReading.readerSwitchOffline", "改为不联网生成"), () => window.api.themedReading.continueOffline(task.id)) : Promise.resolve(false),
     resume: () => task ? run(t("themedReading.resume", "继续未完成部分"), () => window.api.themedReading.resume(task.id)) : Promise.resolve(false),
     regenerateAsset: (assetId: string) => run(t("themedReading.redraw", "重做这张图"), () => window.api.themedReading.regenerateAsset({ ...request, assetId })),
     restore: () => run(t("themedReading.restore", "恢复上一版"), () => { pinned.current = null; return window.api.themedReading.restorePrevious(request); }, t("themedReading.restored", "已恢复上一版主题页")),

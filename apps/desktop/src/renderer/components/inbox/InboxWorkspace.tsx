@@ -128,7 +128,7 @@ export function InboxWorkspace() {
       ...(collectionId ? { collectionId } : {}),
       ...(tags.length ? { addTagNames: tags } : {}),
     });
-    showToast(`已整理 ${changed} 条内容`, "success");
+    showToast(t("inbox.organized", "已整理 {{count}} 条内容", { count: changed }), "success");
     setTagText("");
   };
 
@@ -138,7 +138,7 @@ export function InboxWorkspace() {
       const { useSemanticStore } = await import("../../stores/semantic.store");
       const store = useSemanticStore.getState();
       if (store.isIndexing) {
-        showToast("语义索引正在执行", "info");
+        showToast(t("inbox.semanticRunning", "语义索引正在执行"), "info");
         return;
       }
 
@@ -146,26 +146,30 @@ export function InboxWorkspace() {
       // 处理中心已经展示本轮回执，避免稍后进入 AI 问答时重复弹出。
       useSemanticStore.getState().consumeNotice();
       if (!notice) {
-        showToast("语义索引未能启动，请稍后重试", "error");
+        showToast(t("inbox.semanticStartFailed", "语义索引未能启动，请稍后重试"), "error");
       } else if (notice.kind === "done") {
-        showToast(`已索引 ${notice.indexed} 条`, "success");
+        showToast(t("inbox.semanticIndexed", "已索引 {{count}} 条", { count: notice.indexed }), "success");
       } else if (notice.kind === "partial") {
         showToast(
-          `索引 ${notice.indexed} 条，${notice.failed} 条失败：${notice.message ?? "未知错误"}`,
+          t("inbox.semanticPartial", "索引 {{indexed}} 条，{{failed}} 条失败：{{message}}", {
+            indexed: notice.indexed,
+            failed: notice.failed,
+            message: notice.message ?? t("common.unknownError", "未知错误"),
+          }),
           "warning",
         );
       } else if (notice.kind === "failed") {
-        showToast(`索引失败：${notice.message ?? "未知错误"}`, "error");
+        showToast(t("inbox.semanticFailed", "索引失败：{{message}}", { message: notice.message ?? t("common.unknownError", "未知错误") }), "error");
       } else if (notice.kind === "not-configured") {
-        showToast("尚未配置语义索引模型", "error");
+        showToast(t("inbox.semanticNotConfigured", "尚未配置语义索引模型"), "error");
         requestSettingsSection("ai");
       } else {
-        showToast("没有需要索引的内容", "info");
+        showToast(t("inbox.semanticNothing", "没有需要索引的内容"), "info");
       }
       await refresh();
     } catch (error) {
       showToast(
-        `语义索引执行失败：${error instanceof Error ? error.message : String(error)}`,
+        t("inbox.semanticError", "语义索引执行失败：{{message}}", { message: error instanceof Error ? error.message : String(error) }),
         "error",
       );
     } finally {
@@ -182,12 +186,12 @@ export function InboxWorkspace() {
     try {
       const changed = await acknowledgeImportWarning(taskId);
       showToast(
-        changed > 0 ? "已保留导入记录并从处理中心移除" : "该警告已经处理",
+        changed > 0 ? t("inbox.warningAcknowledged", "已保留导入记录并从处理中心移除") : t("inbox.warningAlreadyHandled", "该警告已经处理"),
         changed > 0 ? "success" : "info",
       );
     } catch (error) {
       showToast(
-        `操作失败：${error instanceof Error ? error.message : String(error)}`,
+        t("inbox.actionFailed", "操作失败：{{message}}", { message: error instanceof Error ? error.message : String(error) }),
         "error",
       );
     } finally {
@@ -221,30 +225,32 @@ export function InboxWorkspace() {
       const created = result.createdCollectionNames;
       const summary =
         result.classified > 0
-          ? `已智能归类 ${result.classified} 条${created.length > 0 ? `，新建 ${created.length} 个知识库` : "，全部复用现有知识库"}`
-          : "没有仍需归类的内容";
+          ? created.length > 0
+            ? t("inbox.classifiedWithNew", "已智能归类 {{count}} 条，新建 {{created}} 个知识库", { count: result.classified, created: created.length })
+            : t("inbox.classifiedReused", "已智能归类 {{count}} 条，全部复用现有知识库", { count: result.classified })
+          : t("inbox.nothingToClassify", "没有仍需归类的内容");
       showToast(
         result.skipped > 0
-          ? `${summary}；跳过 ${result.skipped} 条已变更内容`
+          ? t("inbox.classifySkipped", "{{summary}}；跳过 {{count}} 条已变更内容", { summary, count: result.skipped })
           : summary,
         result.classified > 0 ? "success" : "info",
-        created.length > 0 ? { detail: created.join("、") } : undefined,
+        created.length > 0 ? { detail: created.join(t("inbox.nameSeparator", "、")) } : undefined,
       );
     } catch (error) {
       if (
         controller.signal.aborted ||
         (error instanceof Error && error.name === "AbortError")
       ) {
-        showToast("已停止 AI 归类，尚未写入任何分类", "info");
+        showToast(t("inbox.classifyStopped", "已停止 AI 归类，尚未写入任何分类"), "info");
       } else if (
         error instanceof Error &&
         error.message === "AI_NOT_CONFIGURED"
       ) {
-        showToast("尚未配置可用的 AI 文本模型", "error");
+        showToast(t("inbox.aiNotConfigured", "尚未配置可用的 AI 文本模型"), "error");
         requestSettingsSection("ai");
       } else {
         showToast(
-          `AI 智能归类失败：${error instanceof Error ? error.message : String(error)}`,
+          t("inbox.classifyFailed", "AI 智能归类失败：{{message}}", { message: error instanceof Error ? error.message : String(error) }),
           "error",
         );
       }
@@ -260,14 +266,14 @@ export function InboxWorkspace() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section">
       <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-5">
-        <h2 className="text-sm font-semibold text-foreground">处理中心</h2>
+        <h2 className="text-sm font-semibold text-foreground">{t("nav.inbox", "处理中心")}</h2>
         <button type="button" onClick={() => setShowThemeTasks(true)} className="rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent">{t("themedReading.tasks", "主题页任务")}</button>
         <span className="text-xs text-muted-foreground">
           {filter === "wiki-pending"
-            ? `${counts[filter]} 条内容待编译`
+            ? t("inbox.countWikiPending", "{{count}} 条内容待编译", { count: counts[filter] })
             : filter === "semantic-pending"
-              ? `${counts[filter]} 条内容待索引`
-              : `${filter === "all" ? total : counts[filter]} 条内容待处理`}
+              ? t("inbox.countSemanticPending", "{{count}} 条内容待索引", { count: counts[filter] })
+              : t("inbox.countPending", "{{count}} 条内容待处理", { count: filter === "all" ? total : counts[filter] })}
         </span>
         {selectableVisibleIds.length > 0 ? (
           <Checkbox
@@ -276,7 +282,7 @@ export function InboxWorkspace() {
             onChange={(checked) =>
               checked ? setSelection(selectableVisibleIds) : clearSelection()
             }
-            label="全选当前列表"
+            label={t("inbox.selectAllVisible", "全选当前列表")}
             className="ml-auto"
           />
         ) : null}
@@ -284,8 +290,8 @@ export function InboxWorkspace() {
           type="button"
           onClick={() => void refresh()}
           className={`${selectableVisibleIds.length > 0 ? "" : "ml-auto"} rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground`}
-          title="刷新"
-          aria-label="刷新处理中心"
+          title={t("common.refresh", "刷新")}
+          aria-label={t("inbox.refresh", "刷新处理中心")}
         >
           <RefreshCwIcon
             className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
@@ -296,13 +302,13 @@ export function InboxWorkspace() {
       {selectionIds.length > 0 ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-5 py-2">
           <span className="text-sm text-foreground">
-            已选 {selectionIds.length} 条
+            {t("inbox.selectedCount", "已选 {{count}} 条", { count: selectionIds.length })}
           </span>
           <Select
             value={collectionId}
             onChange={setCollectionId}
-            placeholder="归入知识库"
-            ariaLabel="归入知识库"
+            placeholder={t("inbox.moveToCollection", "归入知识库")}
+            ariaLabel={t("inbox.moveToCollection", "归入知识库")}
             options={collections.map((collection) => ({
               value: collection.id,
               label: `${collection.icon ?? "📚"} ${collection.name}`,
@@ -312,7 +318,7 @@ export function InboxWorkspace() {
           <input
             value={tagText}
             onChange={(event) => setTagText(event.target.value)}
-            placeholder="添加标签，逗号分隔"
+            placeholder={t("inbox.addTagsPlaceholder", "添加标签，逗号分隔")}
             className="h-9 w-52 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary/50"
           />
           <button
@@ -321,7 +327,7 @@ export function InboxWorkspace() {
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground"
           >
             <FolderInputIcon className="h-4 w-4" />
-            批量整理
+            {t("inbox.organizeSelected", "批量整理")}
           </button>
           {selectedUnclassifiedIds.length > 0 ? (
             <button
@@ -339,8 +345,8 @@ export function InboxWorkspace() {
                 <SparklesIcon className="h-4 w-4" aria-hidden="true" />
               )}
               {classificationProgress
-                ? `停止归类 ${classificationProgress.completed}/${classificationProgress.total}`
-                : `AI 智能归类 ${selectedUnclassifiedIds.length}`}
+                ? t("inbox.stopClassify", "停止归类 {{completed}}/{{total}}", { completed: classificationProgress.completed, total: classificationProgress.total })
+                : t("inbox.smartClassify", "AI 智能归类 {{count}}", { count: selectedUnclassifiedIds.length })}
             </button>
           ) : null}
           <button
@@ -348,14 +354,14 @@ export function InboxWorkspace() {
             onClick={clearSelection}
             className="h-9 rounded-lg px-3 text-sm text-muted-foreground hover:bg-muted"
           >
-            取消
+            {t("common.cancel", "取消")}
           </button>
         </div>
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        {wikiCandidates ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">Wiki：可执行 {wikiCandidates.ready} · 需复核 {wikiCandidates.review} · 等待重试/继续 {wikiCandidates.waiting} · 待选择升级 {wikiCandidates.upgrade} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>查看范围和任务</button></div> : null}
-        {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="mb-2 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? "Wiki" : "语义索引"}状态读取失败：{error} <button className="text-primary hover:underline" onClick={() => void refresh()}>重试</button></div>)}
+        {wikiCandidates ? <div className="mb-2 rounded-lg border border-border p-3 text-sm">{t("inbox.wikiCandidates", "Wiki：可执行 {{ready}} · 需复核 {{review}} · 等待重试/继续 {{waiting}} · 待选择升级 {{upgrade}}", { ready: wikiCandidates.ready, review: wikiCandidates.review, waiting: wikiCandidates.waiting, upgrade: wikiCandidates.upgrade })} <button className="text-primary hover:underline" onClick={() => window.dispatchEvent(new Event("wiki-compile-preview"))}>{t("inbox.wikiCandidatesView", "查看范围和任务")}</button></div> : null}
+        {Object.entries(sectionErrors).map(([kind, error]) => <div key={kind} role="alert" className="mb-2 rounded-lg border border-border p-3 text-sm">{kind === "wiki" ? t("inbox.wikiStatusFailed", "Wiki状态读取失败：{{error}}", { error }) : t("inbox.semanticStatusFailed", "语义索引状态读取失败：{{error}}", { error })} <button className="text-primary hover:underline" onClick={() => void refresh()}>{t("common.retry", "重试")}</button></div>)}
         {isLoading && items.length === 0 ? (
           <div className="flex h-32 items-center justify-center">
             <Spinner size="sm" tone="muted" />
@@ -366,7 +372,7 @@ export function InboxWorkspace() {
           <div className="flex h-52 flex-col items-center justify-center text-center">
             <CheckIcon className="h-10 w-10 text-emerald-500" />
             <p className="mt-3 text-sm font-medium text-foreground">
-              当前分组已处理完
+              {t("inbox.groupDone", "当前分组已处理完")}
             </p>
           </div>
         ) : (
@@ -384,12 +390,12 @@ export function InboxWorkspace() {
                     <Icon className="h-5 w-5 text-primary" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-foreground">
-                        {semantic ? "语义索引待更新" : "Wiki 待编译"}
+                        {semantic ? t("inbox.semanticAggregateTitle", "语义索引待更新") : t("inbox.wikiAggregateTitle", "Wiki 待编译")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.count} 条内容
-                        {semantic ? "待建立语义索引" : "待编译为 Wiki"}
-                        ；不计入待处理内容数。
+                        {semantic
+                          ? t("inbox.semanticAggregateDesc", "{{count}} 条内容待建立语义索引；不计入待处理内容数。", { count: item.count })
+                          : t("inbox.wikiAggregateDesc", "{{count}} 条内容待编译为 Wiki；不计入待处理内容数。", { count: item.count })}
                       </p>
                     </div>
                     <button
@@ -407,10 +413,10 @@ export function InboxWorkspace() {
                             className="h-3.5 w-3.5 animate-spin"
                             aria-hidden="true"
                           />
-                          {semantic ? "索引中…" : "编译中…"}
+                          {semantic ? t("inbox.indexing", "索引中…") : t("wiki.compilingShort", "编译中…")}
                         </>
                       ) : (
-                        "立即执行"
+                        t("inbox.runNow", "立即执行")
                       )}
                     </button>
                   </div>
@@ -427,7 +433,7 @@ export function InboxWorkspace() {
                     <Checkbox
                       checked={selected}
                       onChange={() => toggleSelection(itemId)}
-                      ariaLabel={`选择 ${item.title}`}
+                      ariaLabel={t("inbox.selectItem", "选择 {{title}}", { title: item.title })}
                       className="mt-1 shrink-0"
                     />
                   ) : item.kind === "import-issue" ? (
@@ -437,16 +443,16 @@ export function InboxWorkspace() {
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {item.title || "无标题"}
+                      {item.title || t("library.untitled", "无标题")}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {item.kind === "review-required"
-                        ? item.reasons.join("；") || "采集结果需要人工复核"
+                        ? item.reasons.join("；") || t("inbox.reviewRequiredReason", "采集结果需要人工复核")
                         : item.kind === "unclassified"
-                          ? "尚未归入任何知识库"
+                          ? t("inbox.unclassifiedReason", "尚未归入任何知识库")
                           : item.kind === "import-issue"
                             ? item.message
-                            : "定时发现的新候选，尚未导入"}
+                            : t("inbox.discoveryReason", "定时发现的新候选，尚未导入")}
                     </p>
                   </div>
                   {itemId ? (
@@ -455,7 +461,7 @@ export function InboxWorkspace() {
                       onClick={() => void openItem(itemId)}
                       className="h-8 rounded-lg border border-border px-2.5 text-xs hover:bg-muted"
                     >
-                      打开
+                      {t("common.open", "打开")}
                     </button>
                   ) : null}
                   {item.kind === "review-required" ? (
@@ -464,7 +470,7 @@ export function InboxWorkspace() {
                       onClick={() => void markReviewed([item.itemId])}
                       className="h-8 rounded-lg bg-primary px-2.5 text-xs text-primary-foreground"
                     >
-                      标记已复核
+                      {t("library.markReviewed", "标记已复核")}
                     </button>
                   ) : null}
                   {item.kind === "import-issue" && item.status === "failed" ? (
@@ -473,7 +479,7 @@ export function InboxWorkspace() {
                       onClick={() => void retryTask(item.taskId).then(refresh)}
                       className="h-8 rounded-lg border border-border px-2.5 text-xs hover:bg-muted"
                     >
-                      重试
+                      {t("common.retry", "重试")}
                     </button>
                   ) : null}
                   {item.kind === "import-issue" &&
@@ -487,7 +493,7 @@ export function InboxWorkspace() {
                       }
                       className="h-8 rounded-lg border border-border px-2.5 text-xs hover:bg-muted"
                     >
-                      查看条目
+                      {t("inbox.viewItem", "查看条目")}
                     </button>
                   ) : null}
                   {item.kind === "import-issue" &&
@@ -499,8 +505,8 @@ export function InboxWorkspace() {
                       className="h-8 rounded-lg border border-border px-2.5 text-xs hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {acknowledgingTaskId === item.taskId
-                        ? "处理中…"
-                        : "不再提醒"}
+                        ? t("inbox.processing", "处理中…")
+                        : t("inbox.dismissWarning", "不再提醒")}
                     </button>
                   ) : null}
                 </div>

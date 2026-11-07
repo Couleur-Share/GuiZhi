@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type { AskSessionMeta } from "@guizhi/shared/types";
 import type { ArticleContext, ArticleMessage, ArticleTarget } from "@guizhi/shared/types/article-ask";
 import { askArticle } from "../services/knowledge-ai/article-qa";
+import { translate } from "../i18n";
 import { runGuardedMutation } from "./operation-error.store";
 
 interface ArticleAskState {
@@ -37,7 +38,7 @@ export function parseArticleMessages(json: string): ArticleMessage[] {
   return sanitizeCachedMessages(messages.map(m => {
     if (!m || typeof m.id !== "string" || typeof m.question !== "string" || typeof m.answer !== "string") throw new Error("问答消息格式损坏");
     return { ...m, sources: Array.isArray(m.sources) ? m.sources : [], warnings: Array.isArray(m.warnings) ? m.warnings : [],
-      ...(m.status === "running" ? { status: "error", error: "会话在完成前被中断", step: undefined } : {}) };
+      ...(m.status === "running" ? { status: "error", error: translate("ask.sessionInterrupted", "会话在完成前被中断"), step: undefined } : {}) };
   }));
 }
 
@@ -51,12 +52,12 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
       title: snapshot.messages[0].question.slice(0, 30), messagesJson: JSON.stringify(snapshot.messages),
       target: snapshot.target, webEnabled: snapshot.webEnabled };
     const job = queueConversationSave(input.id, async () => {
-      const ok = await runGuardedMutation("articleAsk.save", "保存本文问答", async () => {
+      const ok = await runGuardedMutation("articleAsk.save", translate("articleAsk.save", "保存本文问答"), async () => {
         const saved = await window.api.askSession.save(input);
         if (get().sessionId === input.id) set({ saveError: null, sessions: [saved, ...get().sessions.filter(s => s.id !== saved.id)] });
         window.dispatchEvent(new Event("article-ask-saved"));
       });
-      if (!ok && get().sessionId === input.id) set({ saveError: "问答尚未保存，请重试保存" });
+      if (!ok && get().sessionId === input.id) set({ saveError: translate("articleAsk.notSaved", "问答尚未保存，请重试保存") });
       return ok;
     });
     return job;
@@ -75,7 +76,7 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
       const item = await window.api.knowledge.get(target.itemId);
       if (generation !== loadingGeneration) return;
       set({ sessionId: record?.id ?? makeId(), itemId: target.itemId, target: sanitizeCachedTarget(record?.target ?? target),
-        title: item?.title ?? record?.articleTitle ?? "文章已删除", sessions,
+        title: item?.title ?? record?.articleTitle ?? translate("articleAsk.articleDeleted", "文章已删除"), sessions,
         messages: record ? parseArticleMessages(record.messagesJson) : [], webEnabled: record?.webEnabled !== false,
         loading: false, running: false, saveError: null });
     } catch (e) {
@@ -94,7 +95,7 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
     const active = controller;
     if (!active) return;
     controller = null; active.abort();
-    set(s => ({ running: false, messages: s.messages.map(m => m.status === "running" ? { ...m, status: "error", error: "已停止", step: undefined } : m) }));
+    set(s => ({ running: false, messages: s.messages.map(m => m.status === "running" ? { ...m, status: "error", error: translate("ask.stopped", "已停止"), step: undefined } : m) }));
     void get().persist();
   },
   ask: async (question, target, context) => {
@@ -115,7 +116,7 @@ export const useArticleAskStore = create<ArticleAskState>((set, get) => ({
       await askArticle({ question: question.trim(), target, history, context, webEnabled: message.webEnabled, signal: local.signal, requestId: id, patch });
       return true;
     } catch (e) {
-      patch({ status: "error", error: local.signal.aborted ? "已停止" : errorText(e), step: undefined });
+      patch({ status: "error", error: local.signal.aborted ? translate("ask.stopped", "已停止") : errorText(e), step: undefined });
       if (!local.signal.aborted) void window.api.log.appError({ scope: "articleAsk", action: "回答", message: errorText(e) });
       return false;
     } finally {

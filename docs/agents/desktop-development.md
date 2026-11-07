@@ -291,6 +291,10 @@ dev 的 `onstart`，不改变构建产物，也不影响 `vite build`。看到�
 
 - TreatWarnings 严格：eslint `--max-warnings 0`；文件行数上限见
   `config/file-line-limit-baseline.json`（`pnpm lint:file-size`）。
+- 界面文案写成 `t("键", "中文兜底")` 并同时补齐 `zh.json` / `en.json`；`pnpm lint:i18n`
+  检查缺失键、无人引用的键、英文漏译，以及写死中文不超过
+  `config/i18n-hardcoded-baseline.json`（冻结功能暂留在基线里，只减不增）。
+  非组件模块用 `i18n.t`；`--report` 列出每一处。
 - 生成的代码注释与日志用中文（可中英双语），标识符用英文。
 - 渲染进程不得直接访问 Node API；一切系统能力经 preload 白名单。
 - 界面里不出现原生控件。`<select>` 的下拉列表、`<input type="color">`、

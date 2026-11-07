@@ -12,34 +12,34 @@ import { canResumeThemeTask, isThemeTaskActive } from "./use-themed-reading";
 import { themeButton } from "./ThemedReadingSetup";
 
 const stages = {
-  prepare: "准备内容",
-  understand: "理解原文",
-  research: "联网查证",
-  write: "撰写文章",
-  design: "设计页面",
-  images: "生成主题图片",
-  assemble: "组装页面",
-  validate: "检查页面",
-  done: "完成",
+  prepare: { labelKey: "themedReading.stage.prepare", fallback: "准备内容" },
+  understand: { labelKey: "themedReading.stage.understand", fallback: "理解原文" },
+  research: { labelKey: "themedReading.stage.research", fallback: "联网查证" },
+  write: { labelKey: "themedReading.stage.write", fallback: "撰写文章" },
+  design: { labelKey: "themedReading.stage.design", fallback: "设计页面" },
+  images: { labelKey: "themedReading.stage.images", fallback: "生成主题图片" },
+  assemble: { labelKey: "themedReading.stage.assemble", fallback: "组装页面" },
+  validate: { labelKey: "themedReading.stage.validate", fallback: "检查页面" },
+  done: { labelKey: "themedReading.stage.done", fallback: "完成" },
 };
 const states = {
-  queued: "排队中",
-  running: "进行中",
-  completed: "已完成",
-  partial: "部分内容尚未完成",
-  failed: "本次生成未完成",
-  cancelled: "已停止生成",
-  interrupted: "生成已中断",
+  queued: { labelKey: "themedReading.readerState.queued", fallback: "排队中" },
+  running: { labelKey: "themedReading.readerState.running", fallback: "进行中" },
+  completed: { labelKey: "themedReading.readerState.completed", fallback: "已完成" },
+  partial: { labelKey: "themedReading.readerState.partial", fallback: "部分内容尚未完成" },
+  failed: { labelKey: "themedReading.readerState.failed", fallback: "本次生成未完成" },
+  cancelled: { labelKey: "themedReading.readerState.cancelled", fallback: "已停止生成" },
+  interrupted: { labelKey: "themedReading.readerState.interrupted", fallback: "生成已中断" },
 };
 const stepLabels = {
-  prepare: "内容",
-  understand: "理解",
-  research: "研究",
-  write: "写作",
-  design: "设计",
-  images: "图片",
-  assemble: "排版",
-  validate: "检查",
+  prepare: { labelKey: "themedReading.step.prepare", fallback: "内容" },
+  understand: { labelKey: "themedReading.step.understand", fallback: "理解" },
+  research: { labelKey: "themedReading.step.research", fallback: "研究" },
+  write: { labelKey: "themedReading.step.write", fallback: "写作" },
+  design: { labelKey: "themedReading.step.design", fallback: "设计" },
+  images: { labelKey: "themedReading.step.images", fallback: "图片" },
+  assemble: { labelKey: "themedReading.step.assemble", fallback: "排版" },
+  validate: { labelKey: "themedReading.step.validate", fallback: "检查" },
 };
 
 /** 首次生成突出阶段进展；已有成品时保持紧凑，原因和用量按需展开。 */
@@ -88,7 +88,7 @@ export function ThemedReadingStatus({
     task.stage === "done" ? steps.length : steps.indexOf(task.stage);
   const stageLabel = task.stage === "assemble" && task.total > 0
     ? t("themedReading.compilingGraphics", "处理图形")
-    : t(`themedReading.stage.${task.stage}`, stages[task.stage]);
+    : t(stages[task.stage].labelKey, stages[task.stage].fallback);
   const designDetail = task.stage === "design" && task.designProgress
     ? (task.designProgress.receivedChars > 0
       ? t("themedReading.designReceiving", "正在输出页面 · 已接收 {{count}} 字符", { count: task.designProgress.receivedChars })
@@ -100,7 +100,7 @@ export function ThemedReadingStatus({
       : `${task.designProgress?.attempt > 1 && task.stage === "design" ? t("themedReading.designRepairing", "调整页面设计") : stageLabel}${task.total > 0 ? ` · ${task.completed}/${task.total}` : ""}`
     : research
       ? t("themedReading.readerResearchPaused", "资料查证尚未完成")
-      : t(`themedReading.readerState.${task.state}`, states[task.state]);
+      : t(states[task.state].labelKey, states[task.state].fallback);
   const context = task.state === "completed" ? "" : task.legacyFormat
     ? t("themedReading.readerLegacyTask", "旧格式任务不再支持继续，可重新生成新版阅读页。")
     : hasPage
@@ -151,7 +151,7 @@ export function ThemedReadingStatus({
                 />
               ) : null}
               <span className="break-words">
-                {t(`themedReading.step.${stage}`, stepLabels[stage])}
+                {t(stepLabels[stage].labelKey, stepLabels[stage].fallback)}
               </span>
             </span>
           </li>
@@ -307,9 +307,9 @@ export function ThemedReadingStatus({
               )}
             </p>
           ) : null}
-          {task.firstContentAt?<p>首个内容：{((task.firstContentAt-task.createdAt)/1000).toFixed(1)} 秒</p>:null}
-          {task.reused && Object.values(task.reused).some(n=>n>0)?<p>已复用：{task.reused.chapters} 章正文 · {task.reused.notes} 份笔记 · {task.reused.references} 篇资料 · {task.reused.assets} 张图片</p>:null}
-          {task.timings?<p>{Object.entries(task.timings).map(([stage,ms])=>`${stages[stage]??stage} ${(ms/1000).toFixed(1)} 秒`).join(" · ")}</p>:null}
+          {task.firstContentAt?<p>{t("themedReading.readerFirstContent","首个内容：{{seconds}} 秒",{seconds:((task.firstContentAt-task.createdAt)/1000).toFixed(1)})}</p>:null}
+          {task.reused && Object.values(task.reused).some(n=>n>0)?<p>{t("themedReading.readerReused","已复用：{{chapters}} 章正文 · {{notes}} 份笔记 · {{references}} 篇资料 · {{assets}} 张图片",{chapters:task.reused.chapters,notes:task.reused.notes,references:task.reused.references,assets:task.reused.assets})}</p>:null}
+          {task.timings?<p>{Object.entries(task.timings).map(([stage,ms])=>t("themedReading.readerStageTiming","{{stage}} {{seconds}} 秒",{stage:stages[stage]?t(stages[stage].labelKey,stages[stage].fallback):stage,seconds:(ms/1000).toFixed(1)})).join(" · ")}</p>:null}
           {task.usage ? (
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <span>

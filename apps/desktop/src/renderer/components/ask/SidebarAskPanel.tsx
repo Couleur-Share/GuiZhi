@@ -178,7 +178,7 @@ export function SidebarAskPanel() {
       </div>
 
       <HistoryControls />
-      {historyError ? <p role="alert" className="p-2 text-xs text-destructive">{historyError} <button onClick={() => void useAskHistoryStore.getState().load()}>重试</button></p> : null}
+      {historyError ? <p role="alert" className="p-2 text-xs text-destructive">{historyError} <button onClick={() => void useAskHistoryStore.getState().load()}>{t("common.retry", "重试")}</button></p> : null}
       {sessions.length === 0 && !historyLoading && !historyError ? (
         <p className="px-3 py-1 text-xs text-sidebar-foreground/75">
           {t("ask.sessionListEmpty", "提问后会话会保存在这里")}
@@ -199,7 +199,7 @@ export function SidebarAskPanel() {
               >
                 <span className="w-full truncate pr-5 text-sm">
                   {session.scope === "article" ? `${t("articleAsk.historyBadge", "本文问答")} · ${session.articleTitle} · ` : ""}
-                  {session.pinned ? "置顶 · " : ""}{session.title || t("ask.untitledSession", "新对话")}
+                  {session.pinned ? `${t("ask.sessionPinned", "置顶")} · ` : ""}{session.title || t("ask.untitledSession", "新对话")}
                 </span>
                 <span
                   className={`text-xs ${
@@ -226,15 +226,15 @@ export function SidebarAskPanel() {
                 <XIcon className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
               <div className="flex gap-3 px-3 text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-                <button onClick={() => setRenaming(session)}>重命名</button>
-                <button onClick={() => void useAskHistoryStore.getState().update(session.id, { pinned: !session.pinned })}>{session.pinned ? "取消置顶" : "置顶"}</button>
+                <button onClick={() => setRenaming(session)}>{t("library.rename", "重命名")}</button>
+                <button onClick={() => void useAskHistoryStore.getState().update(session.id, { pinned: !session.pinned })}>{session.pinned ? t("library.unpin", "取消置顶") : t("library.pin", "置顶")}</button>
               </div>
             </div>
           );
         })
       )}
 
-      {nextCursor ? <button disabled={historyLoading} className="m-2 rounded border border-border py-2 text-xs" onClick={() => void useAskHistoryStore.getState().load(true)}>{historyLoading ? "加载中…" : "加载更早的 50 条会话"}</button> : null}
+      {nextCursor ? <button disabled={historyLoading} className="m-2 rounded border border-border py-2 text-xs" onClick={() => void useAskHistoryStore.getState().load(true)}>{historyLoading ? t("common.loading", "加载中…") : t("ask.loadOlderSessions", "加载更早的 50 条会话")}</button> : null}
       <HistoryRename session={renaming} close={() => setRenaming(null)} />
       <ConfirmDialog
         isOpen={confirmDelete !== null}

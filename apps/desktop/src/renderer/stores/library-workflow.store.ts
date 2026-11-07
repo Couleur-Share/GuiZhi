@@ -2,6 +2,7 @@ import { clearCachedConversationEvidence } from './conversation-evidence';
 import { create } from 'zustand';
 import type { KnowledgeItemQuery } from '@guizhi/shared/types';
 import type { KnowledgeBatchAction, KnowledgeBatchResult } from '@guizhi/shared/types/knowledge-batch';
+import { translate } from '../i18n';
 import { useKnowledgeStore } from './knowledge.store';
 import { runGuardedMutation } from './operation-error.store';
 
@@ -30,7 +31,7 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
     if (get().busy) return false;
     set({ busy: true });
     try {
-      return await runGuardedMutation('library.review', '打开连续整理', async () => {
+      return await runGuardedMutation('library.review', translate('library.actionOpenWorkflow', '打开连续整理'), async () => {
         const query = currentQuery();
         const result = await window.api.knowledge.selection({ action: 'freeze', query });
         if (!result.ok || !result.ids) throw new Error(result.error || '读取整理范围失败');
@@ -44,7 +45,7 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
     if (get().busy) return false;
     set({ busy: true });
     try {
-      return await runGuardedMutation('library.review', '切换资料', async () => {
+      return await runGuardedMutation('library.review', translate('library.actionSwitchWorkflowItem', '切换资料'), async () => {
         const library = useKnowledgeStore.getState();
         if (!(await library.flushPendingSave())) throw new Error(library.saveError || '保存未完成');
         const order = get().reviewIds, step = direction < 0 ? -1 : 1;
@@ -57,24 +58,24 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
           if (!(await useKnowledgeStore.getState().selectItem(id))) throw new Error('资料读取失败，请重试');
           return;
         }
-        set({ notice: '已到本次整理范围的边界' });
+        set({ notice: translate('library.workflowBoundary', '已到本次整理范围的边界') });
       });
     } finally { set({ busy: false }); }
   },
   selectAllMatching: async () => {
-    await runGuardedMutation('library.selectAll', '选择筛选结果', async () => {
+    await runGuardedMutation('library.selectAll', translate('library.actionSelectAllMatching', '选择筛选结果'), async () => {
       const query = currentQuery(), result = await window.api.knowledge.selection({ action: 'freeze', query });
       if (!result.ok || !result.ids) throw new Error(result.error || '冻结选择失败');
       if (JSON.stringify(query) !== JSON.stringify(currentQuery())) throw new Error('筛选已变化，请重新选择');
       useKnowledgeStore.getState().setSelection(result.ids);
-      set({ notice: `已冻结 ${result.ids.length} 项，之后新增的资料不在本次选择中` });
+      set({ notice: translate('library.workflowFrozen', '已冻结 {{count}} 项，之后新增的资料不在本次选择中', { count: result.ids.length }) });
     });
   },
   execute: async (ids, command, retry = false) => {
     if (get().busy) return false;
     set({ busy: true });
     try {
-      const ok = await runGuardedMutation('library.batch', '批量操作', async () => {
+      const ok = await runGuardedMutation('library.batch', translate('library.actionBatch', '批量操作'), async () => {
         if (!(await useKnowledgeStore.getState().flushPendingSave())) throw new Error('请先处理草稿保存错误');
         const targets = [...new Set(ids)], query = currentQuery();
         if (!retry) set({ results: [], command, batchId: crypto.randomUUID() });
@@ -84,7 +85,7 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
           try {
             const reply = await window.api.knowledge.selection({ action: 'execute', runId: get().batchId ?? undefined, ids: chunk, command });
             if (!reply.ok || !reply.results) throw new Error(reply.error || '批量操作未返回结果');
-            results = chunk.map(id => reply.results!.find(result => result.id === id) ?? { id, ok: false, error: '未返回此条结果' });
+            results = chunk.map(id => reply.results!.find(result => result.id === id) ?? { id, ok: false, error: translate('library.workflowNoResult', '未返回此条结果') });
           } catch (error) { results = chunk.map(id => ({ id, ok: false, error: String(error) })); }
           if (command.kind === 'delete' && command.clearEvidence) clearCachedConversationEvidence(results.filter(row => row.ok).map(row => row.id));
           set(s => ({ results: [...s.results.filter(row => !chunk.includes(row.id)), ...results] }));
@@ -94,7 +95,7 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
         await useKnowledgeStore.getState().refreshAll();
         const selected = useKnowledgeStore.getState().selectedId;
         if (selected && targets.includes(selected)) await useKnowledgeStore.getState().selectItem(selected);
-        set({ notice: `成功 ${get().results.length - failures.length} 项，失败 ${failures.length} 项` });
+        set({ notice: translate('library.workflowSummary', '成功 {{succeeded}} 项，失败 {{failed}} 项', { succeeded: get().results.length - failures.length, failed: failures.length }) });
       });
       return ok && get().results.every(row => row.ok);
     } finally { set({ busy: false }); }
@@ -108,6 +109,6 @@ export const useLibraryWorkflowStore = create<Workflow>((set, get) => ({
 useKnowledgeStore.subscribe((state, previous) => {
   if (previous.selectionIds.length && (state.scope !== previous.scope || state.collectionId !== previous.collectionId ||
     state.tagId !== previous.tagId || state.platform !== previous.platform || state.searchQuery !== previous.searchQuery)) {
-    useLibraryWorkflowStore.setState({ notice: '筛选已变化，原来的跨页选择已清空' });
+    useLibraryWorkflowStore.setState({ notice: translate('library.workflowSelectionCleared', '筛选已变化，原来的跨页选择已清空') });
   }
 });

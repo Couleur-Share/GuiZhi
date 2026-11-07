@@ -19,7 +19,8 @@ vi.mock("../../../src/renderer/stores/ui.store", () => ({
   useUIStore: (select: (state: any) => unknown) =>
     select({ isFocusReadingMode: false }),
 }));
-vi.mock("react-i18next", () => ({
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react-i18next")>(),
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
 vi.mock("../../../src/renderer/components/library/ItemDetailHeader", () => ({

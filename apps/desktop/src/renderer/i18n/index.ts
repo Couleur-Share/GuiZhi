@@ -102,6 +102,15 @@ export const i18nReady = (async () => {
   }
 })();
 
+/**
+ * 非组件模块（store、工具函数）取文案。i18n 未初始化时（单测、初始化失败）
+ * i18n.t 返回 undefined，这里改用兜底文案并做 {{变量}} 插值，保证不出现空文案。
+ */
+export function translate(key: string, fallback: string, options?: Record<string, unknown>): string {
+  if (i18n.isInitialized) return i18n.t(key, { ...options, defaultValue: fallback });
+  return fallback.replace(/\{\{(\w+)\}\}/g, (_, name: string) => String(options?.[name] ?? ''));
+}
+
 // Change language
 // 切换语言
 export const changeLanguage = async (lang: string) => {

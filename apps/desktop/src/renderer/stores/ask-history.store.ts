@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AskSessionMeta, AskSessionQuery } from '@guizhi/shared/types/ask';
+import { translate } from '../i18n';
 import { runGuardedMutation } from './operation-error.store';
 interface HistoryState {
   articles: { id: string; title: string }[]; entries: AskSessionMeta[]; query: AskSessionQuery; nextCursor: string | null; loading: boolean; error: string | null;
@@ -30,5 +31,5 @@ export const useAskHistoryStore = create<HistoryState>((set, get) => ({
     } catch (e) { if (request === generation) set({ error: e instanceof Error ? e.message : String(e) }); }
     finally { if (request === generation) set({ loading: false }); }
   },
-  update: (id, patch) => runGuardedMutation('ask.history', '更新会话', async () => { await window.api.askSession.updateMeta(id, patch); await get().load(); }),
+  update: (id, patch) => runGuardedMutation('ask.history', translate('ask.actionUpdateSession', '更新会话'), async () => { await window.api.askSession.updateMeta(id, patch); await get().load(); }),
 }));

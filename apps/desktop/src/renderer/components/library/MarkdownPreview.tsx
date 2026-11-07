@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import { remarkGfmPlugins } from "../../utils/remark-gfm-plugins";
 import rehypeHighlight from "rehype-highlight";
@@ -41,6 +42,7 @@ function CodeBlock({
   children?: ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const codeChild = Children.toArray(children).find((child) =>
     isValidElement<{ className?: string; children?: ReactNode }>(child),
@@ -76,8 +78,8 @@ function CodeBlock({
           type="button"
           onClick={() => void copy()}
           className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-background/80 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover/code:opacity-100 focus-visible:opacity-100"
-          aria-label={copied ? "已复制" : "复制代码"}
-          title={copied ? "已复制" : "复制代码"}
+          aria-label={copied ? t("ask.copied", "已复制") : t("library.copyCode", "复制代码")}
+          title={copied ? t("ask.copied", "已复制") : t("library.copyCode", "复制代码")}
         >
           {copied ? (
             <CheckIcon

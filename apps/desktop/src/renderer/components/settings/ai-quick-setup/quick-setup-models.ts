@@ -15,13 +15,13 @@ export type QuickSetupRole = "text" | "embedding" | "vision" | "audio" | "imageG
 
 export const ROLE_META: Record<
   QuickSetupRole,
-  { label: string; capabilities: AIModelCapabilities; routes: AIModelRoute[] }
+  { labelKey: string; fallback: string; capabilities: AIModelCapabilities; routes: AIModelRoute[] }
 > = {
-  text: { label: "基础问答", capabilities: { chat: true }, routes: ["mainText", "fastText"] },
-  embedding: { label: "语义检索", capabilities: { chat: false, embedding: true }, routes: ["embedding"] },
-  vision: { label: "图片识别", capabilities: { chat: true, vision: true }, routes: ["visionText"] },
-  audio: { label: "语音转写", capabilities: { chat: false, audioTranscription: true }, routes: ["audioText"] },
-  imageGen: { label: "正文配图", capabilities: { chat: false, imageGeneration: true }, routes: ["imageGen"] },
+  text: { labelKey: "settings.quickSetupBasic", fallback: "基础问答", capabilities: { chat: true }, routes: ["mainText", "fastText"] },
+  embedding: { labelKey: "settings.quickSetupSemantic", fallback: "语义检索", capabilities: { chat: false, embedding: true }, routes: ["embedding"] },
+  vision: { labelKey: "settings.aiScenarioOcr", fallback: "图片识别", capabilities: { chat: true, vision: true }, routes: ["visionText"] },
+  audio: { labelKey: "settings.aiScenarioTranscription", fallback: "语音转写", capabilities: { chat: false, audioTranscription: true }, routes: ["audioText"] },
+  imageGen: { labelKey: "settings.aiScenarioIllustration", fallback: "正文配图", capabilities: { chat: false, imageGeneration: true }, routes: ["imageGen"] },
 };
 
 export function rolesForGoals(goals: Set<QuickSetupGoal>): QuickSetupRole[] {

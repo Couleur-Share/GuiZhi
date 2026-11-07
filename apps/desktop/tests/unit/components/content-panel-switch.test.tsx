@@ -5,7 +5,8 @@ import type { KnowledgeItem } from "@guizhi/shared/types";
 import { ContentPanel } from "../../../src/renderer/components/library/ContentPanel";
 import { saveContentReadingMemory } from "../../../src/renderer/components/library/reading-memory";
 
-vi.mock("react-i18next", () => ({
+vi.mock("react-i18next", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react-i18next")>(),
   useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
 }));
 vi.mock("../../../src/renderer/components/ui/Toast", () => ({

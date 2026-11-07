@@ -10,7 +10,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useTranslation } from "react-i18next";
 import type { KnowledgeItem, WebSnapshotView } from "@guizhi/shared/types";
+import { translate } from "../../i18n";
 import { Select } from "../ui/Select";
 import { useToast } from "../ui/Toast";
 import { ImageLightbox } from "./ImageLightbox";
@@ -39,6 +41,7 @@ export function WebSnapshotPane({
   onOriginalChange?: (original: boolean) => void;
   onFindOpen?: () => void;
 }) {
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const [view, setView] = useState<WebSnapshotView | null>(null),
     [error, setError] = useState<string | null>(null);
@@ -81,7 +84,7 @@ export function WebSnapshotPane({
       .then((result) => {
         if (canceled) return;
         if (!result.ok || result.data?.error) {
-          setError(result.error || result.data?.error || "读取网页快照失败");
+          setError(result.error || result.data?.error || translate("library.snapshotLoadFailed", "读取网页快照失败"));
           return;
         }
         setView(result.data!);
@@ -171,7 +174,7 @@ export function WebSnapshotPane({
             (task) => task.status !== "completed",
           );
           showToast(
-            failures.length ? "网页补采未完成" : "网页快照版本已保存",
+            failures.length ? translate("library.snapshotSupplementIncomplete", "网页补采未完成") : translate("library.snapshotVersionSaved", "网页快照版本已保存"),
             failures.length ? "error" : "success",
             {
               detail: matched
@@ -200,7 +203,7 @@ export function WebSnapshotPane({
     setBusy(true);
     const ok = await runGuardedMutation(
       "webSnapshot.supplement",
-      "补采公众号网页",
+      t("library.snapshotSupplementWechat", "补采公众号网页"),
       async () => {
         const result = await window.api.webCapture.supplement([item.id]);
         if (!result.ok) throw new Error(result.error);
@@ -213,7 +216,7 @@ export function WebSnapshotPane({
     let exported: { canceled?: boolean; path?: string; incomplete?: boolean };
     const ok = await runGuardedMutation(
       "webSnapshot.export",
-      "导出网页快照 HTML",
+      t("library.snapshotExportHtml", "导出网页快照 HTML"),
       async () => {
         const result = await window.api.webCapture.exportHtml(
           item.id,
@@ -225,7 +228,7 @@ export function WebSnapshotPane({
     );
     if (ok && !exported?.canceled)
       showToast(
-        exported?.incomplete ? "已导出，部分资源有缺失" : "网页快照 HTML 已导出",
+        exported?.incomplete ? t("library.snapshotExportedIncomplete", "已导出，部分资源有缺失") : t("library.snapshotExported", "网页快照 HTML 已导出"),
         exported?.incomplete ? "warning" : "success",
       );
   };
@@ -233,33 +236,33 @@ export function WebSnapshotPane({
   const toolbar = (
 <div className="flex shrink-0 items-center gap-1.5">
         <span data-testid="snapshot-reading-mode" className="px-2 text-xs text-muted-foreground">
-          {original ? "网页快照" : view?.edited && !versionId ? "正文已编辑" : "标准排版"}
+          {original ? t("articleAsk.view.snapshot", "网页快照") : view?.edited && !versionId ? t("library.snapshotModeEdited", "正文已编辑") : t("library.snapshotModeSimple", "标准排版")}
         </span>
         {!original && view?.document ? (
-          <button className={button} onClick={() => setMode("original")} disabled={forceSimple}>查看网页快照</button>
+          <button className={button} onClick={() => setMode("original")} disabled={forceSimple}>{t("library.snapshotViewOriginal", "查看网页快照")}</button>
         ) : original && view?.edited && !versionId ? (
-          <button className={button} onClick={() => setMode("simple")}>返回编辑后正文</button>
+          <button className={button} onClick={() => setMode("simple")}>{t("library.snapshotBackToEdited", "返回编辑后正文")}</button>
         ) : null}
-        {original && !reader.wideRail ? <button data-snapshot-toc-trigger className={button} aria-expanded={reader.catalogOpen} onClick={()=>reader.setCatalogOpen(!reader.catalogOpen)}>目录</button> : null}
+        {original && !reader.wideRail ? <button data-snapshot-toc-trigger className={button} aria-expanded={reader.catalogOpen} onClick={()=>reader.setCatalogOpen(!reader.catalogOpen)}>{t("library.catalog", "目录")}</button> : null}
         {original ? (
           <Select
             className="w-32"
             triggerClassName="flex h-7 w-full items-center gap-1 rounded-lg bg-muted px-2 text-xs text-left focus-visible:ring-2 focus-visible:ring-primary"
-            ariaLabel="网页快照宽度"
+            ariaLabel={t("library.snapshotWidth", "网页快照宽度")}
             value={width}
             onChange={(value) => {
               setWidth(value);
               localStorage.setItem("wechat-reader-width", value);
             }}
             options={[
-              { value: "original", label: "网页宽度" },
-              { value: "fluid", label: "自适应宽度" },
-              { value: "wide", label: "铺满宽度" },
+              { value: "original", label: t("library.snapshotWidthOriginal", "网页宽度") },
+              { value: "fluid", label: t("library.snapshotWidthFluid", "自适应宽度") },
+              { value: "wide", label: t("library.snapshotWidthWide", "铺满宽度") },
             ]}
           />
         ) : null}
-        <button ref={menuTrigger} className={button} type="button" aria-haspopup="menu" aria-expanded={!!menu} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setMenu(menu ? null : {x:rect.left,y:rect.bottom+4});}}>更多</button>
-        {busy ? <span className="whitespace-nowrap text-xs text-muted-foreground">正在补采…</span> : null}
+        <button ref={menuTrigger} className={button} type="button" aria-haspopup="menu" aria-expanded={!!menu} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();setMenu(menu ? null : {x:rect.left,y:rect.bottom+4});}}>{t("common.more", "更多")}</button>
+        {busy ? <span className="whitespace-nowrap text-xs text-muted-foreground">{t("library.snapshotSupplementing", "正在补采…")}</span> : null}
       </div>
   );
   return (
@@ -269,36 +272,36 @@ export function WebSnapshotPane({
     >
       {toolbarTarget ? createPortal(toolbar, toolbarTarget) : <div className="border-b border-border p-2">{toolbar}</div>}
       {menu ? <ContextMenu ignoreRef={menuTrigger} x={menu.x} y={menu.y} onClose={()=>setMenu(null)} items={[
-        ...(original ? [{label:view?.edited && !versionId ? "查看编辑后正文" : "切换到标准排版",onClick:()=>setMode("simple")}] : []),
-        ...(!item.deletedAt ? [{label:snapshot?.failures.length ? "重试缺失资源" : "补采 / 更新网页快照",disabled:busy,onClick:()=>void supplement()}] : []),
-        ...(snapshot ? [{label:"导出网页快照 HTML",onClick:()=>void exportHtml()}] : []),
-        ...(busy ? [{label:"取消补采",onClick:()=>void runGuardedMutation("webSnapshot.cancel","取消补采",async()=>{for(const id of tasks)if(!await window.api.import.cancel(id))throw new Error("任务已结束或无法取消");})}] : []),
+        ...(original ? [{label:view?.edited && !versionId ? t("library.snapshotViewEdited", "查看编辑后正文") : t("library.snapshotSwitchSimple", "切换到标准排版"),onClick:()=>setMode("simple")}] : []),
+        ...(!item.deletedAt ? [{label:snapshot?.failures.length ? t("library.snapshotRetryMissing", "重试缺失资源") : t("library.snapshotSupplementUpdate", "补采 / 更新网页快照"),disabled:busy,onClick:()=>void supplement()}] : []),
+        ...(snapshot ? [{label:t("library.snapshotExportHtml", "导出网页快照 HTML"),onClick:()=>void exportHtml()}] : []),
+        ...(busy ? [{label:t("library.snapshotCancelSupplement", "取消补采"),onClick:()=>void runGuardedMutation("webSnapshot.cancel",t("library.snapshotCancelSupplement", "取消补采"),async()=>{for(const id of tasks)if(!await window.api.import.cancel(id))throw new Error("任务已结束或无法取消");})}] : []),
       ]}/> : null}
       {error ? (
         <div className="p-3 text-sm text-destructive" role="alert">
           {error}
           <button className={button} onClick={reload}>
-            重试读取
+            {t("library.snapshotRetryLoad", "重试读取")}
           </button>
         </div>
       ) : null}
       {!view && !error ? (
-        <p className="p-3 text-sm text-muted-foreground">正在读取网页快照…</p>
+        <p className="p-3 text-sm text-muted-foreground">{t("library.snapshotLoading", "正在读取网页快照…")}</p>
       ) : null}
       {view && !snapshot ? (
         <p className="p-3 text-sm text-muted-foreground">
-          尚未保存网页快照，当前显示标准排版。
-          {!item.deletedAt ? <button className={`${button} ml-2`} disabled={busy} onClick={() => void supplement()}>补采网页快照</button> : null}
+          {t("library.snapshotMissing", "尚未保存网页快照，当前显示标准排版。")}
+          {!item.deletedAt ? <button className={`${button} ml-2`} disabled={busy} onClick={() => void supplement()}>{t("library.snapshotSupplement", "补采网页快照")}</button> : null}
         </p>
       ) : null}
       {view?.edited ? (
         <p className="px-3 py-1 text-xs text-muted-foreground">
-          {original ? "当前查看采集时的原文快照，不包含你的正文修改。" : "当前显示编辑后的正文，原文快照仍保留采集时内容。"}
+          {original ? t("library.snapshotOriginalHint", "当前查看采集时的原文快照，不包含你的正文修改。") : t("library.snapshotEditedHint", "当前显示编辑后的正文，原文快照仍保留采集时内容。")}
         </p>
       ) : null}
       {view?.pending ? (
         <p className="px-3 py-1 text-xs text-muted-foreground">
-          有新来源版本，请在“网页快照版本”中比较并采用。
+          {t("library.snapshotPendingVersion", "有新来源版本，请在“网页快照版本”中比较并采用。")}
         </p>
       ) : null}
       {snapshot?.failures.length || snapshot?.warnings.length ? (
@@ -320,7 +323,7 @@ export function WebSnapshotPane({
             data-article-target={JSON.stringify({ itemId: item.id, view: "snapshot", versionId: view?.version?.id })}
             ref={frame}
             onLoad={sendFind}
-            aria-label="微信公众号原文快照"
+            aria-label={t("library.snapshotFrame", "微信公众号原文快照")}
             sandbox="allow-scripts"
             referrerPolicy="no-referrer"
             srcDoc={view.document}
@@ -355,7 +358,7 @@ export async function supplementWechatSelection(
 ): Promise<boolean> {
   return runGuardedMutation(
     "webSnapshot.supplement",
-    "批量补采公众号网页",
+    translate("library.snapshotSupplementWechatBulk", "批量补采公众号网页"),
     async () => {
       if (!(await useKnowledgeStore.getState().flushPendingSave())) return;
       if (useKnowledgeStore.getState().hasUnsavedChanges)

@@ -6,7 +6,7 @@ import { Select } from "../../ui/Select";
 import { getCategoryIcon } from "../../ui/ModelIcons";
 import { PasswordInput, ToggleSwitch } from "../shared";
 import { PROVIDER_OPTIONS } from "./constants";
-import { getProviderInfo } from "./helpers";
+import { getProviderInfo, getProviderOptionLabel } from "./helpers";
 import { Modal } from "../../ui/Modal";
 import type { EndpointDraft } from "./types";
 import {
@@ -30,7 +30,7 @@ export function EndpointFormModal({
   const providerInfo = getProviderInfo(endpointDraft.provider);
   const showProtocolField = providerInfo?.allowsCustomProtocol === true;
   const isAddingProvider = endpointDraft.key === "";
-  const providerTypeLabel = providerInfo?.name || endpointDraft.provider;
+  const providerTypeLabel = getProviderOptionLabel(providerInfo) || endpointDraft.provider;
   const trimmedApiUrl = endpointDraft.apiUrl.trim();
   const normalizedInput = useMemo(
     () => normalizeApiUrlInput(endpointDraft.apiUrl),
@@ -73,10 +73,10 @@ export function EndpointFormModal({
         <span aria-hidden="true" className="shrink-0">
           {getCategoryIcon(item.iconCategory, 18)}
         </span>
-        <span className="truncate">{item.name}</span>
+        <span className="truncate">{getProviderOptionLabel(item)}</span>
       </span>
     ),
-    labelText: item.name,
+    labelText: getProviderOptionLabel(item),
   }));
 
   return (
@@ -128,7 +128,7 @@ export function EndpointFormModal({
                 prev
                   ? (() => {
                       const previousTypeName =
-                        getProviderInfo(prev.provider)?.name || prev.provider;
+                        getProviderOptionLabel(getProviderInfo(prev.provider)) || prev.provider;
                       const shouldReplaceName =
                         isAddingProvider &&
                         (!prev.name.trim() ||
@@ -137,7 +137,7 @@ export function EndpointFormModal({
                       return {
                         ...prev,
                         name: shouldReplaceName
-                          ? provider?.name || value
+                          ? getProviderOptionLabel(provider) || value
                           : prev.name,
                         provider: value,
                         apiProtocol:

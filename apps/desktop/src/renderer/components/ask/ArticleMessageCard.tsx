@@ -38,10 +38,10 @@ export function ArticleMessageCard({ message, running, onRetry, onLocate }: {
     {message.error ? <p role="alert" className="whitespace-pre-wrap break-words text-sm text-destructive">{message.error}</p> : null}
     {message.truncated ? <p role="status" className="text-xs text-destructive">{t("ask.answerTruncated", "回答达到模型输出长度上限，内容可能不完整。")}</p> : null}
     <div className="flex flex-wrap gap-1.5">{message.sources.map(s => <button type="button" key={s.ordinal} onClick={() => open(s)} className="max-w-full truncate rounded border border-border px-2 py-1 text-left text-xs">[{s.ordinal}] {s.title}</button>)}</div>
-    {source?.evidence && locationError ? <p role="status" className="text-xs text-muted-foreground">无法定位当前来源，历史摘录仍可查看。</p> : null}
+    {source?.evidence && locationError ? <p role="status" className="text-xs text-muted-foreground">{t("articleAsk.locateFailedEvidence", "无法定位当前来源，历史摘录仍可查看。")}</p> : null}
     {source?.evidence || source?.cleared ? <EvidenceExcerpt evidence={source.evidence} cleared={source.cleared} onCurrent={() => void locate()} onClose={() => setSource(null)} /> : source ? <section className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs" aria-label={t("articleAsk.excerpt", "引用摘录")}>
       <p className="font-medium">{source.title}</p>
-      <p className="max-h-48 overflow-auto whitespace-pre-wrap">{source.text || "未保存历史片段；当前版本可能已变化。"}</p>
+      <p className="max-h-48 overflow-auto whitespace-pre-wrap">{source.text || t("articleAsk.excerptNotSaved", "未保存历史片段；当前版本可能已变化。")}</p>
       {locationError ? <p role="status">{t("articleAsk.locateFailed", "无法定位到当前来源，以上是回答时保存的摘录。")}</p> : null}
       <button type="button" className="text-primary underline" onClick={() => void locate()}>{source.kind === "web" ? t("articleAsk.openSource", "打开网页来源") : t("articleAsk.locate", "定位到原文")}</button>
       <button type="button" className="ml-3 text-muted-foreground" onClick={() => setSource(null)}>{t("common.close", "关闭")}</button>

@@ -26,7 +26,7 @@ import { Select } from "../../../ui/Select";
 import { getCategoryIcon } from "../../../ui/ModelIcons";
 import { PasswordInput } from "../../shared";
 import { PROVIDER_OPTIONS } from "../constants";
-import { getProviderInfo } from "../helpers";
+import { getProviderInfo, getProviderOptionLabel } from "../helpers";
 import type { ModelFormState } from "../types";
 
 function CapabilityCheckbox({
@@ -168,10 +168,10 @@ export function BaseFields({
         <span aria-hidden="true" className="shrink-0">
           {getCategoryIcon(item.iconCategory, 18)}
         </span>
-        <span className="truncate">{item.name}</span>
+        <span className="truncate">{getProviderOptionLabel(item)}</span>
       </span>
     ),
-    labelText: item.name,
+    labelText: getProviderOptionLabel(item),
   }));
 
   return (

@@ -74,8 +74,8 @@ export function ThemedReadingPane({
   const toolbar = (
     <div className="flex shrink-0 items-center gap-1">
       <div ref={setReaderToolbar} className="flex items-center" />
-      {page&&view.task?.previewRevision&&view.task.versionId!==page.id&&!view.latest?<button className={themeButton} onClick={()=>setPreviewOpen(!previewOpen)}>{previewOpen?"返回当前版":"预览新稿"}</button>:null}
-      {view.latest?<button className={themeButton} onClick={()=>{view.adoptLatest();setPreviewOpen(false);}}>新版已完成 · 切换</button>:null}
+      {page&&view.task?.previewRevision&&view.task.versionId!==page.id&&!view.latest?<button className={themeButton} onClick={()=>setPreviewOpen(!previewOpen)}>{previewOpen?t("themedReading.readerBackToCurrent","返回当前版"):t("themedReading.readerPreviewDraft","预览新稿")}</button>:null}
+      {view.latest?<button className={themeButton} onClick={()=>{view.adoptLatest();setPreviewOpen(false);}}>{t("themedReading.readerSwitchLatest","新版已完成 · 切换")}</button>:null}
       {page ? (
         <ThemedReadingPageTools
           view={view}

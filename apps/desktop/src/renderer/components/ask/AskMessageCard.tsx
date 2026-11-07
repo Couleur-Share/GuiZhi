@@ -140,7 +140,7 @@ function SourceList({
                 aria-hidden="true"
               />
             )}
-            <span className="min-w-0 truncate">{source.title}{source.evidence?.reviewStatus === "needs_review" ? " · 待复核" : ""}</span>
+            <span className="min-w-0 truncate">{source.title}{source.evidence?.reviewStatus === "needs_review" ? ` · ${t("ask.sourceNeedsReview", "待复核")}` : ""}</span>
           </button>
         ))}
       </div>
@@ -315,7 +315,7 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
           />
         ) : null}
 
-        {message.evidenceSources?.length ? <details className="my-2 text-xs text-muted-foreground"><summary className="cursor-pointer">本次读取的全部证据（{message.evidenceSources.length}）</summary><div className="flex flex-wrap gap-2 py-2">{message.evidenceSources.map((entry, index) => <button key={index} className="rounded border border-border px-2 py-1 text-left" onClick={() => setSource(entry)}>{entry.title}</button>)}</div></details> : null}
+        {message.evidenceSources?.length ? <details className="my-2 text-xs text-muted-foreground"><summary className="cursor-pointer">{t("ask.evidenceAll", "本次读取的全部证据（{{count}}）", { count: message.evidenceSources.length })}</summary><div className="flex flex-wrap gap-2 py-2">{message.evidenceSources.map((entry, index) => <button key={index} className="rounded border border-border px-2 py-1 text-left" onClick={() => setSource(entry)}>{entry.title}</button>)}</div></details> : null}
         {source ? <EvidenceExcerpt evidence={source.evidence} cleared={source.cleared} onCurrent={() => void openSource(source)} onClose={() => setSource(null)} /> : null}
         {!isRunning ? (
           <div className="mt-1 flex flex-wrap items-center gap-x-2">

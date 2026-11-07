@@ -43,7 +43,7 @@ export function ForumFloorCatalog({
     return replies.filter((reply) => {
       const hay = [
         String(reply.floor),
-        `${reply.floor} 楼`,
+        t("library.forumFloor", "{{floor}} 楼", { floor: reply.floor }),
         reply.author,
         reply.content,
         reply.replyTo?.author ?? "",
@@ -53,7 +53,7 @@ export function ForumFloorCatalog({
         .toLowerCase();
       return hay.includes(needle);
     });
-  }, [filter, replies]);
+  }, [filter, replies, t]);
 
   if (!open) {
     return (
@@ -117,7 +117,7 @@ export function ForumFloorCatalog({
                 }`}
               >
                 <span className="truncate text-[11px] font-medium">
-                  {reply.floor} 楼 · {reply.author || "匿名"}
+                  {t("library.forumFloor", "{{floor}} 楼", { floor: reply.floor })} · {reply.author || t("library.forumAnonymous", "匿名")}
                 </span>
                 {snippet ? (
                   <span className="line-clamp-2 text-[10px] leading-snug opacity-70">

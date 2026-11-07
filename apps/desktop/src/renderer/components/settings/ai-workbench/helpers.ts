@@ -3,6 +3,7 @@ import type {
   AIProviderConfig,
 } from "../../../stores/settings.store";
 import { findMatchingAIProvider } from "../../../stores/settings/settings-ai";
+import { translate } from "../../../i18n";
 
 import { DEFAULT_MODEL_CAPABILITIES, PROVIDER_OPTIONS } from "./constants";
 import type { ModelFormState, ModelOption, ProviderOption } from "./types";
@@ -150,8 +151,17 @@ export function getProviderInfo(
   return PROVIDER_OPTIONS.find((item) => item.id === providerId);
 }
 
+export function getProviderOptionLabel(
+  option: ProviderOption | undefined,
+): string | undefined {
+  if (!option) return undefined;
+  return option.labelKey
+    ? translate(option.labelKey, option.fallback)
+    : option.fallback;
+}
+
 export function getProviderLabel(providerId: string): string {
-  return getProviderInfo(providerId)?.name || providerId || "Unknown";
+  return getProviderOptionLabel(getProviderInfo(providerId)) || providerId || "Unknown";
 }
 
 export function getEndpointDisplayName(input: {

@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { changeLanguage, i18nReady } from "../../../src/renderer/i18n";
 import { InboxWorkspace } from "../../../src/renderer/components/inbox/InboxWorkspace";
 import { ToastProvider } from "../../../src/renderer/components/ui/Toast";
 import { useCollectionStore } from "../../../src/renderer/stores/collection.store";
@@ -22,6 +23,11 @@ function actionButton(title: string) {
   if (!card) throw new Error(`找不到聚合卡：${title}`);
   return within(card).getByRole("button");
 }
+
+beforeAll(async () => {
+  await i18nReady;
+  await changeLanguage("zh");
+});
 
 beforeEach(() => {
   const refresh = vi.fn(async () => undefined);
