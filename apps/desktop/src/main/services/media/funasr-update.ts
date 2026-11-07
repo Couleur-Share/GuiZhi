@@ -6,8 +6,13 @@ import type {
   ToolUpdateCheck,
 } from "@guizhi/shared/types";
 import { resolvePublicAddress } from "../net-safety";
-import { fetchWithNetworkProxy, hasAnyProxyConfigured } from "../network-proxy";
+import {
+  fetchWithNetworkProxy,
+  hasAnyProxyConfigured,
+  resolveManualProxy,
+} from "../network-proxy";
 import { ensureFunasrPip, type RunFunasrTool } from "./funasr-pip";
+import { FUNASR_SOCKS_PROXY_HINT } from "./funasr-proxy";
 import {
   cleanupFunasrBackups,
   createFunasrBackup,
@@ -34,6 +39,7 @@ import {
 } from "./funasr-service";
 
 const PYPI_URL = "https://pypi.org/pypi/funasr/json";
+const PIP_INDEX_URL = "https://pypi.org/simple";
 const VERSION_PATTERN = /^\d+\.\d+(?:\.\d+)*$/;
 
 /** 只接收稳定数字版本，避免预发布、未知格式或版本字符串进入 pip 参数。 */
@@ -111,6 +117,9 @@ export async function updateWindowsFunasr(
   if (typeof version !== "string" || !VERSION_PATTERN.test(version)) {
     throw new Error("无效的 FunASR 更新版本");
   }
+  // 先于停服务和备份依赖环境：pip 无法经 SOCKS 代理访问索引。
+  if (resolveManualProxy(new URL(PIP_INDEX_URL))?.socks)
+    throw new Error(FUNASR_SOCKS_PROXY_HINT);
   const emitProgress = (progress: FunasrInstallProgress) => {
     try {
       onProgress?.(progress);
@@ -194,7 +203,7 @@ export async function updateWindowsFunasr(
           "--only-binary=:all:",
           `funasr==${version}`,
           "-i",
-          "https://pypi.org/simple",
+          PIP_INDEX_URL,
         ],
         {
           timeoutMs: 30 * 60_000,

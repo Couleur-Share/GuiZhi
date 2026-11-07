@@ -141,7 +141,11 @@ export function getHttpRequestAgent(
     cachedSocksAgent = getCachedAgent(
       proxyUrl,
       cachedSocksAgent,
-      () => new SocksProxyAgent(proxyUrl) as unknown as RequestAgent,
+      // 域名必须交给代理解析（socks5h）：本地解析在 fake-IP 或 DNS 污染下会把错误地址发给代理。
+      () =>
+        new SocksProxyAgent(
+          proxyUrl.replace(/^socks5:/, "socks5h:"),
+        ) as unknown as RequestAgent,
     );
     return cachedSocksAgent;
   }

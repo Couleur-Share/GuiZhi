@@ -43,6 +43,11 @@ import {
   probeFunasrHealth,
   stopFunasrService,
 } from "./funasr-service";
+import { resolveManualProxy } from "../network-proxy";
+import {
+  FUNASR_SOCKS_PROXY_HINT,
+  explainFunasrProxyFailure,
+} from "./funasr-proxy";
 
 import { updateWindowsFunasr } from "./funasr-update";
 export { checkFunasrUpdate } from "./funasr-update";
@@ -235,7 +240,9 @@ function runTool(
         } else {
           reject(
             new Error(
-              `${path.basename(executable)} 退出码 ${code}: ${tail.trim().slice(-300)}`,
+              explainFunasrProxyFailure(
+                `${path.basename(executable)} 退出码 ${code}: ${tail.trim().slice(-300)}`,
+              ),
             ),
           );
         }
@@ -429,6 +436,9 @@ let operationInFlight = false;
 async function installWindowsPython(
   onProgress?: (progress: FunasrInstallProgress) => void,
 ): Promise<{ version?: string }> {
+  // 必须先于停服务、清理旧环境和下载运行时：pip 无法经 SOCKS 代理访问索引。
+  if (resolveManualProxy(new URL(PIP_INDEX_URL))?.socks)
+    throw new Error(FUNASR_SOCKS_PROXY_HINT);
   const paths = getFunasrPaths();
   stopFunasrService();
   fs.mkdirSync(paths.root, { recursive: true });

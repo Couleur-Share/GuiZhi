@@ -23,6 +23,7 @@ import {
   resolveGgufSensevoiceCli,
 } from "./funasr-paths";
 import { ensureFunasrServerScript } from "./funasr-server-script";
+import { explainFunasrProxyFailure } from "./funasr-proxy";
 import {
   startGgufShim,
   type GgufShimHandle,
@@ -222,7 +223,7 @@ async function startPythonAndWait(bootTimeoutMs: number): Promise<void> {
         summarizeProcessLog(logTail) || "进程异常退出（无可用日志）";
       detachLogging?.();
       child = null;
-      throw new Error(`本地转写服务启动失败：${reason}`);
+      throw new Error(`本地转写服务启动失败：${explainFunasrProxyFailure(reason)}`);
     }
     if (await probeFunasrHealth(2000)) {
       console.log(`[funasr] 服务已就绪（127.0.0.1:${FUNASR_PORT}）`);

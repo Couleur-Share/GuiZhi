@@ -9,10 +9,12 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   port: vi.fn(),
+  manualProxy: vi.fn(),
 }));
 vi.mock("../../../src/main/services/network-proxy", () => ({
   fetchWithNetworkProxy: mocks.fetch,
   hasAnyProxyConfigured: () => false,
+  resolveManualProxy: mocks.manualProxy,
 }));
 vi.mock("../../../src/main/services/net-safety", () => ({
   resolvePublicAddress: vi.fn(),
@@ -38,6 +40,7 @@ import {
   isNewerFunasrVersion,
   updateWindowsFunasr,
 } from "../../../src/main/services/media/funasr-update";
+import { FUNASR_SOCKS_PROXY_HINT } from "../../../src/main/services/media/funasr-proxy";
 
 const platform = process.platform;
 beforeEach(() => {
@@ -69,6 +72,7 @@ beforeEach(() => {
   });
   mocks.start.mockResolvedValue(undefined);
   mocks.port.mockResolvedValue(false);
+  mocks.manualProxy.mockReturnValue(null);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -196,6 +200,27 @@ describe("FunASR 更新事务", () => {
     await expect(updateWindowsFunasr("1.3.30", run)).rejects.toThrow(
       "磁盘空间不足",
     );
+    expect(mocks.stop).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(
+      fs
+        .readdirSync(getFunasrPaths().root)
+        .some((name) => name.startsWith("update-backup-")),
+    ).toBe(false);
+  });
+  it("手动 SOCKS5 代理下不联网检查、不停止服务、不创建备份、不运行 pip", async () => {
+    mocks.manualProxy.mockReturnValue({
+      proxyUrl: "socks5://127.0.0.1:1080",
+      socks: true,
+    });
+    const run = updater();
+    await expect(updateWindowsFunasr("1.3.30", run)).rejects.toThrow(
+      FUNASR_SOCKS_PROXY_HINT,
+    );
+    expect(mocks.manualProxy.mock.calls[0][0].href).toBe(
+      "https://pypi.org/simple",
+    );
+    expect(mocks.fetch).not.toHaveBeenCalled();
     expect(mocks.stop).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
     expect(
