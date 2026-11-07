@@ -31,12 +31,13 @@ vi.mock("../../../src/main/services/web-capture/web-electron-renderer", () => ({
     render = mocks.render;
   },
 }));
-vi.mock("../../../src/main/services/web-capture/web-html-extractor", () => ({
-  WebHtmlExtractor: class {
-    extract = mocks.extract;
-    close = mocks.close;
-    running = false;
-  },
+vi.mock("../../../src/main/services/web-capture/web-node-extractor", () => ({
+  WEB_EXTRACT_ENGINE: "readability/1",
+  webNodeExtractor: () => ({
+    extract: mocks.extract,
+    close: mocks.close,
+    running: false,
+  }),
 }));
 const request = {
   taskId: "test",

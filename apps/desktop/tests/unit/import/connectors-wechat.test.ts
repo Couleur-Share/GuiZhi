@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { extractContent } from "../../../src/main/services/import/connectors";
 import { fetchHtml } from "../../../src/main/services/import/safe-fetch";
 vi.mock("../../../src/main/services/import/safe-fetch", () => ({ fetchHtml: vi.fn() }));
+// 兼容采集与网页采集共用提取线程；单测里在进程内执行同一套提取规则。
+vi.mock("../../../src/main/services/web-capture/web-node-extractor", async () => {
+  const { extractWebArticle } = await import("../../../src/main/services/web-capture/web-extract-article");
+  return { webNodeExtractor: () => ({ extract: async (html: string, url: string, status: number) => extractWebArticle(html, url, status).result }) };
+});
 vi.mock("../../../src/main/services/web-capture/snapshot-assets",()=>({
   collectSnapshotAssets: vi.fn(async()=>({assets:[{fileName:"wechat-"+"a".repeat(64)+".jpg",sha256:"a".repeat(64),sourceUrl:"https://mmbiz.qpic.cn/example.jpg",bytes:10}],failures:[]})),
   releaseSnapshotAssets:vi.fn(),
