@@ -50,7 +50,17 @@ export default async context => {
         document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); return;
       } throw new Error("iframe 文本不存在");
     }, text);
-    await win.getByRole("button", { name: "解释这段", exact: true }).click();
+    // 选段菜单浮在 iframe 上方。菜单刚出现时浏览器可能仍按上一帧的命中区域把指针事件交给 iframe，
+    // 点击落进 iframe 会清空选区、菜单随之消失；先悬停到按钮确实收到指针（:hover）再点击。
+    const explain = win.getByRole("button", { name: "解释这段", exact: true });
+    let hovered = false;
+    for (let attempt = 0; attempt < 40 && !hovered; attempt++) {
+      await explain.hover({ position: { x: 8 + (attempt % 2), y: 8 } });
+      hovered = await explain.evaluate(element => element.matches(":hover"));
+      if (!hovered) await win.waitForTimeout(50);
+    }
+    assert.ok(hovered, "选段菜单按钮一直收不到指针事件");
+    await explain.click({ position: { x: 8, y: 8 } });
     assert.equal(await panel.locator("footer blockquote").innerText(), text);
     await panel.getByRole("button", { name: "发送", exact: true }).click();
     await panel.getByTestId("article-ask-message").last().getByText("fixture-model", { exact: true }).waitFor();
