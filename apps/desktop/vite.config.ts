@@ -83,6 +83,17 @@ export default defineConfig(async () => ({
     electron([
       { entry: "src/preload/reading-view.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-view-preload", emptyOutDir: true } } },
       { entry: "src/preload/reading-graphics.ts", onstart() {}, vite: { resolve: { alias: aliases }, build: { outDir: "out/reading-graphics-preload", emptyOutDir: true } } },
+      // 网页正文提取线程：依赖全部打进单文件，由主进程读出后以内联脚本启动（asar 内的文件不能直接作为 worker），
+      // 产物只能引用 Node 内置模块。linkedom 的可选依赖 canvas 换成它自带的替身；turndown 在 ES 模块里
+      // require 的 domino 也要打进来，否则运行时会按当前目录查找模块。
+      {
+        entry: "src/main/services/web-capture/web-extract-worker.ts",
+        onstart() {},
+        vite: {
+          resolve: { alias: { ...aliases, canvas: path.resolve(__dirname, "node_modules/linkedom/commonjs/canvas-shim.cjs") } },
+          build: { outDir: "out/web-extract-worker", emptyOutDir: true, commonjsOptions: { transformMixedEsModules: true } },
+        },
+      },
       {
         entry: "src/main/index.ts",
         onstart(args) {

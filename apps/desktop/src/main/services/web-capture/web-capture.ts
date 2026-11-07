@@ -6,6 +6,7 @@ import type {
 } from "@guizhi/shared/types";
 import { canonicalWebUrl } from "@guizhi/shared/utils/web-scope";
 import { ElectronWebCapture } from "./web-electron-capture";
+import { WEB_EXTRACT_ENGINE } from "./web-node-extractor";
 import { webRuntimeStatus } from "./web-runtime";
 import { webCaptureError } from "./web-error";
 import { createWebTrace } from "./web-trace";
@@ -90,7 +91,7 @@ export async function captureWebPage(
       paragraphs: [],
       contentHash: "",
       capturedAt: Date.now(),
-      engineVersion: "crawl4ai/0.9.3",
+      engineVersion: WEB_EXTRACT_ENGINE,
       complete: false,
       truncated: false,
       warnings: [],

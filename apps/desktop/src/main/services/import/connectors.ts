@@ -3,9 +3,6 @@
  */
 import fs from "fs/promises";
 import path from "path";
-import { Readability } from "@mozilla/readability";
-import { parseHTML } from "linkedom";
-import TurndownService from "turndown";
 import type {
   ImportCaptureStrategy,
   ImportSourceKind,
@@ -15,6 +12,7 @@ import type {
 import type { DouyinAweme } from "./douyin";
 import type { XiaohongshuNote } from "./xiaohongshu";
 import { fetchHtml } from "./safe-fetch";
+import { webNodeExtractor } from "../web-capture/web-node-extractor";
 import {
   classifyMediaFile,
   MEDIA_SIZE_LIMITS,
@@ -92,16 +90,6 @@ function firstLineTitle(text: string): string {
   return firstLine.length > TITLE_MAX_LENGTH
     ? `${firstLine.slice(0, TITLE_MAX_LENGTH)}…`
     : firstLine;
-}
-
-function createTurndown(): TurndownService {
-  const turndown = new TurndownService({
-    headingStyle: "atx",
-    codeBlockStyle: "fenced",
-    bulletListMarker: "-",
-  });
-  turndown.remove(["script", "style", "noscript", "iframe"]);
-  return turndown;
 }
 
 async function extractText(input: string): Promise<ExtractedContent> {
@@ -203,29 +191,41 @@ async function extractWebpage(
     };
   }
 
-  const { document } = parseHTML(fetched.html);
-  const pageTitle = document.querySelector("title")?.textContent?.trim() ?? "";
-
-  let article: { title?: string | null; content?: string | null } | null;
+  // 与网页采集共用正文提取线程（规则见 web-capture/web-extract-article.ts）。
+  let extracted;
   try {
-    article = new Readability(document as unknown as Document, { charThreshold: 100 }).parse();
-  } catch {
-    article = null;
+    extracted = await webNodeExtractor().extract(
+      fetched.html,
+      fetched.finalUrl,
+      200,
+      signal ?? new AbortController().signal,
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return {
+      title: fetched.finalUrl,
+      content: "",
+      itemType: "webpage",
+      sourceUri: null,
+      degradedReason: `网页正文提取失败：${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 
-  if (!article?.content) {
+  if (extracted.error) {
     return {
-      title: pageTitle || fetched.finalUrl,
+      title: extracted.title || fetched.finalUrl,
       content: "",
       itemType: "webpage",
       sourceUri: null,
       degradedReason:
-        "未能抽取网页正文（页面可能由脚本动态渲染，或需要登录后才能访问）",
+        extracted.error.code === "empty"
+          ? "未能抽取网页正文（页面可能由脚本动态渲染，或需要登录后才能访问）"
+          : extracted.error.message,
     };
   }
 
-  const markdown = createTurndown().turndown(article.content).trim();
-  const title = (article.title || pageTitle || fetched.finalUrl).trim();
+  const markdown = extracted.markdown;
+  const title = (extracted.title || fetched.finalUrl).trim();
   return {
     title:
       title.length > TITLE_MAX_LENGTH

@@ -4,7 +4,7 @@ import type {
   WebCaptureResult,
 } from "@guizhi/shared/types";
 import { canonicalWebUrl, inWebScope } from "@guizhi/shared/utils/web-scope";
-import { WebHtmlExtractor } from "./web-html-extractor";
+import { WEB_EXTRACT_ENGINE, webNodeExtractor } from "./web-node-extractor";
 import {
   WebElectronRenderer,
   type RenderedWebPage,
@@ -29,7 +29,7 @@ async function solvePage(request: WebCaptureRequest, signal: AbortSignal, settin
 }
 
 export class ElectronWebCapture {
-  private extractor = new WebHtmlExtractor();
+  private extractor = webNodeExtractor();
   private network = new WebTaskGate(8);
   private renderer = new WebElectronRenderer(this.network);
   private pages = new WebTaskGate(2);
@@ -124,7 +124,7 @@ export class ElectronWebCapture {
         finalUrl: page.url,
         links: page.links,
         capturedAt: Date.now(),
-        engineVersion: `crawl4ai/0.9.3-${engine}`,
+        engineVersion: `${WEB_EXTRACT_ENGINE}-${engine}`,
       };
     });
     this.operations.add(work);
