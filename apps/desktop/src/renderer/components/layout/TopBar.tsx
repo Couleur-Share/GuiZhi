@@ -7,6 +7,7 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { getRuntimeCapabilities } from "../../runtime";
 import { NewItemButton } from "./NewItemButton";
 import { WindowControls } from "./WindowControls";
+import { useSidebarCollapse } from "./use-sidebar-collapse";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -25,8 +26,8 @@ function openCommandPalette(): void {
  */
 export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
   const { t } = useTranslation();
-  const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
-  const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
+  const { isCollapsed: isSidebarCollapsed, toggle: toggleSidebar } =
+    useSidebarCollapse();
   const appModule = useUIStore((state) => state.appModule);
   const setKnowledgeSearch = useKnowledgeStore(
     (state) => state.setSearchQuery,
@@ -71,7 +72,7 @@ export function TopBar({ updateAvailable, onShowUpdateDialog }: TopBarProps) {
       >
         <button
           type="button"
-          onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
+          onClick={toggleSidebar}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
           title={
             isSidebarCollapsed

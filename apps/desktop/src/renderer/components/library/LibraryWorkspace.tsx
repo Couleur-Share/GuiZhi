@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Minimize2Icon } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -21,8 +21,28 @@ const ItemTableView = lazy(() =>
   import("./ItemTableView").then((module) => ({ default: module.ItemTableView })),
 );
 
+/** 列表再宽也不能把阅读区挤到这个宽度以下 */
+const DETAIL_MIN_WIDTH = 400;
+
 function DetailFallback() {
   return <div className="h-full animate-pulse bg-muted/20" aria-hidden="true" />;
+}
+
+/** 回调 ref：卡片布局随视图切换挂载/卸载，需要在节点出现时重新观察 */
+function useObservedWidth() {
+  const [width, setWidth] = useState<number | null>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    observerRef.current?.disconnect();
+    observerRef.current = null;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      setWidth(entry.contentRect.width);
+    });
+    observer.observe(node);
+    observerRef.current = observer;
+  }, []);
+  return [ref, width] as const;
 }
 
 /**
@@ -48,6 +68,15 @@ export function LibraryWorkspace() {
   const viewMode = useUIStore((state) => state.libraryViewMode);
   const isFocusReadingMode = useUIStore((state) => state.isFocusReadingMode);
   const setFocusReadingMode = useUIStore((state) => state.setFocusReadingMode);
+  const [containerRef, containerWidth] = useObservedWidth();
+  const listMaxWidth =
+    containerWidth === null
+      ? ITEM_LIST_PANE_WIDTH_MAX
+      : Math.max(
+          ITEM_LIST_PANE_WIDTH_MIN,
+          Math.min(ITEM_LIST_PANE_WIDTH_MAX, containerWidth - DETAIL_MIN_WIDTH),
+        );
+  const listWidth = Math.min(itemListPaneWidth, listMaxWidth);
 
   useEffect(() => {
     void refreshAll();
@@ -127,21 +156,21 @@ export function LibraryWorkspace() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 overflow-hidden">
+    <div ref={containerRef} className="flex h-full min-h-0 flex-1 overflow-hidden">
       <div
         className="relative shrink-0 border-r border-border app-wallpaper-panel"
         style={
           {
-            width: `${itemListPaneWidth}px`,
+            width: `${listWidth}px`,
           } as CSSProperties
         }
       >
         <ItemList />
         <div className="absolute inset-y-0 right-0 z-10 flex">
           <ColumnResizer
-            currentWidth={itemListPaneWidth}
+            currentWidth={listWidth}
             min={ITEM_LIST_PANE_WIDTH_MIN}
-            max={ITEM_LIST_PANE_WIDTH_MAX}
+            max={listMaxWidth}
             defaultWidth={ITEM_LIST_PANE_WIDTH_DEFAULT}
             onResize={setItemListPaneWidth}
             ariaLabel={t("library.resizeList", "调整列表宽度")}

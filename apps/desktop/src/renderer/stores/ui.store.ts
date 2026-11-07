@@ -45,6 +45,11 @@ export const ITEM_LIST_PANE_WIDTH_MIN = 240;
 export const ITEM_LIST_PANE_WIDTH_MAX = 720;
 
 /**
+ * 窗口宽度低于此值为紧凑布局：二级侧栏默认收起，展开时浮在内容上方，不挤压阅读区。
+ */
+export const COMPACT_LAYOUT_MAX_WIDTH = 1180;
+
+/**
  * Wiki 目录列宽度。原本写死 288px，窄列里摘要一行就被 truncate 成半句话。
  */
 export const WIKI_CATALOG_PANE_WIDTH_DEFAULT = 300;
@@ -75,6 +80,9 @@ interface UIState {
   isSidebarCollapsed: boolean;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  /** 紧凑布局下临时展开的侧栏；不持久化，也不改写宽屏下的收起偏好 */
+  compactSidebarOpen: boolean;
+  setCompactSidebarOpen: (open: boolean) => void;
   sidebarPanelWidth: number;
   itemListPaneWidth: number;
   wikiCatalogPaneWidth: number;
@@ -114,6 +122,8 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
       setSidebarCollapsed: (collapsed) =>
         set({ isSidebarCollapsed: collapsed }),
+      compactSidebarOpen: false,
+      setCompactSidebarOpen: (open) => set({ compactSidebarOpen: open }),
       sidebarPanelWidth: SIDEBAR_PANEL_WIDTH_DEFAULT,
       itemListPaneWidth: ITEM_LIST_PANE_WIDTH_DEFAULT,
       wikiCatalogPaneWidth: WIKI_CATALOG_PANE_WIDTH_DEFAULT,

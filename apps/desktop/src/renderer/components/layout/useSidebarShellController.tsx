@@ -14,6 +14,7 @@ import { useImportStore } from "../../stores/import.store";
 import { useInboxStore } from "../../stores/inbox.store";
 import { isWebRuntime } from "../../runtime";
 import type { SidebarLayout, PageType } from "./sidebar-controller-types";
+import { useSidebarCollapse } from "./use-sidebar-collapse";
 
 const APP_MODULES: readonly AppModule[] = [
   "library",
@@ -27,7 +28,7 @@ const APP_MODULES: readonly AppModule[] = [
 function useSidebarUiBindings() {
   const appModule = useUIStore((state) => state.appModule);
   const setAppModule = useUIStore((state) => state.setAppModule);
-  const isCollapsed = useUIStore((state) => state.isSidebarCollapsed);
+  const { isCollapsed, isOverlay, closeOverlay } = useSidebarCollapse();
   const sidebarPanelWidth = useUIStore((state) => state.sidebarPanelWidth);
   const setSidebarPanelWidth = useUIStore(
     (state) => state.setSidebarPanelWidth,
@@ -36,6 +37,8 @@ function useSidebarUiBindings() {
     appModule,
     setAppModule,
     isCollapsed,
+    isOverlay,
+    closeOverlay,
     sidebarPanelWidth,
     setSidebarPanelWidth,
   };
@@ -60,9 +63,11 @@ function useSidebarPlatformState() {
 function getSidebarLayoutStyle(
   layout: SidebarLayout,
   isCollapsed: boolean,
+  isOverlay: boolean,
   sidebarPanelWidth: number,
 ) {
   const railWidthClass = "w-20";
+  const overlay = layout === "panel" && isOverlay;
   const combinedWidthClass = "w-[23rem]";
   const panelStyle =
     layout === "panel" && !isCollapsed
@@ -78,6 +83,10 @@ function getSidebarLayoutStyle(
     railWidthClass,
     panelStyle,
     asideClassName,
+    asidePositionClassName: overlay
+      ? "absolute inset-y-0 left-0 z-30 shadow-2xl"
+      : "relative z-20",
+    isPanelOverlay: overlay,
     showRail: layout !== "panel",
     showPanel: layout !== "rail",
   };
@@ -160,7 +169,12 @@ export function useSidebarShellController(
   return {
     ...ui,
     ...platform,
-    ...getSidebarLayoutStyle(layout, ui.isCollapsed, ui.sidebarPanelWidth),
+    ...getSidebarLayoutStyle(
+      layout,
+      ui.isCollapsed,
+      ui.isOverlay,
+      ui.sidebarPanelWidth,
+    ),
     activeModule: ui.appModule,
     webRuntime,
     t,

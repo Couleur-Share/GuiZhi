@@ -746,7 +746,7 @@ function App() {
               onShowUpdateDialog={openUpdateDialog}
             />
 
-            <div className="flex min-h-0 flex-1 overflow-hidden">
+            <div className="relative flex min-h-0 flex-1 overflow-hidden">
               {currentPage === "home" &&
               !(isFocusReadingMode && appModule === "library") ? (
                 <Sidebar
