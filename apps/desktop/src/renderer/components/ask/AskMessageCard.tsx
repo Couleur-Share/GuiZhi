@@ -1,5 +1,5 @@
 import { EvidenceExcerpt } from "./EvidenceExcerpt";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BookOpenIcon,
   CheckIcon,
@@ -18,6 +18,11 @@ import { useAskStore, type AskMessage } from "../../stores/ask.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { AnswerBody } from "./AnswerBody";
+import {
+  buildCitationLabels,
+  renumberCitations,
+  type CitationLabels,
+} from "./qa-citations";
 import type { QaSourceRef } from "../../services/knowledge-ai/qa";
 
 /** 打开某条引用来源（Wiki 页面或知识条目） */
@@ -96,14 +101,25 @@ function AgentSteps({ steps, running }: { steps: string[]; running: boolean }) {
 
 function SourceList({
   sources,
+  labels,
   highlighted,
   onOpen,
 }: {
   sources: QaSourceRef[];
+  labels: CitationLabels;
   highlighted: number | null;
   onOpen: (source: QaSourceRef) => void;
 }) {
   const { t } = useTranslation();
+  const ordered = useMemo(
+    () =>
+      [...sources].sort(
+        (a, b) =>
+          (labels.get(a.ordinal) ?? a.ordinal) -
+          (labels.get(b.ordinal) ?? b.ordinal),
+      ),
+    [sources, labels],
+  );
   if (sources.length === 0) {
     return null;
   }
@@ -114,7 +130,7 @@ function SourceList({
         {t("ask.sources", "引用来源")}
       </p>
       <div className="flex flex-wrap gap-1.5">
-        {sources.map((source) => (
+        {ordered.map((source) => (
           <button
             key={source.ordinal}
             type="button"
@@ -127,7 +143,7 @@ function SourceList({
             }`}
           >
             <span className="shrink-0 font-mono text-[10px] text-primary">
-              [{source.ordinal}]
+              [{labels.get(source.ordinal) ?? source.ordinal}]
             </span>
             {source.kind === "wiki" ? (
               <NetworkIcon
@@ -196,7 +212,13 @@ function MessageError({ message }: { message: AskMessage }) {
   );
 }
 
-function MessageActions({ message }: { message: AskMessage }) {
+function MessageActions({
+  message,
+  copyText,
+}: {
+  message: AskMessage;
+  copyText: string;
+}) {
   const { t } = useTranslation();
   const retry = useAskStore((state) => state.retry);
   const removeMessage = useAskStore((state) => state.removeMessage);
@@ -204,7 +226,7 @@ function MessageActions({ message }: { message: AskMessage }) {
   const [copied, setCopied] = useState(false);
 
   const copyAnswer = async () => {
-    await navigator.clipboard.writeText(message.answer);
+    await navigator.clipboard.writeText(copyText);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
   };
@@ -259,7 +281,14 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
     setSourceChoice(value ? { list, index: message[list]?.indexOf(value) ?? -1 } : null);
   };
   const [highlighted, setHighlighted] = useState<number | null>(null);
-
+  const ordinals = useMemo(
+    () => message.sources.map((s) => s.ordinal),
+    [message.sources],
+  );
+  const labels = useMemo(
+    () => buildCitationLabels(message.answer, ordinals),
+    [message.answer, ordinals],
+  );
 
   const focusCitation = (ordinal: number) => {
     setSource(message.sources.find(s => s.ordinal === ordinal) ?? null);
@@ -286,7 +315,7 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
         ) : null}
         {message.answer ? (
           <>
-            <AnswerBody answer={message.answer} ordinals={message.sources.map(s => s.ordinal)} onCitation={focusCitation} />
+            <AnswerBody answer={message.answer} ordinals={ordinals} labels={labels} onCitation={focusCitation} />
             {message.truncated ? (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
                 <TriangleAlertIcon
@@ -310,6 +339,7 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
         {message.status === "done" ? (
           <SourceList
             sources={message.sources}
+            labels={labels}
             highlighted={highlighted}
             onOpen={setSource}
           />
@@ -339,7 +369,10 @@ export function AskMessageCard({ message }: { message: AskMessage }) {
               </span>
             ) : null}
             <span className="min-w-0 flex-1" />
-            <MessageActions message={message} />
+            <MessageActions
+              message={message}
+              copyText={renumberCitations(message.answer, new Set(ordinals), labels)}
+            />
           </div>
         ) : null}
       </div>

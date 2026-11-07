@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   QA_CITE_HREF_PREFIX,
+  buildCitationLabels,
   linkifyCitations,
+  renumberCitations,
 } from "../../../src/renderer/components/ask/qa-citations";
 
 const VALID = new Set([1, 2]);
@@ -59,6 +61,44 @@ describe("linkifyCitations", () => {
     const markdown = "见 [文档](https://example.com) 与 [1]";
     expect(linkifyCitations(markdown, VALID)).toBe(
       `见 [文档](https://example.com) 与 [\\[1\\]](${QA_CITE_HREF_PREFIX}1)`,
+    );
+  });
+});
+
+describe("引用展示编号", () => {
+  const answer = "先看 [7]，再看 [3]；两者都提到 [3、12]。代码 `a[5]` 不算。";
+  const ordinals = [3, 5, 7, 12];
+
+  it("按正文首次出现顺序连续编号，正文未提到的来源排在最后", () => {
+    expect([...buildCitationLabels(answer, ordinals)]).toEqual([
+      [7, 1],
+      [3, 2],
+      [12, 3],
+      [5, 4],
+    ]);
+  });
+
+  it("显示展示编号，链接仍指向原始编号", () => {
+    const labels = buildCitationLabels(answer, ordinals);
+    const output = linkifyCitations(answer, new Set(ordinals), labels);
+    expect(output).toContain(`[\\[1\\]](${QA_CITE_HREF_PREFIX}7)`);
+    expect(output).toContain(
+      `\\[[2](${QA_CITE_HREF_PREFIX}3), [3](${QA_CITE_HREF_PREFIX}12)\\]`,
+    );
+    expect(output).toContain("`a[5]`");
+  });
+
+  it("重排后去掉指不到来源的编号，避免与展示编号撞号", () => {
+    const labels = buildCitationLabels("见 [9] 与 [3, 2]", [3]);
+    expect(linkifyCitations("见 [9] 与 [3, 2]", new Set([3]), labels)).toBe(
+      `见  与 [\\[1\\]](${QA_CITE_HREF_PREFIX}3)`,
+    );
+  });
+
+  it("复制文本与屏幕编号一致", () => {
+    const labels = buildCitationLabels(answer, ordinals);
+    expect(renumberCitations(answer, new Set(ordinals), labels)).toBe(
+      "先看 [1]，再看 [2]；两者都提到 [2, 3]。代码 `a[5]` 不算。",
     );
   });
 });

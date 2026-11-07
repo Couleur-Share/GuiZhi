@@ -1,8 +1,9 @@
 import { EvidenceExcerpt } from "./EvidenceExcerpt";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ArticleMessage, ArticleSource } from "@guizhi/shared/types/article-ask";
 import { AnswerBody } from "./AnswerBody";
+import { buildCitationLabels, renumberCitations } from "./qa-citations";
 import { useToast } from "../ui/Toast";
 
 export function ArticleMessageCard({ message, running, onRetry, onLocate }: {
@@ -13,6 +14,9 @@ export function ArticleMessageCard({ message, running, onRetry, onLocate }: {
   const source = sourceIndex === null ? null : message.sources[sourceIndex];
   const setSource = (value: ArticleSource | null) => setSourceIndex(value ? message.sources.indexOf(value) : null);
   const open = (value: ArticleSource) => { setSource(value); setLocationError(false); };
+  const ordinals = useMemo(() => message.sources.map(s => s.ordinal), [message.sources]);
+  const labels = useMemo(() => buildCitationLabels(message.answer, ordinals), [message.answer, ordinals]);
+  const orderedSources = useMemo(() => [...message.sources].sort((a, b) => (labels.get(a.ordinal) ?? a.ordinal) - (labels.get(b.ordinal) ?? b.ordinal)), [message.sources, labels]);
   const locate = async () => {
     if (!source) return;
     try {
@@ -25,7 +29,7 @@ export function ArticleMessageCard({ message, running, onRetry, onLocate }: {
     } catch { setLocationError(true); }
   };
   const copy = async () => {
-    try { await navigator.clipboard.writeText(message.answer); showToast(t("ask.copied", "已复制"), "success"); }
+    try { await navigator.clipboard.writeText(renumberCitations(message.answer, new Set(ordinals), labels)); showToast(t("ask.copied", "已复制"), "success"); }
     catch (e) { showToast(t("articleAsk.copyFailed", "复制失败"), "error", { detail: String(e) }); }
   };
   return <article className="space-y-3 border-b border-border/60 pb-5" data-testid="article-ask-message">
@@ -34,10 +38,10 @@ export function ArticleMessageCard({ message, running, onRetry, onLocate }: {
     {message.status === "running" ? <p role="status" className="animate-pulse text-xs text-muted-foreground">{message.step}</p> : null}
     {message.webStatus === "failed" || message.webStatus === "partial" ? <p role="status" className="text-xs font-medium text-destructive">{t("articleAsk.unverified", "未完成联网查证")}</p> : null}
     {message.warnings.map((warning, i) => <p key={i} className="text-xs text-muted-foreground">{warning}</p>)}
-    {message.answer ? <AnswerBody answer={message.answer} ordinals={message.sources.map(s => s.ordinal)} onCitation={n => { const found = message.sources.find(s => s.ordinal === n); if (found) open(found); }} /> : null}
+    {message.answer ? <AnswerBody answer={message.answer} ordinals={ordinals} labels={labels} onCitation={n => { const found = message.sources.find(s => s.ordinal === n); if (found) open(found); }} /> : null}
     {message.error ? <p role="alert" className="whitespace-pre-wrap break-words text-sm text-destructive">{message.error}</p> : null}
     {message.truncated ? <p role="status" className="text-xs text-destructive">{t("ask.answerTruncated", "回答达到模型输出长度上限，内容可能不完整。")}</p> : null}
-    <div className="flex flex-wrap gap-1.5">{message.sources.map(s => <button type="button" key={s.ordinal} onClick={() => open(s)} className="max-w-full truncate rounded border border-border px-2 py-1 text-left text-xs">[{s.ordinal}] {s.title}</button>)}</div>
+    <div className="flex flex-wrap gap-1.5">{orderedSources.map(s => <button type="button" key={s.ordinal} onClick={() => open(s)} className="max-w-full truncate rounded border border-border px-2 py-1 text-left text-xs">[{labels.get(s.ordinal) ?? s.ordinal}] {s.title}</button>)}</div>
     {source?.evidence && locationError ? <p role="status" className="text-xs text-muted-foreground">{t("articleAsk.locateFailedEvidence", "无法定位当前来源，历史摘录仍可查看。")}</p> : null}
     {source?.evidence || source?.cleared ? <EvidenceExcerpt evidence={source.evidence} cleared={source.cleared} onCurrent={() => void locate()} onClose={() => setSource(null)} /> : source ? <section className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs" aria-label={t("articleAsk.excerpt", "引用摘录")}>
       <p className="font-medium">{source.title}</p>
