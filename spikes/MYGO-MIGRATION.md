@@ -139,17 +139,39 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - **产品的两处改动必须移植。** 它们是 `linkDensityModifier = 0.1`（条件清理里两处链接占比阈值 `0.2`、`0.5` 各加该值）与「保留与标题重复的首个 h1/h2」（把 `_headerDuplicatesTitle` 改成恒 `false`）。Go 库没有对应选项；不打补丁时，对产品模式的基准只有 52 / 118 输入逐字相同，打补丁后为 100 / 118（118 是静态与渲染两份都算）。补丁很小（3 处，`prepare-patched.ps1`），需要维护一份 fork 或补丁序列。
 - **最差的一页相似度 0.931**（martinfowler 的长文，JS 多保留了一些图示文字）；其余差异在 0.988 以上，都是个别元素的取舍（例如 dev.to 代码块的「全屏」按钮文字、Playwright 文档里的示意图文字）。没有出现整块正文丢失。
 - **静态 HTML 的解析器差异：** 产品用 linkedom（非规范解析器），Go 用 `x/net/html`（HTML5 规范解析）。5 个 MDN 页面的静态版本差异很大（其中 3 个 JS 取到约 1.8 万字，Go 只有 800 到 2000 字；另 2 个相差约 25%），但产品把它们分流到渲染版本，渲染版本两边一致，所以不影响实际结果。分流规则本身需要一并迁移。
-- **尚未验证：** 产品自己那 590 行规则（区域回退、隐藏内容展开、标题区补回、代码块语言、表格转换）、Turndown 到 Markdown 的转换（Go 需要 `html-to-markdown` 之类并补自定义规则）、`sanitize-html`、GBK 等非 UTF-8 站点、评估文档提到的 47 页留出样本（不在本机）。结论只能到「库层面可行」，不能到「整条提取链路等价」。
+- **库层面之外的部分，也做了移植验证（下一小节）。**
 
+### 整条提取链路（`spikes/mygo-readability/extract`）
+
+把 `web-extract-article.ts` 与 `web-extract-markdown.ts` 移植到 Go（`extract` 包约 1100 行，含辅助的 DOM 函数；TS 原文约 590 行），Markdown 转换用 `JohannesKaufmann/html-to-markdown` v2 加两条自定义规则（代码块、数据表格转管道表格），对同一批 59 页与 TS 的 `extractWebArticle` 逐页比较：
+
+| 指标 | 结果 |
+|---|---|
+| 选出的正文来源（Readability / 区域回退 / 整页 / 公众号）一致 | 59 / 59 |
+| 标题一致 | 59 / 59 |
+| Readability 与语义区域的段落字数都一致 | 49 / 59 |
+| 去掉 Markdown 符号后的纯文字相似度 ≥0.99 | 54 / 59（其余 4 页 0.95–0.99，1 页 0.80–0.95，最低 0.940） |
+| Markdown 去空白后相似度 ≥0.99 | 50 / 59 |
+| Markdown 逐字相同 | 7 / 59 |
+
+结论分两层：
+
+- **内容层：基本等价。** 每一页都选中了同一块正文，没有选错区域或整块丢失，纯文字相似度最低 0.94（差异来自个别元素取舍）。
+- **字节层：不等价。** Markdown 逐字相同只有 7 页，差异来自两个库的写法：Turndown 转义 `]`、html-to-markdown 不转义；html-to-markdown 会重新编码链接 URL（把查询串里的 `/` 改成 `%2F`，并对括号、方括号、空格做百分号编码）；列表标记后的空格数也不同。URL 被改写会改变链接的字面内容。要字节级一致，就得自己写一个 Turndown 的 Go 移植（需处理空白折叠与转义规则，工作量未估算），而不是用现成库；或者接受换引擎后 `contentHash` 全变，由 `WEB_EXTRACT_ENGINE` 版本号（现为 `readability/1`）标明引擎变化，已入库的页面按新引擎版本重新比较。
+- 10 页的段落字数（`readabilityChars`）不一致，但正文来源的决定没有因此翻转。原因没有深查：最可能是 Readability 输出里 `div` 与 `p` 的划分，跟 linkedom 与 `x/net/html` 的解析差异有关。回退阈值是 0.6 的比例，目前样本里没有页面因此越线，但越线的风险存在。
+
+仍没有验证：`sanitize-html`、GBK 等非 UTF-8 站点、非技术类网站的留出样本、微信公众号页面、正文超长截断的页面。
 运行方式（语料目录与输出目录自行指定）：
 
 ```powershell
 node spikes/mygo-readability/make-golden.mjs <样本目录> <golden 目录>
 pnpm dlx tsx spikes/mygo-readability/route-check.mts <样本目录> <golden 目录>
+pnpm dlx tsx spikes/mygo-readability/make-article-golden.mts <样本目录> <golden 目录>
 cd spikes/mygo-readability
 go run . <样本目录> <golden 目录> stock
 powershell -File prepare-patched.ps1
 go run -tags patched "-modfile=go.patched.mod" . <样本目录> <golden 目录> product
+go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目录> <golden 目录>
 ```
 ## 还没做的
 
