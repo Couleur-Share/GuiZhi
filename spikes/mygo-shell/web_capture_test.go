@@ -320,8 +320,8 @@ func TestWebCaptureDegradedForImport(t *testing.T) {
 	if !strings.Contains(ex.DegradedReason, "网站拒绝访问") {
 		t.Errorf("降级原因: %q", ex.DegradedReason)
 	}
-	// 尚未迁移的来源如实报错
-	for _, in := range []string{"https://www.bilibili.com/video/BV1xx411c7mD", "https://www.v2ex.com/t/123456"} {
+	// 尚未迁移的来源（视频）如实报错；论坛已迁移，其分发由 forum_import_test.go 用注入的抓取器覆盖，这里不能触发真实联网
+	for _, in := range []string{"https://www.bilibili.com/video/BV1xx411c7mD"} {
 		_, err := ws.l.defaultExtract(context.Background(), map[string]any{"sourceKind": "url", "sourceInput": in}, nil)
 		if err == nil || !strings.Contains(err.Error(), "尚未迁移") {
 			t.Errorf("%s: %v", in, err)

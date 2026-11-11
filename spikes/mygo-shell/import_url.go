@@ -1,7 +1,7 @@
 package main
 
 // 对应 connectors.ts 里 case "url" 的分发顺序：视频 → 论坛 → 公众号 → 通用网页。
-// 视频、论坛、公众号随各自切片接入；在此之前如实报错，不假装成功。
+// 视频随连接器切片接入（论坛 NGA / NodeSeek 与 LINUX DO 的浏览器会话降级依赖渲染宿主，暂未接入）；在此之前如实报错，不假装成功。
 
 import (
 	"context"
@@ -19,8 +19,13 @@ func (l *Library) importExtractURL(ctx context.Context, task map[string]any, onS
 	if onStage == nil {
 		onStage = func(string) {}
 	}
-	if detectVideoPlatform(url) != "" || detectForumPlatform(url) != nil {
+	if detectVideoPlatform(url) != "" {
 		return nil, errURLKindNotMigrated
+	}
+	if target := detectForumPlatform(url); target != nil {
+		deps := l.forumPost
+		deps.onStage = onStage
+		return l.extractForumPost(ctx, *target, deps)
 	}
 	parsed, err := whatwg.Parse(url)
 	if err != nil {

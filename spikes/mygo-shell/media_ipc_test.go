@@ -297,13 +297,17 @@ func TestMediaIPCTestTranscription(t *testing.T) {
 	}
 }
 
-func TestMediaIPCPendingConnectors(t *testing.T) {
+// 论坛总结 / 刷新已迁移：没有讨论内容或来源不受支持的论坛条目走各自的业务错误，不再报“尚未迁移”。
+func TestMediaIPCForumChannels(t *testing.T) {
 	e := newMediaEnv(t, true)
 	forum := e.create("forum", "帖子", "正文", "")
-	for _, ch := range []string{chMediaSummarize, chMediaRefreshForum} {
+	for ch, want := range map[string]string{
+		chMediaSummarize:    "该条目没有可用于总结的讨论内容",
+		chMediaRefreshForum: "仅 LINUX DO、小众软件论坛与 2Libra 条目支持刷新讨论",
+	} {
 		res := e.call(ch, forum)
-		if res["success"] != false || !strings.Contains(fmt.Sprint(res["error"]), "尚未迁移") {
-			t.Errorf("%s 应如实报未迁移: %v", ch, res)
+		if res["success"] != false || res["error"] != want {
+			t.Errorf("%s = %v，期望错误 %q", ch, res, want)
 		}
 	}
 }
