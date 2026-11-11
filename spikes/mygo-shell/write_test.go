@@ -78,6 +78,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerCatalogWrite(b)
 	l.registerInboxWrite(b)
 	l.registerAskSessions(b)
+	l.registerAIUsage(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -94,6 +95,9 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
 				channel = ns + ":" + method
+				if ns == "ai" {
+					channel = "ai:" + method
+				}
 				if ns == "ask" && (method == "query" || method == "meta") {
 					channel = "askSession:" + method
 				}

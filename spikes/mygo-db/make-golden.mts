@@ -279,6 +279,21 @@ const importCases: unknown[] = [
   runImport({ cursor: Buffer.from(JSON.stringify({ createdAt: 1_700_000_005_000, id: "task-09" })).toString("base64url"), pageSize: 20 }),
 ];
 
+// ── AI 用量：相对「今天」的几天，含超过保留期的旧记录、空模型名、多场景同日 ──
+const localDayOf = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const usageRows: Array<[number, string, string, number, number, number, number]> = [
+  [0, "ask", "gpt-x", 5, 1, 1000, 500], [0, "wiki", "gpt-x", 2, 0, 400, 100], [0, "ask", "claude-y", 3, 0, 300, 200],
+  [1, "ask", "gpt-x", 4, 2, 800, 300], [1, "ask", "", 1, 0, 10, 5], [2, "wiki", "claude-y", 9, 3, 5000, 2500],
+  [5, "inbox", "gpt-x", 2, 0, 50, 20], [29, "ask", "gpt-x", 7, 0, 700, 70], [30, "wiki", "gpt-x", 7, 0, 700, 70], [89, "ask", "old-model", 1, 0, 1, 1],
+  [90, "ask", "edge90", 1, 0, 1, 1], [91, "ask", "too-old", 1, 0, 1, 1], [200, "wiki", "ancient", 1, 0, 1, 1],
+];
+const dayMs = 24 * 60 * 60 * 1000;
+for (const [ago, scenario, model, calls, failed, prompt, completion] of usageRows) {
+  database.run(
+    "INSERT INTO ai_usage_daily(day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at) VALUES(?,?,?,?,?,?,?,?)",
+    [localDayOf(Date.now() - ago * dayMs), scenario, model, calls, failed, prompt, completion, 1_700_000_000_000],
+  );
+}
 // ── 问答会话：知识库范围与文章范围、置顶、自定义标题、来源清除标记 ──
 const asks = new AskSessionDB(database);
 const askMsgs = (pairs: Array<[string, string]>) => JSON.stringify(pairs.map(([question, answer]) => ({ question, answer, role: "turn" })));
@@ -350,6 +365,12 @@ function askHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> 
     listSessions: wrap("ask:listSessions"), getSession: wrap("ask:getSession"), saveSession: wrap("ask:saveSession"),
     deleteSession: wrap("ask:deleteSession"), query: wrap("askSession:query"), meta: wrap("askSession:meta"),
   };
+}// ai 用量频道：真实的 ai.ipc.ts（含网络请求代理的其余部分，这里只用 usage 三个频道）
+const aiIpc = await import("../../apps/desktop/src/main/ipc/ai.ipc.ts");
+function aiUsageHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  aiIpc.registerAIIPC(db as never);
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  return { usageRecord: wrap("ai:usageRecord"), usageSummary: wrap("ai:usageSummary"), usageClear: wrap("ai:usageClear") };
 }// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
@@ -363,6 +384,7 @@ const DUMP_SQL: Record<string, string> = {
   askMeta: "SELECT id, custom_title, pinned FROM ask_session_meta",
   askFts: "SELECT session_id, title, questions, answers FROM ask_session_fts",
   askClear: "SELECT item_id FROM ask_evidence_clearances",
+  aiUsage: "SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at FROM ai_usage_daily",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
 };
@@ -669,6 +691,24 @@ const applyInvalidCases: unknown[] = [
     { fn: "ask.query", args: [{ search: "桌面" }] },
     { fn: "ask.deleteSession", args: ["q-01"] },
     { fn: "ask.query", args: [{ search: "桌面" }] },
+  ],  // ── AI 用量（fn 带 ai. 前缀）──
+  "ai.summary": [
+    ...[undefined, null, 1, 2, 3, 7, 30, 31, 90, 91, 1000, 0, -5, 2.5, 0.5, "7", "x", true, [3], {}, "  5  ", "0x10", ""].map((days) => ({ fn: "ai.usageSummary", args: [days] })),
+  ],
+  "ai.record": [
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "gpt-x", promptTokens: 10, completionTokens: 5 }] },
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "gpt-x", promptTokens: 10.9, completionTokens: -3, failed: true }] },
+    { fn: "ai.usageRecord", args: [{ scenario: "new-scenario", model: "", promptTokens: "7", completionTokens: null }] },
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "gpt-x", promptTokens: "abc", completionTokens: [4], failed: "true" }] },
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "gpt-x", failed: true }] },
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "gpt-x", promptTokens: true, completionTokens: 1e3 }] },
+    { fn: "ai.usageRecord", args: [{ scenario: 1, model: "m" }] }, { fn: "ai.usageRecord", args: [{ scenario: "s", model: null }] },
+    { fn: "ai.usageRecord", args: [null] }, { fn: "ai.usageRecord", args: [undefined] }, { fn: "ai.usageRecord", args: [5] }, { fn: "ai.usageRecord", args: [{}] },
+    { fn: "ai.usageSummary", args: [30] },
+  ],
+  "ai.clear": [
+    { fn: "ai.usageClear", args: [] }, { fn: "ai.usageSummary", args: [90] },
+    { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "m", promptTokens: 1, completionTokens: 1 }] }, { fn: "ai.usageSummary", args: [1] },
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -696,6 +736,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     tag: new TagDB(db) as never,
     inbox: inboxHandlers(db),
     ask: askHandlers(db),
+    ai: aiUsageHandlers(db),
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
