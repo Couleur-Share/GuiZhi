@@ -290,7 +290,31 @@ const golden: Record<string, unknown> = {
 const tagSnapshot = tags.list();
 closeDatabase();
 
-// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
+// electron 桩：必须在加载任何 ipc 模块之前安装（写入场景与 settings 场景共用）
+const ipcHandlers = new Map<string, (...args: unknown[]) => unknown>();
+const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === "then" ? undefined : noop), apply: () => noop });
+const electronStub = new Proxy(
+  { ipcMain: { handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn), on() {}, removeHandler() {} } } as Record<string | symbol, unknown>,
+  { get: (t, p) => (p in t ? t[p] : noop) },
+);
+const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
+const originalLoad = moduleLoader._load;
+moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);
+};
+// inbox 写频道：用真实的 inbox.ipc.ts 处理函数（electron 已换成桩），每个场景库单独注册
+const inboxIpc = await import("../../apps/desktop/src/main/ipc/inbox.ipc.ts");
+function inboxHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  inboxIpc.registerInboxIPC(db as never);
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  return {
+    organize: wrap("inbox:organize"),
+    markReviewed: wrap("inbox:markReviewed"),
+    acknowledgeImportWarning: wrap("inbox:acknowledgeImportWarning"),
+    aiClassificationSources: wrap("inbox:aiClassificationSources"),
+    applyAiClassification: wrap("inbox:applyAiClassification"),
+  };
+}// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
 const DUMP_SQL: Record<string, string> = {
@@ -299,6 +323,7 @@ const DUMP_SQL: Record<string, string> = {
   itemTags: "SELECT item_id, tag_id FROM knowledge_item_tags",
   fts: "SELECT item_id, title, content, tags FROM knowledge_fts",
   collections: "SELECT id, name, icon, sort_order, created_at, updated_at FROM collections",
+  importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
 };
 type Op = { fn: string; args: unknown[] };
@@ -306,7 +331,24 @@ const tagIdByName = new Map(tagSnapshot.map((t) => [t.name, t.id]));
 const tagIdOf = (name: string) => tagIdByName.get(name) ?? "missing-tag";
 // 超过单批 400 的 id 数，覆盖分块路径
 const manyIds = [A, B, C, F, G, ...bulk, ...Array.from({ length: 440 }, (_, n) => `missing-${n}`)];
-const scenarios: Record<string, Op[]> = {
+// 每个 apply 的异常/边界输入单独成场景：同一场景里前面的操作会改变条目是否「仍符合归类条件」，会遮住后面的校验
+const eligibleIds = [bulk[2], ...bulk.slice(5, 12), e.id, vid.id, longItem.id];
+const one = (collectionName: unknown, itemId: unknown = eligibleIds[0]) => ({ assignments: [{ itemId, collectionName }] });
+const applyInvalidCases: unknown[] = [
+  one(""), one("   "), one("一二三四五六七八九十一二三四五六七八九十一"), one("一二三四五六七八九十一二三四五六七八九十"),
+  one("😀😀😀😀😀😀😀😀😀😀😀"), one("😀😀😀😀😀😀😀😀😀😀"), one("a\tb"), one("a\nb"), one("x", ""), one("x", "  "),
+  { assignments: [{ itemId: eligibleIds[0], collectionName: "x" }, { itemId: ` ${eligibleIds[0]} `, collectionName: "y" }] },
+  one("回收站"), one("全部"), one("未归知识库"), one(" 收藏 "), one("ＡＬＬ"),
+  { assignments: [{ itemId: eligibleIds[0], collectionName: "ＡＬＬ" }, { itemId: eligibleIds[1], collectionName: "未分类" }] },
+  { assignments: eligibleIds.slice(0, 9).map((itemId, n) => ({ itemId, collectionName: `新合集${n}` })) },
+  { assignments: eligibleIds.slice(0, 8).map((itemId, n) => ({ itemId, collectionName: `新合集${n}` })) },
+  { assignments: Array.from({ length: 101 }, (_, n) => ({ itemId: `m-${n}`, collectionName: "x" })) },
+  { assignments: "not-array" }, { assignments: [null, 5, { itemId: 7, collectionName: 8 }] },
+  { assignments: [null] }, { assignments: [{ itemId: eligibleIds[0] }] }, { assignments: [{ collectionName: "x" }] },
+  null, {}, { assignments: [] },
+  // 复用已有集合（含大小写、全角、首尾空白）而不新建
+  one("技术"), one(" ＴＥＣＨ "), one("阅读  "), one("空集合"),
+];const scenarios: Record<string, Op[]> = {
   createMinimal: [{ fn: "create", args: [{ title: "新建", content: "正文 abc 检索" }] }],
   createFull: [{ fn: "create", args: [{
     title: "完整输入", content: "全文内容", transcript: "转写", itemType: "webpage", status: "active", collectionId: tech.id,
@@ -412,6 +454,64 @@ const scenarios: Record<string, Op[]> = {
     { fn: "tag.delete", args: [tagIdOf("知识库")] },
     { fn: "tag.delete", args: [tagIdOf("知识库")] },
     { fn: "tag.delete", args: ["missing"] },
+  ],  // ── 收件箱写频道（fn 带 inbox. 前缀，参数形状与渲染进程一致）──
+  "inbox.organize": [
+    { fn: "inbox.organize", args: [{ itemIds: [bulk[2], bulk[5], bulk[2]], collectionId: tech.id, addTagNames: ["整理", " 批量 "] }] },
+    { fn: "inbox.organize", args: [{ itemIds: [bulk[6]], collectionId: null }] },
+    { fn: "inbox.organize", args: [{ itemIds: [bulk[7]], addTagNames: ["仅标签"] }] },
+    // 多余字段（status、isFavorite）必须被忽略
+    { fn: "inbox.organize", args: [{ itemIds: [bulk[8]], status: "archived", isFavorite: true, collectionId: reading.id }] },
+    { fn: "inbox.organize", args: [{ itemIds: [] , collectionId: tech.id }] },
+    { fn: "inbox.organize", args: [{ itemIds: "not-array", collectionId: tech.id }] },
+    { fn: "inbox.organize", args: [{ itemIds: [1, null, "", bulk[9]], collectionId: tech.id }] },
+    { fn: "inbox.organize", args: [null] },
+  ],
+  "inbox.markReviewed": [
+    { fn: "inbox.markReviewed", args: [[bulk[0], bulk[1], bulk[3], bulk[4], "missing", bulk[0]]] },
+    { fn: "inbox.markReviewed", args: ["x"] },
+    { fn: "inbox.markReviewed", args: [[]] },
+  ],
+  "inbox.acknowledge": [
+    ...Array.from({ length: 30 }, (_, n) => ({ fn: "inbox.acknowledgeImportWarning", args: [`task-${String(n + 1).padStart(2, "0")}`] })),
+    { fn: "inbox.acknowledgeImportWarning", args: ["  task-03  "] },
+    { fn: "inbox.acknowledgeImportWarning", args: [5] },
+    { fn: "inbox.acknowledgeImportWarning", args: [null] },
+    { fn: "inbox.acknowledgeImportWarning", args: [""] },
+  ],
+  "inbox.sources": [
+    { fn: "inbox.aiClassificationSources", args: [[bulk[2], bulk[0], A, e.id, longItem.id, emojiItem.id, vid.id, "missing", G, F, bulk[2]]] },
+    { fn: "inbox.aiClassificationSources", args: [[]] },
+    { fn: "inbox.aiClassificationSources", args: ["x"] },
+    { fn: "inbox.aiClassificationSources", args: [Array.from({ length: 101 }, (_, n) => `m-${n}`)] },
+    { fn: "inbox.aiClassificationSources", args: [Array.from({ length: 100 }, (_, n) => `m-${n}`)] },
+    { fn: "inbox.aiClassificationSources", args: [[" " + bulk[2] + " ", bulk[2]]] },
+  ],
+  "inbox.apply": [
+    { fn: "inbox.applyAiClassification", args: [{ assignments: [
+      { itemId: bulk[2], collectionName: "技术" },
+      { itemId: bulk[5], collectionName: "  新  集合  " },
+      { itemId: bulk[6], collectionName: "新 集合" },
+      { itemId: bulk[7], collectionName: "ＡＢＣ　全角" },
+      { itemId: bulk[8], collectionName: "abc 全角" },
+      { itemId: A, collectionName: "不会生效" },
+      { itemId: bulk[9], collectionName: "阅读" },
+    ] }] },
+  ],
+  ...Object.fromEntries(applyInvalidCases.map((input, n) => [`inbox.applyInvalid${String(n).padStart(2, "0")}`, [{ fn: "inbox.applyAiClassification", args: [input] }]])),
+  "inbox.applyEdge": [
+    // 全部不符合条件：不新建集合
+    { fn: "inbox.applyAiClassification", args: [{ assignments: [{ itemId: A, collectionName: "全新" }, { itemId: bulk[0], collectionName: "也全新" }] }] },
+    // 大小写、变音、特殊 casing 的归并键
+    { fn: "inbox.applyAiClassification", args: [{ assignments: [
+      { itemId: bulk[2], collectionName: "İstanbul" },
+      { itemId: bulk[5], collectionName: "i̇stanbul" },
+      { itemId: bulk[6], collectionName: "ΑΣ" },
+      { itemId: bulk[7], collectionName: "ας" },
+      { itemId: bulk[8], collectionName: "ΑΣ Β" },
+      { itemId: bulk[9], collectionName: "ΣΑ" },
+      { itemId: bulk[10], collectionName: "ß" },
+      { itemId: bulk[11], collectionName: "SS" },
+    ] }] },
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -437,6 +537,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     knowledge: new KnowledgeItemDB(db) as never,
     collection: new CollectionDB(db) as never,
     tag: new TagDB(db) as never,
+    inbox: inboxHandlers(db),
   };
   const call = (fn: string, args: unknown[]) => {
     const [ns, method] = fn.includes(".") ? fn.split(".") : ["knowledge", fn];
@@ -457,17 +558,6 @@ golden.dumpSql = DUMP_SQL;
 golden.writes = writes;
 
 // ── settings:get / settings:set：用真实的 settings.ipc.ts 处理函数（electron 换成桩）做基准 ──
-const ipcHandlers = new Map<string, (...args: unknown[]) => unknown>();
-const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === "then" ? undefined : noop), apply: () => noop });
-const electronStub = new Proxy(
-  { ipcMain: { handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn), on() {}, removeHandler() {} } } as Record<string | symbol, unknown>,
-  { get: (t, p) => (p in t ? t[p] : noop) },
-);
-const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
-const originalLoad = moduleLoader._load;
-moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
-  return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);
-};
 const settingsIpc = await import("../../apps/desktop/src/main/ipc/settings.ipc.ts");
 const { DEFAULT_SETTINGS } = await import("../../packages/shared/types/settings.ts");
 type SettingsOp = { fn: "get" | "set"; args: unknown[] };

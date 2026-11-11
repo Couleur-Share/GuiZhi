@@ -76,6 +76,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	b := &Bridge{handlers: map[string]handler{}}
 	l.registerWrite(b)
 	l.registerCatalogWrite(b)
+	l.registerInboxWrite(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
