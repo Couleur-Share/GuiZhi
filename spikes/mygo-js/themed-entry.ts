@@ -2,6 +2,7 @@
 // 保证与 Electron 版逐字节一致。只含纯函数；文件读写、数据库与模型请求都留在 Go 侧。
 import { parseHTML } from "linkedom";
 import { themedReadingDocument } from "../../apps/desktop/src/main/services/themed-reading/document";
+import { validateThemedReadingVersion, validateThemedReadingTask } from "../../packages/db/src/themed-reading-validation";
 import { renderThemedReadingBlocks } from "../../apps/desktop/src/main/services/themed-reading/content";
 import { v3InnerDocument, v3WrapperDocument, validateV3Page, normalizeV3Section, cleanV3Html, checkReadingScript, ReadingPageError } from "../../apps/desktop/src/main/services/themed-reading/v3-document";
 
@@ -14,6 +15,9 @@ function guarded<T>(fn: () => T): { ok: T } | { issue: unknown } {
 (globalThis as Record<string, unknown>).GZT = {
   document: (version: string, instanceId: string | null, assetUrls: string | null) =>
     themedReadingDocument(JSON.parse(version), instanceId ?? undefined, assetUrls ? JSON.parse(assetUrls) : undefined),
+  /** 数据库与备份均非可信输入：与 packages/db 同一份结构校验，失败时抛出原文案。 */
+  validateVersion: (json: string) => { validateThemedReadingVersion(JSON.parse(json)); return true; },
+  validateTask: (json: string) => { validateThemedReadingTask(JSON.parse(json)); return true; },
   renderBlocks: (content: string) => JSON.stringify(renderThemedReadingBlocks(content)),
   v3Inner: (version: string, assets: string, interactive: boolean, partial: boolean, host: boolean) =>
     JSON.stringify(guarded(() => v3InnerDocument(JSON.parse(version), JSON.parse(assets), interactive, partial, host))),
