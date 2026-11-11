@@ -1384,5 +1384,95 @@ golden.settings = { defaults: DEFAULT_SETTINGS, dumpSql: settingsDump, runs: set
   };
   ipcHandlers.clear();
 }
+// ── 导入管线的纯函数基准：URL 规范化、来源标识、链接抠取、复核评估、文本连接器 ──
+{
+  const { normalizeUrl } = await import("../../apps/desktop/src/main/services/import/url-normalize.ts");
+  const { sourceIdentity } = await import("../../apps/desktop/src/main/services/import/source-identity.ts");
+  const { extractUrlsFromText } = await import("../../packages/shared/utils/url-text.ts");
+  const { assessImportReview } = await import("../../apps/desktop/src/main/services/import/review-assessment.ts");
+  const { extractContent } = await import("../../apps/desktop/src/main/services/import/connectors.ts");
+
+  // localeCompare：可打印 ASCII 全排列的符号矩阵
+  const ascii = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i));
+  const localeMatrix = ascii.map((a) => ascii.map((b) => { const c = a.localeCompare(b); return c < 0 ? "-" : c > 0 ? "+" : "0"; }).join(""));
+  // 多字符：大小写、前缀、标点混合
+  const names = ["a", "A", "b", "B", "a_b", "a-b", "ab", "aB", "Ab", "AB", "a1", "a10", "a2", "_x", "-x", "x", "X", "utm", "UTM", "id", "ID", "Id", "page", "Page", "p", "p-1", "p_1", "p.1", "p1", "", "0", "00", "9", "z", "Z", "é", "e", "f", "中", "a中", "ａ"];
+  const localePairs = names.flatMap((a) => names.map((b) => [a, b, Math.sign(a.localeCompare(b))]));
+
+  const urls: string[] = [
+    "https://Example.COM/Path/?b=2&a=1&utm_source=x#frag", "http://example.com:80/a/b/", "https://example.com:443", "https://example.com:8443/x/",
+    "https://example.com/", "https://example.com", "https://example.com/?", "https://example.com/a?", "https://example.com/a/?x=", "https://example.com/a/?ref=1&source=2",
+    "https://example.com/a?B=1&a=2&A=3&b=4", "https://example.com/a?a=1&a=0&A=2", "https://example.com/a?q=hello world&x=中文", "https://example.com/a?q=a+b%20c&r=%E4%B8%AD",
+    "https://example.com/a?q=%ZZ&r=%", "https://example.com/a?_x=1&-x=2&x=3&1=4&=5", "https://example.com/a?utm_medium=1", "https://example.com/a/?utm_medium=1",
+    "  https://example.com/a  ", "ftp://example.com/a", "example.com/a", "https://", "http://[::1]:80/a/", "https://user:pw@example.com/a/b/", "https://中文.com/路径/?参数=值",
+    "https://example.com/a%2Fb/", "https://example.com/a/./b/../c/", "https://example.com//a//", "HTTPS://EXAMPLE.com/X", "https://example.com/a?x=1#", "https://example.com/#top",
+    "https://example.com/a?x=a%2Bb&y=a+b", "https://example.com/a?refer=1&REF=2&Spm=3&vd_source=4&from_source=5&share_tag=6&SHARE_PLAT=7&fbclid=8&gclid=9", "http://1.2.3.4:8080/x/",
+    "https://example.com/a?x=*&y=~&z=!&w='", "https://example.com/a?x=%7E%2A", "", " ", "https://example.com/a b", "https://exa mple.com/",
+  ];
+  const identityInputs: string[] = [
+    ...urls,
+    "https://www.nodeseek.com/post-123-1", "https://nodeseek.com/post-123-4/", "https://www.nodeseek.com/post-0-1", "https://www.nodeseek.com/post-123-1/x", "https://www.nodeseek.com/post-123",
+    "https://www.xiaohongshu.com/explore/65A1B2C3D4E5F6A7B8C9D0E1?xsec_token=x", "http://xhslink.com/a/xxx，复制本条信息", "https://www.xiaohongshu.com/discovery/item/65a1b2c3d4e5f6a7b8c9d0e1",
+    "https://www.xiaohongshu.com/explore/65a1b2c3d4e5f6a7b8c9d0e", "https://notxiaohongshu.com/explore/65a1b2c3d4e5f6a7b8c9d0e1",
+    "https://www.douyin.com/video/7300000000000000001?x=1", "https://www.douyin.com/note/7300000", "https://www.douyin.com/jingxuan?modal_id=7300000000000000002", "https://www.douyin.com/jingxuan?modal_id=123",
+    "https://www.douyin.com/jingxuan?modal_id=", "https://www.douyin.com/video/123", "https://www.douyin.com/video/12345?modal_id=7300000",
+    "https://www.bilibili.com/video/BV1xx411c7mD/?p=2", "https://www.bilibili.com/video/bv1xx411c7md", "https://m.bilibili.com/video/BV1xx411c7mD", "https://www.bilibili.com/read/cv123",
+    "https://youtu.be/dQw4w9WgXcQ?t=1", "https://youtu.be/", "https://youtu.be/short", "https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=x", "https://www.youtube.com/watch?v=", "https://www.youtube.com/watch?v=abc",
+    "https://www.youtube.com/shorts/dQw4w9WgXcQ", "https://www.youtube.com/live/dQw4w9WgXcQ?feature=share", "https://www.youtube.com/watch?x=1&v=dQw4w9WgXcQ&v=other", "https://youtube.com/embed/dQw4w9WgXcQ",
+    "看看这个 https://www.bilibili.com/video/BV1xx411c7mD?share_source=copy 很好", "没有链接的文本", "(见 https://example.com/a_(b))", "https://example.com/a).", "https://example.com/a]!",
+  ];
+  const textInputs: string[] = [
+    "", "没有链接", "https://a.com", "HTTP://A.COM/x", "看 https://a.com/x，然后 https://b.com/y。再 https://a.com/x", "（https://a.com/x）", "[https://a.com/x]", "https://a.com/x).", "https://a.com/wiki/Foo_(bar)",
+    "https://a.com/wiki/Foo_(bar)).", "https://a.com/x?y=1&z=2;", "https://a.com/x!!!", "https://a.com/中文路径", "https://", "http://", "https://\u00a0x", "https://a.com/x\u3000https://b.com/y",
+    "https://a.com/x「引」https://b.com/y", "https://a.com/x'https://b.com/y", "https://a.com/a`b", "x https://a.com/x#frag. y", "https://a.com/x]]", "https://a.com/[x]]", "https://a.com/(((",
+    "https://exa mple.com", "https://[::1]/x", "http://a b.com", "xhttps://a.com/p", "ahttps://a.com", "https://a.com?x", "https://a.com/x…", "https://😀.com/x", "https://a.com/😀.", "HtTpS://A.com/Q",
+  ];
+  const mk = (over: Record<string, unknown>) => ({ title: "t", content: "c", itemType: "note", sourceUri: null, ...over });
+  const reviewCases: Array<[Record<string, unknown>, string]> = [
+    [mk({ content: "" }), "url"], [mk({ content: "短", itemType: "webpage" }), "url"], [mk({ content: "短", itemType: "webpage" }), "text"], [mk({ content: "短", itemType: "note" }), "file"],
+    [mk({ content: "短", itemType: "document" }), "file"], [mk({ content: "短", itemType: "forum" }), "url"], [mk({ content: "x".repeat(80), itemType: "webpage" }), "url"], [mk({ content: "x".repeat(79), itemType: "webpage" }), "url"],
+    [mk({ content: "😀".repeat(40), itemType: "webpage" }), "url"], [mk({ content: "😀".repeat(39), itemType: "webpage" }), "url"],
+    [mk({ content: "> 元数据\n> 更多\n\n正文很短", itemType: "webpage" }), "url"], [mk({ content: ">only quote", itemType: "webpage" }), "url"], [mk({ content: "> a\r\n> b\r\n\r\nbody", itemType: "webpage" }), "url"],
+    [mk({ content: ">\n>\n  \u00a0 body", itemType: "document" }), "file"], [mk({ content: "![图](http://x/y.png) [链接](http://z) 文字", itemType: "webpage" }), "url"],
+    [mk({ content: "![图\n片](http://x/y.png)", itemType: "webpage" }), "url"], [mk({ content: "[a](b)[c](d)", itemType: "document" }), "url"], [mk({ content: "`*_#>|~-` 符号 ** __", itemType: "webpage" }), "url"],
+    [mk({ content: "含\uFFFD坏字符" }), "file"], [mk({ content: "含\u0000控制" }), "file"], [mk({ content: "含\u0001控制", itemType: "webpage" }), "url"], [mk({ content: "含\t制表\n换行\r回车\u000b\u000c" }), "file"], [mk({ content: "含\u000e" }), "file"],
+    [mk({ content: "正常", warningReason: "转写失败" }), "url"], [mk({ content: "正常", warningReason: "  转写失败  " }), "url"], [mk({ content: "正常", warningReason: "   " }), "url"], [mk({ content: "含\uFFFD", warningReason: "解析文本含有不可识别字符，建议与原始文件核对。" }), "url"],
+    [mk({ content: "短", itemType: "webpage", warningReason: "解析出的正文仅 1 字，建议确认是否漏掉了正文或结构内容。" }), "url"], [mk({ content: "a\u00a0\u2003\ufeff\u3000b", itemType: "webpage" }), "url"],
+    [mk({ content: "  \n\t ", itemType: "webpage" }), "url"], [mk({ content: "- - -", itemType: "webpage" }), "url"],
+  ];
+  const textExtractInputs: string[] = [
+    "", "  ", "标题\n正文", "# 标题\n正文", "###### 六级\nx", "####### 七级\nx", "#标题无空格", "#\u00a0nbsp 标题", "#\u3000全角空格标题", "# \n正文", "#", "  \n\n  首行在后\n第二行  ", "A\r\nB", "A\rB", "A\r",
+    "x".repeat(120), "x".repeat(121), "😀".repeat(60), "😀".repeat(61), "# " + "字".repeat(130), `${"x".repeat(119)}😀尾`, "\ufeff带BOM", "标题\u2028第二行",
+  ];
+  const { detectVideoPlatform } = await import("../../packages/shared/utils/video-platforms.ts");
+  const { detectForumPlatform } = await import("../../packages/shared/utils/forum-platforms.ts");
+  const { resolveSourcePlatform } = await import("../../packages/shared/utils/source-platforms.ts");
+  const { detectPlatformCapturePlatform } = await import("../../packages/shared/utils/platform-capture.ts");
+  const { needsWebVerification } = await import("../../packages/shared/utils/web-verification.ts");
+  const platformUrls: string[] = [
+    ...identityInputs, "https://b23.tv/abc", "https://www.bilibili.com/bangumi/play/ep1", "https://evilbilibili.com/video/BV1", "https://m.youtube.com/watch?v=x", "https://www.youtube.com/channel/x",
+    "https://v.douyin.com/abc/", "https://www.iesdouyin.com/share/video/1", "https://evildouyin.com/x", "https://xhslink.com/a/b", "http://xhslink.cn/x", "https://www.xiaohongshu.com/user/profile/1",
+    "https://www.v2ex.com/t/1227616#reply1", "https://fakev2ex.com/t/1", "https://v2ex.com/t/abc", "https://bbs.nga.cn/read.php?tid=37194262&fav=1", "https://bbs.nga.cn/read.php?tid=abc", "https://ngabbs.com/read.php?tid=%2037194262%20",
+    "https://nga.178.com/READ.PHP?tid=12", "https://linux.do/t/topic/2702071", "https://linux.do/t/2702071", "https://meta.linux.do/t/some-slug/2702071/5", "https://linux.do/t/a/b/c", "https://meta.appinn.net/t/topic/123", "https://appinn.net/t/topic/123",
+    "https://2libra.com/post/node/AbC_-12", "https://www.2libra.com/post/node/AbC_-12/", "https://2libra.com/post/node/short", "https://nodeseek.com:8443/post-1-1", "https://user@www.nodeseek.com/post-1-1", "https://www.nodeseek.com/",
+    "https://mp.weixin.qq.com/s/abc", "http://www.xiaohongshu.com/explore/1", "https://sub.linux.do/", "https://linux.do.evil.com/", "file:///c:/a", "mailto:a@b.c", "not a url", "",
+  ];
+  const wvTasks = [
+    { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: "x web_verification_required y", displayName: "t" }, { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: null, displayName: "Just a moment..." },
+    { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: "网页要求完成验证码", displayName: "t" }, { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: "403", displayName: "t" },
+    { status: "completed", sourceKind: "url", sourceInput: "https://a.com/x", error: "web_verification_required", displayName: "t" }, { status: "failed", sourceKind: "text", sourceInput: "x", error: "web_verification_required", displayName: "t" },
+    { status: "failed", sourceKind: "url", sourceInput: "https://www.douyin.com/video/1", error: "web_verification_required", displayName: "t" }, { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: null, displayName: "验证 人机验证" },
+    { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: null, displayName: "人机验证中" }, { status: "failed", sourceKind: "url", sourceInput: "https://a.com/x", error: null, displayName: "VERIFY YOU ARE HUMAN" },
+  ];  golden.importUtil = {
+    localeMatrix, localePairs,
+    normalize: urls.map((u) => [u, normalizeUrl(u)]),
+    identity: identityInputs.map((u) => [u, sourceIdentity(u)]),
+    urlText: textInputs.map((t) => [t, extractUrlsFromText(t)]),
+    review: reviewCases.map(([e, k]) => [e, k, assessImportReview(e as never, k as never)]),
+    textExtract: await Promise.all(textExtractInputs.map(async (t) => [t, await extractContent("text", t)])),
+    platforms: platformUrls.map((u) => [u, detectVideoPlatform(u), detectForumPlatform(u), resolveSourcePlatform("url", u), resolveSourcePlatform("file", u), resolveSourcePlatform("text", u), resolveSourcePlatform("url", null), detectPlatformCapturePlatform(u)]),
+    webVerification: wvTasks.map((tk) => [tk, needsWebVerification(tk as never)]),
+  };
+}
 fs.writeFileSync(path.join(out, "golden.json"), JSON.stringify(golden, null, 2));
 console.log("golden ok:", out, `fts=${fts.length} counts=${counts.length} list=${listCases.length} writes=${Object.keys(writes).length}`);
