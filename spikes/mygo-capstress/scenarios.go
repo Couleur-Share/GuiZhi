@@ -265,3 +265,100 @@ func memScenario(e *env, _ int) {
 	e.check("进程数不随任务数增长", lastN <= n0+4, fmt.Sprintf("起点 %d → 300 个任务后 %d", n0, lastN))
 	e.note("增长 %.0f MB / 300 个任务；是否需要定期重启采集进程，以这组数字和真实站点的复测为准", last-mb0)
 }
+
+// popupPaths：除 window.open 之外的弹窗路径，逐个对比“有无 window.open 置空”两种配置。
+func popupPaths(e *env, _ int) {
+	allow := allowLoopbackHosts("127.0.0.1", "localhost")
+	p := e.srv.port
+	vectors := []struct{ name, js string }{
+		{"window.open", `window.open(U);1`},
+		{"a[target=_blank].click()", `var a=document.createElement('a');a.href=U;a.target='_blank';document.body.appendChild(a);a.click();1`},
+		{"form[target=_blank].submit()", `var f=document.createElement('form');f.action=U;f.target='_blank';document.body.appendChild(f);f.submit();1`},
+		{"iframe.contentWindow.open", `var i=document.createElement('iframe');document.body.appendChild(i);i.contentWindow.open(U);1`},
+		{"base[target=_blank] + a.click()", `var b=document.createElement('base');b.target='_blank';document.head.appendChild(b);var a=document.createElement('a');a.href=U;document.body.appendChild(a);a.click();1`},
+	}
+	for _, cfg := range []struct {
+		name            string
+		blockOpen, sand bool
+	}{{"无缓解", false, false}, {"仅 window.open 置空", true, false}, {"CSP sandbox", false, true}} {
+		blockOpen, sand := cfg.blockOpen, cfg.sand
+		for _, gesture := range []bool{false} { // 前两轮实测手势有无结果相同，省时间只测无手势
+			var leaked, opened []string
+			for _, v := range vectors {
+				v := v
+				e.srv.resetSecret()
+				js := strings.ReplaceAll(v.js, "U", fmt.Sprintf("'http://127.0.0.2:%d/secret?via=x'", p))
+				res, _ := e.runJobs([]job{{url: func(id int) string { return e.srv.base() + "/popup" }, o: capOpts{allow: allow, autoAttach: true, blockOpen: blockOpen, sandbox: sand, settle: 2 * time.Second,
+					afterLoad: func(t *task) { t.evalG(js, 3*time.Second, gesture) }}}}, 1)
+				e.settleTargets(10 * time.Second)
+				if !res[0].ok {
+					e.note("警告：%s 的宿主页没有加载成功（%s: %s），该项结果无效", v.name, res[0].phase, res[0].err)
+					leaked = append(leaked, v.name+"(无效)")
+				}
+				if len(e.srv.secretHits()) > 0 {
+					leaked = append(leaked, v.name)
+				}
+				if res[0].popups > 0 {
+					opened = append(opened, v.name)
+				}
+			}
+			label := fmt.Sprintf("%s，用户手势=%v", cfg.name, gesture)
+			switch cfg.name {
+			case "无缓解":
+				e.check("正向对照（"+label+"）：各路径都能弹窗并命中内网", len(leaked) == len(vectors), fmt.Sprintf("命中内网 %d/%d：%v", len(leaked), len(vectors), leaked))
+			case "仅 window.open 置空":
+				e.note("%s：仍能弹窗并命中内网的路径 %v（弹出 %v）", label, leaked, opened)
+			default:
+				e.check("缓解（"+label+"）：所有路径都不再命中内网", len(leaked) == 0, fmt.Sprintf("弹出：%v；命中内网：%v", opened, leaked))
+			}
+		}
+	}
+}
+
+// sandboxCost：给文档响应加 CSP sandbox 后，59 页的采集结果与耗时有没有变化。
+func sandboxCost(e *env, _ int) {
+	plain := e.corpusJobs(1)
+	sb := e.corpusJobs(1)
+	for i := range sb {
+		sb[i].o.sandbox = true
+	}
+	r0, w0 := e.runJobs(plain, 3)
+	r1, w1 := e.runJobs(sb, 3)
+	ok0, ok1, sameTitle, textDiff, htmlDiff := 0, 0, 0, 0, 0
+	for i := range r0 {
+		if r0[i].ok {
+			ok0++
+		}
+		if r1[i].ok {
+			ok1++
+		}
+		if r0[i].ok && r1[i].ok {
+			if r0[i].title == r1[i].title {
+				sameTitle++
+			}
+			if r0[i].textLen != r1[i].textLen {
+				textDiff++
+			}
+			if r0[i].htmlLen != r1[i].htmlLen {
+				htmlDiff++
+			}
+		}
+	}
+	e.check("加 sandbox 后 59 页全部成功", ok1 == len(sb), fmt.Sprintf("无 sandbox %d/%d，有 sandbox %d/%d", ok0, len(plain), ok1, len(sb)))
+	e.check("标题与无 sandbox 时一致", sameTitle == ok1, fmt.Sprintf("%d/%d", sameTitle, ok1))
+	e.note("可见文本长度不同 %d 页，DOM 长度不同 %d 页（页面里的脚本每次执行结果也可能略有不同，两次无 sandbox 运行之间也会有差异）", textDiff, htmlDiff)
+	e.note("墙钟：无 sandbox %s，有 sandbox %s", w0.Round(time.Millisecond), w1.Round(time.Millisecond))
+}
+
+func sbDebug(e *env, _ int) {
+	p := e.srv.port
+	probe := func(t *task) {
+		o, err0 := t.eval(`window.origin`, 3*time.Second)
+		fmt.Println("       window.origin =", string(o), err0)
+		v, err := t.eval(fmt.Sprintf(`(function(){var w=window.open('http://127.0.0.2:%d/secret?via=dbg');return 'origin='+window.origin+' open='+(w===null?'null':typeof w)})()`, p), 3*time.Second)
+		fmt.Println("       探针返回：", string(v), err)
+	}
+	e.srv.resetSecret()
+	res, _ := e.runJobs([]job{{url: func(id int) string { return e.srv.base() + "/popup" }, o: capOpts{allow: allowLoopbackHosts("127.0.0.1", "localhost"), autoAttach: true, sandbox: true, settle: 1500 * time.Millisecond, afterLoad: probe}}}, 1)
+	e.note("CSP=%q ok=%v err=%s 内网命中=%v", os.Getenv("CAPCSP"), res[0].ok, res[0].err, e.srv.secretHits())
+}

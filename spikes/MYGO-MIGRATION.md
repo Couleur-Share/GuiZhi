@@ -382,8 +382,12 @@ powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-res
 - **302 与 meta refresh 跳到内网地址**：在跳转那一跳被 `Fetch` 拦下，内网零命中。
 - **跨站 iframe**：只在主页面启用 `Fetch` 也没有漏（对照组零命中）；开了递归自动接管后同样零命中。
 - **`window.open` 弹窗：有缺口。** WebView2 没有 Chromium 的弹窗拦截，无论有没有用户手势，页面脚本都能弹出窗口；弹窗的首个导航请求在我们接管并启用 `Fetch` 之前就已发出，内网被命中。浏览器级 `Target.setAutoAttach`（暂停等待调试器）接管得到弹窗，但拦不住这个首请求。
-- **缓解**：在每个新文档里用 `Page.addScriptToEvaluateOnNewDocument` 把 `window.open` 置空，弹窗与内网访问都消失（已验证，不影响普通页面）。`--block-new-web-contents` 不可靠：两次运行一次仍弹出并命中内网，一次没命中，不能采用。
-- **未解决的残余**：`<a target=_blank>` 由脚本 `click()`、`form target` 之类不经过 `window.open` 的弹窗路径没有测。要彻底堵住，应评估 MyGo 的新窗口策略或把采集进程放在一个按进程设置的过滤代理之后。
+- **缓解（实测，且已验证宿主页确实加载成功，避免“页面没起来所以没命中”的假阳性）**：
+  - 在每个新文档里用 `Page.addScriptToEvaluateOnNewDocument` 把 `window.open` 置空，只挡住 `window.open` 与 `iframe.contentWindow.open`；脚本 `click()` 一个 `<a target=_blank>`、`form[target=_blank].submit()`、`<base target=_blank>` 加链接点击这三条路径照样弹窗并命中内网（5 条路径里 3 条漏）。
+  - 通过 `Fetch.continueResponse` 给文档响应加 `Content-Security-Policy: sandbox`：**无效**。页面能正常加载（59 页结果与不加时一致，耗时 +15%），但 `window.origin` 仍是真实来源，弹窗照开。WebView2 下改写响应头没有让 CSP 生效。（这条路径曾因 `continueResponse` 少传 `responseCode` 而整页挂死、使探针“没命中”，是靠加宿主页加载校验才发现的。）
+  - 浏览器参数 `--block-new-web-contents`：不可靠，两次运行一次仍弹出并命中内网，一次没命中。
+  - 另观察到：弹窗打开后，打开者页面的下一次 `Runtime.evaluate` 在 8 秒内无响应（压测在离屏桌面里运行，真实桌面是否相同未验证），弹窗不只是安全问题，也会拖住采集任务。
+- **结论**：目前没有已验证有效的弹窗封堵办法。可选方向：（a）在 MyGo 层查新窗口的拦截点（`NewWindowRequested`），拒绝一切新窗口，这是根本办法；（b）采集进程走按进程设置的过滤代理，对所有目标一视同仁；（c）接受残余风险，仅对“放行的站点”采集。选择前，涉及不可信页面的采集都不应在此架构上上线。
 
 ### 兜底参数的一个坑
 
@@ -396,13 +400,14 @@ powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-res
 - 内存增长是否收敛：三次测量的增量并不单调，不能据此断言有或没有泄漏。保守做法是每 100–200 个任务回收一次采集进程（重启 0.45 秒）。
 - 带登录态的会话、`browserContext` 隔离、长时间（小时级）运行。
 - 弹窗之外的其他“新目标”路径（见上）。
+- 弹窗是否也会拖住真实桌面上的采集（本次在离屏桌面运行）。
 
 ### 复跑
 
 ```powershell
 # 构建（在 spikes\mygo-capstress 下）；语料目录默认 %TEMP%\guizhi-crawl-eval\cache
 go build -o ..\mygo-capstress.exe .
-# 全部场景，默认离屏运行（日志在 %TEMP%\capstress-*.log）；-run 可选 base,conc,rules,faults,security,kill,mem
+# 全部场景，默认离屏运行（日志在 %TEMP%\capstress-*.log）；-run 可选 base,conc,rules,faults,security,popup2,sandbox,kill,mem
 .\spikes\mygo-capstress.exe
 ```
 ## 还没做的

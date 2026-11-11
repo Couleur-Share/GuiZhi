@@ -263,6 +263,9 @@ var scenarios = []scenario{
 	}},
 	{"faults", "4. 故障注入（每项与 6 个正常任务并发）", faults},
 	{"security", "5. 安全探针：重定向、meta 刷新、弹窗、跨站 iframe", security},
+	{"popup2", "5b. 弹窗的其他路径（脚本 click、表单、iframe、base）", popupPaths},
+	{"sandbox", "5c. CSP sandbox 对正常采集的影响", sandboxCost},
+	{"sbdebug", "调试 sandbox", sbDebug},
 	{"kill", "6. 采集进程被杀：检测速度与恢复", killScenario},
 	{"mem", "7. 内存：300 个任务前后", memScenario},
 }

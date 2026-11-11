@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,7 +23,8 @@ type capOpts struct {
 	autoAttach  bool
 	afterLoad   func(t *task) // 页面加载后的额外动作（如触发弹窗）
 	settle      time.Duration
-	blockOpen   bool // 在每个新文档里把 window.open 换成空函数（缓解脚本发起的弹窗）
+	blockOpen   bool // 在每个新文档里把 window.open 换成空函数（只挡 window.open，挡不住 a/form 的 target）
+	sandbox     bool // 给文档响应加 CSP sandbox（不含 allow-popups），由浏览器本身禁止一切弹窗
 }
 
 type taskResult struct {
@@ -40,6 +42,14 @@ type taskResult struct {
 	dialogs  int
 	crashed  bool
 	navErr   string
+}
+
+func (t *task) fetchPatterns() []map[string]any {
+	ps := []map[string]any{{"urlPattern": "*", "requestStage": "Request"}}
+	if t.o.sandbox {
+		ps = append(ps, map[string]any{"urlPattern": "*", "resourceType": "Document", "requestStage": "Response"})
+	}
+	return ps
 }
 
 type task struct {
@@ -95,13 +105,40 @@ func (t *task) onEvent(m cdpMsg) {
 
 func (t *task) decide(m cdpMsg) {
 	var e struct {
-		RequestID string `json:"requestId"`
-		Request   struct {
+		RequestID       string `json:"requestId"`
+		ResponseStatus  *int   `json:"responseStatusCode"`
+		ResponseHeaders []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		} `json:"responseHeaders"`
+		Request struct {
 			URL     string            `json:"url"`
 			Headers map[string]string `json:"headers"`
 		} `json:"request"`
 	}
 	json.Unmarshal(m.Params, &e)
+	if os.Getenv("CAPDEBUG") != "" {
+		fmt.Println("DEBUG paused:", e.Request.URL, e.ResponseStatus != nil)
+	}
+	if e.ResponseStatus != nil {
+		// 响应阶段（仅文档）：非重定向的响应加 CSP sandbox；重定向原样放行（下一跳会重新经过请求阶段）。
+		if *e.ResponseStatus >= 300 && *e.ResponseStatus < 400 {
+			t.d.call(m.SessionID, "Fetch.continueResponse", map[string]any{"requestId": e.RequestID})
+			return
+		}
+		csp := "sandbox allow-scripts allow-same-origin allow-forms"
+		if v := os.Getenv("CAPCSP"); v != "" {
+			csp = v
+		}
+		hs := []map[string]string{{"name": "Content-Security-Policy", "value": csp}}
+		for _, h := range e.ResponseHeaders {
+			hs = append(hs, map[string]string{"name": h.Name, "value": h.Value})
+		}
+		if _, err := t.d.call(m.SessionID, "Fetch.continueResponse", map[string]any{"requestId": e.RequestID, "responseCode": *e.ResponseStatus, "responseHeaders": hs}); err != nil {
+			fmt.Println("DEBUG continueResponse:", err, e.Request.URL)
+		}
+		return
+	}
 	u, err := url.Parse(e.Request.URL)
 	host := ""
 	if err == nil {
@@ -152,7 +189,7 @@ func (t *task) adopt(m cdpMsg) {
 		t.popups = append(t.popups, e.TargetInfo.TargetID)
 	}
 	t.mu.Unlock()
-	t.d.call(sid, "Fetch.enable", map[string]any{"patterns": []map[string]any{{"urlPattern": "*", "requestStage": "Request"}}})
+	t.d.call(sid, "Fetch.enable", map[string]any{"patterns": t.fetchPatterns()})
 	t.d.call(sid, "Target.setAutoAttach", map[string]any{"autoAttach": true, "waitForDebuggerOnStart": true, "flatten": true})
 	if e.WaitingForDebugger {
 		t.d.call(sid, "Runtime.runIfWaitingForDebugger", nil)
@@ -261,7 +298,7 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 	}{
 		{"Page.enable", nil},
 		{"Runtime.enable", nil},
-		{"Fetch.enable", map[string]any{"patterns": []map[string]any{{"urlPattern": "*", "requestStage": "Request"}}}},
+		{"Fetch.enable", map[string]any{"patterns": t.fetchPatterns()}},
 	} {
 		if _, err := b.d.call(t.main, c.m, c.p); err != nil {
 			return fail(c.m, err)
