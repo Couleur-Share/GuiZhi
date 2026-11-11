@@ -1772,6 +1772,8 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   golden.webSource = await buildWebSourceGolden(out);
   const { buildFunasrGolden } = await import("./golden-funasr.mts");
   golden.funasr = await buildFunasrGolden(out);
+  const { buildMediaGolden } = await import("./golden-media.mts");
+  golden.media = await buildMediaGolden(out);
 }
 
 golden.dumpSql = DUMP_SQL;

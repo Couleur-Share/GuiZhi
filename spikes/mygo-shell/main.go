@@ -229,6 +229,7 @@ func main() {
 	lib.registerCrawl(b)
 	lib.registerManagedTools(b)
 	lib.registerFunasr(b)
+	lib.registerMedia(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)

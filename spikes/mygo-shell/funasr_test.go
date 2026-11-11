@@ -94,7 +94,7 @@ func newFunasrFixture(t *testing.T) *funasrFixture {
 	e.port = freePort(t)
 	e.healthPoll = 30 * time.Millisecond
 	e.stopSettle = 300 * time.Millisecond
-	e.waitStep = 20 * time.Millisecond
+	e.waitStep = 100 * time.Millisecond // 满载时进程退出与端口释放可能超过 0.4s，太小会误报“仍在运行”
 	e.removeRetryDelay = 300 * time.Millisecond
 	e.platform = "win32"
 	e.pypiURL = "https://pypi.test/pypi/funasr/json"

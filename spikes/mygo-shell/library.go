@@ -29,18 +29,21 @@ type Library struct {
 	crawl      *crawlService // 文档批次调度（crawl_service.go）
 	toolsHTTP  *http.Client  // 托管工具下载/版本查询用的 HTTP 客户端；空则按网络代理设置新建（测试注入）
 	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
-	extractURL       func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
-	disposeExtracted func(*extractedContent)
-	webRenderer      webRenderer  // 渲染进程（渲染切片接入前为空）
-	webFetcher       *safeFetcher // 网页采集的出站抓取；空则用 defaultSafeFetcher（测试注入）
-	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
-	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
-	funasrOnce       sync.Once
-	funasrEng        *funasrEngine                      // 本地转写引擎（FunASR）托管状态，首次使用时创建
-	pickExecutable   func(title string) (string, error) // 选择 yt-dlp / ffmpeg 可执行文件；取消返回空串
-	extractOverride  importExtractFn
-	pickDirectory    func(title string) (string, error)
-	saveFileDialog   func(title, defaultPath string, filters []dialogFilter) (string, error)
+	extractURL        func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
+	disposeExtracted  func(*extractedContent)
+	webRenderer       webRenderer  // 渲染进程（渲染切片接入前为空）
+	webFetcher        *safeFetcher // 网页采集的出站抓取；空则用 defaultSafeFetcher（测试注入）
+	captureComments   func(ctx context.Context, task map[string]any, itemID string) error
+	pickFiles         func(multiple bool, filters []dialogFilter) ([]string, error)
+	funasrOnce        sync.Once
+	aiChatHTTP        *http.Client // 测试注入；为空时用按网络代理选路的默认客户端
+	aiChatHTTPOnce    sync.Once
+	aiChatHTTPDefault *http.Client
+	funasrEng         *funasrEngine                      // 本地转写引擎（FunASR）托管状态，首次使用时创建
+	pickExecutable    func(title string) (string, error) // 选择 yt-dlp / ffmpeg 可执行文件；取消返回空串
+	extractOverride   importExtractFn
+	pickDirectory     func(title string) (string, error)
+	saveFileDialog    func(title, defaultPath string, filters []dialogFilter) (string, error)
 	// 主题阅读一族迁移前的接入点：取消这些条目的主题阅读任务；返回仍被主题阅读快照租用的资产文件名
 	cancelThemedReading     func(ids []string)
 	leasedSnapshotAssets    func() []string

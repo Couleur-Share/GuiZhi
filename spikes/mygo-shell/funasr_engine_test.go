@@ -776,7 +776,6 @@ func TestFunasrIPC(t *testing.T) {
 	if st := call("funasr:status").(map[string]any); st["installed"] != false || st["installSupported"] != true {
 		t.Errorf("初始状态：%v", st)
 	}
-	// 安装失败（下载一律 404）；失败后缓存应已失效
 	// 安装失败（下载一律 404）
 	if res := call("funasr:install").(map[string]any); res["success"] != false || !strings.HasPrefix(fmt.Sprint(res["error"]), "全部下载源失败——") {
 		t.Errorf("install 失败：%v", res)

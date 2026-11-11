@@ -483,7 +483,7 @@ func (q *importQueue) processTask(ctx context.Context, id string, task map[strin
 		q.updateAndNotify(ctx, id, p, true, s, rec)
 	}
 	var err error
-	extracted, err = q.extract(ctx, task, onStage)
+	extracted, err = q.extract(withAICallSink(ctx, rec.recordAICall), task, onStage)
 	if err != nil {
 		fail(err)
 		return
