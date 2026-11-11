@@ -39,10 +39,14 @@ func findPortFile(dir string, wait time.Duration) string {
 
 func runChild(userData string) {
 	mygo.App.WhenReady(func() {
-		mygo.NewWindow(mygo.WindowOptions{
+		w := mygo.NewWindow(mygo.WindowOptions{
 			Title: "capture-child", Width: 900, Height: 600, URL: "about:blank", Hidden: true,
 			Page: mygo.PageOptions{BackgroundThrottling: mygo.ThrottlingOff},
 		})
+		if os.Getenv("CAPDENYOPEN") != "" {
+			// 宿主层拒绝一切 window.open / target=_blank；不设处理器时 MyGo 会把 http(s) 交给系统默认浏览器。
+			w.Page().SetWindowOpenHandler(func(mygo.WindowOpenRequest) *mygo.WindowOptions { return nil })
+		}
 		go func() {
 			f := findPortFile(userData, 15*time.Second)
 			raw, _ := os.ReadFile(f)

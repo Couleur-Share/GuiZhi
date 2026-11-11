@@ -93,7 +93,7 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - 下载被拒绝前，请求已经发出。涉及 SSRF 防护的地址仍必须在 `Fetch` 的请求阶段拦截，不能只靠下载拒绝。
 - 代理是环境级参数（`--proxy-server`），按进程设置；Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物。
 - 按分区隔离：`Fetch` 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
-- 已验证（见「采集进程的真实页面与并发压测」）：多个并发 target 的拦截隔离、崩溃恢复。还没验证：采集进程池的复用策略、真实互联网站点与反爬。仅在主页面启用拦截会漏掉 `window.open` 弹窗的首个请求。
+- 已验证（见「采集进程的真实页面与并发压测」）：多个并发 target 的拦截隔离、崩溃恢复。还没验证：采集进程池的复用策略、真实互联网站点与反爬。CDP 新建的页面会漏掉 `window.open` 弹窗的首个请求，应改用带“拒绝新窗口”处理器的 MyGo 窗口池。
 ## 备份验证（`spikes/mygo-backup`）
 
 `createBackup` 用 `VACUUM INTO` 对在线库生成单文件备份；MyGo 内置 SQLite 拒绝它（`authorization denied (code 23)`，已实测）。替代做法：业务读写仍走 MyGo 自带 SQLite，备份只用纯 Go 的 `modernc.org/sqlite` 以 `mode=ro` 打开同一个库并执行 `VACUUM INTO`。运行：`go run . <含 knowledge.db 的目录> [padMB]`，样本是 212 MB 的库（真实 `knowledge.db` 加两张各 100 MB 的 pad 表）。
@@ -387,7 +387,9 @@ powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-res
   - 通过 `Fetch.continueResponse` 给文档响应加 `Content-Security-Policy: sandbox`：**无效**。页面能正常加载（59 页结果与不加时一致，耗时 +15%），但 `window.origin` 仍是真实来源，弹窗照开。WebView2 下改写响应头没有让 CSP 生效。（这条路径曾因 `continueResponse` 少传 `responseCode` 而整页挂死、使探针“没命中”，是靠加宿主页加载校验才发现的。）
   - 浏览器参数 `--block-new-web-contents`：不可靠，两次运行一次仍弹出并命中内网，一次没命中。
   - 另观察到：弹窗打开后，打开者页面的下一次 `Runtime.evaluate` 在 8 秒内无响应（压测在离屏桌面里运行，真实桌面是否相同未验证），弹窗不只是安全问题，也会拖住采集任务。
-- **结论**：目前没有已验证有效的弹窗封堵办法。可选方向：（a）在 MyGo 层查新窗口的拦截点（`NewWindowRequested`），拒绝一切新窗口，这是根本办法；（b）采集进程走按进程设置的过滤代理，对所有目标一视同仁；（c）接受残余风险，仅对“放行的站点”采集。选择前，涉及不可信页面的采集都不应在此架构上上线。
+- **有效的办法（已验证）**：弹窗要由宿主层拒绝。MyGo 的 `Page.SetWindowOpenHandler(func(WindowOpenRequest) *WindowOptions { return nil })` 会拒绝一切 `window.open` 与 `target=_blank`（含 `a.click()`、`form.submit()`、`<base target>`、`iframe.contentWindow.open`，共 5 条路径，全部不再弹窗、内网零命中，宿主页加载正常）。**但只对 MyGo 窗口里的页面生效**：用 `Target.createTarget` 新建的 CDP 页面（本次压测用的方式）不经过这个处理器，Chromium 自己开窗。所以产品里的采集页应当是采集进程内预先创建的隐藏 MyGo 窗口（池），而不是 `createTarget`；窗口复用时必须在任务结束时 `Fetch.disable` 并导航回空白页，否则残留的拦截没人处理，下一次导航会挂住（实测）。
+  - **不设处理器是危险默认值**：MyGo 在没有处理器时，会把 `window.open` 的 http(s) 地址交给系统默认浏览器（`Shell.OpenExternal`），采集进程里必须显式设置“拒绝”。出于这个原因，没有做“MyGo 窗口 + 无处理器”的正向对照；5 条路径的正向对照来自 `createTarget` 页面（5/5 弹窗并命中内网）。
+  - 池化方案的并发、窗口创建开销、崩溃后窗口回收还没验证，是下一步。
 
 ### 兜底参数的一个坑
 
@@ -464,5 +466,5 @@ go build -o ..\mygo-capstress.exe .
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 独立采集进程的并发压测已在本机语料上做完（见「采集进程的真实页面与并发压测」），真实互联网站点仍待验证，弹窗缺口需要先决定处理方式；AI 流式请求（见「AI 流式请求切片」）与加密备份格式、换库与回滚（见「备份恢复与加密仓库切片」）已验证；备份恢复外围的编排（`pre-restore`、停后台任务、重启）还没验证。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
+2. 独立采集进程的并发压测已在本机语料上做完（见「采集进程的真实页面与并发压测」），真实互联网站点仍待验证，弹窗缺口的有效办法已找到（MyGo 窗口 + 拒绝新窗口的处理器），采集页改为窗口池后需重做并发压测；AI 流式请求（见「AI 流式请求切片」）与加密备份格式、换库与回滚（见「备份恢复与加密仓库切片」）已验证；备份恢复外围的编排（`pre-restore`、停后台任务、重启）还没验证。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。

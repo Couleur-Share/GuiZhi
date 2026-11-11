@@ -23,8 +23,9 @@ type capOpts struct {
 	autoAttach  bool
 	afterLoad   func(t *task) // 页面加载后的额外动作（如触发弹窗）
 	settle      time.Duration
-	blockOpen   bool // 在每个新文档里把 window.open 换成空函数（只挡 window.open，挡不住 a/form 的 target）
-	sandbox     bool // 给文档响应加 CSP sandbox（不含 allow-popups），由浏览器本身禁止一切弹窗
+	blockOpen   bool   // 在每个新文档里把 window.open 换成空函数（只挡 window.open，挡不住 a/form 的 target）
+	reuse       string // 不新建 target，直接用这个（采集进程自带的 MyGo 窗口），结束时不关闭
+	sandbox     bool   // 给文档响应加 CSP sandbox（不含 allow-popups），由浏览器本身禁止一切弹窗
 }
 
 type taskResult struct {
@@ -234,15 +235,21 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 		res.phase, res.err = phase, err.Error()
 		return res
 	}
-	r, err := b.d.call("", "Target.createTarget", map[string]any{"url": "about:blank"})
-	if err != nil {
-		return fail("createTarget", err)
+	var r json.RawMessage
+	var err error
+	if o.reuse != "" {
+		t.targetID = o.reuse
+	} else {
+		r, err = b.d.call("", "Target.createTarget", map[string]any{"url": "about:blank"})
+		if err != nil {
+			return fail("createTarget", err)
+		}
+		var ct struct {
+			TargetID string `json:"targetId"`
+		}
+		json.Unmarshal(r, &ct)
+		t.targetID = ct.TargetID
 	}
-	var ct struct {
-		TargetID string `json:"targetId"`
-	}
-	json.Unmarshal(r, &ct)
-	t.targetID = ct.TargetID
 	b.tasks.Store(t.targetID, t)
 	defer func() {
 		// 关闭：本页、弹窗；记录耗时，并确认 target 真的消失。
@@ -251,7 +258,13 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 		for _, tid := range ids {
 			b.tasks.Delete(tid)
 		}
-		for _, tid := range ids {
+		for i, tid := range ids {
+			if i == 0 && o.reuse != "" {
+				b.d.call(t.main, "Fetch.disable", nil) // 否则这个窗口里残留的拦截没人处理，下次导航会挂住
+				b.d.call(t.main, "Target.setAutoAttach", map[string]any{"autoAttach": false, "flatten": true})
+				b.d.call(t.main, "Page.navigate", map[string]any{"url": "about:blank"})
+				continue
+			}
 			b.d.call("", "Target.closeTarget", map[string]any{"targetId": tid})
 		}
 		deadline := time.Now().Add(8 * time.Second)
@@ -262,7 +275,7 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 			}
 			left := false
 			for _, x := range ts {
-				for _, tid := range ids {
+				for _, tid := range ids[map[bool]int{true: 1, false: 0}[o.reuse != ""]:] {
 					if x.TargetID == tid {
 						left = true
 					}

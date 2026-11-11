@@ -18,6 +18,8 @@ import (
 )
 
 type env struct {
+	baseTarget string // 采集进程自带的 MyGo 窗口对应的 target
+
 	srv   *server
 	b     *browser
 	base  int // 基线页面数（采集进程自带的空白窗口）
@@ -45,6 +47,14 @@ func (e *env) newBrowser() error {
 	}
 	e.b = b
 	e.base = b.pageCount()
+	e.baseTarget = ""
+	if ts, err := b.targets(); err == nil {
+		for _, t := range ts {
+			if t.Type == "page" && e.baseTarget == "" {
+				e.baseTarget = t.TargetID
+			}
+		}
+	}
 	return nil
 }
 

@@ -280,15 +280,27 @@ func popupPaths(e *env, _ int) {
 	for _, cfg := range []struct {
 		name            string
 		blockOpen, sand bool
-	}{{"无缓解", false, false}, {"仅 window.open 置空", true, false}, {"CSP sandbox", false, true}} {
+		deny            bool
+	}{{"无缓解", false, false, false}, {"宿主层拒绝新窗口（SetWindowOpenHandler 返回 nil）", false, false, true}} {
 		blockOpen, sand := cfg.blockOpen, cfg.sand
+		if os.Getenv("CAPSKIPCTRL") != "" && !cfg.deny {
+			continue // 正向对照已在此前的运行里确认，省时间
+		}
+		if cfg.deny {
+			os.Setenv("CAPDENYOPEN", "1")
+			e.b.stop()
+			if err := e.newBrowser(); err != nil {
+				e.check("以宿主层拒绝新窗口重启采集进程", false, err.Error())
+				return
+			}
+		}
 		for _, gesture := range []bool{false} { // 前两轮实测手势有无结果相同，省时间只测无手势
 			var leaked, opened []string
 			for _, v := range vectors {
 				v := v
 				e.srv.resetSecret()
 				js := strings.ReplaceAll(v.js, "U", fmt.Sprintf("'http://127.0.0.2:%d/secret?via=x'", p))
-				res, _ := e.runJobs([]job{{url: func(id int) string { return e.srv.base() + "/popup" }, o: capOpts{allow: allow, autoAttach: true, blockOpen: blockOpen, sandbox: sand, settle: 2 * time.Second,
+				res, _ := e.runJobs([]job{{url: func(id int) string { return e.srv.base() + "/popup" }, o: capOpts{allow: allow, autoAttach: true, blockOpen: blockOpen, sandbox: sand, reuse: map[bool]string{true: e.baseTarget, false: ""}[cfg.deny], settle: 2 * time.Second,
 					afterLoad: func(t *task) { t.evalG(js, 3*time.Second, gesture) }}}}, 1)
 				e.settleTargets(10 * time.Second)
 				if !res[0].ok {
@@ -306,12 +318,15 @@ func popupPaths(e *env, _ int) {
 			switch cfg.name {
 			case "无缓解":
 				e.check("正向对照（"+label+"）：各路径都能弹窗并命中内网", len(leaked) == len(vectors), fmt.Sprintf("命中内网 %d/%d：%v", len(leaked), len(vectors), leaked))
-			case "仅 window.open 置空":
-				e.note("%s：仍能弹窗并命中内网的路径 %v（弹出 %v）", label, leaked, opened)
 			default:
-				e.check("缓解（"+label+"）：所有路径都不再命中内网", len(leaked) == 0, fmt.Sprintf("弹出：%v；命中内网：%v", opened, leaked))
+				e.check("缓解（"+label+"）：所有路径都不再弹窗、不再命中内网", len(leaked) == 0 && len(opened) == 0, fmt.Sprintf("弹出：%v；命中内网：%v", opened, leaked))
 			}
 		}
+	}
+	os.Unsetenv("CAPDENYOPEN")
+	e.b.stop()
+	if err := e.newBrowser(); err != nil {
+		e.check("恢复默认参数重启采集进程", false, err.Error())
 	}
 }
 
