@@ -10,3 +10,13 @@ $todo = $rows | ? { -not $_.Done -and -not $_.Frozen }
 "total=$($rows.Count) done=$(($rows|?{$_.Done}).Count) frozen=$(($rows|?{$_.Frozen -and -not $_.Done}).Count) todo=$($todo.Count)"
 $todo | Group-Object { ($_.Ch -split ':')[0] } | Sort-Object Count -Descending | % { "{0,-20} {1}" -f $_.Name, $_.Count }
 if ($List) { $todo | % { $_.Ch } }
+
+# 追加：ipc-channels.ts 之外直接以字符串字面量注册的频道（ipcMain.handle/on("x:y")）
+$known = [System.Collections.Generic.HashSet[string]]::new([string[]]$pairs)
+$lit = Get-ChildItem apps\desktop\src\main -Recurse -Include *.ts | ? { $_.Name -notmatch '\.test\.' } | % {
+  [regex]::Matches((Get-Content $_.FullName -Raw), 'ipcMain\.(?:handle|on|once)\(\s*["'']([A-Za-z0-9_:\-]+)["'']') | % { $_.Groups[1].Value }
+} | Sort-Object -Unique | ? { -not $known.Contains($_) }
+$litRows = $lit | % { [pscustomobject]@{ Ch = $_; Done = $go.Contains('"' + $_ + '"'); Frozen = ($_ -match $frozen) } }
+$litTodo = $litRows | ? { -not $_.Done -and -not $_.Frozen }
+"literal(outside constants): total=$($litRows.Count) done=$(($litRows|?{$_.Done}).Count) frozen=$(($litRows|?{$_.Frozen -and -not $_.Done}).Count) todo=$($litTodo.Count)"
+if ($List) { $litTodo | % { 'literal: ' + $_.Ch } }

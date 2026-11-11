@@ -102,6 +102,7 @@ func main() {
 	dbPath := flag.String("db", "", "knowledge.db（建议用隔离 fixture）")
 	configDir := flag.String("config", "", "config 目录（放 ai-models.json）；不给则 AI 配置读写报错")
 	userData := flag.String("userdata", "", "userData 目录（等价 Electron 的 app.getPath(\"userData\")）；不给则取 -db 所在 data 目录的上一级")
+	appData := flag.String("appdata", "", "appData 目录（data-path.json 所在的 GuiZhi 上一级）；不给则取 userData 的上一级，避免测试时写到真实 %APPDATA%")
 	shot := flag.String("shot", "", "启动后截图到该文件并退出")
 	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
@@ -131,7 +132,10 @@ func main() {
 	if ud == "" {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
 	}
-	lib := &Library{db: db, configDir: *configDir, paths: Paths{UserData: ud}}
+	lib := &Library{db: db, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
+	if lib.appData == "" {
+		lib.appData = filepath.Dir(ud)
+	}
 	lib.openDialog = func(multiple bool, name string, exts []string) ([]string, error) {
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: []mygo.FileFilter{{Name: name, Extensions: exts}}})
 	}
@@ -183,6 +187,7 @@ func main() {
 	lib.registerShortcutsIPC(b)
 	lib.registerConfigTransfer(b)
 	lib.registerLegacyMigration(b)
+	lib.registerDataPath(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}
