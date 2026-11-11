@@ -193,7 +193,7 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - `style` 属性与样式表由 `cleanCss` 处理，另见下一小节；`CleanHTML` 本身一律丢弃 `style`，HTML 对拍时两边都去掉 `style` 再比较。
 - 没有微信公众号的真实 HTML 样本，快照路径的完整行为未验证。
 
-**4. CSS 白名单 `cleanCss`**（`extract/css.go`，`cmd/compare-css`）。产品用 `css-tree` 解析，按属性白名单、`url()` 必须能映射到本快照资源、拒绝 `expression`/`var`/`env`/`paint`/`image-set`、`position` 只允许 `relative`/`absolute`/`static`、样式表中的 at 规则整体移除。Go 用 `tdewolff/parse` 的 CSS 解析器移植（约 300 行）。对拍输入是 59 个真实网页里的全部 style 属性（19,980 条）与 `<style>` 块（372 个），加 40 条攻击用例，每条用「拒绝所有 url」和「映射所有 url」两种映射各跑一次，两边输出去掉空白、注释、url 引号后比较：
+**4. CSS 白名单 `cleanCss`**（`extract/css.go`，`cmd/compare-css`）。产品用 `css-tree` 解析，按属性白名单、`url()` 必须能映射到本快照资源、拒绝 `expression`/`var`/`env`/`paint`/`image-set`、`position` 只允许 `relative`/`absolute`/`static`、样式表中的 at 规则整体移除。Go 用 `tdewolff/parse` 的 CSS 解析器移植（约 260 行）。对拍输入是 59 个真实网页里的全部 style 属性（19,980 条）与 `<style>` 块（372 个），加 40 条攻击用例，每条用「拒绝所有 url」和「映射所有 url」两种映射各跑一次，两边输出去掉空白、注释、url 引号后比较：
 
 | 类别 | 总数 | 一致 |
 |---|---|---|
