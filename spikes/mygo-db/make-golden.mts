@@ -14,6 +14,7 @@ import {
   AskSessionDB,
   SemanticIndexDB,
 } from "../../packages/db/src/index.ts";
+import { saveKnowledgeDraft } from "../../packages/db/src/knowledge-draft.ts";
 import { listInboxItems } from "../../apps/desktop/src/main/services/inbox.ts";
 import { buildFtsMatchQuery, segmentTextForFts } from "../../packages/db/src/fts.ts";
 
@@ -928,6 +929,42 @@ const scenarios: Record<string, Op[]> = {
   "wiki.flushSearch": [{ fn: "wiki.search", args: ["新页正文 检索"] }, { fn: "wiki.catalog", args: [] }, { fn: "wiki.graph", args: [] }],
   "wiki.flushThenUpdate": [
     { fn: "wiki.updatePage", args: [{ pageId: P(2), body: "更新前未 flush", linkTargets: ["新页面"] }] }, { fn: "wiki.catalog", args: [] }, { fn: "wiki.getPage", args: [P(2)] },
+  ],  // ── 编辑器草稿（fn 带 draft. 前缀；直接调用 DAO，IPC 只是一层转发）──
+  "draft.ok": [
+    { fn: "draft.save", args: [{ id: A, requestId: "r1", base: { title: a.title }, patch: { title: "新标题" } }] },
+    { fn: "draft.save", args: [{ id: A, requestId: "r2", base: { content: "旧基线" }, patch: { content: "新正文" } }] },
+    { fn: "draft.save", args: [{ id: B, requestId: "r3", base: { title: b.title, content: "采集" }, patch: { title: " 改 ", content: "改文" } }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "r4", base: {}, patch: {} }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "r5", base: 5, patch: 5 }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "r6", base: {}, patch: true }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "r7", base: [], patch: [] }] },
+    { fn: "knowledge.get", args: [A] }, { fn: "knowledge.get", args: [B] },
+  ],
+  "draft.conflict": [
+    { fn: "draft.save", args: [{ id: A, requestId: "c1", base: { title: "别人改之前" }, patch: { title: "我的标题" } }] },
+    { fn: "draft.save", args: [{ id: A, requestId: "c2", base: { title: "别人改之前", content: "基线" }, patch: { title: a.title, content: "我的正文" } }] },
+    { fn: "draft.save", args: [{ id: A, requestId: "c3", base: { title: "别人改之前" }, patch: { title: a.title } }] },
+    { fn: "draft.save", args: [{ id: A, requestId: "c4", base: { content: "x" }, patch: { content: "y" } }] },
+    { fn: "draft.save", args: [{ id: A, requestId: "c5", base: {}, patch: { title: "没有基线" } }] },
+  ],
+  "draft.tags": [
+    { fn: "draft.save", args: [{ id: A, requestId: "t1", base: { tagNames: ["知识库", "本地"] }, patch: { tagNames: ["知识库", "新标签"] } }] },
+    { fn: "knowledge.update", args: [B, { tagNames: ["桌面", "框架", "并发加的"] }] },
+    { fn: "draft.save", args: [{ id: B, requestId: "t2", base: { tagNames: ["桌面", "框架"] }, patch: { tagNames: ["框架", " 新一 ", "NEW一"] } }] },
+    { fn: "draft.save", args: [{ id: B, requestId: "t3", base: { tagNames: [" 框架 ", "新一"] }, patch: { tagNames: ["新一", "ＦＵＬＬ", "İstanbul", "ΑΣ"] } }] },
+    { fn: "draft.save", args: [{ id: B, requestId: "t4", base: { tagNames: ["新一"] }, patch: { tagNames: [] } }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "t5", base: {}, patch: { tagNames: ["检索", "检索", "A", "a"] } }] },
+    { fn: "draft.save", args: [{ id: C, requestId: "t6", base: { tagNames: ["检索", "FTS5"] }, patch: { tagNames: ["检索"], title: "同改标题" } }] },
+  ],
+  "draft.invalid": [
+    ...[null, undefined, 5, "x", [], {}, { id: A }, { id: A, requestId: "r" }, { id: A, requestId: "r", base: {} }, { id: A, requestId: "r", patch: {} },
+      { id: 1, requestId: "r", base: {}, patch: {} }, { id: A, requestId: 1, base: {}, patch: {} }, { id: A, requestId: "r", base: 0, patch: {} }, { id: A, requestId: "r", base: {}, patch: "" },
+      { id: A, requestId: "r", base: {}, patch: "ab" }, { id: A, requestId: "r", base: {}, patch: { summary: "x" } }, { id: A, requestId: "r", base: { isPinned: true }, patch: {} },
+      { id: A, requestId: "r", base: {}, patch: { title: 1 } }, { id: A, requestId: "r", base: {}, patch: { title: null } }, { id: A, requestId: "r", base: { content: 5 }, patch: {} },
+      { id: A, requestId: "r", base: {}, patch: { tagNames: "x" } }, { id: A, requestId: "r", base: {}, patch: { tagNames: ["a", 1] } }, { id: A, requestId: "r", base: { tagNames: {} }, patch: {} },
+      { id: A, requestId: "r", base: {}, patch: { tagNames: null } },
+      { id: "missing", requestId: "r", base: {}, patch: { title: "x" } }, { id: G, requestId: "r", base: {}, patch: { title: "x" } },
+    ].map((x) => ({ fn: "draft.save", args: [x] })),
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -958,6 +995,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     ai: aiUsageHandlers(db),
     semantic: semanticHandlers(db),
     wiki: wikiHandlers(db),
+    draft: { save: (input: unknown) => saveKnowledgeDraft(db as never, input as never) } as never,
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>

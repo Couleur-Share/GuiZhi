@@ -130,6 +130,7 @@ func main() {
 	lib.registerAIUsage(b)
 	lib.registerSemantic(b)
 	lib.registerWiki(b)
+	lib.registerKnowledgeDraft(b)
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)
