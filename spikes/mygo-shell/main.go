@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -120,6 +121,11 @@ func main() {
 		log.Fatal("需要 -dist 与 -db")
 	}
 
+	automation := *shot != "" || *aiTest != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
+	if !automation && !mygo.App.RequestSingleInstanceLock() {
+		return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
+	}
+
 	ctx := context.Background()
 	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
 	if err != nil {
@@ -188,6 +194,9 @@ func main() {
 	lib.registerConfigTransfer(b)
 	lib.registerLegacyMigration(b)
 	lib.registerDataPath(b)
+	lc := newAppLifecycle(runtime.GOOS == "windows")
+	lc.setLoginItem = setLoginItemNative
+	lc.register(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}
@@ -210,7 +219,10 @@ func main() {
 	origin := "http://" + ln.Addr().String()
 
 	mygo.App.WhenReady(func() {
-		win := mygo.NewWindow(mygo.WindowOptions{
+		manage := !automation // 真实启动：恢复上次窗口、按登录项/设置决定显示或驻留托盘
+		stateFile := filepath.Join(ud, "window-state.json")
+		launch := windowLaunchState{ShouldMaximize: false, Bounds: windowBounds{Width: 1280, Height: 800}}
+		opts := mygo.WindowOptions{
 			Title: "归知 GuiZhi（MyGo spike）", Width: 1280, Height: 800, URL: origin + "/",
 			Hidden: *shot != "" || *aiTest != "",
 			X:      benchX(*bench), Y: benchX(*bench),
@@ -218,7 +230,19 @@ func main() {
 				PreloadScript:  string(preload),
 				TrustedOrigins: []string{origin},
 			},
-		})
+		}
+		if manage {
+			launch = readWindowLaunchState(stateFile, displayWorkAreas())
+			opts.Width, opts.Height = launch.Bounds.Width, launch.Bounds.Height
+			if launch.HasPosition {
+				opts.X, opts.Y = launch.Bounds.X, launch.Bounds.Y
+			}
+			opts.MinWidth, opts.MinHeight = minWindowWidth, minWindowHeight
+			opts.Hidden = true // 等 ready-to-show 再按启动可见性决定
+			opts.BackgroundColor = "#1a1d23"
+			opts.Frameless = runtime.GOOS == "windows" // 与 Electron 版一致：Windows 用无边框窗口，标题栏由页面自绘
+		}
+		win := mygo.NewWindow(opts)
 		b.registerWindow(win)
 		p := win.Page()
 		skipGlobal := *shot != "" || *aiTest != "" || *bench // 自动化实例不抢用户正在用的系统级快捷键
@@ -233,6 +257,14 @@ func main() {
 				log.Printf("[push] 推送 %s 失败：%v", channel, err)
 			}
 		})
+		lc.mu.Lock()
+		lc.win, lc.push = mygoHost{win}, lib.pushMain
+		if manage {
+			lc.tray = &mygoTray{a: lc, lib: lib, locale: systemLocale}
+		}
+		lc.quit = mygo.App.Quit
+		lc.mu.Unlock()
+		wireWindowLifecycle(win, lc, lib, manage, stateFile, launch)
 		p.OnDidFailLoad(func(e *mygo.LoadError) { fmt.Println("[FAIL] 页面加载失败：", e) })
 		if *bench {
 			// 与 Electron 版的就绪判据一致：顶栏搜索框出现在 DOM 里
@@ -269,6 +301,9 @@ func main() {
 			if v, err := p.Eval(`document.getElementById('root') ? document.getElementById('root').childElementCount : -1`); err == nil {
 				fmt.Printf("[INFO] #root 子元素数：%v\n", v)
 			}
+			if v, err := p.Eval(`(()=>{const e=document.querySelector(".titlebar-drag");return e?getComputedStyle(e).getPropertyValue("--app-region"):"无 .titlebar-drag"})()`); err == nil {
+				fmt.Printf("[INFO] 拖拽区域 --app-region：%v\n", v)
+			}
 			png, err := win.CapturePage()
 			if err == nil {
 				err = os.WriteFile(*shot, png, 0o644)
@@ -293,4 +328,59 @@ func benchX(on bool) int {
 		return -32000
 	}
 	return 0
+}
+
+// wireWindowLifecycle 把窗口事件接到 appLifecycle：可见性推送、关闭策略、全屏推送、状态落盘、启动可见性。
+func wireWindowLifecycle(win *mygo.Window, lc *appLifecycle, lib *Library, manage bool, stateFile string, launch windowLaunchState) {
+	var persist *windowStatePersister
+	if manage {
+		persist = &windowStatePersister{win: win, file: stateFile}
+		persist.attach()
+	}
+	win.OnShow(func() { lc.emitVisibility(true) })
+	win.OnHide(func() { lc.emitVisibility(false) })
+	win.OnMinimize(func() { lc.emitVisibility(false) })
+	win.OnRestore(func() { lc.emitVisibility(true) })
+	win.OnEnterFullScreen(func() { lc.push("window:fullscreen-changed", true) })
+	win.OnLeaveFullScreen(func() { lc.push("window:fullscreen-changed", false) })
+	win.OnClose(func(e *mygo.CloseEvent) {
+		if persist != nil {
+			persist.flush() // 即使这次关闭被拦下（隐藏到托盘），也先保存
+		}
+		if lc.onClose() {
+			e.PreventDefault()
+		}
+	})
+	win.OnClosed(func() {
+		lc.mu.Lock()
+		lc.win = nil
+		lc.mu.Unlock()
+		lc.destroyTray()
+	})
+	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { lc.setQuitting() })
+	mygo.App.OnSecondInstance(func([]string, string) { lc.onSecondInstance() })
+	if !manage {
+		return
+	}
+	win.OnReadyToShow(func() {
+		minimizeOnLaunch, _ := lib.readBoolSetting(context.Background(), "minimizeOnLaunch")
+		vis := resolveLaunchVisibility(os.Args, mygo.App.WasOpenedAtLogin(), minimizeOnLaunch, launch.ShouldMaximize)
+		switch {
+		case vis.MaximizeNow:
+			win.Maximize()
+		case vis.MaximizeOnFirstShow:
+			var off func()
+			off = win.OnShow(func() {
+				off()
+				win.Maximize()
+			})
+		}
+		if vis.StartHidden {
+			lc.createTray()
+			lc.emitVisibility(false)
+			return
+		}
+		win.Show()
+		lc.emitVisibility(true)
+	})
 }

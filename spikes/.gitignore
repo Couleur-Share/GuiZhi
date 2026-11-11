@@ -1,3 +1,4 @@
 **/*.exe
 **/*.png
 !mygo-shell/shell8.png
+!mygo-shell/assets/tray-icon.png

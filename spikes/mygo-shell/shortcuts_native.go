@@ -50,7 +50,14 @@ func (n *mygoShortcutNative) register(action, accelerator string) bool {
 }
 
 // toggleWindowForShowApp 对应 shortcuts.ts 的同名函数：最小化 → 还原并聚焦；可见 → 隐藏；否则显示并聚焦。
-func toggleWindowForShowApp(win *mygo.Window, onVisibility func(bool)) {
+func toggleWindowForShowApp(win interface {
+	IsMinimized() bool
+	IsVisible() bool
+	Restore()
+	Show()
+	Hide()
+	Focus()
+}, onVisibility func(bool)) {
 	switch {
 	case win.IsMinimized():
 		win.Restore()

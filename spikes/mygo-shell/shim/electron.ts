@@ -60,3 +60,32 @@ export const webUtils = {
     return "";
   },
 };
+
+// Electron 的窗口拖拽区域写作 `-webkit-app-region`，MyGo 认的是 `--app-region`。
+// 渲染进程的 CSS 不改：页面加载后扫描样式表，把带该属性的规则同样写成 `--app-region`（幂等，只维护一个 <style>）。
+function mirrorAppRegion() {
+  const rules: string[] = [];
+  for (const sheet of Array.from(document.styleSheets)) {
+    let list: CSSRuleList;
+    try {
+      list = sheet.cssRules; // 跨域样式表会抛 SecurityError，渲染进程的样式都同源
+    } catch {
+      continue;
+    }
+    for (const rule of Array.from(list)) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      const value = rule.style.getPropertyValue("-webkit-app-region").trim();
+      if (value) rules.push(`${rule.selectorText}{--app-region:${value}}`);
+    }
+  }
+  const id = "guizhi-mygo-app-region";
+  let el = document.getElementById(id) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement("style");
+    el.id = id;
+    document.head.appendChild(el);
+  }
+  el.textContent = rules.join("\n");
+}
+window.addEventListener("DOMContentLoaded", mirrorAppRegion);
+window.addEventListener("load", mirrorAppRegion);
