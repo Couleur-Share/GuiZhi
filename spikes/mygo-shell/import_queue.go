@@ -708,6 +708,9 @@ func (l *Library) importSaveItem(ctx context.Context, p importSaveParams) (strin
 	if err != nil {
 		return "", err
 	}
+	if ex.WebCapture != nil {
+		stmts = append(stmts, webSourceInitStmts(id, in.Title.orDefault(""), in.Content.orDefault(""), *ex.WebCapture)...)
+	}
 	var accessURI, normalized any
 	if sourceKind == "url" {
 		accessURI = sourceInput

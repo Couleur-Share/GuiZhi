@@ -18,8 +18,9 @@ import (
 	"strings"
 )
 
-// extractedContent 对应 ExtractedContent（暂不含 webCapture）。
+// extractedContent 对应 ExtractedContent。
 type extractedContent struct {
+	WebCapture     *webCaptureResult
 	Title          string
 	Content        string
 	ItemType       string
@@ -198,7 +199,7 @@ func (l *Library) defaultExtract(ctx context.Context, task map[string]any, onSta
 		if l.extractURL != nil {
 			return l.extractURL(ctx, task, onStage)
 		}
-		return nil, errors.New("该来源类型的采集尚未迁移到新内核")
+		return l.importExtractURL(ctx, task, onStage)
 	}
 	return nil, fmt.Errorf("未知的采集类型: %s", kind)
 }

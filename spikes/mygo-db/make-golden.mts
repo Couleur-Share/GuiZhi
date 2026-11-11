@@ -1763,6 +1763,11 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   golden.net = await buildNetGolden();
 }
 
+{
+  const { buildWebGolden } = await import("./golden-web.mts");
+  golden.web = await buildWebGolden();
+}
+
 golden.dumpSql = DUMP_SQL;
 golden.selAssets = selAssets;
 golden.writes = writes;

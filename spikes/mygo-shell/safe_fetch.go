@@ -46,6 +46,9 @@ type safeRequestOptions struct {
 	Cookie    string // 原样写入 Cookie 头（NGA guestJs 握手）
 	// 除 2xx 外也交给 consume 读 body 的状态码（NGA 的 guestJs 挑战是 403）
 	AcceptStatuses []int
+	// AcceptEncoding 非空时随请求发出（调用方负责解压）；NoLanguage 不发 Accept-Language（网页采集与渲染窗口同一身份）。
+	AcceptEncoding string
+	NoLanguage     bool
 }
 
 // safeFetcher 持有可替换的解析器与拨号器，生产用 newSafeFetcher，测试注入。
@@ -202,7 +205,12 @@ func (f *safeFetcher) openRequest(ctx context.Context, target *whatwg.Url, pinne
 	}
 	req.Header.Set("User-Agent", ua)
 	req.Header.Set("Accept", accept)
-	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	if !o.NoLanguage {
+		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	}
+	if o.AcceptEncoding != "" {
+		req.Header.Set("Accept-Encoding", o.AcceptEncoding)
+	}
 	if o.Referer != "" {
 		req.Header.Set("Referer", o.Referer)
 	}
@@ -443,6 +451,7 @@ func decodeTextBody(body []byte, contentType string, peekMeta bool) string {
 	if err != nil {
 		return lossyUTF8(body)
 	}
+	enc = whatwgDecoderFor(enc)
 	if name, _ := htmlindex.Name(enc); name == "replacement" {
 		return lossyUTF8(body)
 	}

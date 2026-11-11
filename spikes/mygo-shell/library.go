@@ -28,6 +28,8 @@ type Library struct {
 	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
 	extractURL       func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
 	disposeExtracted func(*extractedContent)
+	webRenderer      webRenderer  // 渲染进程（渲染切片接入前为空）
+	webFetcher       *safeFetcher // 网页采集的出站抓取；空则用 defaultSafeFetcher（测试注入）
 	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
 	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
 	extractOverride  importExtractFn
