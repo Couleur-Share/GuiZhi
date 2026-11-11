@@ -69,13 +69,30 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 | 覆盖 User-Agent | `Emulation.setUserAgentOverride` | 服务端收到新 UA |
 | 主框架导航拦截 | `Fetch.failRequest` | 服务端 0 命中，`OnDidFailLoad` 触发 |
 
-约束与未验证项：
+### 独立采集进程（`spikes/mygo-netproc`）
 
-- **安全（按 Chromium 行为推断，未单独验证）**：这个参数是整个 WebView2 环境共用的，开启后本机任何同用户进程都能连上端口、驱动该环境里的**所有**窗口，包括带 `window.mygo` 桥的主界面。因此采集必须放进**独立的采集进程**（自己的环境、自己的数据目录），主界面进程不开调试端口。
-- 独立采集进程还顺带解决代理：`--proxy-server` 是环境级参数，Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物，按进程设置代理才能保持语义。
-- 附加调试器之前发出的请求拦截不到。采集需要先开空白页、附加并启用 `Fetch`，再用 `Page.navigate` 跳转；这个流程尚未验证。
-- `will-download` 与权限回调尚未验证。可能可由 `Browser.setDownloadBehavior`、`Browser.setPermission` 替代。
-- 按分区隔离：Fetch 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
+主进程（带界面，不开调试端口）拉起子进程（采集进程，环境变量里带 `--remote-debugging-port=0`），再只用 DevTools 协议驱动它。`go build` 后运行，15 行输出全部为 OK（其中 5 行是启用步骤）：
+
+| 能力 | 结果 |
+|---|---|
+| 主进程的数据目录里没有 `DevToolsActivePort` | 通过 |
+| 采集进程的 DevTools 只列出自己的页面，看不到主界面 | 通过（1 个 target） |
+| 先在空白页附加并启用 `Fetch`，再 `Page.navigate` | 首个文档请求被拦到并改写请求头 |
+| 文档里的子资源拦截 | 服务端 0 命中 |
+| `Runtime.evaluate` 取值、`Page.captureScreenshot`（隐藏窗口） | 通过，可替代 `Eval` 和 `CapturePage` |
+| 权限拦截：`Browser.setPermission` 拒绝 geolocation | 立即返回 `denied:1`，不挂起 |
+| 下载拦截：`Browser.setDownloadBehavior` 为 `deny` | 事件为 begin、inProgress、canceled，没有文件落盘；服务端仍收到了一次请求 |
+| 杀掉采集进程后主进程窗口仍可用 | 通过 |
+
+结论：网络拦截这条路径在设计上可行，采集放进独立进程既解决安全暴露，也解决崩溃隔离。
+
+仍然成立的约束：
+
+- 调试端口对整个 WebView2 环境生效。同用户的其他本机进程只要拿到端口就能驱动采集进程里的页面，所以采集进程不应加载任何带 `window.mygo` 桥的页面，也不应使用主进程的数据目录。
+- 下载被拒绝前，请求已经发出。涉及 SSRF 防护的地址仍必须在 `Fetch` 的请求阶段拦截，不能只靠下载拒绝。
+- 代理是环境级参数（`--proxy-server`），按进程设置；Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物。
+- 按分区隔离：`Fetch` 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
+- 还没验证：多个并发 target 的拦截隔离、采集进程池与复用、反爬场景下的真实站点。
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -111,9 +128,9 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 1. 新版不含手机同步、近期研究、平台发现、正文配图。需要的用户回旧版。
 2. 研究、发现等数据保留在库里，新版不读不写，也不删。
 3. 新旧版本不能同时打开同一个库（见上文第 3 条风险），只能轮流使用。
-4. 采集一族依赖的网络拦截已验证可由 DevTools 协议替代，但必须放进独立的采集进程（见「网络拦截验证」）；完整流程仍待验证。
+4. 采集一族依赖的网络拦截已验证可由 DevTools 协议替代，须放进独立的采集进程（见「网络拦截验证」）；真实站点和并发仍待验证。
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 验证备份替代方案（第 1 条）；验证独立采集进程的完整流程（先空白页附加再导航、下载与权限）。
+2. 验证备份替代方案（第 1 条）；用真实站点和多 target 并发压测独立采集进程。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
