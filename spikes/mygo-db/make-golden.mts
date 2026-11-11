@@ -336,9 +336,20 @@ closeDatabase();
 
 // electron 桩：必须在加载任何 ipc 模块之前安装（写入场景与 settings 场景共用）
 const ipcHandlers = new Map<string, (...args: unknown[]) => unknown>();
+const ipcOn = new Map<string, (...args: unknown[]) => unknown>();
+const dialogQueue: Array<{ canceled: boolean; filePaths: string[] }> = [];
 const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === "then" ? undefined : noop), apply: () => noop });
 const electronStub = new Proxy(
-  { ipcMain: { handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn), on() {}, removeHandler() {} } } as Record<string | symbol, unknown>,
+  {
+    ipcMain: {
+      handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn),
+      on: (ch: string, fn: (...a: unknown[]) => unknown) => ipcOn.set(ch, fn),
+      removeAllListeners: (ch: string) => ipcOn.delete(ch),
+      removeHandler() {},
+    },
+    app: { getPath: (_name: string) => path.join(isolatedAppData, "GuiZhi"), getVersion: () => "0.28.0" },
+    dialog: { showOpenDialog: async () => dialogQueue.shift() },
+  } as Record<string | symbol, unknown>,
   { get: (t, p) => (p in t ? t[p] : noop) },
 );
 const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
@@ -1174,5 +1185,79 @@ if (!seededGet.value || "aiProviders" in seededGet.value || "aiModels" in seeded
 if (!aiConfigDir.startsWith(out)) throw new Error("AI 配置目录不在隔离区内");
 golden.settings = { defaults: DEFAULT_SETTINGS, dumpSql: settingsDump, runs: settingsRuns };
 
+// ── 运行时路径、诊断日志、本地图片：真实的 app-runtime.ipc.ts / image.ipc.ts ──
+{
+  const userData = path.join(isolatedAppData, "GuiZhi");
+  const appRuntimeIpc = await import("../../apps/desktop/src/main/ipc/app-runtime.ipc.ts");
+  const imageIpc = await import("../../apps/desktop/src/main/ipc/image.ipc.ts");
+  ipcHandlers.clear();
+  appRuntimeIpc.registerAppRuntimeIPC();
+  imageIpc.registerImageIPC();
+  const logsDir = path.join(userData, "logs");
+  const imagesDir = path.join(userData, "data", "assets", "images");
+  fs.rmSync(logsDir, { recursive: true, force: true });
+  fs.rmSync(imagesDir, { recursive: true, force: true });
+  fs.mkdirSync(path.join(imagesDir, "dir"), { recursive: true });
+  const seedFiles: Record<string, number[]> = { "a.png": [137, 80, 78, 71, 1, 2, 3], "b.JPG": [255, 216, 255, 0, 255], "noext": [1], "空 格 名.png": [9, 9], "empty.gif": [] };
+  for (const [name, bytes] of Object.entries(seedFiles)) fs.writeFileSync(path.join(imagesDir, name), Buffer.from(bytes));
+  const srcDir = path.join(out, "image-src");
+  fs.mkdirSync(srcDir, { recursive: true });
+  const srcFiles: Record<string, number[]> = { "x1.png": [1, 1, 1], "x2.JPEG": [2, 2], "x3.txt": [3], "x4": [4], ".png": [5], "x5.WebP": [6, 6, 6, 6], "x6.tar.gif": [7], "gone.png": [8] };
+  for (const [name, bytes] of Object.entries(srcFiles)) fs.writeFileSync(path.join(srcDir, name), Buffer.from(bytes));
+  const src = (name: string) => path.join(srcDir, name);
+  const call = async (channel: string, ...args: unknown[]) => {
+    try { return { value: (await ipcHandlers.get(channel)!({}, ...args)) ?? null }; } catch (error) { return { error: (error as Error).message }; }
+  };
+  const readNames: unknown[] = ["a.png", "b.JPG", "noext", "空 格 名.png", "empty.gif", "missing.png", "dir", "../x", "a/b", "a\\b", "C:x", "", ".", "..", "a..b", null, 5, ["a.png"], "a.png\u0000", "tab\t", "a.png ", "A.PNG", "nul"];
+  const reads = [];
+  for (const n of readNames) reads.push({ arg: n ?? null, ...(await call("image:readBase64", n)) });
+  // 保存：dialog 队列里放下一次选择结果；选择后才允许保存
+  type SaveOp = { select?: string[] | "cancel"; save?: unknown };
+  const saveOps: SaveOp[] = [
+    { save: [src("x1.png")] },
+    { select: [src("x1.png"), src("x2.JPEG"), src("x3.txt"), src("x5.WebP")] },
+    { save: [src("x1.png"), src("x2.JPEG"), src("x3.txt"), src("x4"), src("x5.WebP"), src("x6.tar.gif"), "nonexist.png"] },
+    { save: [src("x1.png")] },
+    { select: "cancel" }, { save: [src("x1.png")] },
+    { select: [src(".png"), src("x4"), src("x6.tar.gif"), src("gone.png")] },
+    { save: [src(".png"), src("x4"), src("x6.tar.gif"), src("gone.png"), 5, null] },
+    { select: [src("x1.png")] }, { save: "notarray" }, { save: null }, { save: [src("x1.png"), src("x1.png")] },
+    { select: [src("x1.png").replaceAll("\\", "/")] }, { save: [src("x1.png")] }, { save: [] },
+  ];
+  const saves = [];
+  for (const op of saveOps) {
+    if (op.select !== undefined) {
+      dialogQueue.push(op.select === "cancel" ? { canceled: true, filePaths: [] } : { canceled: false, filePaths: op.select });
+      saves.push({ op, ...(await call("dialog:selectImage")) });
+    } else {
+      saves.push({ op, ...(await call("image:save", op.save)) });
+    }
+  }
+  const files = fs.readdirSync(imagesDir).filter((n) => fs.statSync(path.join(imagesDir, n)).isFile()).map((n) => ({ name: n, bytes: [...fs.readFileSync(path.join(imagesDir, n))] }));
+  // 日志
+  const longMsg = "长".repeat(2500);
+  const home = (await import("node:os")).homedir();
+  const logEntries: unknown[] = [
+    { scope: "backup", action: "自动备份", message: "失败了" }, { message: "只有消息" }, { scope: "  trim 我  ", action: " 动作 ", message: "  前后空白  " },
+    { scope: "s", action: "a", message: "   " }, { scope: "s", action: "a", message: 5 }, { scope: "s", action: "a" }, { scope: "x".repeat(100), action: "y".repeat(100), message: "长字段" },
+    { scope: "s", action: "a", message: longMsg }, { scope: "s", action: "a", message: "a".repeat(1999) + "😀" + "tail" }, { scope: 5, action: null, message: "scope 非字符串" },
+    { scope: "s", action: "a", message: `EPERM: unlink '${home}\\x\\y' 与 '${home.toUpperCase()}\\z'` },
+    { scope: "s", action: "a", message: "多行\n消息\t带制表符 \"引号\" \\反斜杠 </script>" }, { scope: "s", action: "a", message: "\u00a0\u2003 nbsp 两侧 \ufeff" },
+    { scope: "s", action: "a", message: "extra", extra: { nested: 1 } },
+    null, 5, "x", [], {}, { message: ["a"] }, true,
+  ];
+  ipcOn.get("log:appError")!({}, undefined);
+  for (const e of logEntries) ipcOn.get("log:appError")!({}, e);
+  const logFile = path.join(logsDir, "error.log");
+  const logLines = fs.existsSync(logFile)
+    ? fs.readFileSync(logFile, "utf8").split("\n").filter(Boolean).map((line) => { const r = JSON.parse(line); delete r.ts; delete r.pid; delete r.version; return r; })
+    : [];
+  golden.appRuntime = {
+    userData, home, srcDir,
+    paths: await call("app:getRuntimePaths"),
+    seedFiles, srcFiles, reads, saveOps, saves, files, logEntries, logLines,
+  };
+  ipcHandlers.clear();
+}
 fs.writeFileSync(path.join(out, "golden.json"), JSON.stringify(golden, null, 2));
 console.log("golden ok:", out, `fts=${fts.length} counts=${counts.length} list=${listCases.length} writes=${Object.keys(writes).length}`);

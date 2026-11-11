@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -100,6 +101,7 @@ func main() {
 	dist := flag.String("dist", "", "spikes/mygo-shell/dist 目录")
 	dbPath := flag.String("db", "", "knowledge.db（建议用隔离 fixture）")
 	configDir := flag.String("config", "", "config 目录（放 ai-models.json）；不给则 AI 配置读写报错")
+	userData := flag.String("userdata", "", "userData 目录（等价 Electron 的 app.getPath(\"userData\")）；不给则取 -db 所在 data 目录的上一级")
 	shot := flag.String("shot", "", "启动后截图到该文件并退出")
 	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
@@ -120,7 +122,20 @@ func main() {
 	defer db.Close()
 
 	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
-	lib := &Library{db: db, configDir: *configDir}
+	ud := *userData
+	if ud == "" {
+		ud = filepath.Dir(filepath.Dir(*dbPath))
+	}
+	lib := &Library{db: db, configDir: *configDir, paths: Paths{UserData: ud}}
+	lib.openDialog = func(multiple bool, name string, exts []string) ([]string, error) {
+		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: []mygo.FileFilter{{Name: name, Extensions: exts}}})
+	}
+	lib.relaunch = func() {
+		if exe, err := os.Executable(); err == nil {
+			_ = exec.Command(exe, os.Args[1:]...).Start()
+		}
+		mygo.App.Quit()
+	}
 	lib.register(b)
 	lib.registerList(b)
 	lib.registerWrite(b)
@@ -131,6 +146,7 @@ func main() {
 	lib.registerSemantic(b)
 	lib.registerWiki(b)
 	lib.registerKnowledgeDraft(b)
+	lib.registerAppRuntime(b)
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)

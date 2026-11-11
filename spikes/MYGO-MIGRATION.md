@@ -73,6 +73,7 @@
 | 11-11 | `semantic:status/listPending/applyEmbeddings/search/clear`（含内容哈希、进程内向量缓存、float32 小端 BLOB、堆容量按 `<limit` 多留一个） | 7 组场景（独立播种库 `semantic-base.db`）；含缓存失效只覆盖本次写入的模型这一 TS 特点、孤立代理项截断、NaN 输出为 null | 46 / 141 |
 | 11-11 | `wiki:catalog/backlinkCounts/search/getPage/updatePage/deletePage/status/graph/listRevisions/restoreRevision`（含 `flushWikiInvalidations` 失效重建，事务内读写用内存状态模拟） | 11 组场景（独立播种库 + 带贡献与失效记录的库）：节点/边/历史保留 10 份/手动编辑标记/旧版页面改走建议；适配器的单参数绑定语义（数组按位置参数、布尔、对象报错）也已复刻。对拍时 uuid 键与并列时间戳、图谱边顺序做了稳定化 | 56 / 131 |
 | 11-11 | `knowledge:saveDraft` | 4 组 59 个调用：基线冲突（含 patch 等于当前值不算冲突）、标签按基线增删合并（trim+小写键、Map 语义）、参数校验（`Object.keys` 对数字/数组/字符串的行为）。读写之间有极小窗口（TS 是单事务），见源码注释 | 57 / 130 |
+| 11-11 | `app:getRuntimePaths`、`app:relaunch`、`log:appError`、`dialog:selectImage`、`image:save/readBase64` | 路径、诊断日志（脱敏、512KB 滚动、字段顺序）、图片选择集授权、保存与读取全部与 TS 对拍；发现 Node 对 `a.png␠`、`nul` 返回不存在而 Go 的 Win32 路径会规范化，已按 Node 行为拒绝；`image:save` 传字符串时不抛错且清空选择集。`app:relaunch` 只验证返回值，未实机重启 | 63 / 124 |
 
 | 项目 | 结果 |
 |---|---|

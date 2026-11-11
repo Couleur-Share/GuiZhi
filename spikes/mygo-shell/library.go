@@ -15,10 +15,14 @@ import (
 
 // writeMu 串行化写操作：MyGo 事务不能穿插读取，写入采用先读后写，需保证读到写之间无他人插入。
 type Library struct {
-	db        *sqlite.DB
-	writeMu   sync.Mutex
-	configDir string // 对应 userData/config，放 ai-models.json
-	sem       semanticState
+	db         *sqlite.DB
+	writeMu    sync.Mutex
+	configDir  string // 对应 userData/config，放 ai-models.json
+	sem        semanticState
+	paths      Paths
+	images     imageState
+	openDialog openDialogFn // 选择图片的对话框；测试里替换
+	relaunch   func()       // 重启应用；测试里替换
 }
 
 func asInt(v any) int64 {
