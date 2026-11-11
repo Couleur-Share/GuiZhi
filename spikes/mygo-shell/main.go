@@ -194,6 +194,7 @@ func main() {
 	lib.registerConfigTransfer(b)
 	lib.registerLegacyMigration(b)
 	lib.registerDataPath(b)
+	lib.registerUpdater(b, packagedBuild == "true", mygo.App.Quit)
 	lc := newAppLifecycle(runtime.GOOS == "windows")
 	lc.setLoginItem = setLoginItemNative
 	lc.register(b)

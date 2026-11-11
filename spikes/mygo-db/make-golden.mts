@@ -1743,6 +1743,11 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   golden.window = await buildWindowGolden({ out });
 }
 
+{
+  const { buildUpdaterGolden } = await import("./golden-updater.mts");
+  golden.updater = await buildUpdaterGolden();
+}
+
 golden.dumpSql = DUMP_SQL;
 golden.selAssets = selAssets;
 golden.writes = writes;

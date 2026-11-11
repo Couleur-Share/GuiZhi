@@ -13,4 +13,5 @@ require (
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
 	golang.org/x/net v0.59.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
