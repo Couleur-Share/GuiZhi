@@ -1,0 +1,3 @@
+*.exe
+.patched/
+go.patched.*

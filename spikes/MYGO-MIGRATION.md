@@ -125,6 +125,32 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 也就是说，备份格式在新旧版之间是双向互通的。运行：`GUIZHI_BACKUP_KEEP=<路径> go run . <含 knowledge.db 的目录> 1` 生成备份，再 `pnpm dlx tsx spikes/mygo-backup/verify-wasm.mts <备份> <回写副本>`，最后 `GUIZHI_BACKUP_CHECK=<回写副本> go run .` 回读。
 
 还没验证：恢复流程里的 `pre-restore` 快照、换库、重启；加密备份格式（`encrypted` 字段）；旧版 wasm 与新版 SQLite 同时打开同一个库的锁冲突（第 3 条风险，仍成立）。
+## 正文提取等价性（`spikes/mygo-readability`）
+
+产品的网页正文提取是 `@mozilla/readability` 0.6.0（经 linkedom）加一层自己的规则（`web-extract-article.ts` 约 400 行、`web-extract-markdown.ts` 约 190 行）。这一步只验证最底层：Go 的 `codeberg.org/readeck/go-readability/v2`（`github.com/go-shiori/go-readability` 已弃用，指向它；该库声明对标 Readability.js 0.6.0，版本与产品一致）与 JS 在同一份真实网页上选出的正文是否一致。
+
+语料：`%TEMP%\guizhi-crawl-eval` 里 2026-11-06 评估 Crawl4AI 时留下的 59 个真实网页缓存（静态与渲染两份 HTML）。它不在仓库里，也不随提交走；样本偏技术文档，且是评估时调阈值用过的那一批，不是留出样本。按产品的静态/渲染分流（`assessStaticPage`）只比较每页实际会使用的那份 HTML。比较方式：正文去空白后逐字比较，不相同时用 5 字窗口的多重集合重合度。
+
+| 模式 | 逐字相同 | ≥0.99 | 0.95–0.99 | 0.80–0.95 | <0.80 | 标题一致 |
+|---|---|---|---|---|---|---|
+| 库默认行为（仅 `charThreshold=100`） | 51 / 59 | 5 | 2 | 1 | 0 | 59 / 59 |
+| 加上产品对 Readability 的两处改动 | 52 / 59 | 3 | 3 | 1 | 0 | 59 / 59 |
+
+- **产品的两处改动必须移植。** 它们是 `linkDensityModifier = 0.1`（条件清理里两处链接占比阈值 `0.2`、`0.5` 各加该值）与「保留与标题重复的首个 h1/h2」（把 `_headerDuplicatesTitle` 改成恒 `false`）。Go 库没有对应选项；不打补丁时，对产品模式的基准只有 52 / 118 输入逐字相同，打补丁后为 100 / 118（118 是静态与渲染两份都算）。补丁很小（3 处，`prepare-patched.ps1`），需要维护一份 fork 或补丁序列。
+- **最差的一页相似度 0.931**（martinfowler 的长文，JS 多保留了一些图示文字）；其余差异在 0.988 以上，都是个别元素的取舍（例如 dev.to 代码块的「全屏」按钮文字、Playwright 文档里的示意图文字）。没有出现整块正文丢失。
+- **静态 HTML 的解析器差异：** 产品用 linkedom（非规范解析器），Go 用 `x/net/html`（HTML5 规范解析）。5 个 MDN 页面的静态版本差异很大（其中 3 个 JS 取到约 1.8 万字，Go 只有 800 到 2000 字；另 2 个相差约 25%），但产品把它们分流到渲染版本，渲染版本两边一致，所以不影响实际结果。分流规则本身需要一并迁移。
+- **尚未验证：** 产品自己那 590 行规则（区域回退、隐藏内容展开、标题区补回、代码块语言、表格转换）、Turndown 到 Markdown 的转换（Go 需要 `html-to-markdown` 之类并补自定义规则）、`sanitize-html`、GBK 等非 UTF-8 站点、评估文档提到的 47 页留出样本（不在本机）。结论只能到「库层面可行」，不能到「整条提取链路等价」。
+
+运行方式（语料目录与输出目录自行指定）：
+
+```powershell
+node spikes/mygo-readability/make-golden.mjs <样本目录> <golden 目录>
+pnpm dlx tsx spikes/mygo-readability/route-check.mts <样本目录> <golden 目录>
+cd spikes/mygo-readability
+go run . <样本目录> <golden 目录> stock
+powershell -File prepare-patched.ps1
+go run -tags patched "-modfile=go.patched.mod" . <样本目录> <golden 目录> product
+```
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -169,7 +195,7 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - 本次 spike 的 Go 与被替换的 TS 行数大致 1:1；按此，剩余约 4 万行 Go 加对应的对拍基准。这是量级估计，不是工期承诺。
 - 最大的几块：`import` 0.71 万、`web-capture` 0.50 万、`media` 0.49 万、`themed-reading` 0.44 万、`platform-capture` 0.26 万。
 
-没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库，但逐字一致没有验证过；网页正文提取的差异会直接改变用户入库的内容，是最大的行为风险。
+没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库；正文提取的底层（Readability）已验证基本等价，见「正文提取等价性」，但其余规则、Markdown 转换与净化库尚未验证。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
 
 继续迁移的建议顺序与停止条件：
 
