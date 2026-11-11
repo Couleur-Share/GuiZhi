@@ -5,6 +5,7 @@ go 1.27.3
 require (
 	github.com/egoist/mygo v0.8.3
 	github.com/nlnwa/whatwg-url v0.6.2
+	golang.org/x/crypto v0.57.0
 	golang.org/x/text v0.43.0
 )
 

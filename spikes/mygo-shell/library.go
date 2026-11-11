@@ -38,6 +38,8 @@ type Library struct {
 	leasedSnapshotAssets func() []string
 	pushMu               sync.RWMutex
 	push                 func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
+	sc                   shortcutState                     // 快捷键配置（shortcuts.go）
+	cfg                  configState                       // 配置迁移的 read→apply 状态（config_transfer.go）
 }
 
 func asInt(v any) int64 {

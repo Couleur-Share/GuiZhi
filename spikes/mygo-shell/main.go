@@ -180,6 +180,8 @@ func main() {
 	lib.registerImport(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
+	lib.registerShortcutsIPC(b)
+	lib.registerConfigTransfer(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}
@@ -213,6 +215,13 @@ func main() {
 		})
 		b.registerWindow(win)
 		p := win.Page()
+		skipGlobal := *shot != "" || *aiTest != "" || *bench // 自动化实例不抢用户正在用的系统级快捷键
+		if !skipGlobal {
+			lib.sc.mu.Lock()
+			lib.sc.native = newMygoShortcutNative(lib, win)
+			lib.sc.mu.Unlock()
+		}
+		lib.startShortcuts(skipGlobal)
 		lib.setPush(func(channel string, payload any) {
 			if err := ipcEvent.EmitPage(p, ipcPush{Channel: channel, Args: []any{payload}}); err != nil {
 				log.Printf("[push] 推送 %s 失败：%v", channel, err)

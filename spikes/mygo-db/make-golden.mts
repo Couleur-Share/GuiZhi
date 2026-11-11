@@ -338,6 +338,8 @@ closeDatabase();
 const ipcHandlers = new Map<string, (...args: unknown[]) => unknown>();
 const ipcOn = new Map<string, (...args: unknown[]) => unknown>();
 const dialogQueue: Array<{ canceled: boolean; filePaths: string[] }> = [];
+const saveQueue: Array<{ canceled: boolean; filePath?: string }> = [];
+const dialogCalls: Array<{ kind: "open" | "save"; options: Record<string, unknown> }> = [];
 const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === "then" ? undefined : noop), apply: () => noop });
 const electronStub = new Proxy(
   {
@@ -348,7 +350,10 @@ const electronStub = new Proxy(
       removeHandler() {},
     },
     app: { getPath: (_name: string) => path.join(isolatedAppData, "GuiZhi"), getVersion: () => "0.28.0" },
-    dialog: { showOpenDialog: async () => dialogQueue.shift() },
+    dialog: {
+      showOpenDialog: async (...a: unknown[]) => { dialogCalls.push({ kind: "open", options: a[a.length - 1] as Record<string, unknown> }); return dialogQueue.shift(); },
+      showSaveDialog: async (...a: unknown[]) => { dialogCalls.push({ kind: "save", options: a[a.length - 1] as Record<string, unknown> }); return saveQueue.shift(); },
+    },
   } as Record<string | symbol, unknown>,
   { get: (t, p) => (p in t ? t[p] : noop) },
 );
@@ -1714,6 +1719,13 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   const probed = await probe("cmd.exe", ["/c", tsxBin, serverTs], { GUIZHI_DATA_DIR: mcpDataDir }, stdioRequests);
   if (probed.stderr) console.error("[mcp stdio] TS server stderr:", probed.stderr.slice(0, 300));
   golden.mcp = { tools, handoff, scopes, install, stdio: { requests: stdioRequests, lines: probed.lines } };
+}
+
+{
+  const { buildConfigGolden } = await import("./golden-config.mts");
+  const cfg = await buildConfigGolden({ ipcHandlers, ipcOn, openQueue: dialogQueue, saveQueue, dialogCalls, userData: path.join(isolatedAppData, "GuiZhi"), out });
+  golden.shortcuts = cfg.shortcuts;
+  golden.configTransfer = cfg.configTransfer;
 }
 
 golden.dumpSql = DUMP_SQL;
