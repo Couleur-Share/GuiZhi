@@ -190,10 +190,29 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - 攻击用例 34 / 35 一致：覆盖脚本、事件属性、`javascript:`（含实体、制表符、大小写变体）、`data:`、协议相对 URL、SVG 内容、`<math>`、`iframe`/`form`/`object`、注释与 CDATA、未闭合标签、标签粗糙拼接等。
 - 移植时发现并照搬了三处产品行为：`sanitize-html` 丢弃空值属性；`img` 的 `src` 只放行本快照登记的 `local-image`，其余替换为 `alt="图片未保存"`；`nonTextTags` 里的 `foreignobject` 实际不生效（htmlparser2 在 SVG 内保留标签大小写，`foreignObject` 匹配不上），所以 `foreignObject` 里的 `div` 会保留，再经白名单过滤。
 - 剩下的不一致是解析器差异：`<noscript><p title="</noscript><img src=x onerror=...">` 里，`x/net/html` 把 `noscript` 当原始文本，在第一个 `</noscript>` 处结束，htmlparser2 则不是。Go 的输出里没有事件属性和可执行内容，`img` 被去掉 `src` 并替换为占位，残留的是转义后的文字 `">`，是安全的，但文字与 TS 不同。
-- 没有移植 `cleanCss`（`css-tree` 白名单）：Go 版目前一律丢弃 `style` 属性与样式表，CSS 白名单需要在 Go 里另找 CSS 解析器重做，工作量未估算。
+- `style` 属性与样式表由 `cleanCss` 处理，另见下一小节；`CleanHTML` 本身一律丢弃 `style`，HTML 对拍时两边都去掉 `style` 再比较。
 - 没有微信公众号的真实 HTML 样本，快照路径的完整行为未验证。
 
-仍没有验证：非技术类网站的留出样本（不在本机的 47 页）、CSS 白名单、带 `charset` 的真实 GBK 站点（本次是合成字节，不是真实页面）。
+**4. CSS 白名单 `cleanCss`**（`extract/css.go`，`cmd/compare-css`）。产品用 `css-tree` 解析，按属性白名单、`url()` 必须能映射到本快照资源、拒绝 `expression`/`var`/`env`/`paint`/`image-set`、`position` 只允许 `relative`/`absolute`/`static`、样式表中的 at 规则整体移除。Go 用 `tdewolff/parse` 的 CSS 解析器移植（约 300 行）。对拍输入是 59 个真实网页里的全部 style 属性（19,980 条）与 `<style>` 块（372 个），加 40 条攻击用例，每条用「拒绝所有 url」和「映射所有 url」两种映射各跑一次，两边输出去掉空白、注释、url 引号后比较：
+
+| 类别 | 总数 | 一致 |
+|---|---|---|
+| 真实网页的 style 属性 | 39,960 | 39,960 |
+| 真实网页的 `<style>` 块 | 744 | 744 |
+| 攻击用例（行内） | 60 | 54 |
+| 攻击用例（样式表） | 20 | 18 |
+
+真实数据全部一致。攻击用例里 6 条不一致，都是 Go 更严格或写法不同，没有 Go 放行而产品拒绝的情况：
+
+- 函数名里的 CSS 转义：产品直接拿原文比较，`i\6d age-set(...)`、`v\61r(--x)`、`ex\70ression(...)` 都能通过黑名单；Go 先解码转义再匹配，所以拒绝。这是产品现有实现的缺口：我在原目录之外的测试里确认 `background-image:i\6d age-set("https://…")` 会被原样保留。快照文档的 CSP 是 `default-src 'none'; img-src local-image:`，外链图片与 `image-set` 会被挡住，所以不构成可利用漏洞，属于纵深防御缺口；本次没有改产品代码。
+- 解析失败的片段：产品会把 css-tree 无法解析为声明的片段原样保留（如 `color:;`、没有冒号的 `padding`），Go 一律丢弃。
+- 嵌套规则（CSS nesting）：产品原样保留，Go 整体丢弃。第一版 Go 把嵌套规则的选择器错误合并成 `.a,.b{…}`，改成丢弃后修正。
+- 属性名大小写：产品保留，Go 小写化，语义相同。
+- 值里出现冒号（如缺分号的 `justify-content:space-between overflow:hidden`）：产品和浏览器都当作无效声明丢弃，Go 起初放行，已加规则丢弃。
+
+产品输出里还有三类对渲染无影响的内容，对拍时忽略：`/*! … */` 注释、空值声明（`vertical-align:;`）、声明被清空的规则（`.a{}`，Go 也保留以便一致）。
+
+仍没有验证：非技术类网站的留出样本（不在本机的 47 页）、微信公众号真实快照、带 `charset` 的真实 GBK 站点（本次是合成字节，不是真实页面）。
 运行方式（语料目录与输出目录自行指定）：
 
 ```powershell
