@@ -228,6 +228,7 @@ func main() {
 	lib.registerImport(b)
 	lib.registerCrawl(b)
 	lib.registerManagedTools(b)
+	lib.registerFunasr(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)
@@ -366,6 +367,9 @@ func main() {
 	err = mygo.App.Run()
 	if lib.crawl != nil { // 对应 closeWebCapture：先暂停运行中的批次，再关库
 		lib.crawl.close(context.Background())
+	}
+	if lib.funasrEng != nil { // 对应 will-quit：停掉由本进程拉起的转写服务
+		lib.funasrEng.stop()
 	}
 	shutdownDB()
 	if err != nil {

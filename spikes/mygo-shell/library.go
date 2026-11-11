@@ -35,6 +35,8 @@ type Library struct {
 	webFetcher       *safeFetcher // 网页采集的出站抓取；空则用 defaultSafeFetcher（测试注入）
 	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
 	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
+	funasrOnce       sync.Once
+	funasrEng        *funasrEngine                      // 本地转写引擎（FunASR）托管状态，首次使用时创建
 	pickExecutable   func(title string) (string, error) // 选择 yt-dlp / ffmpeg 可执行文件；取消返回空串
 	extractOverride  importExtractFn
 	pickDirectory    func(title string) (string, error)
