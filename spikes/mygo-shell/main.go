@@ -102,6 +102,7 @@ func main() {
 	configDir := flag.String("config", "", "config 目录（放 ai-models.json）；不给则 AI 配置读写报错")
 	shot := flag.String("shot", "", "启动后截图到该文件并退出")
 	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
+	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
 	flag.Parse()
 	if *dist == "" || *dbPath == "" {
 		log.Fatal("需要 -dist 与 -db")
@@ -140,6 +141,7 @@ func main() {
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title: "归知 GuiZhi（MyGo spike）", Width: 1280, Height: 800, URL: origin + "/",
 			Hidden: *shot != "",
+			X:      benchX(*bench), Y: benchX(*bench),
 			Page: mygo.PageOptions{
 				PreloadScript:  string(preload),
 				TrustedOrigins: []string{origin},
@@ -148,6 +150,18 @@ func main() {
 		b.registerWindow(win)
 		p := win.Page()
 		p.OnDidFailLoad(func(e *mygo.LoadError) { fmt.Println("[FAIL] 页面加载失败：", e) })
+		if *bench {
+			// 与 Electron 版的就绪判据一致：顶栏搜索框出现在 DOM 里
+			go func() {
+				for {
+					if v, err := p.Eval(`!!document.querySelector('[data-testid="topbar-search"]')`); err == nil && v == true {
+						fmt.Println("READY")
+						return
+					}
+					time.Sleep(10 * time.Millisecond)
+				}
+			}()
+		}
 		if *shot == "" {
 			return
 		}
@@ -175,4 +189,12 @@ func main() {
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// benchX 基准模式下把窗口挪到所有显示器之外（与 Electron 版的 offscreen 模式对应）。
+func benchX(on bool) int {
+	if on {
+		return -32000
+	}
+	return 0
 }
