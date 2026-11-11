@@ -6,6 +6,7 @@ require (
 	codeberg.org/readeck/go-readability/v2 v2.1.3
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
 	github.com/andybalholm/cascadia v1.3.5
+	github.com/dop251/goja v0.0.0-20261110204830-f493a2b600d6
 	github.com/egoist/mygo v0.8.3
 	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/tdewolff/parse/v2 v2.8.20
@@ -20,10 +21,13 @@ require (
 require (
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
+	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
+	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
+	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect

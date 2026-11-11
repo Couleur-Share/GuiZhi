@@ -228,6 +228,7 @@ func main() {
 	lib.registerBackgroundJobs(b)
 	lib.registerImport(b)
 	lib.registerCrawl(b)
+	lib.registerWebSnapshot(b)
 	lib.registerManagedTools(b)
 	lib.registerFunasr(b)
 	lib.registerMedia(b)
