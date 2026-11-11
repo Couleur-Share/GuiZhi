@@ -1766,6 +1766,10 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
 {
   const { buildWebGolden } = await import("./golden-web.mts");
   golden.web = await buildWebGolden();
+  const { buildCrawlGolden } = await import("./golden-crawl.mts");
+  golden.crawl = await buildCrawlGolden(out);
+  const { buildWebSourceGolden } = await import("./golden-websource.mts");
+  golden.webSource = await buildWebSourceGolden(out);
 }
 
 golden.dumpSql = DUMP_SQL;

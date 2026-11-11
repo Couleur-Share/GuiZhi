@@ -363,12 +363,27 @@ func (l *Library) knowledgeCreateStmts(ctx context.Context, in CreateInput) (str
 func (l *Library) knowledgeUpdate(ctx context.Context, id string, in UpdateInput) (any, error) {
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()
-	rows, err := l.db.Query(ctx, `SELECT `+itemColumns+` FROM knowledge_items i WHERE i.id = ?`, id)
+	stmts, found, err := l.knowledgeUpdateStmts(ctx, id, in)
 	if err != nil {
 		return nil, err
 	}
-	if len(rows.Values) == 0 {
+	if !found {
 		return nil, nil
+	}
+	if _, err := l.db.Transaction(ctx, stmts); err != nil {
+		return nil, err
+	}
+	return l.knowledgeGet(ctx, id)
+}
+
+// knowledgeUpdateStmts 生成 update 的全部语句（读当前行→算新值→UPDATE + 标签 + FTS）；条目不存在时 found=false。调用方须持有 writeMu。
+func (l *Library) knowledgeUpdateStmts(ctx context.Context, id string, in UpdateInput) (stmts []sqlite.Statement, found bool, err error) {
+	rows, err := l.db.Query(ctx, `SELECT `+itemColumns+` FROM knowledge_items i WHERE i.id = ?`, id)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(rows.Values) == 0 {
+		return nil, false, nil
 	}
 	e := rows.Values[0]
 	existingReasons := parseReviewReasons(e[11])
@@ -393,7 +408,7 @@ func (l *Library) knowledgeUpdate(ctx context.Context, id string, in UpdateInput
 		isPin = in.IsPinned.Val
 	}
 	now := nowMs()
-	stmts := []sqlite.Statement{{
+	stmts = []sqlite.Statement{{
 		SQL: `UPDATE knowledge_items SET
            title = ?, content = ?, summary = ?, transcript = ?,
            item_type = ?, status = ?, collection_id = ?,
@@ -407,31 +422,28 @@ func (l *Library) knowledgeUpdate(ctx context.Context, id string, in UpdateInput
 	if in.TagNames.Set {
 		tagStmts, resolved, err := l.replaceTagsStmts(ctx, id, normalizeTagNames(in.TagNames.Val), now, map[string][2]string{})
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		stmts, tagNames = append(stmts, tagStmts...), resolved
 	} else if tagNames, err = l.currentTagNames(ctx, id); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	ftsStmts, err := l.writeFtsStmts(ctx, id, title, content, tagNames)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	stmts = append(stmts, ftsStmts...)
 	// 用户或模型明确写入摘要后，网页更新留下的旧摘要提示已经处理（该表不一定存在）
 	if in.Summary.Set {
 		t, err := l.db.Query(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='web_source_baselines'")
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if len(t.Values) > 0 {
 			stmts = append(stmts, sqlite.Statement{SQL: "UPDATE web_source_baselines SET summary_stale=0 WHERE item_id=?", Args: []any{id}})
 		}
 	}
-	if _, err := l.db.Transaction(ctx, stmts); err != nil {
-		return nil, err
-	}
-	return l.knowledgeGet(ctx, id)
+	return stmts, true, nil
 }
 
 func uniqueStrings(ss []string) []string {
