@@ -622,3 +622,60 @@ func toUTF16(s string) []uint16 {
 	}
 	return out
 }
+
+// jsToNumber 对应 Number(v) / 一元 +v / Math.max 等对参数的隐式转换。
+func jsToNumber(v any) float64 {
+	switch x := v.(type) {
+	case jsUndefinedT:
+		return math.NaN()
+	case jsNullT:
+		return 0
+	case bool:
+		if x {
+			return 1
+		}
+		return 0
+	case float64:
+		return x
+	case string:
+		return stringToNumber(x)
+	case jsArr:
+		return stringToNumber(jsToString(x))
+	}
+	return math.NaN()
+}
+
+func stringToNumber(s string) float64 {
+	s = jsTrim(s)
+	if s == "" {
+		return 0
+	}
+	switch s {
+	case "Infinity", "+Infinity":
+		return math.Inf(1)
+	case "-Infinity":
+		return math.Inf(-1)
+	}
+	if len(s) > 2 && s[0] == '0' {
+		base := map[byte]int{'x': 16, 'X': 16, 'o': 8, 'O': 8, 'b': 2, 'B': 2}[s[1]]
+		if base != 0 {
+			n, err := strconv.ParseUint(s[2:], base, 64)
+			if err != nil {
+				return math.NaN()
+			}
+			return float64(n)
+		}
+	}
+	// 十进制字面量：数字、小数点、指数；不接受 Go 额外支持的 inf/nan/下划线/十六进制浮点
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if !(c >= '0' && c <= '9' || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') {
+			return math.NaN()
+		}
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil && !math.IsInf(f, 0) {
+		return math.NaN()
+	}
+	return f
+}

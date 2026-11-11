@@ -77,6 +77,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerWrite(b)
 	l.registerCatalogWrite(b)
 	l.registerInboxWrite(b)
+	l.registerAskSessions(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -93,12 +94,15 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
 				channel = ns + ":" + method
+				if ns == "ask" && (method == "query" || method == "meta") {
+					channel = "askSession:" + method
+				}
 			}
 			h, ok := b.handlers[channel]
 			if !ok {
 				t.Fatalf("频道未登记: %s", op.Fn)
 			}
-			v, err = h(ctx, op.Args)
+			v, err = h(ctx, resolveCursorArgs(op.Args, out))
 		}
 		if err != nil {
 			out = append(out, map[string]any{"error": err.Error()})
@@ -261,9 +265,9 @@ func TestWriteParity(t *testing.T) {
 			wantRes, wantDump := normalizeScenario(t, baseItems, baseTags, baseCollections, tsResults, sc.Dump)
 			gotRes, gotDump := normalizeScenario(t, baseItems, baseTags, baseCollections, goResults, goDump)
 			if !reflect.DeepEqual(wantRes, gotRes) {
-				w, _ := json.MarshalIndent(wantRes, "", " ")
-				gt, _ := json.MarshalIndent(gotRes, "", " ")
-				t.Errorf("返回值不一致\nTS: %s\nGo: %s", w, gt)
+				w, _ := json.Marshal(wantRes)
+				gt, _ := json.Marshal(gotRes)
+				t.Errorf("返回值不一致（只显示首个差异附近）\nTS: %s\nGo: %s", diffWindow(w, gt, true), diffWindow(w, gt, false))
 			}
 			for table := range wantDump {
 				if !reflect.DeepEqual(wantDump[table], gotDump[table]) {
@@ -274,4 +278,57 @@ func TestWriteParity(t *testing.T) {
 			}
 		})
 	}
+}
+
+// resolveCursorArgs 把参数里的 {"__cursorOf": n} 换成前面第 n 步结果的 nextCursor（与 make-golden.mts 的 resolveArgs 对应）。
+func resolveCursorArgs(args []json.RawMessage, results []map[string]any) []json.RawMessage {
+	out := make([]json.RawMessage, len(args))
+	for i, raw := range args {
+		var walk func(v any) any
+		v, err := jsParse(string(raw))
+		if err != nil {
+			out[i] = raw
+			continue
+		}
+		walk = func(v any) any {
+			switch x := v.(type) {
+			case *jsObj:
+				if n, ok := x.get("__cursorOf").(float64); ok {
+					if int(n) < len(results) {
+						if m, ok := results[int(n)]["value"].(map[string]any); ok {
+							if c, ok := m["nextCursor"].(string); ok {
+								return c
+							}
+						}
+					}
+					return jsNull
+				}
+				for _, k := range x.keys() {
+					x.m[k] = walk(x.m[k])
+				}
+			case jsArr:
+				for j := range x {
+					x[j] = walk(x[j])
+				}
+			}
+			return v
+		}
+		s, _ := jsStringify(walk(v))
+		out[i] = json.RawMessage(s)
+	}
+	return out
+}
+
+// diffWindow 取两段 JSON 首个不同位置前后各约 160 字节；用于避免大结果刷屏。
+func diffWindow(a, b []byte, first bool) string {
+	i := 0
+	for i < len(a) && i < len(b) && a[i] == b[i] {
+		i++
+	}
+	s := b
+	if first {
+		s = a
+	}
+	lo, hi := max(0, i-160), min(len(s), i+160)
+	return fmt.Sprintf("…@%d… %s", i, s[lo:hi])
 }

@@ -11,6 +11,7 @@ import {
   CollectionDB,
   TagDB,
   ImportTaskDB,
+  AskSessionDB,
 } from "../../packages/db/src/index.ts";
 import { listInboxItems } from "../../apps/desktop/src/main/services/inbox.ts";
 import { buildFtsMatchQuery, segmentTextForFts } from "../../packages/db/src/fts.ts";
@@ -278,6 +279,32 @@ const importCases: unknown[] = [
   runImport({ cursor: Buffer.from(JSON.stringify({ createdAt: 1_700_000_005_000, id: "task-09" })).toString("base64url"), pageSize: 20 }),
 ];
 
+// ── 问答会话：知识库范围与文章范围、置顶、自定义标题、来源清除标记 ──
+const asks = new AskSessionDB(database);
+const askMsgs = (pairs: Array<[string, string]>) => JSON.stringify(pairs.map(([question, answer]) => ({ question, answer, role: "turn" })));
+const askSeed: Array<{ id: string; title: string; msgs: Array<[string, string]>; at: number }> = [
+  { id: "s-01", title: "检索与分词", msgs: [["如何做中文全文检索？", "写入前逐字分隔，用 FTS5。"]], at: 1_700_000_100_000 },
+  { id: "s-02", title: "Backup strategy", msgs: [["How to back up?", "Use VACUUM INTO."], ["And restore?", "Copy back."]], at: 1_700_000_200_000 },
+  { id: "s-03", title: "桌面框架", msgs: [["Electron 和 MyGo 怎么选？", "看体积与运行时依赖。"]], at: 1_700_000_200_000 },
+  { id: "s-04", title: "空消息", msgs: [], at: 1_700_000_300_000 },
+  { id: "s-05", title: "同时间 A", msgs: [["检索 检索", "检索"]], at: 1_700_000_400_000 },
+  { id: "s-06", title: "同时间 B", msgs: [["检索一次", "答"]], at: 1_700_000_400_000 },
+  { id: "s-07", title: "同时间 C", msgs: [["x", "y"]], at: 1_700_000_400_000 },
+  { id: "s-08", title: "😀 emoji 标题", msgs: [["😀 问题", "😀 回答"]], at: 1_700_000_500_000 },
+  { id: "s-09", title: "100% 与 _ 特殊", msgs: [["100% 完成_1", "ok"]], at: 1_700_000_600_000 },
+  { id: "s-10", title: "长对话", msgs: Array.from({ length: 6 }, (_, n) => [`第 ${n} 问 检索`, `第 ${n} 答`] as [string, string]), at: 1_700_000_700_000 },
+];
+for (const s of askSeed) asks.save({ id: s.id, title: s.title, messagesJson: askMsgs(s.msgs) } as never);
+asks.save({ id: "a-01", title: "本文问答一", messagesJson: askMsgs([["本文讲什么？", "讲归知。"]]), scope: "article", itemId: a.id, articleTitle: a.title, webEnabled: true, target: { itemId: a.id, view: "reader", selection: "选中文字 https://example.com/p?token=1" } } as never);
+asks.save({ id: "a-02", title: "本文问答二", messagesJson: askMsgs([["再问一次", "再答"]]), scope: "article", itemId: a.id, articleTitle: a.title, webEnabled: false, target: { itemId: a.id, view: "reader" } } as never);
+asks.save({ id: "a-03", title: "另一篇", messagesJson: askMsgs([["另一篇讲什么", "讲 Electron"]]), scope: "article", itemId: b.id, articleTitle: b.title, target: { itemId: b.id, view: "source" } } as never);
+const askTimes: Record<string, number> = { "a-01": 1_700_000_800_000, "a-02": 1_700_000_900_000, "a-03": 1_700_001_000_000 };
+for (const s of askSeed) database.run("UPDATE ask_sessions SET created_at = ?, updated_at = ? WHERE id = ?", [s.at - 50, s.at, s.id]);
+for (const [id, at] of Object.entries(askTimes)) database.run("UPDATE ask_sessions SET created_at = ?, updated_at = ? WHERE id = ?", [at - 50, at, id]);
+asks.updateMeta("s-03", { pinned: true });
+asks.updateMeta("s-01", { title: "  自定义标题 检索  " });
+asks.updateMeta("a-02", { pinned: true, title: "置顶的本文问答" });
+database.run("INSERT INTO ask_evidence_clearances(item_id, cleared_at) VALUES(?, ?)", [f.id, 1_700_000_000_000]);
 const golden: Record<string, unknown> = {
   fts,
   collections: collections.list(),
@@ -314,6 +341,15 @@ function inboxHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown
     aiClassificationSources: wrap("inbox:aiClassificationSources"),
     applyAiClassification: wrap("inbox:applyAiClassification"),
   };
+}// ask 会话频道：同样用真实的 ask.ipc.ts 处理函数
+const askIpc = await import("../../apps/desktop/src/main/ipc/ask.ipc.ts");
+function askHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  askIpc.registerAskIPC(db as never);
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  return {
+    listSessions: wrap("ask:listSessions"), getSession: wrap("ask:getSession"), saveSession: wrap("ask:saveSession"),
+    deleteSession: wrap("ask:deleteSession"), query: wrap("askSession:query"), meta: wrap("askSession:meta"),
+  };
 }// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
@@ -323,6 +359,10 @@ const DUMP_SQL: Record<string, string> = {
   itemTags: "SELECT item_id, tag_id FROM knowledge_item_tags",
   fts: "SELECT item_id, title, content, tags FROM knowledge_fts",
   collections: "SELECT id, name, icon, sort_order, created_at, updated_at FROM collections",
+  askSessions: "SELECT id, title, messages_json, created_at, updated_at, scope, item_id, article_title, options_json FROM ask_sessions",
+  askMeta: "SELECT id, custom_title, pinned FROM ask_session_meta",
+  askFts: "SELECT session_id, title, questions, answers FROM ask_session_fts",
+  askClear: "SELECT item_id FROM ask_evidence_clearances",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
 };
@@ -512,6 +552,123 @@ const applyInvalidCases: unknown[] = [
       { itemId: bulk[10], collectionName: "ß" },
       { itemId: bulk[11], collectionName: "SS" },
     ] }] },
+  ],  // ── 问答会话（fn 带 ask. 前缀；{__cursorOf: n} 取第 n 步结果的 nextCursor）──
+  "ask.queryBasic": [
+    { fn: "ask.query", args: [{}] }, { fn: "ask.query", args: [null] }, { fn: "ask.query", args: [undefined] },
+    { fn: "ask.query", args: [{ scope: "article" }] }, { fn: "ask.query", args: [{ scope: "knowledge" }] },
+    { fn: "ask.query", args: [{ itemId: A }] }, { fn: "ask.query", args: [{ scope: "article", itemId: B }] },
+    { fn: "ask.query", args: [{ from: 1_700_000_300_000, to: 1_700_000_600_000 }] },
+    { fn: "ask.query", args: [{ from: null }] }, { fn: "ask.query", args: [{ to: 0 }] }, { fn: "ask.query", args: [{ from: "1700000300000" }] },
+    { fn: "ask.query", args: [{ scope: "bogus" }] }, { fn: "ask.query", args: [{ itemId: "" }] }, { fn: "ask.query", args: ["x"] }, { fn: "ask.query", args: [5] },
+  ],
+  "ask.querySearch": [
+    ...["检索", " 检索 ", "backup", "Backup restore", "桌面 框架", "😀", "100%", "_", "\"", "a b c d", "   ", "", "自定义标题", "Electron", "不存在的词汇", "回答", "VACUUM INTO"].map((search) => ({ fn: "ask.query", args: [{ search }] })),
+    { fn: "ask.query", args: [{ search: "检索", scope: "knowledge", from: 1_700_000_000_000 }] },
+    { fn: "ask.query", args: [{ search: 5 }] }, { fn: "ask.query", args: [{ search: null }] }, { fn: "ask.query", args: [{ search: ["x"] }] },
+  ],
+  "ask.queryLimit": [
+    ...[0, 1, 2, 3, 2.5, 500, 1000, -5, null, 10].map((limit) => ({ fn: "ask.query", args: [{ limit }] })),
+    { fn: "ask.query", args: [{ limit: "3" }] }, { fn: "ask.query", args: [{ limit: "x" }] }, { fn: "ask.query", args: [{ limit: true }] },
+  ],
+  "ask.queryPaging": [
+    { fn: "ask.query", args: [{ limit: 4 }] },
+    { fn: "ask.query", args: [{ limit: 4, cursor: { __cursorOf: 0 } }] },
+    { fn: "ask.query", args: [{ limit: 4, cursor: { __cursorOf: 1 } }] },
+    { fn: "ask.query", args: [{ limit: 4, cursor: { __cursorOf: 2 } }] },
+    { fn: "ask.query", args: [{ limit: 4, cursor: { __cursorOf: 3 } }] },
+    // 筛选条件变化后复用游标 → 报错
+    { fn: "ask.query", args: [{ limit: 4, scope: "knowledge", cursor: { __cursorOf: 0 } }] },
+    { fn: "ask.query", args: [{ limit: 5, cursor: { __cursorOf: 0 } }] },
+  ],
+  "ask.queryPagingSearch": [
+    { fn: "ask.query", args: [{ search: "检索", limit: 2 }] },
+    { fn: "ask.query", args: [{ search: "检索", limit: 2, cursor: { __cursorOf: 0 } }] },
+    { fn: "ask.query", args: [{ search: "检索", limit: 2, cursor: { __cursorOf: 1 } }] },
+    { fn: "ask.query", args: [{ search: "检索 ", limit: 2, cursor: { __cursorOf: 0 } }] },
+    { fn: "ask.query", args: [{ search: "答", limit: 1 }] },
+    { fn: "ask.query", args: [{ search: "答", limit: 1, cursor: { __cursorOf: 4 } }] },
+  ],
+  "ask.queryBadCursor": [
+    { fn: "ask.query", args: [{ cursor: "garbage" }] }, { fn: "ask.query", args: [{ cursor: "" }] }, { fn: "ask.query", args: [{ cursor: 5 }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from("null").toString("base64url") }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from("{}").toString("base64url") }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from(JSON.stringify({ fingerprint: '[null,null,"",null,null]', rank: 0, pinned: 0, updatedAt: 1, id: "s-05" })).toString("base64url") }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from(JSON.stringify({ fingerprint: '[null,null,"",null,null]', rank: 0, pinned: 1, updatedAt: 1_700_000_900_000, id: "z" })).toString("base64url") }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from(JSON.stringify({ fingerprint: '[null,null,"",null,null]', rank: 0, pinned: 0, updatedAt: 1_700_000_400_000, id: 5 })).toString("base64url") }] },
+    { fn: "ask.query", args: [{ cursor: Buffer.from(JSON.stringify({ fingerprint: '[null,null,"",null,null]', rank: 0, pinned: 0, updatedAt: 1_700_000_400_000, id: "s-06" })).toString("base64") }] },
+  ],
+  "ask.list": [
+    { fn: "ask.listSessions", args: [] }, { fn: "ask.listSessions", args: [undefined] }, { fn: "ask.listSessions", args: [null] },
+    { fn: "ask.listSessions", args: [{ scope: "article" }] }, { fn: "ask.listSessions", args: [{ itemId: A }] }, { fn: "ask.listSessions", args: [{ scope: "knowledge", itemId: "none" }] },
+    { fn: "ask.listSessions", args: [{ limit: 2 }] }, { fn: "ask.listSessions", args: [{ search: "桌面" }] },
+  ],
+  "ask.get": [
+    ...["s-01", "s-02", "s-03", "a-01", "a-02", "a-03", "missing", ""].map((id) => ({ fn: "ask.getSession", args: [id] })),
+    { fn: "ask.getSession", args: [null] }, { fn: "ask.getSession", args: [5] },
+  ],
+  "ask.saveNew": [
+    { fn: "ask.saveSession", args: [{ id: "n-01", title: "新会话", messagesJson: JSON.stringify([{ question: "问 https://example.com/p?token=1&q=2#x", answer: "答 (https://example.com/b?key=1)" }]) }] },
+    { fn: "ask.saveSession", args: [{ id: "n-02", title: "显式 knowledge", messagesJson: "[]", scope: "knowledge", webEnabled: true, itemId: "ignored", articleTitle: "ignored" }] },
+    { fn: "ask.saveSession", args: [{ id: "n-03", title: "文章", messagesJson: "[]", scope: "article", itemId: A, articleTitle: "T", webEnabled: false, target: { itemId: A, view: "reader", selection: "sel https://e.com/?sig=1&a=2" } }] },
+    { fn: "ask.saveSession", args: [{ id: "n-04", title: "文章默认 webEnabled", messagesJson: "[]", scope: "article", itemId: B, target: { itemId: B } }] },
+    { fn: "ask.saveSession", args: [{ id: "n-05", title: "清除过的文章", messagesJson: "[]", scope: "article", itemId: F, articleTitle: "F", target: { itemId: F, view: "reader", selection: "已清除 https://e.com/?token=1" } }] },
+  ],
+  "ask.saveUpdate": [
+    { fn: "ask.saveSession", args: [{ id: "s-01", title: "改名但被自定义标题覆盖", messagesJson: JSON.stringify([{ question: "新问题 检索", answer: "新回答" }]) }] },
+    { fn: "ask.saveSession", args: [{ id: "s-02", title: "Backup strategy v2", messagesJson: "[]" }] },
+    { fn: "ask.saveSession", args: [{ id: "a-01", title: "本文问答一（更新）", messagesJson: "[]", scope: "article", itemId: A, articleTitle: "新标题", webEnabled: false, target: { itemId: A, view: "source" } }] },
+    { fn: "ask.saveSession", args: [{ id: "s-03", title: "从 knowledge 变 article", messagesJson: "[]", scope: "article", itemId: A, target: { itemId: A } }] },
+  ],
+  "ask.saveInvalid": [
+    { fn: "ask.saveSession", args: [null] }, { fn: "ask.saveSession", args: [{}] }, { fn: "ask.saveSession", args: [5] },
+    { fn: "ask.saveSession", args: [{ id: 1, title: "t", messagesJson: "[]" }] }, { fn: "ask.saveSession", args: [{ id: "x", title: 2, messagesJson: "[]" }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: [] }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "{" }] }, { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "{}" }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "bogus" }] }, { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: 5 }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "article" }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "article", itemId: A }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "article", itemId: A, target: { itemId: B } }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "article", itemId: A, target: { itemId: A, selection: 5 } }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: "[]", scope: "knowledge", target: { selection: ["x"] } }] },
+    { fn: "ask.saveSession", args: [{ id: "x", title: "t", messagesJson: JSON.stringify([{ sources: [{ sourceItemIds: "bad" }] }]) }] },
+  ],
+  "ask.saveEvidence": [
+    { fn: "ask.saveSession", args: [{ id: "e-01", title: "证据", messagesJson: JSON.stringify([
+      { question: "q", answer: "a", sources: [{ ordinal: 1, kind: "item", refId: F, sourceId: F, title: "被清除的来源", text: "正文" }, { ordinal: 2, kind: "item", refId: A, sourceId: A, title: "正常", text: `见 https://example.com/p?token=1` }],
+        context: { target: { itemId: F, view: "v" }, sources: [{ title: "继承清除" }] } },
+      { question: "q2", context: { target: { itemId: A, selection: "https://x.com/?key=1" }, sources: [{ title: "继承 A" }] }, evidenceSources: [{ kind: "item", refId: F, title: "x", evidence: { text: "t", capturedAt: 9, sourceItemIds: [F] } }] },
+    ]) }] },
+  ],
+  "ask.metaTitle": [
+    { fn: "ask.meta", args: ["s-02", { title: "  新标题  " }] }, { fn: "ask.meta", args: ["s-02", { title: "再改一次 检索" }] },
+    { fn: "ask.meta", args: ["s-04", { title: "x".repeat(200) }] }, { fn: "ask.meta", args: ["s-05", { title: "😀".repeat(100) }] }, { fn: "ask.meta", args: ["s-05", { title: "😀".repeat(101) }] },
+    { fn: "ask.meta", args: ["s-06", { title: "x".repeat(201) }] }, { fn: "ask.meta", args: ["s-06", { title: "" }] }, { fn: "ask.meta", args: ["s-06", { title: "   " }] },
+    { fn: "ask.meta", args: ["s-06", { title: null }] }, { fn: "ask.meta", args: ["s-06", { title: 5 }] }, { fn: "ask.meta", args: ["s-06", { title: ["x"] }] },
+    { fn: "ask.meta", args: ["s-07", { title: "\u3000全角空白\u3000" }] },
+  ],
+  "ask.metaPin": [
+    { fn: "ask.meta", args: ["s-02", { pinned: true }] }, { fn: "ask.meta", args: ["s-03", { pinned: false }] }, { fn: "ask.meta", args: ["s-04", { pinned: 1 }] },
+    { fn: "ask.meta", args: ["s-05", { pinned: "" }] }, { fn: "ask.meta", args: ["s-06", { pinned: null }] }, { fn: "ask.meta", args: ["s-07", { pinned: {} }] },
+    { fn: "ask.meta", args: ["s-08", {}] }, { fn: "ask.meta", args: ["s-08", null] }, { fn: "ask.meta", args: ["s-08", undefined] },
+    { fn: "ask.meta", args: ["s-09", { pinned: true, title: "同时改" }] },
+    { fn: "ask.query", args: [{ limit: 5 }] },
+  ],
+  "ask.metaMissing": [
+    { fn: "ask.meta", args: ["missing", { title: "x" }] }, { fn: "ask.meta", args: ["", {}] }, { fn: "ask.meta", args: [null, { pinned: true }] },
+    { fn: "ask.meta", args: ["missing", { title: "" }] },
+  ],
+  "ask.delete": [
+    { fn: "ask.deleteSession", args: ["s-01"] }, { fn: "ask.deleteSession", args: ["s-01"] }, { fn: "ask.deleteSession", args: ["missing"] },
+    { fn: "ask.deleteSession", args: ["s-03"] }, { fn: "ask.deleteSession", args: [null] }, { fn: "ask.deleteSession", args: [""] },
+  ],
+  "ask.sequence": [
+    { fn: "ask.saveSession", args: [{ id: "q-01", title: "序列 检索", messagesJson: JSON.stringify([{ question: "序列问 检索", answer: "答" }]) }] },
+    { fn: "ask.meta", args: ["q-01", { title: "序列改名 桌面", pinned: true }] },
+    { fn: "ask.query", args: [{ search: "桌面" }] },
+    { fn: "ask.saveSession", args: [{ id: "q-01", title: "再保存", messagesJson: "[]" }] },
+    { fn: "ask.query", args: [{ search: "桌面" }] },
+    { fn: "ask.deleteSession", args: ["q-01"] },
+    { fn: "ask.query", args: [{ search: "桌面" }] },
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -538,14 +695,18 @@ for (const [name, ops] of Object.entries(scenarios)) {
     collection: new CollectionDB(db) as never,
     tag: new TagDB(db) as never,
     inbox: inboxHandlers(db),
+    ask: askHandlers(db),
   };
+  const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
+    JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
+      v && typeof v === "object" && "__cursorOf" in v ? ((results[v.__cursorOf]?.value as { nextCursor?: string } | undefined)?.nextCursor ?? null) : v);
   const call = (fn: string, args: unknown[]) => {
     const [ns, method] = fn.includes(".") ? fn.split(".") : ["knowledge", fn];
     return daos[ns][method](...args);
   };  const results: unknown[] = [];
   for (const op of ops) {
     try {
-      results.push({ value: call(op.fn, op.args) ?? null });
+      results.push({ value: call(op.fn, resolveArgs(op.args, results as never)) ?? null });
     } catch (error) {
       results.push({ error: (error as Error).message });
     }

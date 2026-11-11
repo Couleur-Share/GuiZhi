@@ -114,6 +114,10 @@ func rowStr(v any) any {
 // ── ask-history.ts ──
 
 func (l *Library) askSessionQuery(ctx context.Context, input any) (any, error) {
+	if _, isStr := input.(string); isStr {
+		// 字符串自带 String.prototype.search 方法，`input.search?.trim` 会得到 undefined 再被调用而抛错
+		return nil, errors.New("input.search?.trim is not a function")
+	}
 	var searchTrim string
 	if s := jsGet(input, "search"); !isNullish(s) {
 		str, ok := s.(string)
@@ -206,11 +210,10 @@ func (l *Library) askSessionQuery(ctx context.Context, input any) (any, error) {
 	}
 	limit := 50.0
 	if lv := jsGet(input, "limit"); !isNullish(lv) {
-		f, ok := lv.(float64)
-		if !ok {
-			return nil, errors.New("limit 必须是数字")
-		}
-		limit = f
+		limit = jsToNumber(lv) // Math.max(1, "3") 会把字符串转成数字
+	}
+	if math.IsNaN(limit) {
+		return nil, errors.New("datatype mismatch") // LIMIT NaN
 	}
 	limit = math.Min(500, math.Max(1, limit))
 
