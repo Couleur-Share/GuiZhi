@@ -164,7 +164,9 @@ func main() {
 	if lib.appData == "" {
 		lib.appData = filepath.Dir(ud)
 	}
-	lib.backfillMissingFts(ctx) // 老库里缺的全文索引行（回收站条目、Wiki 页面）补齐
+	raw, found := lib.readRawSetting(ctx, "networkProxy")
+	applyStoredNetworkProxy(raw, found) // 对应 index.ts applyStoredNetworkProxySettings
+	lib.backfillMissingFts(ctx)         // 老库里缺的全文索引行（回收站条目、Wiki 页面）补齐
 	lib.openDialog = func(multiple bool, name string, exts []string) ([]string, error) {
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: []mygo.FileFilter{{Name: name, Extensions: exts}}})
 	}

@@ -7,7 +7,7 @@ package main
 // 与 TS 版刻意不同的地方（都在迁移文档里记录）：
 //   - 守卫在拨号时再检查一次实际连上的地址（net.Dialer.Control），所以 DNS 重绑定和重定向到元数据地址都会被挡；
 //     TS 版只校验第一跳 URL 的解析结果。
-//   - 网络代理设置（settings.networkProxy）未接入：这里一律直连。
+//   - 网络代理设置（settings.networkProxy）经 activeNetProxy 接入：手动代理生效，其余直连。
 //   - 错误文案：Node 的 "fetch failed" / "terminated" 在 Go 里按错误发生的阶段还原。
 
 import (
@@ -106,7 +106,7 @@ func newAIProxy(configured func() map[string]bool) *aiProxy {
 		},
 	}
 	tr := &http.Transport{
-		Proxy:               nil,
+		Proxy:               activeNetProxy.ProxyFunc, // 手动代理（含绕过规则）；system/direct 直连
 		DialContext:         dialer.DialContext,
 		ForceAttemptHTTP2:   true,
 		TLSHandshakeTimeout: 10 * time.Second,

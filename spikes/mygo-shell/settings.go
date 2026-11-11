@@ -3,7 +3,7 @@ package main
 // 对应 apps/desktop/src/main/ipc/settings.ipc.ts 的 settings:get / settings:set。
 //
 // 尚未迁移、并且不静默吞掉的部分：
-//   - 网络代理生效（applyNetworkProxySettings）：值会写库，但 Go 侧还没有按它配置网络栈的出口。
+//   - 网络代理生效（applyNetworkProxySettings）：写库后同步给 activeNetProxy（netproxy.go）；Electron 会话代理不适用。
 //   - 可执行文件路径白名单（pickedPaths）：文件选择器未迁移，注册表恒为空，所以只接受空串（清除路径）。
 //
 // 与 TS 一致的一个特性：settings:set 先写 AI 配置文件，再校验并写库。
@@ -249,7 +249,9 @@ func (l *Library) settingsSet(ctx context.Context, raw json.RawMessage) (any, er
 	}
 	for _, w := range writes {
 		if w.key == "networkProxy" {
-			log.Printf("[settings] networkProxy 已写库，但新内核尚未按它配置网络出口")
+			var v any
+			_ = json.Unmarshal([]byte(w.value), &v)
+			activeNetProxy.Apply(v) // 对应 applyNetworkProxySettings
 		}
 	}
 	return true, nil

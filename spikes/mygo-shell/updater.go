@@ -190,7 +190,7 @@ type Updater struct {
 
 func newUpdater(d updaterDeps) *Updater {
 	if d.client == nil {
-		d.client = &http.Client{Timeout: 0}
+		d.client = &http.Client{Timeout: 0, Transport: newProxiedTransport()}
 	}
 	if d.githubBase == "" {
 		d.githubBase = "https://github.com"
