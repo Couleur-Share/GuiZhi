@@ -263,13 +263,13 @@ go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目�
 4. 采集一族依赖的网络拦截已验证可由 DevTools 协议替代，须放进独立的采集进程（见「网络拦截验证」）；真实站点和并发仍待验证。
 ## 工作量与继续条件（2026-11-11）
 
-规模（`Measure-Object -Line`，非空行，不含测试）：主进程 TS 约 4.0 万行（其中 `ipc` 0.47 万、`services` 3.2 万），`packages/db` 0.83 万，`packages/core` 0.16 万；已写的 Go 约 3000 行加约 700 行测试。冻结功能涉及的目录（`research`、`illustration`、`reading-sync`、`discovery`、`mobile-capture`）合计约 0.27 万行。
+规模（`Measure-Object -Line`，非空行，不含测试）：主进程 TS 约 4.0 万行（其中 `ipc` 0.47 万、`services` 3.2 万），`packages/db` 0.83 万，`packages/core` 0.16 万；已写的 Go 约 7500 行（含测试，其中壳层与频道约 3700、正文提取与清理约 2400，其余是网络拦截、采集进程、备份、数据库互通等 spike）。冻结功能涉及的目录（`research`、`illustration`、`reading-sync`、`discovery`、`mobile-capture`）合计约 0.27 万行。
 
 - 需要迁的核心代码约 4.4 万行 TS，已迁约 7%（按频道数 9%，按代码行数略低，因为剩下的多是采集、导入、媒体、AI 这类体量大的服务）。
-- 本次 spike 的 Go 与被替换的 TS 行数大致 1:1；按此，剩余约 4 万行 Go 加对应的对拍基准。这是量级估计，不是工期承诺。
+- Go 与被替换的 TS 的行数比，读库、写库、IPC 这类代码大致 1:1；DOM 与文本处理这类代码更高：正文提取、Markdown 转换、HTML 与 CSS 清理，非空行 Go 1565（含一份约 240 行的 DOM 辅助）对 TS 846，约 1.6–1.85 倍。剩余约 4.4 万行 TS，按 1:1 到 1.85:1 的区间，估计 Go 约 4.4–8 万行，另加对应的对拍基准。这是量级估计，不是工期承诺。
 - 最大的几块：`import` 0.71 万、`web-capture` 0.50 万、`media` 0.49 万、`themed-reading` 0.44 万、`platform-capture` 0.26 万。
 
-没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库；正文提取的底层（Readability）已验证基本等价，见「正文提取等价性」，但其余规则、Markdown 转换与净化库尚未验证。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
+没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库。已验证：Readability、产品规则、Markdown 转换、`sanitize-html` 与 `css-tree` 在本机 59 页上内容层等价（Markdown 字节不等价，已决定接受），见「正文提取等价性」。未验证：`@modelcontextprotocol/server`、`@resvg/resvg-js`、`adm-zip`/`fflate`，以及本机之外的留出样本。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
 
 继续迁移的建议顺序与停止条件：
 
@@ -279,5 +279,5 @@ go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目�
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式。
+2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式；做 AI 流式请求的垂直切片（尚未验证）。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
