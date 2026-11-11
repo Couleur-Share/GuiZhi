@@ -46,6 +46,27 @@
 - **不建议现在承诺整体重写。** 已经排除的是“做不到”的风险；剩下的主要是“值不值”：用户可见的收益集中在体积和空闲内存，启动速度和功能都没有改善，而成本是数万行 Go 加长期维护两套对拍基准。
 - **如果要继续，分两步，并设止损点：** 先花一个有限的阶段做第 1、2、3 项（真实站点试采、WebView2 前置条件、大库基准），这三项都可能直接否决方案，且不需要再写大量服务代码；通过后再按“纯读库 → 写库 → 带副作用”的顺序迁移，每组频道补一组基准。止损条件：正文提取在更大样本上无法收敛；真实站点上采集进程稳定性明显低于 Electron；新旧互斥带来的数据风险无法接受。
 - **如果不继续**，这批 spike 仍有可复用的价值：`mygo-ai` 和 `mygo-restore` 里发现的 TS 版行为（例如 `isLoopbackHost` 把 `127.evil.com` 当回环导致绕过限流）、窗口池里踩到的三个并发坑，对 Electron 版也有参考意义。
+## 全量迁移进度（2026-11-11 起，目标：核心频道全部迁完）
+
+范围沿用「服务边界」：冻结功能不迁，核心频道全部迁。进度用脚本统计：在仓库根目录运行 `.\spikes\migration-status.ps1`（加 `-List` 列出待迁频道）。统计口径是 `ipc-channels.ts` 的频道字符串是否出现在 `mygo-shell` 的 Go 源码里，只表示「登记了」，是否对拍通过看对应测试。
+
+| 日期 | 切片 | 对拍 | 登记频道（累计 / 待迁） |
+|---|---|---|---|
+| 11-11 | `collection:create/update/delete`、`tag:create/update/delete` | 11 个场景，逐表比较（含 sortOrder 浮点、null、非字符串名称、大小写不敏感的标签唯一） | 27 / 160 |
+| 11-11 | `inbox:organize/markReviewed/acknowledgeImportWarning/aiClassificationSources/applyAiClassification` | 用真实 `inbox.ipc.ts`（electron 换桩）生成基准，约 40 个场景，含 NFKC、Final_Sigma、UTF-16 长度、保留名、新建上限 | 32 / 155 |
+
+对拍中发现的 JS 语义（Go 里必须显式复刻，否则静默偏差）：
+- `new Map(entries).values()`：顺序取键**第一次**出现的位置，值取**最后一次**写入的值（`inbox:applyAiClassification` 的新建集合名因此是后出现的写法）。
+- `toLocaleLowerCase` 与 Go 的 `strings.ToLower` 有两处不同：`İ` 展开为 `i̇`，词尾 `Σ` 变 `ς`。
+- 字符串长度按 UTF-16 码元计，一个 emoji 算 2；`/\s+/` 的空白集合与 Go 的 `unicode.IsSpace` 不同（沿用 `jsSpace`）。
+- 同一场景里前面的操作会改变后面操作的前置条件，校验类场景必须一场景一操作，否则会被前一步遮住（已用 `applyInvalid00…31` 避免）。
+
+接下来的顺序（先 DB 内、后带副作用；每组先扩 `make-golden.mts` 再写 Go）：
+1. 问答会话 `ask:*`、`askSession:*`：依赖有序 JSON（保持键顺序、与 `JSON.stringify` 同样的数字与转义规则）和 `evidenceText/evidenceUrl`；有序 JSON 是后面许多频道共用的基础件，先做。
+2. `ai:usage*`、`semantic:*`、`wiki:*` 的库内读写、`knowledge:saveDraft/selection`、`export:*`。
+3. 后台任务运行时、导入队列、备份与备份仓库频道、迁移检测、`config:*`、`mcp:*`、更新、快捷键、网络代理、可执行文件白名单。
+4. 采集一族、媒体一族、主题阅读、Wiki 编译器。
+5. 打包、端到端用例、`pnpm shot` 式的隔离离屏验证。
 ## 已验证的事
 
 | 项目 | 结果 |
