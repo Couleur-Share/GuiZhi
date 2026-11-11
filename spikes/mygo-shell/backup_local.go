@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-// supportedSchemaVersion 是当前应用支持的数据库结构版本，对应 TS 的 SCHEMA_VERSION（MIGRATIONS 条数，39）。
-// Go 壳层还没有迁移执行器；它落地后应改为迁移列表的长度。
-const supportedSchemaVersion = 39
+// supportedSchemaVersion 是当前应用支持的数据库结构版本，对应 TS 的 SCHEMA_VERSION（MIGRATIONS 条数）。
+// 取自 Go 迁移清单的长度（db_migrate.go），并由测试保证与 TS 清单同名同序。
+var supportedSchemaVersion = schemaVersion()
 
 var (
 	backupFilePattern = regexp.MustCompile(`^knowledge-(manual|auto|pre-update|pre-restore)-(\d{8})-(\d{6})(?:-(\d+))?\.db$`)

@@ -133,21 +133,38 @@ func main() {
 	}
 
 	ctx := context.Background()
-	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
 	ud := *userData
 	if ud == "" {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
 	}
+	// 结构初始化/迁移先于插件打开数据库：租约 → 完整性检查 → 升级前备份 → 建表迁移（db_init.go）
+	lease, err := initDatabaseFile(ctx, *dbPath, dbInitOptions{BackupsDir: (Paths{UserData: ud}).BackupsDir()})
+	if err != nil {
+		var live *errLiveDatabaseClient
+		if errors.As(err, &live) {
+			fmt.Fprintln(os.Stderr, live.Error())
+		}
+		log.Fatalf("数据库初始化失败：%v", err)
+	}
+	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
+	if err != nil {
+		lease.release()
+		log.Fatal(err)
+	}
+	// 正常退出：先关库，再留「干净关闭」标记（下次启动据此跳过 quick_check），最后释放租约
+	shutdownDB := sync.OnceFunc(func() {
+		db.Close()
+		writeCleanShutdownMarker(*dbPath)
+		lease.release()
+	})
+	defer shutdownDB()
+
+	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
 	lib := &Library{db: db, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
 	if lib.appData == "" {
 		lib.appData = filepath.Dir(ud)
 	}
+	lib.backfillMissingFts(ctx) // 老库里缺的全文索引行（回收站条目、Wiki 页面）补齐
 	lib.openDialog = func(multiple bool, name string, exts []string) ([]string, error) {
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: []mygo.FileFilter{{Name: name, Extensions: exts}}})
 	}
@@ -331,7 +348,9 @@ func main() {
 			mygo.App.Quit()
 		}()
 	})
-	if err := mygo.App.Run(); err != nil {
+	err = mygo.App.Run()
+	shutdownDB()
+	if err != nil {
 		log.Fatal(err)
 	}
 }

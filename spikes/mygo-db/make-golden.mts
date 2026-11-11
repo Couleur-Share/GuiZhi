@@ -1744,6 +1744,11 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
 }
 
 {
+  const { buildSchemaGolden } = await import("./golden-schema.mts");
+  golden.schema = await buildSchemaGolden({ out });
+}
+
+{
   const { buildBackupGolden } = await import("./golden-backup.mts");
   golden.backup = await buildBackupGolden({ out });
 }
