@@ -386,6 +386,9 @@ func main() {
 	if lib.crawl != nil { // 对应 closeWebCapture：先暂停运行中的批次，再关库
 		lib.crawl.close(context.Background())
 	}
+	if lib.themedRT != nil { // 对应 shutdownThemedReading：把活动任务标为已中断并等执行线程退出
+		lib.themedRT.shutdown(context.Background())
+	}
 	if lib.funasrEng != nil { // 对应 will-quit：停掉由本进程拉起的转写服务
 		lib.funasrEng.stop()
 	}

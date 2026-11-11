@@ -490,3 +490,8 @@ func (p *themedPages) startup(ctx context.Context) {
 	}
 	p.retireLegacyTasks(ctx)
 }
+
+// listAssetFiles 对应 ThemedReadingDB.listAssetFiles：全库主题页引用的素材文件名。
+func (p *themedPages) listAssetFiles(ctx context.Context) ([]string, error) {
+	return p.l.themedReadingAssetFiles(ctx, nil)
+}

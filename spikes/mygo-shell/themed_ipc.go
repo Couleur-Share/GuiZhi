@@ -461,7 +461,13 @@ func themedFail(l *Library, action string, err error) any {
 	return map[string]any{"success": false, "error": msg}
 }
 
+// themedUUIDHook 仅供测试：让两端按「第 n 次生成」的计数器对拍生成次序。
+var themedUUIDHook func() string
+
 func themedUUID() string {
+	if themedUUIDHook != nil {
+		return themedUUIDHook()
+	}
 	var b [16]byte
 	_, _ = rand.Read(b[:])
 	b[6] = b[6]&0x0f | 0x40
@@ -837,6 +843,7 @@ func (l *Library) registerThemedReading(b *Bridge) {
 		}
 		return map[string]any{"success": true, "path": dest}, nil
 	})
+	l.registerThemedRuntime(b)
 }
 
 var reThemedBadFileChars = regexp.MustCompile("[<>:\"/\\\\|?*\\x00-\\x1f]")

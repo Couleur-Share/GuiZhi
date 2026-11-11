@@ -48,6 +48,7 @@ type pipeRule struct {
 		Throw          string                                            `json:"throw"`
 		Abort          bool                                              `json:"abort"`
 		EchoCandidates bool                                              `json:"echoCandidates"`
+		Block          bool                                              `json:"block"`
 	} `json:"reply"`
 }
 

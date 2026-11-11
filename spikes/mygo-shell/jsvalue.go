@@ -44,6 +44,20 @@ func (o *jsObj) set(k string, v any) {
 	o.m[k] = v
 }
 
+// delete 对应 delete obj[k]。
+func (o *jsObj) delete(k string) {
+	if _, ok := o.m[k]; !ok {
+		return
+	}
+	delete(o.m, k)
+	for i, key := range o.order {
+		if key == k {
+			o.order = append(o.order[:i:i], o.order[i+1:]...)
+			break
+		}
+	}
+}
+
 func (o *jsObj) get(k string) any {
 	if v, ok := o.m[k]; ok {
 		return v
