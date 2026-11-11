@@ -1,0 +1,4152 @@
+{
+ "urls": [
+  {
+   "in": "http://127.0.0.1:11434/v1",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.0.0.1:11434",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "HTTP://LOCALHOST:11434/v1",
+   "ok": true,
+   "protocol": "http:",
+   "host": "localhost:11434",
+   "hostname": "localhost"
+  },
+  {
+   "in": "http://[::1]:11434",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::1]:11434",
+   "hostname": "[::1]"
+  },
+  {
+   "in": "http://[0:0:0:0:0:0:0:1]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::1]",
+   "hostname": "[::1]"
+  },
+  {
+   "in": "https://api.openai.com/v1/chat/completions",
+   "ok": true,
+   "protocol": "https:",
+   "host": "api.openai.com",
+   "hostname": "api.openai.com"
+  },
+  {
+   "in": "https://api.openai.com:443/v1",
+   "ok": true,
+   "protocol": "https:",
+   "host": "api.openai.com",
+   "hostname": "api.openai.com"
+  },
+  {
+   "in": "https://api.openai.com:8443/v1",
+   "ok": true,
+   "protocol": "https:",
+   "host": "api.openai.com:8443",
+   "hostname": "api.openai.com"
+  },
+  {
+   "in": "http://example.com:80",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://example.com:81",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com:81",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://example.com:00080/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://example.com:65535",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com:65535",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://example.com:65536",
+   "ok": false
+  },
+  {
+   "in": "http://user:pass@127.0.0.1:80/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.0.0.1",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "http://127.0.0.1@169.254.169.254/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://169.254.169.254/latest/meta-data",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://2852039166/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://0xa9fea9fe/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://0251.0376.0251.0376/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://169.254.43518/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://169.254.169.254./",
+   "ok": true,
+   "protocol": "http:",
+   "host": "169.254.169.254",
+   "hostname": "169.254.169.254"
+  },
+  {
+   "in": "http://127.1/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.0.0.1",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "http://0x7f.1/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.0.0.1",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "http://2130706433",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.0.0.1",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "http://0/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "0.0.0.0",
+   "hostname": "0.0.0.0"
+  },
+  {
+   "in": "http://0.0.0.0",
+   "ok": true,
+   "protocol": "http:",
+   "host": "0.0.0.0",
+   "hostname": "0.0.0.0"
+  },
+  {
+   "in": "http://256.1.1.1/",
+   "ok": false
+  },
+  {
+   "in": "http://1.2.3.4.5/",
+   "ok": false
+  },
+  {
+   "in": "http://1.2.3.256/",
+   "ok": false
+  },
+  {
+   "in": "http://4294967296/",
+   "ok": false
+  },
+  {
+   "in": "http://4294967295/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "255.255.255.255",
+   "hostname": "255.255.255.255"
+  },
+  {
+   "in": "http://foo.0x10/",
+   "ok": false
+  },
+  {
+   "in": "http://foo.09/",
+   "ok": false
+  },
+  {
+   "in": "http://a.1/",
+   "ok": false
+  },
+  {
+   "in": "http://1.a/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "1.a",
+   "hostname": "1.a"
+  },
+  {
+   "in": "http://[::ffff:169.254.169.254]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::ffff:a9fe:a9fe]",
+   "hostname": "[::ffff:a9fe:a9fe]"
+  },
+  {
+   "in": "http://[::ffff:a9fe:a9fe]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::ffff:a9fe:a9fe]",
+   "hostname": "[::ffff:a9fe:a9fe]"
+  },
+  {
+   "in": "http://[::a9fe:a9fe]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::a9fe:a9fe]",
+   "hostname": "[::a9fe:a9fe]"
+  },
+  {
+   "in": "http://[::169.254.169.254]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::a9fe:a9fe]",
+   "hostname": "[::a9fe:a9fe]"
+  },
+  {
+   "in": "http://[::ffff:0:a9fe:a9fe]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::ffff:0:a9fe:a9fe]",
+   "hostname": "[::ffff:0:a9fe:a9fe]"
+  },
+  {
+   "in": "http://[fe80::1]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[fe80::1]",
+   "hostname": "[fe80::1]"
+  },
+  {
+   "in": "http://[FE80::1]:8080/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[fe80::1]:8080",
+   "hostname": "[fe80::1]"
+  },
+  {
+   "in": "http://[ff02::1]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[ff02::1]",
+   "hostname": "[ff02::1]"
+  },
+  {
+   "in": "http://[2001:db8::1]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[2001:db8::1]",
+   "hostname": "[2001:db8::1]"
+  },
+  {
+   "in": "http://[2001:0db8:0000:0000:0000:0000:0000:0001]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[2001:db8::1]",
+   "hostname": "[2001:db8::1]"
+  },
+  {
+   "in": "http://[1:0:0:2:0:0:0:3]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[1:0:0:2::3]",
+   "hostname": "[1:0:0:2::3]"
+  },
+  {
+   "in": "http://[::]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::]",
+   "hostname": "[::]"
+  },
+  {
+   "in": "http://[::2]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::2]",
+   "hostname": "[::2]"
+  },
+  {
+   "in": "http://[::ffff:127.0.0.1]/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "[::ffff:7f00:1]",
+   "hostname": "[::ffff:7f00:1]"
+  },
+  {
+   "in": "http://[fe80::1%25eth0]/",
+   "ok": false
+  },
+  {
+   "in": "http://[::1",
+   "ok": false
+  },
+  {
+   "in": "http://[1::2::3]/",
+   "ok": false
+  },
+  {
+   "in": "http://224.0.0.1/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "224.0.0.1",
+   "hostname": "224.0.0.1"
+  },
+  {
+   "in": "http://240.0.0.1/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "240.0.0.1",
+   "hostname": "240.0.0.1"
+  },
+  {
+   "in": "http://255.255.255.255/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "255.255.255.255",
+   "hostname": "255.255.255.255"
+  },
+  {
+   "in": "http://239.255.255.250/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "239.255.255.250",
+   "hostname": "239.255.255.250"
+  },
+  {
+   "in": "http://223.255.255.255/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "223.255.255.255",
+   "hostname": "223.255.255.255"
+  },
+  {
+   "in": "http://192.168.1.10:1234/v1",
+   "ok": true,
+   "protocol": "http:",
+   "host": "192.168.1.10:1234",
+   "hostname": "192.168.1.10"
+  },
+  {
+   "in": "http://10.0.0.5",
+   "ok": true,
+   "protocol": "http:",
+   "host": "10.0.0.5",
+   "hostname": "10.0.0.5"
+  },
+  {
+   "in": "http://localhost./",
+   "ok": true,
+   "protocol": "http:",
+   "host": "localhost.",
+   "hostname": "localhost."
+  },
+  {
+   "in": "http://127.evil.com/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "127.evil.com",
+   "hostname": "127.evil.com"
+  },
+  {
+   "in": "http://xn--fiq228c.com/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "xn--fiq228c.com",
+   "hostname": "xn--fiq228c.com"
+  },
+  {
+   "in": "ftp://example.com/",
+   "ok": true,
+   "protocol": "ftp:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "file:///etc/passwd",
+   "ok": true,
+   "protocol": "file:",
+   "host": "",
+   "hostname": ""
+  },
+  {
+   "in": "javascript:alert(1)",
+   "ok": true,
+   "protocol": "javascript:",
+   "host": "",
+   "hostname": ""
+  },
+  {
+   "in": "localhost:11434",
+   "ok": true,
+   "protocol": "localhost:",
+   "host": "",
+   "hostname": ""
+  },
+  {
+   "in": "127.0.0.1:11434",
+   "ok": false
+  },
+  {
+   "in": "not a url",
+   "ok": false
+  },
+  {
+   "in": "",
+   "ok": false
+  },
+  {
+   "in": "   ",
+   "ok": false
+  },
+  {
+   "in": "//foo.com",
+   "ok": false
+  },
+  {
+   "in": "/path",
+   "ok": false
+  },
+  {
+   "in": "http://",
+   "ok": false
+  },
+  {
+   "in": "http:///x",
+   "ok": true,
+   "protocol": "http:",
+   "host": "x",
+   "hostname": "x"
+  },
+  {
+   "in": "http:example.com",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http:/example.com",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http:\\\\example.com\\x",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": " http://example.com/ ",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://exa\tmple.com/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://exa mple.com/",
+   "ok": false
+  },
+  {
+   "in": "http://exa<mple.com/",
+   "ok": false
+  },
+  {
+   "in": "http://exa%41mple.com/",
+   "ok": true,
+   "protocol": "http:",
+   "host": "exaample.com",
+   "hostname": "exaample.com"
+  },
+  {
+   "in": "http://example.com?x=1",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://example.com#x",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com",
+   "hostname": "example.com"
+  },
+  {
+   "in": "http://EXAMPLE.com:8080/Path?Q=1",
+   "ok": true,
+   "protocol": "http:",
+   "host": "example.com:8080",
+   "hostname": "example.com"
+  },
+  {
+   "in": "mailto:a@b.c",
+   "ok": true,
+   "protocol": "mailto:",
+   "host": "",
+   "hostname": ""
+  },
+  {
+   "in": "ws://127.0.0.1/",
+   "ok": true,
+   "protocol": "ws:",
+   "host": "127.0.0.1",
+   "hostname": "127.0.0.1"
+  },
+  {
+   "in": "data:text/plain,hi",
+   "ok": true,
+   "protocol": "data:",
+   "host": "",
+   "hostname": ""
+  }
+ ],
+ "addrs": [
+  {
+   "addr": "127.0.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "10.0.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "169.254.169.254",
+   "forbidden": true
+  },
+  {
+   "addr": "169.254.0.1",
+   "forbidden": true
+  },
+  {
+   "addr": "169.253.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "224.0.0.1",
+   "forbidden": true
+  },
+  {
+   "addr": "239.255.255.255",
+   "forbidden": true
+  },
+  {
+   "addr": "223.255.255.255",
+   "forbidden": false
+  },
+  {
+   "addr": "240.0.0.1",
+   "forbidden": true
+  },
+  {
+   "addr": "255.255.255.255",
+   "forbidden": true
+  },
+  {
+   "addr": "0.0.0.0",
+   "forbidden": true
+  },
+  {
+   "addr": "0.1.2.3",
+   "forbidden": true
+  },
+  {
+   "addr": "1.1.1.1",
+   "forbidden": false
+  },
+  {
+   "addr": "192.168.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "100.64.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "198.18.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "::1",
+   "forbidden": false
+  },
+  {
+   "addr": "::",
+   "forbidden": false
+  },
+  {
+   "addr": "::2",
+   "forbidden": false
+  },
+  {
+   "addr": "::1:0",
+   "forbidden": true
+  },
+  {
+   "addr": "::ffff:a9fe:a9fe",
+   "forbidden": true
+  },
+  {
+   "addr": "::ffff:169.254.169.254",
+   "forbidden": true
+  },
+  {
+   "addr": "::ffff:127.0.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "::ffff:7f00:1",
+   "forbidden": false
+  },
+  {
+   "addr": "::ffff:0.0.0.1",
+   "forbidden": true
+  },
+  {
+   "addr": "::ffff:e000:1",
+   "forbidden": true
+  },
+  {
+   "addr": "::a9fe:a9fe",
+   "forbidden": true
+  },
+  {
+   "addr": "::a9fe:1",
+   "forbidden": true
+  },
+  {
+   "addr": "::7f00:1",
+   "forbidden": false
+  },
+  {
+   "addr": "::1:1",
+   "forbidden": true
+  },
+  {
+   "addr": "::0.0.0.1",
+   "forbidden": false
+  },
+  {
+   "addr": "::ffff:0:a9fe:a9fe",
+   "forbidden": true
+  },
+  {
+   "addr": "::ffff:0:7f00:1",
+   "forbidden": false
+  },
+  {
+   "addr": "fe80::1",
+   "forbidden": true
+  },
+  {
+   "addr": "febf::1",
+   "forbidden": true
+  },
+  {
+   "addr": "fec0::1",
+   "forbidden": false
+  },
+  {
+   "addr": "fe80::1%eth0",
+   "forbidden": true
+  },
+  {
+   "addr": "ff02::1",
+   "forbidden": true
+  },
+  {
+   "addr": "ff00::",
+   "forbidden": true
+  },
+  {
+   "addr": "fd00::1",
+   "forbidden": false
+  },
+  {
+   "addr": "2001:db8::1",
+   "forbidden": false
+  },
+  {
+   "addr": "2002:a9fe:a9fe::1",
+   "forbidden": false
+  },
+  {
+   "addr": "64:ff9b::a9fe:a9fe",
+   "forbidden": false
+  },
+  {
+   "addr": "2606:4700:4700::1111",
+   "forbidden": false
+  },
+  {
+   "addr": "1::",
+   "forbidden": false
+  },
+  {
+   "addr": "0:0:0:0:0:ffff:a9fe:a9fe",
+   "forbidden": true
+  }
+ ],
+ "gate": [
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.0.0.1:11434/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1:11434",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://localhost:1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://localhost:1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://127.evil.com/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.evil.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::1]/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::1]",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://API.OPENAI.COM/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://api.openai.com:8443/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://api.openai.com:8443",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1234/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1234",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://192.168.1.10:1235/v1",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://192.168.1.10:1235",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "https://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "https://example.org/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "https://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://EXAMPLE.org:80/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://example.org:8080/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://example.org:8080",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "not a url",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "无效的接口地址",
+    "host": null,
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://2130706433/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://0x7f.1/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://127.0.0.1",
+    "isKnown": true
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 95000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 90001,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 1 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 90000,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 100000,
+   "last": 89999,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": true,
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 5000,
+   "last": 0,
+   "granted": [],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  },
+  {
+   "url": "http://[::ffff:7f00:1]/",
+   "now": 5000,
+   "last": 0,
+   "granted": [
+    "http://example.org",
+    "https://example.org"
+   ],
+   "configured": [
+    "https://api.openai.com",
+    "http://192.168.1.10:1234"
+   ],
+   "result": {
+    "allowed": false,
+    "reason": "未配置的接口地址请求过于频繁，请 5 秒后重试",
+    "host": "http://[::ffff:7f00:1]",
+    "isKnown": false
+   }
+  }
+ ]
+}

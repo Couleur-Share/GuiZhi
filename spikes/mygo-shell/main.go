@@ -103,6 +103,10 @@ func main() {
 	shot := flag.String("shot", "", "启动后截图到该文件并退出")
 	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
+	aiTest := flag.String("aitest", "", "AI 代理对拍：模拟服务地址（如 http://127.0.0.1:4827）；跑完 -aiscen 里的场景后把结果写到 -aiout 并退出")
+	aiScen := flag.String("aiscen", "", "-aitest 的场景文件 scenarios.json")
+	aiRunner := flag.String("airunner", "", "-aitest 的运行器 runner.mjs")
+	aiOut := flag.String("aiout", "", "-aitest 的结果输出文件")
 	flag.Parse()
 	if *dist == "" || *dbPath == "" {
 		log.Fatal("需要 -dist 与 -db")
@@ -124,6 +128,7 @@ func main() {
 	lib.registerImportList(b)
 	lib.registerSettings(b)
 	b.registerSimpleBoot(&rendererBackupSettings{})
+	newAIProxy(lib.configuredAIHosts).register(b)
 	mygo.Bind(b)
 
 	preload, err := os.ReadFile(filepath.Join(*dist, "preload", "preload.js"))
@@ -140,7 +145,7 @@ func main() {
 	mygo.App.WhenReady(func() {
 		win := mygo.NewWindow(mygo.WindowOptions{
 			Title: "归知 GuiZhi（MyGo spike）", Width: 1280, Height: 800, URL: origin + "/",
-			Hidden: *shot != "",
+			Hidden: *shot != "" || *aiTest != "",
 			X:      benchX(*bench), Y: benchX(*bench),
 			Page: mygo.PageOptions{
 				PreloadScript:  string(preload),
@@ -161,6 +166,18 @@ func main() {
 					time.Sleep(10 * time.Millisecond)
 				}
 			}()
+		}
+		if *aiTest != "" {
+			go func() {
+				err := runAITest(p, *aiTest, *aiScen, *aiRunner, *aiOut, 120*time.Second)
+				if err != nil {
+					fmt.Println("[FAIL] aitest：", err)
+					os.Exit(1)
+				}
+				fmt.Println("[ OK ] aitest 结果已写入", *aiOut)
+				mygo.App.Quit()
+			}()
+			return
 		}
 		if *shot == "" {
 			return

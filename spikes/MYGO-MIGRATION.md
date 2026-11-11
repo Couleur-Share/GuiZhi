@@ -20,6 +20,7 @@
 | 收件箱与导入 | `inbox:list`、`import:list`（45 个用例，含搜索转义、状态与来源筛选、游标、`pageSize` 取整、坏 JSON 容错） |
 | 设置 | `settings:get/set`（白名单、FlareSolverr 校验、整批不写）与 AI 配置文件读写归一化（共 33 个场景，含逐字节比较输出文件） |
 | 小频道 | `updater:version`、`updater:logAutoSkip`、`backupRepository:syncRendererSettings`、窗口控制 |
+| AI 请求与流式 | i:httpRequest、i:httpStream、i:httpCancel：48 个场景与 TS 原版对拍，47 个一致，1 个是 Go 版更严（见「AI 流式请求切片」） |
 
 ### 怎么复跑
 
@@ -244,6 +245,66 @@ go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目�
 - **口径限制。** Electron 版经 Playwright 启动，会多一点连接开销；两边只测了一台机器、一个很小的数据库，没有测大库（数万条）下的内存与首屏；没有测安装包（NSIS）压缩后的大小；没有测更新、托盘等后台常驻场景。
 
 这些数字回答的是「换内核能得到什么」：体积减少约 94%；空闲私有工作集少约 40%、含共享页的工作集少约 20%（都是上界）；启动速度没有可测的变化。它们能否抵得上 4.4–8 万行 Go 的迁移成本，是决策问题，不是技术问题。
+## AI 流式请求切片（`spikes/mygo-ai`、`mygo-shell/ai_*.go`，2026-11-11）
+
+目标：把最后一个大未知项查清——流式请求在 MyGo 里到底行不行，尤其是「Go 往页面推事件」「请求挂起时还能取消」「守卫不被绕过」。
+
+**做法**：本地模拟服务（`spikes/mygo-ai-mock`，只监听 127.0.0.1，不访问外网）提供 SSE、畸形字节、挂起、断连、重定向、gzip、各类状态码。同一批 48 个场景（`scenarios.json`）用同一个运行器（`runner.mjs`）跑两遍，都经**真实 preload 的 `aiApi`**：
+
+- TS 侧：真实的 `ai.ipc.ts`、`ai-endpoint-guard.ts`、`net-safety.ts`，只把 `electron` 换成内存总线，`fetch` 是 Node 自带的 undici（`ts-run.mts`）。
+- Go 侧：壳层 `-aitest` 模式把运行器注入真实渲染页，请求走 WebView2 → `Bridge.Invoke` → `ai_proxy.go`，块事件由 Go 经 `ipc` 事件推回页面，取消走 `Bridge.Send`。
+
+场景覆盖：流式基本与 UTF-8 多字节被切开、畸形字节、3 MB 大流、5000 个小事件、非 2xx（不走流）、服务端中途断连、中途取消、响应头前取消、响应体中途超时、响应头前超时、连接被拒、多请求并发、取消其中一个、普通请求的 JSON/401/429/500/POST 回显/重定向/gzip/204/超时/取消、守卫（元数据地址的多种写法、协议、非法 URL、数字 IP 的十进制/十六进制/带点写法、userinfo 混淆）、未知主机限速。比较的是 ok、状态、状态文本、错误文案、响应体或其长度与哈希、流式拼接文本的长度与哈希、流错误列表、`content-type` 与自定义响应头；块数与耗时只作参考。
+
+### 结果
+
+| 项 | 结果 |
+|---|---|
+| 端到端对拍 | 48 个场景，47 个逐字段一致；连续跑 3 次结果相同 |
+| 唯一的不一致 | `redirect-to-metadata`：服务端 302 到 `http://169.254.169.254/`。TS 照跟，最后因为地址不通撞上超时（`AI 请求超时（1500ms）`）；Go 在拨号时拦下（`不允许访问该地址: 169.254.169.254`）。**这是 Go 版更严，不是缺陷**：TS 的守卫只校验第一跳 URL，重定向的下一跳和 DNS 重绑定都不过守卫 |
+| 守卫的地址解析 | 87 条 URL 与 Node 的 WHATWG `URL` 逐条对拍（`host`、`hostname`、协议、合法性）全部一致；46 个地址的 `isForbiddenAIEndpointAddress` 全部一致；`evaluateEndpointAccess` 204 个状态组合全部一致 |
+| 流式 UTF-8 解码 | 600 组随机字节加随机切块，对拍 Node 的 `TextDecoder`（stream 模式），0 组不一致；另有 4 组只差 U+FEFF（见下） |
+| 3 MB 流、5000 小事件 | 拼接结果与 TS 逐字节一致，事件没有丢失、没有乱序、没有在返回之后才到 |
+| 并发与取消 | 并发 3 路流互不影响；一路挂起时取消另一路和取消自己都立即生效。**MyGo 没有把绑定方法的调用串行化**（取消的 `Bridge.Send` 不会排在挂起的 `Bridge.Invoke` 后面），这是方案成立的前提 |
+| 计时 | 取消、超时的触发时刻与 TS 在 10 ms 量级内一致（Go 400/710/505 ms，TS 403/712/514 ms） |
+
+### 必须单独处理的差异
+
+1. **地址解析不能用 `net/url` 和 `netip`。** `http://2852039166/`、`http://0xa9fea9fe/`、`http://169.254.169.254./`、`http://127.1/` 在 WHATWG 里都是 IPv4 字面量，Go 的 `net/url` 当域名处理。`ai_net.go` 按 WHATWG 重写了主机解析（IPv4 的十进制/八进制/十六进制/省略段、IPv6 的十六进制序列化与零段压缩、权限部分切分、端口范围、百分号解码），用上面的 golden 守住。守卫是安全边界，这部分以后只要改动就必须重跑对拍。
+2. **错误文案要按阶段还原。** Node 的 `fetch failed`（连接阶段）与 `terminated`（响应体读取阶段）在 Go 里没有对应物，`ai_proxy.go` 按错误发生的阶段补回；取消与超时的文案用 `context.Cause` 带出。DNS 失败的文案不同（Node 是 `getaddrinfo ENOTFOUND x`，Go 是自己的措辞），场景未覆盖，渲染进程不依赖它。
+3. **UTF-8 解码要自己实现。** Go 的 `string([]byte)` 把每个坏字节替换成一个 U+FFFD，WHATWG 按最大合法前缀折成一个；流式解码还要跨块保留未完成的序列。`ai_utf8.go` 按 Encoding 标准的状态机实现。残留差异：Node（ICU）会在「不完整序列之后紧跟的 BOM」「连续两个 BOM」处额外吞掉 U+FEFF，偏离了规范，Go 按规范只剥流开头的一个；对 SSE 文本没有实际影响。
+4. **undici 的隐式请求头。** 字符串 body 且调用方没给 `Content-Type` 时 undici 补 `text/plain;charset=UTF-8`、默认 `User-Agent: node`；Go 版照补（已用 Node 实测确认这两个值）。undici 还会发 Accept: */*、Accept-Language: *、Sec-Fetch-Mode: cors，Go 版没有照搬，没有发现服务端依赖它们，但真实服务未测。
+
+### 与产品 TS 版刻意不同的地方
+
+- 拨号时再校验一次实际要连的地址（`net.Dialer.Control`）：关闭 DNS 重绑定和重定向到元数据地址两个缺口。
+- 网络代理设置未接入，一律直连。这是 AI 请求切片里剩下的唯一功能缺口，要等「设置里的网络代理生效」一起做。
+
+### 顺带发现的产品问题（TS 原版，未改）
+
+- `isLoopbackHost` 用 `/^127\./` 判回环，任何以 `127.` 开头的**域名**（如 `127.evil.com`）都被当成回环，绕过未知端点的限速。Go 版为了保持对拍一致照搬了这一行为（`ai_net.go` 的 `isLoopbackHostname`，golden 里有对应用例）。修法很小：先判是不是 IPv4 字面量，再判前缀。
+
+### 复跑
+
+```powershell
+# 单元级对拍（守卫、地址、UTF-8）：golden 已提交在 mygo-shell/testdata/
+cd spikes/mygo-shell; go test -run 'TestEndpoint|TestForbidden|TestUTF8' -v .
+# 重新生成 golden
+pnpm dlx tsx spikes/mygo-ai/make-net-golden.mts spikes/mygo-shell/testdata/ai-net.json
+node spikes/mygo-ai/make-utf8-golden.mjs spikes/mygo-shell/testdata/ai-utf8.json
+# 端到端（需要先 go build 出壳层与模拟服务；脚本自动起停模拟服务，用临时数据库副本与临时 WebView2 目录）
+cd spikes/mygo-ai-mock; go build -o ../mygo-ai-mock.exe .
+cd ../mygo-shell; go build -o ../mygo-shell-ai.exe .
+powershell -File spikes\mygo-ai\run-diff.ps1 -ShellExe <壳层.exe> -Dist <dist> -DbFile <fixture 数据库>
+```
+
+### 没覆盖的
+
+- 真实的第三方 AI 服务（OpenAI、Anthropic、Gemini 的真实 SSE 与限流行为）、HTTP/2 与 TLS 细节：只测了本地明文 HTTP/1.1。
+- 用户配置了网络代理（系统代理、HTTP/SOCKS）的环境。
+- 超长空闲的流（undici 默认 5 分钟的头/体超时没有照搬）。
+- 渲染进程真实的问答界面（流式渲染、停止按钮）：这里测的是它依赖的 `aiApi` 契约，不是界面。
+- 事件吞吐的上限：最大测到 3 MB（Go 版 97 个事件、TS 版 232 个）；没有测每秒数千个事件的洪峰。
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -288,7 +349,7 @@ go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目�
 - Go 与被替换的 TS 的行数比，读库、写库、IPC 这类代码大致 1:1；DOM 与文本处理这类代码更高：正文提取、Markdown 转换、HTML 与 CSS 清理，非空行 Go 1565（含一份约 240 行的 DOM 辅助）对 TS 846，约 1.6–1.85 倍。剩余约 4.4 万行 TS，按 1:1 到 1.85:1 的区间，估计 Go 约 4.4–8 万行，另加对应的对拍基准。这是量级估计，不是工期承诺。
 - 最大的几块：`import` 0.71 万、`web-capture` 0.50 万、`media` 0.49 万、`themed-reading` 0.44 万、`platform-capture` 0.26 万。
 
-没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库。已验证：Readability、产品规则、Markdown 转换、`sanitize-html` 与 `css-tree` 在本机 59 页上内容层等价（Markdown 字节不等价，已决定接受），见「正文提取等价性」。未验证：`@modelcontextprotocol/server`、`@resvg/resvg-js`、`adm-zip`/`fflate`，以及本机之外的留出样本。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
+没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库。已验证：Readability、产品规则、Markdown 转换、`sanitize-html` 与 `css-tree` 在本机 59 页上内容层等价（Markdown 字节不等价，已决定接受），见「正文提取等价性」。AI 请求代理已对拍（见「AI 流式请求切片」）。未验证：`@modelcontextprotocol/server`、`@resvg/resvg-js`、`adm-zip`/`fflate`，以及本机之外的留出样本。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
 
 继续迁移的建议顺序与停止条件：
 
@@ -298,5 +359,5 @@ go run -tags patched "-modfile=go.patched.mod" ./cmd/compare-extract <样本目�
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式；做 AI 流式请求的垂直切片（尚未验证）。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
+2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式；AI 流式请求的垂直切片已做完（见「AI 流式请求切片」）。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
