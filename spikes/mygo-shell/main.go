@@ -137,6 +137,20 @@ func main() {
 		}
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: fs})
 	}
+	lib.pickDirectory = func(title string) (string, error) {
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: title, Directory: true})
+		if err != nil || len(paths) == 0 {
+			return "", err
+		}
+		return paths[0], nil
+	}
+	lib.saveFileDialog = func(title, defaultPath string, filters []dialogFilter) (string, error) {
+		var fs []mygo.FileFilter
+		for _, f := range filters {
+			fs = append(fs, mygo.FileFilter{Name: f.Name, Extensions: f.Exts})
+		}
+		return mygo.Dialog.Save(mygo.SaveDialogOptions{Title: title, DefaultPath: defaultPath, Filters: fs})
+	}
 	lib.relaunch = func() {
 		if exe, err := os.Executable(); err == nil {
 			_ = exec.Command(exe, os.Args[1:]...).Start()
@@ -157,6 +171,7 @@ func main() {
 	lib.registerAppRuntime(b)
 	lib.registerBackgroundJobs(b)
 	lib.registerImport(b)
+	lib.registerExport(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}

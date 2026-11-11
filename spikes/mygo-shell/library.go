@@ -31,6 +31,8 @@ type Library struct {
 	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
 	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
 	extractOverride  importExtractFn
+	pickDirectory    func(title string) (string, error)
+	saveFileDialog   func(title, defaultPath string, filters []dialogFilter) (string, error)
 	pushMu           sync.RWMutex
 	push             func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
 }

@@ -1341,6 +1341,60 @@ for (const [name, ops] of Object.entries(scenarios)) {
   closeDatabase();
   fs.rmSync(work, { force: true });
 }
+// ── Markdown 批量导出：同一份库、同一批资产，TS 导出的目录树作为基准 ──
+{
+  const exportDbPath = path.join(out, "export-base.db");
+  fs.copyFileSync(baseDb, exportDbPath);
+  const edb = initDatabase(exportDbPath);
+  const ids = (edb.all("SELECT id FROM knowledge_items WHERE deleted_at IS NULL ORDER BY created_at, id") as Array<{ id: string }>).map((r) => r.id);
+  const coll = (id: string, name: string) => edb.run("INSERT INTO collections (id, name, icon, sort_order, created_at, updated_at) VALUES (?, ?, 'folder', 99, 1700000000000, 1700000000000)", [id, name]);
+  coll("ex-con", "con"); coll("ex-Work", "Work"); coll("ex-work", "work"); coll("ex-blank", "  "); coll("ex-long", "长".repeat(70)); coll("ex-dot", "点.点. ");
+  const upd = (n: number, set: Record<string, unknown>) => {
+    const cols = Object.keys(set);
+    edb.run(`UPDATE knowledge_items SET ${cols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`, [...cols.map((c) => set[c]), ids[n]]);
+  };
+  upd(0, { title: 'a/b:c*d?e"f<g>h|i', content: "图 local-image://img1.png 视频 local-video://vid1.mp4 缺失 local-image://missing.png 越界 local-image://.. 隐藏 local-image://.hid", collection_id: null });
+  upd(1, { title: "a".repeat(59) + "😀😀", content: "x", transcript: "转写 文本\n第二行", is_favorite: 1, summary: '摘要 "引号" \\ 反斜杠', collection_id: "ex-blank" });
+  upd(2, { title: "", collection_id: "ex-con" });
+  upd(3, { title: "  ..点点.. ", collection_id: "ex-Work" });
+  upd(4, { collection_id: "ex-work", content: "同一资产 local-image://img1.png 与 local-video://vid1.mp4" });
+  upd(5, { title: "a\tb\nc   d\u00a0e", collection_id: "ex-long" });
+  upd(6, { title: "end.", content: "", transcript: "只有转写", collection_id: "ex-dot" });
+  upd(7, { content: "line1\r\nline2\n\n\n", summary: "" });
+  upd(8, { title: "CON", content: "reserved title" });
+  edb.run("INSERT INTO tags (id, name, color_key, created_at, updated_at) VALUES ('ex-tag', '导出标签\"', 'blue', 1700000000000, 1700000000000)");
+  edb.run("INSERT INTO knowledge_item_tags (item_id, tag_id) VALUES (?, 'ex-tag')", [ids[0]]);
+  closeDatabase();
+
+  const assetRoot = path.join(isolatedAppData, "GuiZhi", "data", "assets");
+  fs.mkdirSync(path.join(assetRoot, "images"), { recursive: true });
+  fs.mkdirSync(path.join(assetRoot, "videos"), { recursive: true });
+  fs.writeFileSync(path.join(assetRoot, "images", "img1.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]));
+  fs.writeFileSync(path.join(assetRoot, "videos", "vid1.mp4"), Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]));
+  fs.writeFileSync(path.join(assetRoot, "images", ".hid"), Buffer.from("hidden"));
+  const goldenAssets = path.join(out, "export-assets");
+  fs.rmSync(goldenAssets, { recursive: true, force: true });
+  fs.cpSync(assetRoot, goldenAssets, { recursive: true });
+
+  const { exportKnowledgeToMarkdown } = await import("../../apps/desktop/src/main/services/export-markdown.ts");
+  const exportDir = path.join(out, "export-out");
+  fs.rmSync(exportDir, { recursive: true, force: true });
+  fs.mkdirSync(exportDir, { recursive: true });
+  const exdb = initDatabase(exportDbPath);
+  const stats = exportKnowledgeToMarkdown(exdb as never, exportDir);
+  closeDatabase();
+  const tree: Record<string, string> = {};
+  const walkDir = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walkDir(full);
+      else tree[path.relative(exportDir, full).split(path.sep).join("/")] = fs.readFileSync(full).toString("base64");
+    }
+  };
+  walkDir(exportDir);
+  golden.exportMarkdown = { stats, tree };
+}
+
 golden.dumpSql = DUMP_SQL;
 golden.writes = writes;
 
