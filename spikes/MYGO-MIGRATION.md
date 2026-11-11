@@ -305,6 +305,57 @@ powershell -File spikes\mygo-ai\run-diff.ps1 -ShellExe <壳层.exe> -Dist <dist>
 - 超长空闲的流（undici 默认 5 分钟的头/体超时没有照搬）。
 - 渲染进程真实的问答界面（流式渲染、停止按钮）：这里测的是它依赖的 `aiApi` 契约，不是界面。
 - 事件吞吐的上限：最大测到 3 MB（Go 版 97 个事件、TS 版 232 个）；没有测每秒数千个事件的洪峰。
+## 备份恢复与加密仓库切片（`spikes/mygo-restore`，2026-11-11）
+
+目标：确认加密备份仓库的格式和恢复流程能在 Go 里重写，且和 TS 版双向互通。方法：用产品的真实 TS 代码（`backup-repository*.ts`、`backup-portable.ts`）和 Go 版各自创建、读取、恢复，再对拍结果。全部在隔离的临时目录进行，不碰用户数据目录和运行中的实例。
+
+### 结果（`run-diff.ps1`，9 组，失败 0 项）
+
+| 组 | 内容 | 结果 |
+|---|---|---|
+| 1 | TS 创建的仓库，Go 读取清单与全部对象 | 一致（含第二个快照复用旧对象） |
+| 2 | 口令：全角/emoji、NFKC 等价写法、错误口令与过短口令的提示文本 | 一致 |
+| 3 | 同一“现场”分别由 TS 与 Go 恢复：文件树、设置、条目、机器相关设置保留、暂存与回滚目录清理 | 一致 |
+| 4 | Go 创建的仓库：TS 解开、预检通过、恢复结果与 TS 自己的快照一致 | 一致 |
+| 5 | 混合仓库：Go 往 TS 仓库加快照，对象跨实现去重（复用 ≥6 个） | 通过 |
+| 6 | 预检矩阵：完好、快照不存在、id 非法、对象改一字节、对象缺失、清单被篡改、仓库版本不支持 | 7 项判定与文本一致 |
+| 7 | 改口令（双向）、旧口令失效、删除快照后对象回收 | 一致 |
+| 8 | 便携包导出：解压后条目与内容哈希相同；目标已存在时拒绝覆盖 | 一致 |
+| 9 | 换库第 1/2/3/5/7 步后注入失败：回滚后与换库前完全相同 | 全部回滚 |
+
+### safeStorage（无人值守解锁）
+
+用 Electron 45.2.3 在隔离 userData 里实测（`safestorage-test.ps1`，4 项全过）：
+
+- Windows 上 safeStorage 密文是 `v10` + 12 字节 nonce + AES-256-GCM 密文 + 16 字节 tag；密钥是 `<userData>/Local State` 里 `os_crypt.encrypted_key`（`DPAPI` 前缀 + `CryptProtectData`）解开的 32 字节主密钥。Go 用 `x/sys/windows` 的 `CryptUnprotectData` 即可，不需要 cgo。
+- Electron 加密的仓库密钥，Go 能据此无人值守解锁并读完快照；Go 加密的 `v10` 密文，Electron 能解开。
+- 删掉 `Local State` 后 Go 解锁失败，不会回落成明文，与产品约定一致。
+
+**迁移约束**：已有仓库头里的 `safeStorageWrappedKey` 绑定在旧 Electron 的 `Local State` 上，新版必须能读到旧 userData 里的这个文件，否则无人值守备份只能退回口令。新版自己的新建仓库用什么包装（继续写 Electron 同格式以便新旧互读，还是改成直接 DPAPI）是待定的设计点；Go 版目前只实现了读取和测试用的写入。
+
+### 与 TS 版刻意或被迫不同的地方
+
+- 快照数据库来自 `VACUUM INTO`：MyGo 内置 SQLite 拒绝该语句，Go 版用 modernc 的只读连接执行。
+- GCM 校验失败时，Go 版返回与 Node 完全相同的文案“Unsupported state or unable to authenticate data”，供界面沿用。
+
+### 没覆盖的
+
+- 主题阅读资产的检查与校验（依赖主题阅读服务，冻结范围之外但仍属核心，待迁时补）。
+- `sanitizeSnapshot` 只校验了结构；TS 里它的清理结果本来就被丢弃。
+- 恢复前后的编排：`pre-restore` 备份、停后台任务、关库与重启、活动任务检查。这里只验证了“换库”这一步及其回滚。
+- 渲染进程设置的整数式键排序（JS 对象的排序规则）未模拟。
+- 没有按真实体量（数百 MB 媒体）测过耗时与内存；新旧版 SQLite 锁冲突仍未验证。
+
+### 复跑
+
+```powershell
+# 构建（在 spikes\mygo-restore 下）
+go build -o ..\mygo-restore.exe .
+# 全部对拍（在仓库根目录；FixtureDb 是一份产品数据库副本）
+powershell -File spikes\mygo-restore\run-diff.ps1 -GoExe spikes\mygo-restore.exe -FixtureDb $env:TEMP\guizhi-shell.db
+# safeStorage 互通：-SrcRepo 用上面某次运行目录里的 r-ts，-Snapshot 用 make.json 里的快照 id
+powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-restore.exe -Electron <electron.exe> -SrcRepo <r-ts> -Snapshot <id>
+```
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -349,7 +400,7 @@ powershell -File spikes\mygo-ai\run-diff.ps1 -ShellExe <壳层.exe> -Dist <dist>
 - Go 与被替换的 TS 的行数比，读库、写库、IPC 这类代码大致 1:1；DOM 与文本处理这类代码更高：正文提取、Markdown 转换、HTML 与 CSS 清理，非空行 Go 1565（含一份约 240 行的 DOM 辅助）对 TS 846，约 1.6–1.85 倍。剩余约 4.4 万行 TS，按 1:1 到 1.85:1 的区间，估计 Go 约 4.4–8 万行，另加对应的对拍基准。这是量级估计，不是工期承诺。
 - 最大的几块：`import` 0.71 万、`web-capture` 0.50 万、`media` 0.49 万、`themed-reading` 0.44 万、`platform-capture` 0.26 万。
 
-没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库。已验证：Readability、产品规则、Markdown 转换、`sanitize-html` 与 `css-tree` 在本机 59 页上内容层等价（Markdown 字节不等价，已决定接受），见「正文提取等价性」。AI 请求代理已对拍（见「AI 流式请求切片」）。未验证：`@modelcontextprotocol/server`、`@resvg/resvg-js`、`adm-zip`/`fflate`，以及本机之外的留出样本。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
+没有现成等价物、需要单独验证输出一致性的 JS 库（`apps/desktop/package.json`）：`@mozilla/readability` + `linkedom`（网页正文提取）、`turndown`（HTML 转 Markdown）、`sanitize-html`、`css-tree`、`@modelcontextprotocol/server`（MCP）、`@resvg/resvg-js`（SVG 渲染）、`adm-zip`/`fflate`。Go 里有同类库。已验证：Readability、产品规则、Markdown 转换、`sanitize-html` 与 `css-tree` 在本机 59 页上内容层等价（Markdown 字节不等价，已决定接受），见「正文提取等价性」。AI 请求代理已对拍（见「AI 流式请求切片」）；备份仓库、恢复与便携包已与 TS 双向对拍（见「备份恢复与加密仓库切片」）。未验证：`@modelcontextprotocol/server`、`@resvg/resvg-js`、`adm-zip`/`fflate` 在产品里的其他用法，以及本机之外的留出样本。网页正文提取的差异会直接改变用户入库的内容，仍是最大的行为风险。
 
 继续迁移的建议顺序与停止条件：
 
@@ -359,5 +410,5 @@ powershell -File spikes\mygo-ai\run-diff.ps1 -ShellExe <壳层.exe> -Dist <dist>
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式；AI 流式请求的垂直切片已做完（见「AI 流式请求切片」）。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
+2. 用真实站点和多 target 并发压测独立采集进程；AI 流式请求（见「AI 流式请求切片」）与加密备份格式、换库与回滚（见「备份恢复与加密仓库切片」）已验证；备份恢复外围的编排（`pre-restore`、停后台任务、重启）还没验证。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
