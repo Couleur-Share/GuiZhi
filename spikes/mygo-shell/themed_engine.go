@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	whatwg "github.com/nlnwa/whatwg-url/url"
 )
 
 //go:embed themed_engine.js
@@ -171,6 +172,30 @@ func newThemedEngine() (*themedEngine, error) {
 			return msg + "\n" + strconv.Itoa(line)
 		}
 		return ""
+	})
+	// WHATWG URL 解析（JS 的 new URL）：失败返回空串。\n	must("__gzURLParse", func(input, base string, hasBase bool) string {\n		var u *whatwg.Url\n		var err error\n		if hasBase {\n			u, err = whatwg.ParseRef(base, input)\n		} else {\n			u, err = whatwg.Parse(input)\n		}\n		if err != nil {\n			return ""\n		}\n		out := newObj()\n		out.set("protocol", u.Protocol())\n		out.set("username", u.Username())\n		out.set("password", u.Password())\n		out.set("hostname", u.Hostname())\n		out.set("port", u.Port())\n		out.set("pathname", u.Pathname())\n		out.set("search", u.Search())\n		out.set("_hash", u.Hash())\n		s, _ := jsStringify(out)\n		return s\n	})\n	// WHATWG URL 解析（JS 的 new URL）：失败返回空串。
+	must("__gzURLParse", func(input, base string, hasBase bool) string {
+		var u *whatwg.Url
+		var err error
+		if hasBase {
+			u, err = whatwg.ParseRef(base, input)
+		} else {
+			u, err = whatwg.Parse(input)
+		}
+		if err != nil {
+			return ""
+		}
+		out := newObj()
+		out.set("protocol", u.Protocol())
+		out.set("username", u.Username())
+		out.set("password", u.Password())
+		out.set("hostname", u.Hostname())
+		out.set("port", u.Port())
+		out.set("pathname", u.Pathname())
+		out.set("search", u.Search())
+		out.set("_hash", u.Hash())
+		s, _ := jsStringify(out)
+		return s
 	})
 	must("__gzLibrary", func(name string) (string, error) { return e.library(name) })
 	if _, err := rt.RunString(themedEngineJS); err != nil {

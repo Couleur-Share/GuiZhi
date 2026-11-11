@@ -441,3 +441,52 @@ func (p *themedPages) hasActiveTasks(ctx context.Context) (bool, error) {
 	r, err := p.oneRow(ctx, "SELECT id FROM themed_reading_tasks WHERE state IN ('queued','running') LIMIT 1")
 	return r != nil, err
 }
+
+// 旧格式（v1/v2）页面只读保留：可以阅读、导出和备份恢复，不再生成、补图或续跑。
+const (
+	themedLegacyPageError = "旧格式阅读页只读，不能调整、补图或继续生成；请重新生成新版阅读页"
+	themedLegacyTaskError = "旧格式任务不再支持继续，请重新生成新版阅读页"
+)
+
+// retireLegacyTasks 页面数据保持原样；只把旧格式任务标记为不可继续，未完成的工作任务写明失败原因。
+func (p *themedPages) retireLegacyTasks(ctx context.Context) {
+	tasks, err := p.listTasks(ctx)
+	if err != nil {
+		p.l.paths.logAppError("themedReading", "retireLegacyTasks", err.Error(), nil)
+		return
+	}
+	for _, task := range tasks {
+		state := themedStr(task, "state")
+		if jsGet(task, "legacyFormat") == true || (state != "interrupted" && state != "failed" && state != "cancelled" && state != "partial") {
+			continue
+		}
+		err := func() error {
+			version, err := p.getVersion(ctx, themedStr(task, "versionId"))
+			if err != nil || version == nil || jsToNumber(version.get("formatVersion")) >= 3 {
+				return err
+			}
+			next := themedCopyObj(task)
+			next.set("legacyFormat", true)
+			if themedStr(version, "role") == "working" {
+				next.set("state", "failed")
+				next.set("error", themedLegacyTaskError)
+			}
+			_, err = p.saveTask(ctx, next)
+			return err
+		}()
+		if err != nil {
+			// 单条存量记录损坏不能阻止阅读服务启动；继续时会再次报出具体原因。
+			extra := newObj()
+			extra.set("itemId", task.get("itemId"))
+			p.l.paths.logAppError("themedReading", "retireLegacyTask", err.Error(), extra)
+		}
+	}
+}
+
+// startup 对应 ThemedReadingRuntime 构造函数：把遗留的排队 / 运行任务标记为中断，并清理旧格式任务。
+func (p *themedPages) startup(ctx context.Context) {
+	if _, err := p.interruptRunning(ctx); err != nil {
+		p.l.paths.logAppError("themedReading", "interruptRunning", err.Error(), nil)
+	}
+	p.retireLegacyTasks(ctx)
+}

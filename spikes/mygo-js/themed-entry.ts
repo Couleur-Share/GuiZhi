@@ -1,5 +1,7 @@
 // 打进 goja 的主题阅读渲染层入口：直接引用 TS 原文件（正文分块、净化、v3 页面规范化与校验、文档拼装、导出文档），
 // 保证与 Electron 版逐字节一致。只含纯函数；文件读写、数据库与模型请求都留在 Go 侧。
+import "./text-polyfill";
+import "./url-polyfill";
 import { parseHTML } from "linkedom";
 import { themedReadingDocument } from "../../apps/desktop/src/main/services/themed-reading/document";
 import { validateThemedReadingVersion, validateThemedReadingTask } from "../../packages/db/src/themed-reading-validation";

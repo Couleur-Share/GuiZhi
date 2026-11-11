@@ -233,6 +233,7 @@ func main() {
 	lib.registerFunasr(b)
 	lib.registerMedia(b)
 	lib.registerArticleAsk(b)
+	lib.registerThemedReading(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)

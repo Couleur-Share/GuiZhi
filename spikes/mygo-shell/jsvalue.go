@@ -137,7 +137,7 @@ func jsIsObject(v any) bool {
 
 // jsGet 对应 `v.key`：只有对象有自有属性；对 null/undefined 属性访问会抛错，这里由 jsGetStrict 处理。
 func jsGet(v any, key string) any {
-	if o, ok := v.(*jsObj); ok {
+	if o, ok := v.(*jsObj); ok && o != nil {
 		return o.get(key)
 	}
 	return jsUndefined
@@ -679,3 +679,12 @@ func stringToNumber(s string) float64 {
 	}
 	return f
 }
+
+// MarshalJSON 让 jsObj / undefined / null 能直接放进 Go 返回值（按 JSON.stringify 的规则输出）。
+func (o *jsObj) MarshalJSON() ([]byte, error) {
+	s, _ := jsStringify(o)
+	return []byte(s), nil
+}
+
+func (jsNullT) MarshalJSON() ([]byte, error)      { return []byte("null"), nil }
+func (jsUndefinedT) MarshalJSON() ([]byte, error) { return []byte("null"), nil }

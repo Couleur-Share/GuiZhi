@@ -61,6 +61,7 @@ type Library struct {
 	retireIdleThemedReading func() // 主题阅读一族迁移前的接入点：恢复前让空闲的主题阅读 worker 退场
 	dbPath                  string // 在线数据库文件路径（备份 VACUUM INTO 的来源）
 	backup                  backupState
+	themedAbort             func(taskID string) // 主题阅读运行时：中止正在执行的任务（取消频道调用）
 }
 
 func asInt(v any) int64 {

@@ -8,7 +8,7 @@ import { parseHTML } from "linkedom";
 export interface Rec { kind: string; name: string; input: unknown; output: unknown }
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-const MARKDOWNS: Record<string, string> = {
+export const MARKDOWNS: Record<string, string> = {
   technical: "# 本地知识文件的整理流程\n\n这是一份纯离线界面验证教程。\n\n## 一、先定义目录\n\n1. 原始资料保留独立目录。\n2. 生成内容保存到派生目录。\n\n```typescript\nconst example = { title: \"长字段\" };\n```\n\n| 输入 | 文件名 |\n| --- | --- |\n| input_0 | a.md |\n\n> 完成条件：正文完整。",
   cjkEmphasis: "这是**“强调”**的中文，也有*斜体*和~~删除~~，还有~单波浪~与**加粗。**后续文字。\n\n中文句末**，**标点。",
   html: "<div class=\"x\">原样 <b>HTML</b></div>\n\n段落中有 <span style=\"color:red\">行内</span> 与 <script>alert(1)</script> 与 <iframe src=\"https://e.example\"></iframe>。\n\n<details><summary>摘要</summary>\n\n内部 **markdown**\n\n</details>",
@@ -28,11 +28,11 @@ const MARKDOWNS: Record<string, string> = {
   emojiZwj: "👨‍👩‍👧‍👦 家庭 **加粗👍** 结束",
 };
 
-function blockSource(content: string, blocks: any[], title = "测试文章") {
+export function blockSource(content: string, blocks: any[], title = "测试文章") {
   return { title, content, sourceUri: null, fingerprint: "a".repeat(64), blocks };
 }
 
-function v1Page(markdownKey: string, R: any, extra: Record<string, unknown> = {}) {
+export function v1Page(markdownKey: string, R: any, extra: Record<string, unknown> = {}) {
   const blocks = R.renderThemedReadingBlocks(MARKDOWNS[markdownKey]);
   return {
     id: `v1-${markdownKey}`, itemId: "it", sourceKind: "body", role: "current", formatVersion: 1, createdAt: 1, updatedAt: 1, warnings: [], assets: [],
@@ -43,8 +43,8 @@ function v1Page(markdownKey: string, R: any, extra: Record<string, unknown> = {}
   };
 }
 
-const TEXT = "这是一份用于验证独立阅读环境的完整文章。页面中的交互只改变本页的演示数值，原始知识条目始终独立保存。关闭增强交互以后，正文、图注和说明仍然可读。点击下方按钮，可以观察计数器变化；缩小阅读区以后，正文应自动换行。";
-function v3Page(over: Record<string, unknown> = {}, design: Record<string, unknown> = {}) {
+export const TEXT = "这是一份用于验证独立阅读环境的完整文章。页面中的交互只改变本页的演示数值，原始知识条目始终独立保存。关闭增强交互以后，正文、图注和说明仍然可读。点击下方按钮，可以观察计数器变化；缩小阅读区以后，正文应自动换行。";
+export function v3Page(over: Record<string, unknown> = {}, design: Record<string, unknown> = {}) {
   return {
     id: "v3", itemId: "it", sourceKind: "body", role: "current", formatVersion: 3, createdAt: 1, updatedAt: 1, warnings: [], assets: [],
     options: { style: "", generateImages: false, maxImages: 0, research: false, action: "create", enhancedInteraction: true, researchDepth: "standard" },
