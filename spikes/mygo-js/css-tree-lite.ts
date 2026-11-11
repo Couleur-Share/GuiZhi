@@ -8,3 +8,4 @@ import walkImpl from "css-tree/walker";
 export const parse = parseImpl;
 export const generate = generateImpl;
 export const walk = walkImpl;
+export { clone, List } from "css-tree/utils";
