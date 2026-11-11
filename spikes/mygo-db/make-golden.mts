@@ -1534,6 +1534,188 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   golden.exportMarkdown = { stats, tree };
 }
 
+// ── MCP：检索/读取两个工具、AI 交接稿、MCP 范围解析、一键安装进 Cursor 的 jsonc 合并 ──
+{
+  const { searchKnowledge, readItem } = await import("../../apps/desktop/src/mcp/tools.ts");
+  const { buildAiHandoff } = await import("../../packages/shared/utils/ai-handoff.ts");
+  const { parseMcpScope, serializeMcpScope } = await import("../../packages/shared/utils/mcp-scope.ts");
+  const { installIntoCursorAt } = await import("../../apps/desktop/src/main/services/mcp-install.ts");
+
+  const toolDbPath = path.join(out, "mcp-tools.db");
+  fs.copyFileSync(baseDb, toolDbPath);
+  const tdb = initDatabase(toolDbPath);
+  const all: { mode: "all"; allowedCollectionIds: string[]; allowUncategorized: boolean } = { mode: "all", allowedCollectionIds: [], allowUncategorized: true };
+  const sel = (ids: string[], allowUncategorized: boolean) => ({ mode: "selected" as const, allowedCollectionIds: ids, allowUncategorized });
+  const run = (fn: () => unknown) => { try { return { value: fn() }; } catch (error) { return { error: (error as Error).message }; } };
+  const searchCases: Array<{ input: Record<string, unknown>; scope: unknown }> = [
+    ...["", "   ", "检索", "  检索  ", "桌面框架 选型", "Electron", "backup", "BACKUP", "100%", "!!!", "检索 检索", "不存在的词语", "FTS5", "视频", "整理"].map((query) => ({ input: { query }, scope: all })),
+    ...[1, 2, 3, 50, 100, 0, -5].map((limit) => ({ input: { query: "检索", limit }, scope: all })),
+    ...["web", "douyin", "xiaohongshu", " douyin ", "bogus", ""].map((platform) => ({ input: { query: "检索", platform }, scope: all })),
+    ...["技术", " 技术 ", "阅读", "空集合", "不存在", "", "  "].map((collection) => ({ input: { query: "检索", collection }, scope: all })),
+    { input: { query: "检索" }, scope: sel([tech.id], false) }, { input: { query: "检索" }, scope: sel([tech.id], true) },
+    { input: { query: "检索" }, scope: sel([], true) }, { input: { query: "检索" }, scope: sel([], false) },
+    { input: { query: "检索", collection: "阅读" }, scope: sel([tech.id], true) }, { input: { query: "检索", collection: "技术" }, scope: sel([tech.id, reading.id], false) },
+    { input: { query: "检索", collection: "技术", platform: "web" }, scope: all },
+    { input: {}, scope: all }, { input: { query: undefined }, scope: all },
+  ];
+  const itemIdsForRead = [A, B, C, D, E, F, G, vid.id, longItem.id, emojiItem.id, h.id, i.id];
+  const readCases: Array<{ input: Record<string, unknown>; scope: unknown }> = [
+    ...itemIdsForRead.flatMap((id) => [{ input: { id }, scope: all }, { input: { id, includeFullText: false }, scope: all }]),
+    ...["missing", "", "   ", ` ${A} `].map((id) => ({ input: { id }, scope: all })),
+    { input: { id: A }, scope: sel([reading.id], false) }, { input: { id: A }, scope: sel([tech.id], false) }, { input: { id: E }, scope: sel([tech.id], true) },
+    { input: { id: E }, scope: sel([tech.id], false) }, { input: { id: B }, scope: sel([], true) }, { input: {}, scope: all },
+  ];
+  const tools = {
+    search: searchCases.map((c) => ({ ...c, result: run(() => searchKnowledge(tdb as never, c.input as never, c.scope as never)) })),
+    read: readCases.map((c) => ({ ...c, result: run(() => readItem(tdb as never, c.input as never, c.scope as never)) })),
+  };
+  closeDatabase();
+
+  // AI 交接稿：覆盖各 itemType、转写稿长短（含代理对、边界 180/181）、资产链接、元数据块、论坛逐楼小节、CRLF 与各种空白
+  const ts0 = 1_700_000_000_000;
+  const longTranscript = "转写内容。".repeat(60);
+  const base = { title: "标题", content: "正文", itemType: "note", tags: [], createdAt: ts0 };
+  const handoffItems: Array<Record<string, unknown>> = [
+    base, { ...base, title: "" }, { ...base, title: 'He said "hi" \\ 反斜杠\n换行' },
+    { ...base, sourceUri: "https://example.com/a?b=1&c=2", summary: "  摘要 \"引号\"  ", tags: [{ name: "甲" }, { name: "" }, { name: "乙\"丙" }], collectionName: "技术" },
+    { ...base, summary: "   ", collectionName: "", sourceUri: "" },
+    ...["video", "audio", "forum", "image", "note", "webpage", "other"].map((itemType) => ({ ...base, itemType })),
+    { ...base, itemType: "video", transcript: "短转写" },
+    { ...base, itemType: "video", transcript: "字".repeat(180) }, { ...base, itemType: "video", transcript: "字".repeat(181) },
+    { ...base, itemType: "video", transcript: longTranscript }, { ...base, itemType: "video", transcript: "  " + longTranscript + "\n  " },
+    { ...base, itemType: "video", transcript: "😀".repeat(100) }, { ...base, itemType: "video", transcript: "a" + "😀".repeat(100) },
+    { ...base, itemType: "video", transcript: "多   空白\n\n换行\t制表\u00a0不换行\u3000全角".repeat(20) },
+    { ...base, itemType: "video", transcript: "含图 local-image://x.png 与 ![图](local-image://y.png)" + "。".repeat(200) },
+    { ...base, content: "图：![图 1](local-image://a.png) 与 [ 图2 ](local-video://v.mp4) 以及 ![](local-image://b.png) 裸引用 local-image://c.png 和 local-video://d_e-f.mp4。" },
+    { ...base, content: "无资产" }, { ...base, content: "> 平台：抖音 · 作者：甲 · 时长：1:02\n> 原标题：旧标题\n> 简介：简介 · 含点\n> 文字稿来源：平台字幕\n\n\n正文第一行\n\n\n\n正文第二行" },
+    { ...base, content: "> 平台：B站\n正文紧跟" }, { ...base, content: "> 平台： \n正文" }, { ...base, content: "> 平台:YouTube · 作者:乙 · 时长:12:52 · 其他:忽略\r\n正文" },
+    { ...base, content: ">平台：小红书\n>作者：丙\n\n正文" }, { ...base, content: "普通引用\n> 平台：不是首行" },
+    { ...base, itemType: "forum", content: "## 讨论总结\n总结内容\n\n## 讨论 1 楼\n第一楼内容\n第二行\n\n## 讨论回复\n更多回复\n\n## 其他小节\n保留" },
+    { ...base, itemType: "forum", content: "## 讨论总结\n只有总结" }, { ...base, itemType: "forum", content: "## 讨论\n全是讨论\n\n\n\n" },
+    { ...base, itemType: "forum", content: "##讨论 没空格\n  ## 讨论 缩进  \n内容\n## 讨论 \u3000全角空格\n内容二" },
+    { ...base, content: "行一\r\n行二\r\n\r\n\r\n行三\r\n" }, { ...base, content: "\n\n\n仅换行\n\n\n" }, { ...base, content: "" }, { ...base, content: "   \n  " },
+    { ...base, title: "😀 标题", content: "😀 正文", tags: [{ name: "😀" }] },
+    { ...base, createdAt: 0 }, { ...base, createdAt: 1_735_689_599_999 }, { ...base, createdAt: 1_735_689_600_000 }, { ...base, createdAt: 4_102_444_800_000 },
+    { ...base, itemType: "video", transcript: "文".repeat(1234), content: "> 平台：抖音\n## 讨论 x\n内容 local-image://q.png" },
+    { ...base, itemType: "forum", transcript: "论坛转写 ".repeat(50), content: "## 讨论总结\n总\n## 讨论 1\n" + "楼层内容\n".repeat(400) },
+  ];
+  const handoff = handoffItems.flatMap((item) => [true, false].map((includeFullText) => ({ item, includeFullText, result: buildAiHandoff(item as never, { includeFullText }) })));
+
+  const scopeRaws: unknown[] = [null, undefined, 5, "x", [], {}, { mode: "selected" }, { mode: "all", allowedCollectionIds: ["a", "a", "", 5, "b"] },
+    { mode: "selected", allowedCollectionIds: ["x", "y", "x"], allowUncategorized: false }, { mode: "selected", allowedCollectionIds: "x", allowUncategorized: "no" },
+    { mode: "SELECTED", allowUncategorized: true }, { allowUncategorized: false }, { mode: "selected", allowedCollectionIds: [null, 1, "k"], allowUncategorized: 0 }];
+  const scopes = scopeRaws.map((raw) => ({ raw: raw === undefined ? "__undefined" : raw, parsed: parseMcpScope(raw), text: serializeMcpScope(parseMcpScope(raw)) }));
+
+  // 一键安装：每种已有文件内容在临时路径各跑一次，记录结果与写后文件
+  const spec = { command: "C:\\Program Files\\GuiZhi\\GuiZhi.exe", args: ["--mcp", "a b"], env: {} as Record<string, string> };
+  const specEnv = { command: "/usr/bin/x", args: ["m.mjs"], env: { ELECTRON_RUN_AS_NODE: "1", K: "v \"q\"" } };
+  const installCases: Array<{ name: string; before: string | null; spec: typeof spec | typeof specEnv }> = [
+    { name: "nofile", before: null, spec }, { name: "empty", before: "", spec }, { name: "blank", before: "  \n\n", spec }, { name: "obj", before: "{}", spec },
+    { name: "obj-nl", before: "{}\n", spec }, { name: "env", before: "{}", spec: specEnv },
+    { name: "empty-servers", before: '{"mcpServers":{}}', spec }, { name: "oneline-other", before: '{"mcpServers":{"other":{"command":"x"}}}', spec },
+    { name: "pretty-other", before: '{\n  "mcpServers": {\n    "other": {\n      "command": "x",\n      "args": ["a"]\n    }\n  }\n}\n', spec },
+    { name: "pretty-replace", before: '{\n  "mcpServers": {\n    "guizhi": {\n      "command": "old",\n      "args": ["o"]\n    },\n    "other": { "command": "x" }\n  }\n}\n', spec },
+    { name: "comments", before: '{\n  // 我的服务器\n  "mcpServers": {\n    "other": { "command": "x" }, // 行尾注释\n  },\n}\n', spec },
+    { name: "block-comment", before: '/* head */\n{\n  "a": 1, /* mid */ "mcpServers": {}\n}\n', spec },
+    { name: "no-servers", before: '{\n  "foo": 1\n}\n', spec }, { name: "no-servers-oneline", before: '{"foo": 1}', spec },
+    { name: "tabs", before: '{\n\t"mcpServers": {\n\t\t"other": {"command": "x"}\n\t}\n}\n', spec },
+    { name: "crlf", before: '{\r\n  "mcpServers": {\r\n    "other": { "command": "x" }\r\n  }\r\n}\r\n', spec },
+    { name: "invalid", before: '{ "mcpServers": ', spec }, { name: "invalid2", before: "not json", spec }, { name: "trailing-garbage", before: '{} x', spec },
+    { name: "array-root", before: "[]", spec }, { name: "null-servers", before: '{"mcpServers": null}', spec }, { name: "servers-array", before: '{"mcpServers": []}', spec },
+    { name: "replace-oneline", before: '{"mcpServers":{"guizhi":{"command":"old"}}}', spec }, { name: "bom", before: '\ufeff{"mcpServers":{}}', spec },
+    { name: "unicode-comment", before: '{\n  // 中文注释 😀\n  "x": "y"\n}', spec },
+  ];
+  const installDir = path.join(out, "mcp-install");
+  fs.rmSync(installDir, { recursive: true, force: true });
+  fs.mkdirSync(installDir, { recursive: true });
+  const install = installCases.map((c) => {
+    const dir = path.join(installDir, c.name);
+    const file = path.join(dir, "mcp.json");
+    if (c.before !== null) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file, c.before); }
+    const result = run(() => installIntoCursorAt(file, c.spec));
+    const norm = (v: unknown) => JSON.parse(JSON.stringify(v ?? null).split(dir.replace(/\\/g, "\\\\")).join("<DIR>"));
+    return {
+      ...c, result: norm(result),
+      after: fs.existsSync(file) ? fs.readFileSync(file).toString("base64") : null,
+      backup: fs.existsSync(`${file}.guizhi-backup`) ? fs.readFileSync(`${file}.guizhi-backup`).toString("base64") : null,
+    };
+  });
+  // stdio 协议层：起真实的 TS server 进程，让 Go 的 --mcp 与之逐条比对（含协议版本协商、zod 校验报错原文）。
+  const { probe } = await import("./mcp-probe.mts");
+  const mcpDataDir = path.join(out, "mcp-data");
+  fs.mkdirSync(path.join(mcpDataDir, "data"), { recursive: true });
+  fs.copyFileSync(baseDb, path.join(mcpDataDir, "data", "knowledge.db"));
+  const initParams = (protocolVersion: unknown) => ({ protocolVersion, capabilities: {}, clientInfo: { name: "probe", version: "1" } });
+  let rid = 0;
+  const call = (name: unknown, args?: unknown) => ({ jsonrpc: "2.0", id: ++rid, method: "tools/call", params: args === undefined && name !== undefined ? { name } : { name, arguments: args } });
+  const stdioRequests: Array<Record<string, unknown> | string> = [
+    { jsonrpc: "2.0", id: ++rid, method: "tools/call", params: { name: "search_knowledge", arguments: { query: "检索" } } },
+    ...["2024-10-07", "2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28", "1999-01-01", 5].map((v) => ({ jsonrpc: "2.0", id: ++rid, method: "initialize", params: initParams(v) })),
+    { jsonrpc: "2.0", id: ++rid, method: "initialize", params: {} },
+    { jsonrpc: "2.0", id: ++rid, method: "initialize" },
+    { jsonrpc: "2.0", method: "notifications/initialized" },
+    { jsonrpc: "2.0", id: ++rid, method: "tools/list" },
+    { jsonrpc: "2.0", id: ++rid, method: "tools/list", params: { cursor: "abc" } },
+    { jsonrpc: "2.0", id: "s1", method: "ping" },
+    { jsonrpc: "2.0", id: ++rid, method: "resources/list" },
+    { jsonrpc: "2.0", id: ++rid, method: "server/discover" },
+    { jsonrpc: "2.0", id: ++rid, method: "bogus/method" },
+    { jsonrpc: "2.0", method: "bogus/notification" },
+    "not json at all",
+    { jsonrpc: "2.0", id: ++rid, method: "tools/call", params: {} },
+    { jsonrpc: "2.0", id: ++rid, method: "tools/call" },
+    call("nope", {}),
+    call(5, {}),
+    call("search_knowledge"),
+    call("search_knowledge", {}),
+    call("search_knowledge", null),
+    call("search_knowledge", []),
+    call("search_knowledge", "x"),
+    call("search_knowledge", 5),
+    call("search_knowledge", { query: 5 }),
+    call("search_knowledge", { query: null }),
+    call("search_knowledge", { query: ["a"] }),
+    call("search_knowledge", { query: { a: 1 } }),
+    call("search_knowledge", { query: true }),
+    call("search_knowledge", { query: "检索", limit: 0 }),
+    call("search_knowledge", { query: "检索", limit: 0.5 }),
+    call("search_knowledge", { query: "检索", limit: 1.5 }),
+    call("search_knowledge", { query: "检索", limit: 51 }),
+    call("search_knowledge", { query: "检索", limit: -1 }),
+    call("search_knowledge", { query: "检索", limit: 100.5 }),
+    call("search_knowledge", { query: "检索", limit: "3" }),
+    call("search_knowledge", { query: "检索", limit: null }),
+    call("search_knowledge", { query: "检索", limit: 1 }),
+    call("search_knowledge", { query: "检索", limit: 50 }),
+    call("search_knowledge", { query: "检索", platform: "bad" }),
+    call("search_knowledge", { query: "检索", platform: 3 }),
+    call("search_knowledge", { query: "检索", platform: "web" }),
+    call("search_knowledge", { query: "检索", platform: "local" }),
+    call("search_knowledge", { query: "检索", collection: 5 }),
+    call("search_knowledge", { query: "检索", collection: "技术" }),
+    call("search_knowledge", { query: "检索", collection: "不存在" }),
+    call("search_knowledge", { query: 5, limit: 0, platform: "x", collection: 1 }),
+    call("search_knowledge", { limit: 0, platform: "x" }),
+    call("search_knowledge", { query: "检索", extra: 1 }),
+    call("search_knowledge", { query: "" }),
+    call("search_knowledge", { query: "桌面框架 选型" }),
+    call("search_knowledge", { query: "不存在的词语" }),
+    call("read_item", { id: "nope" }),
+    call("read_item", {}),
+    call("read_item", { id: 5 }),
+    call("read_item", { id: "x", includeFullText: "yes" }),
+    call("read_item", { id: "x", includeFullText: null }),
+    ...itemIdsForRead.flatMap((id) => [call("read_item", { id }), call("read_item", { id, includeFullText: false }), call("read_item", { id, includeFullText: true })]),
+    { jsonrpc: "2.0", id: ++rid, method: "ping" },
+  ];
+  const hereDir = path.dirname((await import("node:url")).fileURLToPath(import.meta.url));
+  const tsxBin = path.resolve(hereDir, "../../node_modules/.bin/tsx.CMD");
+  const serverTs = path.resolve(hereDir, "../../apps/desktop/src/mcp/server.ts");
+  const probed = await probe("cmd.exe", ["/c", tsxBin, serverTs], { GUIZHI_DATA_DIR: mcpDataDir }, stdioRequests);
+  if (probed.stderr) console.error("[mcp stdio] TS server stderr:", probed.stderr.slice(0, 300));
+  golden.mcp = { tools, handoff, scopes, install, stdio: { requests: stdioRequests, lines: probed.lines } };
+}
+
 golden.dumpSql = DUMP_SQL;
 golden.selAssets = selAssets;
 golden.writes = writes;

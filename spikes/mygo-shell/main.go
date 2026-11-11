@@ -109,7 +109,12 @@ func main() {
 	aiScen := flag.String("aiscen", "", "-aitest 的场景文件 scenarios.json")
 	aiRunner := flag.String("airunner", "", "-aitest 的运行器 runner.mjs")
 	aiOut := flag.String("aiout", "", "-aitest 的结果输出文件")
+	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	flag.Parse()
+	if *mcpMode {
+		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
+		return
+	}
 	if *dist == "" || *dbPath == "" {
 		log.Fatal("需要 -dist 与 -db")
 	}
@@ -174,6 +179,7 @@ func main() {
 	lib.registerBackgroundJobs(b)
 	lib.registerImport(b)
 	lib.registerExport(b)
+	lib.registerMcp(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}
