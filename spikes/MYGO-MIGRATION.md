@@ -46,12 +46,36 @@ Go 工具链要求 1.27.3，本机 1.26.3 由 `GOTOOLCHAIN=auto` 自动拉取。
 ## 已知阻塞与风险
 
 1. **备份：`VACUUM INTO` 与 `ATTACH` 被 MyGo 的 SQLite 插件拒绝。** 备选方案：换纯 Go 驱动（如 `modernc.org/sqlite`，未验证）、或关库后拷贝。
-2. **网络层拦截缺口。** MyGo 里没找到按请求改写头部或读取状态码的接口，只有 `PerformanceObserver` 能拿到 URL、类型和耗时。采集链路里依赖这类拦截的部分需要重新评估。
+2. **网络层拦截：已找到可行路径，附带安全约束（见下节「网络拦截验证」）。** MyGo 没有直接的 webRequest 接口，但可以在进程内设置 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0`，再由 Go 连 DevTools 协议拦截。
 3. **新旧版本不能同时打开同一个数据库。** 旧版 wasm 驱动用 `mkdir <db>.lock` 目录锁，与原生 SQLite 的字节范围锁不兼容；MCP 服务也用 wasm 驱动。灰度期要么互斥，要么统一驱动。
 4. **机密与加密。** `ai-models.json` 里 `apiKey` 以明文保存在数据目录（与 TS 一致，迁移时没改）；`safeStorage`（DPAPI）保存的凭证、`electron-updater` 都需要单独的迁移方案。
 5. **`settings:set` 的半写入特性。** 与 TS 一致：先写 AI 配置文件，再校验并写库，同一批里 AI 合法而 `flareSolverr` 非法时会出现「AI 已落盘、其余未写入」。正式迁移时建议改成先校验、后写入。
 6. **窗口选项的顺序依赖。** MyGo 的 `ThrottlingOff` 必须给第一个窗口或 web view，后建的窗口设置无效。
 
+## 网络拦截验证（`spikes/mygo-net`）
+
+GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBeforeRequest` 拦截（SSRF 防护、采集时屏蔽资源、阻止外联）、`onCompleted` 观测状态码、`onHeadersReceived` 改写 CSP、`setProxy`、`setUserAgent`、`will-download` 与权限回调，另有 `webContents.debugger` 的 Network 域。
+
+在 MyGo 上用 DevTools 协议替代，已用真实 WebView2 验证以下 8 项全部通过（`go run .`）：
+
+| 能力 | 做法 | 结果 |
+|---|---|---|
+| 取得调试端口 | `--remote-debugging-port=0`，读用户数据目录下的 `DevToolsActivePort` | 通过 |
+| 端口只在回环地址 | 对本机非回环 IP 拨号 | 拒绝连接 |
+| 子请求拦截 | `Fetch.enable` + `Fetch.failRequest` | 页面 `fetch` 失败，服务端 0 命中 |
+| 改写请求头 | `Fetch.continueRequest` | 服务端收到自定义头；`headers` 是整体替换，必须带上原有头 |
+| 读响应状态码 | `Network.responseReceived` | 读到 404 |
+| 改写响应头 | `Fetch.continueResponse` | 页面读到被改写的响应头，状态码保留（可用于 CSP） |
+| 覆盖 User-Agent | `Emulation.setUserAgentOverride` | 服务端收到新 UA |
+| 主框架导航拦截 | `Fetch.failRequest` | 服务端 0 命中，`OnDidFailLoad` 触发 |
+
+约束与未验证项：
+
+- **安全（按 Chromium 行为推断，未单独验证）**：这个参数是整个 WebView2 环境共用的，开启后本机任何同用户进程都能连上端口、驱动该环境里的**所有**窗口，包括带 `window.mygo` 桥的主界面。因此采集必须放进**独立的采集进程**（自己的环境、自己的数据目录），主界面进程不开调试端口。
+- 独立采集进程还顺带解决代理：`--proxy-server` 是环境级参数，Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物，按进程设置代理才能保持语义。
+- 附加调试器之前发出的请求拦截不到。采集需要先开空白页、附加并启用 `Fetch`，再用 `Page.navigate` 跳转；这个流程尚未验证。
+- `will-download` 与权限回调尚未验证。可能可由 `Browser.setDownloadBehavior`、`Browser.setPermission` 替代。
+- 按分区隔离：Fetch 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -87,9 +111,9 @@ Go 工具链要求 1.27.3，本机 1.26.3 由 `GOTOOLCHAIN=auto` 自动拉取。
 1. 新版不含手机同步、近期研究、平台发现、正文配图。需要的用户回旧版。
 2. 研究、发现等数据保留在库里，新版不读不写，也不删。
 3. 新旧版本不能同时打开同一个库（见上文第 3 条风险），只能轮流使用。
-4. 采集一族依赖网络拦截能力，MyGo 目前没有，这是整条核心链路最大的未验证项。若补不上，应先回头评估整体是否继续。
+4. 采集一族依赖的网络拦截已验证可由 DevTools 协议替代，但必须放进独立的采集进程（见「网络拦截验证」）；完整流程仍待验证。
 ## 建议的下一步
 
-1. 先定上面的服务边界，再决定是否继续迁移。
-2. 解决备份（第 1 条）和网络拦截（第 2 条）两个已知硬缺口的方案验证，它们决定采集链路和备份能不能迁。
+1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
+2. 验证备份替代方案（第 1 条）；验证独立采集进程的完整流程（先空白页附加再导航、下载与权限）。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
