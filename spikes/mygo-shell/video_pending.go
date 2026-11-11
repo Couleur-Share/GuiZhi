@@ -9,7 +9,6 @@ import (
 
 type douyinDeps struct{}
 type xiaohongshuDeps struct{}
-type imageNoteDeps struct{}
 
 func (l *Library) resolveDouyinSource(ctx context.Context, url string, deps *videoDeps) (*mediaSource, error) {
 	return nil, errors.New("抖音采集尚未迁移到新内核")

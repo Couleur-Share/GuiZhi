@@ -89,7 +89,9 @@ func TestVideoGolden(t *testing.T) {
 			case "extract":
 				vgExtract(t, r, want)
 			default:
-				t.Fatalf("未知基线类型 %s", r.Kind)
+				if !imgnoteGolden(t, r, want) {
+					t.Fatalf("未知基线类型 %s", r.Kind)
+				}
 			}
 		})
 	}

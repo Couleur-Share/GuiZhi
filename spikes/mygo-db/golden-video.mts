@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface Rec {
@@ -208,6 +209,8 @@ export async function buildVideoGolden(): Promise<{ recs: Rec[] }> {
     } catch (e) { error = errMsg(e); }
     add("extract", s.name, { ...s, platform, url }, { result: result ?? null, error: error ?? null, stages, runCalls, transcribeCalls, formatCalls, summarizeCalls, prepareCalls });
   }
+  const { addImageNoteCases } = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "imagenote-cases.mts")).href);
+  await addImageNoteCases(add);
   void os;
   return { recs };
 }
