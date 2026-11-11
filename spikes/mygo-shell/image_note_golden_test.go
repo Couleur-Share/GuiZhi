@@ -67,7 +67,7 @@ func imgnoteGolden(t *testing.T, r forumRec, want any) bool {
 	case "imgnoteEntry":
 		imgnoteEntryCase(t, r, want)
 	default:
-		return false
+		return douyinGolden(t, r, want)
 	}
 	return true
 }

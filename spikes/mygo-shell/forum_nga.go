@@ -446,7 +446,7 @@ func (l *Library) ngaRequestPid(ctx context.Context, pid float64, topicID, cooki
 
 // ---- 图片 ----
 
-func ngaSniffImageExt(filePath string) string {
+func sniffImageExt(filePath string) string {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return ".jpg"
@@ -482,7 +482,7 @@ func (l *Library) ngaDefaultDownloadImage(ctx context.Context, rawURL string) (s
 	if err != nil {
 		return "", "", err
 	}
-	renamed := filepath.Join(dir, "image"+ngaSniffImageExt(filePath))
+	renamed := filepath.Join(dir, "image"+sniffImageExt(filePath))
 	if err := os.Rename(filePath, renamed); err != nil {
 		_ = os.RemoveAll(dir)
 		return "", "", err

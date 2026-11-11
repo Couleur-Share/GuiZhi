@@ -237,17 +237,17 @@ func TestNgaSniffImageExt(t *testing.T) {
 		if err := os.WriteFile(fp, head, 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if got := ngaSniffImageExt(fp); got != want {
+		if got := sniffImageExt(fp); got != want {
 			t.Errorf("%q → %s，期望 %s", head, got, want)
 		}
 	}
 	// 未识别 / 文件缺失都回落 .jpg（与 TS 一致）
 	fp := filepath.Join(t.TempDir(), "y.bin")
 	_ = os.WriteFile(fp, []byte("????"), 0o600)
-	if got := ngaSniffImageExt(fp); got != ".jpg" {
+	if got := sniffImageExt(fp); got != ".jpg" {
 		t.Errorf("未知头应回落 .jpg，得到 %s", got)
 	}
-	if got := ngaSniffImageExt(filepath.Join(t.TempDir(), "none")); got != ".jpg" {
+	if got := sniffImageExt(filepath.Join(t.TempDir(), "none")); got != ".jpg" {
 		t.Errorf("缺失文件应回落 .jpg，得到 %s", got)
 	}
 }
