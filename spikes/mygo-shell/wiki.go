@@ -129,6 +129,16 @@ func (l *Library) flushWikiInvalidations(ctx context.Context) error {
 }
 
 func (l *Library) publishWikiPages(ctx context.Context, titles []string, model string) ([]sqlite.Statement, error) {
+	// try { const parsed = JSON.parse(model); if (Array.isArray(parsed)) model = String(parsed.at(-1)); } catch {}
+	if parsed, err := jsParse(model); err == nil {
+		if arr, ok := parsed.(jsArr); ok {
+			if len(arr) == 0 {
+				model = "undefined"
+			} else {
+				model = jsToString(arr[len(arr)-1])
+			}
+		}
+	}
 	pageRows, err := l.db.Query(ctx, "SELECT id, normalized_title FROM wiki_pages")
 	if err != nil {
 		return nil, err

@@ -222,6 +222,7 @@ func main() {
 	lib.registerAIUsage(b)
 	lib.registerSemantic(b)
 	lib.registerWiki(b)
+	lib.registerWikiCompiler(b)
 	lib.registerKnowledgeDraft(b)
 	lib.registerAppRuntime(b)
 	lib.registerBackgroundJobs(b)
