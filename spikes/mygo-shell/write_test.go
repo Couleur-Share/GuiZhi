@@ -40,9 +40,9 @@ type writeGolden struct {
 // 抹平时间戳的阈值：基准库造的数据都在 1.7e12 附近，运行时 Date.now() 在 1.75e12 之后
 const nowThreshold = 1.75e12
 
-func openWriteCopy(t *testing.T, dir string) *Library {
+func openWriteCopy(t *testing.T, dir, base string) *Library {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(dir, "knowledge.db"))
+	data, err := os.ReadFile(filepath.Join(dir, base))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +79,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerInboxWrite(b)
 	l.registerAskSessions(b)
 	l.registerAIUsage(b)
+	l.registerSemantic(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -95,9 +96,6 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
 				channel = ns + ":" + method
-				if ns == "ai" {
-					channel = "ai:" + method
-				}
 				if ns == "ask" && (method == "query" || method == "meta") {
 					channel = "askSession:" + method
 				}
@@ -190,6 +188,9 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[st
 			for k := range x {
 				x[k] = walk(x[k])
 			}
+			if _, ok := x["lastSearchMs"].(float64); ok {
+				x["lastSearchMs"] = "MS" // 检索耗时是观测值，只比较「有没有」
+			}
 			return x
 		}
 		return v
@@ -242,7 +243,11 @@ func TestWriteParity(t *testing.T) {
 	for _, name := range names {
 		sc := g.Writes[name]
 		t.Run(name, func(t *testing.T) {
-			l := openWriteCopy(t, dir)
+			base := "knowledge.db"
+			if strings.HasPrefix(name, "semantic.") {
+				base = "semantic-base.db" // 语义场景用播种过向量的独立基准库
+			}
+			l := openWriteCopy(t, dir, base)
 			baseItems := queryIDs(t, l, "SELECT id FROM knowledge_items")
 			baseTags := queryIDs(t, l, "SELECT id FROM tags")
 			baseCollections := queryIDs(t, l, "SELECT id FROM collections")

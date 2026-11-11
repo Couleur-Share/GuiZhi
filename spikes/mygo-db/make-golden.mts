@@ -12,6 +12,7 @@ import {
   TagDB,
   ImportTaskDB,
   AskSessionDB,
+  SemanticIndexDB,
 } from "../../packages/db/src/index.ts";
 import { listInboxItems } from "../../apps/desktop/src/main/services/inbox.ts";
 import { buildFtsMatchQuery, segmentTextForFts } from "../../packages/db/src/fts.ts";
@@ -384,6 +385,7 @@ const DUMP_SQL: Record<string, string> = {
   askMeta: "SELECT id, custom_title, pinned FROM ask_session_meta",
   askFts: "SELECT session_id, title, questions, answers FROM ask_session_fts",
   askClear: "SELECT item_id FROM ask_evidence_clearances",
+  semantic: "SELECT item_id, chunk_index, chunk_text, content_hash, model, dims, hex(vector) AS vec, updated_at FROM knowledge_embeddings",
   aiUsage: "SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at FROM ai_usage_daily",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
@@ -410,7 +412,50 @@ const applyInvalidCases: unknown[] = [
   null, {}, { assignments: [] },
   // 复用已有集合（含大小写、全角、首尾空白）而不新建
   one("技术"), one(" ＴＥＣＨ "), one("阅读  "), one("空集合"),
-];const scenarios: Record<string, Op[]> = {
+];// ── 语义索引：真实的 semantic.ipc.ts；先在基准库里播种几组向量 ──
+const semanticIpc = await import("../../apps/desktop/src/main/ipc/semantic.ipc.ts");
+const semanticSvc = await import("../../apps/desktop/src/main/services/semantic.ts");
+const { computeContentHash } = await import("../../apps/desktop/src/main/services/import/content-hash.ts");
+function semanticHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  semanticIpc.registerSemanticIPC(db as never);
+  semanticSvc.resetSemanticSearchTelemetryForTests();
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  return { status: wrap("semantic:status"), listPending: wrap("semantic:listPending"), applyEmbeddings: wrap("semantic:applyEmbeddings"), search: wrap("semantic:search"), clear: wrap("semantic:clear") };
+}
+const semHash: Record<string, string> = {};
+// 语义场景用独立的基准库：播种会改条目的审核字段，不能影响其他场景与列表/收件箱基线
+const semBaseDb = path.join(out, "semantic-base.db");
+{
+  fs.copyFileSync(baseDb, semBaseDb);
+  const sdb = initDatabase(semBaseDb);
+  const sem = new SemanticIndexDB(sdb);
+  const hashFor = (id: string) => {
+    const r = sdb.get("SELECT title, content, transcript FROM knowledge_items WHERE id = ?", id) as { title: string; content: string; transcript: string | null };
+    return computeContentHash(semanticSvc.buildSemanticSourceText(r.title, r.content, r.transcript));
+  };
+  for (const id of [A, B, C, d.id, e.id, F, G, h.id, i.id, vid.id, emojiItem.id, longItem.id, ...bulk.slice(0, 12)]) semHash[id] = hashFor(id);
+  const put = (id: string, model: string, chunks: Array<[string, number[]]>, hash = semHash[id]) =>
+    sem.replaceItemChunks({ itemId: id, contentHash: hash, model, dims: chunks[0][1].length, chunks: chunks.map(([text, v]) => ({ text, vector: new Float32Array(v) })) });
+  put(A, "m1", [["第一块  文本", [1, 0, 0, 0]], ["第二块\n\n文本", [0.6, 0.8, 0, 0]]]);
+  put(B, "m1", [["  很长\n\n文本 " + "字".repeat(200), [0, 1, 0, 0]]]);
+  put(C, "m1", [["并列分数", [1, 0, 0, 0]]], "stale-hash");
+  put(d.id, "m2", [["另一个模型", [0, 0, 1, 0]]]);
+  put(h.id, "m1", [["a\u00a0\u2003b\ufeffc 末尾\u2028", [0.5, 0.5, 0.5, 0.5]]]);
+  put(G, "m1", [["回收站里的", [1, 0, 0, 0]]]);
+  put(e.id, "m1", [["维度三", [1, 1, 1]]]);
+  put(i.id, "m1", [["重复一", [0, 0, 0, 1]], ["重复二", [0, 0, 0, 1]]]);
+  put(vid.id, "m3", [["坏的审核原因", [1, 0, 0, 0]]]);
+  put(emojiItem.id, "m4", [["😀".repeat(100), [1, 0, 0, 0]]]);
+  put(longItem.id, "m5", [["a" + "😀".repeat(100), [1, 0, 0, 0]]]);
+  sdb.run("UPDATE knowledge_embeddings SET updated_at = 1700000000000 WHERE item_id IN (?, ?)", [C, h.id]);
+  sdb.run("UPDATE knowledge_items SET review_status = 'needs_review', review_reasons = ? WHERE id = ?", [JSON.stringify(["过短", "重复"]), B]);
+  sdb.run("UPDATE knowledge_items SET review_reasons = 'not json' WHERE id = ?", [vid.id]);
+  closeDatabase();
+}
+const vecQuery = (model: unknown, vector: unknown, extra: Record<string, unknown> = {}) => ({ model, vector, ...extra });
+const goodChunks = (text = "新块") => [{ text, vector: [1, 0, 0, 0] }, { text: text + "2", vector: [0, 0, 1, 0] }];
+const applyArgs = (id: string, over: Record<string, unknown> = {}) => ({ itemId: id, contentHash: semHash[id], model: "m1", dims: 4, chunks: goodChunks(), ...over });
+const scenarios: Record<string, Op[]> = {
   createMinimal: [{ fn: "create", args: [{ title: "新建", content: "正文 abc 检索" }] }],
   createFull: [{ fn: "create", args: [{
     title: "完整输入", content: "全文内容", transcript: "转写", itemType: "webpage", status: "active", collectionId: tech.id,
@@ -709,6 +754,67 @@ const applyInvalidCases: unknown[] = [
   "ai.clear": [
     { fn: "ai.usageClear", args: [] }, { fn: "ai.usageSummary", args: [90] },
     { fn: "ai.usageRecord", args: [{ scenario: "ask", model: "m", promptTokens: 1, completionTokens: 1 }] }, { fn: "ai.usageSummary", args: [1] },
+  ],  // ── 语义索引（fn 带 semantic. 前缀）──
+  "semantic.status": [
+    ...["m1", "m2", "", null, 5, "none", "m1"].map((m) => ({ fn: "semantic.status", args: [m] })),
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0])] }, { fn: "semantic.status", args: ["m1"] },
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0])] }, { fn: "semantic.status", args: ["m2"] },
+  ],
+  "semantic.pending": [
+    ...[{ model: "m1" }, { model: "m1", limit: 1 }, { model: "m1", limit: 2 }, { model: "m1", limit: 2.5 }, { model: "m1", limit: 3 }, { model: "m1", limit: 10 },
+      { model: "m1", limit: 50 }, { model: "m1", limit: 51 }, { model: "m1", limit: 0 }, { model: "m1", limit: -1 }, { model: "m1", limit: "5" }, { model: "m1", limit: "x" },
+      { model: "m2", limit: 4 }, { model: "none", limit: 3 }, { model: 5 }, {}, null, undefined, "m1", [1]].map((p) => ({ fn: "semantic.listPending", args: [p] })),
+    { fn: "semantic.status", args: ["m1"] },
+  ],
+  "semantic.search": [
+    ...[
+      vecQuery("m1", [1, 0, 0, 0]), vecQuery("m1", [1, 0, 0, 0], { limit: 1 }), vecQuery("m1", [1, 0, 0, 0], { limit: 2 }), vecQuery("m1", [1, 0, 0, 0], { limit: 2.5 }),
+      vecQuery("m1", [0, 1, 0, 0]), vecQuery("m1", [0.5, 0.5, 0.5, 0.5], { limit: 20 }), vecQuery("m1", [0, 0, 0, 1], { limit: 100 }), vecQuery("m1", [1, 1, 1, 1], { limit: "3" }),
+      vecQuery("m1", [1, 0, 0, 0], { limit: 0 }), vecQuery("m1", [1, 0, 0, 0], { limit: -4 }), vecQuery("m1", [1, 0, 0, 0], { limit: "x" }),
+      vecQuery("m1", ["1", null, true, [0]]), vecQuery("m1", [1e30, 0, 0, 0]), vecQuery("m1", [0.1, 0.2, 0.3, 0.4], { limit: 20 }), vecQuery("m1", [-1, 0, 0, 0], { limit: 20 }),
+      vecQuery("m1", [1, 1, 1]), vecQuery("m1", [1, 0, 0, 0, 0]), vecQuery("m1", []), vecQuery("m1", "abc"), vecQuery("m1", null), vecQuery("", [1, 0, 0, 0]), vecQuery(5, [1, 0, 0, 0]),
+      vecQuery("m2", [0, 0, 1, 0]), vecQuery("m2", [1, 0, 0, 0]), vecQuery("m3", [1, 0, 0, 0]), vecQuery("m4", [1, 0, 0, 0]), vecQuery("m5", [1, 0, 0, 0]), vecQuery("none", [1, 0, 0, 0]),
+      null, undefined, {}, "m1", [1, 0, 0, 0],
+    ].map((p) => ({ fn: "semantic.search", args: [p] })),
+  ],
+  "semantic.apply": [
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[0])] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[1], { model: "m9", chunks: [{ text: "单块", vector: ["1", null, 0.5, "x"] }] })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(A, { chunks: goodChunks("覆盖") })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(C)] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[2], { contentHash: "wrong" })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(G)] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs("missing-item", { contentHash: "x" })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[3], { dims: 3 })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[3], { dims: 4.0, chunks: [{ text: "整数浮点", vector: [1e-3, 2e-3, -3, 3e38] }] })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(bulk[4], { chunks: [{ text: "x", vector: [0.1, 0.2, 0.3, 0.4] }] })] },
+    { fn: "semantic.status", args: ["m1"] }, { fn: "semantic.listPending", args: [{ model: "m1", limit: 20 }] },
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0], { limit: 20 })] }, { fn: "semantic.search", args: [vecQuery("m9", [1, 0, 1, 0.5])] },
+  ],
+  "semantic.applyInvalid": [
+    ...[
+      null, undefined, 5, "x", [], {}, applyArgs(bulk[5], { itemId: 1 }), applyArgs(bulk[5], { contentHash: null }), applyArgs(bulk[5], { model: 1 }),
+      applyArgs(bulk[5], { dims: 0 }), applyArgs(bulk[5], { dims: -4 }), applyArgs(bulk[5], { dims: 4.5 }), applyArgs(bulk[5], { dims: "4" }), applyArgs(bulk[5], { dims: null }),
+      applyArgs(bulk[5], { chunks: [] }), applyArgs(bulk[5], { chunks: null }), applyArgs(bulk[5], { chunks: {} }), applyArgs(bulk[5], { chunks: [null] }),
+      applyArgs(bulk[5], { chunks: [{ vector: [1, 0, 0, 0] }] }), applyArgs(bulk[5], { chunks: [{ text: "x" }] }), applyArgs(bulk[5], { chunks: [{ text: "x", vector: [1, 0, 0] }] }),
+      applyArgs(bulk[5], { chunks: [{ text: "x", vector: "1000" }] }), applyArgs(bulk[5], { chunks: [{ text: 1, vector: [1, 0, 0, 0] }] }),
+      applyArgs(bulk[5], { chunks: [{ text: "ok", vector: [1, 0, 0, 0] }, { text: "bad", vector: [1] }] }),
+    ].map((p) => ({ fn: "semantic.applyEmbeddings", args: [p] })),
+    { fn: "semantic.status", args: ["m1"] },
+  ],
+  "semantic.staleCache": [
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0], { limit: 20 })] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(A, { model: "m2", chunks: [{ text: "移到 m2", vector: [0, 0, 1, 0] }] })] },
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0], { limit: 20 })] },
+    { fn: "semantic.search", args: [vecQuery("m2", [0, 0, 1, 0], { limit: 20 })] },
+    { fn: "semantic.status", args: ["m1"] },
+    { fn: "semantic.applyEmbeddings", args: [applyArgs(B, { chunks: [{ text: "B 新块", vector: [0, 1, 0, 0] }] })] },
+    { fn: "semantic.search", args: [vecQuery("m1", [0, 1, 0, 0], { limit: 20 })] },
+  ],
+  "semantic.clear": [
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0])] }, { fn: "semantic.clear", args: [] },
+    { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0])] }, { fn: "semantic.status", args: ["m1"] }, { fn: "semantic.listPending", args: [{ model: "m1", limit: 50 }] },
+    { fn: "semantic.clear", args: [] },
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -728,7 +834,7 @@ function dumpAll(database: ReturnType<typeof initDatabase>) {
 const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown }> = {};
 for (const [name, ops] of Object.entries(scenarios)) {
   const work = path.join(out, `scenario-${name}.db`);
-  fs.copyFileSync(baseDb, work);
+  fs.copyFileSync(name.startsWith("semantic.") ? semBaseDb : baseDb, work);
   const db = initDatabase(work);
   const daos: Record<string, Record<string, (...a: unknown[]) => unknown>> = {
     knowledge: new KnowledgeItemDB(db) as never,
@@ -737,6 +843,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     inbox: inboxHandlers(db),
     ask: askHandlers(db),
     ai: aiUsageHandlers(db),
+    semantic: semanticHandlers(db),
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
@@ -747,7 +854,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
   };  const results: unknown[] = [];
   for (const op of ops) {
     try {
-      results.push({ value: call(op.fn, resolveArgs(op.args, results as never)) ?? null });
+      results.push({ value: (await call(op.fn, resolveArgs(op.args, results as never))) ?? null });
     } catch (error) {
       results.push({ error: (error as Error).message });
     }

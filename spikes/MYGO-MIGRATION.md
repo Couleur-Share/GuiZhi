@@ -62,12 +62,15 @@
 - 同一场景里前面的操作会改变后面操作的前置条件，校验类场景必须一场景一操作，否则会被前一步遮住（已用 `applyInvalid00…31` 避免）。
 
 接下来的顺序（先 DB 内、后带副作用；每组先扩 `make-golden.mts` 再写 Go）：
-1. 问答会话 `ask:*`、`askSession:*`：依赖有序 JSON（保持键顺序、与 `JSON.stringify` 同样的数字与转义规则）和 `evidenceText/evidenceUrl`；有序 JSON 是后面许多频道共用的基础件，先做。
+1. （已完成）问答会话 `ask:*`、`askSession:*`：依赖有序 JSON（保持键顺序、与 `JSON.stringify` 同样的数字与转义规则）和 `evidenceText/evidenceUrl`；有序 JSON 是后面许多频道共用的基础件，先做。
 2. `ai:usage*`、`semantic:*`、`wiki:*` 的库内读写、`knowledge:saveDraft/selection`、`export:*`。
 3. 后台任务运行时、导入队列、备份与备份仓库频道、迁移检测、`config:*`、`mcp:*`、更新、快捷键、网络代理、可执行文件白名单。
 4. 采集一族、媒体一族、主题阅读、Wiki 编译器。
 5. 打包、端到端用例、`pnpm shot` 式的隔离离屏验证。
 ## 已验证的事
+| 11-11 | `ask:listSessions/getSession/saveSession/deleteSession`、`askSession:query/meta`（含 JS 值模型 `jsvalue.go`、证据清洗 `evidence.go`） | 232 个证据清洗用例逐字节一致；17 个会话场景（分页游标、搜索、保存/更新证据、置顶与自定义标题、字符串入参的强转） | 38 / 149 |
+| 11-11 | `ai:usageRecord/usageSummary/usageClear` | 3 组 36 个调用：按本地自然日聚合、保留期清理、`Number(x)||fallback` 强转、小数天数 | 41 / 146 |
+| 11-11 | `semantic:status/listPending/applyEmbeddings/search/clear`（含内容哈希、进程内向量缓存、float32 小端 BLOB、堆容量按 `<limit` 多留一个） | 7 组场景（独立播种库 `semantic-base.db`）；含缓存失效只覆盖本次写入的模型这一 TS 特点、孤立代理项截断、NaN 输出为 null | 46 / 141 |
 
 | 项目 | 结果 |
 |---|---|

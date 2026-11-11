@@ -18,6 +18,7 @@ type Library struct {
 	db        *sqlite.DB
 	writeMu   sync.Mutex
 	configDir string // 对应 userData/config，放 ai-models.json
+	sem       semanticState
 }
 
 func asInt(v any) int64 {

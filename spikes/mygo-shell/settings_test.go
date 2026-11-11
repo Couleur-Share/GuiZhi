@@ -83,7 +83,7 @@ func TestSettingsParity(t *testing.T) {
 	for _, name := range names {
 		run := g.Settings.Runs[name]
 		t.Run(name, func(t *testing.T) {
-			lib := openWriteCopy(t, dir)
+			lib := openWriteCopy(t, dir, "knowledge.db")
 			lib.configDir = filepath.Join(t.TempDir(), "config")
 			if run.AI != nil {
 				if err := os.MkdirAll(lib.configDir, 0o755); err != nil {
