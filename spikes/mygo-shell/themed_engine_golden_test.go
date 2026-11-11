@@ -153,7 +153,7 @@ func scrubSyntaxMessages(v any) any {
 	switch x := v.(type) {
 	case map[string]any:
 		for k, e := range x {
-			if s, ok := e.(string); ok && k == "message" {
+			if s, ok := e.(string); ok && (k == "message" || k == "error") {
 				if i := strings.Index(s, "语法错误："); i >= 0 {
 					x[k] = s[:i+len("语法错误：")]
 				}

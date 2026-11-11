@@ -8,10 +8,7 @@ package main
 // 内置库脚本（echarts / mermaid / animation，数 MB）不嵌入可执行文件：由 reading_libraries.json 按需读取。
 
 import (
-	"crypto/sha256"
 	_ "embed"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,13 +16,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/dop251/goja"
-	whatwg "github.com/nlnwa/whatwg-url/url"
 )
 
 //go:embed themed_engine.js
@@ -37,10 +31,13 @@ type themedEngine struct {
 	mu  sync.Mutex
 	rt  *goja.Runtime
 	gzt *goja.Object
+}
 
-	libOnce sync.Once
-	libs    map[string]json.RawMessage
-	libErr  error
+// themedLibs 是内置库资源（渲染引擎与生成管线共用，惰性读取一次）。
+var themedLibs struct {
+	once sync.Once
+	libs map[string]json.RawMessage
+	err  error
 }
 
 var (
@@ -71,11 +68,11 @@ func readingLibrariesPath() string {
 }
 
 // library 取内置库脚本 / 组件样式（惰性读取；读不到时抛出与 Electron 版同样的中文原因）。
-func (e *themedEngine) library(name string) (string, error) {
-	e.libOnce.Do(func() {
+func readingLibrary(name string) (string, error) {
+	themedLibs.once.Do(func() {
 		raw, err := os.ReadFile(readingLibrariesPath())
 		if err != nil {
-			e.libErr = fmt.Errorf("阅读组件资源读取失败：reading-libraries；%v", err)
+			themedLibs.err = fmt.Errorf("阅读组件资源读取失败：reading-libraries；%v", err)
 			return
 		}
 		var all struct {
@@ -83,19 +80,19 @@ func (e *themedEngine) library(name string) (string, error) {
 			Runtime    map[string]string
 		}
 		if err := json.Unmarshal(raw, &all); err != nil {
-			e.libErr = fmt.Errorf("阅读组件资源读取失败：reading-libraries；%v", err)
+			themedLibs.err = fmt.Errorf("阅读组件资源读取失败：reading-libraries；%v", err)
 			return
 		}
-		e.libs = map[string]json.RawMessage{"components": all.Components}
+		themedLibs.libs = map[string]json.RawMessage{"components": all.Components}
 		for k, v := range all.Runtime {
 			b, _ := json.Marshal(v)
-			e.libs[k] = b
+			themedLibs.libs[k] = b
 		}
 	})
-	if e.libErr != nil {
-		return "", e.libErr
+	if themedLibs.err != nil {
+		return "", themedLibs.err
 	}
-	raw, ok := e.libs[name]
+	raw, ok := themedLibs.libs[name]
 	if !ok {
 		return "", fmt.Errorf("阅读组件资源读取失败：reading-libraries/%s", name)
 	}
@@ -123,81 +120,14 @@ func newThemedEngine() (*themedEngine, error) {
 		}
 		return rt.NewObject()
 	})
-	must("atob", func(s string) (string, error) {
-		b, err := base64.StdEncoding.DecodeString(s)
-		if err != nil {
-			b, err = base64.RawStdEncoding.DecodeString(s)
-		}
-		if err != nil {
-			return "", fmt.Errorf("atob: 无效的 base64")
-		}
-		out := make([]rune, len(b))
-		for i, c := range b {
-			out[i] = rune(c)
-		}
-		return string(out), nil
-	})
-	must("btoa", func(s string) (string, error) {
-		b := make([]byte, 0, len(s))
-		for _, r := range s {
-			if r > 0xff {
-				return "", fmt.Errorf("btoa: 字符超出 Latin-1")
-			}
-			b = append(b, byte(r))
-		}
-		return base64.StdEncoding.EncodeToString(b), nil
-	})
-	must("__gzHash", func(algorithm, data, encoding string) (string, error) {
-		if algorithm != "sha256" {
-			return "", fmt.Errorf("不支持的摘要算法：%s", algorithm)
-		}
-		sum := sha256.Sum256([]byte(data))
-		switch encoding {
-		case "hex":
-			return hex.EncodeToString(sum[:]), nil
-		case "base64":
-			return base64.StdEncoding.EncodeToString(sum[:]), nil
-		}
-		return "", fmt.Errorf("不支持的摘要编码：%s", encoding)
-	})
-	// 语法检查：返回 ""（通过）或 "原因\n行号"。goja 与 V8 的错误措辞不同，行号口径一致（从 1 起）。
-	must("__gzCompile", func(code, filename string) string {
-		if _, err := goja.Compile(filename, code, true); err != nil {
-			// goja 的错误形如 "SyntaxError: 原因 at 文件名:行:列"。
-			msg, line := strings.TrimPrefix(err.Error(), "SyntaxError: "), 1
-			if m := gojaSyntaxPos.FindStringSubmatch(msg); m != nil {
-				msg = msg[:len(msg)-len(m[0])]
-				line, _ = strconv.Atoi(m[1])
-			}
-			return msg + "\n" + strconv.Itoa(line)
-		}
-		return ""
-	})
-	// WHATWG URL 解析（JS 的 new URL）：失败返回空串。\n	must("__gzURLParse", func(input, base string, hasBase bool) string {\n		var u *whatwg.Url\n		var err error\n		if hasBase {\n			u, err = whatwg.ParseRef(base, input)\n		} else {\n			u, err = whatwg.Parse(input)\n		}\n		if err != nil {\n			return ""\n		}\n		out := newObj()\n		out.set("protocol", u.Protocol())\n		out.set("username", u.Username())\n		out.set("password", u.Password())\n		out.set("hostname", u.Hostname())\n		out.set("port", u.Port())\n		out.set("pathname", u.Pathname())\n		out.set("search", u.Search())\n		out.set("_hash", u.Hash())\n		s, _ := jsStringify(out)\n		return s\n	})\n	// WHATWG URL 解析（JS 的 new URL）：失败返回空串。
-	must("__gzURLParse", func(input, base string, hasBase bool) string {
-		var u *whatwg.Url
-		var err error
-		if hasBase {
-			u, err = whatwg.ParseRef(base, input)
-		} else {
-			u, err = whatwg.Parse(input)
-		}
-		if err != nil {
-			return ""
-		}
-		out := newObj()
-		out.set("protocol", u.Protocol())
-		out.set("username", u.Username())
-		out.set("password", u.Password())
-		out.set("hostname", u.Hostname())
-		out.set("port", u.Port())
-		out.set("pathname", u.Pathname())
-		out.set("search", u.Search())
-		out.set("_hash", u.Hash())
-		s, _ := jsStringify(out)
-		return s
-	})
-	must("__gzLibrary", func(name string) (string, error) { return e.library(name) })
+	must("atob", jsAtob)
+	must("btoa", jsBtoa)
+	must("__gzHash", jsHash)
+	// 语法检查：返回 ""（通过）或 "原因\n行号"。
+	must("__gzCompile", jsCompileCheck)
+	// WHATWG URL 解析（JS 的 new URL）：失败返回空串。
+	must("__gzURLParse", jsURLParse)
+	must("__gzLibrary", readingLibrary)
 	if _, err := rt.RunString(themedEngineJS); err != nil {
 		return nil, fmt.Errorf("加载主题阅读渲染引擎失败：%w", err)
 	}
