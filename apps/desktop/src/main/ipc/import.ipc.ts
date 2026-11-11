@@ -14,6 +14,7 @@ import type Database from "../database/sqlite";
 import {
   createImportService,
   type ImportService,
+  type ImportServiceTestHooks,
 } from "../services/import/import-service";
 
 let service: ImportService | null = null;
@@ -48,8 +49,9 @@ function validInput(value: unknown): value is EnqueueImportInput {
 export function registerImportIPC(
   db: Database.Database,
   broadcast: (task: ImportTask) => void,
+  hooks?: ImportServiceTestHooks,
 ): void {
-  service = createImportService(db, broadcast);
+  service = createImportService(db, broadcast, hooks);
 
   ipcMain.handle(
     IPC_CHANNELS.IMPORT_ENQUEUE,

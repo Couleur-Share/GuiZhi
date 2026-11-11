@@ -321,6 +321,18 @@ func (l *Library) currentTagNames(ctx context.Context, itemID string) ([]string,
 func (l *Library) knowledgeCreate(ctx context.Context, in CreateInput) (any, error) {
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()
+	id, stmts, err := l.knowledgeCreateStmts(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := l.db.Transaction(ctx, stmts); err != nil {
+		return nil, err
+	}
+	return l.knowledgeGet(ctx, id)
+}
+
+// knowledgeCreateStmts 生成创建条目所需的全部语句，由调用方决定事务边界（调用方须持有 writeMu）。
+func (l *Library) knowledgeCreateStmts(ctx context.Context, in CreateInput) (string, []sqlite.Statement, error) {
 	now, id := nowMs(), newUUID()
 	tagNames := normalizeTagNames(in.TagNames.Val)
 	reasons := normalizeReviewReasons(in.ReviewReasons.Val)
@@ -340,19 +352,14 @@ func (l *Library) knowledgeCreate(ctx context.Context, in CreateInput) (any, err
 	}}
 	tagStmts, resolved, err := l.replaceTagsStmts(ctx, id, tagNames, now, map[string][2]string{})
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	ftsStmts, err := l.writeFtsStmts(ctx, id, title, content, resolved)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	stmts = append(append(stmts, tagStmts...), ftsStmts...)
-	if _, err := l.db.Transaction(ctx, stmts); err != nil {
-		return nil, err
-	}
-	return l.knowledgeGet(ctx, id)
+	return id, append(append(stmts, tagStmts...), ftsStmts...), nil
 }
-
 func (l *Library) knowledgeUpdate(ctx context.Context, id string, in UpdateInput) (any, error) {
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()

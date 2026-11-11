@@ -41,7 +41,7 @@ func taskSearch(origin string, query string) (sqlPart, error) {
 	if !slices.Contains([]string{"all", "mobile", "desktop"}, origin) {
 		return sqlPart{}, errors.New("提交来源筛选不合法")
 	}
-	keyword := strings.ToLower(strings.TrimFunc(query, jsSpace))
+	keyword := jsLower(strings.TrimFunc(query, jsSpace))
 	source := ""
 	switch origin {
 	case "mobile":

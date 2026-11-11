@@ -130,6 +130,13 @@ func main() {
 	lib.openDialog = func(multiple bool, name string, exts []string) ([]string, error) {
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: []mygo.FileFilter{{Name: name, Extensions: exts}}})
 	}
+	lib.pickFiles = func(multiple bool, filters []dialogFilter) ([]string, error) {
+		var fs []mygo.FileFilter
+		for _, f := range filters {
+			fs = append(fs, mygo.FileFilter{Name: f.Name, Extensions: f.Exts})
+		}
+		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: fs})
+	}
 	lib.relaunch = func() {
 		if exe, err := os.Executable(); err == nil {
 			_ = exec.Command(exe, os.Args[1:]...).Start()
@@ -149,6 +156,10 @@ func main() {
 	lib.registerKnowledgeDraft(b)
 	lib.registerAppRuntime(b)
 	lib.registerBackgroundJobs(b)
+	lib.registerImport(b)
+	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
+		log.Printf("[import] 恢复遗留任务失败：%v", err)
+	}
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)

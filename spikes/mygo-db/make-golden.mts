@@ -355,6 +355,7 @@ const electronStub = new Proxy(
 const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
 const originalLoad = moduleLoader._load;
 moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  if (request === "virtual:reading-libraries") return { __esModule: true, default: { compiler: "", animation: "", components: {}, runtime: {} } }; // vite 虚拟模块，导入服务的依赖链会带上它
   return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);
 };
 // inbox 写频道：用真实的 inbox.ipc.ts 处理函数（electron 已换成桩），每个场景库单独注册
@@ -422,6 +423,73 @@ function jobHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> 
   };
 }
 
+// 导入队列：真实的 import.ipc.ts + ImportQueue + 持久化；只把「抽取」换成按输入文本决定行为的固定替身
+const importIpc = await import("../../apps/desktop/src/main/ipc/import.ipc.ts");
+function scrubTasks(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(scrubTasks);
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v)) {
+      o[k] = k === "stageStats" && Array.isArray(x) ? x.map((s) => (s as { stage?: unknown } | null)?.stage ?? null) : scrubTasks(x);
+    }
+    return o;
+  }
+  return v;
+}
+function importHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  const events: Array<Record<string, unknown>> = [];
+  const holds = new Map<string, () => void>();
+  const extract = async (task: { sourceKind: string; sourceInput: string }, signal: AbortSignal, onStage: (s: never) => void) => {
+    const input = task.sourceInput;
+    const rest = (prefix: string) => input.slice(prefix.length);
+    if (input.startsWith("hold:")) {
+      await new Promise<void>((resolve, reject) => {
+        holds.set(input, resolve);
+        signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }
+    if (input.startsWith("stage:")) { onStage("web-preparing" as never); onStage("web-verifying" as never); }
+    if (input.startsWith("fail:")) throw new Error(rest("fail:"));
+    if (input.includes("/captcha")) throw new Error("网页要求完成验证码");
+    if (input.includes("/boom")) throw new Error("抓取失败 boom");
+    const base = {
+      title: input.startsWith("same:") ? "共同标题" : `标题 ${input}`,
+      content: input.startsWith("same:") ? "共同内容正文" : input.startsWith("short:") ? "短" : `${input} 的正文内容，足够长以通过复核。`.repeat(3),
+      itemType: input.startsWith("img:") ? "image" : "note",
+      sourceUri: task.sourceKind === "url" ? input : null, // 真实连接器对非 URL 返回 null，undefined 会让 SQLite 绑定报错
+      transcript: input.startsWith("tr:") ? `转写 ${input}` : undefined,
+    };
+    if (input.startsWith("degrade:")) return { ...base, degradedReason: rest("degrade:") };
+    if (input.startsWith("warn:")) return { ...base, warningReason: rest("warn:") };
+    return base;
+  };
+  importIpc.registerImportIPC(db as never, (task: unknown) => events.push(JSON.parse(JSON.stringify(task))), { extract } as never);
+  const wrap = (channel: string) => (...args: unknown[]) => scrubTasks((ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args));
+  const settle = async () => { for (let i = 0; i < 40; i++) await new Promise((r) => setImmediate(r)); return null; };
+  return {
+    enqueue: wrap("import:enqueue"), list: wrap("import:list"), state: wrap("import:queueState"), pause: wrap("import:pause"),
+    resume: wrap("import:resume"), cancel: wrap("import:cancel"), retry: wrap("import:retry"), remove: wrap("import:remove"),
+    clearFinished: wrap("import:clearFinished"), clearTerminalPreview: wrap("import:clearTerminalPreview"), clearTerminal: wrap("import:clearTerminal"),
+    seed: (rows: unknown) => {
+      for (const r of rows as Array<Record<string, unknown>>) {
+        (db as { run: (sql: string, params: unknown[]) => void }).run(
+          "INSERT INTO import_tasks (id, source_kind, source_input, display_name, status, stage, capture_strategy, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [r.id, r.kind ?? "text", r.input, r.input, r.status, r.stage ?? null, r.strategy ?? "standard", r.at ?? 1_700_000_000_000, r.at ?? 1_700_000_000_000]);
+      }
+      return null;
+    },
+    recover: () => { importIpc.getRegisteredImportService().queue.recover(); return null; },
+    release: (name: unknown) => { holds.get(name as string)?.(); holds.delete(name as string); return null; },
+    settle,
+    // 事件按任务（以 sourceInput 区分）分组：任务之间的交错顺序不是契约，同一任务的状态序列才是
+    events: () => {
+      const byTask: Record<string, unknown[]> = {};
+      for (const e of events.splice(0)) (byTask[e.sourceInput as string] ??= []).push(scrubTasks(e));
+      return byTask;
+    },
+  };
+}
+
 // ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
@@ -446,6 +514,10 @@ const DUMP_SQL: Record<string, string> = {
   backgroundJobs: "SELECT id, kind, scope_id, state, payload_json, interval_minutes, next_run_at, attempt, lease_owner, lease_until, last_error, last_success_at, created_at, updated_at FROM background_jobs",
   aiUsage: "SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at FROM ai_usage_daily",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
+  // 导入队列：任务全列（stage_stats 只取阶段名，耗时是观测值）与入库产物
+  importFull: "SELECT id, source_kind, source_input, display_name, status, stage, error, warning, warning_acknowledged_at, item_type, result_item_id, duplicate_item_id, collection_id, refresh_of_item_id, tag_names, (SELECT group_concat(CASE WHEN type = 'object' THEN json_extract(value, '$.stage') END, ',') FROM json_each(CASE WHEN json_valid(stage_stats) THEN stage_stats ELSE '[]' END)) AS stage_names, capture_strategy, comment_limit, force_duplicate, created_at, updated_at FROM import_tasks",
+  sourceRecords: "SELECT item_id, source_type, source_uri, access_uri, normalized_uri, content_hash, platform, captured_at FROM source_records",
+  sourceRevisions: "SELECT item_id, title, content, transcript, review_json, captured_at FROM source_capture_revisions",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
 };
 type Op = { fn: string; args: unknown[] };
@@ -570,6 +642,15 @@ const wikiFlushBaseDb = path.join(out, "wiki-flush-base.db");
   contrib(e.id, "b2", "mygo", draft("MyGo", "entity", "MyGo 新摘要", "MyGo 新正文", ["检索"]));
   contrib(G, "b1", "归知", draft("归知", "topic", "回收站来源", "不应出现", []));
   for (const t of ["检索", "electron", "mygo", "新页面", "新页面二", "孤立页", "幽灵", "归知"]) fdb.run("INSERT INTO wiki_invalidated_pages VALUES(?)", [t]);
+  closeDatabase();
+}
+// 导入队列场景的基准库：去掉预置任务（它们会在启动恢复时被真实执行），其余数据保留
+const importBaseDb = path.join(out, "import-base.db");
+{
+  fs.copyFileSync(baseDb, importBaseDb);
+  const idb = initDatabase(importBaseDb);
+  idb.run("DELETE FROM mobile_capture_tasks");
+  idb.run("DELETE FROM import_tasks");
   closeDatabase();
 }
 const P = (n: number) => `p-0${n}`;
@@ -1108,6 +1189,112 @@ const scenarios: Record<string, Op[]> = {
   });
 }
 
+// ── 导入队列场景：抽取是固定替身，其余（校验、排队、去重、入库、事件、清理）走真实实现 ──
+{
+  const m = (fn: string, ...args: unknown[]): Op => ({ fn: `imp.${fn}`, args });
+  const tk = (input: string) => ({ __taskOf: input });
+  const txt = (input: string, extra: Record<string, unknown> = {}) => ({ kind: "text", input, ...extra });
+  const url = (input: string, extra: Record<string, unknown> = {}) => ({ kind: "url", input, ...extra });
+  const wrapUp: Op[] = [m("settle"), m("list"), m("events"), m("state")];
+  Object.assign(scenarios, {
+    "imp.basic": [
+      m("enqueue", [txt("t1"), txt("tr:t2"), txt("short:t3", { tagNames: ["标签甲", " 标签甲 ", "新标签"] }), txt("t4", { collectionId: tech.id })]),
+      ...wrapUp,
+    ],
+    "imp.status": [
+      m("enqueue", [txt("stage:s1"), txt("fail:原因 一"), txt("degrade:降级原因"), txt("warn:转写失败"), txt("img:i1")]),
+      ...wrapUp,
+      m("retry", tk("fail:原因 一")), m("settle"), m("events"),
+      m("retry", tk("stage:s1")), m("retry", "missing-id"), m("retry", tk("warn:转写失败"), { forceDuplicate: true }),
+      ...wrapUp,
+    ],
+    "imp.dups": [
+      m("enqueue", [url("https://dup.test/a?x=1")]), m("settle"),
+      m("enqueue", [url("https://dup.test/a?x=1#frag")]), m("settle"),
+      m("enqueue", [url("https://dup.test/a?x=1#force", { forceDuplicate: true })]), m("settle"),
+      m("enqueue", [txt("same:1")]), m("settle"), m("enqueue", [txt("same:2")]), m("settle"),
+      m("enqueue", [txt("same:3", { forceDuplicate: true })]), m("settle"),
+      m("enqueue", [url("https://dup.test/boom"), url("https://dup.test/captcha")]), m("settle"),
+      ...wrapUp,
+    ],
+    "imp.merge": [
+      m("pause"), m("enqueue", [url("https://merge.test/a"), url("https://merge.test/a#2"), url("HTTPS://MERGE.test/a/")]),
+      m("list"), m("events"), m("resume"), m("settle"), m("enqueue", [url("https://merge.test/a#force", { forceDuplicate: true })]), ...wrapUp,
+    ],
+    "imp.refresh": [
+      m("enqueue", [url("https://r.test/x")]), m("settle"),
+      m("enqueue", [url("https://r.test/x#again", { refreshOfItemId: { __itemOfTask: "https://r.test/x" } })]), m("settle"),
+      m("enqueue", [url("https://r.test/other", { refreshOfItemId: { __itemOfTask: "https://r.test/x" } })]), m("settle"),
+      m("enqueue", [url("https://r.test/y", { refreshOfItemId: "missing-item" })]), m("settle"),
+      m("enqueue", [txt("not url", { refreshOfItemId: { __itemOfTask: "https://r.test/x" } })]), m("settle"),
+      ...wrapUp,
+    ],
+    "imp.hold": [
+      m("enqueue", [txt("hold:a"), txt("hold:b"), txt("hold:c")]), m("settle"), m("state"), m("events"),
+      m("cancel", tk("hold:c")), m("cancel", tk("hold:a")), m("settle"), m("events"), m("state"),
+      m("cancel", tk("hold:c")), m("cancel", "missing"), m("cancel", 5), m("cancel", null), m("cancel"),
+      m("release", "hold:b"), m("settle"), m("events"),
+      m("pause"), m("enqueue", [txt("p1")]), m("settle"), m("state"), m("resume"), m("settle"), m("state"),
+      m("retry", tk("hold:a")), m("settle"), m("release", "hold:a"), ...wrapUp,
+    ],
+    "imp.pending-cancel": [
+      m("pause"), m("enqueue", [txt("q1"), txt("q2")]), m("cancel", tk("q1")), m("resume"), ...wrapUp,
+    ],
+    "imp.retry-validation": [
+      m("enqueue", [url("https://v.test/captcha"), url("https://www.xiaohongshu.com/explore/abc123", { captureStrategy: "authenticated" }), txt("fail:x")]), m("settle"),
+      m("retry"), m("retry", ""), m("retry", 5), m("retry", null),
+      m("retry", tk("fail:x"), { captureStrategy: "bogus" }), m("retry", tk("fail:x"), { captureStrategy: null }),
+      m("retry", tk("fail:x"), { commentLimit: 5 }), m("retry", tk("fail:x"), { commentLimit: "10" }),
+      m("retry", tk("fail:x"), { forceDuplicate: "yes" }), m("retry", tk("fail:x"), { verifyWeb: "true" }),
+      m("retry", tk("fail:x"), { verifyWeb: true }),
+      m("retry", tk("fail:x"), { captureStrategy: "authenticated" }),
+      m("retry", tk("fail:x"), { commentLimit: 10 }),
+      m("retry", "missing", { captureStrategy: "bogus" }), m("retry", "missing", { verifyWeb: "x" }), m("retry", "missing"),
+      m("retry", tk("https://v.test/captcha"), { verifyWeb: true, captureStrategy: "authenticated" }),
+      m("retry", tk("https://v.test/captcha"), { verifyWeb: true, commentLimit: 10 }),
+      m("retry", tk("https://v.test/captcha"), { verifyWeb: true }), m("settle"), m("events"),
+      m("retry", tk("https://www.xiaohongshu.com/explore/abc123"), { commentLimit: 10 }), m("settle"),
+      m("retry", tk("https://www.xiaohongshu.com/explore/abc123"), { captureStrategy: "standard", commentLimit: 0, forceDuplicate: false }), m("settle"),
+      ...wrapUp,
+    ],
+    "imp.enqueue-invalid": [
+      m("enqueue"), m("enqueue", null), m("enqueue", "x"), m("enqueue", {}), m("enqueue", []), m("enqueue", [null]), m("enqueue", [5]), m("enqueue", [[]]),
+      m("enqueue", [{ kind: "x", input: "a" }]), m("enqueue", [{ kind: "text", input: "   " }]), m("enqueue", [{ kind: "text", input: 5 }]), m("enqueue", [{ kind: "text" }]),
+      m("enqueue", [txt("a", { captureStrategy: "bogus" })]), m("enqueue", [txt("a", { captureStrategy: null })]), m("enqueue", [txt("a", { captureStrategy: "authenticated" })]),
+      m("enqueue", [url("https://example.org/a", { captureStrategy: "authenticated" })]), m("enqueue", [txt("a", { commentLimit: 10 })]),
+      m("enqueue", [url("https://www.xiaohongshu.com/explore/c1", { commentLimit: 10 })]), m("enqueue", [url("https://www.xiaohongshu.com/explore/c1", { captureStrategy: "authenticated", commentLimit: 7 })]),
+      m("enqueue", [txt("ok"), txt("  ")]),
+      m("enqueue", Array.from({ length: 51 }, (_, n) => url(`https://www.xiaohongshu.com/explore/n${n}`, { captureStrategy: "authenticated" }))),
+      m("enqueue", [txt("  两端留白  "), txt("a\u00a0b", { tagNames: ["x"] })]),
+      ...wrapUp,
+    ],
+    "imp.clear": [
+      m("pause"),
+      m("enqueue", [txt("c-ok1"), txt("fail:c-fail"), txt("warn:c-warn"), txt("c-ok2"), url("https://clear.test/boom")]), m("resume"), m("settle"),
+      m("pause"), m("enqueue", [txt("c-pending")]),
+      m("clearTerminalPreview"), m("clearTerminalPreview", null), m("clearTerminalPreview", { scope: "bogus" }),
+      m("clearTerminalPreview", { scope: "all" }), m("clearTerminalPreview", { scope: "filtered" }),
+      m("clearTerminalPreview", { scope: "filtered", status: "failed" }), m("clearTerminalPreview", { scope: "filtered", status: "completed", query: "c-ok" }),
+      m("clearTerminalPreview", { scope: "filtered", query: 5 }), m("clearTerminalPreview", { scope: "filtered", origin: "mobile" }), m("clearTerminalPreview", { scope: "filtered", origin: null }),
+      m("clearTerminal", { scope: "filtered", status: "failed" }), m("list"),
+      m("remove", tk("c-ok1")), m("remove", tk("c-ok1")), m("remove", "missing"), m("remove", 5), m("remove", null), m("remove"),
+      m("clearFinished"), m("list"), m("clearFinished"),
+      m("clearTerminal", { scope: "all" }), m("clearTerminal"), m("list"), m("state"),
+    ],
+    "imp.recover": [
+      m("seed", [
+        { id: "seed-1", input: "r1", status: "pending", at: 1_700_000_001_000 },
+        { id: "seed-2", input: "r2", status: "processing", stage: "fetching", at: 1_700_000_002_000 },
+        { id: "seed-3", kind: "url", input: "https://www.xiaohongshu.com/explore/rec1", status: "pending", strategy: "authenticated", at: 1_700_000_003_000 },
+        { id: "seed-4", input: "r4", status: "completed", at: 1_700_000_004_000 },
+        { id: "seed-5", input: "r5", status: "pending", at: 1_700_000_005_000 },
+        { id: "seed-6", kind: "url", input: "https://rec.test/z", status: "processing", at: 1_700_000_006_000 },
+      ]),
+      m("recover"), m("recover"), ...wrapUp,
+    ],
+  });
+}
+
 function dumpAll(database: ReturnType<typeof initDatabase>) {
   const dump: Record<string, unknown[][]> = {};
   for (const [name, sql] of Object.entries(DUMP_SQL)) {
@@ -1119,7 +1306,7 @@ function dumpAll(database: ReturnType<typeof initDatabase>) {
 const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown }> = {};
 for (const [name, ops] of Object.entries(scenarios)) {
   const work = path.join(out, `scenario-${name}.db`);
-  fs.copyFileSync(name.startsWith("semantic.") ? semBaseDb : name.startsWith("wiki.flush") ? wikiFlushBaseDb : name.startsWith("wiki.") ? wikiBaseDb : baseDb, work);
+  fs.copyFileSync(name.startsWith("imp.") ? importBaseDb : name.startsWith("semantic.") ? semBaseDb : name.startsWith("wiki.flush") ? wikiFlushBaseDb : name.startsWith("wiki.") ? wikiBaseDb : baseDb, work);
   const db = initDatabase(work);
   const daos: Record<string, Record<string, (...a: unknown[]) => unknown>> = {
     knowledge: new KnowledgeItemDB(db) as never,
@@ -1132,10 +1319,13 @@ for (const [name, ops] of Object.entries(scenarios)) {
     wiki: wikiHandlers(db),
     draft: { save: (input: unknown) => saveKnowledgeDraft(db as never, input as never) } as never,
     job: jobHandlers(db),
+    imp: name.startsWith("imp.") ? importHandlers(db) : {}, // 注册会触发启动恢复，只给导入场景开
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
-      v && typeof v === "object" && "__cursorOf" in v ? ((results[v.__cursorOf]?.value as { nextCursor?: string } | undefined)?.nextCursor ?? null) : v);
+      v && typeof v === "object" && "__cursorOf" in v ? ((results[v.__cursorOf]?.value as { nextCursor?: string } | undefined)?.nextCursor ?? null)
+        : v && typeof v === "object" && "__taskOf" in v ? ((db.get("SELECT id FROM import_tasks WHERE source_input = ? ORDER BY created_at DESC, rowid DESC", v.__taskOf) as { id: string } | undefined)?.id ?? "missing-task")
+        : v && typeof v === "object" && "__itemOfTask" in v ? ((db.get("SELECT result_item_id AS id FROM import_tasks WHERE source_input = ? ORDER BY created_at DESC, rowid DESC", v.__itemOfTask) as { id: string } | undefined)?.id ?? "missing-item") : v);
   const call = (fn: string, args: unknown[]) => {
     const [ns, method] = fn.includes(".") ? fn.split(".") : ["knowledge", fn];
     return daos[ns][method](...args);

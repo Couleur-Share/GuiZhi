@@ -24,8 +24,15 @@ type Library struct {
 	openDialog openDialogFn // 选择图片的对话框；测试里替换
 	relaunch   func()       // 重启应用；测试里替换
 	jobs       *BackgroundJobRuntime
-	pushMu     sync.RWMutex
-	push       func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
+	imports    *importQueue
+	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
+	extractURL       func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
+	disposeExtracted func(*extractedContent)
+	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
+	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
+	extractOverride  importExtractFn
+	pushMu           sync.RWMutex
+	push             func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
 }
 
 func asInt(v any) int64 {

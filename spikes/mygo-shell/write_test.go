@@ -83,6 +83,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerWiki(b)
 	l.registerKnowledgeDraft(b)
 	jt := newJobTestEnv(l)
+	var imp *impTestEnv
 	l.registerBackgroundJobs(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
@@ -98,6 +99,12 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			v, err = l.emptyTrash(ctx)
 		case "job.clock", "job.register", "job.schedule", "job.unschedule", "job.tick", "job.settle", "job.drain":
 			v, err = jt.run(ctx, strings.TrimPrefix(op.Fn, "job."), op.Args)
+		case "imp.settle", "imp.recover", "imp.release", "imp.seed", "imp.events", "imp.enqueue", "imp.list", "imp.state", "imp.pause", "imp.resume", "imp.cancel",
+			"imp.retry", "imp.remove", "imp.clearFinished", "imp.clearTerminalPreview", "imp.clearTerminal":
+			if imp == nil {
+				imp = newImpTestEnv(t, l, b)
+			}
+			v, err = imp.run(ctx, t, strings.TrimPrefix(op.Fn, "imp."), op.Args)
 		default:
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
@@ -157,6 +164,33 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections, baseW
 		return out
 	}
 	idMap := map[string]string{}
+	mapTaskIDs := func(v any) {
+		var scan func(v any)
+		scan = func(v any) {
+			switch x := v.(type) {
+			case []any:
+				for _, e := range x {
+					scan(e)
+				}
+			case map[string]any:
+				if id, ok := x["id"].(string); ok {
+					if in, ok := x["sourceInput"].(string); ok {
+						idMap[id] = "TASK[" + in + "]"
+					}
+				}
+				for _, e := range x {
+					scan(e)
+				}
+			}
+		}
+		scan(v)
+	}
+	mapTaskIDs(resAny)
+	for _, r := range rows("importFull") {
+		if id, ok := r[0].(string); ok {
+			idMap[id] = "TASK[" + fmt.Sprint(r[2]) + "]"
+		}
+	}
 	assign := func(table string, known map[string]bool, prefix string, keys ...int) {
 		var fresh [][]any
 		for _, r := range rows(table) {
@@ -270,6 +304,8 @@ func TestWriteParity(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			base := "knowledge.db"
 			switch {
+			case strings.HasPrefix(name, "imp."):
+				base = "import-base.db" // 导入队列场景：去掉预置任务的基准库
 			case strings.HasPrefix(name, "semantic."):
 				base = "semantic-base.db" // 语义场景用播种过向量的独立基准库
 			case strings.HasPrefix(name, "wiki.flush"):
@@ -308,6 +344,10 @@ func TestWriteParity(t *testing.T) {
 			if !reflect.DeepEqual(wantRes, gotRes) {
 				w, _ := json.Marshal(wantRes)
 				gt, _ := json.Marshal(gotRes)
+				if d := os.Getenv("GUIZHI_DUMP_DIR"); d != "" { // 差异太长时落盘比对
+					_ = os.WriteFile(filepath.Join(d, name+".ts.json"), w, 0o600)
+					_ = os.WriteFile(filepath.Join(d, name+".go.json"), gt, 0o600)
+				}
 				t.Errorf("返回值不一致（只显示首个差异附近）\nTS: %s\nGo: %s", diffWindow(w, gt, true), diffWindow(w, gt, false))
 			}
 			for table := range wantDump {

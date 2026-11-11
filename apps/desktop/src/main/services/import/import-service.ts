@@ -24,6 +24,7 @@ import {
   ImportQueue,
   createSourceRecordId,
   type ImportPersistence,
+  type ImportQueueOptions,
 } from "./import-queue";
 import { getBrowserCaptureService } from "../platform-capture/browser-capture";
 import {
@@ -200,9 +201,15 @@ export function readNetworkProxySetting(
   }
 }
 
+/** 迁移对拍用：替换抽取实现，其余管线（去重、入库、队列）保持真实。 */
+export interface ImportServiceTestHooks {
+  extract?: ImportQueueOptions["extract"];
+}
+
 export function createImportService(
   db: Database.Database,
   broadcast: (task: ImportTask) => void,
+  hooks?: ImportServiceTestHooks,
 ): ImportService {
   const taskDb = new ImportTaskDB(db);
   const commentDb = new SourceCommentDB(db);
@@ -214,7 +221,7 @@ export function createImportService(
     store: taskDb,
     persistence: createPersistence(db),
     resolveSource: resolveSourceIdentity,
-    extract: (task, signal, onStage) => {
+    extract: hooks?.extract ?? ((task, signal, onStage) => {
       const interactiveVerification = webVerificationTasks.delete(task.id);
       if (task.captureStrategy === "authenticated") {
         onStage("browser-capture");
@@ -240,7 +247,7 @@ export function createImportService(
           fetchAuthenticatedLinuxdoJson(browserCapture, url, requestSignal),
         onStage,
       });
-    },
+    }),
     captureComments: async (task, resultItemId, signal) => {
       const platform = platformFromAuthenticatedUrl(task.sourceInput);
       if (!platform || task.captureStrategy !== "authenticated") {
