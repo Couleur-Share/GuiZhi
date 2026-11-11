@@ -132,7 +132,39 @@ func verify(ctx context.Context, srcDB *sqlite.DB, dst string, compareWithSrc bo
 	return fmt.Sprintf("pad=%d", a), true
 }
 
+// checkOnly 对一份已有文件做 modernc 完整性、FTS 完整性与 MyGo 可打开校验（旧版写过之后回读用）。
+func checkOnly(path string) {
+	ctx := context.Background()
+	chk, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		report("modernc 打开", false, err.Error())
+		return
+	}
+	defer chk.Close()
+	var ic string
+	err = chk.QueryRow("PRAGMA integrity_check").Scan(&ic)
+	report("modernc integrity_check", err == nil && ic == "ok", ic)
+	_, err = chk.Exec("INSERT INTO knowledge_fts(knowledge_fts) VALUES('integrity-check')")
+	report("modernc FTS integrity-check", err == nil, fmt.Sprint(err))
+	db, err := sqlite.Open(ctx, path, sqlite.OpenOptions{ReadOnly: true})
+	if err != nil {
+		report("MyGo 打开", false, err.Error())
+		return
+	}
+	defer db.Close()
+	rows, err := db.Query(ctx, "SELECT count(*) FROM knowledge_items")
+	if err != nil {
+		report("MyGo 读条目数", false, err.Error())
+		return
+	}
+	report("MyGo 读条目数", true, fmt.Sprint(rows.Values[0][0]))
+}
+
 func main() {
+	if p := os.Getenv("GUIZHI_BACKUP_CHECK"); p != "" {
+		checkOnly(p)
+		return
+	}
 	if len(os.Args) < 2 {
 		fmt.Println("用法：go run . <含 knowledge.db 的目录> [padMB]")
 		os.Exit(2)
@@ -195,6 +227,9 @@ func main() {
 	}
 	detail, ok := verify(ctx, db, dst1, true)
 	st, _ := os.Stat(dst1)
+	if keep := os.Getenv("GUIZHI_BACKUP_KEEP"); keep != "" {
+		copyFile(dst1, keep)
+	}
 	report("备份保真（完整性/FTS/行数/建表语句）", ok, fmt.Sprintf("%s，耗时 %v，备份 %.0f MB", detail, d1.Round(time.Millisecond), float64(st.Size())/1e6))
 
 	// 2) 并发写入：MyGo 写入成对 pad 行，同时反复备份。

@@ -110,7 +110,21 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 
 - 当前库是回滚日志模式（没有 WAL，见 `packages/db/src/init.ts`），备份持有读锁期间，写入会等到备份结束，所以停顿大约等于备份耗时。这和现状一致，但 Go 里备份可以放在后台协程，界面线程不会像现在这样被同步 `VACUUM INTO` 冻住。
 - 二进制体积增加约 4 MB（只含这两个包的最小程序对比，粗略值）。
-- 这些只验证了「备份生成」。还没验证：恢复流程（`pre-restore` 快照、换库、重启）、加密备份格式、备份仓库的 `syncRendererSettings` 之外的频道、sqlite 版本差异对旧版 wasm 读取备份的影响。
+### 新旧版互通（`verify-wasm.mts`）
+
+用 Go 加 modernc 生成的备份，交给旧版真实代码处理，再把旧版写过的库交回新版：
+
+| 步骤 | 结果 |
+|---|---|
+| 旧版 `validateBackupFile`（恢复前校验：`quick_check`、核心表、结构版本） | 通过 |
+| 旧版 `initDatabase`（恢复后的真实打开路径，含迁移执行器）读条目数 | 通过 |
+| 旧版 FTS5 中文检索 | 通过，有命中 |
+| 旧版在该备份上新建条目（含 FTS 同步） | 通过，条目数加 1 |
+| 新版（modernc `integrity_check`、FTS `integrity-check`、MyGo 打开读条目数） 回读旧版写过的库 | 通过，条目数含新增那条 |
+
+也就是说，备份格式在新旧版之间是双向互通的。运行：`GUIZHI_BACKUP_KEEP=<路径> go run . <含 knowledge.db 的目录> 1` 生成备份，再 `pnpm dlx tsx spikes/mygo-backup/verify-wasm.mts <备份> <回写副本>`，最后 `GUIZHI_BACKUP_CHECK=<回写副本> go run .` 回读。
+
+还没验证：恢复流程里的 `pre-restore` 快照、换库、重启；加密备份格式（`encrypted` 字段）；旧版 wasm 与新版 SQLite 同时打开同一个库的锁冲突（第 3 条风险，仍成立）。
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -150,5 +164,5 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程，以及旧版 wasm 能否读取 modernc 生成的备份。
+2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程（`pre-restore`、换库、重启）与加密备份格式。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
