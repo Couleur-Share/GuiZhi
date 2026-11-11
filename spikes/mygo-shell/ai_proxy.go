@@ -87,6 +87,9 @@ type aiProxy struct {
 	client     *http.Client
 	configured func() map[string]bool // 已配置端点的 `scheme://host`，对应 collectConfiguredHosts
 
+	// emit 仅测试使用：替代向调用方页面推送（没有真实窗口时也能观察流式块）。
+	emit func(channel string, payload aiStreamPayload)
+
 	mu            sync.Mutex
 	tracked       map[string]*aiCall
 	lastUnknownAt int64
@@ -365,10 +368,14 @@ func (p *aiProxy) stream(ctx context.Context, req aiRequest) aiResponse {
 	defer release()
 	page := mygo.CallerPage(ctx)
 	push := func(channel string, payload aiStreamPayload) {
+		payload.RequestID = req.RequestID
+		if p.emit != nil {
+			p.emit(channel, payload)
+			return
+		}
 		if page == nil {
 			return
 		}
-		payload.RequestID = req.RequestID
 		if err := ipcEvent.EmitPage(page, ipcPush{Channel: channel, Args: []any{payload}}); err != nil {
 			log.Printf("[ai] 推送 %s 失败：%v", channel, err)
 		}

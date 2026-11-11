@@ -121,12 +121,20 @@ func main() {
 	if *backupCLI {
 		os.Exit(runBackupCLI(flag.Args()))
 	}
+	if *dbPath == "" { // 没有显式数据库：正式启动，路径按 Electron 版的规则推断（startup_paths.go）
+		exe, _ := os.Executable()
+		sp := resolveStartupPaths(startupPaths{Dist: *dist, UserData: *userData, AppData: *appData, Config: *configDir}, exe, packagedBuild == "true", defaultAppDataDir)
+		*dbPath, *userData, *appData, *configDir = sp.DB, sp.UserData, sp.AppData, sp.Config
+		if *dist == "" {
+			*dist = findDistDir(exe)
+		}
+	}
 	if *mcpMode {
 		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
 		return
 	}
 	if *dist == "" || *dbPath == "" {
-		log.Fatal("需要 -dist 与 -db")
+		log.Fatal("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定")
 	}
 
 	waitForRelaunchParent()
