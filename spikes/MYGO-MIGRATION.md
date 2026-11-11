@@ -93,7 +93,7 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - 下载被拒绝前，请求已经发出。涉及 SSRF 防护的地址仍必须在 `Fetch` 的请求阶段拦截，不能只靠下载拒绝。
 - 代理是环境级参数（`--proxy-server`），按进程设置；Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物。
 - 按分区隔离：`Fetch` 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
-- 还没验证：多个并发 target 的拦截隔离、采集进程池与复用、反爬场景下的真实站点。
+- 已验证（见「采集进程的真实页面与并发压测」）：多个并发 target 的拦截隔离、崩溃恢复。还没验证：采集进程池的复用策略、真实互联网站点与反爬。仅在主页面启用拦截会漏掉 `window.open` 弹窗的首个请求。
 ## 备份验证（`spikes/mygo-backup`）
 
 `createBackup` 用 `VACUUM INTO` 对在线库生成单文件备份；MyGo 内置 SQLite 拒绝它（`authorization denied (code 23)`，已实测）。替代做法：业务读写仍走 MyGo 自带 SQLite，备份只用纯 Go 的 `modernc.org/sqlite` 以 `mode=ro` 打开同一个库并执行 `VACUUM INTO`。运行：`go run . <含 knowledge.db 的目录> [padMB]`，样本是 212 MB 的库（真实 `knowledge.db` 加两张各 100 MB 的 pad 表）。
@@ -356,6 +356,55 @@ powershell -File spikes\mygo-restore\run-diff.ps1 -GoExe spikes\mygo-restore.exe
 # safeStorage 互通：-SrcRepo 用上面某次运行目录里的 r-ts，-Snapshot 用 make.json 里的快照 id
 powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-restore.exe -Electron <electron.exe> -SrcRepo <r-ts> -Snapshot <id>
 ```
+## 采集进程的真实页面与并发压测（`spikes/mygo-capstress`，2026-11-11）
+
+目的：补上「独立采集进程」此前没验证的部分——多 target 并发的拦截隔离、故障下的行为、崩溃恢复、内存。输入是本机 59 页真实网页的静态 HTML，回放到本地模拟站点（另在 127.0.0.2 上放一个“内网”探针站点）。**不访问外网**：采集进程带 `--host-resolver-rules` 兜底，并且所有非本地请求同时在 `Fetch` 阶段被拦（59 页共拦掉约 790 个外部子资源请求）。
+
+**离屏运行**：压测本体在独立的 Win32 桌面里启动（`launcher.go`，`CreateDesktop`），采集进程的窗口和页面弹窗都不会出现在用户桌面、任务栏，也不抢焦点。这同时说明：采集进程在非交互桌面里也能正常工作。
+
+### 结果
+
+| 项 | 结果 |
+|---|---|
+| `Target.createTarget` 每个任务一个页面 | 可用；59 页串行全部成功，标题与源文件一致 59/59，3.5 页/秒 |
+| 并发 3 / 8（各 177 个任务） | 全部成功；4.5 / 4.3 页/秒（并发超过 3 后吞吐不再增加，单页耗时从 0.66 秒涨到 1.8 秒） |
+| 请求头串扰（每个任务给自己的文档请求注入唯一令牌，服务端校验） | 354 个主文档请求，串扰 0、缺失 0 |
+| 并发任务各自的拦截规则（一半全放行、一半全拦截） | 36/36 行为正确 |
+| target 泄漏 | 每个场景之后页面数都回到基线 |
+| 故障：慢响应超时、HTTP 500、重定向死循环、连接重置、下载、三种 JS 弹窗、脚本死循环、30 MB 页面、外部资源、渲染进程崩溃 | 均未拖垮并发的 6 个正常任务；卡死页面取值超时后 0.5 秒内可关闭 |
+| 采集进程被杀 | 3 个在途任务 0.13–0.25 秒内收到“连接已断开”；无残留子进程；重启 0.45 秒，随后 20/20 成功 |
+| 内存（300 个任务，并发 3） | 进程树工作集从约 520 MB 涨到约 800–850 MB（三次测量相对起点 +284 到 +326 MB）；进程数 7→8 |
+
+### 安全探针（SSRF 相关）
+
+先做正向对照：放行 127.0.0.2 时，重定向、iframe、弹窗三个探针都能命中内网，所以下面“没命中”的结论可信。
+
+- **302 与 meta refresh 跳到内网地址**：在跳转那一跳被 `Fetch` 拦下，内网零命中。
+- **跨站 iframe**：只在主页面启用 `Fetch` 也没有漏（对照组零命中）；开了递归自动接管后同样零命中。
+- **`window.open` 弹窗：有缺口。** WebView2 没有 Chromium 的弹窗拦截，无论有没有用户手势，页面脚本都能弹出窗口；弹窗的首个导航请求在我们接管并启用 `Fetch` 之前就已发出，内网被命中。浏览器级 `Target.setAutoAttach`（暂停等待调试器）接管得到弹窗，但拦不住这个首请求。
+- **缓解**：在每个新文档里用 `Page.addScriptToEvaluateOnNewDocument` 把 `window.open` 置空，弹窗与内网访问都消失（已验证，不影响普通页面）。`--block-new-web-contents` 不可靠：两次运行一次仍弹出并命中内网，一次没命中，不能采用。
+- **未解决的残余**：`<a target=_blank>` 由脚本 `click()`、`form target` 之类不经过 `window.open` 的弹窗路径没有测。要彻底堵住，应评估 MyGo 的新窗口策略或把采集进程放在一个按进程设置的过滤代理之后。
+
+### 兜底参数的一个坑
+
+`--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE ..."` 会把 IP 字面量也当作“待解析主机”：不排除 127.0.0.2 时，访问它得到 `ERR_NAME_NOT_RESOLVED`，探针看起来“没漏”，其实是被这条规则挡的。这次是靠正向对照发现的。产品里若用这条规则兜底外网，要知道它对 IP 字面量同样生效，且不能代替 `Fetch` 的 SSRF 检查。
+
+### 没覆盖的
+
+- 真实互联网站点（本次刻意只用本机语料）：反爬、慢站、证书错误、真实的 JS 渲染站点。
+- 语料是静态 HTML 回放，页面里的外部脚本全被拦掉，所以没有测大量脚本执行与长时间渲染的稳定性。
+- 内存增长是否收敛：三次测量的增量并不单调，不能据此断言有或没有泄漏。保守做法是每 100–200 个任务回收一次采集进程（重启 0.45 秒）。
+- 带登录态的会话、`browserContext` 隔离、长时间（小时级）运行。
+- 弹窗之外的其他“新目标”路径（见上）。
+
+### 复跑
+
+```powershell
+# 构建（在 spikes\mygo-capstress 下）；语料目录默认 %TEMP%\guizhi-crawl-eval\cache
+go build -o ..\mygo-capstress.exe .
+# 全部场景，默认离屏运行（日志在 %TEMP%\capstress-*.log）；-run 可选 base,conc,rules,faults,security,kill,mem
+.\spikes\mygo-capstress.exe
+```
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -410,5 +459,5 @@ powershell -File spikes\mygo-restore\safestorage-test.ps1 -GoExe spikes\mygo-res
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 用真实站点和多 target 并发压测独立采集进程；AI 流式请求（见「AI 流式请求切片」）与加密备份格式、换库与回滚（见「备份恢复与加密仓库切片」）已验证；备份恢复外围的编排（`pre-restore`、停后台任务、重启）还没验证。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
+2. 独立采集进程的并发压测已在本机语料上做完（见「采集进程的真实页面与并发压测」），真实互联网站点仍待验证，弹窗缺口需要先决定处理方式；AI 流式请求（见「AI 流式请求切片」）与加密备份格式、换库与回滚（见「备份恢复与加密仓库切片」）已验证；备份恢复外围的编排（`pre-restore`、停后台任务、重启）还没验证。非 UTF-8 站点的处理策略要定：一律走渲染路径，或接受 `x/text` 对畸形字节的差异。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
