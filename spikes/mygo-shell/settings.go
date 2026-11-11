@@ -4,7 +4,7 @@ package main
 //
 // 尚未迁移、并且不静默吞掉的部分：
 //   - 网络代理生效（applyNetworkProxySettings）：写库后同步给 activeNetProxy（netproxy.go）；Electron 会话代理不适用。
-//   - 可执行文件路径白名单（pickedPaths）：文件选择器未迁移，注册表恒为空，所以只接受空串（清除路径）。
+//   - 可执行文件路径白名单（pickedPaths）：由 ytdlp/ffmpeg:pickBinary 登记（managed_tools.go），只接受空串或登记过的路径。
 //
 // 与 TS 一致的一个特性：settings:set 先写 AI 配置文件，再校验并写库。
 // 所以同一批里 AI 部分合法、flareSolverr 非法时，AI 配置已落盘而其余设置未写入（TS 原本如此，未改）。
@@ -176,7 +176,7 @@ func isAcceptableBinaryPath(raw json.RawMessage) bool {
 	if json.Unmarshal(raw, &s) != nil {
 		return false
 	}
-	return strings.TrimFunc(s, jsSpace) == "" // 文件选择器未迁移，登记表恒空
+	return strings.TrimFunc(s, jsSpace) == "" || isPickedBinaryPath(s) // 空串表示清除；非空只接受文件选择器返回过的路径
 }
 
 func (l *Library) settingsSet(ctx context.Context, raw json.RawMessage) (any, error) {

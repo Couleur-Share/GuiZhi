@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -26,6 +27,7 @@ type Library struct {
 	jobs       *BackgroundJobRuntime
 	imports    *importQueue
 	crawl      *crawlService // 文档批次调度（crawl_service.go）
+	toolsHTTP  *http.Client  // 托管工具下载/版本查询用的 HTTP 客户端；空则按网络代理设置新建（测试注入）
 	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
 	extractURL       func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
 	disposeExtracted func(*extractedContent)
@@ -33,6 +35,7 @@ type Library struct {
 	webFetcher       *safeFetcher // 网页采集的出站抓取；空则用 defaultSafeFetcher（测试注入）
 	captureComments  func(ctx context.Context, task map[string]any, itemID string) error
 	pickFiles        func(multiple bool, filters []dialogFilter) ([]string, error)
+	pickExecutable   func(title string) (string, error) // 选择 yt-dlp / ffmpeg 可执行文件；取消返回空串
 	extractOverride  importExtractFn
 	pickDirectory    func(title string) (string, error)
 	saveFileDialog   func(title, defaultPath string, filters []dialogFilter) (string, error)

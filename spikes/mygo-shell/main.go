@@ -177,6 +177,17 @@ func main() {
 		}
 		return mygo.Dialog.Open(mygo.OpenDialogOptions{Multiple: multiple, Filters: fs})
 	}
+	lib.pickExecutable = func(title string) (string, error) {
+		filters := []mygo.FileFilter{{Name: "All Files", Extensions: []string{"*"}}}
+		if runtime.GOOS == "windows" {
+			filters = append([]mygo.FileFilter{{Name: "可执行文件", Extensions: []string{"exe"}}}, filters...)
+		}
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: title, Filters: filters})
+		if err != nil || len(paths) == 0 {
+			return "", err
+		}
+		return paths[0], nil
+	}
 	lib.pickDirectory = func(title string) (string, error) {
 		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: title, Directory: true})
 		if err != nil || len(paths) == 0 {
@@ -216,6 +227,7 @@ func main() {
 	lib.registerBackgroundJobs(b)
 	lib.registerImport(b)
 	lib.registerCrawl(b)
+	lib.registerManagedTools(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)
