@@ -101,6 +101,25 @@ func TestThemedIPCDifferential(t *testing.T) {
 	ctx := context.Background()
 	for _, r := range g.Recs {
 		r := r
+		if r.Kind == "thmArticle" {
+			// 本文问答的 AI 阅读页来源：TS articleContext 对拍
+			in, perr := jsParse(string(r.Input))
+			if perr != nil {
+				t.Fatal(perr)
+			}
+			out, err := l.articleContext(ctx, in)
+			t.Run(r.Name, func(t *testing.T) {
+				var got any
+				if err != nil {
+					got = map[string]any{"thrown": err.Error()}
+				} else {
+					b, _ := json.Marshal(out)
+					_ = json.Unmarshal(b, &got)
+				}
+				fgCompare(t, fgDecode(t, r.Output), got)
+			})
+			continue
+		}
 		var call struct {
 			Ch   string            `json:"ch"`
 			Args []json.RawMessage `json:"args"`

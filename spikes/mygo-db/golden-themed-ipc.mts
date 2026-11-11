@@ -228,6 +228,28 @@ export async function buildThemedIpcGolden(outDir: string) {
   registerThemedReadingIPC(db);
 
   const recs: { kind: string; name: string; input: unknown; output: unknown }[] = [];
+  // 本文问答的「AI 阅读页」来源（article-ask-context.ts 的 themed 分支）：与脚本频道共用同一份种子库，先于会改库的频道执行
+  const { articleContext } = await import("../../apps/desktop/src/main/services/article-ask-context.ts");
+  const askCases: { name: string; input: unknown }[] = [
+    { name: "v3-current", input: { target: { itemId: "it", view: "themed", versionId: "it-v3" }, question: "资料一 全文" } },
+    { name: "v3-explicit-body", input: { target: { itemId: "it", view: "themed", versionId: "it-v3", sourceKind: "body" }, question: "第二段" } },
+    { name: "v3-selection-ok", input: { target: { itemId: "it", view: "themed", versionId: "it-v3", selection: "甲" }, question: "甲" } },
+    { name: "v3-selection-missing", input: { target: { itemId: "it", view: "themed", versionId: "it-v3", selection: "完全不存在的选段" }, question: "x" } },
+    { name: "v3-wrong-kind", input: { target: { itemId: "it", view: "themed", versionId: "it-v3", sourceKind: "summary" }, question: "x" } },
+    { name: "v3-wrong-item", input: { target: { itemId: "forum", view: "themed", versionId: "it-v3" }, question: "x" } },
+    { name: "no-version", input: { target: { itemId: "it", view: "themed" }, question: "x" } },
+    { name: "unknown-version", input: { target: { itemId: "it", view: "themed", versionId: "nope" }, question: "x" } },
+    { name: "v1-page", input: { target: { itemId: "it-nosrc", view: "themed", versionId: "ns-v1" }, question: "图" } },
+    { name: "v1-forum-body", input: { target: { itemId: "forum", view: "themed", versionId: "fb-v1" }, question: "楼主" } },
+    { name: "working-empty", input: { target: { itemId: "it-nosrc", view: "themed", versionId: "ns-work", sourceKind: "summary" }, question: "草稿" } },
+    { name: "trashed-item", input: { target: { itemId: "gone", view: "themed", versionId: "gone-v1" }, question: "x" } },
+    { name: "long-question", input: { target: { itemId: "it", view: "themed", versionId: "it-v3" }, question: "q".repeat(8001) } },
+  ];
+  for (const [i, c] of askCases.entries()) {
+    let out: any;
+    try { out = articleContext(db, c.input as any); } catch (e) { out = { thrown: e instanceof Error ? e.message : String(e) }; }
+    recs.push({ kind: "thmArticle", name: `ask-${String(i).padStart(2, "0")}-${c.name}`, input: c.input, output: JSON.parse(JSON.stringify(out ?? null)) });
+  }
   const script = ipcScript();
   for (const [i, call] of script.entries()) {
     const fn = handlers.get(call.ch);

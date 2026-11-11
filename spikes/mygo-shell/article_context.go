@@ -275,14 +275,10 @@ func articleSHA256(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// themedArticleSource 取「AI 阅读页」版本的文本、原文与已有资料；AI 阅读页（themedReading）迁移前如实报告。
+// themedArticleSource 取「AI 阅读页」版本的文本、原文与已有资料（取数见 themed_article_source.go）。
 type themedArticleSource struct {
 	text, original string
 	prior          []articleSource
-}
-
-func (l *Library) themedArticleSource(ctx context.Context, itemID string, t articleTarget, question string) (themedArticleSource, error) {
-	return themedArticleSource{}, errors.New("AI 阅读页尚未迁移到新内核")
 }
 
 // articleContext 组装本文问答的上下文来源（正文 / 总结 / 文字稿 / OCR / 论坛讨论 / 网页快照 / AI 阅读页）。
