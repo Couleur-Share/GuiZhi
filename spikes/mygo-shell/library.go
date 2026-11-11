@@ -25,6 +25,7 @@ type Library struct {
 	relaunch   func()       // 重启应用；测试里替换
 	jobs       *BackgroundJobRuntime
 	imports    *importQueue
+	crawl      *crawlService // 文档批次调度（crawl_service.go）
 	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
 	extractURL       func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
 	disposeExtracted func(*extractedContent)
