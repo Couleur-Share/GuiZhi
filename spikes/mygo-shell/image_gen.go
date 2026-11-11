@@ -69,7 +69,11 @@ func openAIImageSize(model, aspect string) string {
 }
 
 func buildOpenAIImageBody(model, prompt, aspect string) string {
-	body := newOmap().set("model", model).set("prompt", prompt).set("n", float64(1)).set("size", openAIImageSize(model, aspect))
+	body := newObj()
+	body.set("model", model)
+	body.set("prompt", prompt)
+	body.set("n", float64(1))
+	body.set("size", openAIImageSize(model, aspect))
 	if !regexp.MustCompile(`(?i)gpt-image`).MatchString(model) {
 		body.set("response_format", "b64_json")
 	}
