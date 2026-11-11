@@ -80,6 +80,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerAskSessions(b)
 	l.registerAIUsage(b)
 	l.registerSemantic(b)
+	l.registerWiki(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -129,7 +130,7 @@ func dumpGo(t *testing.T, l *Library, sqls map[string]string) map[string][][]any
 }
 
 // normalizeScenario 对一侧的（返回值, 转储）做同一套抹平，返回可直接比较的结构。
-func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[string]bool, results any, dump map[string][][]any) (any, map[string]any) {
+func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections, baseWikiPages, baseWikiRevs map[string]bool, results any, dump map[string][][]any) (any, map[string]any) {
 	t.Helper()
 	resAny := normalize(t, results)
 	dumpAny := normalize(t, dump).(map[string]any)
@@ -165,6 +166,8 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[st
 	assign("items", baseItems, "ITEM", 1, 2)
 	assign("tags", baseTags, "TAG", 1)
 	assign("collections", baseCollections, "COLL", 1)
+	assign("wikiPages", baseWikiPages, "PAGE", 2)
+	assign("wikiRevisions", baseWikiRevs, "REV", 2, 4, 5)
 
 	var walk func(v any) any
 	walk = func(v any) any {
@@ -188,6 +191,13 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[st
 			for k := range x {
 				x[k] = walk(x[k])
 			}
+			// 以 id 为键的对象（如 backlinkCounts）：键也要换成稳定占位
+			for k, val := range x {
+				if m, ok := idMap[k]; ok {
+					delete(x, k)
+					x[m] = val
+				}
+			}
 			if _, ok := x["lastSearchMs"].(float64); ok {
 				x["lastSearchMs"] = "MS" // 检索耗时是观测值，只比较「有没有」
 			}
@@ -205,6 +215,7 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[st
 		row[3] = strings.Join(words, " ")
 	}
 	resAny = walk(resAny)
+	resAny = sortNowTies(resAny)
 	normalized := map[string]any{}
 	for name := range dumpAny {
 		rs := walk(dumpAny[name]).([]any)
@@ -244,13 +255,20 @@ func TestWriteParity(t *testing.T) {
 		sc := g.Writes[name]
 		t.Run(name, func(t *testing.T) {
 			base := "knowledge.db"
-			if strings.HasPrefix(name, "semantic.") {
+			switch {
+			case strings.HasPrefix(name, "semantic."):
 				base = "semantic-base.db" // 语义场景用播种过向量的独立基准库
+			case strings.HasPrefix(name, "wiki.flush"):
+				base = "wiki-flush-base.db" // 带失效记录与贡献的 Wiki 库
+			case strings.HasPrefix(name, "wiki."):
+				base = "wiki-base.db"
 			}
 			l := openWriteCopy(t, dir, base)
 			baseItems := queryIDs(t, l, "SELECT id FROM knowledge_items")
 			baseTags := queryIDs(t, l, "SELECT id FROM tags")
 			baseCollections := queryIDs(t, l, "SELECT id FROM collections")
+			baseWikiPages := queryIDs(t, l, "SELECT id FROM wiki_pages")
+			baseWikiRevs := queryIDs(t, l, "SELECT id FROM wiki_page_revisions")
 
 			goResults := runGoOps(t, l, sc.Ops)
 			goDump := dumpGo(t, l, g.DumpSQL)
@@ -271,8 +289,8 @@ func TestWriteParity(t *testing.T) {
 				}
 			}
 
-			wantRes, wantDump := normalizeScenario(t, baseItems, baseTags, baseCollections, tsResults, sc.Dump)
-			gotRes, gotDump := normalizeScenario(t, baseItems, baseTags, baseCollections, goResults, goDump)
+			wantRes, wantDump := normalizeScenario(t, baseItems, baseTags, baseCollections, baseWikiPages, baseWikiRevs, tsResults, sc.Dump)
+			gotRes, gotDump := normalizeScenario(t, baseItems, baseTags, baseCollections, baseWikiPages, baseWikiRevs, goResults, goDump)
 			if !reflect.DeepEqual(wantRes, gotRes) {
 				w, _ := json.Marshal(wantRes)
 				gt, _ := json.Marshal(gotRes)
@@ -340,4 +358,56 @@ func diffWindow(a, b []byte, first bool) string {
 	}
 	lo, hi := max(0, i-160), min(len(s), i+160)
 	return fmt.Sprintf("…@%d… %s", i, s[lo:hi])
+}
+
+// sortNowTies：带 updatedAt 的对象数组里，updatedAt 同为 "NOW" 的相邻元素本来就没有确定顺序
+// （TS 逐页取时间戳，Go 一批语句同一毫秒），按 id 排序后再比较；其余顺序照旧。
+func sortNowTies(v any) any {
+	switch x := v.(type) {
+	case []any:
+		for i := range x {
+			x[i] = sortNowTies(x[i])
+		}
+		// 图谱的边没有 ORDER BY：SQLite 按主键（含随机 uuid）索引扫描，顺序无意义
+		if len(x) > 0 {
+			if first, ok := x[0].(map[string]any); ok {
+				if _, hasS := first["source"]; hasS {
+					if _, hasT := first["target"]; hasT {
+						sort.SliceStable(x, func(a, b int) bool {
+							ma, _ := x[a].(map[string]any)
+							mb, _ := x[b].(map[string]any)
+							ka, kb := fmt.Sprint(ma["source"], "\x00", ma["target"]), fmt.Sprint(mb["source"], "\x00", mb["target"])
+							return ka < kb
+						})
+					}
+				}
+			}
+		}
+		isNow := func(e any) bool {
+			m, ok := e.(map[string]any)
+			return ok && m["updatedAt"] == "NOW"
+		}
+		for i := 0; i < len(x); {
+			if !isNow(x[i]) {
+				i++
+				continue
+			}
+			j := i
+			for j < len(x) && isNow(x[j]) {
+				j++
+			}
+			group := x[i:j]
+			sort.SliceStable(group, func(a, b int) bool {
+				return fmt.Sprint(group[a].(map[string]any)["id"]) < fmt.Sprint(group[b].(map[string]any)["id"])
+			})
+			i = j
+		}
+		return x
+	case map[string]any:
+		for k := range x {
+			x[k] = sortNowTies(x[k])
+		}
+		return x
+	}
+	return v
 }

@@ -129,6 +129,7 @@ func main() {
 	lib.registerAskSessions(b)
 	lib.registerAIUsage(b)
 	lib.registerSemantic(b)
+	lib.registerWiki(b)
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)

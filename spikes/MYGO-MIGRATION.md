@@ -71,6 +71,7 @@
 | 11-11 | `ask:listSessions/getSession/saveSession/deleteSession`、`askSession:query/meta`（含 JS 值模型 `jsvalue.go`、证据清洗 `evidence.go`） | 232 个证据清洗用例逐字节一致；17 个会话场景（分页游标、搜索、保存/更新证据、置顶与自定义标题、字符串入参的强转） | 38 / 149 |
 | 11-11 | `ai:usageRecord/usageSummary/usageClear` | 3 组 36 个调用：按本地自然日聚合、保留期清理、`Number(x)||fallback` 强转、小数天数 | 41 / 146 |
 | 11-11 | `semantic:status/listPending/applyEmbeddings/search/clear`（含内容哈希、进程内向量缓存、float32 小端 BLOB、堆容量按 `<limit` 多留一个） | 7 组场景（独立播种库 `semantic-base.db`）；含缓存失效只覆盖本次写入的模型这一 TS 特点、孤立代理项截断、NaN 输出为 null | 46 / 141 |
+| 11-11 | `wiki:catalog/backlinkCounts/search/getPage/updatePage/deletePage/status/graph/listRevisions/restoreRevision`（含 `flushWikiInvalidations` 失效重建，事务内读写用内存状态模拟） | 11 组场景（独立播种库 + 带贡献与失效记录的库）：节点/边/历史保留 10 份/手动编辑标记/旧版页面改走建议；适配器的单参数绑定语义（数组按位置参数、布尔、对象报错）也已复刻。对拍时 uuid 键与并列时间戳、图谱边顺序做了稳定化 | 56 / 131 |
 
 | 项目 | 结果 |
 |---|---|

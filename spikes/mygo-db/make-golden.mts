@@ -386,6 +386,13 @@ const DUMP_SQL: Record<string, string> = {
   askFts: "SELECT session_id, title, questions, answers FROM ask_session_fts",
   askClear: "SELECT item_id FROM ask_evidence_clearances",
   semantic: "SELECT item_id, chunk_index, chunk_text, content_hash, model, dims, hex(vector) AS vec, updated_at FROM knowledge_embeddings",
+  wikiPages: "SELECT id, title, normalized_title, kind, summary, body, aliases_json, provider, model, prompt_version, generated_at, manual_edited_at, created_at, updated_at FROM wiki_pages",
+  wikiLinks: "SELECT from_page_id, to_page_id, created_at FROM wiki_page_links",
+  wikiSources: "SELECT page_id, item_id, created_at FROM wiki_page_sources",
+  wikiRevisions: "SELECT id, page_id, title, kind, summary, body, aliases_json, model, prompt_version, created_at FROM wiki_page_revisions",
+  wikiSuggestions: "SELECT page_id, draft_json, reason, created_at FROM wiki_page_suggestions",
+  wikiFts: "SELECT page_id, title, summary, body FROM wiki_fts",
+  wikiInvalid: "SELECT page_title FROM wiki_invalidated_pages",
   aiUsage: "SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at FROM ai_usage_daily",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
@@ -455,6 +462,66 @@ const semBaseDb = path.join(out, "semantic-base.db");
 const vecQuery = (model: unknown, vector: unknown, extra: Record<string, unknown> = {}) => ({ model, vector, ...extra });
 const goodChunks = (text = "新块") => [{ text, vector: [1, 0, 0, 0] }, { text: text + "2", vector: [0, 0, 1, 0] }];
 const applyArgs = (id: string, over: Record<string, unknown> = {}) => ({ itemId: id, contentHash: semHash[id], model: "m1", dims: 4, chunks: goodChunks(), ...over });
+// ── Wiki：真实的 wiki.ipc.ts；基准库另播种页面、链接、来源、历史版本与编译指纹 ──
+const wikiIpc = await import("../../apps/desktop/src/main/ipc/wiki.ipc.ts");
+function wikiHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  wikiIpc.registerWikiIPC(db as never);
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  return {
+    catalog: wrap("wiki:catalog"), backlinkCounts: wrap("wiki:backlinkCounts"), search: wrap("wiki:search"), getPage: wrap("wiki:getPage"),
+    updatePage: wrap("wiki:updatePage"), deletePage: wrap("wiki:deletePage"), status: wrap("wiki:status"), graph: wrap("wiki:graph"),
+    listRevisions: wrap("wiki:listRevisions"), restoreRevision: wrap("wiki:restoreRevision"),
+  };
+}
+const wikiBaseDb = path.join(out, "wiki-base.db");
+const wikiFlushBaseDb = path.join(out, "wiki-flush-base.db");
+{
+  fs.copyFileSync(baseDb, wikiBaseDb);
+  const wdb = initDatabase(wikiBaseDb);
+  const page = (id: string, title: string, kind: string, summary: string, body: string, aliases: string | null, prompt: string, manual: number | null, at: number) =>
+    wdb.run(
+      "INSERT INTO wiki_pages(id,title,normalized_title,kind,summary,body,aliases_json,provider,model,prompt_version,generated_at,manual_edited_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+      [id, title, title.toLowerCase(), kind, summary, body, aliases, "guizhi", "model-a", prompt, at - 10, manual, at - 20, at],
+    );
+  page("p-01", "归知", "topic", "本地优先的个人知识库", "归知把 [[检索]] 与 [[Electron]] 放在一起。\n\n第二段。", '["GuiZhi","归知应用"]', "fulltext-v2", null, 1_700_000_100_000);
+  page("p-02", "检索", "concept", "全文检索与语义检索", "检索分为全文与语义。见 [[归知]]。", null, "fulltext-v2", null, 1_700_000_200_000);
+  page("p-03", "Electron", "entity", "桌面框架", "Electron 体积大。", "[]", "fulltext-v2", 1_700_000_250_000, 1_700_000_300_000);
+  page("p-04", "MyGo", "entity", "Go 桌面框架", "MyGo 用 WebView2。", null, "old-v1", null, 1_700_000_300_000);
+  page("p-05", "孤立页", "topic", "没有任何链接", "孤立。", null, "fulltext-v2", null, 1_700_000_050_000);
+  for (const [from, to] of [["p-01", "p-02"], ["p-01", "p-03"], ["p-02", "p-01"], ["p-03", "p-02"], ["p-04", "p-02"], ["p-04", "p-03"]])
+    wdb.run("INSERT INTO wiki_page_links VALUES(?,?,?)", [from, to, 1_700_000_000_000]);
+  for (const [pg, item, at] of [["p-01", A, 3], ["p-01", G, 2], ["p-01", B, 1], ["p-02", C, 1], ["p-03", d.id, 1], ["p-04", e.id, 1], ["p-05", vid.id, 1]] as const)
+    wdb.run("INSERT INTO wiki_page_sources VALUES(?,?,?)", [pg, item, 1_700_000_000_000 + at]);
+  for (let n = 1; n <= 12; n++)
+    wdb.run("INSERT INTO wiki_page_revisions VALUES(?,?,?,?,?,?,?,?,?,?)", [`r-${String(n).padStart(2, "0")}`, "p-01", `归知 v${n}`, "topic", `摘要 ${n}`, `旧正文 ${n} [[检索]]`, null, "model-a", "fulltext-v2", 1_699_999_000_000 + n]);
+  wdb.run("INSERT INTO wiki_page_revisions VALUES(?,?,?,?,?,?,?,?,?,?)", ["r-20", "p-02", "检索旧", "concept", "旧摘要", "旧检索正文", '["Search"]', "model-a", "fulltext-v2", 1_699_999_500_000]);
+  for (const [item, hash, prompt] of [[A, "h-a", "fulltext-v2"], [B, "h-b", ""], [C, "h-c", "fulltext-v2"], [G, "h-g", "fulltext-v2"], [d.id, "h-d", "fulltext-v2"]])
+    wdb.run("INSERT INTO wiki_ingestions(item_id,content_hash,model,prompt_version,failure_count,next_attempt_at,updated_at) VALUES(?,?,?,?,?,?,?)", [item, hash, "model-a", prompt, prompt ? 0 : 2, null, 1_700_000_000_000]);
+  wdb.run("UPDATE knowledge_items SET review_status = 'needs_review', review_reasons = ? WHERE id = ?", [JSON.stringify(["过短"]), B]);
+  wdb.run("UPDATE knowledge_items SET review_reasons = 'not json' WHERE id = ?", [vid.id]);
+  wdb.run("UPDATE knowledge_items SET title = '' WHERE id = ?", [d.id]);
+  for (const { id, title, summary, body } of wdb.all("SELECT id, title, summary, body FROM wiki_pages") as Array<{ id: string; title: string; summary: string; body: string }>)
+    wdb.run("INSERT INTO wiki_fts(page_id,title,summary,body) VALUES(?,?,?,?)", [id, segmentTextForFts(title), segmentTextForFts(summary), segmentTextForFts(body)]);
+  closeDatabase();
+
+  // 失效重建用的库：贡献与待重建标题。触发器会在更新条目时清空贡献，所以条目字段不再改动
+  fs.copyFileSync(wikiBaseDb, wikiFlushBaseDb);
+  const fdb = initDatabase(wikiFlushBaseDb);
+  const draft = (title: string, kind: string, summary: string, body: string, linkTargets: string[], aliases: string | null = null) =>
+    JSON.stringify({ title, normalizedTitle: title.toLowerCase(), kind, summary, aliasesJson: aliases, body, linkTargets });
+  const contrib = (item: string, block: string, pageTitle: string, json: string) => fdb.run("INSERT INTO wiki_contributions VALUES(?,?,?,?)", [item, block, pageTitle, json]);
+  contrib(C, "b1", "检索", draft("检索", "concept", "新摘要", "新检索正文 [[归知]] [[不存在]]", ["归知", "不存在", "检索"], '["Retrieval"]'));
+  contrib(A, "b1", "检索", draft("检索", "concept", "另一摘要", "来自归知条目的检索正文", ["electron"]));
+  contrib(A, "b2", "检索", draft("检索", "concept", "第三摘要", "第三块", ["归知"]));
+  contrib(d.id, "b1", "electron", draft("Electron", "entity", "新框架摘要", "新 Electron 正文", ["mygo"]));
+  contrib(i.id, "b1", "新页面", draft("新页面", "topic", "新页摘要", "新页正文 [[检索]] [[mygo]]", ["检索", "mygo", "新页面二"]));
+  contrib(e.id, "b1", "新页面二", draft("新页面二", "entity", "第二个新页", "第二个新页正文 [[新页面]]", ["新页面"]));
+  contrib(e.id, "b2", "mygo", draft("MyGo", "entity", "MyGo 新摘要", "MyGo 新正文", ["检索"]));
+  contrib(G, "b1", "归知", draft("归知", "topic", "回收站来源", "不应出现", []));
+  for (const t of ["检索", "electron", "mygo", "新页面", "新页面二", "孤立页", "幽灵", "归知"]) fdb.run("INSERT INTO wiki_invalidated_pages VALUES(?)", [t]);
+  closeDatabase();
+}
+const P = (n: number) => `p-0${n}`;
 const scenarios: Record<string, Op[]> = {
   createMinimal: [{ fn: "create", args: [{ title: "新建", content: "正文 abc 检索" }] }],
   createFull: [{ fn: "create", args: [{
@@ -815,6 +882,52 @@ const scenarios: Record<string, Op[]> = {
     { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0])] }, { fn: "semantic.clear", args: [] },
     { fn: "semantic.search", args: [vecQuery("m1", [1, 0, 0, 0])] }, { fn: "semantic.status", args: ["m1"] }, { fn: "semantic.listPending", args: [{ model: "m1", limit: 50 }] },
     { fn: "semantic.clear", args: [] },
+  ],  // ── Wiki（fn 带 wiki. 前缀；wiki.flush* 用带失效记录的库）──
+  "wiki.reads": [
+    { fn: "wiki.catalog", args: [] }, { fn: "wiki.backlinkCounts", args: [] }, { fn: "wiki.status", args: [] }, { fn: "wiki.graph", args: [] },
+    ...[P(1), P(2), P(3), P(4), P(5), "missing", "", null, undefined, 5, true, ["p-01"], { id: "p-01" }].map((id) => ({ fn: "wiki.getPage", args: [id] })),
+    ...[P(1), P(2), P(5), "missing", null, undefined, 5].map((id) => ({ fn: "wiki.listRevisions", args: [id] })),
+  ],
+  "wiki.search": [
+    ...["检索", "归知 知识库", "Electron", "桌面框架", "MyGo WebView2", "孤立", "全文检索与语义检索怎么做", "", "  ", "!!!", "[[归知]]", "NOT AND", "\"引号\""].map((q) => ({ fn: "wiki.search", args: [q] })),
+    ...[null, undefined, 5, true, ["检索"], {}].map((q) => ({ fn: "wiki.search", args: [q] })),
+    ...[1, 2, 3, 100, 0, -1, "2", "x", null, 2.5, 0.5].map((limit) => ({ fn: "wiki.search", args: ["检索 归知 Electron", limit] })),
+  ],
+  "wiki.update": [
+    { fn: "wiki.updatePage", args: [{ pageId: P(1), body: "全新正文 [[检索]] [[electron]] [[归知]] [[不存在]] [[mygo]]", linkTargets: ["检索", "electron", "归知", "不存在", "mygo", "检索", 5, null] }] },
+    { fn: "wiki.listRevisions", args: [P(1)] }, { fn: "wiki.getPage", args: [P(1)] }, { fn: "wiki.getPage", args: [P(2)] }, { fn: "wiki.backlinkCounts", args: [] },
+    { fn: "wiki.search", args: ["全新正文"] }, { fn: "wiki.search", args: ["旧"] },
+    { fn: "wiki.updatePage", args: [{ pageId: P(3), body: "放回自动", linkTargets: [], releaseToAuto: true }] },
+    { fn: "wiki.updatePage", args: [{ pageId: P(2), body: "手动编辑 😀 emoji", linkTargets: ["归知"], releaseToAuto: "true" }] },
+    { fn: "wiki.catalog", args: [] }, { fn: "wiki.graph", args: [] },
+  ],
+  "wiki.updateInvalid": [
+    ...[null, undefined, 5, "x", [], {}, { pageId: "missing", body: "b" }, { pageId: 5, body: "b" }, { pageId: P(5) }, { pageId: P(5), body: 5, linkTargets: "x" },
+      { pageId: [P(4)], body: ["a", "b"], linkTargets: { 0: "检索" } }, { pageId: P(4), body: "只改正文", linkTargets: [P(4), "mygo", "MyGo"] },
+    ].map((x) => ({ fn: "wiki.updatePage", args: [x] })),
+    { fn: "wiki.catalog", args: [] }, { fn: "wiki.listRevisions", args: [P(4)] }, { fn: "wiki.listRevisions", args: [P(5)] },
+  ],
+  "wiki.delete": [
+    { fn: "wiki.deletePage", args: [P(1)] }, { fn: "wiki.catalog", args: [] }, { fn: "wiki.graph", args: [] }, { fn: "wiki.backlinkCounts", args: [] },
+    { fn: "wiki.getPage", args: [P(1)] }, { fn: "wiki.listRevisions", args: [P(1)] }, { fn: "wiki.search", args: ["归知"] }, { fn: "wiki.getPage", args: [P(2)] },
+    ...["missing", "", null, undefined, 5, [P(2)], { x: 1 }].map((x) => ({ fn: "wiki.deletePage", args: [x] })),
+    { fn: "wiki.deletePage", args: [P(5)] }, { fn: "wiki.status", args: [] },
+  ],
+  "wiki.restore": [
+    { fn: "wiki.restoreRevision", args: ["r-05"] }, { fn: "wiki.getPage", args: [P(1)] }, { fn: "wiki.listRevisions", args: [P(1)] }, { fn: "wiki.search", args: ["旧正文 5"] },
+    { fn: "wiki.restoreRevision", args: ["r-20"] }, { fn: "wiki.getPage", args: [P(2)] },
+    ...["missing", "", null, undefined, 5, true].map((x) => ({ fn: "wiki.restoreRevision", args: [x] })),
+    { fn: "wiki.catalog", args: [] },
+  ],
+  "wiki.flushCatalog": [
+    { fn: "wiki.catalog", args: [] }, { fn: "wiki.backlinkCounts", args: [] }, { fn: "wiki.status", args: [] },
+    ...[P(1), P(2), P(3), P(4), P(5)].map((id) => ({ fn: "wiki.getPage", args: [id] })), { fn: "wiki.listRevisions", args: [P(2)] }, { fn: "wiki.graph", args: [] },
+    { fn: "wiki.search", args: ["新页正文"] },
+  ],
+  "wiki.flushGetPage": [{ fn: "wiki.getPage", args: [P(3)] }, { fn: "wiki.catalog", args: [] }],
+  "wiki.flushSearch": [{ fn: "wiki.search", args: ["新页正文 检索"] }, { fn: "wiki.catalog", args: [] }, { fn: "wiki.graph", args: [] }],
+  "wiki.flushThenUpdate": [
+    { fn: "wiki.updatePage", args: [{ pageId: P(2), body: "更新前未 flush", linkTargets: ["新页面"] }] }, { fn: "wiki.catalog", args: [] }, { fn: "wiki.getPage", args: [P(2)] },
   ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
@@ -834,7 +947,7 @@ function dumpAll(database: ReturnType<typeof initDatabase>) {
 const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown }> = {};
 for (const [name, ops] of Object.entries(scenarios)) {
   const work = path.join(out, `scenario-${name}.db`);
-  fs.copyFileSync(name.startsWith("semantic.") ? semBaseDb : baseDb, work);
+  fs.copyFileSync(name.startsWith("semantic.") ? semBaseDb : name.startsWith("wiki.flush") ? wikiFlushBaseDb : name.startsWith("wiki.") ? wikiBaseDb : baseDb, work);
   const db = initDatabase(work);
   const daos: Record<string, Record<string, (...a: unknown[]) => unknown>> = {
     knowledge: new KnowledgeItemDB(db) as never,
@@ -844,6 +957,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     ask: askHandlers(db),
     ai: aiUsageHandlers(db),
     semantic: semanticHandlers(db),
+    wiki: wikiHandlers(db),
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
