@@ -287,6 +287,7 @@ const golden: Record<string, unknown> = {
   inbox: listInboxItems(database as never),
   imports: importCases,
 };
+const tagSnapshot = tags.list();
 closeDatabase();
 
 // ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
@@ -297,9 +298,12 @@ const DUMP_SQL: Record<string, string> = {
   tags: "SELECT id, name, color_key, created_at, updated_at FROM tags",
   itemTags: "SELECT item_id, tag_id FROM knowledge_item_tags",
   fts: "SELECT item_id, title, content, tags FROM knowledge_fts",
+  collections: "SELECT id, name, icon, sort_order, created_at, updated_at FROM collections",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
 };
 type Op = { fn: string; args: unknown[] };
+const tagIdByName = new Map(tagSnapshot.map((t) => [t.name, t.id]));
+const tagIdOf = (name: string) => tagIdByName.get(name) ?? "missing-tag";
 // 超过单批 400 的 id 数，覆盖分块路径
 const manyIds = [A, B, C, F, G, ...bulk, ...Array.from({ length: 440 }, (_, n) => `missing-${n}`)];
 const scenarios: Record<string, Op[]> = {
@@ -339,7 +343,76 @@ const scenarios: Record<string, Op[]> = {
   ],
   deleteForever: [{ fn: "deleteForever", args: [[C, G, "missing"]] }],
   emptyTrash: [{ fn: "moveToTrash", args: [[A, B]] }, { fn: "emptyTrash", args: [] }],
-  sequence: [
+  // ── 集合 / 标签写入（fn 带 collection. / tag. 前缀）──
+  "collection.create": [
+    { fn: "collection.create", args: [{ name: "  新集合  ", icon: "star" }] },
+    { fn: "collection.create", args: [{ name: "无图标" }] },
+    { fn: "collection.create", args: [{ name: "空图标", icon: null }] },
+    { fn: "collection.create", args: [{ name: "😀 emoji 集合" }] },
+  ],
+  "collection.createBad": [
+    { fn: "collection.create", args: [{ name: "   " }] },
+    { fn: "collection.create", args: [{}] },
+    { fn: "collection.create", args: [{ name: null }] },
+    { fn: "collection.create", args: [{ name: 5 }] },
+    { fn: "collection.create", args: [null] },
+  ],
+  "collection.update": [
+    { fn: "collection.update", args: [tech.id, { name: " 技术二 " }] },
+    { fn: "collection.update", args: [reading.id, { icon: null, sortOrder: 9 }] },
+    { fn: "collection.update", args: [reading.id, { icon: "book", sortOrder: 1.5 }] },
+    { fn: "collection.update", args: [tech.id, {}] },
+    { fn: "collection.update", args: ["missing", { name: "x" }] },
+  ],
+  "collection.updateBad": [
+    { fn: "collection.update", args: [tech.id, { name: "  " }] },
+    { fn: "collection.update", args: [tech.id, { name: null }] },
+    { fn: "collection.update", args: [tech.id, { sortOrder: null }] },
+    { fn: "collection.update", args: [tech.id, { name: 7 }] },
+  ],
+  "collection.delete": [
+    { fn: "collection.delete", args: [tech.id] },
+    { fn: "collection.delete", args: [tech.id] },
+    { fn: "collection.delete", args: ["missing"] },
+  ],
+  "collection.sequence": [
+    { fn: "collection.create", args: [{ name: "甲" }] },
+    { fn: "collection.delete", args: [reading.id] },
+    { fn: "collection.create", args: [{ name: "乙" }] },
+  ],
+  "tag.create": [
+    { fn: "tag.create", args: [{ name: "  新标签  ", colorKey: "red" }] },
+    { fn: "tag.create", args: [{ name: "知识库", colorKey: "blue" }] },
+    { fn: "tag.create", args: [{ name: "BACKUP" }] },
+    { fn: "tag.create", args: [{ name: "非法颜色", colorKey: "chartreuse" }] },
+    { fn: "tag.create", args: [{ name: "颜色空", colorKey: null }] },
+    { fn: "tag.create", args: [{ name: "ÁBC" }] },
+    { fn: "tag.create", args: [{ name: "ábc" }] },
+  ],
+  "tag.createBad": [
+    { fn: "tag.create", args: [{ name: " " }] },
+    { fn: "tag.create", args: [{}] },
+    { fn: "tag.create", args: [null] },
+    { fn: "tag.create", args: [{ name: 3 }] },
+  ],
+  "tag.update": [
+    { fn: "tag.update", args: [tagIdOf("检索"), { name: " 检索新名 ", colorKey: "purple" }] },
+    { fn: "tag.update", args: [tagIdOf("检索新名x"), { colorKey: "green" }] },
+    { fn: "tag.update", args: [tagIdOf("桌面"), { colorKey: "nope" }] },
+    { fn: "tag.update", args: [tagIdOf("本地"), {}] },
+    { fn: "tag.update", args: ["missing", { name: "x" }] },
+  ],
+  "tag.updateConflict": [
+    { fn: "tag.update", args: [tagIdOf("桌面"), { name: "MYGO" }] },
+    { fn: "tag.update", args: [tagIdOf("桌面"), { name: "桌面" }] },
+    { fn: "tag.update", args: [tagIdOf("桌面"), { name: "  " }] },
+    { fn: "tag.update", args: [tagIdOf("桌面"), { name: null }] },
+  ],
+  "tag.delete": [
+    { fn: "tag.delete", args: [tagIdOf("知识库")] },
+    { fn: "tag.delete", args: [tagIdOf("知识库")] },
+    { fn: "tag.delete", args: ["missing"] },
+  ],  sequence: [
     { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
     { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
     { fn: "moveToTrash", args: [[A]] },
@@ -360,11 +433,18 @@ for (const [name, ops] of Object.entries(scenarios)) {
   const work = path.join(out, `scenario-${name}.db`);
   fs.copyFileSync(baseDb, work);
   const db = initDatabase(work);
-  const dao = new KnowledgeItemDB(db) as unknown as Record<string, (...a: unknown[]) => unknown>;
-  const results: unknown[] = [];
+  const daos: Record<string, Record<string, (...a: unknown[]) => unknown>> = {
+    knowledge: new KnowledgeItemDB(db) as never,
+    collection: new CollectionDB(db) as never,
+    tag: new TagDB(db) as never,
+  };
+  const call = (fn: string, args: unknown[]) => {
+    const [ns, method] = fn.includes(".") ? fn.split(".") : ["knowledge", fn];
+    return daos[ns][method](...args);
+  };  const results: unknown[] = [];
   for (const op of ops) {
     try {
-      results.push({ value: dao[op.fn](...op.args) ?? null });
+      results.push({ value: call(op.fn, op.args) ?? null });
     } catch (error) {
       results.push({ error: (error as Error).message });
     }

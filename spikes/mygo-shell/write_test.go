@@ -75,6 +75,7 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	t.Helper()
 	b := &Bridge{handlers: map[string]handler{}}
 	l.registerWrite(b)
+	l.registerCatalogWrite(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -88,7 +89,11 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 		case "emptyTrash":
 			v, err = l.emptyTrash(ctx)
 		default:
-			h, ok := b.handlers["knowledge:"+op.Fn]
+			channel := "knowledge:" + op.Fn
+			if ns, method, found := strings.Cut(op.Fn, "."); found {
+				channel = ns + ":" + method
+			}
+			h, ok := b.handlers[channel]
 			if !ok {
 				t.Fatalf("频道未登记: %s", op.Fn)
 			}
@@ -117,7 +122,7 @@ func dumpGo(t *testing.T, l *Library, sqls map[string]string) map[string][][]any
 }
 
 // normalizeScenario 对一侧的（返回值, 转储）做同一套抹平，返回可直接比较的结构。
-func normalizeScenario(t *testing.T, baseItems, baseTags map[string]bool, results any, dump map[string][][]any) (any, map[string]any) {
+func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections map[string]bool, results any, dump map[string][][]any) (any, map[string]any) {
 	t.Helper()
 	resAny := normalize(t, results)
 	dumpAny := normalize(t, dump).(map[string]any)
@@ -152,6 +157,7 @@ func normalizeScenario(t *testing.T, baseItems, baseTags map[string]bool, result
 	}
 	assign("items", baseItems, "ITEM", 1, 2)
 	assign("tags", baseTags, "TAG", 1)
+	assign("collections", baseCollections, "COLL", 1)
 
 	var walk func(v any) any
 	walk = func(v any) any {
@@ -230,6 +236,7 @@ func TestWriteParity(t *testing.T) {
 			l := openWriteCopy(t, dir)
 			baseItems := queryIDs(t, l, "SELECT id FROM knowledge_items")
 			baseTags := queryIDs(t, l, "SELECT id FROM tags")
+			baseCollections := queryIDs(t, l, "SELECT id FROM collections")
 
 			goResults := runGoOps(t, l, sc.Ops)
 			goDump := dumpGo(t, l, g.DumpSQL)
@@ -250,8 +257,8 @@ func TestWriteParity(t *testing.T) {
 				}
 			}
 
-			wantRes, wantDump := normalizeScenario(t, baseItems, baseTags, tsResults, sc.Dump)
-			gotRes, gotDump := normalizeScenario(t, baseItems, baseTags, goResults, goDump)
+			wantRes, wantDump := normalizeScenario(t, baseItems, baseTags, baseCollections, tsResults, sc.Dump)
+			gotRes, gotDump := normalizeScenario(t, baseItems, baseTags, baseCollections, goResults, goDump)
 			if !reflect.DeepEqual(wantRes, gotRes) {
 				w, _ := json.MarshalIndent(wantRes, "", " ")
 				gt, _ := json.MarshalIndent(gotRes, "", " ")
