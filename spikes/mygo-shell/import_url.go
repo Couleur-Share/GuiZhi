@@ -11,16 +11,14 @@ import (
 	whatwg "github.com/nlnwa/whatwg-url/url"
 )
 
-var errURLKindNotMigrated = errors.New("该来源类型的采集尚未迁移到新内核")
-
 func (l *Library) importExtractURL(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error) {
 	raw, _ := task["sourceInput"].(string)
 	url := jsTrim(raw)
 	if onStage == nil {
 		onStage = func(string) {}
 	}
-	if detectVideoPlatform(url) != "" {
-		return nil, errURLKindNotMigrated
+	if platform := detectVideoPlatform(url); platform != "" {
+		return l.extractVideoURL(ctx, url, platform, l.newVideoDeps(ctx, onStage))
 	}
 	if target := detectForumPlatform(url); target != nil {
 		deps := l.forumPost

@@ -43,6 +43,7 @@ type Library struct {
 	pickExecutable    func(title string) (string, error) // 选择 yt-dlp / ffmpeg 可执行文件；取消返回空串
 	extractOverride   importExtractFn
 	forumPost         forumPostDeps // 论坛抓取 / 总结的可注入依赖；零值即生产行为（测试用）
+	videoTestDeps     *videoDeps    // 测试注入：非 nil 时视频采集用它替换设置读取与真实依赖
 	pickDirectory     func(title string) (string, error)
 	saveFileDialog    func(title, defaultPath string, filters []dialogFilter) (string, error)
 	// 主题阅读一族迁移前的接入点：取消这些条目的主题阅读任务；返回仍被主题阅读快照租用的资产文件名
