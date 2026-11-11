@@ -414,8 +414,8 @@ func (q *importQueue) processTask(ctx context.Context, id string, task map[strin
 		if releaseSource != nil {
 			releaseSource()
 		}
-		if extracted != nil && q.l.disposeExtracted != nil {
-			q.l.disposeExtracted(extracted)
+		if extracted != nil {
+			q.l.disposeExtractedContent(extracted)
 		}
 	}()
 	fail := func(err error) {
@@ -636,7 +636,25 @@ func (l *Library) importSaveItem(ctx context.Context, p importSaveParams) (strin
 	sourceInput, _ := task["sourceInput"].(string)
 	reasons := assessImportReview(ex.Content, ex.ItemType, ex.WarningReason, sourceKind)
 
-	if refresh, _ := task["refreshOfItemId"].(string); refresh != "" {
+	refresh, _ := task["refreshOfItemId"].(string)
+	if refresh != "" && ex.WebCapture != nil && ex.WebCapture.Snapshot != nil && isWechatURL(sourceInput) {
+		// 公众号补采：只追加原文快照版本，不改正文
+		rows, err := l.db.Query(ctx, "SELECT source_uri FROM source_records WHERE item_id=? ORDER BY captured_at DESC LIMIT 1", refresh)
+		if err != nil {
+			return "", err
+		}
+		original := ""
+		if len(rows.Values) > 0 {
+			original, _ = rows.Values[0][0].(string)
+		}
+		a, aok := normalizeURL(original)
+		b, bok := normalizeURL(sourceInput)
+		if len(rows.Values) == 0 || aok != bok || a != b {
+			return "", errors.New("补采来源与原条目不一致")
+		}
+		return refresh, l.webSourceAttach(ctx, refresh, *ex.WebCapture)
+	}
+	if refresh != "" {
 		rows, err := l.db.Query(ctx, `SELECT i.deleted_at, (
          SELECT s.source_uri FROM source_records s WHERE s.item_id = i.id ORDER BY s.captured_at DESC LIMIT 1
        ) AS source_uri FROM knowledge_items i WHERE i.id = ?`, refresh)

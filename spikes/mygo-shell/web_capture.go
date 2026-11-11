@@ -377,6 +377,13 @@ func (l *Library) captureWebPage(parent context.Context, req webCaptureRequest, 
 	if stage == nil {
 		stage = func(string) {}
 	}
+	if isWechatURL(req.URL) {
+		result, err := l.captureWechat(parent, req.URL, req.TaskID)
+		if err != nil {
+			return l.failWebCapture(req, err)
+		}
+		return result
+	}
 	entry, err := canonicalWebURL(req.URL)
 	if err != nil {
 		// 与 TS 一致：canonicalWebUrl 在 captureWebPage 里直接抛出（不折成结果）；这里折成结果便于调用方统一处理

@@ -50,6 +50,10 @@ type webCaptureResult struct {
 	Truncated      bool             `json:"truncated"`
 	Warnings       []string         `json:"warnings"`
 	Error          *webCaptureError `json:"error,omitempty"`
+	// 公众号原文快照（有序对象，直接并入版本 payload）、其资产文件名，以及释放资产租约的回调
+	Snapshot       *jsObj   `json:"-"`
+	SnapshotAssets []string `json:"-"`
+	release        func()
 }
 
 // canonicalWebURL 对应 canonicalWebUrl：只接受不含账号口令的 http(s)，去掉 hash。

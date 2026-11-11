@@ -26,11 +26,38 @@ func (l *Library) importExtractURL(ctx context.Context, task map[string]any, onS
 	if err != nil {
 		return nil, errors.New("Invalid URL")
 	}
-	if strings.EqualFold(parsed.Hostname(), "mp.weixin.qq.com") {
-		return nil, errURLKindNotMigrated
-	}
 	taskID, _ := task["id"].(string)
+	// 公众号正文已在 HTML 中，直接读取可避免页面脚本、统计请求耗尽浏览器预算。
+	if parsed.Hostname() == "mp.weixin.qq.com" {
+		result, err := l.captureWechat(ctx, url, "import-wechat")
+		if err != nil {
+			return nil, err
+		}
+		ex := webCaptureToExtracted(result)
+		ex.WarningReason = strings.Join(result.Warnings, "；")
+		return ex, nil
+	}
 	onStage("web-preparing")
 	result := l.captureWebPage(ctx, webCaptureRequest{TaskID: taskID, Purpose: "import", URL: url}, onStage)
 	return webCaptureToExtracted(result), nil
+}
+
+// disposeExtractedContent 对应 import-service 的 disposeExtracted：释放公众号快照资产租约，并清掉未被引用的资产文件。
+func (l *Library) disposeExtractedContent(ex *extractedContent) {
+	if l.disposeExtracted != nil {
+		l.disposeExtracted(ex)
+		return
+	}
+	if ex == nil || ex.WebCapture == nil {
+		return
+	}
+	r := ex.WebCapture
+	if r.release != nil {
+		r.release()
+	}
+	if len(r.SnapshotAssets) > 0 {
+		if _, err := l.cleanupOrphanAssets(context.Background(), r.SnapshotAssets); err != nil {
+			logAppErrorf("main", "清理公众号快照资源", "%v", err)
+		}
+	}
 }

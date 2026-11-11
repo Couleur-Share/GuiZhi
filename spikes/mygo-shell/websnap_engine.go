@@ -205,3 +205,30 @@ func snapshotEscapeText(s string) (string, error) {
 	}
 	return e.call("escapeSnapshotText", s)
 }
+
+// snapshotCleanHTMLFn 与 snapshotCleanHTML 相同，资源映射改为回调（返回 ok=false 表示无映射）。
+func snapshotCleanHTMLFn(html string, mapURL func(string) (string, bool)) (string, error) {
+	e, err := getWebsnapEngine()
+	if err != nil {
+		return "", err
+	}
+	return e.call("cleanHtmlFn", html, wrapURLMapper(mapURL))
+}
+
+// snapshotCleanCSSFn 与 snapshotCleanCSS 相同，资源映射改为回调；公众号采集用它按出现顺序收集 url()。
+func snapshotCleanCSSFn(css string, mapURL func(string) (string, bool), stylesheet bool) (string, error) {
+	e, err := getWebsnapEngine()
+	if err != nil {
+		return "", err
+	}
+	return e.call("cleanCssFn", css, wrapURLMapper(mapURL), stylesheet)
+}
+
+func wrapURLMapper(mapURL func(string) (string, bool)) func(string) any {
+	return func(u string) any {
+		if v, ok := mapURL(u); ok {
+			return v
+		}
+		return nil
+	}
+}

@@ -321,7 +321,7 @@ func TestWebCaptureDegradedForImport(t *testing.T) {
 		t.Errorf("降级原因: %q", ex.DegradedReason)
 	}
 	// 尚未迁移的来源如实报错
-	for _, in := range []string{"https://www.bilibili.com/video/BV1xx411c7mD", "https://www.v2ex.com/t/123456", "https://mp.weixin.qq.com/s/abc"} {
+	for _, in := range []string{"https://www.bilibili.com/video/BV1xx411c7mD", "https://www.v2ex.com/t/123456"} {
 		_, err := ws.l.defaultExtract(context.Background(), map[string]any{"sourceKind": "url", "sourceInput": in}, nil)
 		if err == nil || !strings.Contains(err.Error(), "尚未迁移") {
 			t.Errorf("%s: %v", in, err)

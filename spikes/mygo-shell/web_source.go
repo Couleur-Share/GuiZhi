@@ -33,22 +33,77 @@ func webSourceVersionJSON(id, itemID string, r webCaptureResult) string {
 	o.set("engineVersion", r.EngineVersion)
 	o.set("complete", r.Complete && !r.Truncated && r.Error == nil)
 	o.set("kind", "remote")
+	if r.Snapshot != nil {
+		o.set("snapshot", r.Snapshot)
+	}
 	s, _ := jsStringify(o)
 	return s
 }
 
 func webSourceInitStmts(itemID, title, content string, r webCaptureResult) []sqlite.Statement {
 	versionID := newUUID()
-	return []sqlite.Statement{
-		{
-			SQL:  "INSERT INTO web_source_versions VALUES (?,?,?,?)",
-			Args: []any{versionID, itemID, webSourceVersionJSON(versionID, itemID, r), r.CapturedAt},
-		},
-		{
-			SQL:  "INSERT INTO web_source_baselines VALUES (?,?,?,?,?,?,?) ON CONFLICT(item_id) DO UPDATE SET version_id=excluded.version_id,content_hash=excluded.content_hash,title=excluded.title,checked_at=excluded.checked_at,remote_hash=excluded.remote_hash,summary_stale=excluded.summary_stale",
-			Args: []any{itemID, versionID, webContentHash(content), title, nowMs(), webContentHash(r.Markdown), 0},
-		},
+	stmts := webSourceSaveStmts(versionID, itemID, webSourceVersionJSON(versionID, itemID, r), r.CapturedAt, r.SnapshotAssets)
+	return append(stmts, sqlite.Statement{
+		SQL:  "INSERT INTO web_source_baselines VALUES (?,?,?,?,?,?,?) ON CONFLICT(item_id) DO UPDATE SET version_id=excluded.version_id,content_hash=excluded.content_hash,title=excluded.title,checked_at=excluded.checked_at,remote_hash=excluded.remote_hash,summary_stale=excluded.summary_stale",
+		Args: []any{itemID, versionID, webContentHash(content), title, nowMs(), webContentHash(r.Markdown), 0},
+	})
+}
+
+// webSourceSaveStmts 对应 save()：写入版本，并登记快照引用的资产文件（文件名格式不对就整体失败）。
+func webSourceSaveStmts(id, itemID, payload string, capturedAt int64, assets []string) []sqlite.Statement {
+	stmts := []sqlite.Statement{webSourceSaveStmt(id, itemID, payload, capturedAt)}
+	for _, name := range assets {
+		stmts = append(stmts, sqlite.Statement{SQL: "INSERT OR IGNORE INTO web_snapshot_assets VALUES (?,?)", Args: []any{id, name}})
 	}
+	return stmts
+}
+
+// webResultSnapshotHash 对应 result.snapshot?.hash。
+func webResultSnapshotHash(r webCaptureResult) (string, bool) {
+	if r.Snapshot == nil {
+		return "", false
+	}
+	h, ok := r.Snapshot.get("hash").(string)
+	return h, ok
+}
+
+// webSourceAttach 对应 attach：补采只添加来源版本，不覆盖用户正文。
+func (l *Library) webSourceAttach(ctx context.Context, itemID string, r webCaptureResult) error {
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+	item, err := l.webSourceItemGet(ctx, itemID)
+	if err != nil {
+		return err
+	}
+	if item == nil {
+		return errors.New("条目不存在或已删除")
+	}
+	versions, err := l.webSourceVersions(ctx, itemID)
+	if err != nil {
+		return err
+	}
+	newHash, newHas := webResultSnapshotHash(r)
+	for i := range versions {
+		if versions[i].Kind != "remote" {
+			continue
+		}
+		prevHash, prevHas := versions[i].snapshotHash()
+		if prevHas == newHas && prevHash == newHash && versions[i].ContentHash == webContentHash(r.Markdown) && versions[i].Title == r.Title {
+			return nil
+		}
+		break
+	}
+	baseline, err := l.webSourceBaseline(ctx, itemID)
+	if err != nil {
+		return err
+	}
+	versionID := newUUID()
+	stmts := webSourceSaveStmts(versionID, itemID, webSourceVersionJSON(versionID, itemID, r), r.CapturedAt, r.SnapshotAssets)
+	if baseline == nil {
+		stmts = append(stmts, webSourceBaselineStmt(itemID, versionID, item.Content, item.Title, webContentHash(r.Markdown), false))
+	}
+	_, err = l.db.Transaction(ctx, stmts)
+	return err
 }
 
 // webSourceVersion 是 web_source_versions.payload 的解析形式；Raw 保留原始 JSON，IPC 原样返回。
@@ -228,9 +283,9 @@ func (l *Library) webSourceCheck(ctx context.Context, itemID string, r webCaptur
 	if basis == nil {
 		basis = previous
 	}
-	// 本次采集没有快照（hash 为 undefined）；旧版本带 hash 时视为已变化
+	newHash, newHas := webResultSnapshotHash(r)
 	if previous != nil && previous.ContentHash == version.ContentHash && previous.Title == version.Title {
-		if _, hasHash := previous.snapshotHash(); !hasHash {
+		if prevHash, prevHas := previous.snapshotHash(); prevHas == newHas && prevHash == newHash {
 			if _, err := l.db.Transaction(ctx, []sqlite.Statement{{SQL: "UPDATE web_source_baselines SET checked_at=? WHERE item_id=?", Args: []any{nowMs(), itemID}}}); err != nil {
 				return "", err
 			}
@@ -240,14 +295,14 @@ func (l *Library) webSourceCheck(ctx context.Context, itemID string, r webCaptur
 			return "pending-version", nil
 		}
 	}
-	stmts := []sqlite.Statement{webSourceSaveStmt(versionID, itemID, payload, version.CapturedAt)}
+	stmts := webSourceSaveStmts(versionID, itemID, payload, version.CapturedAt, r.SnapshotAssets)
 	var basisEngine *string
 	if basis != nil {
 		basisEngine = basis.EngineVersion
 	}
 	be, bok := extractorOf(basisEngine)
 	ve, vok := extractorOf(version.EngineVersion)
-	if baseline == nil || webContentHash(item.Content) != baseline.ContentHash || be != ve || bok != vok {
+	if r.Snapshot != nil || baseline == nil || webContentHash(item.Content) != baseline.ContentHash || be != ve || bok != vok {
 		if _, err := l.db.Transaction(ctx, stmts); err != nil {
 			return "", err
 		}
