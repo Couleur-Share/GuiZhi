@@ -160,6 +160,8 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - **字节层：不等价。** Markdown 逐字相同只有 7 页，差异来自两个库的写法：Turndown 转义 `]`、html-to-markdown 不转义；html-to-markdown 会重新编码链接 URL（把查询串里的 `/` 改成 `%2F`，并对括号、方括号、空格做百分号编码）；列表标记后的空格数也不同。URL 被改写会改变链接的字面内容。要字节级一致，就得自己写一个 Turndown 的 Go 移植（需处理空白折叠与转义规则，工作量未估算），而不是用现成库；或者接受换引擎后 `contentHash` 全变，由 `WEB_EXTRACT_ENGINE` 版本号（现为 `readability/1`）标明引擎变化，已入库的页面按新引擎版本重新比较。
 - 10 页的段落字数（`readabilityChars`）不一致，但正文来源的决定没有因此翻转。原因没有深查：最可能是 Readability 输出里 `div` 与 `p` 的划分，跟 linkedom 与 `x/net/html` 的解析差异有关。回退阈值是 0.6 的比例，目前样本里没有页面因此越线，但越线的风险存在。
 
+**决定（2026-11-11）：** 接受 Markdown 字节差异，不移植 Turndown。换引擎时提高 `WEB_EXTRACT_ENGINE` 版本号，已入库页面按新引擎版本重新比较。前提：内容层等价（上表前两行）在更大样本上仍成立；若留出样本出现正文选错，再重新评估是否移植 Turndown。
+
 仍没有验证：`sanitize-html`、GBK 等非 UTF-8 站点、非技术类网站的留出样本、微信公众号页面、正文超长截断的页面。
 运行方式（语料目录与输出目录自行指定）：
 
