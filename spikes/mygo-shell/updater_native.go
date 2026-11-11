@@ -45,6 +45,12 @@ func (l *Library) registerUpdater(b *Bridge, isPackaged bool, quit func()) *Upda
 		downloadsDir:   func() string { return filepath.Join(home, "Downloads") },
 		spawnInstaller: spawnDetached,
 		quit:           quit,
+		createBackup: func(reason string) {
+			// 安装前先留一份可回退的快照；失败只记日志，不阻断更新（与 TS 的 createBackupSafe 一致）
+			if _, err := l.localBackups().createSafe(reason); err != nil {
+				logAppErrorf("updater", "安装前备份失败", "%v", err)
+			}
+		},
 	})
 	u.register(b)
 	return u

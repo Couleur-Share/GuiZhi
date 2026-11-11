@@ -34,14 +34,17 @@ type Library struct {
 	pickDirectory    func(title string) (string, error)
 	saveFileDialog   func(title, defaultPath string, filters []dialogFilter) (string, error)
 	// 主题阅读一族迁移前的接入点：取消这些条目的主题阅读任务；返回仍被主题阅读快照租用的资产文件名
-	cancelThemedReading    func(ids []string)
-	leasedSnapshotAssets   func() []string
-	pushMu                 sync.RWMutex
-	push                   func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
-	sc                     shortcutState                     // 快捷键配置（shortcuts.go）
-	cfg                    configState                       // 配置迁移的 read→apply 状态（config_transfer.go）
-	appData                string                            // %APPDATA%（getPath(\"appData\")）；空则读环境变量
-	hasActiveThemedReading func() bool                       // 主题阅读一族迁移前的接入点：是否有任务在跑
+	cancelThemedReading     func(ids []string)
+	leasedSnapshotAssets    func() []string
+	pushMu                  sync.RWMutex
+	push                    func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
+	sc                      shortcutState                     // 快捷键配置（shortcuts.go）
+	cfg                     configState                       // 配置迁移的 read→apply 状态（config_transfer.go）
+	appData                 string                            // %APPDATA%（getPath(\"appData\")）；空则读环境变量
+	hasActiveThemedReading  func() bool
+	retireIdleThemedReading func() // 主题阅读一族迁移前的接入点：恢复前让空闲的主题阅读 worker 退场
+	dbPath                  string // 在线数据库文件路径（备份 VACUUM INTO 的来源）
+	backup                  backupState
 }
 
 func asInt(v any) int64 {

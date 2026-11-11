@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"log"
 	"slices"
+	"sort"
 	"sync"
 )
 
@@ -26,14 +27,55 @@ var (
 type rendererBackupSettings struct {
 	mu       sync.RWMutex
 	settings map[string]any
+	raw      []byte // 原始 JSON：保留键序（JS 对象序），快照里的 renderer-settings.json 靠它还原
+	onChange func() // 设置变化后回调（重算仓库自动备份任务）；nil 表示无
 }
 
 func (s *rendererBackupSettings) set(v map[string]any) {
 	s.mu.Lock()
 	s.settings = v
+	s.raw = nil
 	s.mu.Unlock()
 }
 
+// setRaw 记录一份已校验为对象的 JSON；raw 保留键序。
+func (s *rendererBackupSettings) setRaw(raw []byte, v map[string]any) {
+	s.mu.Lock()
+	s.settings = v
+	s.raw = append([]byte(nil), raw...)
+	cb := s.onChange
+	s.mu.Unlock()
+	if cb != nil {
+		cb()
+	}
+}
+
+// ordered 返回按原始键序解析的设置；没有设置返回 nil（对应 getBackupRendererSettings() 的 undefined）。
+func (s *rendererBackupSettings) ordered() *omap {
+	s.mu.RLock()
+	raw, m := s.raw, s.settings
+	s.mu.RUnlock()
+	if raw != nil {
+		if v, err := parseOrdered(raw); err == nil {
+			if o, ok := v.(*omap); ok {
+				return o
+			}
+		}
+	}
+	if m == nil {
+		return nil
+	}
+	o := newOmap() // 仅测试经 set() 写入时走这里：键序不保证
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		o.set(k, m[k])
+	}
+	return o
+}
 func (s *rendererBackupSettings) get() map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -63,7 +105,7 @@ func (b *Bridge) registerSimpleBoot(backup *rendererBackupSettings) {
 		if len(raw) == 0 || raw[0] != '{' || json.Unmarshal(raw, &m) != nil {
 			return false, nil
 		}
-		backup.set(m)
+		backup.setRaw(raw, m)
 		return true, nil
 	}
 }

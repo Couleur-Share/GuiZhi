@@ -1,7 +1,8 @@
-﻿# 备份仓库与恢复流程的差分测试：产品真实的 TS 代码 vs Go 移植，互读互写、对拍恢复结果。
+# 备份仓库与恢复流程的差分测试：产品真实的 TS 代码 vs Go 移植，互读互写、对拍恢复结果。
 # 用法（仓库根目录）：powershell -File spikes\mygo-restore\run-diff.ps1 -GoExe <mygo-restore.exe> -FixtureDb <fixture 数据库>
+# 对拍壳层里的实现：-GoExe <mygo-shell.exe> -GoPrefix -backupcli（壳层的 -backupcli 子命令与 spike 的命令行同名同参）
 # 所有操作都在临时目录里，不碰真实用户数据；fixture 数据库只读复制。
-param([Parameter(Mandatory)][string]$GoExe, [Parameter(Mandatory)][string]$FixtureDb)
+param([Parameter(Mandatory)][string]$GoExe, [Parameter(Mandatory)][string]$FixtureDb, [string[]]$GoPrefix = @())
 $ErrorActionPreference = 'Continue'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'UTF8'   # PowerShell 5.1 默认按 ANSI 读文件，中文会乱码
 $noBom = New-Object Text.UTF8Encoding $false
@@ -15,7 +16,7 @@ $env:GUIZHI_SCHEMA_VERSION = (& pnpm dlx tsx $ts schema 2>&1 | Select-Object -La
 $script:fails = 0
 $PW = 'correct horse battery'
 function T { & pnpm dlx tsx $ts @args 2>&1 | Where-Object { $_ -notmatch 'starship|^\[DB\]|Database initialized' } }
-function G { & $GoExe @args 2>&1 }
+function G { & $GoExe @GoPrefix @args 2>&1 }
 function Check($name, $ok, $detail = '') {
   $ok = [bool]$ok
   if (-not $ok) { $script:fails++ }

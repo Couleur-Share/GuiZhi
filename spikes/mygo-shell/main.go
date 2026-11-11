@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -112,7 +113,11 @@ func main() {
 	aiRunner := flag.String("airunner", "", "-aitest 的运行器 runner.mjs")
 	aiOut := flag.String("aiout", "", "-aitest 的结果输出文件")
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
+	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
 	flag.Parse()
+	if *backupCLI {
+		os.Exit(runBackupCLI(flag.Args()))
+	}
 	if *mcpMode {
 		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
 		return
@@ -121,6 +126,7 @@ func main() {
 		log.Fatal("需要 -dist 与 -db")
 	}
 
+	waitForRelaunchParent()
 	automation := *shot != "" || *aiTest != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
 	if !automation && !mygo.App.RequestSingleInstanceLock() {
 		return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
@@ -138,7 +144,7 @@ func main() {
 	if ud == "" {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
 	}
-	lib := &Library{db: db, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
+	lib := &Library{db: db, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
 	if lib.appData == "" {
 		lib.appData = filepath.Dir(ud)
 	}
@@ -168,7 +174,9 @@ func main() {
 	}
 	lib.relaunch = func() {
 		if exe, err := os.Executable(); err == nil {
-			_ = exec.Command(exe, os.Args[1:]...).Start()
+			cmd := exec.Command(exe, os.Args[1:]...)
+			cmd.Env = append(os.Environ(), relaunchParentEnv+"="+strconv.Itoa(os.Getpid()))
+			_ = cmd.Start()
 		}
 		mygo.App.Quit()
 	}
@@ -204,7 +212,12 @@ func main() {
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)
-	b.registerSimpleBoot(&rendererBackupSettings{})
+	renderer := &rendererBackupSettings{}
+	lib.registerBackup(b, renderer)
+	b.registerSimpleBoot(renderer)
+	if !automation {
+		lib.jobs.Start() // 对应 backgroundJobs.start()：自动化实例（截图/基准/AI 对拍）不跑后台任务
+	}
 	newAIProxy(lib.configuredAIHosts).register(b)
 	mygo.Bind(b)
 
