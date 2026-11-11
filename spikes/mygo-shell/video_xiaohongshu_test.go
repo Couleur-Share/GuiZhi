@@ -107,7 +107,7 @@ func xhsGolden(t *testing.T, r forumRec, want any) bool {
 		}
 		fgCompare(t, want, map[string]any{"ok": xhsProject(n), "fetchCalls": fetchCalls})
 	default:
-		return false
+		return articleGolden(t, r, want)
 	}
 	return true
 }

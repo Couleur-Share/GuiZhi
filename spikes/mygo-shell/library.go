@@ -37,6 +37,9 @@ type Library struct {
 	pickFiles         func(multiple bool, filters []dialogFilter) ([]string, error)
 	funasrOnce        sync.Once
 	aiChatHTTP        *http.Client // 测试注入；为空时用按网络代理选路的默认客户端
+	searchHTTP        *http.Client // 联网搜索的出站客户端（测试注入；空则用不跟随重定向的代理客户端）
+	readingSearch     readingSearchState
+	articleAsk        articleAskDeps
 	aiChatHTTPOnce    sync.Once
 	aiChatHTTPDefault *http.Client
 	funasrEng         *funasrEngine                      // 本地转写引擎（FunASR）托管状态，首次使用时创建

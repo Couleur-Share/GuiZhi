@@ -215,6 +215,8 @@ export async function buildVideoGolden(): Promise<{ recs: Rec[] }> {
   await addDouyinCases(add);
   const { addXhsCases } = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "xhs-cases.mts")).href);
   await addXhsCases(add);
+  const { addArticleCases } = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "article-cases.mts")).href);
+  await addArticleCases(add);
   void os;
   return { recs };
 }
