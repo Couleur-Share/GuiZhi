@@ -1728,6 +1728,11 @@ fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景�
   golden.configTransfer = cfg.configTransfer;
 }
 
+{
+  const { buildLegacyGolden } = await import("./golden-legacy.mts");
+  golden.legacyMigration = await buildLegacyGolden({ ipcHandlers, userData: path.join(isolatedAppData, "GuiZhi"), out, initDatabase, closeDatabase });
+}
+
 golden.dumpSql = DUMP_SQL;
 golden.selAssets = selAssets;
 golden.writes = writes;

@@ -182,6 +182,7 @@ func main() {
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)
 	lib.registerConfigTransfer(b)
+	lib.registerLegacyMigration(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
 	}
