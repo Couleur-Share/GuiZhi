@@ -279,29 +279,9 @@ func (f *safeFetcher) webRequest(ctx context.Context, rawURL string, o safeReque
 	if len(raw) > webResponseLimit {
 		return webHop{}, errors.New("网页响应超过 10 MiB")
 	}
-	data := raw
-	switch enc := strings.ToLower(resp.Header.Get("Content-Encoding")); enc {
-	case "", "identity":
-	case "gzip", "deflate":
-		var r io.Reader
-		if enc == "gzip" {
-			r, err = gzip.NewReader(bytes.NewReader(raw))
-		} else if r, err = zlib.NewReader(bytes.NewReader(raw)); err != nil {
-			// 个别服务器发送裸 deflate，Node 的 inflateSync 会失败；这里多容一层，结果只会更宽松
-			r, err = flate.NewReader(bytes.NewReader(raw)), nil
-		}
-		if err != nil {
-			return webHop{}, err
-		}
-		data, err = io.ReadAll(io.LimitReader(r, webResponseLimit+1))
-		if err != nil {
-			return webHop{}, err
-		}
-		if len(data) > webResponseLimit {
-			return webHop{}, errors.New("解压后的网页超过 10 MiB")
-		}
-	default:
-		return webHop{}, errors.New("不支持的响应压缩格式")
+	data, err := decodeWebContentEncoding(raw, resp.Header.Get("Content-Encoding"))
+	if err != nil {
+		return webHop{}, err
 	}
 	h := map[string]string{}
 	for k, vs := range resp.Header {
@@ -313,6 +293,36 @@ func (f *safeFetcher) webRequest(ctx context.Context, rawURL string, o safeReque
 		h[lk] = strings.Join(vs, "\n")
 	}
 	return webHop{Status: resp.StatusCode, Headers: h, Body: data}, nil
+}
+
+// decodeWebContentEncoding 解压响应体：gzip / deflate（Go 无 brotli，请求头不声明 br），解压后同样受 10 MiB 上限约束。
+func decodeWebContentEncoding(raw []byte, encoding string) ([]byte, error) {
+	var err error
+	switch enc := strings.ToLower(encoding); enc {
+	case "", "identity":
+		return raw, nil
+	case "gzip", "deflate":
+		var r io.Reader
+		if enc == "gzip" {
+			r, err = gzip.NewReader(bytes.NewReader(raw))
+		} else if r, err = zlib.NewReader(bytes.NewReader(raw)); err != nil {
+			// 个别服务器发送裸 deflate，Node 的 inflateSync 会失败；这里多容一层，结果只会更宽松
+			r, err = flate.NewReader(bytes.NewReader(raw)), nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		data, err := io.ReadAll(io.LimitReader(r, webResponseLimit+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(data) > webResponseLimit {
+			return nil, errors.New("解压后的网页超过 10 MiB")
+		}
+		return data, nil
+	default:
+		return nil, errors.New("不支持的响应压缩格式")
+	}
 }
 
 var reWebBinaryType = regexp.MustCompile(`(?i)application/(?:pdf|json|octet-stream)`)

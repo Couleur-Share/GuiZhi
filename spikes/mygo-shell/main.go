@@ -100,6 +100,9 @@ func (b *Bridge) report() {
 }
 
 func main() {
+	if runCaptureChildIfRequested() { // 采集浏览器子进程：只托管隐藏窗口，不走正常启动流程
+		return
+	}
 	dist := flag.String("dist", "", "spikes/mygo-shell/dist 目录")
 	dbPath := flag.String("db", "", "knowledge.db（建议用隔离 fixture）")
 	configDir := flag.String("config", "", "config 目录（放 ai-models.json）；不给则 AI 配置读写报错")
@@ -161,6 +164,8 @@ func main() {
 
 	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
 	lib := &Library{db: db, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
+	// 网页渲染：采集浏览器子进程按需启动（首次需要渲染时），空闲 90 s 后自动退出。
+	lib.webRenderer = newRenderHost(func() *safeFetcher { return lib.webFetcher })
 	if lib.appData == "" {
 		lib.appData = filepath.Dir(ud)
 	}
