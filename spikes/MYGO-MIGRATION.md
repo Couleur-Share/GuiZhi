@@ -45,7 +45,7 @@ Go 工具链要求 1.27.3，本机 1.26.3 由 `GOTOOLCHAIN=auto` 自动拉取。
 
 ## 已知阻塞与风险
 
-1. **备份：`VACUUM INTO` 与 `ATTACH` 被 MyGo 的 SQLite 插件拒绝。** 备选方案：换纯 Go 驱动（如 `modernc.org/sqlite`，未验证）、或关库后拷贝。
+1. **备份：MyGo 的 SQLite 插件用授权回调拒绝 `VACUUM INTO` 与 `ATTACH`（authorization denied）。已验证的替代方案：备份单独用 `modernc.org/sqlite` 只读连接做 `VACUUM INTO`（见下节「备份验证」）。
 2. **网络层拦截：已找到可行路径，附带安全约束（见下节「网络拦截验证」）。** MyGo 没有直接的 webRequest 接口，但可以在进程内设置 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0`，再由 Go 连 DevTools 协议拦截。
 3. **新旧版本不能同时打开同一个数据库。** 旧版 wasm 驱动用 `mkdir <db>.lock` 目录锁，与原生 SQLite 的字节范围锁不兼容；MCP 服务也用 wasm 驱动。灰度期要么互斥，要么统一驱动。
 4. **机密与加密。** `ai-models.json` 里 `apiKey` 以明文保存在数据目录（与 TS 一致，迁移时没改）；`safeStorage`（DPAPI）保存的凭证、`electron-updater` 都需要单独的迁移方案。
@@ -93,6 +93,24 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 - 代理是环境级参数（`--proxy-server`），按进程设置；Electron 的按分区 `setProxy` 在 MyGo 的 `Session` 接口里没找到对应物。
 - 按分区隔离：`Fetch` 拦截按 target 生效，天然隔离；持久会话与 cookie 已在 `mygo-capture` 验证。
 - 还没验证：多个并发 target 的拦截隔离、采集进程池与复用、反爬场景下的真实站点。
+## 备份验证（`spikes/mygo-backup`）
+
+`createBackup` 用 `VACUUM INTO` 对在线库生成单文件备份；MyGo 内置 SQLite 拒绝它（`authorization denied (code 23)`，已实测）。替代做法：业务读写仍走 MyGo 自带 SQLite，备份只用纯 Go 的 `modernc.org/sqlite` 以 `mode=ro` 打开同一个库并执行 `VACUUM INTO`。运行：`go run . <含 knowledge.db 的目录> [padMB]`，样本是 212 MB 的库（真实 `knowledge.db` 加两张各 100 MB 的 pad 表）。
+
+| 检查 | 结果 |
+|---|---|
+| 备份文件的 `integrity_check` 与 FTS5 `integrity-check` | 通过 |
+| MyGo 自带 SQLite 打开备份，所有表行数、建表语句与源库一致 | 通过 |
+| 单次备份耗时（212 MB） | 约 0.83 秒 |
+| MyGo 持续写入时连续备份 5 次 | 全部通过，快照原子（成对写入的两张表行数相等），写入 0 次失败 |
+| 备份期间写入的最长停顿 | 882 ms |
+| 目标文件已存在 | 报错 `output file already exists`，与 `VACUUM INTO` 语义一致 |
+
+要点：
+
+- 当前库是回滚日志模式（没有 WAL，见 `packages/db/src/init.ts`），备份持有读锁期间，写入会等到备份结束，所以停顿大约等于备份耗时。这和现状一致，但 Go 里备份可以放在后台协程，界面线程不会像现在这样被同步 `VACUUM INTO` 冻住。
+- 二进制体积增加约 4 MB（只含这两个包的最小程序对比，粗略值）。
+- 这些只验证了「备份生成」。还没验证：恢复流程（`pre-restore` 快照、换库、重启）、加密备份格式、备份仓库的 `syncRendererSettings` 之外的频道、sqlite 版本差异对旧版 wasm 读取备份的影响。
 ## 还没做的
 
 启动时壳层仍有 7 个频道未实现：
@@ -132,5 +150,5 @@ GuiZhi 主进程对网络层的实际用法（`apps/desktop/src/main`）：`onBe
 ## 建议的下一步
 
 1. 服务边界已定，网络拦截已有可行路径。可以继续迁移。
-2. 验证备份替代方案（第 1 条）；用真实站点和多 target 并发压测独立采集进程。
+2. 用真实站点和多 target 并发压测独立采集进程；验证备份恢复流程，以及旧版 wasm 能否读取 modernc 生成的备份。
 3. 如果继续迁：按「纯读库 → 写库 → 带副作用」的顺序，沿用差分对拍，每迁一组频道就补一组基准。
