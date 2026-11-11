@@ -161,6 +161,8 @@ func main() {
 	lib.register(b)
 	lib.registerList(b)
 	lib.registerWrite(b)
+	lib.registerKnowledgeCleanup(b)
+	lib.registerKnowledgeBatch(b)
 	lib.registerCatalogWrite(b)
 	lib.registerInboxWrite(b)
 	lib.registerAskSessions(b)

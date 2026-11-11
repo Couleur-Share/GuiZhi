@@ -33,8 +33,11 @@ type Library struct {
 	extractOverride  importExtractFn
 	pickDirectory    func(title string) (string, error)
 	saveFileDialog   func(title, defaultPath string, filters []dialogFilter) (string, error)
-	pushMu           sync.RWMutex
-	push             func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
+	// 主题阅读一族迁移前的接入点：取消这些条目的主题阅读任务；返回仍被主题阅读快照租用的资产文件名
+	cancelThemedReading  func(ids []string)
+	leasedSnapshotAssets func() []string
+	pushMu               sync.RWMutex
+	push                 func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
 }
 
 func asInt(v any) int64 {

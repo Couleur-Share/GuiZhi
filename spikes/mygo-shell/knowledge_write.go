@@ -446,12 +446,30 @@ func uniqueStrings(ss []string) []string {
 	return out
 }
 
+// knowledgeBulkUpdate 对应 bulkUpdate：自己加锁并开事务；批处理要把它与回执写进同一个事务时用 bulkUpdateStmts。
 func (l *Library) knowledgeBulkUpdate(ctx context.Context, ids []string, in BulkUpdateInput) (any, error) {
 	if len(ids) == 0 {
 		return int64(0), nil
 	}
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()
+	stmts, updateCount, err := l.bulkUpdateStmts(ctx, ids, in)
+	if err != nil {
+		return nil, err
+	}
+	results, err := l.db.Transaction(ctx, stmts)
+	if err != nil {
+		return nil, err
+	}
+	var changed int64
+	for i := 0; i < updateCount; i++ {
+		changed += results[i].Changes
+	}
+	return changed, nil
+}
+
+// bulkUpdateStmts 生成 bulkUpdate 的全部语句；前 updateCount 条是 UPDATE，其 Changes 之和即返回值。调用方须持有 writeMu。
+func (l *Library) bulkUpdateStmts(ctx context.Context, ids []string, in BulkUpdateInput) (stmts []sqlite.Statement, updateCount int, err error) {
 	addNames := normalizeTagNames(in.AddTagNames.Val)
 	removeNames := map[string]bool{}
 	for _, n := range normalizeTagNames(in.RemoveTagNames.Val) {
@@ -489,8 +507,6 @@ func (l *Library) knowledgeBulkUpdate(ctx context.Context, ids []string, in Bulk
 	}
 
 	pending := map[string][2]string{}
-	var stmts []sqlite.Statement
-	updateCount := 0
 	for start := 0; start < len(target); start += bulkWriteChunkSize {
 		end := min(start+bulkWriteChunkSize, len(target))
 		batch := target[start:end]
@@ -504,7 +520,7 @@ func (l *Library) knowledgeBulkUpdate(ctx context.Context, ids []string, in Bulk
 		for _, id := range target {
 			rows, err := l.db.Query(ctx, "SELECT id, title, content FROM knowledge_items WHERE id = ?", id)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			if len(rows.Values) == 0 {
 				continue
@@ -513,7 +529,7 @@ func (l *Library) knowledgeBulkUpdate(ctx context.Context, ids []string, in Bulk
 			content, _ := rows.Values[0][2].(string)
 			current, err := l.currentTagNames(ctx, id)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			var kept []string
 			for _, n := range current {
@@ -523,24 +539,25 @@ func (l *Library) knowledgeBulkUpdate(ctx context.Context, ids []string, in Bulk
 			}
 			tagStmts, resolved, err := l.replaceTagsStmts(ctx, id, normalizeTagNames(append(kept, addNames...)), now, pending)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			ftsStmts, err := l.writeFtsStmts(ctx, id, title, content, resolved)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			stmts = append(append(stmts, tagStmts...), ftsStmts...)
 		}
 	}
-	results, err := l.db.Transaction(ctx, stmts)
-	if err != nil {
-		return nil, err
+	return stmts, updateCount, nil
+}
+
+// perIDStmts 逐条 UPDATE 的语句；批处理把它们与回执放进同一个事务。
+func perIDStmts(ids []string, sql string, args func(id string) []any) []sqlite.Statement {
+	stmts := make([]sqlite.Statement, len(ids))
+	for i, id := range ids {
+		stmts[i] = sqlite.Statement{SQL: sql, Args: args(id)}
 	}
-	var changed int64
-	for i := 0; i < updateCount; i++ {
-		changed += results[i].Changes
-	}
-	return changed, nil
+	return stmts
 }
 
 // perIDUpdate 对应 setStatus / moveToTrash / restore：逐条 UPDATE，汇总实际改动数。
@@ -550,11 +567,7 @@ func (l *Library) perIDUpdate(ctx context.Context, ids []string, sql string, arg
 	}
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()
-	stmts := make([]sqlite.Statement, len(ids))
-	for i, id := range ids {
-		stmts[i] = sqlite.Statement{SQL: sql, Args: args(id)}
-	}
-	results, err := l.db.Transaction(ctx, stmts)
+	results, err := l.db.Transaction(ctx, perIDStmts(ids, sql, args))
 	if err != nil {
 		return nil, err
 	}
@@ -583,34 +596,18 @@ func (l *Library) restore(ctx context.Context, ids []string) (any, error) {
 		func(id string) []any { return []any{now, id} })
 }
 
-// deleteForever 只做数据库部分。knowledge:deleteForever 频道还要取消主题阅读、清理问答证据、
-// 回收磁盘资产（见 knowledge.ipc.ts），这些子系统尚未迁移，所以该频道暂不登记，免得静默漏掉清理。
-func (l *Library) deleteForever(ctx context.Context, ids []string) (any, error) {
-	if len(ids) == 0 {
-		return int64(0), nil
-	}
-	l.writeMu.Lock()
-	defer l.writeMu.Unlock()
-	var stmts []sqlite.Statement
-	var deletes []int
+// deleteForeverStmts 生成彻底删除的语句与各条 DELETE 的下标（其 Changes 之和即返回值）；调用方须持有 writeMu。
+func (l *Library) deleteForeverStmts(ctx context.Context, ids []string) (stmts []sqlite.Statement, deletes []int, err error) {
 	for _, id := range ids {
 		fts, err := l.deleteFtsStmts(ctx, id)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		stmts = append(stmts, fts...)
 		deletes = append(deletes, len(stmts))
 		stmts = append(stmts, sqlite.Statement{SQL: "DELETE FROM knowledge_items WHERE id = ?", Args: []any{id}})
 	}
-	results, err := l.db.Transaction(ctx, stmts)
-	if err != nil {
-		return nil, err
-	}
-	var changed int64
-	for _, i := range deletes {
-		changed += results[i].Changes
-	}
-	return changed, nil
+	return stmts, deletes, nil
 }
 
 func normalizeIDs(raw json.RawMessage) []string {
@@ -674,23 +671,15 @@ func (l *Library) registerWrite(b *Bridge) {
 		_ = json.Unmarshal(argAt(a, 1), &status)
 		return l.setStatus(ctx, normalizeIDs(argAt(a, 0)), status)
 	}
-	// moveToTrash 在 TS 里还会取消这些条目的主题阅读任务（内存态）；主题阅读迁移前没有可取消的任务。
+	// moveToTrash 在 TS 里还会取消这些条目的主题阅读任务（内存态）；主题阅读迁移前没有可取消的任务，挂钩留空。
 	b.handlers["knowledge:moveToTrash"] = func(ctx context.Context, a []json.RawMessage) (any, error) {
-		return l.moveToTrash(ctx, normalizeIDs(argAt(a, 0)))
+		ids := normalizeIDs(argAt(a, 0))
+		if l.cancelThemedReading != nil {
+			l.cancelThemedReading(ids)
+		}
+		return l.moveToTrash(ctx, ids)
 	}
 	b.handlers["knowledge:restore"] = func(ctx context.Context, a []json.RawMessage) (any, error) {
 		return l.restore(ctx, normalizeIDs(argAt(a, 0)))
 	}
-}
-
-func (l *Library) emptyTrash(ctx context.Context) (any, error) {
-	rows, err := l.db.Query(ctx, "SELECT id FROM knowledge_items WHERE deleted_at IS NOT NULL")
-	if err != nil {
-		return nil, err
-	}
-	ids := make([]string, 0, len(rows.Values))
-	for _, r := range rows.Values {
-		ids = append(ids, r[0].(string))
-	}
-	return l.deleteForever(ctx, ids)
 }

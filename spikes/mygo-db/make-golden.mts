@@ -490,6 +490,37 @@ function importHandlers(db: unknown): Record<string, (...a: unknown[]) => unknow
   };
 }
 
+// 批量选择/彻底删除：真实的 knowledge.ipc.ts（含资产清理）；selectionId 是随机 uuid，统一抹成 SEL
+const knowledgeIpc = await import("../../apps/desktop/src/main/ipc/knowledge.ipc.ts");
+function scrubSel(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(scrubSel);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "selectionId" && typeof x === "string" ? "SEL" : scrubSel(x)]));
+  return v;
+}
+function selHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  knowledgeIpc.registerKnowledgeIPC(db as never);
+  const wrap = (channel: string) => async (...args: unknown[]) => scrubSel(await (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args));
+  return { selection: wrap("knowledge:selection"), deleteForever: wrap("knowledge:deleteForever"), emptyTrash: wrap("knowledge:emptyTrash") };
+}
+// sel.* 场景的资产文件：每个场景开始前重建，结束后列出剩余文件作为比对基准
+const selAssets = { images: ["sel-d.png", "sel-shared.png", "sel-crawl.png", "sel-keep.png", "sel-g.png", "sel-rev.png", "sel-web.png", "sel-snap.png", "sel-orphan.png"], videos: ["sel-g.mp4"] };
+const selAssetRoot = path.join(isolatedAppData, "GuiZhi", "data", "assets");
+function resetSelAssets() {
+  fs.rmSync(selAssetRoot, { recursive: true, force: true });
+  for (const [dir, names] of Object.entries(selAssets)) {
+    fs.mkdirSync(path.join(selAssetRoot, dir), { recursive: true });
+    for (const n of names) fs.writeFileSync(path.join(selAssetRoot, dir, n), "x");
+  }
+}
+function listSelAssets(): string[] {
+  const out: string[] = [];
+  for (const dir of Object.keys(selAssets)) {
+    const full = path.join(selAssetRoot, dir);
+    if (fs.existsSync(full)) for (const n of fs.readdirSync(full)) out.push(`${dir}/${n}`);
+  }
+  return out.sort();
+}
+
 // ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
@@ -519,6 +550,12 @@ const DUMP_SQL: Record<string, string> = {
   sourceRecords: "SELECT item_id, source_type, source_uri, access_uri, normalized_uri, content_hash, platform, captured_at FROM source_records",
   sourceRevisions: "SELECT item_id, title, content, transcript, review_json, captured_at FROM source_capture_revisions",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
+  // 批量选择：冻结集合（展开成逐条 id，集合 id 是随机的不比）、批量回执、各类版本/抓取页
+  selectionSets: "SELECT s.created_at, j.key, j.value FROM knowledge_selection_sets s, json_each(s.ids_json) j",
+  selectionSetCount: "SELECT COUNT(*) FROM knowledge_selection_sets",
+  batchResults: "SELECT run_id, item_id, command_json, result_json, updated_at FROM knowledge_batch_results",
+  webVersions: "SELECT id, item_id FROM web_source_versions WHERE id LIKE 'wv-%'",
+  revisionIds: "SELECT id, item_id FROM source_capture_revisions WHERE id LIKE 'rv-%' OR id LIKE 'rev-%'",
 };
 type Op = { fn: string; args: unknown[] };
 const tagIdByName = new Map(tagSnapshot.map((t) => [t.name, t.id]));
@@ -651,6 +688,29 @@ const importBaseDb = path.join(out, "import-base.db");
   const idb = initDatabase(importBaseDb);
   idb.run("DELETE FROM mobile_capture_tasks");
   idb.run("DELETE FROM import_tasks");
+  closeDatabase();
+}
+// 批量选择/彻底删除场景的基准库：D、G 在回收站；各处引用资产（正文、采集修订、网页版本、抓取页），
+// E 与 D 共用 sel-shared.png / sel-keep.png（E 未删，所以不能被回收）；另放 25 份修订测 LIMIT 20
+const selBaseDb = path.join(out, "sel-base.db");
+const D = d.id, E = e.id;
+{
+  fs.copyFileSync(baseDb, selBaseDb);
+  const sdb = initDatabase(selBaseDb);
+  const setContent = (id: string, content: string) => sdb.run("UPDATE knowledge_items SET content = ? WHERE id = ?", [content, id]);
+  sdb.run("UPDATE knowledge_items SET deleted_at = ? WHERE id = ?", [1_700_000_000_000, D]);
+  setContent(D, "d 正文 local-image://sel-d.png local-image://sel-shared.png local-image://sel-crawl.png local-image://sel-keep.png");
+  setContent(G, "g 正文 local-image://sel-g.png local-video://sel-g.mp4");
+  setContent(E, "e 正文 local-image://sel-shared.png");
+  sdb.run("INSERT INTO source_capture_revisions VALUES('rev-g', ?, '旧版', 'local-image://sel-rev.png', NULL, '[\"x\"]', 1700000000000)", [G]);
+  for (let n = 0; n < 25; n++) {
+    sdb.run("INSERT INTO source_capture_revisions VALUES(?, ?, ?, ?, ?, '[]', ?)", [`rv-${String(n).padStart(2, "0")}`, E, `修订 ${n}`, `内容 ${n}`, n % 2 ? `转写 ${n}` : null, 1_700_000_000_000 + (n % 5) * 1000]);
+  }
+  sdb.run("INSERT INTO web_source_versions VALUES('wv-g', ?, ?, 1700000000000)", [G, JSON.stringify({ markdown: "网页 local-image://sel-web.png", snapshot: { assets: [{ fileName: "sel-snap.png" }] } })]);
+  sdb.run("INSERT INTO web_source_versions VALUES('wv-e', ?, ?, 1700000000000)", [E, JSON.stringify({ snapshot: { assets: [{ fileName: "sel-keep.png" }] } })]);
+  sdb.run("INSERT INTO crawl_jobs VALUES('cj', '{}', 'done', 1700000000000, 1700000000000)");
+  sdb.run("INSERT INTO crawl_pages VALUES('cp', 'cj', 'https://c.test/', 0, 0, 'done', ?)", [JSON.stringify({ result: { snapshot: { assets: [{ fileName: "sel-crawl.png" }] } } })]);
+  sdb.run("INSERT INTO knowledge_selection_sets VALUES('old-set', '[\"x\"]', 1700000000000)");
   closeDatabase();
 }
 const P = (n: number) => `p-0${n}`;
@@ -1295,6 +1355,82 @@ const scenarios: Record<string, Op[]> = {
   });
 }
 
+// ── 批量选择 / 彻底删除 / 清空回收站（含磁盘资产回收、问答证据清除、回执幂等）──
+{
+  const s = (fn: string, ...args: unknown[]): Op => ({ fn: `sel.${fn}`, args });
+  const sel = (input: unknown): Op => s("selection", input);
+  const ex = (ids: unknown, command: unknown, runId?: unknown): Op => sel({ action: "execute", ids, command, runId });
+  const res = (runId: unknown): Op => sel({ action: "results", runId });
+  // 回执按 (updated_at, item_id) 排序：处理顺序与 id 顺序一致，同毫秒也不会换位
+  const ord = (...x: string[]) => [...x].sort();
+  const miss = ["zz-missing-1", "zz-missing-2"];
+  const trashA: Op = { fn: "moveToTrash", args: [[A]] };
+  Object.assign(scenarios, {
+    "sel.delete-forever": [s("deleteForever", [D, G, "missing"])],
+    "sel.delete-forever-steps": [s("deleteForever", [G]), s("deleteForever", [D]), s("deleteForever", [D])],
+    "sel.delete-forever-live": [s("deleteForever", [E])],
+    "sel.empty-trash": [s("emptyTrash"), s("emptyTrash")],
+    "sel.empty-trash-evidence": [trashA, s("emptyTrash", { clearEvidence: true })],
+    "sel.delete-evidence": [
+      { fn: "moveToTrash", args: [[A, B]] }, s("deleteForever", [A], { clearEvidence: "yes" }), s("deleteForever", [B], { clearEvidence: true }),
+      s("deleteForever", [], { clearEvidence: true }), s("deleteForever", null), s("deleteForever", "x", { clearEvidence: true }),
+    ],
+    "sel.freeze": [
+      sel({ action: "freeze", query: { scope: "all" } }), sel({ action: "freeze", query: { scope: "trash" } }), sel({ action: "freeze", query: {} }),
+      sel({ action: "freeze", query: { scope: "all", includeArchived: true } }), sel({ action: "freeze", query: { scope: "favorites" } }),
+      sel({ action: "freeze", query: { scope: "archived" } }), sel({ action: "freeze", query: { scope: "uncategorized" } }),
+      sel({ action: "freeze", query: { scope: "all", search: "检索" } }), sel({ action: "freeze", query: { scope: "all", search: "  桌面  ", searchMode: "recall" } }),
+      sel({ action: "freeze", query: { scope: "all", search: "!!!" } }), sel({ action: "freeze", query: { scope: "all", search: "   " } }),
+      sel({ action: "freeze", query: { scope: "all", excludedItemIds: [A, B] } }), sel({ action: "freeze", query: { scope: "all", excludedItemIds: [] } }),
+      sel({ action: "freeze", query: { scope: "all", collectionScope: { ids: [tech.id], includeUncategorized: false } } }),
+      sel({ action: "freeze", query: { scope: "all", collectionScope: { ids: [tech.id], includeUncategorized: true } } }),
+      sel({ action: "freeze", query: { scope: "all", collectionScope: { ids: [], includeUncategorized: true } } }),
+      sel({ action: "freeze", query: { scope: "all", collectionScope: { ids: [], includeUncategorized: false } } }),
+      sel({ action: "freeze", query: { scope: "all", collectionId: tech.id } }), sel({ action: "freeze", query: { scope: "all", tagId: tagIdOf("桌面") } }),
+      sel({ action: "freeze", query: { scope: "all", platform: "web" } }),
+      sel({ action: "freeze", query: { scope: "all", sortBy: "title", sortOrder: "asc" } }), sel({ action: "freeze", query: { scope: "all", sortBy: "createdAt", sortOrder: "asc" } }),
+      sel({ action: "freeze", query: { scope: "all", sortBy: "bogus" } }),
+      sel({ action: "freeze", query: { scope: "all", search: "检索", excludedItemIds: [C], sortBy: "title" } }),
+      sel({ action: "freeze" }), sel({ action: "freeze", query: null }),
+    ],
+    "sel.source-versions": [
+      sel({ action: "source-versions", id: E }), sel({ action: "source-versions", id: G }), sel({ action: "source-versions", id: "missing" }),
+      sel({ action: "source-versions", id: null }), sel({ action: "source-versions" }), sel({ action: "source-versions", id: 5 }),
+    ],
+    "sel.invalid": [
+      sel(undefined), sel(null), sel({}), sel({ action: "bogus" }), sel("freeze"), sel({ action: "execute" }), sel({ action: "execute", command: null }),
+      sel({ action: "execute", command: { kind: "trash" } }), sel({ action: "execute", ids: 5, command: { kind: "status", status: "active" } }),
+      sel({ action: "execute", ids: { a: 1 }, command: { kind: "status", status: "active" } }),
+      sel({ action: "execute", ids: "ab", command: { kind: "restore" } }), sel({ action: "execute", ids: null, command: { kind: "restore" } }),
+      ex([A], { kind: "bogus" }, "inv"), res("inv"), ex([A], { kind: "update" }, "inv2"), ex([A], { kind: "update", patch: {} }), ex([A], "restore"),
+      ex(["", null, 5, A, A], { kind: "restore" }), ex([A], { kind: "restore" }, ""), res(""), res(null), sel({ action: "results" }), res("none"),
+    ],
+    "sel.exec-update": [
+      ex([...ord(A, B, F), A, ...miss], { kind: "update", patch: { isFavorite: true, status: "archived", addTagNames: ["批量新", "桌面"], removeTagNames: ["本地"] } }, "r1"),
+      res("r1"),
+      ex(ord(A, B, F), { kind: "update", patch: { isFavorite: true, status: "archived", addTagNames: ["批量新", "桌面"], removeTagNames: ["本地"] } }, "r1"),
+      ex(ord(A, B), { kind: "update", patch: { isFavorite: false } }, "r1"), res("r1"),
+      ex(ord(A, B), { kind: "update", patch: { collectionId: tech.id, isPinned: true, reviewStatus: "clear" } }),
+      ex([G], { kind: "update", patch: { isFavorite: true } }, "r2"), res("r2"),
+    ],
+    "sel.exec-status-trash": [
+      ex(ord(A, F), { kind: "status", status: "archived" }, "s1"), res("s1"),
+      ex([...ord(A, B, G), ...miss], { kind: "trash" }, "t1"), res("t1"),
+      ex(ord(A, B), { kind: "trash" }, "t1"), ex([G], { kind: "status", status: "active" }, "t2"), ex(ord(A, G), { kind: "restore" }, "t3"), res("t3"),
+      ex(ord(A, F, G), { kind: "restore" }, "t3"), ex([A], { kind: "trash" }, "t4"), ex([A], { kind: "restore" }, "t4"), res("t4"),
+    ],
+    "sel.exec-delete": [
+      ex(ord(A, D, G, E), { kind: "delete" }, "d1"), res("d1"), ex(ord(A, D, G, E), { kind: "delete" }, "d1"),
+      ex([A], { kind: "trash" }), ex([A], { kind: "delete", clearEvidence: true }, "d2"), res("d2"), ex([A], { kind: "delete", clearEvidence: true }, "d2"),
+      ex([B], { kind: "trash" }), ex([B], { kind: "delete", clearEvidence: false }),
+    ],
+    "sel.exec-delete-retry": [
+      ex(ord(D, G), { kind: "delete" }, "d3"), ex(ord(D, G), { kind: "delete", clearEvidence: true }, "d3"), res("d3"),
+      ex(ord(D, G), { kind: "delete" }, "d3"),
+    ],
+  });
+}
+
 function dumpAll(database: ReturnType<typeof initDatabase>) {
   const dump: Record<string, unknown[][]> = {};
   for (const [name, sql] of Object.entries(DUMP_SQL)) {
@@ -1303,10 +1439,11 @@ function dumpAll(database: ReturnType<typeof initDatabase>) {
   return dump;
 }
 
-const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown }> = {};
+const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown; assetFiles?: string[] }> = {};
 for (const [name, ops] of Object.entries(scenarios)) {
   const work = path.join(out, `scenario-${name}.db`);
-  fs.copyFileSync(name.startsWith("imp.") ? importBaseDb : name.startsWith("semantic.") ? semBaseDb : name.startsWith("wiki.flush") ? wikiFlushBaseDb : name.startsWith("wiki.") ? wikiBaseDb : baseDb, work);
+  if (name.startsWith("sel.")) resetSelAssets();
+  fs.copyFileSync(name.startsWith("sel.") ? selBaseDb : name.startsWith("imp.") ? importBaseDb : name.startsWith("semantic.") ? semBaseDb : name.startsWith("wiki.flush") ? wikiFlushBaseDb : name.startsWith("wiki.") ? wikiBaseDb : baseDb, work);
   const db = initDatabase(work);
   const daos: Record<string, Record<string, (...a: unknown[]) => unknown>> = {
     knowledge: new KnowledgeItemDB(db) as never,
@@ -1320,6 +1457,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     draft: { save: (input: unknown) => saveKnowledgeDraft(db as never, input as never) } as never,
     job: jobHandlers(db),
     imp: name.startsWith("imp.") ? importHandlers(db) : {}, // 注册会触发启动恢复，只给导入场景开
+    sel: name.startsWith("sel.") ? selHandlers(db) : {},
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>
@@ -1337,10 +1475,11 @@ for (const [name, ops] of Object.entries(scenarios)) {
       results.push({ error: (error as Error).message });
     }
   }
-  writes[name] = { ops, results, dump: dumpAll(db) };
+  writes[name] = { ops, results, dump: dumpAll(db), ...(name.startsWith("sel.") ? { assetFiles: listSelAssets() } : {}) };
   closeDatabase();
   fs.rmSync(work, { force: true });
 }
+fs.rmSync(selAssetRoot, { recursive: true, force: true }); // 不让 sel 场景的资产混进导出基准
 // ── Markdown 批量导出：同一份库、同一批资产，TS 导出的目录树作为基准 ──
 {
   const exportDbPath = path.join(out, "export-base.db");
@@ -1396,6 +1535,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
 }
 
 golden.dumpSql = DUMP_SQL;
+golden.selAssets = selAssets;
 golden.writes = writes;
 
 // ── settings:get / settings:set：用真实的 settings.ipc.ts 处理函数（electron 换成桩）做基准 ──

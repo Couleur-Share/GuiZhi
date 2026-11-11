@@ -29,12 +29,14 @@ type writeScenario struct {
 		Value json.RawMessage `json:"value"`
 		Error *string         `json:"error"`
 	} `json:"results"`
-	Dump map[string][][]any `json:"dump"`
+	Dump       map[string][][]any `json:"dump"`
+	AssetFiles []string           `json:"assetFiles"`
 }
 
 type writeGolden struct {
-	DumpSQL map[string]string        `json:"dumpSql"`
-	Writes  map[string]writeScenario `json:"writes"`
+	DumpSQL   map[string]string        `json:"dumpSql"`
+	Writes    map[string]writeScenario `json:"writes"`
+	SelAssets map[string][]string      `json:"selAssets"`
 }
 
 // 抹平时间戳的阈值：基准库造的数据都在 1.7e12 附近，运行时 Date.now() 在 1.75e12 之后
@@ -75,6 +77,8 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	t.Helper()
 	b := &Bridge{handlers: map[string]handler{}}
 	l.registerWrite(b)
+	l.registerKnowledgeCleanup(b)
+	l.registerKnowledgeBatch(b)
 	l.registerCatalogWrite(b)
 	l.registerInboxWrite(b)
 	l.registerAskSessions(b)
@@ -93,10 +97,6 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			err error
 		)
 		switch op.Fn {
-		case "deleteForever":
-			v, err = l.deleteForever(ctx, normalizeIDs(op.Args[0]))
-		case "emptyTrash":
-			v, err = l.emptyTrash(ctx)
 		case "job.clock", "job.register", "job.schedule", "job.unschedule", "job.tick", "job.settle", "job.drain":
 			v, err = jt.run(ctx, strings.TrimPrefix(op.Fn, "job."), op.Args)
 		case "imp.settle", "imp.recover", "imp.release", "imp.seed", "imp.events", "imp.enqueue", "imp.list", "imp.state", "imp.pause", "imp.resume", "imp.cancel",
@@ -109,6 +109,9 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
 				channel = ns + ":" + method
+				if ns == "sel" {
+					channel = "knowledge:" + method
+				}
 				if ns == "draft" {
 					channel = "knowledge:saveDraft"
 				}
@@ -127,6 +130,9 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 				t.Fatalf("频道未登记: %s", op.Fn)
 			}
 			v, err = h(ctx, resolveCursorArgs(op.Args, out))
+			if strings.HasPrefix(op.Fn, "sel.") {
+				v = scrubSelectionID(v)
+			}
 		}
 		if err != nil {
 			out = append(out, map[string]any{"error": err.Error()})
@@ -134,6 +140,41 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			out = append(out, map[string]any{"value": v})
 		}
 	}
+	return out
+}
+
+// scrubSelectionID 把冻结集合的随机 id 统一成 SEL（与 make-golden.mts 的 scrubSel 对应）。
+func scrubSelectionID(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, e := range x {
+			if _, ok := e.(string); ok && k == "selectionId" {
+				x[k] = "SEL"
+			} else {
+				x[k] = scrubSelectionID(e)
+			}
+		}
+	case []any:
+		for i := range x {
+			x[i] = scrubSelectionID(x[i])
+		}
+	}
+	return v
+}
+
+func listAssetFiles(t *testing.T, p Paths) []string {
+	t.Helper()
+	out := []string{}
+	for _, dir := range []string{"images", "videos"} {
+		entries, err := os.ReadDir(filepath.Join(p.AssetsDir(), dir))
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			out = append(out, dir+"/"+e.Name())
+		}
+	}
+	sort.Strings(out)
 	return out
 }
 
@@ -304,6 +345,8 @@ func TestWriteParity(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			base := "knowledge.db"
 			switch {
+			case strings.HasPrefix(name, "sel."):
+				base = "sel-base.db" // 批量选择/彻底删除：带资产引用、修订、网页版本的基准库
 			case strings.HasPrefix(name, "imp."):
 				base = "import-base.db" // 导入队列场景：去掉预置任务的基准库
 			case strings.HasPrefix(name, "semantic."):
@@ -320,7 +363,25 @@ func TestWriteParity(t *testing.T) {
 			baseWikiPages := queryIDs(t, l, "SELECT id FROM wiki_pages")
 			baseWikiRevs := queryIDs(t, l, "SELECT id FROM wiki_page_revisions")
 
+			if strings.HasPrefix(name, "sel.") {
+				l.paths = Paths{UserData: t.TempDir()}
+				for dir, names := range g.SelAssets {
+					if err := os.MkdirAll(filepath.Join(l.paths.AssetsDir(), dir), 0o755); err != nil {
+						t.Fatal(err)
+					}
+					for _, n := range names {
+						if err := os.WriteFile(filepath.Join(l.paths.AssetsDir(), dir, n), []byte("x"), 0o600); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
 			goResults := runGoOps(t, l, sc.Ops)
+			if strings.HasPrefix(name, "sel.") {
+				if got := listAssetFiles(t, l.paths); !reflect.DeepEqual(sc.AssetFiles, got) {
+					t.Errorf("磁盘资产不一致\nTS: %v\nGo: %v", sc.AssetFiles, got)
+				}
+			}
 			goDump := dumpGo(t, l, g.DumpSQL)
 
 			// TS 侧结果：{value} 或 {error}
