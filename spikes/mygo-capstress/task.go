@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,20 +30,21 @@ type capOpts struct {
 }
 
 type taskResult struct {
-	id       int
-	ok       bool
-	phase    string // 失败发生的阶段
-	err      string
-	dur      time.Duration
-	closeDur time.Duration
-	title    string
-	htmlLen  int
-	textLen  int
-	blocked  int
-	popups   int
-	dialogs  int
-	crashed  bool
-	navErr   string
+	id        int
+	ok        bool
+	phase     string // 失败发生的阶段
+	err       string
+	dur       time.Duration
+	closeDur  time.Duration
+	title     string
+	htmlLen   int
+	textLen   int
+	blocked   int
+	popups    int
+	dialogs   int
+	crashed   bool
+	navErr    string
+	unhealthy bool // 窗口需要换掉（卡死、崩溃、加载超时）
 }
 
 func (t *task) fetchPatterns() []map[string]any {
@@ -67,6 +69,8 @@ type task struct {
 	dialogs  int
 	crashed  bool
 	subs     []string
+	loads    map[string]bool // 已收到 load 生命周期事件的 loaderId
+	loadSig  chan struct{}
 }
 
 var taskSeq atomic.Int64
@@ -81,10 +85,19 @@ func allowLoopbackHosts(hosts ...string) func(string) bool {
 
 func (t *task) onEvent(m cdpMsg) {
 	switch m.Method {
-	case "Page.loadEventFired":
-		if m.SessionID == t.main {
+	case "Page.lifecycleEvent":
+		// 用 loaderId 对应到本次导航：复用的窗口可能带着上一个文档的 load 事件，不能只看“收到了 load”。
+		var le struct {
+			Name     string `json:"name"`
+			LoaderID string `json:"loaderId"`
+		}
+		json.Unmarshal(m.Params, &le)
+		if le.Name == "load" && m.SessionID == t.main {
+			t.mu.Lock()
+			t.loads[le.LoaderID] = true
+			t.mu.Unlock()
 			select {
-			case t.loaded <- struct{}{}:
+			case t.loadSig <- struct{}{}:
 			default:
 			}
 		}
@@ -92,7 +105,12 @@ func (t *task) onEvent(m cdpMsg) {
 		t.mu.Lock()
 		t.dialogs++
 		t.mu.Unlock()
-		go t.d.call(m.SessionID, "Page.handleJavaScriptDialog", map[string]any{"accept": false})
+		var dp struct {
+			Type string `json:"type"`
+		}
+		json.Unmarshal(m.Params, &dp)
+		// beforeunload 必须接受，否则复用窗口时导航回空白页会被它拦住；其余弹窗一律取消。
+		go t.d.call(m.SessionID, "Page.handleJavaScriptDialog", map[string]any{"accept": dp.Type == "beforeunload"})
 	case "Inspector.targetCrashed":
 		t.mu.Lock()
 		t.crashed = true
@@ -230,9 +248,10 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 	if o.evalTimeout == 0 {
 		o.evalTimeout = 8 * time.Second
 	}
-	t := &task{b: b, d: b.d, id: id, o: o, loaded: make(chan struct{}, 2)}
+	t := &task{b: b, d: b.d, id: id, o: o, loaded: make(chan struct{}, 2), loads: map[string]bool{}, loadSig: make(chan struct{}, 1)}
 	fail := func(phase string, err error) taskResult {
 		res.phase, res.err = phase, err.Error()
+		res.unhealthy = !(phase == "navigate" && res.navErr != "") || errors.Is(err, errClosed)
 		return res
 	}
 	var r json.RawMessage
@@ -260,6 +279,9 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 		}
 		for i, tid := range ids {
 			if i == 0 && o.reuse != "" {
+				if res.unhealthy {
+					continue // 窗口由池整个换掉，不再往卡死的页面发命令
+				}
 				b.d.call(t.main, "Fetch.disable", nil) // 否则这个窗口里残留的拦截没人处理，下次导航会挂住
 				b.d.call(t.main, "Target.setAutoAttach", map[string]any{"autoAttach": false, "flatten": true})
 				b.d.call(t.main, "Page.navigate", map[string]any{"url": "about:blank"})
@@ -292,6 +314,9 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 		for _, sid := range t.subs {
 			b.d.setSession(sid, nil)
 		}
+		if t.main != "" {
+			b.d.setSession(t.main, nil)
+		}
 		t.mu.Unlock()
 	}()
 	r, err = b.d.call("", "Target.attachToTarget", map[string]any{"targetId": t.targetID, "flatten": true})
@@ -303,14 +328,14 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 	}
 	json.Unmarshal(r, &at)
 	t.main = at.SessionID
-	b.d.setSession(t.main, t.onEvent)
-	defer b.d.setSession(t.main, nil)
+	b.d.setSession(t.main, t.onEvent) // 清理阶段还要处理 beforeunload 弹窗，所以在清理的最后才摘掉
 	for _, c := range []struct {
 		m string
 		p any
 	}{
 		{"Page.enable", nil},
 		{"Runtime.enable", nil},
+		{"Page.setLifecycleEventsEnabled", map[string]any{"enabled": true}},
 		{"Fetch.enable", map[string]any{"patterns": t.fetchPatterns()}},
 	} {
 		if _, err := b.d.call(t.main, c.m, c.p); err != nil {
@@ -333,19 +358,29 @@ func (b *browser) capture(u string, id int, o capOpts) (res taskResult) {
 	}
 	var nv struct {
 		ErrorText string `json:"errorText"`
+		LoaderID  string `json:"loaderId"`
 	}
 	json.Unmarshal(nr, &nv)
 	if nv.ErrorText != "" {
 		res.navErr = nv.ErrorText
 		return fail("navigate", fmt.Errorf("%s", nv.ErrorText))
 	}
-	select {
-	case <-t.loaded:
-	case <-b.d.closed:
-		return fail("load", errClosed)
-	case <-time.After(o.navTimeout):
-		b.d.call(t.main, "Page.stopLoading", nil)
-		return fail("load", fmt.Errorf("加载超时（%s）", o.navTimeout))
+	loadDeadline := time.After(o.navTimeout)
+	for {
+		t.mu.Lock()
+		got := nv.LoaderID != "" && t.loads[nv.LoaderID]
+		t.mu.Unlock()
+		if got {
+			break
+		}
+		select {
+		case <-t.loadSig:
+		case <-b.d.closed:
+			return fail("load", errClosed)
+		case <-loadDeadline:
+			b.d.call(t.main, "Page.stopLoading", nil)
+			return fail("load", fmt.Errorf("加载超时（%s）", o.navTimeout))
+		}
 	}
 	if o.afterLoad != nil {
 		o.afterLoad(t)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -57,7 +58,19 @@ func runChild(userData string) {
 				return
 			}
 			fmt.Printf("READY %s %s\n", strings.TrimSpace(lines[0]), strings.TrimSpace(lines[1]))
-			io.Copy(io.Discard, os.Stdin) // 父进程退出或关闭管道即结束
+			// 控制通道：父进程发 NEW 就新建一个隐藏窗口（采集页池里的一个），父进程退出或关闭管道即结束。
+			sc := bufio.NewScanner(os.Stdin)
+			for sc.Scan() {
+				if sc.Text() == "NEW" {
+					nw := mygo.NewWindow(mygo.WindowOptions{
+						Title: "capture-page", Width: 1024, Height: 768, URL: "about:blank", Hidden: true,
+						Page: mygo.PageOptions{BackgroundThrottling: mygo.ThrottlingOff},
+					})
+					// 必须显式拒绝：不设处理器时，MyGo 会把 window.open 的 http(s) 地址交给系统默认浏览器。
+					nw.Page().SetWindowOpenHandler(func(mygo.WindowOpenRequest) *mygo.WindowOptions { return nil })
+					fmt.Println("WIN")
+				}
+			}
 			mygo.App.Quit()
 		}()
 	})
@@ -69,6 +82,9 @@ func runChild(userData string) {
 // ---------- 父进程侧 ----------
 
 type browser struct {
+	winCh    chan struct{}
+	winMu    sync.Mutex
+	pool     *pool
 	tasks    sync.Map // targetID → *task，用来把弹窗归到打开它的任务
 	cmd      *exec.Cmd
 	d        *cdp
@@ -96,11 +112,20 @@ func startBrowser() (*browser, error) {
 		return nil, err
 	}
 	lineCh := make(chan string, 1)
+	winCh := make(chan struct{}, 256)
 	go func() {
-		buf := make([]byte, 256)
-		n, _ := stdout.Read(buf)
-		lineCh <- strings.TrimSpace(string(buf[:n]))
-		io.Copy(io.Discard, stdout)
+		sc := bufio.NewScanner(stdout)
+		first := true
+		for sc.Scan() {
+			if first {
+				first = false
+				lineCh <- strings.TrimSpace(sc.Text())
+				continue
+			}
+			if strings.TrimSpace(sc.Text()) == "WIN" {
+				winCh <- struct{}{}
+			}
+		}
 	}()
 	var line string
 	select {
@@ -119,7 +144,7 @@ func startBrowser() (*browser, error) {
 		cmd.Process.Kill()
 		return nil, err
 	}
-	b := &browser{cmd: cmd, d: d, userData: ud, stdin: stdin, started: t0}
+	b := &browser{cmd: cmd, d: d, userData: ud, stdin: stdin, started: t0, winCh: winCh}
 	d.global = b.onBrowserEvent
 	// 浏览器级自动接管：新 target（包括 window.open 弹窗，它们不会出现在打开者的页面会话里）都先暂停，
 	// 由我们套上拦截规则再放行。

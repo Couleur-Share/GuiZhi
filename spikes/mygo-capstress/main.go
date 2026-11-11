@@ -18,6 +18,7 @@ import (
 )
 
 type env struct {
+	poolSize   int    // >0：用采集进程里预建的隐藏 MyGo 窗口作为采集页；0：每个任务 Target.createTarget
 	baseTarget string // 采集进程自带的 MyGo 窗口对应的 target
 
 	srv   *server
@@ -46,6 +47,11 @@ func (e *env) newBrowser() error {
 		return err
 	}
 	e.b = b
+	if e.poolSize > 0 {
+		if err := b.makePool(e.poolSize); err != nil {
+			return err
+		}
+	}
 	e.base = b.pageCount()
 	e.baseTarget = ""
 	if ts, err := b.targets(); err == nil {
@@ -75,7 +81,15 @@ func (e *env) runJobs(jobs []job, conc int) ([]taskResult, time.Duration) {
 			defer wg.Done()
 			for i := range ch {
 				id := int(taskSeq.Add(1))
-				res[i] = e.b.capture(jobs[i].url(id), id, jobs[i].o)
+				o := jobs[i].o
+				if p := e.b.pool; p != nil && o.reuse == "" {
+					tid := p.acquire()
+					o.reuse = tid
+					res[i] = e.b.capture(jobs[i].url(id), id, o)
+					p.release(tid, res[i].unhealthy)
+					continue
+				}
+				res[i] = e.b.capture(jobs[i].url(id), id, o)
 			}
 		}()
 	}
@@ -171,10 +185,12 @@ func main() {
 	inner := flag.Bool("inner", false, "（内部）已在离屏桌面中")
 	logPath := flag.String("log", "", "（内部）把输出写到该文件")
 	rounds := flag.Int("rounds", 3, "并发场景中语料的轮数")
+	flag.IntVar(&poolMaxUse, "poolmax", 0, "每个池窗口最多服务多少个任务后换新；0 表示不换")
+	poolN := flag.Int("pool", 0, "采集页池大小（隐藏的 MyGo 窗口）；0 表示每个任务用 Target.createTarget")
 	flag.Parse()
 	if *offscreen && !*inner {
 		lp := filepath.Join(os.TempDir(), fmt.Sprintf("capstress-%d.log", time.Now().Unix()))
-		code := runOffscreen([]string{"-corpus", *corpus, "-run", *run, "-rounds", fmt.Sprint(*rounds)}, lp, 30*time.Minute)
+		code := runOffscreen([]string{"-corpus", *corpus, "-run", *run, "-rounds", fmt.Sprint(*rounds), "-pool", fmt.Sprint(*poolN), "-poolmax", fmt.Sprint(poolMaxUse)}, lp, 30*time.Minute)
 		if b, err := os.ReadFile(lp); err == nil {
 			os.Stdout.Write(b)
 		}
@@ -195,7 +211,7 @@ func main() {
 	}
 	defer srv.close()
 	fmt.Printf("语料 %d 页，模拟站点 %s（另监听 127.0.0.2:%d 作为“内网”）\n", len(srv.pages), srv.base(), srv.port)
-	e := &env{srv: srv}
+	e := &env{srv: srv, poolSize: *poolN}
 	t0 := time.Now()
 	if err := e.newBrowser(); err != nil {
 		fmt.Println("[FAIL] 启动采集进程", err)
