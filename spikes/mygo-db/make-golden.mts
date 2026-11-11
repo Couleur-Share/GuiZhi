@@ -1,0 +1,547 @@
+// 迁移一致性基准：用归知现有的 TS DAO 生成一份带集合/标签/收藏/归档/回收站/来源平台的隔离库，
+// 并把 TS 侧各频道的输出存为 golden.json，供 Go 侧 `go test` 逐项比对。
+// 每迁一个频道，就在这里加一组输入，保证 Go 的行为与 TS 逐字段一致。
+import fs from "node:fs";
+import Module from "node:module";
+import path from "node:path";
+import {
+  initDatabase,
+  closeDatabase,
+  KnowledgeItemDB,
+  CollectionDB,
+  TagDB,
+  ImportTaskDB,
+} from "../../packages/db/src/index.ts";
+import { listInboxItems } from "../../apps/desktop/src/main/services/inbox.ts";
+import { buildFtsMatchQuery, segmentTextForFts } from "../../packages/db/src/fts.ts";
+
+const out = process.argv[2];
+if (!out) throw new Error("用法: make-golden.mts <输出目录>");
+fs.rmSync(out, { recursive: true, force: true });
+// 隔离：settings:get 会读 <APPDATA>/GuiZhi/config/ai-models.json 并合并进返回值。
+// 必须在加载任何主进程模块之前把 APPDATA 指到临时目录，否则基准里会混进真实用户的 AI 配置与密钥。
+const isolatedAppData = path.join(out, "isolated-appdata");
+fs.mkdirSync(isolatedAppData, { recursive: true });
+process.env.APPDATA = isolatedAppData;
+fs.mkdirSync(out, { recursive: true });
+
+const database = initDatabase(path.join(out, "knowledge.db"));
+const items = new KnowledgeItemDB(database);
+const collections = new CollectionDB(database);
+const tags = new TagDB(database);
+
+const tech = collections.create({ name: "技术", icon: "code" });
+const reading = collections.create({ name: "阅读" });
+collections.create({ name: "空集合" });
+
+const mk = (title: string, content: string, tagNames: string[]) =>
+  items.create({ title, content, tagNames } as never);
+const a = mk("归知是本地优先的个人知识库", "采集、整理、检索、问答构成核心闭环。", ["知识库", "本地"]);
+const b = mk("Electron 与 WebView2 的取舍", "安装包体积与运行时依赖。", ["桌面", "框架"]);
+const c = mk("中文分词在 SQLite FTS5 里的做法", "写入前在每个汉字两侧插入空格，做全文检索。", ["检索", "FTS5"]);
+const d = mk("MyGo 桌面框架评估", "用 Go 写桌面应用，页面通过 WebView2 渲染。", ["MyGo", "桌面"]);
+const e = mk("English only note about backups", "Backups use VACUUM INTO.", ["backup"]);
+const f = mk("已归档的旧笔记", "这条笔记已经归档。", ["旧"]);
+const g = mk("已进回收站的笔记", "这条笔记在回收站里。", ["知识库"]);
+const h = mk("抖音采集的视频笔记", "来自抖音的内容。", ["视频"]);
+const i = mk("小红书图文", "来自小红书的内容，讲检索与整理。", ["图文", "检索"]);
+
+const now = Date.now();
+database.run("UPDATE knowledge_items SET collection_id = ? WHERE id IN (?, ?, ?)", [tech.id, a.id, c.id, d.id]);
+database.run("UPDATE knowledge_items SET collection_id = ? WHERE id = ?", [reading.id, b.id]);
+database.run("UPDATE knowledge_items SET is_favorite = 1 WHERE id IN (?, ?)", [a.id, e.id]);
+database.run("UPDATE knowledge_items SET status = 'archived' WHERE id = ?", [f.id]);
+database.run("UPDATE knowledge_items SET deleted_at = ? WHERE id = ?", [now, g.id]);
+for (const [item, platform, n] of [[h, "douyin", 1], [i, "xiaohongshu", 2]] as const) {
+  database.run(
+    "INSERT INTO source_records (id, item_id, source_type, source_uri, platform, captured_at) VALUES (?, ?, 'url', ?, ?, ?)",
+    [`src-${n}`, item.id, `https://example.com/${n}`, platform, now],
+  );
+}
+
+// ── knowledge:list 用的更丰富数据：Markdown、视频元数据块、超长正文、emoji、批量条目、置顶与时间并列 ──
+items.update(a.id, {
+  content: "# 归知简介\n\n> 引用一行\n\n- 列表项一\n- 列表项二\n\n```ts\nconst hidden = 1;\n```\n\n**加粗**文字与[链接文字](https://example.com)以及![图片说明](x.png)，全文检索与整理。\n\n\n   末尾段落。",
+} as never);
+const vid = mk("带元数据块的视频", "x", ["视频"]);
+items.update(vid.id, {
+  content: "> 平台：抖音 · 作者：甲 · 时长：1:02\n> 简介：这是简介 · 含点\n\n\n视频正文第一行，讲检索。\n第二行。",
+} as never);
+const longItem = mk("超长正文与搜索摘要", "x", ["检索"]);
+items.update(longItem.id, {
+  content: "前缀填充".repeat(30) + "中间出现关键词检索在这里，" + "后缀填充内容".repeat(60) + "😀".repeat(40) + "尾部检索结束",
+} as never);
+const emojiItem = mk("😀 emoji 标题与内容", "x", ["图文"]);
+items.update(emojiItem.id, { content: "😀😃😄😁".repeat(12) + "检索" + "😀".repeat(100) + "tail" } as never);
+const bulk: string[] = [];
+for (let n = 1; n <= 12; n++) {
+  const it = mk(`批量条目 ${n}`, `第 ${n} 条。${n % 3 === 0 ? "检索 检索 检索" : n % 2 === 0 ? "检索一次" : "无关内容"}。`, n % 2 ? ["批量"] : ["批量", "检索"]);
+  bulk.push(it.id);
+}
+database.run("UPDATE knowledge_items SET is_pinned = 1 WHERE id IN (?, ?)", [bulk[2], c.id]);
+// ── 收件箱 / 导入任务：需复核、导入问题、发现候选、语义索引缺口、手机来源 ──
+items.update(bulk[0], { reviewReasons: ["缺少来源", "格式异常"] } as never);
+items.update(bulk[1], { reviewStatus: "needs_review" } as never);
+items.update(bulk[3], { reviewReasons: ["含 <b>标签</b> & 特殊字符"] } as never);
+database.run("UPDATE knowledge_items SET review_reasons = 'not json', review_status = 'needs_review' WHERE id = ?", [bulk[4]]);
+for (const it of [a, b, c]) {
+  database.run(
+    "INSERT INTO knowledge_embeddings (item_id, chunk_index, chunk_text, content_hash, model, dims, vector, updated_at) VALUES (?, 0, 'x', 'h', 'm', 1, x'00', ?)",
+    [it.id, now],
+  );
+}
+database.run(
+  "INSERT INTO platform_discovery_views (id, name, platform, mode, query, created_at, updated_at) VALUES ('v1', '视图一', 'douyin', 'keyword', 'q', ?, ?)",
+  [now, now],
+);
+const candidateRows: Array<[string, string, string]> = [
+  ["e1", JSON.stringify({ title: "  候选标题  " }), "new"],
+  ["e2", "{坏 json", "new"],
+  ["e3", JSON.stringify({ title: "   " }), "new"],
+  ["e4", JSON.stringify({ title: "已忽略" }), "dismissed"],
+  ["e5", JSON.stringify({ title: 123 }), "new"],
+];
+candidateRows.forEach(([ext, json, state], n) => {
+  database.run(
+    "INSERT INTO platform_discovery_candidates (view_id, platform, external_id, item_json, state, first_seen_at, last_seen_at) VALUES ('v1', 'douyin', ?, ?, ?, ?, ?)",
+    [ext, json, state, 1_700_000_100_000 + n * 1000, 1_700_000_100_000 + n * 1000],
+  );
+});
+const taskStatuses = ["pending", "processing", "completed", "failed", "canceled", "duplicate", "completed", "completed"];
+const mobileTaskNumbers = new Set([3, 11, 17]);
+database.run(
+  "INSERT INTO mobile_capture_receipts (relay_key, delivery_id, original_input, task_ids, progress, created_at) VALUES ('r', 'd1', 'x', '[]', '{}', 1700000500000)",
+);
+for (let n = 1; n <= 30; n++) {
+  const status = taskStatuses[n % taskStatuses.length];
+  const created = 1_700_000_000_000 + Math.floor(n / 2) * 1000; // 每两条共用时间，逼出 id 次序
+  const taskId = `task-${String(n).padStart(2, "0")}`;
+  const warning = status === "completed" && n % 3 === 0 ? "转写失败" : null;
+  database.run(
+    `INSERT INTO import_tasks (id, source_kind, source_input, display_name, status, stage, error, warning, warning_acknowledged_at,
+       item_type, result_item_id, duplicate_item_id, tag_names, stage_stats, capture_strategy, comment_limit, force_duplicate, created_at, updated_at)
+     VALUES (?, 'url', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [
+      taskId, `https://example.com/${n}`,
+      n % 7 === 0 ? `100% 完成_${n}` : n % 5 === 0 ? `检索任务 ${n}` : `任务 ${n}`,
+      status, status === "processing" ? "fetching" : null,
+      status === "failed" ? (n % 2 ? "Network TIMEOUT" : "") : null,
+      warning, warning && n % 2 === 0 ? created + 1 : null,
+      status === "completed" ? "webpage" : null,
+      status === "completed" && n % 4 === 0 ? a.id : status === "failed" && n % 3 === 0 ? c.id : null,
+      status === "duplicate" ? b.id : null,
+      n === 8 ? '["a","b",3]' : n === 9 ? "not json" : null,
+      n === 8 ? '[{"stage":"fetch","ms":12,"extra":1},{"stage":1,"ms":2},{"ms":3},"x",null]' : n === 9 ? '{"a":1}' : n === 10 ? "[]" : null,
+      n % 4 === 0 ? "authenticated" : "standard", n % 6 === 0 ? 10 : 0,
+      created, created,
+    ],
+  );
+  if (mobileTaskNumbers.has(n)) {
+    database.run("INSERT INTO mobile_capture_tasks (task_id, relay_key, delivery_id) VALUES (?, 'r', 'd1')", [taskId]);
+  }
+}
+
+// ── 设置：含合法 JSON、非 JSON 原文、内部状态键（master_password 等）、未知键 ──
+for (const [key, value] of [
+  ["theme", '"dark"'],
+  ["language", "zh"],
+  ["master_password", '"secret"'],
+  ["backupLastRunAt", "123"],
+  ["networkProxy", JSON.stringify({ mode: "manual", protocol: "http", host: "127.0.0.1", port: 7890, username: "", password: "p", bypass: "" })],
+  ["ytDlpPath", '""'],
+  ["unknownKey", "1"],
+  ["backupKeepCount", "not json {"],
+]) {
+  database.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", [key, value]);
+}
+
+// 时间：每 3 条共用一个 updated_at，制造并列，逼出 id 次序与游标的并列分支
+const all = database.all("SELECT id FROM knowledge_items ORDER BY id") as Array<{ id: string }>;
+all.forEach((row, idx) => {
+  const t = 1_700_000_000_000 + Math.floor(idx / 3) * 60_000;
+  database.run("UPDATE knowledge_items SET created_at = ?, updated_at = ? WHERE id = ?", [t - 5_000, t, row.id]);
+});
+
+type Q = Record<string, unknown>;
+function runList(query: Q) {
+  try {
+    return { query, result: items.list(query as never) };
+  } catch (error) {
+    return { query, error: (error as Error).message };
+  }
+}
+/** 沿 nextCursor 一路翻到底，每一页都进 golden，保证 Go 逐页复现 */
+function chain(base: Q): unknown[] {
+  const pages: unknown[] = [];
+  let query: Q = { ...base };
+  for (let guard = 0; guard < 20; guard++) {
+    const entry = runList(query) as { result?: { nextCursor?: string | null } };
+    pages.push(entry);
+    const next = entry.result?.nextCursor;
+    if (!next) break;
+    query = { ...base, cursor: next };
+  }
+  return pages;
+}
+const techId = tech.id;
+const tagSearchId = tags.list().find((t) => t.name === "检索")!.id;
+const listCases: unknown[] = [
+  ...[
+    { scope: "all" }, { scope: "all", limit: 4 }, { scope: "all", limit: 3, offset: 2 },
+    { scope: "all", includeArchived: true, limit: 50 },
+    { scope: "favorites" }, { scope: "archived" }, { scope: "trash" }, { scope: "uncategorized", limit: 5 },
+    { scope: "all", collectionId: techId }, { scope: "all", tagId: tagSearchId, limit: 4 },
+    { scope: "all", platform: "douyin" }, { scope: "all", platform: "xiaohongshu" },
+    { scope: "all", excludedItemIds: [a.id, b.id] },
+    { scope: "all", collectionScope: { ids: [techId], includeUncategorized: false } },
+    { scope: "all", collectionScope: { ids: [], includeUncategorized: true }, limit: 4 },
+    { scope: "all", collectionScope: { ids: [], includeUncategorized: false } },
+    { scope: "all", search: "((" },
+    { scope: "all", search: "怎么做中文分词的", searchMode: "recall" },
+    { scope: "all", search: "归知 检索" },
+    { scope: "all", search: "检索", platform: "douyin" },
+    { scope: "all", cursor: "garbage" },
+  ].map(runList),
+  ...chain({ scope: "all", limit: 4 }),
+  ...chain({ scope: "all", sortBy: "title", sortOrder: "asc", limit: 5 }),
+  ...chain({ scope: "all", sortBy: "createdAt", sortOrder: "asc", limit: 5 }),
+  ...chain({ scope: "all", sortBy: "createdAt", sortOrder: "desc", limit: 6 }),
+  ...chain({ scope: "all", search: "检索", limit: 3 }),
+  ...chain({ scope: "all", search: "检索", searchMode: "recall", limit: 4 }),
+];
+const ftsInputs: Array<[string, "phrase" | "recall"]> = [
+  ["知识库", "phrase"], ["全文检索", "phrase"], ["桌面 框架", "phrase"], ["VACUUM", "phrase"],
+  ["归知(测试)", "phrase"], ["((", "phrase"], ["   ", "phrase"], ["a\"b", "phrase"],
+  ["归知的语义检索是怎么实现的", "recall"], ["为什么中文分词需要这样做", "recall"],
+  ["的了是", "recall"], ["FTS5 中文分词 怎么做", "recall"], ["日本語テスト 한국어", "phrase"],
+  ["一二三四五六七八九十 一二三四五六七八九十 abc def ghi jkl", "recall"],
+];
+const fts = ftsInputs.map(([input, mode]) => ({
+  input,
+  mode,
+  match: buildFtsMatchQuery(input, mode),
+  segmented: segmentTextForFts(input),
+}));
+
+const countQueries: unknown[] = [
+  undefined,
+  { scope: "all" }, { scope: "uncategorized" }, { scope: "favorites" },
+  { scope: "archived" }, { scope: "trash" }, { scope: "all", includeArchived: true },
+  { scope: "all", collectionId: tech.id },
+  { scope: "all", tagId: tags.list().find((t) => t.name === "检索")!.id },
+  { scope: "all", platform: "douyin" },
+  { scope: "all", search: "检索" },
+  { scope: "all", search: "怎么做中文分词的", searchMode: "recall" },
+  { scope: "all", search: "((" },
+];
+const counts = countQueries.map((query) => ({ query: query ?? null, result: items.counts(query as never) }));
+
+// ── inbox:list / import:list ──
+const importDao = new ImportTaskDB(database);
+function runImport(query: unknown) {
+  try {
+    // 与 import.ipc.ts 一致：传对象走分页，否则只返回第一页的 entries 数组
+    const result = query && typeof query === "object"
+      ? importDao.listPage(query as never)
+      : importDao.listPage().entries;
+    return { query: query ?? null, result };
+  } catch (error) {
+    return { query: query ?? null, error: (error as Error).message };
+  }
+}
+function importChain(base: Q): unknown[] {
+  const pages: unknown[] = [];
+  let query: Q = { ...base };
+  for (let guard = 0; guard < 20; guard++) {
+    const entry = runImport(query) as { result?: { nextCursor?: string | null } };
+    pages.push(entry);
+    const next = entry.result?.nextCursor;
+    if (!next) break;
+    query = { ...base, cursor: next };
+  }
+  return pages;
+}
+const importCases: unknown[] = [
+  runImport(undefined), runImport(null), runImport({}),
+  ...importChain({ pageSize: 20 }),
+  ...importChain({ pageSize: 20, status: "completed" }),
+  ...importChain({ pageSize: 20, origin: "desktop" }),
+  ...importChain({ pageSize: 1, status: "all" }),
+  ...["pending", "processing", "failed", "canceled", "duplicate", "active", "degraded", "bogus"].map((status) => runImport({ status })),
+  ...["mobile", "desktop", "all", "bogus"].map((origin) => runImport({ origin })),
+  ...["检索", " 检索 ", "100%", "100", "_1", "ERROR", "timeout", "转写", "example.com/1", "任务 1", "%", "\\", ""].map((query) => runImport({ query })),
+  runImport({ query: "检索", origin: "mobile" }),
+  runImport({ query: "任务", status: "completed", origin: "desktop", pageSize: 20 }),
+  runImport({ pageSize: 20.5 }), runImport({ pageSize: 1000 }), runImport({ pageSize: 5 }), runImport({ pageSize: 33.4 }),
+  runImport({ cursor: "garbage" }), runImport({ cursor: null }),
+  runImport({ cursor: Buffer.from(JSON.stringify({ createdAt: "x", id: "task-01" })).toString("base64url") }),
+  runImport({ cursor: Buffer.from(JSON.stringify({ createdAt: 1_700_000_005_000, id: "task-09" })).toString("base64url"), pageSize: 20 }),
+];
+
+const golden: Record<string, unknown> = {
+  fts,
+  collections: collections.list(),
+  tags: tags.list(),
+  counts,
+  list: listCases,
+  inbox: listInboxItems(database as never),
+  imports: importCases,
+};
+closeDatabase();
+
+// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
+const baseDb = path.join(out, "knowledge.db");
+const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
+const DUMP_SQL: Record<string, string> = {
+  items: "SELECT id, title, content, summary, transcript, item_type, status, collection_id, is_favorite, is_pinned, review_status, review_reasons, deleted_at, created_at, updated_at FROM knowledge_items",
+  tags: "SELECT id, name, color_key, created_at, updated_at FROM tags",
+  itemTags: "SELECT item_id, tag_id FROM knowledge_item_tags",
+  fts: "SELECT item_id, title, content, tags FROM knowledge_fts",
+  ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
+};
+type Op = { fn: string; args: unknown[] };
+// 超过单批 400 的 id 数，覆盖分块路径
+const manyIds = [A, B, C, F, G, ...bulk, ...Array.from({ length: 440 }, (_, n) => `missing-${n}`)];
+const scenarios: Record<string, Op[]> = {
+  createMinimal: [{ fn: "create", args: [{ title: "新建", content: "正文 abc 检索" }] }],
+  createFull: [{ fn: "create", args: [{
+    title: "完整输入", content: "全文内容", transcript: "转写", itemType: "webpage", status: "active", collectionId: tech.id,
+    tagNames: [" 检索 ", "检索", "NewTag", "newtag", "桌面", "", "   ", "Beta", "alpha", "ábc", "Zeta"],
+    reviewReasons: ["a", " a ", "", "b"],
+  }] }],
+  createNulls: [{ fn: "create", args: [{ title: null, content: null, itemType: null, status: null, reviewStatus: null, transcript: null, collectionId: null }] }],
+  // 数据库 CHECK 约束报错：两边都必须失败，且失败后库保持原样（事务回滚）
+  createBadItemType: [{ fn: "create", args: [{ title: "坏类型", itemType: "article", tagNames: ["不该留下"] }] }],
+  updateBadItemType: [{ fn: "update", args: [A, { itemType: "article", tagNames: ["也不该留下"] }] }],
+  createEmptyInput: [{ fn: "create", args: [{}] }],
+  createExplicitReview: [{ fn: "create", args: [{ title: "显式状态", reviewStatus: "clear", reviewReasons: ["仍有原因"] }] }],
+  createReasonsOnly: [{ fn: "create", args: [{ title: "只有原因", reviewReasons: ["缺少来源", "格式异常"] }] }],
+  updateTextKeepsTags: [{ fn: "update", args: [A, { title: "新标题", content: "新的正文 含 检索" }] }],
+  updateTagsReplace: [{ fn: "update", args: [A, { tagNames: ["桌面", "新标签Z", "Zeta", "alpha", "Beta", "ábc", "Éclair", "eclair"] }] }],
+  updateTagsClear: [{ fn: "update", args: [A, { tagNames: [] }] }],
+  updateOptionalFields: [
+    { fn: "update", args: [A, { summary: "摘要", transcript: "转写", isFavorite: false, isPinned: true, reviewReasons: ["原因一"] }] },
+    { fn: "update", args: [A, { summary: null, transcript: null, collectionId: null, reviewStatus: "clear", itemType: "webpage", status: "archived" }] },
+  ],
+  updateNullsFallBack: [{ fn: "update", args: [A, { title: null, content: null, itemType: null, status: null, reviewStatus: null }] }],
+  updateNoop: [{ fn: "update", args: [A, {}] }],
+  updateMissing: [{ fn: "update", args: ["no-such-id", { title: "x" }] }],
+  bulkPlain: [{ fn: "bulkUpdate", args: [[A, B, B, "missing"], { isFavorite: true, collectionId: null, reviewReasons: [] }] }],
+  bulkPlainStatus: [{ fn: "bulkUpdate", args: [[A, B, C], { status: "archived", isPinned: true, reviewStatus: "needs_review", reviewReasons: ["x", "y"] }] }],
+  bulkTags: [{ fn: "bulkUpdate", args: [[A, B, C], { addTagNames: ["共享新标签", "批量", " 共享新标签 "], removeTagNames: ["桌面", " 本地 "] }] }],
+  bulkTagsOnly: [{ fn: "bulkUpdate", args: [[G, "missing"], { removeTagNames: ["知识库"] }] }],
+  bulkEmpty: [{ fn: "bulkUpdate", args: [[], { isFavorite: true }] }],
+  bulkLarge: [{ fn: "bulkUpdate", args: [manyIds, { status: "active", isFavorite: true }] }],
+  setStatus: [{ fn: "setStatus", args: [[A, G, F], "archived"] }, { fn: "setStatus", args: [[], "active"] }],
+  trashRestore: [
+    { fn: "moveToTrash", args: [[A, G, "missing"]] },
+    { fn: "restore", args: [[G, A, F]] },
+  ],
+  deleteForever: [{ fn: "deleteForever", args: [[C, G, "missing"]] }],
+  emptyTrash: [{ fn: "moveToTrash", args: [[A, B]] }, { fn: "emptyTrash", args: [] }],
+  sequence: [
+    { fn: "update", args: [A, { tagNames: ["序列一", "序列二"] }] },
+    { fn: "bulkUpdate", args: [[A, B], { addTagNames: ["序列三"], removeTagNames: ["序列一"] }] },
+    { fn: "moveToTrash", args: [[A]] },
+    { fn: "deleteForever", args: [[A]] },
+  ],
+};
+
+function dumpAll(database: ReturnType<typeof initDatabase>) {
+  const dump: Record<string, unknown[][]> = {};
+  for (const [name, sql] of Object.entries(DUMP_SQL)) {
+    dump[name] = (database.all(sql) as Array<Record<string, unknown>>).map((row) => Object.values(row));
+  }
+  return dump;
+}
+
+const writes: Record<string, { ops: Op[]; results: unknown[]; dump: unknown }> = {};
+for (const [name, ops] of Object.entries(scenarios)) {
+  const work = path.join(out, `scenario-${name}.db`);
+  fs.copyFileSync(baseDb, work);
+  const db = initDatabase(work);
+  const dao = new KnowledgeItemDB(db) as unknown as Record<string, (...a: unknown[]) => unknown>;
+  const results: unknown[] = [];
+  for (const op of ops) {
+    try {
+      results.push({ value: dao[op.fn](...op.args) ?? null });
+    } catch (error) {
+      results.push({ error: (error as Error).message });
+    }
+  }
+  writes[name] = { ops, results, dump: dumpAll(db) };
+  closeDatabase();
+  fs.rmSync(work, { force: true });
+}
+golden.dumpSql = DUMP_SQL;
+golden.writes = writes;
+
+// ── settings:get / settings:set：用真实的 settings.ipc.ts 处理函数（electron 换成桩）做基准 ──
+const ipcHandlers = new Map<string, (...args: unknown[]) => unknown>();
+const noop: unknown = new Proxy(function () {}, { get: (_t, p) => (p === "then" ? undefined : noop), apply: () => noop });
+const electronStub = new Proxy(
+  { ipcMain: { handle: (ch: string, fn: (...a: unknown[]) => unknown) => ipcHandlers.set(ch, fn), on() {}, removeHandler() {} } } as Record<string | symbol, unknown>,
+  { get: (t, p) => (p in t ? t[p] : noop) },
+);
+const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
+const originalLoad = moduleLoader._load;
+moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);
+};
+const settingsIpc = await import("../../apps/desktop/src/main/ipc/settings.ipc.ts");
+const { DEFAULT_SETTINGS } = await import("../../packages/shared/types/settings.ts");
+type SettingsOp = { fn: "get" | "set"; args: unknown[] };
+const flare = (extra: Record<string, unknown>) => ({ enabled: true, connection: "ssh", port: 9000, sshHost: "my-host.01", ...extra });
+const settingsScenarios: Record<string, SettingsOp[]> = {
+  getSeeded: [{ fn: "get", args: [] }],
+  setBasic: [{ fn: "set", args: [{ theme: "light", autoSave: false, backupKeepCount: 5 }] }, { fn: "get", args: [] }],
+  setRejected: [
+    { fn: "set", args: [{ master_password: "x", theme: "dark", bogus: 1, ytDlpPath: "/bin/evil", ffmpegPath: "  " }] },
+    { fn: "get", args: [] },
+  ],
+  setPathClear: [{ fn: "set", args: [{ ytDlpPath: "" }] }, { fn: "get", args: [] }],
+  setFlareValid: [{ fn: "set", args: [{ flareSolverr: flare({}) }] }, { fn: "get", args: [] }],
+  setFlareLocal: [{ fn: "set", args: [{ flareSolverr: { enabled: false, connection: "local", port: 8191, sshHost: "" } }] }],
+  setFlareBadPort: [{ fn: "set", args: [{ theme: "light", flareSolverr: flare({ port: 70000 }) }] }],
+  setFlareFloatPort: [{ fn: "set", args: [{ flareSolverr: flare({ port: 80.5 }) }] }],
+  setFlareStringPort: [{ fn: "set", args: [{ flareSolverr: flare({ port: "9000" }) }] }],
+  setFlareUntrimmedHost: [{ fn: "set", args: [{ flareSolverr: flare({ sshHost: " my-host " }) }] }],
+  setFlareBadHost: [{ fn: "set", args: [{ flareSolverr: flare({ sshHost: "-bad host" }) }] }],
+  setFlareMissingHost: [{ fn: "set", args: [{ flareSolverr: { enabled: true, connection: "ssh", port: 9000 } }] }],
+  setFlareSshEmptyHost: [{ fn: "set", args: [{ flareSolverr: flare({ sshHost: "" }) }] }],
+  setFlareBadConnection: [{ fn: "set", args: [{ flareSolverr: flare({ connection: "x" }) }] }],
+  setFlareEnabledString: [{ fn: "set", args: [{ flareSolverr: flare({ enabled: "yes" }) }] }],
+  setFlareNotObject: [{ fn: "set", args: [{ flareSolverr: "x" }] }, { fn: "set", args: [{ flareSolverr: null }] }, { fn: "set", args: [{ flareSolverr: [] }] }],
+  setNullsAndProxy: [
+    { fn: "set", args: [{ backgroundImageFileName: null, networkProxy: { mode: "manual", protocol: "socks5", host: "h", port: 1080, username: "u", password: "p", bypass: "" } }] },
+    { fn: "get", args: [] },
+  ],
+  setUnicode: [{ fn: "set", args: [{ backgroundImageFileName: "背景 😀 <x> & \u2028", transcribeDiarize: true }] }, { fn: "get", args: [] }],
+  setNullArg: [{ fn: "set", args: [null] }],
+  setNoArg: [{ fn: "set", args: [] }],
+  setEmpty: [{ fn: "set", args: [{}] }],
+  setArray: [{ fn: "set", args: [[1, 2]] }],
+  setString: [{ fn: "set", args: ["theme"] }],
+};
+const settingsDump = "SELECT key, value FROM settings ORDER BY key";
+
+// ── AI 配置文件（config/ai-models.json）场景：用假密钥，文件落在隔离的 APPDATA 下 ──
+const aiFileText = (body: Record<string, unknown>) =>
+  JSON.stringify({ kind: "guizhi-ai-config", version: 1, updatedAt: "2026-01-01T00:00:00.000Z", providers: [], models: [], modelRouteDefaults: {}, ...body }, null, 2) + "\n";
+const richAi = aiFileText({
+  providers: [
+    { id: "p1", name: "  供应商一  ", provider: "Claude Official", apiKey: "  test-key-1  ", apiUrl: " https://x.test/v1 ", enabled: false },
+    { id: "p2", provider: "gemini-pro", apiProtocol: "bogus", apiKey: 42, apiUrl: "https://y.test", lastVerifiedAt: "2026-01-01T00:00:00Z" },
+    { id: "p3", name: "   ", provider: "Local", apiProtocol: "openai", apiUrl: "https://generativelanguage.googleapis.com/v1", lastVerifiedAt: null },
+  ],
+  models: [
+    { id: "m1", providerId: " p1 ", provider: "Claude Official", apiUrl: "https://x.test/v1", model: "claude-x", capabilities: { vision: true, custom: 1, chat: false }, isDefault: true },
+    { id: "m2", provider: "Local", apiUrl: "https://api.anthropic.com", model: "chat-a", apiKey: "test-key-2", isDefault: false },
+    { id: "m3", name: " 名 ", provider: "Local", apiProtocol: "gemini", apiUrl: "u", model: "m3", isDefault: true, capabilities: { chat: true, embedding: true }, enabled: false },
+  ],
+  modelRouteDefaults: { mainText: " m2 ", fastText: "  ", bogusRoute: "x", imageGen: "m1", embedding: 5 },
+});
+const aiGoodProvider = { id: "np1", name: " 新供应商 ", provider: "OpenAI", apiKey: " test-key-new ", apiUrl: "https://new.test/v1" };
+const aiGoodModel = { id: "nm1", provider: "OpenAI", apiUrl: "https://new.test/v1", model: "gpt-x", isDefault: true, capabilities: { vision: true } };
+const legacyPayload = { aiProvider: " OpenAI ", aiApiProtocol: "openai", aiApiKey: " test-key-legacy ", aiApiUrl: " https://z.test ", aiModel: " gpt-legacy " };
+const aiScenarios: Record<string, { ai: string | null; ops: SettingsOp[] }> = {
+  aiAbsentGet: { ai: null, ops: [{ fn: "get", args: [] }] },
+  aiRichGet: { ai: richAi, ops: [{ fn: "get", args: [] }] },
+  aiBadKind: { ai: JSON.stringify({ kind: "x", version: 1 }), ops: [{ fn: "get", args: [] }, { fn: "set", args: [{ aiModels: [] }] }] },
+  aiBadVersion: { ai: JSON.stringify({ kind: "guizhi-ai-config", version: 2 }), ops: [{ fn: "get", args: [] }, { fn: "set", args: [{ aiModels: [] }] }] },
+  aiBadJson: { ai: "{bad", ops: [{ fn: "get", args: [] }, { fn: "set", args: [{ aiModels: [] }] }] },
+  aiNullRoot: { ai: "null", ops: [{ fn: "set", args: [{ aiModels: [] }] }] },
+  aiNumberRoot: { ai: "5", ops: [{ fn: "set", args: [{ aiModels: [] }] }] },
+  aiBadProviderInFile: {
+    ai: aiFileText({ providers: [{ id: "p", provider: "", apiUrl: "u" }] }),
+    ops: [{ fn: "get", args: [] }, { fn: "set", args: [{ aiModels: [] }] }],
+  },
+  aiNoChatModels: {
+    ai: aiFileText({ models: [{ id: "e1", provider: "P", apiUrl: "u", model: "emb", capabilities: { chat: false } }] }),
+    ops: [{ fn: "get", args: [] }],
+  },
+  aiRoutesOnly: { ai: aiFileText({ modelRouteDefaults: { mainText: "m" } }), ops: [{ fn: "get", args: [] }] },
+  aiSetFull: {
+    ai: null,
+    ops: [{ fn: "set", args: [{ aiProviders: [aiGoodProvider], aiModels: [aiGoodModel], modelRouteDefaults: { mainText: " nm1 ", fastText: "nm1" } }] }, { fn: "get", args: [] }],
+  },
+  aiSetProvidersOnly: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: [aiGoodProvider] }] }, { fn: "get", args: [] }] },
+  aiSetNullLists: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: null, aiModels: null }] }, { fn: "get", args: [] }] },
+  aiSetLegacy: { ai: null, ops: [{ fn: "set", args: [legacyPayload] }, { fn: "get", args: [] }] },
+  aiSetLegacyIncomplete: { ai: null, ops: [{ fn: "set", args: [{ ...legacyPayload, aiApiKey: "  " }] }] },
+  aiSetLegacyIgnoredWhenModels: { ai: richAi, ops: [{ fn: "set", args: [legacyPayload] }, { fn: "get", args: [] }] },
+  aiSetLegacyBadTypes: { ai: null, ops: [{ fn: "set", args: [{ ...legacyPayload, aiProvider: 5 }] }] },
+  aiSetLegacyFalsyProtocol: { ai: null, ops: [{ fn: "set", args: [{ ...legacyPayload, aiApiProtocol: "" }] }] },
+  aiSetRoutesArray: { ai: richAi, ops: [{ fn: "set", args: [{ modelRouteDefaults: [1] }] }, { fn: "get", args: [] }] },
+  aiSetRoutesNull: { ai: richAi, ops: [{ fn: "set", args: [{ modelRouteDefaults: null }] }, { fn: "get", args: [] }] },
+  aiSetInvalidProvider: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: [{ id: "x" }] }] }] },
+  aiSetInvalidProviderUrl: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: [{ id: "x", provider: "P" }] }] }] },
+  aiSetInvalidProviderId: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: [{ provider: "P", apiUrl: "u" }] }] }] },
+  aiSetInvalidModelUrl: { ai: richAi, ops: [{ fn: "set", args: [{ aiModels: [{ id: "a", model: "m", provider: "p" }] }] }] },
+  aiSetInvalidModelProvider: { ai: richAi, ops: [{ fn: "set", args: [{ aiModels: [{ id: "a", model: "m", apiUrl: "u" }] }] }] },
+  aiSetInvalidModelId: { ai: richAi, ops: [{ fn: "set", args: [{ aiModels: [{ model: "m", provider: "p", apiUrl: "u" }] }] }] },
+  aiSetNullElement: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: [null] }] }] },
+  aiSetStringElement: { ai: richAi, ops: [{ fn: "set", args: [{ aiProviders: ["x"] }] }] },
+  aiSetNonStringModel: { ai: richAi, ops: [{ fn: "set", args: [{ aiModels: [{ id: "a", model: 5, provider: "p", apiUrl: "u" }] }] }] },
+  aiSetProtocolInference: {
+    ai: null,
+    ops: [{ fn: "set", args: [{ aiModels: [
+      { id: "i1", provider: "Anthropic", apiUrl: "u", model: "a" },
+      { id: "i2", provider: "x", apiUrl: "https://API.ANTHROPIC.COM/v1", model: "b" },
+      { id: "i3", provider: "Google AI", apiUrl: "u", model: "c" },
+      { id: "i4", provider: "x", apiUrl: "u", model: "d", apiProtocol: "openai", name: "  ", providerId: "  ", capabilities: null },
+      { id: "i5", provider: "x", apiUrl: "u", model: "e", apiProtocol: "gemini", capabilities: { chat: "no" }, enabled: false, isDefault: "true" },
+    ] }] }, { fn: "get", args: [] }],
+  },
+  aiSetWithOtherKeys: {
+    ai: null,
+    ops: [{ fn: "set", args: [{ theme: "light", aiModels: [aiGoodModel], backupKeepCount: 3, networkProxy: { mode: "direct", protocol: "http", host: "", port: 1, username: "", password: "", bypass: "" } }] }, { fn: "get", args: [] }],
+  },
+  aiSetWithBadFlare: { ai: null, ops: [{ fn: "set", args: [{ theme: "light", aiModels: [aiGoodModel], flareSolverr: "x" }] }, { fn: "get", args: [] }] },
+  aiSetUnicode: { ai: null, ops: [{ fn: "set", args: [{ aiProviders: [{ id: "u1", name: "名 😀 <b> & \u2028", provider: "P", apiUrl: "https://u.test" }] }] }] },
+};
+const allSettingsScenarios: Record<string, { ai: string | null; ops: SettingsOp[] }> = {
+  ...Object.fromEntries(Object.entries(settingsScenarios).map(([k, ops]) => [k, { ai: null, ops }])),
+  ...aiScenarios,
+};
+const aiConfigDir = path.join(isolatedAppData, "GuiZhi", "config");
+const aiConfigFile = path.join(aiConfigDir, "ai-models.json");
+const settingsRuns: Record<string, { ai: string | null; ops: SettingsOp[]; results: unknown[]; dump: unknown[][]; aiAfter: string | null }> = {};
+for (const [name, { ai, ops }] of Object.entries(allSettingsScenarios)) {
+  const work = path.join(out, `settings-${name}.db`);
+  fs.copyFileSync(baseDb, work);
+  fs.rmSync(aiConfigDir, { recursive: true, force: true });
+  if (ai !== null) {
+    fs.mkdirSync(aiConfigDir, { recursive: true });
+    fs.writeFileSync(aiConfigFile, ai, "utf8");
+  }
+  const db = initDatabase(work);
+  ipcHandlers.clear();
+  settingsIpc.registerSettingsIPC(db as never);
+  const results: unknown[] = [];
+  for (const op of ops) {
+    try {
+      const value = await ipcHandlers.get(`settings:${op.fn}`)!({}, ...op.args);
+      results.push({ value: value ?? null });
+    } catch (error) {
+      results.push({ error: (error as Error).message });
+    }
+  }
+  settingsRuns[name] = {
+    ai, ops, results,
+    dump: (db.all(settingsDump) as Array<Record<string, unknown>>).map((row) => Object.values(row)),
+    aiAfter: fs.existsSync(aiConfigFile) ? fs.readFileSync(aiConfigFile, "utf8") : null,
+  };
+  closeDatabase();
+  fs.rmSync(work, { force: true });
+}
+fs.rmSync(aiConfigDir, { recursive: true, force: true });
+const seededGet = settingsRuns.getSeeded.results[0] as { value?: Record<string, unknown> };
+if (!seededGet.value || "aiProviders" in seededGet.value || "aiModels" in seededGet.value) {
+  throw new Error("基准里出现了 AI 配置：APPDATA 隔离失效，已中止以免泄露真实密钥");
+}
+if (!aiConfigDir.startsWith(out)) throw new Error("AI 配置目录不在隔离区内");
+golden.settings = { defaults: DEFAULT_SETTINGS, dumpSql: settingsDump, runs: settingsRuns };
+
+fs.writeFileSync(path.join(out, "golden.json"), JSON.stringify(golden, null, 2));
+console.log("golden ok:", out, `fts=${fts.length} counts=${counts.length} list=${listCases.length} writes=${Object.keys(writes).length}`);

@@ -1,0 +1,3 @@
+**/*.exe
+**/*.png
+!mygo-shell/shell8.png

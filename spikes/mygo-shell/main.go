@@ -1,0 +1,178 @@
+// 阶段 0 验证原型：归知现有渲染进程 + 未改动的 preload，跑在 MyGo 窗口里。
+// Go 侧只有一个绑定服务 Bridge（Invoke/Send），按原 IPC 频道名分发；
+// 未实现的频道会记录下来，用来量出“渲染进程启动到底需要多少个频道”。
+//
+// 用法：go run . -dist <spikes/mygo-shell/dist> -db <fixture/knowledge.db> [-shot out.png] [-wait 6s]
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/sqlite"
+)
+
+type handler func(ctx context.Context, args []json.RawMessage) (any, error)
+
+// Bridge 是渲染进程唯一的 Go 入口，对应 Electron 的 ipcMain.handle / ipcMain.on。
+type Bridge struct {
+	mu       sync.Mutex
+	handlers map[string]handler
+	sends    map[string]func([]json.RawMessage) // ipcRenderer.send 对应的单向频道
+	seen     map[string]int                     // 渲染进程调用过的频道及次数
+	missing  map[string]int                     // 其中尚未实现的
+	db       *sqlite.DB
+}
+
+func (b *Bridge) Invoke(ctx context.Context, channel string, args string) (string, error) {
+	var list []json.RawMessage
+	if args != "" {
+		if err := json.Unmarshal([]byte(args), &list); err != nil {
+			return "", fmt.Errorf("参数不是 JSON 数组：%w", err)
+		}
+	}
+	b.mu.Lock()
+	b.seen[channel]++
+	h := b.handlers[channel]
+	if h == nil {
+		b.missing[channel]++
+	}
+	b.mu.Unlock()
+	if h == nil {
+		return "", fmt.Errorf("频道未实现：%s", channel)
+	}
+	v, err := h(ctx, list)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(v)
+	return string(out), err
+}
+
+// Send 对应 ipcRenderer.send：单向，无返回值。
+func (b *Bridge) Send(channel string, args string) {
+	b.mu.Lock()
+	b.seen["(send) "+channel]++
+	h := b.sends[channel]
+	b.mu.Unlock()
+	if h == nil {
+		return
+	}
+	var list []json.RawMessage
+	_ = json.Unmarshal([]byte(args), &list)
+	h(list)
+}
+
+func (b *Bridge) report() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	keys := func(m map[string]int) []string {
+		s := make([]string, 0, len(m))
+		for k := range m {
+			s = append(s, k)
+		}
+		sort.Strings(s)
+		return s
+	}
+	fmt.Printf("\n渲染进程启动期间调用了 %d 个不同频道，其中 %d 个未实现：\n", len(b.seen), len(b.missing))
+	for _, k := range keys(b.seen) {
+		mark := "  "
+		if b.missing[k] > 0 {
+			mark = "✗ "
+		}
+		fmt.Printf("  %s%-48s ×%d\n", mark, k, b.seen[k])
+	}
+}
+
+func main() {
+	dist := flag.String("dist", "", "spikes/mygo-shell/dist 目录")
+	dbPath := flag.String("db", "", "knowledge.db（建议用隔离 fixture）")
+	configDir := flag.String("config", "", "config 目录（放 ai-models.json）；不给则 AI 配置读写报错")
+	shot := flag.String("shot", "", "启动后截图到该文件并退出")
+	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
+	flag.Parse()
+	if *dist == "" || *dbPath == "" {
+		log.Fatal("需要 -dist 与 -db")
+	}
+
+	ctx := context.Background()
+	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
+	lib := &Library{db: db, configDir: *configDir}
+	lib.register(b)
+	lib.registerList(b)
+	lib.registerWrite(b)
+	lib.registerInbox(b)
+	lib.registerImportList(b)
+	lib.registerSettings(b)
+	b.registerSimpleBoot(&rendererBackupSettings{})
+	mygo.Bind(b)
+
+	preload, err := os.ReadFile(filepath.Join(*dist, "preload", "preload.js"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Fatal(err)
+	}
+	go http.Serve(ln, http.FileServer(http.Dir(filepath.Join(*dist, "renderer"))))
+	origin := "http://" + ln.Addr().String()
+
+	mygo.App.WhenReady(func() {
+		win := mygo.NewWindow(mygo.WindowOptions{
+			Title: "归知 GuiZhi（MyGo spike）", Width: 1280, Height: 800, URL: origin + "/",
+			Hidden: *shot != "",
+			Page: mygo.PageOptions{
+				PreloadScript:  string(preload),
+				TrustedOrigins: []string{origin},
+			},
+		})
+		b.registerWindow(win)
+		p := win.Page()
+		p.OnDidFailLoad(func(e *mygo.LoadError) { fmt.Println("[FAIL] 页面加载失败：", e) })
+		if *shot == "" {
+			return
+		}
+		go func() {
+			time.Sleep(*wait)
+			if v, err := p.Eval(`document.body.innerText.slice(0,200)`); err == nil {
+				fmt.Printf("[INFO] 页面文本：%v\n", v)
+			}
+			if v, err := p.Eval(`document.getElementById('root') ? document.getElementById('root').childElementCount : -1`); err == nil {
+				fmt.Printf("[INFO] #root 子元素数：%v\n", v)
+			}
+			png, err := win.CapturePage()
+			if err == nil {
+				err = os.WriteFile(*shot, png, 0o644)
+			}
+			if err != nil {
+				fmt.Println("[FAIL] 截图：", errors.Unwrap(err), err)
+			} else {
+				fmt.Printf("[ OK ] 截图 %s（%d 字节）\n", *shot, len(png))
+			}
+			b.report()
+			mygo.App.Quit()
+		}()
+	})
+	if err := mygo.App.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
