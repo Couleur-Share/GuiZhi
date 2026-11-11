@@ -6,3 +6,6 @@ export { fetchAppinnThread } from "../../apps/desktop/src/main/services/import/a
 export { fetchLinuxdoThread } from "../../apps/desktop/src/main/services/import/linuxdo";
 export { fetchTwolibraThread } from "../../apps/desktop/src/main/services/import/twolibra";
 export { extractForumPost, buildForumMetaBlock } from "../../apps/desktop/src/main/services/import/forum-post";
+export { ngaBbcodeToMarkdown, extractNgaReplyContext, parseNgaStore, escapeControlCharsInJsonStrings, mergeNgaCookies, resolveNgaImageUrl, extractGuestJs, fetchNgaThread } from "../../apps/desktop/src/main/services/import/nga";
+export { decodeNgaSubject } from "../../apps/desktop/src/main/services/import/nga-entities";
+

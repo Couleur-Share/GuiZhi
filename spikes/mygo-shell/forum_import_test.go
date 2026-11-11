@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fgStaticFetcher 按 URL 返回固定 JSON 文本的 fetchJSON；缺失的 URL 返回 HTTP 404。
@@ -29,6 +30,10 @@ func TestForumImportURLDispatch(t *testing.T) {
 			"https://www.v2ex.com/api/replies/show.json?topic_id=777": `[{"content":"一楼","member":{"username":"r"},"created":1700000100}]`,
 		})},
 		getSummaryConfig: func() *aiClientConfig { return nil },
+		// NGA 走注入的抓取：不触网，一律 404
+		nga: ngaDeps{retryDelays: []time.Duration{}, fetchRawText: func(context.Context, string, safeRequestOptions) (fetchRawTextResult, error) {
+			return fetchRawTextResult{}, errors.New("HTTP 404")
+		}},
 	}
 	var stages []string
 	ex, err := l.importExtractURL(context.Background(), map[string]any{"sourceInput": " https://www.v2ex.com/t/777#reply1 "}, func(s string) { stages = append(stages, s) })
@@ -49,7 +54,7 @@ func TestForumImportURLDispatch(t *testing.T) {
 
 	// 未接入的平台如实降级，不假装成功
 	for url, want := range map[string]string{
-		"https://bbs.nga.cn/read.php?tid=123": "论坛帖子抓取失败：NGA 论坛采集尚未迁移到新内核",
+		"https://bbs.nga.cn/read.php?tid=123": "论坛帖子抓取失败：[network] 帖子不存在或已被删除",
 		"https://www.nodeseek.com/post-123-1": "论坛帖子抓取失败：NodeSeek 浏览器采集服务未就绪",
 		"https://www.v2ex.com/t/999":          "论坛帖子抓取失败：帖子不存在或已被删除",
 	} {

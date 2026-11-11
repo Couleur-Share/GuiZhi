@@ -23,6 +23,7 @@ type forumPostDeps struct {
 	fetchNodeseek          func(ctx context.Context, topicID string) (*forumThread, error)
 	fetchAuthenticatedJSON func(ctx context.Context, url string) (any, error)
 	fetch                  forumDeps // 抓取层注入（测试用）
+	nga                    ngaDeps   // NGA 抓取层注入（测试用）
 	getSummaryConfig       func() *aiClientConfig
 	summarize              func(ctx context.Context, in forumSummaryInput, cfg aiClientConfig) (*forumSummaryResult, error)
 	onStage                func(stage string)
@@ -42,7 +43,7 @@ func (l *Library) fetchThreadByPlatform(ctx context.Context, t forumTarget, deps
 	case "v2ex":
 		return l.fetchV2exThread(ctx, t.TopicID, fd)
 	case "nga":
-		return nil, errors.New("NGA 论坛采集尚未迁移到新内核")
+		return l.fetchNgaThread(ctx, t.TopicID, deps.nga)
 	case "linuxdo":
 		return l.fetchDiscourseThread(ctx, t.TopicID, linuxdoSite, fd)
 	case "appinn":

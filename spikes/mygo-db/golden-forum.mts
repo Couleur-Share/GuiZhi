@@ -393,5 +393,9 @@ for (const c of postCases) {
     { result: result ?? null, error: error ?? null, stages, summarizeCalls });
 }
 
+// ---------- 6. NGA ----------
+const { addNgaCases } = await import(pathToFileURL(path.join(here, "nga-cases.mts")).href);
+await addNgaCases(T, add, norm);
+
 fs.rmSync(bundlePath, { force: true });
 export const forumGolden = { recs };

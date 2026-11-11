@@ -232,6 +232,9 @@ func TestForumGolden(t *testing.T) {
 			case "post":
 				fgPost(t, l, ctx, r, want)
 			default:
+				if strings.HasPrefix(r.Kind, "nga") {
+					return // NGA 基线由 TestForumNgaGolden 对拍
+				}
 				t.Fatalf("未知基线类型 %s", r.Kind)
 			}
 		})

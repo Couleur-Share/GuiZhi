@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -136,5 +135,3 @@ func (l *Library) fetchV2exThread(ctx context.Context, topicID string, deps foru
 	}
 	return th, nil
 }
-
-var _ = fmt.Sprint
