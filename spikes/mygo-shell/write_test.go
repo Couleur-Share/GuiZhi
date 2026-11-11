@@ -82,6 +82,8 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 	l.registerSemantic(b)
 	l.registerWiki(b)
 	l.registerKnowledgeDraft(b)
+	jt := newJobTestEnv(l)
+	l.registerBackgroundJobs(b)
 	ctx := context.Background()
 	out := make([]map[string]any, 0, len(ops))
 	for _, op := range ops {
@@ -94,12 +96,20 @@ func runGoOps(t *testing.T, l *Library, ops []writeOp) []map[string]any {
 			v, err = l.deleteForever(ctx, normalizeIDs(op.Args[0]))
 		case "emptyTrash":
 			v, err = l.emptyTrash(ctx)
+		case "job.clock", "job.register", "job.schedule", "job.unschedule", "job.tick", "job.settle", "job.drain":
+			v, err = jt.run(ctx, strings.TrimPrefix(op.Fn, "job."), op.Args)
 		default:
 			channel := "knowledge:" + op.Fn
 			if ns, method, found := strings.Cut(op.Fn, "."); found {
 				channel = ns + ":" + method
 				if ns == "draft" {
 					channel = "knowledge:saveDraft"
+				}
+				if ns == "job" {
+					channel = "backgroundJob:" + method
+					if method == "sync" {
+						channel = "backgroundJob:syncRenderer"
+					}
 				}
 				if ns == "ask" && (method == "query" || method == "meta") {
 					channel = "askSession:" + method
@@ -410,6 +420,12 @@ func sortNowTies(v any) any {
 	case map[string]any:
 		for k := range x {
 			x[k] = sortNowTies(x[k])
+		}
+		// 多个主进程任务并发执行时，handler 被调用的先后没有契约，按 id 排序后比较
+		if h, ok := x["handled"].([]any); ok {
+			sort.SliceStable(h, func(a, b int) bool {
+				return fmt.Sprint(h[a].(map[string]any)["id"]) < fmt.Sprint(h[b].(map[string]any)["id"])
+			})
 		}
 		return x
 	}

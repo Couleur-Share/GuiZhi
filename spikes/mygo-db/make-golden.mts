@@ -384,7 +384,45 @@ function aiUsageHandlers(db: unknown): Record<string, (...a: unknown[]) => unkno
   aiIpc.registerAIIPC(db as never);
   const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
   return { usageRecord: wrap("ai:usageRecord"), usageSummary: wrap("ai:usageSummary"), usageClear: wrap("ai:usageClear") };
-}// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
+}// 后台任务：真实的 BackgroundJobRuntime + background-job.ipc.ts；时钟、租约持有者、推送都由场景控制
+const jobRuntimeMod = await import("../../apps/desktop/src/main/services/background-jobs.ts");
+const jobIpc = await import("../../apps/desktop/src/main/ipc/background-job.ipc.ts");
+function jobHandlers(db: unknown): Record<string, (...a: unknown[]) => unknown> {
+  let clock = 1_700_000_000_000;
+  const sent: unknown[] = [];
+  const handled: unknown[] = [];
+  const runtime = new jobRuntimeMod.BackgroundJobRuntime(db as never, {
+    now: () => clock, ownerId: "OWNER", sendRendererJob: (job: unknown) => sent.push(job),
+  });
+  jobIpc.registerBackgroundJobIPC(runtime);
+  const wrap = (channel: string) => (...args: unknown[]) => (ipcHandlers.get(channel) as (...a: unknown[]) => unknown)({}, ...args);
+  const drain = () => ({ sent: sent.splice(0), handled: handled.splice(0) });
+  return {
+    clock: (ms: unknown) => { clock = ms as number; return null; },
+    register: (kind: unknown, behavior: unknown) => {
+      runtime.registerHandler(kind as never, async (job: unknown) => {
+        handled.push(job);
+        const [mode, arg] = String(behavior).split(":");
+        if (mode === "throw") throw new Error(arg ?? "boom");
+        if (mode === "pause") return { pause: true, message: arg || undefined };
+        if (mode === "next") return { nextRunAt: Number(arg) };
+        if (mode === "nextUndefined") return { nextRunAt: undefined };
+        return undefined;
+      });
+      return null;
+    },
+    schedule: (id: unknown, input: unknown) => runtime.schedule(id as string, input as never),
+    unschedule: (kind: unknown, scope: unknown) => runtime.unschedule(kind as never, scope as string),
+    tick: async () => { await runtime.tick(); return null; },
+    settle: async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r)); return drain(); },
+    drain: () => drain(),
+    list: wrap("backgroundJob:list"), sync: wrap("backgroundJob:syncRenderer"), renew: wrap("backgroundJob:renew"),
+    complete: wrap("backgroundJob:complete"), fail: wrap("backgroundJob:fail"), pause: wrap("backgroundJob:pause"),
+    resume: wrap("backgroundJob:resume"),
+  };
+}
+
+// ── 写入频道：每个场景在基准库的独立副本上依次执行一串操作，记录返回值与写后的原始表内容 ──
 const baseDb = path.join(out, "knowledge.db");
 const A = a.id, B = b.id, C = c.id, F = f.id, G = g.id;
 const DUMP_SQL: Record<string, string> = {
@@ -405,6 +443,7 @@ const DUMP_SQL: Record<string, string> = {
   wikiSuggestions: "SELECT page_id, draft_json, reason, created_at FROM wiki_page_suggestions",
   wikiFts: "SELECT page_id, title, summary, body FROM wiki_fts",
   wikiInvalid: "SELECT page_title FROM wiki_invalidated_pages",
+  backgroundJobs: "SELECT id, kind, scope_id, state, payload_json, interval_minutes, next_run_at, attempt, lease_owner, lease_until, last_error, last_success_at, created_at, updated_at FROM background_jobs",
   aiUsage: "SELECT day, scenario, model, calls, failed_calls, prompt_tokens, completion_tokens, updated_at FROM ai_usage_daily",
   importTasks: "SELECT id, status, warning, warning_acknowledged_at, updated_at FROM import_tasks",
   ftsMap: "SELECT m.item_id AS map_item, f.item_id AS fts_item FROM knowledge_fts_map m LEFT JOIN knowledge_fts f ON f.rowid = m.fts_rowid",
@@ -984,6 +1023,91 @@ const scenarios: Record<string, Op[]> = {
   ],
 };
 
+// ── 后台任务场景：时钟由 job.clock 控制，T0 取 1.7e12（低于 Go 测试的 NOW 抹平阈值，时间戳逐位比较） ──
+{
+  const T0 = 1_700_000_000_000, MIN = 60_000;
+  const j = (fn: string, ...args: unknown[]): Op => ({ fn: `job.${fn}`, args });
+  const at = (ms: number) => j("clock", T0 + ms);
+  const failN = (n: number, startMs: number, id: string) => {
+    // 连续 n 次「到期 → 领取 → 失败」，每次把时钟推过上一次的重试等待
+    const ops: Op[] = [];
+    let t = startMs;
+    for (let i = 0; i < n; i++) {
+      ops.push(at(t), j("tick"), j("drain"), j("fail", { id, error: `第${i + 1}次失败` }), j("list"));
+      t += 25 * 60 * MIN; // 超过最长 24 小时的重试间隔
+    }
+    return ops;
+  };
+  Object.assign(scenarios, {
+    "job.renderer": [
+      j("list"),
+      j("sync", { wikiEnabled: true, semanticEnabled: true }), j("drain"),
+      at(61_000), j("tick"), j("drain"), j("list"),
+      j("renew", "renderer-semantic-index"), j("renew", "nope"), j("renew", ""), j("renew", "  "), j("renew", null), j("renew", 5),
+      at(70_000), j("renew", "renderer-semantic-index"), j("list"),
+      j("complete", "renderer-semantic-index"), j("complete", "renderer-semantic-index"), j("tick"), j("drain"),
+      at(400_000), j("tick"), j("drain"), j("list"),
+      j("complete", "renderer-wiki-compile"), j("list"),
+    ],
+    "job.fail": [
+      j("sync", { wikiEnabled: true, semanticEnabled: false }),
+      ...failN(6, 5 * MIN + 1, "renderer-wiki-compile"),
+      at(200 * 60 * MIN), j("tick"), j("drain"),
+      j("fail", { id: "renderer-wiki-compile", error: "手动暂停", pause: true }), j("list"),
+      j("fail", { id: "renderer-wiki-compile", error: "再失败" }), j("fail", { id: "missing", error: "x" }),
+      j("resume", "renderer-wiki-compile"), j("tick"), j("drain"), j("list"),
+      j("pause", "renderer-wiki-compile"), j("list"), j("tick"), j("drain"),
+      j("resume", "renderer-wiki-compile"), j("drain"), j("list"),
+      j("pause", "missing"), j("resume", "missing"),
+    ],
+    "job.invalid": [
+      ...[[], [null], [0], [""], ["x"], [{}], [{ wikiEnabled: true }], [{ wikiEnabled: true, semanticEnabled: "true" }], [{ wikiEnabled: 1, semanticEnabled: true }],
+        [{ wikiEnabled: false, semanticEnabled: false }], [[true, true]]].map((a) => j("sync", ...a)),
+      ...[[], [null], ["str"], [{}], [{ id: "a" }], [{ id: "", error: "x" }], [{ id: "a", error: 1 }], [{ id: 5, error: "x" }], [{ id: "a", error: "x", pause: "true" }]]
+        .map((a) => j("fail", ...a)),
+      ...[[], [null], [5], [" "], ["\u00a0\ufeff"], [{}], [["a"]]].flatMap((a) => [j("pause", ...a), j("resume", ...a), j("complete", ...a), j("renew", ...a)]),
+      j("list"),
+    ],
+    "job.lease": [
+      j("schedule", "x1", { kind: "semantic-index", scopeId: "s1", nextRunAt: T0 }), j("drain"),
+      j("list"),
+      at(30_000), j("tick"), j("drain"),
+      at(100_000), j("tick"), j("drain"), j("list"),
+      j("schedule", "x1", { kind: "semantic-index", scopeId: "s1", payload: { b: 1, a: 2, 2: 3, 1: { z: [1, 2] } }, intervalMinutes: 1.5 }), j("list"),
+      j("schedule", "x2", { kind: "wiki-compile", scopeId: "s2", intervalMinutes: 0, nextRunAt: null }), j("drain"),
+      j("schedule", "x3", { kind: "wiki-compile", scopeId: "s3", enabled: false }), j("list"),
+      j("schedule", "x1", { kind: "semantic-index", scopeId: "s1", enabled: false }), j("list"),
+      j("unschedule", "semantic-index", "s1"), j("unschedule", "semantic-index", "nope"), j("unschedule", "wiki-compile", "s3"), j("list"),
+      j("complete", "x2"), j("list"),
+      at(10 * MIN), j("tick"), j("drain"), j("complete", "x2"), j("list"),
+    ],
+    "job.main": [
+      j("register", "backup", "ok"),
+      j("register", "wiki-compile", "ok"),
+      j("schedule", "b1", { kind: "backup", scopeId: "", intervalMinutes: 60, nextRunAt: T0 + 1 }), j("settle"), j("list"),
+      at(10), j("schedule", "b0", { kind: "backup", scopeId: "once", nextRunAt: T0 }), j("settle"), j("list"),
+      j("register", "backup", "throw:磁盘已满"),
+      at(61 * MIN), j("tick"), j("settle"), j("list"),
+      at(200 * 60 * MIN), j("tick"), j("settle"), j("list"),
+      j("register", "backup", "throw"), at(40 * 60 * MIN * 24), j("tick"), j("settle"), j("list"),
+      j("register", "backup", "pause:用户拒绝"), at(41 * 60 * MIN * 24), j("resume", "b1"), j("settle"), j("list"),
+      j("register", "backup", "pause"), at(42 * 60 * MIN * 24), j("resume", "b1"), j("settle"), j("list"),
+      j("register", "backup", "next:1704500000000"), at(43 * 60 * MIN * 24), j("resume", "b1"), j("settle"), j("list"),
+      j("register", "backup", "nextUndefined"), at(44 * 60 * MIN * 24), j("resume", "b1"), j("settle"), j("list"),
+      j("register", "backup", "next:1704500000000"), at(45 * 60 * MIN * 24), j("resume", "b0"), j("settle"), j("list"),
+    ],
+    "job.parallel": [
+      j("register", "backup", "ok"), j("register", "platform-discovery", "throw:并发失败"),
+      j("sync", { wikiEnabled: true, semanticEnabled: true }),
+      j("schedule", "p1", { kind: "backup", scopeId: "a", nextRunAt: T0 }),
+      j("schedule", "p2", { kind: "platform-discovery", scopeId: "a", nextRunAt: T0, intervalMinutes: 30 }),
+      j("schedule", "p3", { kind: "platform-discovery", scopeId: "b", nextRunAt: T0 }), j("settle"), j("list"),
+      at(6 * MIN), j("tick"), j("settle"), j("tick"), j("settle"), j("list"),
+      at(16 * MIN), j("schedule", "p4", { kind: "backup", scopeId: "c", payload: { 序: "号" } }), j("settle"), j("list"),
+    ],
+  });
+}
+
 function dumpAll(database: ReturnType<typeof initDatabase>) {
   const dump: Record<string, unknown[][]> = {};
   for (const [name, sql] of Object.entries(DUMP_SQL)) {
@@ -1007,6 +1131,7 @@ for (const [name, ops] of Object.entries(scenarios)) {
     semantic: semanticHandlers(db),
     wiki: wikiHandlers(db),
     draft: { save: (input: unknown) => saveKnowledgeDraft(db as never, input as never) } as never,
+    job: jobHandlers(db),
   };
   const resolveArgs = (args: unknown[], results: Array<{ value?: unknown }>): unknown[] =>
     JSON.parse(JSON.stringify(args.map((x) => (x === undefined ? null : x))), (_k, v) =>

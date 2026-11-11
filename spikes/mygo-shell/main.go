@@ -136,6 +136,7 @@ func main() {
 		}
 		mygo.App.Quit()
 	}
+	lib.jobs = newBackgroundJobRuntime(lib, func(job map[string]any) { lib.pushMain(chBackgroundJobAvail, job) })
 	lib.register(b)
 	lib.registerList(b)
 	lib.registerWrite(b)
@@ -147,6 +148,7 @@ func main() {
 	lib.registerWiki(b)
 	lib.registerKnowledgeDraft(b)
 	lib.registerAppRuntime(b)
+	lib.registerBackgroundJobs(b)
 	lib.registerInbox(b)
 	lib.registerImportList(b)
 	lib.registerSettings(b)
@@ -177,6 +179,11 @@ func main() {
 		})
 		b.registerWindow(win)
 		p := win.Page()
+		lib.setPush(func(channel string, payload any) {
+			if err := ipcEvent.EmitPage(p, ipcPush{Channel: channel, Args: []any{payload}}); err != nil {
+				log.Printf("[push] 推送 %s 失败：%v", channel, err)
+			}
+		})
 		p.OnDidFailLoad(func(e *mygo.LoadError) { fmt.Println("[FAIL] 页面加载失败：", e) })
 		if *bench {
 			// 与 Electron 版的就绪判据一致：顶栏搜索框出现在 DOM 里

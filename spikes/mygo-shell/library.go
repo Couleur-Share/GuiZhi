@@ -23,6 +23,9 @@ type Library struct {
 	images     imageState
 	openDialog openDialogFn // 选择图片的对话框；测试里替换
 	relaunch   func()       // 重启应用；测试里替换
+	jobs       *BackgroundJobRuntime
+	pushMu     sync.RWMutex
+	push       func(channel string, payload any) // 向主窗口推送事件；窗口创建后由 main 设置
 }
 
 func asInt(v any) int64 {

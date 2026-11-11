@@ -74,6 +74,7 @@
 | 11-11 | `wiki:catalog/backlinkCounts/search/getPage/updatePage/deletePage/status/graph/listRevisions/restoreRevision`（含 `flushWikiInvalidations` 失效重建，事务内读写用内存状态模拟） | 11 组场景（独立播种库 + 带贡献与失效记录的库）：节点/边/历史保留 10 份/手动编辑标记/旧版页面改走建议；适配器的单参数绑定语义（数组按位置参数、布尔、对象报错）也已复刻。对拍时 uuid 键与并列时间戳、图谱边顺序做了稳定化 | 56 / 131 |
 | 11-11 | `knowledge:saveDraft` | 4 组 59 个调用：基线冲突（含 patch 等于当前值不算冲突）、标签按基线增删合并（trim+小写键、Map 语义）、参数校验（`Object.keys` 对数字/数组/字符串的行为）。读写之间有极小窗口（TS 是单事务），见源码注释 | 57 / 130 |
 | 11-11 | `app:getRuntimePaths`、`app:relaunch`、`log:appError`、`dialog:selectImage`、`image:save/readBase64` | 路径、诊断日志（脱敏、512KB 滚动、字段顺序）、图片选择集授权、保存与读取全部与 TS 对拍；发现 Node 对 `a.png␠`、`nul` 返回不存在而 Go 的 Win32 路径会规范化，已按 Node 行为拒绝；`image:save` 传字符串时不抛错且清空选择集。`app:relaunch` 只验证返回值，未实机重启 | 63 / 124 |
+| 11-11 | `backgroundJob:*`（8 个，含 `available` 推送）+ 调度器 | 6 组场景对拍：渲染进程任务领取/续租/完成/失败退避（15 分/1 时/6 时/24 时封顶）/暂停恢复、租约过期重领、upsert 在运行中的保留规则、主进程 handler（成功/抛错/暂停/自定义下次时间/并发多类）。时钟与租约持有者注入，时间戳逐位比较。已知与 TS 不同：Go 的 tick 在互斥锁内串行而非靠 JS 单线程；handler 返回过去的 `nextRunAt` 时两边都会立即重跑（TS 版会把微任务队列占死，属已有行为，未修）。未验证：`backup` handler 尚未接入（等备份迁移）、30 秒定时器与真实窗口推送未实机跑 | 71 / 116 |
 
 | 项目 | 结果 |
 |---|---|

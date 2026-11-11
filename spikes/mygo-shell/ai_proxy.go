@@ -56,8 +56,8 @@ type aiStreamPayload struct {
 
 // ipcPush 对应垫片里的 "ipc" 事件：{channel, args}，垫片再按频道分发给 ipcRenderer.on 的监听器。
 type ipcPush struct {
-	Channel string            `json:"channel"`
-	Args    []aiStreamPayload `json:"args"`
+	Channel string `json:"channel"`
+	Args    []any  `json:"args"`
 }
 
 var ipcEvent = mygo.NewEvent[ipcPush]("ipc")
@@ -369,7 +369,7 @@ func (p *aiProxy) stream(ctx context.Context, req aiRequest) aiResponse {
 			return
 		}
 		payload.RequestID = req.RequestID
-		if err := ipcEvent.EmitPage(page, ipcPush{Channel: channel, Args: []aiStreamPayload{payload}}); err != nil {
+		if err := ipcEvent.EmitPage(page, ipcPush{Channel: channel, Args: []any{payload}}); err != nil {
 			log.Printf("[ai] 推送 %s 失败：%v", channel, err)
 		}
 	}
