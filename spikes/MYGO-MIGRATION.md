@@ -140,6 +140,18 @@
 
 **仍然没有验证的事（汇总）**：真实 UI 里的备份/恢复整链路与重启、数据库损坏后的修复路径、大库（数万条）耗时；真实第三方站点（采集、渲染、小红书/抖音/LINUX DO/NodeSeek 登录）与真实 SOCKS5/TUN；真实云端 ASR/LLM/OCR/生图/搜索服务；真实 Python/pip/torch 的 FunASR 安装；Wiki 编译在渲染进程驱动下的真实模型循环；SSH 隧道 + FlareSolverr；安装包形态（NSIS、签名、自动更新对接）；与用户真实 Electron 实例并存时的租约与 `Local State`；主题阅读视图 iframe 在真实 UI 里的完整往返、WebView2 对 iframe 是否做进程隔离；goja 在数 MB 页面上的耗时；长时间运行下渲染窗口的内存与泄漏。这些都需要真实环境、真实账号或用户确认，没有在本轮自动化里做。
 
+### 真实网站冒烟（2026-11-12，经用户确认；按当前系统网络直连，未改任何代理设置）
+
+`real_net_test.go`（默认跳过，`GUIZHI_REAL_NET=1` 才运行）对 3 个公开页面各请求 1 次，渲染窗口离屏：
+
+| 页面 | 路由 | 结果 |
+|---|---|---|
+| `https://example.com/` | 静态判定正文过短 → 渲染回退（`readability/1-electron`） | 3.5 s，标题与正文正确 |
+| `https://en.wikipedia.org/wiki/SQLite` | 静态（`readability/1-static`） | 1.1 s，约 6 万字符，含信息框表格 |
+| `https://quotes.toscrape.com/js/` | 需渲染（页面由脚本写入内容） | 7.1 s，名言正文被取到 |
+
+只证明静态抓取、渲染回退和提取在真实站点上能跑通，**没有**与 Electron 版在同一批页面上对拍正文；Cloudflare 挑战页、反爬、懒加载、长时间运行下的窗口泄漏仍未验证。登录类站点（小红书/抖音/LINUX DO/NodeSeek）、论坛与视频站点本次未选，仍是未验证项。
+
 ## 已验证的事
 
 | 项目 | 结果 |
