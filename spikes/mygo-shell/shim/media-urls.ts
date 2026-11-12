@@ -24,6 +24,22 @@ export function rewriteMediaUrl(value: string): string {
   return value;
 }
 
+const MEDIA_URL_IN_TEXT = /local-(?:image|video):\/\/[^\s"'<>)]+/g;
+// CSP 源表达式里的 `local-image:`（后面不跟 //）
+const CSP_SOURCE = /\blocal-(image|video):(?!\/\/)/g;
+
+/**
+ * 网页快照与旧版主题阅读用沙箱 srcdoc iframe 承载文档，文档里的图片地址与 CSP（img-src local-image:）
+ * 都写自定义协议；iframe 内部不在主文档的改写范围内，所以在设置 srcdoc 时对整份 HTML 做同样的改写。
+ * Sandboxed srcdoc documents (web snapshots, legacy reading pages) carry their own local-* URLs and CSP.
+ */
+export function rewriteMediaDocument(html: string): string {
+  if (!html.includes("local-image") && !html.includes("local-video")) return html;
+  return html
+    .replace(MEDIA_URL_IN_TEXT, (m) => rewriteMediaUrl(m))
+    .replace(CSP_SOURCE, (_m, kind: string) => `http://local-${kind}.localhost`);
+}
+
 const ATTRS = ["src", "poster"];
 const SELECTOR = ATTRS.map((a) => `[${a}^="local-"]`).join(",");
 
@@ -43,18 +59,20 @@ let nativeSetAttribute: Element["setAttribute"];
 function patchSetAttribute() {
   nativeSetAttribute = Element.prototype.setAttribute;
   Element.prototype.setAttribute = function (name: string, value: string) {
-    if (ATTRS.includes(String(name).toLowerCase()) && typeof value === "string") value = rewriteMediaUrl(value);
+    const key = String(name).toLowerCase();
+    if (ATTRS.includes(key) && typeof value === "string") value = rewriteMediaUrl(value);
+    else if (key === "srcdoc" && typeof value === "string") value = rewriteMediaDocument(value);
     return nativeSetAttribute.call(this, name, value);
   };
 }
 
-function patchProperty(proto: object, prop: string) {
+function patchProperty(proto: object, prop: string, rewrite: (v: string) => string = rewriteMediaUrl) {
   const desc = Object.getOwnPropertyDescriptor(proto, prop);
   if (!desc || !desc.set || !desc.get) return;
   Object.defineProperty(proto, prop, {
     ...desc,
     set(v: string) {
-      desc.set!.call(this, typeof v === "string" ? rewriteMediaUrl(v) : v);
+      desc.set!.call(this, typeof v === "string" ? rewrite(v) : v);
     },
   });
 }
@@ -70,6 +88,7 @@ export function installMediaUrlRewrite() {
   patchProperty(HTMLMediaElement.prototype, "src");
   patchProperty(HTMLSourceElement.prototype, "src");
   patchProperty(HTMLVideoElement.prototype, "poster");
+  patchProperty(HTMLIFrameElement.prototype, "srcdoc", rewriteMediaDocument);
   const observe = () => {
     scan(document);
     new MutationObserver((records) => {
