@@ -17,7 +17,7 @@ const repo = path.resolve(here, "../../../..");
 const outDir = process.argv[2] ?? path.join(os.tmpdir(), "guizhi-verify", "wire");
 fs.mkdirSync(outDir, { recursive: true });
 
-interface Captured { label: string; kind: "http" | "tls"; text?: string; ja3?: Ja3 }
+interface Captured { label: string; kind: "http" | "tls"; text?: string; ja3?: Ja3; hex?: string }
 interface Ja3 { ja3: string; hash: string; extensions: number[]; sni?: string; alpn?: string[]; ciphers: number }
 const captured: Captured[] = [];
 let label = "";
@@ -75,7 +75,7 @@ const plainSrv = await listen((sock) => {
 const tlsSrv = await listen((sock) => {
   sock.once("data", (d) => {
     const h = parseClientHello(d);
-    if (h) captured.push({ label, kind: "tls", ja3: h });
+    if (h) captured.push({ label, kind: "tls", ja3: h, hex: d.toString("hex") });
     sock.destroy();
   });
   sock.on("error", () => undefined);
@@ -142,5 +142,10 @@ for (const lab of ["go", "ts-electron", "ts-node"]) {
 }
 const text = lines.join("\n");
 fs.writeFileSync(path.join(outDir, "wire-report.txt"), text);
+// 原始 ClientHello（十六进制）供 utls 复刻实验使用：每个客户端各留一份
+for (const lab of ["go", "ts-electron", "ts-node"]) {
+  const h = captured.find((c) => c.label === lab && c.kind === "tls");
+  if (h?.hex) fs.writeFileSync(path.join(outDir, `clienthello-${lab}.hex`), h.hex);
+}
 fs.writeFileSync(path.join(outDir, "wire-raw.json"), JSON.stringify(captured, null, 1));
 console.log(text);
