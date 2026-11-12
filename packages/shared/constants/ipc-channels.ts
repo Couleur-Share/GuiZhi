@@ -127,6 +127,7 @@ export const IPC_CHANNELS = {
   BACKUP_REPOSITORY_PREVIEW: "backupRepository:preview",
   BACKUP_REPOSITORY_DELETE: "backupRepository:deleteSnapshot",
   BACKUP_REPOSITORY_EXPORT_PORTABLE: "backupRepository:exportPortable",
+  BACKUP_REPOSITORY_IMPORT_PORTABLE: "backupRepository:importPortable",
   BACKUP_REPOSITORY_RESTORE: "backupRepository:restore",
   BACKUP_REPOSITORY_CONSUME_RENDERER_SETTINGS:
     "backupRepository:consumeRendererSettings",

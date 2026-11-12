@@ -23,6 +23,7 @@ import type {
   ExportAiHandoffResult,
   ExportMarkdownResult,
   PortableBackupExportResult,
+  PortableBackupImportResult,
   RepositorySnapshotRequest,
   RepositorySnapshotResult,
 } from "@guizhi/shared/types";
@@ -320,6 +321,36 @@ export function registerBackupIPC(
           error: error instanceof Error ? error.message : String(error),
         };
       }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BACKUP_REPOSITORY_IMPORT_PORTABLE,
+    async (
+      event,
+      input: { recoveryPassword?: unknown },
+    ): Promise<PortableBackupImportResult> => {
+      const recoveryPassword =
+        typeof input?.recoveryPassword === "string" ? input.recoveryPassword : "";
+      if (!recoveryPassword) {
+        return { success: false, error: "请先输入这份便携备份对应的恢复口令" };
+      }
+      const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+      const openOptions = {
+        title: "导入归知便携备份",
+        properties: ["openFile" as const],
+        filters: [
+          { name: "GuiZhi Backup", extensions: ["guizhi-backup"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      };
+      const selected = owner
+        ? await dialog.showOpenDialog(owner, openOptions)
+        : await dialog.showOpenDialog(openOptions);
+      if (selected.canceled || selected.filePaths.length === 0) {
+        return { success: false, canceled: true };
+      }
+      return repository.importPortable(selected.filePaths[0], recoveryPassword);
     },
   );
 

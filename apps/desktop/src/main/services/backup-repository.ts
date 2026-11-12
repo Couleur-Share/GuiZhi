@@ -10,6 +10,7 @@ import { extractLocalAssetRefs } from "@guizhi/shared/utils/media-refs";
 import type {
   BackupFileInfo,
   BackupRepositoryStatus,
+  PortableBackupImportResult,
   RepositorySnapshotRequest,
   RepositorySnapshotResult,
 } from "@guizhi/shared/types";
@@ -26,6 +27,7 @@ import {
   writePortableBackup,
   type PortableSource,
 } from "./backup-portable";
+import { extractPortableArchive } from "./backup-portable-reader";
 
 const REPOSITORY_VERSION = 1;
 const HEADER_FILE = "repository-header.json";
@@ -400,6 +402,131 @@ export class BackupRepository {
     await writePortableBackup(destinationPath, sources);
   }
 
+  /**
+   * 导入便携备份（`exportPortable` 的逆操作）：把包里的快照与加密对象并入本机备份仓库，不直接改动数据库。
+   * 导入后在列表里出现一条快照，仍要走「预检并恢复」才会替换当前数据。
+   *
+   * - 必须提供包对应的恢复口令：用它解开包内仓库密钥，并校验快照清单可解密、引用的对象齐全。
+   * - 本机还没有仓库，或仓库里没有任何快照：改用包里的仓库头（换机的主要场景）。恢复口令随之变成包的口令；
+   *   能用系统密钥环时重新包装，使无人值守备份继续可用。本机原有的孤立对象用旧密钥加密，会先清掉，
+   *   否则同哈希对象会与导入对象混在一起。
+   * - 本机已有快照：只有口令能解开本机仓库头且密钥相同（同一仓库的另一份拷贝）时才并入，其余情况拒绝——
+   *   对象按明文哈希命名，不同密钥的对象无法安全共存。
+   * - 提交顺序：先换仓库头，再放对象，最后一步把快照目录整体改名；快照出现之前，仓库不会列出半成品。
+   *   从状态检查到提交之间没有 await，不会与同进程的其它备份操作交错。
+   * - 导入的快照一律记为手动：自动快照有保留数量上限，导入的唯一副本不能被下一轮自动备份清掉。
+   */
+  async importPortable(
+    archivePath: string,
+    password: string,
+  ): Promise<PortableBackupImportResult> {
+    fs.mkdirSync(this.paths.repositoryDir, { recursive: true });
+    const stage = fs.mkdtempSync(path.join(this.paths.repositoryDir, ".import-work-"));
+    try {
+      await extractPortableArchive(archivePath, stage);
+      for (const required of ["repository-header.json", "snapshot/header.json", "snapshot/manifest.enc"]) {
+        if (!fs.existsSync(path.join(stage, ...required.split("/")))) {
+          throw new Error(`便携备份缺少必要文件：${required}`);
+        }
+      }
+      const header = readJson<RepositoryHeader>(path.join(stage, "repository-header.json"));
+      validateHeader(header);
+      const key = unwrapKeyWithPassword(header.passwordWrappedKey, password);
+      const snapshotHeader = readJson<SnapshotHeader>(path.join(stage, "snapshot", "header.json"));
+      if (
+        snapshotHeader?.kind !== "guizhi-repository-snapshot-header" ||
+        typeof snapshotHeader.id !== "string" ||
+        !/^[A-Za-z0-9-]+$/.test(snapshotHeader.id)
+      ) {
+        throw new Error("便携备份的快照头不合法");
+      }
+      const manifestEncrypted = fs.readFileSync(path.join(stage, "snapshot", "manifest.enc"));
+      if (sha256(manifestEncrypted) !== snapshotHeader.manifestSha256) {
+        throw new Error("便携备份的快照清单校验失败");
+      }
+      let manifest: RepositorySnapshotManifest;
+      try {
+        manifest = JSON.parse(
+          gunzipSync(decryptBuffer(manifestEncrypted, key)).toString("utf8"),
+        ) as RepositorySnapshotManifest;
+      } catch {
+        throw new Error("便携备份的快照清单无法解密，文件可能已损坏");
+      }
+      if (manifest.kind !== "guizhi-repository-snapshot" || manifest.id !== snapshotHeader.id) {
+        throw new Error("便携备份的快照清单与快照头不匹配");
+      }
+      const needed = [...new Set(manifest.entries.map((entry) => entry.sha256))];
+      const missing = needed.filter((hash) => !fs.existsSync(path.join(stage, "objects", hash)));
+      if (missing.length > 0) {
+        throw new Error(`便携备份缺少 ${missing.length} 个数据对象，文件可能不完整`);
+      }
+
+      // ── 以下到提交完成全部同步 ──
+      const hasLocalRepository = fs.existsSync(this.headerPath());
+      let sameRepository = false;
+      if (hasLocalRepository) {
+        const local = this.readHeader();
+        try {
+          sameRepository = unwrapKeyWithPassword(local.passwordWrappedKey, password).equals(key);
+        } catch {
+          sameRepository = false;
+        }
+        if (!sameRepository && this.listSnapshots().length > 0) {
+          throw new Error(
+            "本机备份仓库已有完整快照，且与这份便携备份不属于同一个仓库（恢复口令或密钥不同），无法合并。" +
+              "请先在本机删除这些快照，或换一台没有完整快照的机器导入。",
+          );
+        }
+      }
+      const snapshotDir = path.join(this.snapshotsDir(), snapshotHeader.id);
+      if (fs.existsSync(snapshotDir)) {
+        if (!sameRepository) throw new Error("本机已存在同名快照目录，无法导入");
+        this.cachedKey = key;
+        return {
+          success: true,
+          alreadyExisted: true,
+          snapshot: this.snapshotHeaderToInfo(snapshotHeader),
+        };
+      }
+
+      if (!sameRepository) {
+        fs.rmSync(this.objectsDir(), { recursive: true, force: true });
+        const canUseAutomaticAccess = this.protector.isAvailable() && this.protector.isSecure();
+        const nextHeader: RepositoryHeader = {
+          ...header,
+          safeStorageWrappedKey: canUseAutomaticAccess
+            ? this.protector.wrap(key).toString("base64")
+            : null,
+          keyStorageBackend: canUseAutomaticAccess ? this.protector.backend : null,
+        };
+        fs.mkdirSync(this.objectsDir(), { recursive: true });
+        fs.mkdirSync(this.snapshotsDir(), { recursive: true });
+        atomicWrite(this.headerPath(), JSON.stringify(nextHeader, null, 2));
+      }
+      this.cachedKey = key;
+      fs.mkdirSync(this.objectsDir(), { recursive: true });
+      fs.mkdirSync(this.snapshotsDir(), { recursive: true });
+      for (const hash of needed) {
+        const target = path.join(this.objectsDir(), hash);
+        if (!fs.existsSync(target)) fs.renameSync(path.join(stage, "objects", hash), target);
+      }
+      const importedHeader: SnapshotHeader = { ...snapshotHeader, backupKind: "manual" };
+      fs.writeFileSync(
+        path.join(stage, "snapshot", "header.json"),
+        JSON.stringify(importedHeader, null, 2),
+      );
+      fs.renameSync(path.join(stage, "snapshot"), snapshotDir);
+      return {
+        success: true,
+        replacedRepository: hasLocalRepository && !sameRepository,
+        snapshot: this.snapshotHeaderToInfo(importedHeader),
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      fs.rmSync(stage, { recursive: true, force: true });
+    }
+  }
   garbageCollect(): number {
     const referenced = new Set<string>();
     for (const snapshot of this.listSnapshots()) {

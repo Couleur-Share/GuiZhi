@@ -4,6 +4,7 @@ import {
   ArchiveRestoreIcon,
   DatabaseBackupIcon,
   DownloadIcon,
+  FileInputIcon,
   KeyRoundIcon,
   Loader2Icon,
   ShieldCheckIcon,
@@ -29,7 +30,7 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString();
 }
 
-type Busy = "init" | "create" | "preview" | "restore" | "export" | "password" | null;
+type Busy = "init" | "create" | "preview" | "restore" | "export" | "import" | "password" | null;
 
 export function RepositoryBackupSection() {
   const { t } = useTranslation();
@@ -148,6 +149,41 @@ export function RepositoryBackupSection() {
     }
   };
 
+  /** 换机恢复：选择 .guizhi-backup，用恢复口令并入本机仓库；之后仍由「预检并恢复」决定是否替换当前数据。 */
+  const importPortable = async () => {
+    if (!unlockPassword) {
+      showToast(t("settings.fullBackupImportNeedPassword", "请先输入这份便携备份对应的恢复口令"), "error");
+      return;
+    }
+    setBusy("import");
+    try {
+      const result = await window.api.backup.importPortable({ recoveryPassword: unlockPassword });
+      if (result.canceled) return;
+      if (!result.success) {
+        showToast(result.error || t("settings.fullBackupImportFailed", "便携备份导入失败"), "error", {
+          detail: result.error,
+        });
+        return;
+      }
+      if (result.alreadyExisted) {
+        showToast(t("settings.fullBackupImportExisted", "这份便携备份已经在本机仓库里，无需重复导入"), "success");
+      } else {
+        showToast(t("settings.fullBackupImported", "便携备份已导入。在列表里点「预检并恢复」才会替换当前数据"), "success", {
+          detail: result.replacedRepository
+            ? t("settings.fullBackupImportReplacedDetail", "本机原来的备份仓库没有任何快照，已换用这份便携备份的仓库；之后请使用它的恢复口令。")
+            : undefined,
+        });
+      }
+      await reload();
+    } catch (error) {
+      showToast(t("settings.fullBackupImportFailed", "便携备份导入失败"), "error", {
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const changePassword = async () => {
     setBusy("password");
     const result = await window.api.backup.changeRepositoryPassword({
@@ -194,6 +230,17 @@ export function RepositoryBackupSection() {
             {busy === "init" ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <KeyRoundIcon className="h-4 w-4" />}
             {t("settings.fullBackupEnable", "启用完整备份")}
           </button>
+          <div className="border-t border-border/60 pt-4">
+            <p className="text-sm font-medium text-foreground">{t("settings.fullBackupImportTitle", "已有便携备份（换机恢复）")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("settings.fullBackupImportDesc", "输入备份时设置的恢复口令，再选择 .guizhi-backup 文件导入。导入后在列表里点「预检并恢复」才会替换当前数据。")}</p>
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <Input className="w-56" aria-label={t("settings.fullBackupImportPasswordLabel", "便携备份的恢复口令")} placeholder={t("settings.fullBackupImportPasswordPlaceholder", "便携备份的恢复口令")} type="password" value={unlockPassword} onChange={(event) => setUnlockPassword(event.target.value)} autoComplete="off" />
+              <button type="button" disabled={busy !== null} onClick={() => void importPortable()} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted disabled:opacity-50">
+                {busy === "import" ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <FileInputIcon className="h-4 w-4" />}
+                {t("settings.fullBackupImportAction", "导入便携备份")}
+              </button>
+            </div>
+          </div>
         </div>
       </SettingSection>
     );
@@ -214,10 +261,14 @@ export function RepositoryBackupSection() {
               {busy === "create" ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <DatabaseBackupIcon className="h-4 w-4" />}
               {t("settings.fullBackupNow", "立即完整备份")}
             </button>
+            <button type="button" disabled={busy !== null} onClick={() => void importPortable()} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm hover:bg-muted disabled:opacity-50">
+              {busy === "import" ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <FileInputIcon className="h-4 w-4" />}
+              {t("settings.fullBackupImportAction", "导入便携备份")}
+            </button>
           </div>
         </div>
         {snapshots.length === 0 ? (
-          <p className="border-t border-border/60 px-4 py-6 text-center text-sm text-muted-foreground">{t("settings.fullBackupNoSnapshots", "还没有完整快照。")}</p>
+          <p className="border-t border-border/60 px-4 py-6 text-center text-sm text-muted-foreground">{t("settings.fullBackupNoSnapshots", "还没有完整快照。")}<span className="mt-1 block text-xs">{t("settings.fullBackupNoSnapshotsImportHint", "从另一台设备恢复：输入便携备份的恢复口令，点「导入便携备份」。")}</span></p>
         ) : (
           <ul className="max-h-80 overflow-y-auto border-t border-border/60">
             {snapshots.map((snapshot) => (
