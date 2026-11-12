@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	whatwg "github.com/nlnwa/whatwg-url/url"
@@ -58,10 +59,18 @@ type safeFetcher struct {
 	// dialOverride 仅测试使用：替代真实拨号（忽略钉扎地址）。
 	dialOverride func(ctx context.Context, network, addr string) (net.Conn, error)
 	idle         time.Duration
+
+	// 诊断开关（见 fetch_trace.go，仅环境变量打开）：逐跳请求跟踪与最小请求间隔。
+	trace       *fetchTracer
+	minInterval time.Duration
+	paceMu      sync.Mutex
+	paceNext    time.Time
 }
 
 func newSafeFetcher() *safeFetcher {
-	return &safeFetcher{proxy: activeNetProxy, lookup: systemLookup, idle: fetchIdleTimeout}
+	f := &safeFetcher{proxy: activeNetProxy, lookup: systemLookup, idle: fetchIdleTimeout}
+	applyFetchEnv(f)
+	return f
 }
 
 var defaultSafeFetcher = newSafeFetcher()
@@ -185,6 +194,33 @@ func mapFetchError(ctx context.Context, err error) error {
 	return err
 }
 
+// buildRequestHeader 按选项组出请求头（openRequest 与请求跟踪共用，保证日志里的头就是实际发出的头）。
+func buildRequestHeader(o safeRequestOptions) http.Header {
+	h := http.Header{}
+	ua, accept := o.UserAgent, o.Accept
+	if ua == "" {
+		ua = fetchDefaultUA
+	}
+	if accept == "" {
+		accept = fetchHTMLAccept
+	}
+	h.Set("User-Agent", ua)
+	h.Set("Accept", accept)
+	if !o.NoLanguage {
+		h.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	}
+	if o.AcceptEncoding != "" {
+		h.Set("Accept-Encoding", o.AcceptEncoding)
+	}
+	if o.Referer != "" {
+		h.Set("Referer", o.Referer)
+	}
+	if o.Cookie != "" {
+		h.Set("Cookie", o.Cookie)
+	}
+	return h
+}
+
 // openRequest 发起单次 GET，响应头到达即返回；重定向交给调用方。
 func (f *safeFetcher) openRequest(ctx context.Context, target *whatwg.Url, pinned *resolvedAddress, viaProxy bool, o safeRequestOptions) (*http.Response, error) {
 	nu, err := toNetURL(target)
@@ -196,27 +232,7 @@ func (f *safeFetcher) openRequest(ctx context.Context, target *whatwg.Url, pinne
 		return nil, err
 	}
 	req.Host = target.Host()
-	ua, accept := o.UserAgent, o.Accept
-	if ua == "" {
-		ua = fetchDefaultUA
-	}
-	if accept == "" {
-		accept = fetchHTMLAccept
-	}
-	req.Header.Set("User-Agent", ua)
-	req.Header.Set("Accept", accept)
-	if !o.NoLanguage {
-		req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-	}
-	if o.AcceptEncoding != "" {
-		req.Header.Set("Accept-Encoding", o.AcceptEncoding)
-	}
-	if o.Referer != "" {
-		req.Header.Set("Referer", o.Referer)
-	}
-	if o.Cookie != "" {
-		req.Header.Set("Cookie", o.Cookie)
-	}
+	req.Header = buildRequestHeader(o)
 	client := &http.Client{
 		Transport:     f.transport(pinned, viaProxy),
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
@@ -237,6 +253,10 @@ func safeRequest[T any](ctx context.Context, f *safeFetcher, rawURL string, o sa
 	consume func(resp *http.Response, finalURL string, status int) (T, error)) (T, error) {
 	var zero T
 	current := rawURL
+	seq := 0
+	if f.trace != nil {
+		seq = f.trace.nextSeq()
+	}
 	for redirect := 0; redirect <= fetchMaxRedirect; redirect++ {
 		parsed, err := whatwg.Parse(current)
 		if err != nil {
@@ -251,7 +271,12 @@ func safeRequest[T any](ctx context.Context, f *safeFetcher, rawURL string, o sa
 		if err != nil {
 			return zero, err
 		}
+		if err := f.paceWait(ctx); err != nil {
+			return zero, err
+		}
+		hopStart := time.Now()
 		resp, err := f.openRequest(ctx, parsed, pinned, viaProxy, o)
+		f.traceHop(seq, redirect, current, buildRequestHeader(o), resp, err, time.Since(hopStart))
 		if err != nil {
 			return zero, err
 		}
