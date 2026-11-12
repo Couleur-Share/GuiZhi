@@ -35,6 +35,7 @@ var rendererInvokeChannels = []string{
 	"backupRepository:createSnapshot",
 	"backupRepository:deleteSnapshot",
 	"backupRepository:exportPortable",
+	"backupRepository:importPortable",
 	"backupRepository:init",
 	"backupRepository:listSnapshots",
 	"backupRepository:preview",

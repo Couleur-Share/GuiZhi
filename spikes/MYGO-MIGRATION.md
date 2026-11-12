@@ -132,7 +132,7 @@
 
 | 验收项 | 结果 | 证据 |
 |---|---|---|
-| 渲染进程可调用的频道全部有处理器 | 214 个 invoke + 17 个 send，**0 个未实现**。清单由 `spikes/mygo-js/gen-channels.mts` 从 preload 的 `ipcRenderer.invoke/send` 生成（`ipc_channels_gen.go`），启动时自检并写入日志 `[ipc] …均已有处理器`；`migration-status.ps1` 另按字符串统计：230 个常量频道已登记 187 个、冻结 43 个、待迁 0，常量之外的字面量频道 33/33 | 离屏启动日志；`frozen_ipc_test.go` |
+| 渲染进程可调用的频道全部有处理器 | 215 个 invoke + 17 个 send，**0 个未实现**。清单由 `spikes/mygo-js/gen-channels.mts` 从 preload 的 `ipcRenderer.invoke/send` 生成（`ipc_channels_gen.go`），启动时自检并写入日志 `[ipc] …均已有处理器`；`migration-status.ps1` 另按字符串统计：230 个常量频道已登记 187 个、冻结 43 个、待迁 0，常量之外的字面量频道 33/33 | 离屏启动日志；`frozen_ipc_test.go` |
 | 冻结功能的处理 | 研究 / 配图 / 发现视图 / 阅读配图 / 手机收集 / 阅读同步：读取列表类频道（`research:list`、`research:baselines`、`discoveryView:list`）返回空列表，其余明确报「该功能已冻结」。**例外**：配图风格预设的读写（`illustration:styles/builtInStyles/saveStyles/revealStylesFile`）有 Go 实现（属配置迁移的一部分，设置页可用）。此前 `research:list` 在启动时被调用 3 次且无处理器，渲染进程会进入错误态——这是验收时才发现并修复的缺口 | 同上 |
 | 各频道组的 TS/Go 差分 | 全部通过，带全部 golden 环境变量的 `go test -count=1 ./...` 通过（约 125 s）。仍跳过的 4 项：`TestConfigExportEncryptedDump`（需要 `GUIZHI_DUMP_DIR`，仅用于人工查看）、`TestFunasrGoldenConsumesTsDisposable`（TS 一次性目录，每次生成的 golden 只能消费一次）、`TestVideoHelperProcess`（子进程辅助入口）、`TestEvidence*` 在本次补跑 `make-golden-evidence.mts` 后通过 | `go test` 输出 |
 | 主界面在 Go 壳上的离屏验证 | `build-shell.ps1` 产出的 `GuiZhi.exe` 在隔离 `APPDATA`/userData、`-shot` 离屏下：空库显示首次引导；复制的黄金库显示完整资料库（22 条、集合/平台/标签侧栏），点击条目后右侧正文正确显示。`-shot` 新增 `-shotjs <脚本> -shotafter <时长>` 用于截图前执行交互脚本 | `%TEMP%\guizhi-final-shot2\pop.png`、`detail.png` |

@@ -311,6 +311,29 @@ func (l *Library) registerBackup(b *Bridge, renderer *rendererBackupSettings) {
 		}
 		return map[string]any{"success": true, "filePath": dest}, nil
 	}
+	b.handlers["backupRepository:importPortable"] = func(ctx context.Context, a []json.RawMessage) (any, error) {
+		req := obj(a, 0)
+		password := strField(req, "recoveryPassword")
+		if password == "" {
+			return map[string]any{"success": false, "error": "请先输入这份便携备份对应的恢复口令"}, nil
+		}
+		if l.pickFiles == nil {
+			return map[string]any{"success": false, "error": "当前环境不支持选择文件"}, nil
+		}
+		paths, err := l.pickFiles(false, []dialogFilter{{Name: "GuiZhi Backup", Exts: []string{"guizhi-backup"}}, {Name: "All Files", Exts: []string{"*"}}})
+		if err != nil {
+			return map[string]any{"success": false, "error": errText(err)}, nil
+		}
+		if len(paths) == 0 {
+			return map[string]any{"success": false, "canceled": true}, nil
+		}
+		defer lock()()
+		res := l.backupRepository().importPortable(paths[0], password)
+		if res.Success {
+			l.syncRepositoryBackupJob(ctx) // 新机器导入后仓库变为已启用，立即按新状态调度自动完整备份
+		}
+		return res, nil
+	}
 	b.handlers["backupRepository:restore"] = func(ctx context.Context, a []json.RawMessage) (any, error) {
 		req := obj(a, 0)
 		return l.restoreRepositorySnapshot(ctx, strField(req, "snapshotId"), strField(req, "recoveryPassword")), nil
