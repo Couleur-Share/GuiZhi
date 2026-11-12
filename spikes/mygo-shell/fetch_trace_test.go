@@ -17,6 +17,9 @@ func TestFetchTraceRecordsHopsAndMasksSecrets(t *testing.T) {
 	fx = newFetchFixture(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/a":
+			w.Header().Add("Set-Cookie", "guestJs=NEWSECRET; Path=/")
+			w.Header().Add("Set-Cookie", "lastvisit=123; Path=/")
+			w.Header().Set("Server", "gate-1")
 			http.Redirect(w, r, "/b?access_token=LEAKME&tid=5", http.StatusFound)
 		case "/b":
 			w.Header().Set("Content-Type", "text/plain")
@@ -37,7 +40,7 @@ func TestFetchTraceRecordsHopsAndMasksSecrets(t *testing.T) {
 	_, _ = fx.f.fetchRawText(context.Background(), base+"/bad", safeRequestOptions{}, 0)
 
 	raw := buf.String()
-	for _, leak := range []string{"SECRET9", "LEAKME", "COOKIEVAL", "77"} {
+	for _, leak := range []string{"SECRET9", "LEAKME", "COOKIEVAL", "77", "NEWSECRET"} {
 		if strings.Contains(raw, leak) {
 			t.Errorf("跟踪日志不应含 %q：\n%s", leak, raw)
 		}
@@ -56,6 +59,13 @@ func TestFetchTraceRecordsHopsAndMasksSecrets(t *testing.T) {
 	a, b, bad := entries[0], entries[1], entries[2]
 	if a.Hop != 0 || a.Status != 302 || a.Seq != 1 || !strings.HasSuffix(a.Location, "/b?access_token=***&tid=5") {
 		t.Errorf("第一跳不符：%+v", a)
+	}
+	// 响应侧只记名字：重定向跳上的 Set-Cookie（NGA 自重定向循环的关键线索）、Server 与响应头名
+	if strings.Join(a.SetCookieNames, ",") != "guestJs,lastvisit" || a.Server != "gate-1" {
+		t.Errorf("应记录 Set-Cookie 名与 Server：%+v", a)
+	}
+	if !strings.Contains(strings.Join(a.ResponseHeaders, ","), "Server") {
+		t.Errorf("应记录响应头名：%v", a.ResponseHeaders)
 	}
 	if !strings.Contains(a.URL, "token=***") || !strings.Contains(a.URL, "tid=5") {
 		t.Errorf("URL 应保留 tid、打码 token：%q", a.URL)

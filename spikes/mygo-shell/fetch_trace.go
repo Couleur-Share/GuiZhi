@@ -35,7 +35,11 @@ type fetchTraceEntry struct {
 	Status      int               `json:"status"`
 	Location    string            `json:"location,omitempty"`
 	ContentType string            `json:"contentType,omitempty"`
-	ElapsedMS   int64             `json:"elapsedMs"` // 从发出请求到收到响应头
+	// 响应侧只记名字不记值：Set-Cookie 名（重定向跳上下发的会话 Cookie 是自重定向循环的关键线索）、Server、响应头名
+	SetCookieNames  []string `json:"setCookieNames,omitempty"`
+	Server          string   `json:"server,omitempty"`
+	ResponseHeaders []string `json:"responseHeaders,omitempty"`
+	ElapsedMS       int64    `json:"elapsedMs"` // 从发出请求到收到响应头
 	Error       string            `json:"error,omitempty"`
 }
 
@@ -121,6 +125,16 @@ func (f *safeFetcher) traceHop(seq, hop int, rawURL string, h http.Header, resp 
 		e.Status = resp.StatusCode
 		e.Location = maskURLQuery(resp.Header.Get("Location"))
 		e.ContentType = resp.Header.Get("Content-Type")
+		e.Server = resp.Header.Get("Server")
+		for _, line := range resp.Header.Values("Set-Cookie") {
+			if k, _, ok := strings.Cut(strings.TrimSpace(line), "="); ok && k != "" {
+				e.SetCookieNames = append(e.SetCookieNames, k)
+			}
+		}
+		for k := range resp.Header {
+			e.ResponseHeaders = append(e.ResponseHeaders, k)
+		}
+		sort.Strings(e.ResponseHeaders)
 	}
 	f.trace.write(e)
 }

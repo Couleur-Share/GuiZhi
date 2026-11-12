@@ -49,7 +49,14 @@ for (const mod of [http, https] as const) {
       done = true;
       trace({ seq: mine, url: maskUrl(url), request: hdrs, keepAlive: true, elapsedMs: Date.now() - started, ...extra });
     };
-    req.on("response", (res) => finish({ status: res.statusCode, location: res.headers.location ? maskUrl(String(res.headers.location)) : undefined, contentType: res.headers["content-type"] }));
+    req.on("response", (res) =>
+      finish({
+        status: res.statusCode, location: res.headers.location ? maskUrl(String(res.headers.location)) : undefined, contentType: res.headers["content-type"],
+        // 响应侧只记名字不记值（与 Go 侧 fetch_trace.go 一致）
+        setCookieNames: (res.headers["set-cookie"] ?? []).map((c) => c.split("=")[0].trim()),
+        server: res.headers.server, responseHeaders: Object.keys(res.headers).sort(),
+      }),
+    );
     req.on("error", (e) => finish({ status: 0, error: e.message }));
     return req;
   };
