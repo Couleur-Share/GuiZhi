@@ -140,7 +140,7 @@
 | 端到端：采集 → 提取 → 入库 → FTS → AI 流式问答 | `TestEndToEndCaptureSearchAndStreamingAsk` 通过（本地 httptest 站点与 SSE 模型） | `e2e_test.go` |
 | 依赖 | `go mod tidy` 后 `github.com/coder/websocket` 由间接依赖转为直接依赖（CDP 连接使用），其余无变化 | `go.mod` |
 
-**仍然没有验证的事（汇总；第二轮已补：真实 UI 备份/恢复/重启整链路、数据库损坏路径、3 万条大库耗时、阅读视图 iframe 往返、与 Electron 的正文对拍、阅读页开合 300 轮泄漏压力，见下文「收尾验证」）**：真实第三方站点中的 NGA、B 站（待用户给网址）、小红书/抖音/LINUX DO/NodeSeek 登录（用户选择跳过）与真实 SOCKS5/TUN；真实云端 ASR/LLM/OCR/生图/搜索服务；真实 Python/pip/torch 的 FunASR 安装；Wiki 编译在渲染进程驱动下的真实模型循环；SSH 隧道 + FlareSolverr；安装包形态（NSIS、签名、自动更新对接）；与用户真实 Electron 实例并存时的租约与 `Local State`；主题阅读视图 iframe 在真实 UI 里的完整往返、WebView2 对 iframe 是否做进程隔离；goja 在数 MB 页面上的耗时；长时间运行下渲染窗口的内存与泄漏。这些都需要真实环境、真实账号或用户确认，没有在本轮自动化里做。
+**仍然没有验证的事（汇总；第二轮已补：真实 UI 备份/恢复/重启整链路、数据库损坏路径、3 万条大库耗时、阅读视图 iframe 往返、与 Electron 的正文对拍、阅读页开合 300 轮泄漏压力，见下文「收尾验证」）**：NGA 的完整导入结果与附件图 HTTP 567 / 楼主分页重定向循环的原因、B 站平台字幕（本轮只取到元数据）、小红书/抖音/LINUX DO/NodeSeek 登录（用户选择跳过）与真实 SOCKS5/TUN；真实云端 ASR/LLM/OCR/生图/搜索服务；真实 Python/pip/torch 的 FunASR 安装；Wiki 编译在渲染进程驱动下的真实模型循环；SSH 隧道 + FlareSolverr；安装包形态（NSIS、签名、自动更新对接）；与用户真实 Electron 实例并存时的租约与 `Local State`；主题阅读视图 iframe 在真实 UI 里的完整往返、WebView2 对 iframe 是否做进程隔离；goja 在数 MB 页面上的耗时；长时间运行下渲染窗口的内存与泄漏。这些都需要真实环境、真实账号或用户确认，没有在本轮自动化里做。
 
 ### 真实网站冒烟（2026-11-12，经用户确认；按当前系统网络直连，未改任何代理设置）
 
@@ -167,7 +167,10 @@
 | 与 Electron 版正文对拍（同一份真实 HTML，TS `extractWebArticle` 与 Go 各提取一次） | `example.com`、`en.wikipedia.org/wiki/SQLite`：来源、标题、readability/区域字数一致；维基页去标记后的词元序列 9132 = 9132 逐词一致。对拍发现 1 个真实缺陷（相邻列表间插入 `<!--THE END-->`，已修）。其余仅为已接受的写法差异（见下） | `verify/real-parity.mts` + `TestRealPageParity` |
 | 长时间运行（泄漏压力，300 轮「打开阅读页 → 切到普通条目」，6 分钟） | 进程树（GuiZhi.exe + 6 个 WebView2 子进程）工作集 153 MB 起步 → 约 700 MB（首次渲染后）→ 峰值 832 MB，**最后约 100 秒持平在 817–825 MB**；JS 堆呈 GC 锯齿，谷值自第 130 轮起稳定在约 33–35 MB；DOM 节点数始终 875；收尾时残留 iframe 0、视图宿主 0；300 轮 0 失败、0 fault | `run-leak.ps1 -Cycles 300` |
 
-**真实网站（用户确认，每站 1 次只读、不登录、直连）**：V2EX `/t/1` 导入成功；LINUX DO `/t/topic/1` 被 Cloudflare 挑战拦下，按设计如实降级、不入库空壳（Electron 版靠登录会话降级，Go 版 `fetchAuthenticatedJSON` 注入点仍未接渲染宿主）；YouTube `watch?v=jNQXAC9IVRw` 取到元数据与平台字幕（文字稿 217 字符）；B 站未测，所以 yt-dlp 对 B 站的输出仍未验证。**NGA、B 站：用户说稍后给网址，本轮尚未验证。** 披露：调 YouTube 字幕时我曾手工运行过一次 `yt-dlp --sub-langs "en.*"`，产生多次字幕请求并遇到 HTTP 429，超出了「每站 1 次」的约定；yt-dlp 官方 exe 只放在隔离临时目录，没有加入 PATH。
+**真实网站（用户确认，每站 1 次只读、不登录、直连）**：V2EX `/t/1` 导入成功；LINUX DO `/t/topic/1` 被 Cloudflare 挑战拦下，按设计如实降级、不入库空壳（Electron 版靠登录会话降级，Go 版 `fetchAuthenticatedJSON` 注入点仍未接渲染宿主）；YouTube `watch?v=jNQXAC9IVRw` 取到元数据与平台字幕（文字稿 217 字符）。**NGA（`bbs.nga.cn/read.php?tid=37194262`，用户提供）**：一次完整导入的**结果摘要没有取到**（我把命令输出截断了，测试不落盘，重跑要再请求一遍，用户选择不重跑），只看到日志里的现象：楼主发言分页拉到第 18 页报 `[network] 重定向次数过多`（按设计回退到采样内楼主发言）；几十张 `img.nga.cn` 附件图全部返回 **HTTP 567**，两个 `img.nga.178.com` 地址 EOF（正文保留外链）。**原因未查明**：567 可能是 NGA 图床的防盗链/风控，也可能是 Go 版请求头与 TS 版在真实服务上的差异（夹具里 `Referer`/UA 与 TS 逐项一致，真实服务未对比）；重定向循环可能是限流或 guestJs 会话在翻页中失效后的重定向。这两点是**潜在缺陷或站点限制，尚未区分**，需要拿到完整日志与 TS 版同页对比后才能下结论。附带披露：NGA 一次导入按产品流程会发出采样页 + 楼主分页 + 数十张附件图的请求，远多于「1 个页面」，用户确认的是「每站访问一次」。
+**B 站（`BV1NNrCBPEWC`，用户提供，yt-dlp 官方 exe 在隔离临时目录）**：10.5 s，元数据取到（标题、作者、时长 12:52、简介），阶段 `video-metadata`、`video-captions` 走完但**没有取到平台字幕**（B 站字幕通常需要登录，未验证原因），因未配置转写模型只保存视频信息并给出可操作提示，无降级原因。此站为减少输出重跑过一次（共 2 次导入请求，第一次的结果被我截断）。
+
+披露：调 YouTube 字幕时我曾手工运行过一次 `yt-dlp --sub-langs "en.*"`，产生多次字幕请求并遇到 HTTP 429，超出了「每站 1 次」的约定；yt-dlp 官方 exe 只放在隔离临时目录，没有加入 PATH。
 
 **本轮修复的缺陷（均先写失败测试再修；提交未 push）**
 1. **`local-image://` / `local-video://` 在渲染进程里全部无法加载**（影响图片放大、阅读页以外的所有本地图片与视频）：WebView2 不认自定义协议，壳只静态服务渲染目录。现在 Go 用 `mygo.Protocol.Handle` 注册两个协议（WebView2 实际访问 `http://local-image.localhost/…`），路径校验照搬 `local-media-protocol.ts`（拒绝 `.`/`..`/控制字符/冒号/反斜杠开头、扩展名白名单、必须落在目录内），支持 Range/304/`nosniff`；preload 的 `shim/media-urls.ts` 把页面里的地址改写成 `.localhost` 形式（属性、`setAttribute`、`srcdoc` 内的地址与 CSP 源、动态插入的节点）。路径解析 17 例 + 处理器 6 组单测；真实 UI 里主文档与沙箱 `srcdoc` iframe 内的图片探针均加载成功。`local-generation-image://`（冻结的配图功能）未处理。
