@@ -1,4 +1,4 @@
-﻿# 真实进程 + 真实损坏文件：逐个场景离屏启动 GuiZhi.exe，记录退出码、error.log、完整性备份与修复后的数据量。
+# 真实进程 + 真实损坏文件：逐个场景离屏启动 GuiZhi.exe，记录退出码、error.log、完整性备份与修复后的数据量。
 # 用法：.\run-corrupt-db.ps1 [-Db <knowledge.db>]；默认用 %TEMP%\guizhi-golden\knowledge.db（22 条黄金库）。
 param([string]$Db = (Join-Path $env:TEMP 'guizhi-golden\knowledge.db'))
 $ErrorActionPreference = 'Stop'
@@ -16,7 +16,10 @@ $scenarios = [ordered]@{
   '中间 5 页被随机数据覆盖'           = { param($p) $b = New-Object byte[] 20000; (New-Object Random 7).NextBytes($b); Patch-Bytes $p (4096 * 8) $b }
   '文件被截断到一半'                   = { param($p) $fs = [IO.File]::Open($p, 'Open', 'ReadWrite'); $fs.SetLength([long]($fs.Length / 2)); $fs.Close() }
   '整个文件被文本替换（不是数据库）'   = { param($p) [IO.File]::WriteAllText($p, ('not a database ' * 600)) }
-  '文件长度为 0（磁盘写满后的典型残留）' = { param($p) [IO.File]::WriteAllBytes($p, [byte[]]@()) }
+  '文件长度为 0、没有备份（当作空库启动）' = { param($p) [IO.File]::WriteAllBytes($p, [byte[]]@()) }
+  '文件长度为 0、存在备份（应拒绝启动）' = { param($p)
+    $bk = Join-Path (Split-Path (Split-Path $p)) 'backups'; New-Item -ItemType Directory -Force $bk | Out-Null
+    Copy-Item $p (Join-Path $bk 'knowledge-pre-restore-20250101-000000.db'); [IO.File]::WriteAllBytes($p, [byte[]]@()) }
 }
 $i = 0
 foreach ($name in $scenarios.Keys) {

@@ -386,6 +386,49 @@ func backupPendingSchemaUpgrade(ctx context.Context, conn *sql.Conn, dbPath, bac
 	return nil
 }
 
+// recoverableBackups 列出可用于恢复的备份文件（非 0 字节）：备份目录里的 manual/auto/pre-update/pre-restore，
+// 以及数据库旁的完整性备份 <db>.integrity-backup-*。只做目录扫描与大小判断，不打开文件。
+func recoverableBackups(dbPath, backupsDir string) []string {
+	var found []string
+	add := func(p string) {
+		if st, err := os.Stat(p); err == nil && st.Mode().IsRegular() && st.Size() > 0 {
+			found = append(found, p)
+		}
+	}
+	if backupsDir != "" {
+		if entries, err := os.ReadDir(backupsDir); err == nil {
+			for _, e := range entries {
+				if parseBackupKind(e.Name()) != "" {
+					add(filepath.Join(backupsDir, e.Name()))
+				}
+			}
+		}
+	}
+	if sib, err := filepath.Glob(dbPath + ".integrity-backup-*"); err == nil {
+		for _, p := range sib {
+			add(p)
+		}
+	}
+	return found
+}
+
+// refuseEmptyDatabaseWithBackups：数据库文件存在但是 0 字节（常见于磁盘写满或写入中断）时，
+// 若有可恢复的备份就拒绝启动，而不是静默新建空库让用户以为「资料全没了」。没有任何备份时按空库启动。
+// 两种情况都不改动该文件；用户按提示恢复备份，或删除这个空文件后重启即可明确地新建空库。
+func refuseEmptyDatabaseWithBackups(dbPath, backupsDir string) error {
+	st, err := os.Stat(dbPath)
+	if err != nil || !st.Mode().IsRegular() || st.Size() != 0 {
+		return nil
+	}
+	backups := recoverableBackups(dbPath, backupsDir)
+	if len(backups) == 0 {
+		return nil
+	}
+	return fmt.Errorf("数据库文件为空（0 字节）：%s。这通常是磁盘写满或写入被中断造成的，原有资料可能还在备份里。"+
+		"已找到 %d 份可恢复的备份（例如 %s）。请先从备份恢复；如果确实要从空库开始，请删除这个空文件后重新启动",
+		dbPath, len(backups), backups[0])
+}
+
 // initDatabaseFile 把数据库文件初始化到当前结构，返回持有的租约（进程生命周期内保持，退出时 release）。
 func initDatabaseFile(ctx context.Context, dbPath string, opt dbInitOptions) (lease *dbLease, err error) {
 	if opt.Now == nil {
@@ -407,6 +450,9 @@ func initDatabaseFile(ctx context.Context, dbPath string, opt dbInitOptions) (le
 			lease = nil
 		}
 	}()
+	if err = refuseEmptyDatabaseWithBackups(dbPath, opt.BackupsDir); err != nil {
+		return
+	}
 	if err = ensureDatabaseIntegrity(ctx, dbPath, opt.Now); err != nil {
 		return
 	}
