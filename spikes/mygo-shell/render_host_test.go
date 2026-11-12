@@ -326,3 +326,25 @@ func TestRenderBrowserCrashRecovery(t *testing.T) {
 		t.Errorf("崩溃后应自动重启并可继续渲染: %v", err)
 	}
 }
+
+// 回归：正常渲染后窗口必须被复用而不是每次替换。曾因 Target.setAutoAttach 清理缺少必填参数，
+// 每个窗口用一次就被判不健康，池形同虚设（每任务多付一次开窗成本）。
+func TestRenderWindowIsReusedAcrossTasks(t *testing.T) {
+	rf := newRenderFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	for _, path := range []string{"/spa", "/spa", "/redir", "/spa"} {
+		if _, err := rf.render(ctx, path, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rf.host.mu.Lock()
+	pool := rf.host.b.pool
+	rf.host.mu.Unlock()
+	pool.mu.Lock()
+	replaced := pool.replaced
+	pool.mu.Unlock()
+	if replaced != 0 {
+		t.Errorf("4 次正常渲染后窗口被替换了 %d 次，应为 0（清理步骤有失败项）", replaced)
+	}
+}

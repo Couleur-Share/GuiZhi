@@ -802,7 +802,8 @@ func (t *renderTask) cleanup() {
 			}
 		}
 		call("Fetch.disable", nil)
-		call("Target.setAutoAttach", map[string]any{"autoAttach": false, "flatten": true})
+		// CDP 要求 waitForDebuggerOnStart 必填；漏传会让这一步恒失败，窗口每次都被替换、池形同虚设。
+		call("Target.setAutoAttach", map[string]any{"autoAttach": false, "waitForDebuggerOnStart": false, "flatten": true})
 		call("Page.navigate", map[string]any{"url": "about:blank"})
 		call("Network.clearBrowserCookies", nil)
 		t.mu.Lock()

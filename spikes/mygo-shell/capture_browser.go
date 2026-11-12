@@ -304,11 +304,12 @@ func (b *captureBrowser) onBrowserEvent(m cdpMsg) {
 // ---------- 页池 ----------
 
 type capturePool struct {
-	b      *captureBrowser
-	ch     chan string
-	mu     sync.Mutex
-	uses   map[string]int
-	maxUse int // 每个窗口最多服务多少个任务，0 表示不限
+	b        *captureBrowser
+	ch       chan string
+	mu       sync.Mutex
+	uses     map[string]int // 仍在池中的窗口已服务次数；窗口被替换时删除，避免无界增长
+	maxUse   int            // 每个窗口最多服务多少个任务，0 表示不限
+	replaced int            // 累计被替换（不健康或用满）的窗口数，用于诊断窗口复用是否失效
 }
 
 // newWindow 让采集进程新建一个隐藏窗口，并返回它的 target。
@@ -376,11 +377,14 @@ func (p *capturePool) release(tid string, unhealthy bool) {
 	p.mu.Lock()
 	p.uses[tid]++
 	worn := p.maxUse > 0 && p.uses[tid] >= p.maxUse
-	p.mu.Unlock()
 	if !unhealthy && !worn {
+		p.mu.Unlock()
 		p.ch <- tid
 		return
 	}
+	delete(p.uses, tid)
+	p.replaced++
+	p.mu.Unlock()
 	p.b.d.callT("", "Target.closeTarget", map[string]any{"targetId": tid}, 5*time.Second)
 	nt, err := p.b.newWindow()
 	if err != nil {

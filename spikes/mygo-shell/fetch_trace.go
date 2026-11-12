@@ -40,7 +40,7 @@ type fetchTraceEntry struct {
 	Server          string   `json:"server,omitempty"`
 	ResponseHeaders []string `json:"responseHeaders,omitempty"`
 	ElapsedMS       int64    `json:"elapsedMs"` // 从发出请求到收到响应头
-	Error       string            `json:"error,omitempty"`
+	Error           string   `json:"error,omitempty"`
 }
 
 type fetchTracer struct {
