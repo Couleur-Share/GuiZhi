@@ -1,6 +1,7 @@
 ﻿; MyGo 壳安装器的额外检查（仅 GUIZHI_MYGO_SHELL 构建引入，见 electron-builder.mygo.cjs）。
 ; 注意：本文件含中文字符串，必须保存为带 BOM 的 UTF-8，NSIS 才会按 Unicode 读取。
-; 自动更新走静默安装（/S），所有对话框在静默模式下都跳过，不阻塞更新。
+; 对话框的跳过规则：静默安装（/S）全部跳过；应用内更新（updater 以 `--updated --force-run` 启动，非静默，对应 quitAndInstall(false, true)）只做 WebView2 检查，
+; 不弹「覆盖安装前请备份」——更新前应用已自动留了 pre-update 备份，且此时应用已退出，提示里「打开设置→备份」无从谈起。
 
 !define GUIZHI_WEBVIEW2_URL "https://developer.microsoft.com/microsoft-edge/webview2/"
 
@@ -49,11 +50,13 @@
       Abort
     ${endif}
 
-    ; 2) 覆盖安装前提示备份：已登记过安装位置（含旧的 Electron 版）就提醒一次，可取消
+    ; 2) 覆盖安装前提示备份：已登记过安装位置（含旧的 Electron 版）就提醒一次，可取消；应用内更新（--updated）不提示
+    ${ifNot} ${isUpdated}
     ${if} $R0 != ""
     ${orIf} $R1 != ""
       MessageBox MB_OKCANCEL|MB_ICONINFORMATION "检测到已安装的归知，本次安装会覆盖它。$\r$\n$\r$\n你的资料保存在 %APPDATA%\GuiZhi，安装与卸载都不会删除。仍建议先在归知里打开「设置」→「备份」创建一份备份，再继续安装。$\r$\n$\r$\n现在继续安装吗？" IDOK +2
       Abort
+    ${endif}
     ${endif}
   ${endif}
 !macroend
