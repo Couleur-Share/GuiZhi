@@ -1,4 +1,4 @@
-import { backupPendingSchemaUpgrade } from "../services/backup";
+import { backupPendingSchemaUpgrade, listBackups } from "../services/backup";
 /**
  * Desktop-specific database initialization.
  *
@@ -32,6 +32,8 @@ export function initDatabase(): DatabaseAdapter.Database {
     // Main-process initialization runs only after Electron's single-instance gate.
     recoverUnregisteredLock: true,
     beforeSchemaUpgrade: (database) => { backupPendingSchemaUpgrade(database); },
+    // 数据库文件为 0 字节而这里有备份时拒绝启动（见 @guizhi/db 的说明）
+    findRecoverableBackups: () => listBackups().map((backup) => backup.path),
   };
   const db = dbInit(dbPath, hooks);
 
