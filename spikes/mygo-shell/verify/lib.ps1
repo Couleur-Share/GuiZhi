@@ -1,4 +1,4 @@
-# 真实进程验证的公共函数（Windows PowerShell / pwsh 均可）。
+﻿# 真实进程验证的公共函数（Windows PowerShell / pwsh 均可）。
 # 约束：一切在隔离沙箱（%TEMP% 下临时目录）里离屏运行；不读、不写用户真实的 %APPDATA%\GuiZhi；
 # 不按进程名批量结束进程——只等待命令行里带本沙箱路径的 GuiZhi.exe 自行退出，超时才按精确 PID 结束。
 

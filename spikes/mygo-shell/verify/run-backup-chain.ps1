@@ -1,4 +1,4 @@
-# 真实 UI 备份 / 恢复 / 重启整链路（离屏、隔离沙箱）。
+﻿# 真实 UI 备份 / 恢复 / 重启整链路（离屏、隔离沙箱）。
 # 用法：.\run-backup-chain.ps1 [-Db <knowledge.db>]；默认用 %TEMP%\guizhi-golden\knowledge.db（22 条黄金库）。
 param([string]$Db = (Join-Path $env:TEMP 'guizhi-golden\knowledge.db'))
 $ErrorActionPreference = 'Stop'

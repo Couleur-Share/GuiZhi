@@ -1,4 +1,4 @@
-# 大库（默认 3 万条 / 约 750 MB）启动与 IPC 耗时，冷启动（无干净关闭标记，触发 quick_check）与热启动各一次。
+﻿# 大库（默认 3 万条 / 约 750 MB）启动与 IPC 耗时，冷启动（无干净关闭标记，触发 quick_check）与热启动各一次。
 # 先生成夹具：
 #   $env:GUIZHI_MAKE_BIG_DB="$env:TEMP\guizhi-verify\big\knowledge.db"; go test -count=1 -timeout 30m -run TestMakeBigDatabaseFixture .
 param([string]$Db = (Join-Path $env:TEMP 'guizhi-verify\big\knowledge.db'))

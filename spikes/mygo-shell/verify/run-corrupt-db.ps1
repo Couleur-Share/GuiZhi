@@ -1,4 +1,4 @@
-# 真实进程 + 真实损坏文件：逐个场景离屏启动 GuiZhi.exe，记录退出码、error.log、完整性备份与修复后的数据量。
+﻿# 真实进程 + 真实损坏文件：逐个场景离屏启动 GuiZhi.exe，记录退出码、error.log、完整性备份与修复后的数据量。
 # 用法：.\run-corrupt-db.ps1 [-Db <knowledge.db>]；默认用 %TEMP%\guizhi-golden\knowledge.db（22 条黄金库）。
 param([string]$Db = (Join-Path $env:TEMP 'guizhi-golden\knowledge.db'))
 $ErrorActionPreference = 'Stop'
