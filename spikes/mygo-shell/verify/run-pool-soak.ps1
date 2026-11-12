@@ -1,4 +1,5 @@
-﻿# 采集窗口池长时间 / 大批量压测的外部驱动（隔离、离屏、只访问本机 httptest）。
+#Requires -Version 7
+# 采集窗口池长时间 / 大批量压测的外部驱动（隔离、离屏、只访问本机 httptest）。
 # 编译 TestCapturePoolSoak 为独立测试可执行文件并启动，按进程父子关系（不按名称）每 10 秒采样它的整棵进程树
 # （测试进程 + 采集子进程 + WebView2 子进程）的工作集与私有字节；结束后检查是否有残留进程和临时目录。
 #   用法：.\run-pool-soak.ps1 -Tasks 1500 [-Concurrency 4] [-IdleWait 100]

@@ -254,14 +254,34 @@ func (b *captureBrowser) stop() {
 		b.cmd.Process.Kill()
 		<-done
 	}
-	os.RemoveAll(b.userData)
+	removeUserDataDir(b.userData)
 }
 
 func (b *captureBrowser) kill() {
 	b.cmd.Process.Kill()
 	b.cmd.Wait()
-	os.RemoveAll(b.userData)
+	removeUserDataDir(b.userData)
 }
+
+// removeUserDataDir 删除采集浏览器的用户数据目录。Windows 上 WebView2 的子进程在宿主退出后还会持有目录一小会儿，
+// 单次 RemoveAll 会静默失败并把目录留在 %TEMP%，所以按短间隔重试到上限；仍失败则留痕而不是吞掉。
+// 与进程生死无关的清理失败（权限等）同样会走到留痕分支。
+func removeUserDataDir(dir string) {
+	deadline := time.Now().Add(userDataRemoveTimeout)
+	for {
+		err := os.RemoveAll(dir)
+		if err == nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			logAppErrorf("main", "采集浏览器", "用户数据目录未能删除：%s：%v", dir, err)
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+const userDataRemoveTimeout = 5 * time.Second
 
 func (b *captureBrowser) targets() ([]captureTarget, error) {
 	res, err := b.d.call("", "Target.getTargets", nil)

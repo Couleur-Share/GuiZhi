@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -346,5 +347,28 @@ func TestRenderWindowIsReusedAcrossTasks(t *testing.T) {
 	pool.mu.Unlock()
 	if replaced != 0 {
 		t.Errorf("4 次正常渲染后窗口被替换了 %d 次，应为 0（清理步骤有失败项）", replaced)
+	}
+}
+
+// 回归：采集浏览器停止后，它的用户数据目录必须被删掉。曾因 WebView2 子进程在宿主退出后还短暂持有目录，
+// 单次 RemoveAll 静默失败，每次空闲回收都在 %TEMP% 留下一个 guizhi-capture-*。
+func TestRenderHostCloseRemovesUserDataDir(t *testing.T) {
+	rf := newRenderFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	if _, err := rf.render(ctx, "/spa", nil); err != nil {
+		t.Fatal(err)
+	}
+	rf.host.mu.Lock()
+	dir := rf.host.b.userData
+	rf.host.mu.Unlock()
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("运行中的采集浏览器应有用户数据目录：%v", err)
+	}
+	closeStart := time.Now()
+	rf.host.Close()
+	t.Logf("Close 耗时 %s", time.Since(closeStart))
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("Close 返回后用户数据目录仍在：%s（%v）", dir, err)
 	}
 }
