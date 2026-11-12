@@ -331,7 +331,10 @@ func main() {
 			opts.BackgroundColor = "#1a1d23"
 			opts.Frameless = runtime.GOOS == "windows" // 与 Electron 版一致：Windows 用无边框窗口，标题栏由页面自绘
 		}
-		win := mygo.NewWindow(opts)
+		var win *mygo.Window
+		if err := createWindowGuarded(func() { win = mygo.NewWindow(opts) }); err != nil {
+			failStartup(ud, err, !automation) // WebView2 缺失等：写日志并弹窗，不再静默消失
+		}
 		b.registerWindow(win)
 		ipcSelfCheck()
 		p := win.Page()

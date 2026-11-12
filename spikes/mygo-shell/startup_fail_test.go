@@ -60,3 +60,36 @@ func TestReportStartupFailureToleratesMissingUserData(t *testing.T) {
 		}
 	})
 }
+// 窗口创建失败（典型：WebView2 运行时缺失，或注册表登记的版本目录已不存在）时 mygo 会 panic。
+// 沙盒实测：panic 发生在 GUI 子系统进程里，既没有 logs/error.log 也没有对话框，用户只看到进程消失。
+func TestCreateWindowGuardedTurnsPanicIntoActionableError(t *testing.T) {
+	err := createWindowGuarded(func() {
+		panic("mygo: cannot create window: mygo: the WebView2 Runtime registered at C:\\x\\157.0.1 is missing or incomplete; reinstall it from https://go.microsoft.com/fwlink/p/?LinkId=2124703")
+	})
+	if err == nil {
+		t.Fatal("panic 必须转成错误，不能继续向上传播")
+	}
+	msg := err.Error()
+	for _, want := range []string{"is missing or incomplete", "WebView2", "go.microsoft.com/fwlink/p/?LinkId=2124703"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("错误说明缺少 %q：%s", want, msg)
+		}
+	}
+	if !strings.Contains(msg, "修复") && !strings.Contains(msg, "重新安装") {
+		t.Errorf("WebView2 故障应给出修复指引：%s", msg)
+	}
+}
+
+func TestCreateWindowGuardedPassesThroughOnSuccessAndNonStringPanics(t *testing.T) {
+	if err := createWindowGuarded(func() {}); err != nil {
+		t.Fatalf("正常创建不应报错：%v", err)
+	}
+	err := createWindowGuarded(func() { panic(errors.New("boom")) })
+	if err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("error 类型的 panic 也应转成带原因的错误：%v", err)
+	}
+	err = createWindowGuarded(func() { panic(42) })
+	if err == nil || !strings.Contains(err.Error(), "42") {
+		t.Fatalf("其它类型的 panic 也应转成带原因的错误：%v", err)
+	}
+}

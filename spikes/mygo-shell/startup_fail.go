@@ -36,6 +36,29 @@ func reportStartupFailure(userData string, err error, interactive bool, show fun
 	show(startupErrorTitle, b.String())
 }
 
+// webView2DownloadURL 与 mygo 报错里给出的微软官方常青引导程序地址一致。
+const webView2DownloadURL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+
+// createWindowGuarded 执行窗口创建，把 mygo 的 panic 转成带原因的错误。
+// mygo 在窗口无法创建时直接 panic（典型：WebView2 运行时缺失，或注册表登记的版本目录已不存在），
+// GUI 子系统进程里 panic 的输出无处可去，用户只会看到进程消失，所以必须在这里接住并走 failStartup。
+func createWindowGuarded(create func()) (err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		msg := fmt.Sprint(r)
+		if strings.Contains(msg, "WebView2") {
+			err = fmt.Errorf("无法创建窗口：%s\n\n这通常是 Microsoft Edge WebView2 运行时缺失或损坏。请重新安装或修复它后再启动归知：\n%s", msg, webView2DownloadURL)
+			return
+		}
+		err = fmt.Errorf("无法创建窗口：%s", msg)
+	}()
+	create()
+	return nil
+}
+
 // failStartup 报告启动失败并以非零状态退出（替代 log.Fatalf）。
 func failStartup(userData string, err error, interactive bool) {
 	reportStartupFailure(userData, err, interactive, showStartupErrorDialog)
