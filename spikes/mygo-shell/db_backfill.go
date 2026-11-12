@@ -19,9 +19,12 @@ func (l *Library) backfillMissingKnowledgeFts(ctx context.Context) (int, error) 
 	if _, err := l.db.Execute(ctx, "INSERT OR IGNORE INTO knowledge_fts_map (item_id, fts_rowid) SELECT item_id, rowid FROM knowledge_fts"); err != nil {
 		return 0, err
 	}
-	// 缺失以索引本身为准而不是映射表：映射可能指向一条已经不在的索引行
-	rows, err := l.db.Query(ctx, `SELECT id, title, content FROM knowledge_items i
-       WHERE NOT EXISTS (SELECT 1 FROM knowledge_fts WHERE item_id = i.id)`)
+	// 缺失以索引本身为准而不是映射表：映射可能指向一条已经不在的索引行。
+	// 注意：item_id 是 FTS5 的 UNINDEXED 列，对它做相关子查询（NOT EXISTS ... WHERE item_id = i.id）会让每个条目都全表扫一遍虚表，
+	// 是 O(n²)（实测 1.2 万条 23 s、3 万条 / 750 MB 超过 10 分钟，窗口出现前一直卡住）。
+	// 改用 NOT IN 非相关子查询：SQLite 把它物化成一次性的临时索引，整体 O(n log n)；排除 NULL 以免 NOT IN 的空值语义吞掉所有行。
+	rows, err := l.db.Query(ctx, `SELECT id, title, content FROM knowledge_items
+       WHERE id NOT IN (SELECT item_id FROM knowledge_fts WHERE item_id IS NOT NULL)`)
 	if err != nil {
 		return 0, err
 	}
@@ -59,8 +62,9 @@ func (l *Library) backfillMissingKnowledgeFts(ctx context.Context) (int, error) 
 func (l *Library) backfillMissingWikiFts(ctx context.Context) (int, error) {
 	l.writeMu.Lock()
 	defer l.writeMu.Unlock()
-	rows, err := l.db.Query(ctx, `SELECT id, title, summary, body FROM wiki_pages p
-       WHERE NOT EXISTS (SELECT 1 FROM wiki_fts WHERE page_id = p.id)`)
+	// 同上：page_id 也是 UNINDEXED 列，用非相关子查询避免逐页全表扫描虚表。
+	rows, err := l.db.Query(ctx, `SELECT id, title, summary, body FROM wiki_pages
+       WHERE id NOT IN (SELECT page_id FROM wiki_fts WHERE page_id IS NOT NULL)`)
 	if err != nil {
 		return 0, err
 	}

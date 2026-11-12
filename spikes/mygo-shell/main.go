@@ -137,7 +137,7 @@ func main() {
 		return
 	}
 	if *dist == "" || *dbPath == "" {
-		log.Fatal("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定")
+		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && *aiTest == "" && !*bench)
 	}
 
 	waitForRelaunchParent()
@@ -158,12 +158,12 @@ func main() {
 		if errors.As(err, &live) {
 			fmt.Fprintln(os.Stderr, live.Error())
 		}
-		log.Fatalf("数据库初始化失败：%v", err)
+		failStartup(ud, fmt.Errorf("数据库初始化失败：%w", err), !automation) // GUI 子系统无控制台，必须弹窗并落盘
 	}
 	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
 	if err != nil {
 		lease.release()
-		log.Fatal(err)
+		failStartup(ud, fmt.Errorf("打开数据库失败：%w", err), !automation)
 	}
 	// 正常退出：先关库，再留「干净关闭」标记（下次启动据此跳过 quick_check），最后释放租约
 	shutdownDB := sync.OnceFunc(func() {
@@ -294,11 +294,11 @@ func main() {
 
 	preload, err := os.ReadFile(filepath.Join(*dist, "preload", "preload.js"))
 	if err != nil {
-		log.Fatal(err)
+		failStartup(ud, fmt.Errorf("读取 preload 失败（安装是否完整？）：%w", err), !automation)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		log.Fatal(err)
+		failStartup(ud, fmt.Errorf("启动本地渲染资源服务失败：%w", err), !automation)
 	}
 	go http.Serve(ln, http.FileServer(http.Dir(filepath.Join(*dist, "renderer"))))
 	origin := "http://" + ln.Addr().String()
@@ -388,6 +388,7 @@ func main() {
 				} else {
 					v, eerr := p.Eval(string(script))
 					fmt.Printf("[INFO] -shotjs 返回：%v（错误：%v）\n", v, eerr)
+					writeShotResult(*shot, v, eerr)
 					time.Sleep(*shotAfter)
 				}
 			}
