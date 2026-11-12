@@ -71,7 +71,7 @@ func (f *safeFetcher) webSubRequest(ctx context.Context, in webSubRequest) (webH
 	}
 	req.Header.Set("Accept-Encoding", "gzip, deflate")
 	client := &http.Client{
-		Transport:     f.transport(pinned, viaProxy),
+		Transport:     f.transport(pinned, viaProxy, nu),
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	resp, err := client.Do(req)

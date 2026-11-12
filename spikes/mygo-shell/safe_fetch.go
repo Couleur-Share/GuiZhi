@@ -11,6 +11,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -58,7 +59,9 @@ type safeFetcher struct {
 	lookup lookupFunc
 	// dialOverride 仅测试使用：替代真实拨号（忽略钉扎地址）。
 	dialOverride func(ctx context.Context, network, addr string) (net.Conn, error)
-	idle         time.Duration
+	// tlsRoots 仅测试使用：HTTPS 证书校验改用这组根证书（nil 为系统根证书）。
+	tlsRoots *x509.CertPool
+	idle     time.Duration
 
 	// 诊断开关（见 fetch_trace.go，仅环境变量打开）：逐跳请求跟踪与最小请求间隔。
 	trace       *fetchTracer
@@ -146,14 +149,16 @@ func (c idleConn) Write(p []byte) (int, error) {
 
 func toNetURL(u *whatwg.Url) (*url.URL, error) { return url.Parse(u.Href(true)) }
 
-func (f *safeFetcher) transport(pinned *resolvedAddress, viaProxy bool) *http.Transport {
-	dialer := &net.Dialer{Timeout: f.idle}
+// transport 为单次请求构造传输层。target 是本次请求地址：HTTPS 走 dialTLS（Electron 指纹，自行处理代理隧道），
+// HTTP 仍交给标准库的代理逻辑。
+func (f *safeFetcher) transport(pinned *resolvedAddress, viaProxy bool, target *url.URL) *http.Transport {
 	return &http.Transport{
 		DisableKeepAlives:   true,
 		DisableCompression:  true,
 		TLSHandshakeTimeout: f.idle,
 		Proxy: func(r *http.Request) (*url.URL, error) {
-			if !viaProxy {
+			// HTTPS 的代理隧道由 dialTLS 自己建（标准库对「经代理的 HTTPS」不使用自定义 TLS 拨号）
+			if !viaProxy || r.URL.Scheme == "https" {
 				return nil, nil
 			}
 			return f.proxy.ProxyFor(r.URL), nil
@@ -167,19 +172,11 @@ func (f *safeFetcher) transport(pinned *resolvedAddress, viaProxy bool) *http.Tr
 				}
 				addr = net.JoinHostPort(pinned.Address, port)
 			}
-			dial := dialer.DialContext
-			if f.dialOverride != nil {
-				dial = f.dialOverride
-			}
-			c, err := dial(ctx, network, addr)
-			if err != nil {
-				return nil, err
-			}
-			return idleConn{Conn: c, d: f.idle}, nil
+			return f.dialRaw(ctx, network, addr)
 		},
+		DialTLSContext: f.dialTLS(target, pinned, viaProxy),
 	}
 }
-
 func mapFetchError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -234,7 +231,7 @@ func (f *safeFetcher) openRequest(ctx context.Context, target *whatwg.Url, pinne
 	req.Host = target.Host()
 	req.Header = buildRequestHeader(o)
 	client := &http.Client{
-		Transport:     f.transport(pinned, viaProxy),
+		Transport:     f.transport(pinned, viaProxy, nu),
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	resp, err := client.Do(req)

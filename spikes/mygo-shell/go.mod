@@ -10,6 +10,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261110204830-f493a2b600d6
 	github.com/egoist/mygo v0.8.3
 	github.com/nlnwa/whatwg-url v0.6.2
+	github.com/refraction-networking/utls v1.8.2
 	github.com/tdewolff/parse/v2 v2.8.20
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
@@ -21,6 +22,7 @@ require (
 
 require (
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
+	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
@@ -31,6 +33,7 @@ require (
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
+	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
