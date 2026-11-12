@@ -94,7 +94,10 @@ function New-Snapshot {
     ) | ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter '*.lnk' -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*GuiZhi*' -or $_.Name -like '*归知*' } } |
         ForEach-Object { $_.FullName }
     $appData = Join-Path $env:APPDATA 'GuiZhi'
-    $local = Get-ChildItem -LiteralPath $env:LOCALAPPDATA -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*guizhi*' } | ForEach-Object { $_.FullName }
+    # 只把安装器自己创建的更新缓存目录（@guizhidesktop-updater）当作「卸载必须清除」的对象。
+    # %LOCALAPPDATA%\GuiZhi 是 MyGo 壳的 WebView2 用户数据（含渲染进程的 localStorage），与 Electron 版放在 %APPDATA%\GuiZhi 里的同类数据一样，卸载时保留。
+    $local = Get-ChildItem -LiteralPath $env:LOCALAPPDATA -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '@*guizhi*updater*' } | ForEach-Object { $_.FullName }
+    $webview2Data = Join-Path $env:LOCALAPPDATA 'GuiZhi'
     [pscustomobject]@{
         takenAt = (Get-Date).ToString('o'); machine = $env:COMPUTERNAME
         isVm = (Test-IsVirtualMachine); webview2 = (Get-WebView2Version)
@@ -103,6 +106,7 @@ function New-Snapshot {
         shortcuts = @($shortcuts)
         appData = (Get-DirSummary $appData)       # 用户数据：安装、覆盖、卸载都必须保持不变
         localCacheDirs = @($local)
+        webview2UserDataExists = (Test-Path -LiteralPath $webview2Data)   # 仅记录，不做断言
         runningProcs = @(Get-Process -Name 'GuiZhi*' -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
     }
 }
