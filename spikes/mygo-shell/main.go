@@ -302,6 +302,10 @@ func main() {
 	}
 	go http.Serve(ln, http.FileServer(http.Dir(filepath.Join(*dist, "renderer"))))
 	origin := "http://" + ln.Addr().String()
+	// 本地媒体协议必须先于窗口注册；失败只影响图片/视频显示，不阻止启动。
+	if err := registerLocalMediaProtocols(lib.paths); err != nil {
+		log.Printf("[media] 注册 local-image/local-video 协议失败：%v", err)
+	}
 
 	mygo.App.WhenReady(func() {
 		manage := !automation // 真实启动：恢复上次窗口、按登录项/设置决定显示或驻留托盘

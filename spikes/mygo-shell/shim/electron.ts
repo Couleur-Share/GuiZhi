@@ -2,6 +2,10 @@
 // 原样运行在 MyGo 的页面里。invoke/send 统一走 Go 侧一个绑定方法 Bridge.Invoke / Bridge.Send，
 // Go 推送的事件走 "ipc" 事件再按频道分发给 on 监听器。
 import { readingViewInvoke } from "./reading-view-host";
+import { installMediaUrlRewrite } from "./media-urls";
+
+// local-image:// / local-video:// 在 WebView2 里要改写成 http://<scheme>.localhost/，见 media-urls.ts
+installMediaUrlRewrite();
 
 type Listener = (event: unknown, ...args: any[]) => void;
 
