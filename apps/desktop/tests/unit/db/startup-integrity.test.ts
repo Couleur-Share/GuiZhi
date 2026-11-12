@@ -120,3 +120,75 @@ describe("启动完整性检查", () => {
     expect(fs.readFileSync(`${dbPath}.clean`, "utf8")).toBe(firstMarker);
   });
 });
+
+describe("0 字节数据库文件", () => {
+  const FAKE_BACKUP_BYTES = Buffer.from("SQLite format 3\u0000data");
+
+  function makeEmptyDatabaseFile(): void {
+    fs.rmSync(dbPath, { force: true });
+    fs.writeFileSync(dbPath, "");
+  }
+
+  it("存在可恢复备份时拒绝启动，并保持空文件不动", () => {
+    makeEmptyDatabaseFile();
+    const backup = path.join(workDir, "knowledge-pre-restore-20250101-000000.db");
+    fs.writeFileSync(backup, FAKE_BACKUP_BYTES);
+
+    expect(() =>
+      initDatabase(dbPath, { findRecoverableBackups: () => [backup] }),
+    ).toThrow(/0 字节/);
+    expect(fs.statSync(dbPath).size).toBe(0);
+  });
+
+  it("错误说明含数据库路径与备份路径，给出恢复与重新新建两条出路", () => {
+    makeEmptyDatabaseFile();
+    const backup = path.join(workDir, "knowledge-manual-20250101-000000.db");
+    fs.writeFileSync(backup, FAKE_BACKUP_BYTES);
+    let message = "";
+    try {
+      initDatabase(dbPath, { findRecoverableBackups: () => [backup] });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain(dbPath);
+    expect(message).toContain(backup);
+    expect(message).toContain("从备份恢复");
+    expect(message).toContain("删除这个空文件");
+  });
+
+  it("库旁的完整性备份也算可恢复备份", () => {
+    makeEmptyDatabaseFile();
+    fs.writeFileSync(`${dbPath}.integrity-backup-20250101-000000`, FAKE_BACKUP_BYTES);
+    expect(() => initDatabase(dbPath)).toThrow(/0 字节/);
+  });
+
+  it("没有备份时仍按空库启动（行为不变）", () => {
+    makeEmptyDatabaseFile();
+    expect(() =>
+      initDatabase(dbPath, { findRecoverableBackups: () => [] }),
+    ).not.toThrow();
+    expect(fs.statSync(dbPath).size).toBeGreaterThan(0);
+  });
+
+  it("备份文件本身也是 0 字节时不算可恢复备份", () => {
+    makeEmptyDatabaseFile();
+    const empty = path.join(workDir, "knowledge-auto-20250101-000000.db");
+    fs.writeFileSync(empty, "");
+    expect(() =>
+      initDatabase(dbPath, { findRecoverableBackups: () => [empty] }),
+    ).not.toThrow();
+  });
+
+  it("被拦下后租约已释放；用户删除空文件即可正常新建", () => {
+    makeEmptyDatabaseFile();
+    const backup = path.join(workDir, "knowledge-pre-restore-20250101-000000.db");
+    fs.writeFileSync(backup, FAKE_BACKUP_BYTES);
+    expect(() =>
+      initDatabase(dbPath, { findRecoverableBackups: () => [backup] }),
+    ).toThrow();
+    fs.rmSync(dbPath);
+    expect(() =>
+      initDatabase(dbPath, { findRecoverableBackups: () => [backup] }),
+    ).not.toThrow();
+  });
+});
