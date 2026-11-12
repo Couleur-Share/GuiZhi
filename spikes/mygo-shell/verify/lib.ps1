@@ -47,7 +47,9 @@ function Invoke-Shot {
     [string]$Wait = '8s',
     [string]$After = '3s',
     [int]$TimeoutSec = 180,
-    [hashtable]$ExtraEnv = @{}
+    [hashtable]$ExtraEnv = @{},
+    [scriptblock]$OnTick,   # 进程运行期间每 TickMs 调用一次（参数：进程 Id），用于并发采样
+    [int]$TickMs = 5000
   )
   $png = Join-Path $Sandbox.Root $Png
   $argList = @('-shot', $png, '-wait', $Wait, '-userdata', $Sandbox.UserData)
@@ -64,7 +66,11 @@ function Invoke-Shot {
   $proc = [Diagnostics.Process]::Start($psi)
   $outTask = $proc.StandardOutput.ReadToEndAsync()
   $errTask = $proc.StandardError.ReadToEndAsync()
-  $exited = $proc.WaitForExit($TimeoutSec * 1000)
+  if ($OnTick) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while (-not $proc.HasExited -and (Get-Date) -lt $deadline) { & $OnTick $proc.Id; $null = $proc.WaitForExit($TickMs) }
+  }
+  $exited = $proc.WaitForExit([math]::Max(1000, [int](($TimeoutSec * 1000))))
   if (-not $exited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
   $sw.Stop()
   [pscustomobject]@{
