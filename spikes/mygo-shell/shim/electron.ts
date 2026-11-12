@@ -1,6 +1,8 @@
 // `electron` 模块的替身：让归知现有的 preload（215 处 invoke、20 处 send、13 处 on）
 // 原样运行在 MyGo 的页面里。invoke/send 统一走 Go 侧一个绑定方法 Bridge.Invoke / Bridge.Send，
 // Go 推送的事件走 "ipc" 事件再按频道分发给 on 监听器。
+import { readingViewInvoke } from "./reading-view-host";
+
 type Listener = (event: unknown, ...args: any[]) => void;
 
 declare global {
@@ -25,8 +27,16 @@ function ensureSubscribed() {
 
 export const ipcRenderer = {
   async invoke(channel: string, ...args: unknown[]) {
-    const reply = await window.mygo.call<string>("Bridge.Invoke", channel, JSON.stringify(args));
-    return reply === "" ? undefined : JSON.parse(reply);
+    const raw = async (ch: string, a: unknown[]) => {
+      const reply = await window.mygo.call<string>("Bridge.Invoke", ch, JSON.stringify(a));
+      return reply === "" ? undefined : JSON.parse(reply);
+    };
+    // 主题阅读视图要落到页面 DOM 上，由 reading-view-host 在 Go 校验后接手
+    if (channel.startsWith("themedReading:view")) {
+      const r = await readingViewInvoke(channel, args, raw, (c, fn) => ipcRenderer.on(c, fn), (c, ...a) => ipcRenderer.send(c, ...a));
+      if (r.handled) return r.value;
+    }
+    return raw(channel, args);
   },
   send(channel: string, ...args: unknown[]) {
     void window.mygo.call("Bridge.Send", channel, JSON.stringify(args));

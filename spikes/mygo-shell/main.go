@@ -173,7 +173,11 @@ func main() {
 	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
 	lib := &Library{db: db, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
 	// 网页渲染：采集浏览器子进程按需启动（首次需要渲染时），空闲 90 s 后自动退出。
-	lib.webRenderer = newRenderHost(func() *safeFetcher { return lib.webFetcher })
+	rh := newRenderHost(func() *safeFetcher { return lib.webFetcher })
+	lib.webRenderer = rh
+	lib.themedVerify = func(ctx context.Context, versionJSON string) (string, error) {
+		return lib.probeReadingPage(rh, ctx, versionJSON)
+	}
 	if lib.appData == "" {
 		lib.appData = filepath.Dir(ud)
 	}
@@ -386,7 +390,8 @@ func main() {
 	if lib.crawl != nil { // 对应 closeWebCapture：先暂停运行中的批次，再关库
 		lib.crawl.close(context.Background())
 	}
-	if lib.themedRT != nil { // 对应 shutdownThemedReading：把活动任务标为已中断并等执行线程退出
+	lib.readingViews().closeAll() // 关闭所有主题阅读视图并释放素材租约
+	if lib.themedRT != nil {      // 对应 shutdownThemedReading：把活动任务标为已中断并等执行线程退出
 		lib.themedRT.shutdown(context.Background())
 	}
 	if lib.funasrEng != nil { // 对应 will-quit：停掉由本进程拉起的转写服务

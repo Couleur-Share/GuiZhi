@@ -844,6 +844,7 @@ func (l *Library) registerThemedReading(b *Bridge) {
 		return map[string]any{"success": true, "path": dest}, nil
 	})
 	l.registerThemedRuntime(b)
+	l.registerReadingViews(b, wrap)
 }
 
 var reThemedBadFileChars = regexp.MustCompile("[<>:\"/\\\\|?*\\x00-\\x1f]")
