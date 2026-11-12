@@ -30,6 +30,11 @@
       StrCpy $INSTDIR "$R3"
     ${endif}
   ${endif}
+
+  ; MyGo 壳构建额外检查（WebView2 运行时、覆盖安装前备份提示），Electron 版打包不定义该开关
+  !ifdef GUIZHI_MYGO_SHELL
+    !insertmacro guizhiMygoPreInstallChecks
+  !endif
 !macroend
 
 !macro customInstall
