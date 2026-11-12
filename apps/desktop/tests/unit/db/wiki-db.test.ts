@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import DatabaseAdapter from "@guizhi/db/adapter";
 import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
-import { WikiDB } from "@guizhi/db/wiki";
+import { MISSING_WIKI_FTS_PAGES_SQL, WikiDB } from "@guizhi/db/wiki";
 import { KnowledgeItemDB } from "@guizhi/db/knowledge";
 import type { WikiApplyCompilationInput } from "@guizhi/shared/types";
 
@@ -433,6 +433,25 @@ describe("WikiDB", () => {
     expect(wiki.searchPages("知识管理", 5).length).toBeGreaterThan(0);
     // 已补齐后重复调用不再重写
     expect(wiki.backfillMissingFtsRows()).toBe(0);
+  });
+
+  // 与知识库同一类问题：page_id 是 UNINDEXED 列，相关子查询会让每个页面各扫一遍虚表（O(n²)）
+  it("backfillMissingFtsRows 的缺失查询不含相关子查询，且不被 NULL 残行吞掉", () => {
+    const plan = (
+      db.all(`EXPLAIN QUERY PLAN ${MISSING_WIKI_FTS_PAGES_SQL}`) as Array<{
+        detail: string;
+      }>
+    )
+      .map((row) => row.detail)
+      .join("\n");
+    expect(plan).not.toMatch(/CORRELATED/i);
+
+    wiki.applyCompilation(compilationInput(itemId));
+    db.run("DELETE FROM wiki_fts");
+    db.run(
+      "INSERT INTO wiki_fts (page_id, title, summary, body) VALUES (NULL, '残行', '', '')",
+    );
+    expect(wiki.backfillMissingFtsRows()).toBe(2);
   });
 
   it("手动编辑的正文挡得住下一轮编译", () => {

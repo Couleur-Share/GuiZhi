@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import DatabaseAdapter from "@guizhi/db/adapter";
 import { SCHEMA_INDEXES, SCHEMA_TABLES } from "@guizhi/db/schema";
-import { KnowledgeItemDB } from "@guizhi/db/knowledge";
+import { KnowledgeItemDB, MISSING_FTS_ITEMS_SQL } from "@guizhi/db/knowledge";
 import { CollectionDB } from "@guizhi/db/collection";
 import { TagDB } from "@guizhi/db/tag";
 
@@ -277,6 +277,32 @@ describe("KnowledgeItemDB", () => {
     expect(items.list({ scope: "trash", search: "会议纪要" }).total).toBe(1);
     // 幂等：没有缺失时不重复写
     expect(items.backfillMissingFtsRows()).toBe(0);
+  });
+
+  // item_id 是 FTS5 的 UNINDEXED 列：对它做相关子查询（NOT EXISTS ... WHERE item_id = i.id）
+  // 会让每个条目各自全表扫一遍虚表，整体 O(n²)（实测 4000 条 1.8 s、8000 条 9.2 s，随库增长失控）。
+  // 用查询计划断言而不是计时，结果不随机器快慢波动。
+  it("backfillMissingFtsRows 的缺失查询不含相关子查询", () => {
+    const plan = (
+      db.all(`EXPLAIN QUERY PLAN ${MISSING_FTS_ITEMS_SQL}`) as Array<{
+        detail: string;
+      }>
+    )
+      .map((row) => row.detail)
+      .join("\n");
+    expect(plan).not.toMatch(/CORRELATED/i);
+  });
+
+  it("backfillMissingFtsRows 不被索引里 item_id 为 NULL 的残行吞掉", () => {
+    const item = items.create({ title: "待补齐", content: "会议纪要草稿" });
+    db.run("DELETE FROM knowledge_fts WHERE item_id = ?", item.id);
+    // NOT IN 遇到子查询里的 NULL 会让整个条件变成未知，缺失的条目一条都补不上
+    db.run(
+      "INSERT INTO knowledge_fts (item_id, title, content, tags) VALUES (NULL, '残行', '残行', '')",
+    );
+
+    expect(items.backfillMissingFtsRows()).toBe(1);
+    expect(items.list({ scope: "all", search: "会议纪要" }).total).toBe(1);
   });
 
   it("回收站条目彻底删除后移出索引", () => {
