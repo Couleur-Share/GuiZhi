@@ -84,6 +84,17 @@ export interface PortableBackupExportResult {
   error?: string;
 }
 
+export interface PortableBackupImportResult {
+  success: boolean;
+  canceled?: boolean;
+  /** 本机仓库里已经有这条快照（同一仓库的另一份拷贝），没有重复写入 */
+  alreadyExisted?: boolean;
+  /** 本机原有的（无快照的）备份仓库被换成了便携备份的仓库，恢复口令随之变为便携备份的口令 */
+  replacedRepository?: boolean;
+  snapshot?: BackupFileInfo;
+  error?: string;
+}
+
 export interface BackupPasswordChangeRequest {
   currentPassword: string;
   nextPassword: string;

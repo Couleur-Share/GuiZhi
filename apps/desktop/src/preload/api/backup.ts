@@ -12,6 +12,7 @@ import type {
   ExportAiHandoffResult,
   ExportMarkdownResult,
   PortableBackupExportResult,
+  PortableBackupImportResult,
   RepositorySnapshotRequest,
   RepositorySnapshotResult,
 } from "@guizhi/shared/types";
@@ -61,6 +62,10 @@ export const backupApi = {
     recoveryPassword?: string;
   }): Promise<PortableBackupExportResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.BACKUP_REPOSITORY_EXPORT_PORTABLE, input),
+  importPortable: (input: {
+    recoveryPassword: string;
+  }): Promise<PortableBackupImportResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.BACKUP_REPOSITORY_IMPORT_PORTABLE, input),
   restoreRepositorySnapshot: (input: {
     snapshotId: string;
     recoveryPassword?: string;
