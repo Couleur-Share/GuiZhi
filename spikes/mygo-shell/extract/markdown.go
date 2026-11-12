@@ -340,6 +340,8 @@ func htmlToMarkdown(root *html.Node) string {
 			commonmark.NewCommonmarkPlugin(
 				commonmark.WithBulletListMarker("-"),
 				commonmark.WithEmDelimiter("_"),
+				// 相邻列表之间不插 <!--THE END-->：Turndown 没有这行注释，留着会进入正文、全文索引与 AI 上下文
+				commonmark.WithListEndComment(false),
 			),
 		),
 	)
