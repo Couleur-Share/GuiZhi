@@ -350,7 +350,10 @@ export function registerBackupIPC(
       if (selected.canceled || selected.filePaths.length === 0) {
         return { success: false, canceled: true };
       }
-      return repository.importPortable(selected.filePaths[0], recoveryPassword);
+      const imported = await repository.importPortable(selected.filePaths[0], recoveryPassword);
+      // 新机器导入后仓库从“未启用”变为“已启用”，需要立即按新状态调度自动完整备份
+      if (imported.success) syncRepositoryBackupJob(db, backgroundJobs);
+      return imported;
     },
   );
 
