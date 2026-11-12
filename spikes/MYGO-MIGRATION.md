@@ -167,7 +167,7 @@
 | 与 Electron 版正文对拍（同一份真实 HTML，TS `extractWebArticle` 与 Go 各提取一次） | `example.com`、`en.wikipedia.org/wiki/SQLite`：来源、标题、readability/区域字数一致；维基页去标记后的词元序列 9132 = 9132 逐词一致。对拍发现 1 个真实缺陷（相邻列表间插入 `<!--THE END-->`，已修）。其余仅为已接受的写法差异（见下） | `verify/real-parity.mts` + `TestRealPageParity` |
 | 长时间运行（泄漏压力，300 轮「打开阅读页 → 切到普通条目」，6 分钟） | 进程树（GuiZhi.exe + 6 个 WebView2 子进程）工作集 153 MB 起步 → 约 700 MB（首次渲染后）→ 峰值 832 MB，**最后约 100 秒持平在 817–825 MB**；JS 堆呈 GC 锯齿，谷值自第 130 轮起稳定在约 33–35 MB；DOM 节点数始终 875；收尾时残留 iframe 0、视图宿主 0；300 轮 0 失败、0 fault | `run-leak.ps1 -Cycles 300` |
 
-**真实网站（用户确认，每站 1 次只读、不登录、直连）**：V2EX `/t/1` 导入成功；LINUX DO `/t/topic/1` 被 Cloudflare 挑战拦下，按设计如实降级、不入库空壳（Electron 版靠登录会话降级，Go 版 `fetchAuthenticatedJSON` 注入点仍未接渲染宿主）；YouTube `watch?v=jNQXAC9IVRw` 取到元数据与平台字幕（文字稿 217 字符）。**NGA（`bbs.nga.cn/read.php?tid=37194262`，用户提供）**：一次完整导入的**结果摘要没有取到**（我把命令输出截断了，测试不落盘，重跑要再请求一遍，用户选择不重跑），只看到日志里的现象：楼主发言分页拉到第 18 页报 `[network] 重定向次数过多`（按设计回退到采样内楼主发言）；几十张 `img.nga.cn` 附件图全部返回 **HTTP 567**，两个 `img.nga.178.com` 地址 EOF（正文保留外链）。**原因未查明**：567 可能是 NGA 图床的防盗链/风控，也可能是 Go 版请求头与 TS 版在真实服务上的差异（夹具里 `Referer`/UA 与 TS 逐项一致，真实服务未对比）；重定向循环可能是限流或 guestJs 会话在翻页中失效后的重定向。这两点是**潜在缺陷或站点限制，尚未区分**，需要拿到完整日志与 TS 版同页对比后才能下结论。**离线排查（只读源码，未再访问 NGA）**：附件图下载与翻页的请求头在 TS 与 Go 两边逐项一致——UA 同为 NGA 专用 UA、`Referer` 同为 `https://bbs.nga.cn/`（翻页为帖子规范链接）、图片 `Accept: */*`、`Accept-Language: zh-CN,zh;q=0.9,en;q=0.8`、图片请求不带 Cookie、均不发 `Accept-Encoding`、重定向上限同为 5 跳且文案相同（`重定向次数过多`），所以 567 与重定向循环**不能归因于请求头或重定向逻辑的移植差异**。剩下的候选：Go 与 Node 的 TLS 握手特征 / HTTP 头顺序（Go 的头按键排序写出，Node 按插入顺序）、请求节奏、站点自身的防盗链与限流。要区分这些，只能用 TS 版在同一网络、同一时间对同一页做 A/B，这需要再次访问 NGA，用户选择暂不做。附带披露：NGA 一次导入按产品流程会发出采样页 + 楼主分页 + 数十张附件图的请求，远多于「1 个页面」，用户确认的是「每站访问一次」。
+**真实网站（用户确认，每站 1 次只读、不登录、直连）**：V2EX `/t/1` 导入成功；LINUX DO `/t/topic/1` 被 Cloudflare 挑战拦下，按设计如实降级、不入库空壳（Electron 版靠登录会话降级，Go 版 `fetchAuthenticatedJSON` 注入点仍未接渲染宿主）；YouTube `watch?v=jNQXAC9IVRw` 取到元数据与平台字幕（文字稿 217 字符）。**NGA（`bbs.nga.cn/read.php?tid=37194262`，用户提供）**：一次完整导入的**结果摘要没有取到**（我把命令输出截断了，测试不落盘，重跑要再请求一遍，用户选择不重跑），只看到日志里的现象：楼主发言分页拉到第 18 页报 `[network] 重定向次数过多`（按设计回退到采样内楼主发言）；几十张 `img.nga.cn` 附件图全部返回 **HTTP 567**，两个 `img.nga.178.com` 地址 EOF（正文保留外链）。**（原因已在第三轮查明，见下一节「收尾验证（第三轮）」：567 是 TLS 指纹，已修；重定向循环不是移植缺陷，触发原因未查明。以下为当时的推测。）** **原因未查明**：567 可能是 NGA 图床的防盗链/风控，也可能是 Go 版请求头与 TS 版在真实服务上的差异（夹具里 `Referer`/UA 与 TS 逐项一致，真实服务未对比）；重定向循环可能是限流或 guestJs 会话在翻页中失效后的重定向。这两点是**潜在缺陷或站点限制，尚未区分**，需要拿到完整日志与 TS 版同页对比后才能下结论。**离线排查（只读源码，未再访问 NGA）**：附件图下载与翻页的请求头在 TS 与 Go 两边逐项一致——UA 同为 NGA 专用 UA、`Referer` 同为 `https://bbs.nga.cn/`（翻页为帖子规范链接）、图片 `Accept: */*`、`Accept-Language: zh-CN,zh;q=0.9,en;q=0.8`、图片请求不带 Cookie、均不发 `Accept-Encoding`、重定向上限同为 5 跳且文案相同（`重定向次数过多`），所以 567 与重定向循环**不能归因于请求头或重定向逻辑的移植差异**。剩下的候选：Go 与 Node 的 TLS 握手特征 / HTTP 头顺序（Go 的头按键排序写出，Node 按插入顺序）、请求节奏、站点自身的防盗链与限流。要区分这些，只能用 TS 版在同一网络、同一时间对同一页做 A/B，这需要再次访问 NGA，用户选择暂不做。附带披露：NGA 一次导入按产品流程会发出采样页 + 楼主分页 + 数十张附件图的请求，远多于「1 个页面」，用户确认的是「每站访问一次」。
 **B 站（`BV1NNrCBPEWC`，用户提供，yt-dlp 官方 exe 在隔离临时目录）**：10.5 s，元数据取到（标题、作者、时长 12:52、简介），阶段 `video-metadata`、`video-captions` 走完但**没有取到平台字幕**（B 站字幕通常需要登录，未验证原因），因未配置转写模型只保存视频信息并给出可操作提示，无降级原因。此站为减少输出重跑过一次（共 2 次导入请求，第一次的结果被我截断）。
 
 披露：调 YouTube 字幕时我曾手工运行过一次 `yt-dlp --sub-langs "en.*"`，产生多次字幕请求并遇到 HTTP 429，超出了「每站 1 次」的约定；yt-dlp 官方 exe 只放在隔离临时目录，没有加入 PATH。
@@ -186,7 +186,7 @@
 - 阅读视图的选区、Ctrl+F、Esc、图片点击是在 iframe 自己的文档里**合成事件**触发的，不是真实鼠标键盘穿过 WebView2 iframe；WebView2 是否对 sandboxed iframe 做进程隔离同样没有验证。
 - `local-video` 只有 Go 处理器的单测（含 Range 206），没有用真实 `<video>` 验证；微信快照里的图片只用了同形态探针，没有经真实数据库快照。
 - 正文对拍只比较「同一份 HTML 字节」的提取结果，不覆盖请求头、重定向、编码探测；`quotes.toscrape.com/js` 这类需要渲染的页面没有 Electron 对手可比，**渲染路径与 Electron 版的差异没有被验证**。
-- 泄漏压力只覆盖「阅读页开合」这一条路径，6 分钟、300 轮；没有覆盖采集渲染窗口池的长跑，没有证明 8 小时级稳定。工作集前后段相差约 12% 是首次渲染与 GC 余量，不是线性增长，但这是 300 轮内的观察，不是证明。
+- 泄漏压力只覆盖「阅读页开合」这一条路径，6 分钟、300 轮；没有覆盖采集渲染窗口池的长跑（第三轮已补 1500 任务压测，见下），没有证明 8 小时级稳定。工作集前后段相差约 12% 是首次渲染与 GC 余量，不是线性增长，但这是 300 轮内的观察，不是证明。
 - 大库的冷启动 21.5 s 无响应是 `quick_check` 的代价，TS 版（wasm）的同一检查耗时未对比。
 
 **安装包形态的设计要点（仅设计，未实施；改动大，需先与用户定案）**
@@ -197,6 +197,35 @@
 - 切换风险：平台登录会话不互通（见决策 i）、`Local State`/租约在两个外壳并存时的交互未验证；覆盖安装前应提示备份。
 - 验收标准：全新机器静默安装 → 启动 → 卸载干净；覆盖安装后数据完整；`latest.yml` 被现有更新器逻辑接受并通过 sha512 校验；这些都需要独立虚拟机，不在本轮范围。
 
+### 收尾验证（2026-11-12 第三轮，隔离沙箱 + 离屏；提交仅在 `spike/mygo`，未 push）
+
+本轮候选 7 项，用户选了 1–6（登录类站点继续跳过、保持未验证）。真实站点的每一次访问都经用户逐项确认：NGA 只做最小 A/B 与一次图片变体实验，B 站只做一次 `yt-dlp --list-subs`（不带 Cookie）；用户**没有**批准再访问 `bbs.nga.cn` 抓重定向循环的 Set-Cookie。没有改任何代理、DNS、路由设置，没有碰用户的 electron:dev、数据目录与 Vite 端口。
+
+| 项 | 结论 | 证据与复跑 |
+|---|---|---|
+| 1a. img.nga.cn 附件图 HTTP 567 | **根因：TLS 指纹**。同一张图、同一出口、逐字节相同的请求头：TS 版（Electron 内的 Node）200 `image/jpeg`，Go 版 567 `text/html`（腾讯 EdgeOne 拦截页，Server=TencentEdgeOne）。只换 ClientHello 就恢复：v0 Go 原样、v1 Go 仅开 keep-alive 都是 567；v2 复刻 Electron ClientHello + `Connection: close`、v3 复刻 + keep-alive 都是 200（Server=tencent-cos）。所以与 Connection、请求头、头顺序无关。Go 默认 JA3 `9b7dcdf3…`，Electron/Node 的 JA3 `5355e385…` | 离线字节对比 `verify/wire/wire-compare.mts` 与 `wire_client_test.go`；真实 8 次请求 `verify/nga-ab/imglab`（`-hello` 用 wire-compare 产出的 `clienthello-ts-electron.hex`），日志在 `%TEMP%\guizhi-verify\imglab-real.log` |
+| 1b. NGA 楼主分页「重定向次数过多」 | **不是移植缺陷**：同一 A/B 里 TS 版在第 8 页遇到 6 次 302 自重定向（每次约 33 ms，目标 URL 与来源相同），按 5 跳上限报同一错误；Go 版同一次运行 1–19 页全部通过。**触发原因未查明**：怀疑 302 带 Set-Cookie 而我们不回写，但当时追踪没有记录响应侧，现在已能记录（见下），用户选择不再访问 `bbs.nga.cn`，所以**未取得** | A/B 报告 `%TEMP%\guizhi-verify\nga-ab\ab-report.txt`（Go 24 次请求：`bbs.nga.cn` 403×1、200×20，`img.nga.cn` 567×3；TS 18 次：403×1、200×8、302×6，图片 200×3）。复跑：`nga-ab.mts <dry\|real> <目录>` |
+| 2. B 站平台字幕 | **未登录取不到字幕轨**：`yt-dlp --list-subs`（2026.10.26，无 Cookie）只列出 `danmaku (xml)`，没有任何字幕语言；同时提示 1080P 60 帧需会员 Cookie。弹幕不是字幕，不会入库。**登录后是否有字幕：未取得**（用户没有提供登录态）。结论：已知限制，不修；产品已按「没取到字幕 → 无转写模型则只存视频信息」降级 | `%TEMP%\guizhi-verify\bili-listsubs.log` |
+| 3. 启动补齐全文索引 O(n²)（产品 TS） | 已修并提交 `ac0ed93a`（在 `spike/mygo` 分支上，**需要时 cherry-pick 到主线，用户的主目录未动**）：缺失查询改为非相关 `NOT IN (… IS NOT NULL)`，计划里不再出现 `CORRELATED`。4000 条 1.8 s → 12 ms，8000 条 9.2 s → 22 ms；新增单测断言查询计划与 NULL 残留行为 | `knowledge-db.test.ts`、`wiki-db.test.ts` |
+| 6. 采集窗口池长跑 | 1500 个任务、并发 4、用时 1179 s：0 个意外（9 类页面：SPA、重页面 2 万节点、80 张图、弹窗、跨源子框架、Cookie/localStorage/IndexedDB、页内占 64 MB、请求洪泛、挂起），洪泛与挂起各 75 次均按预期失败。Go 协程 3 → 3、堆 6 MB；进程树工作集 5 进程/184 MB 起步，稳定段约 800–960 MB（整段峰值 1148 MB，进程 2–12 个），**未见随任务数单调上升**；空闲 100 s 后浏览器被回收。**压测顺带抓到 2 个真实缺陷，见下** | `verify/run-pool-soak.ps1`（需要 PowerShell 7），结果在 `%TEMP%\guizhi-verify\pool-soak\` |
+
+**本轮修复的缺陷（均先写失败测试、确认红，再修、确认绿；提交未 push）**
+1. **img.nga.cn 等带 WAF 的站点对 Go 抓取层返回拦截页**（`de4472f1`）：`safeFetcher` 的 HTTPS 改用 utls 按内置样本握手（`tls_hello_electron.hex`，取自 Electron 45.2.3 / Node 24.22.2 实际发出的 ClientHello），只发 HTTP/1.1，证书链与主机名照常校验（测试里受信、主机名不符、未受信三种都覆盖）；IP 字面量主机不发 SNI，退回标准库握手。Go 的 `Transport` 对「经代理的 HTTPS」不使用自定义 TLS 拨号，所以 HTTPS 目标的代理隧道（HTTP CONNECT 带 Basic 认证、HTTPS 代理、SOCKS5）改为自建，域名仍由代理解析，隧道被拒时报「代理隧道失败：…」。测试：抓取层发出的 ClientHello JA3 与内置样本逐一致、SNI 正确；HTTP CONNECT / SOCKS5 两条代理路径的 CONNECT 目标是域名而非本地解析出的 IP。**新增依赖**：`github.com/refraction-networking/utls v1.8.2`（经用户同意）。这让 Go 版与现有 Electron 版的线上表现一致，不是新增能力；影响面是 `safeFetcher` 的全部 HTTPS 请求（含渲染窗口的页面请求），AI 请求与更新器的传输层不变。
+2. **采集窗口池形同虚设**（`e188ec9e`）：每个任务结束时清理步骤 `Target.setAutoAttach(false)` 缺少 CDP 必填的 `waitForDebuggerOnStart`，恒报 Invalid parameters，窗口被判不健康、**每个任务都关窗再新开窗**。修复前 4 次正常渲染替换 4 次窗口，修复后 0 次；压测里被替换的 150 个窗口恰好是 75 次洪泛 + 75 次挂起的预期异常任务。
+3. **采集浏览器停止后用户数据目录留在 `%TEMP%\guizhi-capture-*`**（`147aecc5`）：`stop()`/`kill()` 只调一次 `os.RemoveAll` 并吞掉错误，而 WebView2 子进程在宿主退出后还会短暂持有目录。每次空闲回收都会漏一个（实测 %TEMP% 里积了 85 个，7 KB–2 MB 不等，已按「创建超 30 分钟且无进程引用」清掉）。现在按 100 ms 间隔重试至多 5 s，仍失败则 `logAppError` 留痕；`Close` 实测约 260 ms。修复后 20 任务 + 空闲回收的压测残留 0 个。1500 任务那次压测早于此修复，当时收尾残留 1 个目录，就是这个缺陷。
+
+**新增的诊断开关（只读环境变量，不是用户设置；`fetch_trace.go`）**：`GUIZHI_FETCH_TRACE=<文件>` 逐跳写 JSONL（序号、跳数、URL、请求头、状态、Location、Content-Type、响应头名、Set-Cookie **名**、Server、耗时、错误）；URL 查询里名字含 token/key/secret/sig/auth/pass/session/cookie/ticket/code 的值打码，Cookie 只记名不记值。`GUIZHI_FETCH_MIN_INTERVAL_MS=<毫秒>` 让两跳之间至少间隔这么久，取消时返回「已取消」。
+**NGA 线上探针（默认跳过）**：`GUIZHI_REAL_NET=1 GUIZHI_REAL_NGA_PROBE=<摘要文件> go test -run TestRealNgaProbe`，摘要页 1、楼主分页最多 19、不拉父楼、不重试、图片只放行 3 次真实尝试。
+
+**本轮仍然未验证 / 未取得**
+- 修复 1 之后，**产品里的 Go 抓取层对真实 `img.nga.cn` 是否已返回 200：没有再访问**（用户不再放行）。依据是：imglab 的 v2/v3 用同一份 ClientHello 样本得到 200，产品里的实现用同一份样本且离线 JA3 逐一致；但产品路径本身没有在线上跑过。
+- NGA 重定向循环的触发原因；B 站登录后的字幕；登录类站点（小红书/抖音/LINUX DO/NodeSeek）。
+- 系统根证书校验只在 imglab 对真实站点验证过一次（utls 在本机取系统根，`img.nga.cn` 握手成功）；产品里的测试用的是测试根证书池。
+- 压测没有覆盖 8 小时级运行，也不含真实站点的渲染；工作集是进程树合计，没有拆分 WebView2 各进程。
+
+**已定设计（未实施，等用户启动实现）**
+- **0 字节数据库文件**：现状 TS 与 Go 都把它当空库新建（`packages/db/src/init.ts` 对 0 字节跳过完整性检查）。方案：存在备份（`knowledge-pre-restore-*.db` 或自动备份）时，**阻断启动并弹窗**，说明「数据库文件为空，可能是磁盘写满或写入中断」、列出最近备份与日志目录，让用户选择恢复或明确新建；没有任何备份时才按空库启动。弹窗用现有系统对话框通道（Go 版 `z_dialog`）。
+- **安装包形态（方案 A，沿用现有 guid 覆盖安装 Electron 版）**：覆盖安装与卸载**都保留 `%APPDATA%\GuiZhi`**，卸载不删用户数据；**不签名**（与现有 Electron Windows 安装包一致，README 已声明）；安装时检测 WebView2 运行时，缺失就提示并引导到微软下载页（Win11 自带）；覆盖安装前在安装器里用文字提示「建议先在应用内备份」。`latest.yml` 由脚本按 electron-updater 的格式生成（版本、文件名、sha512、size、releaseDate）。验收仍需独立虚拟机，不在本轮范围。
 ## 已验证的事
 
 | 项目 | 结果 |
