@@ -34,6 +34,7 @@ type updaterFixture struct {
 	revealed    []string
 	quit        chan struct{}
 	apiReleases string
+	ymlOK       func(tag, file string) bool // 非 nil 时决定某个 tag 下哪些 .yml 存在（灰度通道对拍用）
 	dir         string
 }
 
@@ -73,7 +74,7 @@ func newUpdaterFixture(t *testing.T, current string) *updaterFixture {
 		tag, file := parts[0], parts[1]
 		switch {
 		case strings.HasSuffix(file, ".yml"):
-			if file != "latest.yml" && file != "beta.yml" {
+			if (f.ymlOK != nil && !f.ymlOK(tag, file)) || (f.ymlOK == nil && file != "latest.yml" && file != "beta.yml") {
 				http.NotFound(w, r)
 				return
 			}
