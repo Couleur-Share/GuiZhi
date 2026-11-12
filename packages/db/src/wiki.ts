@@ -115,6 +115,13 @@ function mapCatalog(row: CatalogRow): WikiCatalogEntry {
 const CATALOG_COLUMNS =
   "id, title, normalized_title, kind, summary, aliases_json, manual_edited_at, updated_at";
 
+/**
+ * 缺失 FTS 行的页面。page_id 是 UNINDEXED 列，写法与原因同 knowledge.ts 的 MISSING_FTS_ITEMS_SQL
+ * （非相关 NOT IN，避免 O(n²)；`IS NOT NULL` 防止 NULL 残行让整个条件变成未知）。
+ */
+export const MISSING_WIKI_FTS_PAGES_SQL = `SELECT id, title, summary, body FROM wiki_pages
+       WHERE id NOT IN (SELECT page_id FROM wiki_fts WHERE page_id IS NOT NULL)`;
+
 export class WikiDB {
   constructor(private readonly db: Database.Database) {}
 
@@ -689,10 +696,12 @@ export class WikiDB {
 
   /** 补齐缺失的 FTS 行（本表是 v0.8.0 新加的，老库里一条都没有） */
   backfillMissingFtsRows(): number {
-    const rows = this.db.all(
-      `SELECT id, title, summary, body FROM wiki_pages p
-       WHERE NOT EXISTS (SELECT 1 FROM wiki_fts WHERE page_id = p.id)`,
-    ) as Array<{ id: string; title: string; summary: string; body: string }>;
+    const rows = this.db.all(MISSING_WIKI_FTS_PAGES_SQL) as Array<{
+      id: string;
+      title: string;
+      summary: string;
+      body: string;
+    }>;
     if (rows.length === 0) {
       return 0;
     }
