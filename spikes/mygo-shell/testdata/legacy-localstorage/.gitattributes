@@ -1,0 +1,2 @@
+# leveldb 夹具是二进制，禁止换行转换（CURRENT 文件被改成 CRLF 会让库打不开）
+* -text
