@@ -77,3 +77,34 @@ func DiscourseHTMLToMarkdown(fragment string) string {
 	}
 	return jsTrim(string(out))
 }
+
+// NodeseekHTMLToMarkdown 对应 import/nodeseek.ts 的 Turndown 配置（atx 标题、围栏代码块、默认 "*" 列表，
+// 丢弃 script/style/noscript/iframe/form）。与 Turndown 的字节级差异属已接受差异。
+func NodeseekHTMLToMarkdown(fragment string) string {
+	conv := converter.NewConverter(
+		converter.WithPlugins(
+			base.NewBasePlugin(),
+			commonmark.NewCommonmarkPlugin(
+				commonmark.WithBulletListMarker("*"),
+				commonmark.WithEmDelimiter("_"),
+				commonmark.WithListEndComment(false),
+			),
+		),
+	)
+	for _, tag := range []string{"script", "style", "noscript", "iframe", "form"} {
+		conv.Register.TagType(tag, converter.TagTypeRemove, converter.PriorityStandard)
+	}
+	nodes, err := html.ParseFragment(strings.NewReader(fragment), &html.Node{Type: html.ElementNode, Data: "div", DataAtom: atom.Div})
+	if err != nil {
+		return ""
+	}
+	wrapper := createElement("div")
+	for _, n := range nodes {
+		wrapper.AppendChild(n)
+	}
+	out, err := conv.ConvertNode(wrapper)
+	if err != nil {
+		return ""
+	}
+	return jsTrim(string(out))
+}

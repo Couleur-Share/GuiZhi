@@ -36,9 +36,23 @@ type cdpConn struct {
 var errClosed = errors.New("CDP 连接已断开")
 
 func dialCDP(ctx context.Context, url string) (*cdpConn, error) {
-	c, _, err := websocket.Dial(ctx, url, nil)
-	if err != nil {
-		return nil, err
+	var c *websocket.Conn
+	var err error
+	// 浏览器刚报告端口时偶有监听尚未就绪（connection refused），短暂重试。
+	// Brief retry when the debug port is announced slightly before it listens.
+	for attempt := 0; ; attempt++ {
+		c, _, err = websocket.Dial(ctx, url, nil)
+		if err == nil {
+			break
+		}
+		if attempt >= 25 || ctx.Err() != nil {
+			return nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(200 * time.Millisecond):
+		}
 	}
 	c.SetReadLimit(256 << 20)
 	d := &cdpConn{c: c, pend: map[int]chan cdpMsg{}, sess: map[string]func(cdpMsg){}, closed: make(chan struct{})}

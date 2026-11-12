@@ -66,7 +66,8 @@ type Library struct {
 	chatFn           aiChatFunc
 	searchFn         func(ctx context.Context, query, scenario string) ([]readingSearchResult, error)
 	imageFn          func(ctx context.Context, prompt, aspect string, cfg aiClientConfig, o imageGenOptions) (generatedImage, error)
-	themedRT         *themedRuntime // 主题阅读运行时（任务队列与执行）
+	themedRT         *themedRuntime    // 主题阅读运行时（任务队列与执行）
+	platformCap      *platformSessions // 登录态平台采集（WebView2 持久会话）
 	readingViewsOnce sync.Once
 	readingViewHost  *readingViewHost                                              // 主题阅读视图（沙箱 iframe 宿主状态）
 	themedVerify     func(ctx context.Context, versionJSON string) (string, error) // 运行检查：隔离环境运行生成页并返回故障说明；空表示不做运行检查

@@ -18,7 +18,9 @@ func (l *Library) importExtractURL(ctx context.Context, task map[string]any, onS
 		onStage = func(string) {}
 	}
 	if platform := detectVideoPlatform(url); platform != "" {
-		return l.extractVideoURL(ctx, url, platform, l.newVideoDeps(ctx, onStage))
+		deps := l.newVideoDeps(ctx, onStage)
+		l.applyPlatformVideoDeps(&deps, task["captureStrategy"] == "authenticated", platform)
+		return l.extractVideoURL(ctx, url, platform, deps)
 	}
 	if target := detectForumPlatform(url); target != nil {
 		deps := l.forumPost

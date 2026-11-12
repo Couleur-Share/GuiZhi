@@ -70,9 +70,42 @@ func newHiddenCaptureWindow(title string) {
 	w.Page().SetWindowOpenHandler(func(mygo.WindowOpenRequest) *mygo.WindowOptions { return nil })
 }
 
-func runCaptureChild(userData string) {
-	mygo.App.WhenReady(func() {
+// 平台登录采集的窗口模式（环境变量 GUIZHI_CAPTURE_WINDOW）：visible = 正常可见的登录窗口；
+// offscreen = 放到所有显示器之外（自动化验证用，不打扰正在使用的桌面）；空 = 隐藏（渲染池与后台采集）。
+const (
+	captureWindowEnv   = "GUIZHI_CAPTURE_WINDOW"
+	captureTitleEnv    = "GUIZHI_CAPTURE_TITLE"
+	captureWindowAfter = 1040
+)
+
+// newCaptureChildWindow 创建子进程的首个窗口：隐藏模式与历史行为完全一致，平台采集按环境变量显示。
+func newCaptureChildWindow() {
+	mode := os.Getenv(captureWindowEnv)
+	if mode != "visible" && mode != "offscreen" {
 		newHiddenCaptureWindow("capture-child")
+		return
+	}
+	title := os.Getenv(captureTitleEnv)
+	if title == "" {
+		title = "归知平台登录"
+	}
+	opt := mygo.WindowOptions{
+		Title: title, Width: captureWindowAfter, Height: 760, MinWidth: 760, MinHeight: 560, URL: "about:blank",
+		Page: mygo.PageOptions{BackgroundThrottling: mygo.ThrottlingOff},
+	}
+	if mode == "offscreen" {
+		opt.X, opt.Y = -32000, -32000
+	}
+	w := mygo.NewWindow(opt)
+	w.Page().SetWindowOpenHandler(func(mygo.WindowOpenRequest) *mygo.WindowOptions { return nil })
+}
+
+func runCaptureChild(userData string) {
+	// 持久会话目录会复用：先清掉上次运行遗留的端口文件，否则会读到已失效的端口。
+	// A reused profile dir keeps the previous run's port file; remove it before launching.
+	removeStaleDevToolsPort(userData)
+	mygo.App.WhenReady(func() {
+		newCaptureChildWindow()
 		go func() {
 			f := findDevToolsPortFile(userData, 15*time.Second)
 			raw, _ := os.ReadFile(f)
@@ -355,4 +388,13 @@ func (p *capturePool) release(tid string, unhealthy bool) {
 		return
 	}
 	p.ch <- nt
+}
+
+func removeStaleDevToolsPort(dir string) {
+	filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && d.Name() == "DevToolsActivePort" {
+			_ = os.Remove(p)
+		}
+		return nil
+	})
 }

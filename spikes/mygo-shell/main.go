@@ -175,6 +175,8 @@ func main() {
 	// 网页渲染：采集浏览器子进程按需启动（首次需要渲染时），空闲 90 s 后自动退出。
 	rh := newRenderHost(func() *safeFetcher { return lib.webFetcher })
 	lib.webRenderer = rh
+	lib.platformCap = newPlatformSessions(lib, ud)
+	lib.wirePlatformCapture()
 	lib.themedVerify = func(ctx context.Context, versionJSON string) (string, error) {
 		return lib.probeReadingPage(rh, ctx, versionJSON)
 	}
@@ -251,6 +253,7 @@ func main() {
 	lib.registerMedia(b)
 	lib.registerArticleAsk(b)
 	lib.registerThemedReading(b)
+	lib.registerPlatformCapture(b)
 	lib.registerExport(b)
 	lib.registerMcp(b)
 	lib.registerShortcutsIPC(b)
@@ -390,6 +393,7 @@ func main() {
 	if lib.crawl != nil { // 对应 closeWebCapture：先暂停运行中的批次，再关库
 		lib.crawl.close(context.Background())
 	}
+	lib.platformCap.close()       // 取消进行中的登录采集并回收其浏览器进程
 	lib.readingViews().closeAll() // 关闭所有主题阅读视图并释放素材租约
 	if lib.themedRT != nil {      // 对应 shutdownThemedReading：把活动任务标为已中断并等执行线程退出
 		lib.themedRT.shutdown(context.Background())

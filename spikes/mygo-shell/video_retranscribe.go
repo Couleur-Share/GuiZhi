@@ -28,12 +28,15 @@ func getPlatformParseCode(err error) string {
 
 // newVideoDeps 读取设置组装视频依赖；测试通过 l.videoTestDeps 注入替身。
 func (l *Library) newVideoDeps(ctx context.Context, onStage func(string)) videoDeps {
+	var d videoDeps
 	if l.videoTestDeps != nil {
-		d := *l.videoTestDeps
+		d = *l.videoTestDeps
 		d.onStage = onStage
-		return d
+	} else {
+		d = l.videoDepsFromSettings(ctx, onStage)
 	}
-	return l.videoDepsFromSettings(ctx, onStage)
+	l.applyPlatformVideoDeps(&d, false, "") // 抖音公开作品的离屏页面回退
+	return d
 }
 
 // downloadItemVideoAudio 按条目来源链接下载音轨到临时目录；重转写优先使用已保存的分享入口，
