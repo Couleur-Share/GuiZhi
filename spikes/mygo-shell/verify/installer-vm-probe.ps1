@@ -68,6 +68,12 @@ function Get-WebView2Version {
 function New-Snapshot {
     $entries = @(Get-UninstallEntries)
     $installDir = ($entries | Where-Object { $_.installLocation } | Select-Object -First 1).installLocation
+    # electron-builder 的 NSIS 卸载登记项不写 InstallLocation，回退到安装器自己登记的 InstallerState。
+    if (-not $installDir) {
+        foreach ($k in 'HKLM:\Software\GuiZhi\InstallerState', 'HKCU:\Software\GuiZhi\InstallerState') {
+            if (Test-Path $k) { $loc = (Get-ItemProperty $k).InstallLocation; if ($loc) { $installDir = $loc; break } }
+        }
+    }
     $exe = if ($installDir) { Join-Path $installDir 'GuiZhi.exe' } else { $null }
     $exeInfo = $null
     if ($exe -and (Test-Path -LiteralPath $exe)) {
