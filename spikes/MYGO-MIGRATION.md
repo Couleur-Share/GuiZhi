@@ -197,14 +197,14 @@
 - 切换风险：平台登录会话不互通（见决策 i）、`Local State`/租约在两个外壳并存时的交互未验证；覆盖安装前应提示备份。
 - 验收标准：全新机器静默安装 → 启动 → 卸载干净；覆盖安装后数据完整；`latest.yml` 被现有更新器逻辑接受并通过 sha512 校验；这些都需要独立虚拟机，不在本轮范围。
 
-### 收尾验证（2026-11-12 第三轮，隔离沙箱 + 离屏；提交仅在 `spike/mygo`，未 push）
+### 收尾验证（2026-11-12 第三轮，隔离沙箱 + 离屏；提交在 `spike/mygo`，已 push）
 
 本轮候选 7 项，用户选了 1–6（登录类站点继续跳过、保持未验证）。真实站点的每一次访问都经用户逐项确认：NGA 只做最小 A/B 与一次图片变体实验，B 站只做一次 `yt-dlp --list-subs`（不带 Cookie）；用户**没有**批准再访问 `bbs.nga.cn` 抓重定向循环的 Set-Cookie。没有改任何代理、DNS、路由设置，没有碰用户的 electron:dev、数据目录与 Vite 端口。
 
 | 项 | 结论 | 证据与复跑 |
 |---|---|---|
 | 1a. img.nga.cn 附件图 HTTP 567 | **根因：TLS 指纹**。同一张图、同一出口、逐字节相同的请求头：TS 版（Electron 内的 Node）200 `image/jpeg`，Go 版 567 `text/html`（腾讯 EdgeOne 拦截页，Server=TencentEdgeOne）。只换 ClientHello 就恢复：v0 Go 原样、v1 Go 仅开 keep-alive 都是 567；v2 复刻 Electron ClientHello + `Connection: close`、v3 复刻 + keep-alive 都是 200（Server=tencent-cos）。所以与 Connection、请求头、头顺序无关。Go 默认 JA3 `9b7dcdf3…`，Electron/Node 的 JA3 `5355e385…` | 离线字节对比 `verify/wire/wire-compare.mts` 与 `wire_client_test.go`；真实 8 次请求 `verify/nga-ab/imglab`（`-hello` 用 wire-compare 产出的 `clienthello-ts-electron.hex`），日志在 `%TEMP%\guizhi-verify\imglab-real.log` |
-| 1b. NGA 楼主分页「重定向次数过多」 | **不是移植缺陷**：同一 A/B 里 TS 版在第 8 页遇到 6 次 302 自重定向（每次约 33 ms，目标 URL 与来源相同），按 5 跳上限报同一错误；Go 版同一次运行 1–19 页全部通过。**触发原因未查明**：怀疑 302 带 Set-Cookie 而我们不回写，但当时追踪没有记录响应侧，现在已能记录（见下），用户选择不再访问 `bbs.nga.cn`，所以**未取得** | A/B 报告 `%TEMP%\guizhi-verify\nga-ab\ab-report.txt`（Go 24 次请求：`bbs.nga.cn` 403×1、200×20，`img.nga.cn` 567×3；TS 18 次：403×1、200×8、302×6，图片 200×3）。复跑：`nga-ab.mts <dry\|real> <目录>` |
+| 1b. NGA 楼主分页「重定向次数过多」 | **不是移植缺陷**：同一 A/B 里 TS 版在第 8 页遇到 6 次 302 自重定向（每次约 33 ms，目标 URL 与来源相同），按 5 跳上限报同一错误；Go 版同一次运行 1–19 页全部通过。**触发原因未查明**：怀疑 302 带 Set-Cookie 而我们不回写，但当时追踪没有记录响应侧，现在已能记录（见下），当时用户选择不再访问 `bbs.nga.cn`；后续复测 24 次请求未复现，仍**未取得**（见「后续二」） | A/B 报告 `%TEMP%\guizhi-verify\nga-ab\ab-report.txt`（Go 24 次请求：`bbs.nga.cn` 403×1、200×20，`img.nga.cn` 567×3；TS 18 次：403×1、200×8、302×6，图片 200×3）。复跑：`nga-ab.mts <dry\|real> <目录>` |
 | 2. B 站平台字幕 | **未登录取不到字幕轨**：`yt-dlp --list-subs`（2026.10.26，无 Cookie）只列出 `danmaku (xml)`，没有任何字幕语言；同时提示 1080P 60 帧需会员 Cookie。弹幕不是字幕，不会入库。**登录后是否有字幕：未取得**（用户没有提供登录态）。结论：已知限制，不修；产品已按「没取到字幕 → 无转写模型则只存视频信息」降级 | `%TEMP%\guizhi-verify\bili-listsubs.log` |
 | 3. 启动补齐全文索引 O(n²)（产品 TS） | 已修并提交 `ac0ed93a`（在 `spike/mygo` 分支上，**需要时 cherry-pick 到主线，用户的主目录未动**）：缺失查询改为非相关 `NOT IN (… IS NOT NULL)`，计划里不再出现 `CORRELATED`。4000 条 1.8 s → 12 ms，8000 条 9.2 s → 22 ms；新增单测断言查询计划与 NULL 残留行为 | `knowledge-db.test.ts`、`wiki-db.test.ts` |
 | 6. 采集窗口池长跑 | 1500 个任务、并发 4、用时 1179 s：0 个意外（9 类页面：SPA、重页面 2 万节点、80 张图、弹窗、跨源子框架、Cookie/localStorage/IndexedDB、页内占 64 MB、请求洪泛、挂起），洪泛与挂起各 75 次均按预期失败。Go 协程 3 → 3、堆 6 MB；进程树工作集 5 进程/184 MB 起步，稳定段约 800–960 MB（整段峰值 1148 MB，进程 2–12 个），**未见随任务数单调上升**；空闲 100 s 后浏览器被回收。**压测顺带抓到 2 个真实缺陷，见下** | `verify/run-pool-soak.ps1`（需要 PowerShell 7），结果在 `%TEMP%\guizhi-verify\pool-soak\` |
@@ -223,11 +223,17 @@
 - 系统根证书校验只在 imglab 对真实站点验证过一次（utls 在本机取系统根，`img.nga.cn` 握手成功）；产品里的测试用的是测试根证书池。
 - 压测没有覆盖 8 小时级运行，也不含真实站点的渲染；工作集是进程树合计，没有拆分 WebView2 各进程。
 
-**后续（同一轮内用户追加放行，均已提交在 `spike/mygo`，未 push）**
+**后续（同一轮内用户追加放行，均已提交在 `spike/mygo`）**
 - **主线回写 FTS 修复**：在独立 worktree `D:\Project\GuiZhi-fts-fix`（分支 `fix/fts-backfill-not-in`，基于主线 `0c5775db`，已 cherry-pick `ac0ed93a` 为 `43f10d0c`）。主目录没有开发服务在跑（只有 `guizhi-mcp.mjs` 的 MCP 进程）、工作区干净，**原目录与其分支 `fix/design-decisions` 零改动**。该 worktree 内 `pnpm install --frozen-lockfile --offline` 后：`knowledge-db.test.ts` + `wiki-db.test.ts` 74/74 通过，`packages/db` 的 `tsc --noEmit` 通过。**未跑全量 `pnpm test:unit` / 根 typecheck**；合并由用户在切换版本时决定。
 - **0 字节数据库（Go 壳已实现，TS 产品未改）**：`initDatabaseFile` 在拿到租约后、完整性检查前调用 `refuseEmptyDatabaseWithBackups`。数据库文件存在且为 0 字节时，若有可恢复备份（`backups/` 里 manual/auto/pre-update/pre-restore 的非 0 字节文件，或库旁 `<db>.integrity-backup-*`）就**拒绝启动**，原因走现有的启动失败通道（写 `logs/error.log`，交互启动弹系统对话框并指出备份目录），说明里给出恢复或「删除这个空文件后重启即新建空库」两条出路；没有备份（或备份也是 0 字节）按空库启动，行为不变；两种情况都不改动该文件。先写失败测试：阻断 3 种备份来源 + 不可用备份仍启动 + 无备份目录仍启动 + 删除空文件后恢复启动，共 6 个子用例；真实进程（`verify/run-corrupt-db.ps1` 新增场景）：无备份退出码 0 / 0 条目，有备份退出码 1 且 `error.log` 含完整说明。**对话框本身没有在真实桌面上观察过**（自动化实例不弹窗）；**TS 产品版（`packages/db/src/init.ts`）没有做同样的改动**，那是主线产品行为变更，需要另行决定。
 - **安装包（已能构建，未安装、未在虚拟机验证）**：`.\spikes\build-installer.ps1`（PowerShell 7）用 `electron-builder --prepackaged` 把 `build-shell.ps1` 的产物目录打成 `GuiZhi-Setup-0.28.0-x64.exe`（11.5 MB）并生成 `latest.yml`。配置 `spikes/mygo-shell/electron-builder.mygo.cjs` 直接复用 Electron 版的 appId、固定 guid、可选安装目录、快捷方式、`installer.nsh`、`publish` 与 `releaseInfo`，没有另写 NSIS，因此能以同一产品「升级」覆盖安装 Electron 版（模板先运行旧版卸载程序再装新文件）。另有 `installer-mygo-checks.nsh`（仅该配置下通过 `GUIZHI_MYGO_SHELL` 打开；`apps/desktop/resources/installer.nsh` 只在 `customInit` 末尾加了受 `!ifdef` 保护的 3 行钩子，Electron 版打包不受影响）：静默安装（自动更新）全部跳过；交互安装时检测 WebView2 运行时（`EdgeUpdate\Clients\{F3017226-…}` 的 `pv`，机器级含 WOW6432Node 或用户级），缺失则提示并可打开微软下载页、然后中止安装；检测到已登记的安装位置（含旧 Electron 版）则提示「资料在 `%APPDATA%\GuiZhi`，安装与卸载都不会删除，建议先在应用内备份」，可取消。不签名（`Get-AuthenticodeSignature` = `NotSigned`）。已验证：产物 sha512 与 `latest.yml` 一致；Go 更新器核心（`TestUpdaterAcceptsRealInstallerArtifacts`，本地 httptest，不执行安装包）接受这份 `latest.yml` 并通过下载与校验。**没有验证的**：安装器本身的运行（全新机器静默安装、覆盖安装 Electron 版数据是否完整、卸载是否干净、两个对话框的显示与文案、WebView2 缺失分支、SmartScreen 与杀毒反应）——**我没有在本机运行安装包**，因为它与真实安装共用同一个 guid，会改写本机已安装归知的卸载注册项。首次构建会下载 NSIS 工具到 `%LOCALAPPDATA%\electron-builder\Cache`。`latest.yml` 没有 `size` 字段，更新器按 sha512 校验，不依赖它。
 - **测试稳定性**：`TestFetchTraceRecordsHopsAndMasksSecrets` 把秘密值 `77` 当子串断言日志里不出现，而日志时间戳偶然含 `77`，约 1/5 概率误报；已换成 `UIDVAL`，连跑 40 次 0 失败。
+
+**后续二（用户再次放行：FTS 全量、TS 0 字节库、PR、虚拟机清单、NGA 重定向复测）**
+- **FTS 修复全量验证（已取得）**：`D:\Project\GuiZhi-fts-fix` 上 `pnpm test:unit` 311 个文件 / 2696 个用例全部通过（194 s），根 `pnpm typecheck` 全部包通过。此前「未跑全量」一条作废。日志 `%TEMP%\guizhi-verify\fts-full-unit.log`、`fts-full-tc.log`。
+- **0 字节库的 TS 产品版（已做在独立 worktree，未合并）**：`D:\Project\GuiZhi-zero-db`，分支 `fix/empty-db-guard`，基于 `0c5775db`，提交 `4442e023`，3 个文件 +122/−1；原目录与 `fix/design-decisions` 零改动。逻辑与 Go 壳一致：`packages/db/src/init.ts` 的 `initDatabase` 在完整性检查前调用 `refuseEmptyDatabaseWithBackups`，数据库是 0 字节且存在可恢复备份时抛出可操作的错误（给出备份路径、恢复与「删除空文件后重启」两条出路），不改文件；无可用备份仍按空库启动。备份来源由 `apps/desktop/src/main/database/index.ts` 通过钩子 `findRecoverableBackups` 注入（`listBackups()` 的路径），库旁 `<db>.integrity-backup-*` 在 db 包内直接枚举，0 字节备份不算。先写失败测试（红：4 失败），修后 `startup-integrity.test.ts` 12/12；备份相关 4 个文件 53/53；`packages/db` 与 `apps/desktop` 的 `tsc --noEmit`、`pnpm lint`、文件行数门禁通过。**没有跑全量 `pnpm test:unit`；错误在真实桌面上的对话框呈现没有观察过**（沿用现有启动失败通道，未改 UI）。
+- **NGA 重定向循环复测（用户放行：`bbs.nga.cn` 话题 37194262 一次，24 次请求，间隔 1 s；已发生）**：**没有复现**。24 次请求里 403×1（首次无 Cookie，响应下发 `lastvisit`、`lastpath`、`ngaPassportUid`）→ 带上 `guestJs` 等重试 200×20，`img.nga.cn` 200×3，**3xx 为 0**，楼主分页 1–19 全部通过（378 条楼主回复）。因此 302 自重定向的触发原因**仍然未取得**：此前 TS 在第 8 页遇到的循环是临时性的，与会话 Cookie 是否回写的关系没有证据（本次没有 302 可供检查 Set-Cookie）。证据 `%TEMP%\guizhi-verify\nga-redirect\trace.jsonl`。后续若再出现循环，用同一探针即可捕获该跳的 Set-Cookie 名。
+- **安装包虚拟机验收（清单与取证脚本，未执行）**：`spikes/mygo-shell/verify/installer-vm-checklist.md`（场景 A–G：全新安装、覆盖 Electron 版、静默覆盖、卸载、缺 WebView2、SmartScreen、更新后启动）与 `installer-vm-probe.ps1`（Snapshot / Check，只读；检测不到虚拟机直接拒绝，保护与真实安装共用的 guid）。Check 的断言用合成快照自测过（全通过与故意违反各一次，退出码 0/1），物理机拒绝路径实测生效。**所有场景都没有在虚拟机里跑过**。
 ## 已验证的事
 
 | 项目 | 结果 |
