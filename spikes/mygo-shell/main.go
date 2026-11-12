@@ -12,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -99,6 +98,13 @@ func (b *Bridge) report() {
 		fmt.Printf("  %s%-48s ×%d\n", mark, k, b.seen[k])
 	}
 }
+
+// rendererScheme 是渲染资源的自定义协议名；WebView2 里页面 origin 固定为 http://guizhi.localhost，
+// localStorage 因此能跨启动保留（见 verify/run-localstorage-persist.ps1）。
+const rendererScheme = "guizhi"
+
+// rendererOrigin 是页面在 WebView2 里看到的 location.origin（自定义协议在 Windows 上落在 http://<协议>.localhost）。
+const rendererOrigin = "http://" + rendererScheme + ".localhost"
 
 func main() {
 	if runCaptureChildIfRequested() { // 采集浏览器子进程：只托管隐藏窗口，不走正常启动流程
@@ -290,18 +296,22 @@ func main() {
 			log.Printf("[ipc] 渲染进程可调用的 %d 个频道（invoke）+ %d 个（send）均已有处理器", len(rendererInvokeChannels), len(rendererSendChannels))
 		}
 	}
+	b.registerLegacyLocalStorage(ud, log.Printf)
 	mygo.Bind(b)
 
 	preload, err := os.ReadFile(filepath.Join(*dist, "preload", "preload.js"))
 	if err != nil {
 		failStartup(ud, fmt.Errorf("读取 preload 失败（安装是否完整？）：%w", err), !automation)
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		failStartup(ud, fmt.Errorf("启动本地渲染资源服务失败：%w", err), !automation)
+	// 渲染资源走自定义协议而不是 127.0.0.1:<随机端口>：localStorage 按 origin 隔离，端口每次不同会让设置、
+	// 界面偏好、首次引导标记每次启动都丢。协议在 WebView2 里的 origin 固定为 http://guizhi.localhost。
+	// Renderer assets are served via a custom scheme so the origin (and thus localStorage) stays stable across launches.
+	if err := mygo.Protocol.Handle(rendererScheme, http.FileServer(http.Dir(filepath.Join(*dist, "renderer")))); err != nil {
+		failStartup(ud, fmt.Errorf("注册渲染资源协议失败：%w", err), !automation)
 	}
-	go http.Serve(ln, http.FileServer(http.Dir(filepath.Join(*dist, "renderer"))))
-	origin := "http://" + ln.Addr().String()
+	origin := rendererScheme + "://localhost"
+	// 旧 Electron 版 localStorage 的一次性导入：脚本拼在 preload 前，页面脚本运行前写入（见 legacy_localstorage.go）。
+	legacyPreload := legacyLocalStoragePreload(ud, log.Printf)
 	// 本地媒体协议必须先于窗口注册；失败只影响图片/视频显示，不阻止启动。
 	if err := registerLocalMediaProtocols(lib.paths); err != nil {
 		log.Printf("[media] 注册 local-image/local-video 协议失败：%v", err)
@@ -316,7 +326,7 @@ func main() {
 			Hidden: *shot != "" || *aiTest != "",
 			X:      benchX(*bench), Y: benchX(*bench),
 			Page: mygo.PageOptions{
-				PreloadScript:  string(preload),
+				PreloadScript:  legacyPreload + string(preload),
 				TrustedOrigins: []string{origin},
 			},
 		}

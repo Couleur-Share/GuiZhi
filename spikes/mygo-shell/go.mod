@@ -11,6 +11,7 @@ require (
 	github.com/egoist/mygo v0.8.3
 	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/refraction-networking/utls v1.8.2
+	github.com/syndtr/goleveldb v1.0.0
 	github.com/tdewolff/parse/v2 v2.8.20
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
@@ -30,6 +31,7 @@ require (
 	github.com/go-shiori/dom v0.0.0-20230515143342-73569d674e1c // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/gogs/chardet v0.0.0-20211120154057-b7413eaefb8f // indirect
+	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
