@@ -218,7 +218,7 @@
 **NGA 线上探针（默认跳过）**：`GUIZHI_REAL_NET=1 GUIZHI_REAL_NGA_PROBE=<摘要文件> go test -run TestRealNgaProbe`，摘要页 1、楼主分页最多 19、不拉父楼、不重试、图片只放行 3 次真实尝试。
 
 **本轮仍然未验证 / 未取得**
-- 修复 1 之后，**产品里的 Go 抓取层对真实 `img.nga.cn` 是否已返回 200：没有再访问**（用户不再放行）。依据是：imglab 的 v2/v3 用同一份 ClientHello 样本得到 200，产品里的实现用同一份样本且离线 JA3 逐一致；但产品路径本身没有在线上跑过。
+- ~~修复 1 之后产品里的 Go 抓取层对真实 `img.nga.cn` 是否返回 200~~ **已确认（用户随后放行，只请求 3 张图、间隔 3 秒、不碰 `bbs.nga.cn`）**：产品的 `ngaDefaultDownloadImage` 对同样 3 张图全部成功（160439 / 116422 / 67758 字节，识别为 jpg），修复前同样 3 张全是 567。复跑：`GUIZHI_REAL_NET=1 GUIZHI_REAL_NGA_IMAGES=<url,...> go test -run TestRealNgaImages -v`，日志 `%TEMP%\guizhi-verify\nga-img-verify.log`。
 - NGA 重定向循环的触发原因；B 站登录后的字幕；登录类站点（小红书/抖音/LINUX DO/NodeSeek）。
 - 系统根证书校验只在 imglab 对真实站点验证过一次（utls 在本机取系统根，`img.nga.cn` 握手成功）；产品里的测试用的是测试根证书池。
 - 压测没有覆盖 8 小时级运行，也不含真实站点的渲染；工作集是进程树合计，没有拆分 WebView2 各进程。
