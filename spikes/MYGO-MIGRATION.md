@@ -263,6 +263,8 @@
 
 **已验证**：214 个 invoke 与 17 个 send 全部有处理器（冻结 43 个明确报「已冻结」）；各频道组 TS/Go 差分通过；沙箱内全新安装、覆盖 Electron、卸载、应用内更新路径、localStorage 持久化与一次性导入、缺 WebView2 与数据库损坏的启动失败路径。
 
+**缺陷 5（已修，2026-11-12 晚，沙箱补验证时发现）：Go 壳遇到 `--updated`、`--hidden`、`--force-run` 会静默 exit(2)。** `main` 里用标准库 `flag.Parse()`，这三个 Electron 沿用下来的拉起参数没有定义，Go 直接报错退出；GUI 子系统下没有任何可见提示。后果：①应用内更新时，安装向导「完成」页点「完成」不会拉起应用（NSIS 经 `launchLink` 带 `--updated`）；②Electron 版登记的开机启动项带 `--hidden`，升级到 Go 壳后开机自启也会无声失败。之前「完成页拉起应用」只在非更新向导里验证过，没覆盖这条参数路径。复现（修前）：沙箱里 `GuiZhi.exe --updated` / `--hidden` / `--force-run` 都 exit=2；修前更新流程点「完成」后 15 秒内无 `GuiZhi` 进程。修复：`launch_args.go` 在解析前摘掉这三个参数（`--hidden` 仍由 `resolveLaunchVisibility` 读原始 `os.Args`），`launch_args_test.go` 含「不摘参数时 flag 解析失败」的回归。修后沙箱复验（重新打包的安装包）：三种参数均存活；应用内更新向导点「完成」后 `归知 GuiZhi` 窗口出现；缺 WebView2 弹「未检测到」对话框，点「否」→ 安装器退出码 2（NSIS Abort），`GuiZhi.exe` 前后一致，安装登记与库不变。`go vet` 与整包 `go test -count=1 .`（97 s）通过。**仍未验证**：`--hidden` 启动后窗口是否确实隐藏（只验证了不再退出）。
+
 **更新通道实测**（`electron-updater` 6.8.9 + Electron 45，本地假 GitHub 源，不联网；脚本为临时文件，未入库；只覆盖官方源路径，镜像源与 Go 壳自己的更新器未在这套里跑）：
 
 | 场景 | 结果 |

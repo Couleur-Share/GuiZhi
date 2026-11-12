@@ -126,7 +126,8 @@ func main() {
 	aiOut := flag.String("aiout", "", "-aitest 的结果输出文件")
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
-	flag.Parse()
+	// 摘掉 --updated / --hidden / --force-run：它们是拉起参数，不是开关，见 launch_args.go
+	_ = flag.CommandLine.Parse(stripLaunchArgs(os.Args[1:]))
 	if *backupCLI {
 		os.Exit(runBackupCLI(flag.Args()))
 	}
