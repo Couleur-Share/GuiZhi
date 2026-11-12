@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -110,6 +111,8 @@ func main() {
 	appData := flag.String("appdata", "", "appData 目录（data-path.json 所在的 GuiZhi 上一级）；不给则取 userData 的上一级，避免测试时写到真实 %APPDATA%")
 	shot := flag.String("shot", "", "启动后截图到该文件并退出")
 	wait := flag.Duration("wait", 6*time.Second, "截图前等待时间")
+	shotJS := flag.String("shotjs", "", "截图前在页面里执行的脚本文件（同步脚本，可自行 setTimeout；用于离屏验证交互后的界面）")
+	shotAfter := flag.Duration("shotafter", 3*time.Second, "执行 -shotjs 之后、截图之前的等待时间")
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
 	aiTest := flag.String("aitest", "", "AI 代理对拍：模拟服务地址（如 http://127.0.0.1:4827）；跑完 -aiscen 里的场景后把结果写到 -aiout 并退出")
 	aiScen := flag.String("aiscen", "", "-aitest 的场景文件 scenarios.json")
@@ -277,6 +280,16 @@ func main() {
 		lib.jobs.Start() // 对应 backgroundJobs.start()：自动化实例（截图/基准/AI 对拍）不跑后台任务
 	}
 	newAIProxy(lib.configuredAIHosts).register(b)
+	lib.registerIllustrationStyles(b)
+	b.registerFrozenStubs()
+	// 启动自检在窗口控制频道登记之后执行（见 WhenReady）。
+	ipcSelfCheck := func() {
+		if miss := b.unimplementedChannels(); len(miss) > 0 {
+			log.Printf("[ipc] 仍有 %d 个渲染进程可调用的频道没有处理器：%s", len(miss), strings.Join(miss, ", "))
+		} else {
+			log.Printf("[ipc] 渲染进程可调用的 %d 个频道（invoke）+ %d 个（send）均已有处理器", len(rendererInvokeChannels), len(rendererSendChannels))
+		}
+	}
 	mygo.Bind(b)
 
 	preload, err := os.ReadFile(filepath.Join(*dist, "preload", "preload.js"))
@@ -316,6 +329,7 @@ func main() {
 		}
 		win := mygo.NewWindow(opts)
 		b.registerWindow(win)
+		ipcSelfCheck()
 		p := win.Page()
 		skipGlobal := *shot != "" || *aiTest != "" || *bench // 自动化实例不抢用户正在用的系统级快捷键
 		if !skipGlobal {
@@ -367,6 +381,16 @@ func main() {
 		}
 		go func() {
 			time.Sleep(*wait)
+			if *shotJS != "" {
+				script, rerr := os.ReadFile(*shotJS)
+				if rerr != nil {
+					fmt.Println("[FAIL] 读取 -shotjs：", rerr)
+				} else {
+					v, eerr := p.Eval(string(script))
+					fmt.Printf("[INFO] -shotjs 返回：%v（错误：%v）\n", v, eerr)
+					time.Sleep(*shotAfter)
+				}
+			}
 			if v, err := p.Eval(`document.body.innerText.slice(0,200)`); err == nil {
 				fmt.Printf("[INFO] 页面文本：%v\n", v)
 			}

@@ -126,6 +126,20 @@
 | i | 平台登录会话用 WebView2 持久配置文件，状态文件改名为 `session-status-webview2.json` | Electron 的 `persist:` 分区无法复用 | **用户在 Electron 版与 Go 版之间切换时需重新登录一次** |
 | j | `fetchJSONViaSession` 用页面导航读 JSON，不用 `session.fetch` | CDP 下没有等价的会话级 fetch | WebSocket 流量绕过 Fetch 拦截 |
 
+### 最终验收（2026-11-12）
+
+| 验收项 | 结果 | 证据 |
+|---|---|---|
+| 渲染进程可调用的频道全部有处理器 | 214 个 invoke + 17 个 send，**0 个未实现**。清单由 `spikes/mygo-js/gen-channels.mts` 从 preload 的 `ipcRenderer.invoke/send` 生成（`ipc_channels_gen.go`），启动时自检并写入日志 `[ipc] …均已有处理器`；`migration-status.ps1` 另按字符串统计：230 个常量频道已登记 187 个、冻结 43 个、待迁 0，常量之外的字面量频道 33/33 | 离屏启动日志；`frozen_ipc_test.go` |
+| 冻结功能的处理 | 研究 / 配图 / 发现视图 / 阅读配图 / 手机收集 / 阅读同步：读取列表类频道（`research:list`、`research:baselines`、`discoveryView:list`）返回空列表，其余明确报「该功能已冻结」。**例外**：配图风格预设的读写（`illustration:styles/builtInStyles/saveStyles/revealStylesFile`）有 Go 实现（属配置迁移的一部分，设置页可用）。此前 `research:list` 在启动时被调用 3 次且无处理器，渲染进程会进入错误态——这是验收时才发现并修复的缺口 | 同上 |
+| 各频道组的 TS/Go 差分 | 全部通过，带全部 golden 环境变量的 `go test -count=1 ./...` 通过（约 125 s）。仍跳过的 4 项：`TestConfigExportEncryptedDump`（需要 `GUIZHI_DUMP_DIR`，仅用于人工查看）、`TestFunasrGoldenConsumesTsDisposable`（TS 一次性目录，每次生成的 golden 只能消费一次）、`TestVideoHelperProcess`（子进程辅助入口）、`TestEvidence*` 在本次补跑 `make-golden-evidence.mts` 后通过 | `go test` 输出 |
+| 主界面在 Go 壳上的离屏验证 | `build-shell.ps1` 产出的 `GuiZhi.exe` 在隔离 `APPDATA`/userData、`-shot` 离屏下：空库显示首次引导；复制的黄金库显示完整资料库（22 条、集合/平台/标签侧栏），点击条目后右侧正文正确显示。`-shot` 新增 `-shotjs <脚本> -shotafter <时长>` 用于截图前执行交互脚本 | `%TEMP%\guizhi-final-shot2\pop.png`、`detail.png` |
+| 打包产物 | `spikes\mygo-shell\out\win-x64`：`GuiZhi.exe`（Windows x64，GUI 子系统）+ `dist` + `reading_libraries.json`，约 39.8 MB；`build-themed.mts`、`build-pipeline.mts`、`build.mts` 重新生成后与已提交的 `themed_engine.js`、`themed_pipeline.js`、`websnap_sanitize.js` 无差异 | `git status` 干净 |
+| 端到端：采集 → 提取 → 入库 → FTS → AI 流式问答 | `TestEndToEndCaptureSearchAndStreamingAsk` 通过（本地 httptest 站点与 SSE 模型） | `e2e_test.go` |
+| 依赖 | `go mod tidy` 后 `github.com/coder/websocket` 由间接依赖转为直接依赖（CDP 连接使用），其余无变化 | `go.mod` |
+
+**仍然没有验证的事（汇总）**：真实 UI 里的备份/恢复整链路与重启、数据库损坏后的修复路径、大库（数万条）耗时；真实第三方站点（采集、渲染、小红书/抖音/LINUX DO/NodeSeek 登录）与真实 SOCKS5/TUN；真实云端 ASR/LLM/OCR/生图/搜索服务；真实 Python/pip/torch 的 FunASR 安装；Wiki 编译在渲染进程驱动下的真实模型循环；SSH 隧道 + FlareSolverr；安装包形态（NSIS、签名、自动更新对接）；与用户真实 Electron 实例并存时的租约与 `Local State`；主题阅读视图 iframe 在真实 UI 里的完整往返、WebView2 对 iframe 是否做进程隔离；goja 在数 MB 页面上的耗时；长时间运行下渲染窗口的内存与泄漏。这些都需要真实环境、真实账号或用户确认，没有在本轮自动化里做。
+
 ## 已验证的事
 
 | 项目 | 结果 |

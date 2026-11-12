@@ -77,7 +77,13 @@ func newTestPlatformSessions(t *testing.T, m *platformMock, loginPath string) *p
 	if testing.Short() {
 		t.Skip("-short：跳过需要启动浏览器的测试")
 	}
-	s := newPlatformSessions(&Library{}, t.TempDir())
+	// WebView2 的辅助进程退出后句柄释放有延迟，t.TempDir 的一次性清理会偶发失败，改为带重试的清理。
+	dir, err := os.MkdirTemp("", "platform-sessions-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = removeAllRetry(dir, 40, 250*time.Millisecond) })
+	s := newPlatformSessions(&Library{}, dir)
 	s.window = "offscreen" // 离屏运行，不打扰桌面
 	s.loginPoll = 200 * time.Millisecond
 	s.policy = platformPolicy{
