@@ -32,7 +32,7 @@ func TestFetchTraceRecordsHopsAndMasksSecrets(t *testing.T) {
 	fx.f.trace = newFetchTracer(&buf)
 	base := "http://site.test:" + fx.port()
 	_, err := fx.f.fetchRawText(context.Background(), base+"/a?token=SECRET9&tid=5", safeRequestOptions{
-		UserAgent: "UA-X", Referer: "https://ref.test/", Cookie: "guestJs=COOKIEVAL; ngaPassportUid=77",
+		UserAgent: "UA-X", Referer: "https://ref.test/", Cookie: "guestJs=COOKIEVAL; ngaPassportUid=UIDVAL",
 	}, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestFetchTraceRecordsHopsAndMasksSecrets(t *testing.T) {
 	_, _ = fx.f.fetchRawText(context.Background(), base+"/bad", safeRequestOptions{}, 0)
 
 	raw := buf.String()
-	for _, leak := range []string{"SECRET9", "LEAKME", "COOKIEVAL", "77", "NEWSECRET"} {
+	for _, leak := range []string{"SECRET9", "LEAKME", "COOKIEVAL", "UIDVAL", "NEWSECRET"} {
 		if strings.Contains(raw, leak) {
 			t.Errorf("跟踪日志不应含 %q：\n%s", leak, raw)
 		}
