@@ -58,17 +58,17 @@ Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
 - 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。
-- 手机收集中转服务在服务器上的部署、入口与镜像升级约束，以 GatewaySentry 文档站 `services/projects/guizhi-capture` 为准（源文件 `E:\Tools\Gatewaysentry-SSH\docs-site\docs\services\projects\guizhi-capture.md`），经 skill `gatewaysentry-docs-lookup` 查阅；对共享服务器做了持久变更后，按 skill `gatewaysentry-ops-docs` 写回。
+- 手机收集中转服务的自托管说明见 [mobile-capture-ops.md](docs/mobile-capture-ops.md)；生产服务器的部署与升级约束属于维护者本机配置，不随仓库公开，由本机 skill `guizhi-linux-preflight` 指引。
 
-## Linux 收集服务预检（默认德国共享构建器）
+## Linux 收集服务预检
 
-2026-10-23 起默认通过 XTerminal 在德国 Bero 的既有 `gs-preflight` 公共构建器执行，复用公共执行器、BuildKit 依赖层及下载缓存，不新建项目专属 builder。下文的完整检查范围、风险分级、源码快照和发版规则保持不变，完整检查由同一套脚本在德国 Linux 执行。本机 WSL/WSLC 已于 2026-10-27 卸载，旧本机入口与 `--local` 已禁用，不得自动重装。
+手机收集服务的完整 Linux 检查用 `pnpm check:linux` 执行，在维护者的共享远程构建器上运行；连接方式、操作步骤与证据回收属于维护者本机配置，不随仓库公开，细节见本机 skill `guizhi-linux-preflight`（`.cursor/skills/guizhi-linux-preflight/SKILL.md`，不入库）。没有该 skill 的检出（含社区贡献者）无法运行远程预检，以 CI 的 `Mobile capture quality` 为准。本机容器预检入口（`--local`）已退役并返回非零，不要自动安装或恢复本机容器环境。
 
-`pnpm check:linux:prepare` 仅打包；Agent 必须按 `docs/agents/linux-preflight.md` 完成 XTerminal plan、按需上传、run 和取回完整证据，再执行 `pnpm check:linux:verify --run <本机运行目录>`。`check:linux` 强制新检查；`check:linux:reuse` 优先核验已有完整证据；缺少结果时生成远程请求并返回非零，绝不把 prepare 当作通过。共享客户端在本机配置文件中登记一次，各仓库只留薄适配器；不得复制公共执行器、读取宿主凭据或挂载生产数据库。
+`pnpm check:linux:prepare` 仅打包源码快照，不是通过凭证；之后 Agent 必须按本机 skill 完成远程执行并取回完整证据，再运行 `pnpm check:linux:verify --run <本机运行目录>`。`check:linux` 强制新检查；`check:linux:reuse` 优先核验已有完整证据，缺少结果时返回非零；绝不把 prepare 当作通过。不得读取宿主凭据或挂载生产数据库。
 
 
 Windows Agent 修改 apps/capture-relay、apps/capture-web、apps/capture-harmony/entry/src/main/ets/core、packages/shared、根依赖/锁文件或 scripts/wslc 后，交付前必须在仓库根目录运行 pnpm check:linux。命令检查当前源码快照，在独立 Node 24/Linux 容器内执行共享包/收集网页/中转服务类型检查、中转服务全量单测、两端构建，以及真实中转进程的健康、静态网页和 SQLite 重启持久性检查。源码变化后须重跑，报告结果指纹和证据目录。
 
-输入只读挂载，依赖及构建放在容器副本内；不得挂载用户数据、手机配对凭据、宿主 .env 或 Windows node_modules，不得停掉或重启用户实例。该门禁验证 Linux 收集服务，桌面端仍执行原有 Windows 隔离验证，HarmonyOS 仍需原有构建/设备验收；不改变官方桌面平台政策，不替代浏览器/E2E、镜像构建或生产发布。德国机检查不可用或失败必须如实报告，不能把入口存在当成预检通过；Linux CI 使用原生检查。详情见 docs/agents/linux-preflight.md。
+输入只读挂载，依赖及构建放在容器副本内；不得挂载用户数据、手机配对凭据、宿主 .env 或 Windows node_modules，不得停掉或重启用户实例。该门禁验证 Linux 收集服务，桌面端仍执行原有 Windows 隔离验证，HarmonyOS 仍需原有构建/设备验收；不改变官方桌面平台政策，不替代浏览器/E2E、镜像构建或生产发布。远程构建器不可用或失败必须如实报告，不能把入口存在当成预检通过；Linux CI 使用原生检查。
 
 修改预检工具 scripts/wslc 时，还必须先运行 pnpm test:wslc 验证源码快照、凭据排除及原 Git 暂存区保留。
