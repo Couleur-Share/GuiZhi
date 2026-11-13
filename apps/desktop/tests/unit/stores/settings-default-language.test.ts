@@ -48,12 +48,13 @@ afterEach(() => {
   localStorage.clear();
 });
 
+// 首次安装（无已保存语言）固定默认中文，不跟随系统语言；已保存的语言设置优先。
 describe("设置默认语言与 i18n 初始语言同源", () => {
   it.each([
     { systemLanguage: "zh-CN", savedState: undefined, expected: "zh" },
     { systemLanguage: "zh-TW", savedState: undefined, expected: "zh" },
-    { systemLanguage: "en-US", savedState: undefined, expected: "en" },
-    { systemLanguage: "fr-FR", savedState: undefined, expected: "en" },
+    { systemLanguage: "en-US", savedState: undefined, expected: "zh" },
+    { systemLanguage: "fr-FR", savedState: undefined, expected: "zh" },
     { systemLanguage: "zh-CN", savedState: { language: "en" }, expected: "en" },
     { systemLanguage: "en-US", savedState: { language: "zh" }, expected: "zh" },
     { systemLanguage: "zh-CN", savedState: { autoSave: false }, expected: "zh" },
@@ -73,8 +74,8 @@ describe("设置默认语言与 i18n 初始语言同源", () => {
     },
   );
 
-  it("首次启动时 store 先于 i18n 创建，语言仍跟随系统且与界面语言一致", async () => {
-    const i18nModule = await startI18n("zh-CN");
+  it("首次启动时 store 先于 i18n 创建，语言默认中文且与界面语言一致", async () => {
+    const i18nModule = await startI18n("en-US"); // 系统是英文也默认中文
 
     const { useSettingsStore } = await withI18nUninitialized(
       i18nModule,

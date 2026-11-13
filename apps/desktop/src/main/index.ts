@@ -215,7 +215,8 @@ const trayController = createTrayController({
   createFromPath: (filePath) => nativeImage.createFromPath(filePath),
   createTray: (icon) => new Tray(icon),
   dirname: __dirname,
-  getLocale: () => app.getLocale(),
+  // 首次安装、尚无已保存语言时托盘菜单默认中文（与渲染进程的默认语言一致），不再取系统区域
+  getLocale: () => "zh-CN",
   getResourcesPath: () => process.resourcesPath,
   getStoredLanguage: () => (appDb ? readLanguageSetting(appDb) : null),
   getWindowVisibility: () => mainWindow?.isVisible() ?? false,

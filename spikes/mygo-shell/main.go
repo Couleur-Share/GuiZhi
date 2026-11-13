@@ -364,7 +364,7 @@ func main() {
 		lc.mu.Lock()
 		lc.win, lc.push = mygoHost{win}, lib.pushMain
 		if manage {
-			lc.tray = &mygoTray{a: lc, lib: lib, locale: systemLocale}
+			lc.tray = &mygoTray{a: lc, lib: lib, locale: func() string { return "zh-CN" }} // 首次安装默认中文，与渲染进程一致
 		}
 		lc.quit = mygo.App.Quit
 		lc.mu.Unlock()

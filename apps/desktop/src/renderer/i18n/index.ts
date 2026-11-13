@@ -24,11 +24,9 @@ function normalizeLanguage(lang: string): SupportedLocale {
   return 'en';
 }
 
-// Get system language
-// 获取系统语言
-const getSystemLanguage = (): string => {
-  return normalizeLanguage(navigator.language);
-};
+// 首次安装（没有已保存的语言设置）时的默认界面语言：固定中文，不再跟随系统语言。
+// 用户在「设置 → 应用设置」里切换后，会写入设置并优先生效。
+const DEFAULT_LANGUAGE: SupportedLocale = 'zh';
 
 // Get saved language settings (read from zustand persist store)
 // 获取保存的语言设置 (从 zustand persist store 读取)
@@ -81,11 +79,11 @@ async function loadInitialResources(lang: string): Promise<InitialResources> {
 }
 
 /**
- * 启动时的界面语言：已保存的设置优先，否则跟随系统语言。
+ * 启动时的界面语言：已保存的设置优先，否则默认中文（首次安装）。
  * 设置 store 的默认语言必须取这个值，不能读 i18n.language：main.tsx 并行加载 App 与语言包，
  * store 可能在 i18n 初始化之前创建，此时 i18n.language 为 undefined，会被归一成 en 并持久化。
  */
-export const initialLanguage = normalizeLanguage(getSavedLanguage() || getSystemLanguage());
+export const initialLanguage = normalizeLanguage(getSavedLanguage() || DEFAULT_LANGUAGE);
 
 export const i18nReady = (async () => {
   const { language, resources } = await loadInitialResources(initialLanguage);
