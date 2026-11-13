@@ -16,7 +16,6 @@ import {
   getIllustrationStylesFilePath,
   resetRuntimePaths,
 } from "@guizhi/core";
-import { validateStyleDrafts } from "../../../src/renderer/components/illustration/use-style-drafts";
 
 let workDir: string;
 
@@ -174,28 +173,5 @@ describe("内置预设本身", () => {
     expect(coreIllustrationStyleService.read()).toHaveLength(
       BUILT_IN_ILLUSTRATION_STYLES.length,
     );
-  });
-});
-
-describe("validateStyleDrafts", () => {
-  const messages = { name: "名称不能为空", visualDna: "画法不能为空" };
-
-  it("逐条挑出必填项没填的风格", () => {
-    const errors = validateStyleDrafts(
-      [
-        base(),
-        { ...base(), id: "no-name", name: "  " },
-        { ...base(), id: "no-dna", visualDna: "" },
-      ],
-      messages,
-    );
-
-    expect(Object.keys(errors)).toEqual(["no-name", "no-dna"]);
-    expect(errors["no-name"].name).toBe(messages.name);
-    expect(errors["no-dna"].visualDna).toBe(messages.visualDna);
-  });
-
-  it("填齐了就没有错误", () => {
-    expect(validateStyleDrafts([base()], messages)).toEqual({});
   });
 });

@@ -51,14 +51,11 @@ vi.mock("../../../src/renderer/components/library/AiOcrCard", () => ({
 vi.mock("../../../src/renderer/components/library/AiSummaryCard", () => ({
   AiSummaryCard: () => null,
 }));
-vi.mock("../../../src/renderer/components/library/SourceCommentsCard", () => ({
-  SourceCommentsCard: () => null,
-}));
 vi.mock("../../../src/renderer/components/library/WebSourceVersions", () => ({
   WebSourceVersions: () => null,
 }));
-vi.mock("../../../src/renderer/components/library/IllustrationCard", () => ({
-  IllustrationCard: function IllustrationFixture() {
+vi.mock("../../../src/renderer/components/library/SourceCommentsCard", () => ({
+  SourceCommentsCard: function CommentsTaskFixture() {
     const [running, setRunning] = useState(false);
     useEffect(() => {
       mocks.mounted();
@@ -68,7 +65,7 @@ vi.mock("../../../src/renderer/components/library/IllustrationCard", () => ({
     }, []);
     return (
       <button onClick={() => setRunning(true)}>
-        {running ? "配图任务进行中" : "开始模拟配图"}
+        {running ? "评论抓取进行中" : "开始模拟抓取评论"}
       </button>
     );
   },
@@ -120,7 +117,7 @@ beforeEach(() => {
 
 describe("文章工具的生命周期和子弹层", () => {
   it.each(["audio", "video"] as const)(
-    "收起再展开不卸载 %s 或清空进行中的配图状态",
+    "收起再展开不卸载 %s 或清空进行中的任务状态",
     (type) => {
       mocks.state.selectedItem.itemType = type;
       const { container } = render(<ItemDetail />);
@@ -130,7 +127,7 @@ describe("文章工具的生命周期和子弹层", () => {
       expect(media).not.toBeNull();
       // 仅验证真实媒体节点的生命周期与播放位置，不在 jsdom 中请求或播放媒体。
       media.currentTime = 17;
-      fireEvent.click(screen.getByRole("button", { name: "开始模拟配图" }));
+      fireEvent.click(screen.getByRole("button", { name: "开始模拟抓取评论" }));
       fireEvent.click(screen.getByRole("button", { name: "收起文章工具" }));
       expect(panel).toHaveAttribute("hidden");
       expect(container.querySelector(type)).toBe(media);
@@ -140,7 +137,7 @@ describe("文章工具的生命周期和子弹层", () => {
       expect(screen.getByText("可继续阅读的正文")).toBeVisible();
       fireEvent.click(screen.getByRole("button", { name: "文章信息与工具" }));
       expect(
-        screen.getByRole("button", { name: "配图任务进行中" }),
+        screen.getByRole("button", { name: "评论抓取进行中" }),
       ).toBeVisible();
       expect(mocks.mounted).toHaveBeenCalledTimes(1);
     },

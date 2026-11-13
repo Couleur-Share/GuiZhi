@@ -1,6 +1,3 @@
-import { readingSyncApi } from './api/reading-sync';
-import { mobileCaptureApi } from "./api/mobile-capture";
-window.addEventListener("online", () => { void mobileCaptureApi.fetch().catch(() => undefined); });
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import { aiApi } from "./api/ai";
@@ -16,12 +13,10 @@ import { articleAskApi } from "./api/article-ask";
 import { askSessionApi } from "./api/ask";
 import { semanticApi } from "./api/semantic";
 import { ffmpegApi, funasrApi, mediaApi, ytDlpApi } from "./api/media";
-import { illustrationApi } from "./api/illustration";
 import { themedReadingApi } from "./api/themed-reading";
 import { backgroundJobApi } from "./api/background-job";
 import { inboxApi } from "./api/inbox";
 import { logApi } from "./api/log";
-import { researchApi } from "./api/research";
 import { webCaptureApi } from "./api/web-capture";
 import { createBufferedSubscription } from "./app-command-subscription";
 import type {
@@ -65,8 +60,6 @@ const api = {
   collection: collectionApi,
   tag: tagApi,
   import: importApi,
-  mobileCapture: mobileCaptureApi,
-  readingSync: readingSyncApi,
   platformCapture: platformCaptureApi,
   wiki: wikiApi,
   migration: migrationApi,
@@ -86,12 +79,10 @@ const api = {
   askSession: askSessionApi,
   semantic: semanticApi,
   media: mediaApi,
-  illustration: illustrationApi,
   themedReading: themedReadingApi,
   backgroundJob: backgroundJobApi,
   inbox: inboxApi,
   log: logApi,
-  research: researchApi,
   webCapture: webCaptureApi,
   ytdlp: ytDlpApi,
   ffmpeg: ffmpegApi,
@@ -108,10 +99,8 @@ const api = {
       "window:fullscreen-changed",
       "window:visibility-changed",
       "import:changed",
-      IPC_CHANNELS.RESEARCH_CHANGED,
       "backup:autoStatus",
       IPC_CHANNELS.BACKGROUND_JOB_AVAILABLE,
-      IPC_CHANNELS.DISCOVERY_OPEN_VIEW,
       "menu:import",
       "menu:export",
       "ytdlp:downloadProgress",

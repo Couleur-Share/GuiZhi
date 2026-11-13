@@ -180,13 +180,11 @@ const CITATION_HREF_PREFIX = "#qa-cite=";
 export function MarkdownBody({
   content,
   onCitationClick,
-  onResearchCitationClick,
   centeredHeadings = false,
   highlightQuery,
 }: {
   content: string;
   onCitationClick?: (ordinal: number) => void;
-  onResearchCitationClick?: (reference: string) => void;
   /** 论坛主楼等：章节标题居中显示 */
   centeredHeadings?: boolean;
   /** 讨论搜索：在渲染树里标出关键字 */
@@ -226,17 +224,6 @@ export function MarkdownBody({
         node: _node,
         ...props
       }: ComponentProps<"a"> & { children?: ReactNode; node?: unknown }) => {
-        const researchRef = extractText(children).replace(/[[\]]/g, "");
-        if (onResearchCitationClick && /^[RL]\d+$/.test(researchRef))
-          return (
-            <button
-              type="button"
-              onClick={() => onResearchCitationClick(researchRef)}
-              className="mx-0.5 inline rounded bg-primary/10 px-1 text-primary hover:bg-primary/20"
-            >
-              {mark(children)}
-            </button>
-          );
         if (onCitationClick && href?.startsWith(CITATION_HREF_PREFIX)) {
           const ordinal = Number(href.slice(CITATION_HREF_PREFIX.length));
           if (Number.isFinite(ordinal)) {
@@ -300,7 +287,7 @@ export function MarkdownBody({
         <CodeBlock className={className}>{children}</CodeBlock>
       ),
     };
-  }, [highlightQuery, localImages, onCitationClick, onResearchCitationClick]);
+  }, [highlightQuery, localImages, onCitationClick]);
 
   return (
     <div

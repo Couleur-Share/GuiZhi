@@ -5,8 +5,6 @@ import { installWindowMocks } from "../../helpers/window";
 import { changeLanguage, i18nReady } from "../../../src/renderer/i18n";
 import { ToastProvider } from "../../../src/renderer/components/ui/Toast";
 import { CaptureDialog } from "../../../src/renderer/components/capture/CaptureDialog";
-import { DISCOVERY_DRAFT_KEY } from "../../../src/renderer/components/imports/platform-discovery-draft";
-
 /** 抖音「复制打开抖音」口令原样，尾部那串是分享校验噪音 */
 const DOUYIN_SHARE_TEXT =
   "0.02 复制打开抖音，看看【六叔ultra的作品】4 个提示词，让 AI 像博士一样帮你调研🔥 用A... https://v.douyin.com/0lZNY93J6Ck/ :3pm t@E.Ul FhB:/ 12/15";
@@ -103,15 +101,18 @@ describe("快速采集识别分享口令", () => {
     ]);
   });
 
-  it("单个作者主页把主操作改为浏览作品，并保留普通网页导入", async () => {
+  it("作者主页链接按普通网页采集，不再提供浏览作品入口", async () => {
     const user = await pasteDraft("https://www.xiaohongshu.com/user/profile/abc");
-    expect(screen.getByRole("button", { name: "浏览作者作品" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "按普通网页采集" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "浏览作者作品" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "浏览作者作品" }));
-    expect(JSON.parse(sessionStorage.getItem(DISCOVERY_DRAFT_KEY)!)).toMatchObject({
-      url: "https://www.xiaohongshu.com/user/profile/abc",
-    });
-    expect(enqueue).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("capture-submit"));
+    expect(enqueue).toHaveBeenCalledWith([
+      {
+        kind: "url",
+        input: "https://www.xiaohongshu.com/user/profile/abc",
+        collectionId: null,
+        tagNames: undefined,
+      },
+    ]);
   });
 });

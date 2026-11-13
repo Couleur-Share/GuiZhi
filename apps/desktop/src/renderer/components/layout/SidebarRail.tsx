@@ -11,7 +11,7 @@ type RailNavItem = SidebarController["railNavItems"][number];
 /** 资产流转 / 智能探索 / 任务队列——组间细线分隔，避免六枚图标等权并列 */
 const RAIL_GROUPS: readonly (readonly AppModule[])[] = [
   ["library", "inbox"],
-  ["ask", "wiki", "research"],
+  ["ask", "wiki"],
   ["imports"],
 ];
 

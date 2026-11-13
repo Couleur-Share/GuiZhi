@@ -459,7 +459,7 @@ func (l *Library) applyDataPathChange(ctx context.Context, newPath, action strin
 	return &dataPathChangeResult{Success: true, Message: strp(fmt.Sprintf("Successfully migrated %d items", migrated)), NewPath: strp(target), NeedsRestart: boolp(true)}
 }
 
-// stopFrozenServices 对应 stopMobileCapture(true) / stopReadingSync(true)：这两族功能已冻结，Go 壳层没有对应服务。
+// stopFrozenServices 对应 stopMobileCapture(true) / stopReadingSync(true)：这两族功能已移除，Go 壳层没有对应服务。
 func (l *Library) stopFrozenServices() {}
 
 // ── shell:openPath ──

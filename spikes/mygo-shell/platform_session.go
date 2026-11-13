@@ -3,7 +3,7 @@ package main
 // 登录态平台采集服务：对应 platform-capture/browser-capture.ts 的 BrowserCaptureService。
 // 差异（登记于 MYGO-MIGRATION.md）：浏览器由 Electron BrowserWindow 换成 WebView2 子进程 + CDP；
 // 登录态状态文件改名为 session-status-webview2.json（两种壳的会话档案不通用，切换后需重新登录一次）；
-// 平台发现（discover / search）属冻结功能，不迁移。
+// 平台发现（discover / search）已移除。
 
 import (
 	"context"

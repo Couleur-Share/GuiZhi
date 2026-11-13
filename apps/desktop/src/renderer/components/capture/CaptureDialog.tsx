@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { EnqueueImportInput } from "@guizhi/shared/types";
-import { detectPlatformCreatorUrl } from "@guizhi/shared/utils/platform-capture";
 import { Modal } from "../ui/Modal";
 import { Select } from "../ui/Select";
 import { useToast } from "../ui/Toast";
@@ -20,8 +19,6 @@ import { useTagStore } from "../../stores/tag.store";
 import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { useUIStore } from "../../stores/ui.store";
 import { parseCaptureDraft, resolveCaptureAction } from "./capture-utils";
-import { DISCOVERY_DRAFT_KEY } from "../imports/platform-discovery-draft";
-
 interface CaptureDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -89,12 +86,6 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     [parsedDraft, draftOverride],
   );
   const canSubmit = captureAction.kind !== "empty" || filePaths.length > 0;
-  const creatorProfile = captureAction.kind === "urls" &&
-    captureAction.urls.length === 1 &&
-    filePaths.length === 0 &&
-    draft.trim() === captureAction.urls[0]
-      ? detectPlatformCreatorUrl(captureAction.urls[0])
-      : null;
   const matchingTags = tagDraft.trim()
     ? tags
         .filter(
@@ -193,17 +184,6 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
     await createItem({ collectionId: collectionId || null });
   };
 
-  const browseCreator = () => {
-    if (!creatorProfile) return;
-    sessionStorage.setItem(DISCOVERY_DRAFT_KEY, JSON.stringify({
-      url: creatorProfile.url,
-      collectionId,
-      tagNames,
-    }));
-    onClose();
-    setAppModule("imports");
-  };
-
   // 从文字里抠出来的链接要显示出来：整段文字里可能不止一条，
   // 用户得看得见我们挑的是哪个
   const hintText = (() => {
@@ -263,10 +243,7 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
               // 快速采集由全局快捷键唤起，提交也不该被迫回到鼠标
               if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                 event.preventDefault();
-                if (canSubmit) {
-                  if (creatorProfile) browseCreator();
-                  else void submit();
-                }
+                if (canSubmit) void submit();
               }
             }}
             autoFocus
@@ -446,30 +423,15 @@ export function CaptureDialog({ isOpen, onClose }: CaptureDialogProps) {
             ]}
             className="w-36"
           />
-          {creatorProfile ? (
-            <button
-              type="button"
-              onClick={() => void submit()}
-              className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-            >
-              {t("capture.importAsWebPage", "按普通网页采集")}
-            </button>
-          ) : null}
           <button
             type="button"
-            onClick={() => creatorProfile ? browseCreator() : void submit()}
+            onClick={() => void submit()}
             disabled={!canSubmit}
             data-testid="capture-submit"
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
-            {creatorProfile ? (
-              <GlobeIcon className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <FilePlusIcon className="h-4 w-4" aria-hidden="true" />
-            )}
-            {creatorProfile
-              ? t("capture.browseCreator", "浏览作者作品")
-              : t("capture.submit", "采集")}
+            <FilePlusIcon className="h-4 w-4" aria-hidden="true" />
+            {t("capture.submit", "采集")}
           </button>
         </div>
       </div>

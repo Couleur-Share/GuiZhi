@@ -1,6 +1,6 @@
 package main
 
-// 登录态采集的 IPC 与导入接入：对应 ipc/platform-capture.ipc.ts（平台发现相关频道属冻结功能，不迁移）、
+// 登录态采集的 IPC 与导入接入：对应 ipc/platform-capture.ipc.ts（平台发现已移除，不提供）、
 // platform-capture/authenticated-platforms.ts、packages/db 的 SourceCommentDB。
 
 import (
@@ -11,8 +11,6 @@ import (
 
 	"github.com/egoist/mygo/plugins/sqlite"
 )
-
-const errPlatformDiscoveryFrozen = "平台发现功能已冻结（见 docs/product-scope.md），Go 壳不提供"
 
 func requirePlatformArg(v any) (string, error) {
 	p, ok := isPlatformCapturePlatform(v)
@@ -333,15 +331,6 @@ func (l *Library) registerPlatformCapture(b *Bridge) {
 			return nil, err
 		}
 		return l.sourceCommentsList(ctx, itemID)
-	}
-	// 平台发现：冻结功能，不迁移。取消类调用没有进行中的任务，返回 false；其余如实报错。
-	b.handlers["platformCapture:cancelDiscovery"] = func(ctx context.Context, a []json.RawMessage) (any, error) {
-		return false, nil
-	}
-	for _, ch := range []string{"platformCapture:discoverCreator", "platformCapture:search"} {
-		b.handlers[ch] = func(ctx context.Context, a []json.RawMessage) (any, error) {
-			return nil, errors.New(errPlatformDiscoveryFrozen)
-		}
 	}
 }
 

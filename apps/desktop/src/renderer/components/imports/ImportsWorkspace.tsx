@@ -3,7 +3,6 @@ import { DocumentSitePanel } from "./DocumentSitePanel";
 import {
   PauseIcon,
   PlayIcon,
-  CompassIcon,
   GlobeIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -25,14 +24,6 @@ import { ImportsEmptyState, ImportsFilteredEmpty } from "./ImportsEmptyState";
 import { ImportTaskDetailModal } from "./ImportTaskDetailModal";
 import { ImportTaskRow } from "./ImportTaskRow";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import {
-  PlatformDiscoveryPanel,
-} from "./PlatformDiscoveryPanel";
-import {
-  DISCOVERY_DRAFT_KEY,
-  DISCOVERY_OPEN_VIEW_KEY,
-} from "./platform-discovery-draft";
-
 function isRunning(task: ImportTask): boolean {
   return task.status === "pending" || task.status === "processing";
 }
@@ -42,46 +33,17 @@ function isRunning(task: ImportTask): boolean {
  * 打开结果条目，重复任务支持「打开已有条目」与「仍要创建副本」。
  */
 export function ImportsWorkspace() {
-  const [view, setView] = useState<"tasks" | "discovery" | "documents">(() =>
-    sessionStorage.getItem(DISCOVERY_DRAFT_KEY) ||
-    sessionStorage.getItem(DISCOVERY_OPEN_VIEW_KEY)
-      ? "discovery"
-      : "tasks",
-  );
-  useEffect(() => {
-    const openDiscovery = () => setView("discovery");
-    window.addEventListener("discovery:open-view", openDiscovery);
-    return () => window.removeEventListener("discovery:open-view", openDiscovery);
-  }, []);
+  const [view, setView] = useState<"tasks" | "documents">("tasks");
   if (view === "documents") return <DocumentSitePanel onBack={() => setView("tasks")} />;
-  return view === "discovery"
-    ? <PlatformDiscoveryPanel onBack={() => setView("tasks")} />
-    : <ImportTasksWorkspace onOpenDiscovery={() => setView("discovery")} onOpenDocuments={() => setView("documents")} />;
+  return <ImportTasksWorkspace onOpenDocuments={() => setView("documents")} />;
 }
 
 function ImportTasksWorkspace({
-  onOpenDiscovery,
   onOpenDocuments,
 }: {
-  onOpenDiscovery: () => void;
   onOpenDocuments: () => void;
 }) {
   const { t } = useTranslation();
-  // 平台发现属冻结功能：只有已保存过发现视图的用户才在工具栏看到入口，
-  // 其余用户经命令面板或快速采集的「浏览博主」进入。
-  const [hasDiscoveryViews, setHasDiscoveryViews] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    void window.api.platformCapture
-      .listDiscoveryViews()
-      .then((views) => {
-        if (!cancelled) setHasDiscoveryViews(views.length > 0);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   const tasks = useImportStore((state) => state.tasks);
   const total = useImportStore((state) => state.total);
   const nextCursor = useImportStore((state) => state.nextCursor);
@@ -269,16 +231,6 @@ function ImportTasksWorkspace({
           <GlobeIcon className="h-4 w-4" aria-hidden="true" />
           {t("webCapture.importSite", "采集文档站")}
         </button>
-        {hasDiscoveryViews ? (
-          <button
-            type="button"
-            onClick={onOpenDiscovery}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted/60"
-          >
-            <CompassIcon className="h-4 w-4" aria-hidden="true" />
-            {t("imports.platformDiscovery", "平台发现")}
-          </button>
-        ) : null}
         {queueState.pendingCount > 0 || queueState.paused ? (
           <button
             type="button"

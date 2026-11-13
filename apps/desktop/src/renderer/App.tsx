@@ -1,7 +1,6 @@
 import { WikiCompileDialog } from "./components/wiki/WikiCompileDialog";
 import { SaveBeforeClose } from "./components/app/SaveBeforeClose";
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
-import { IPC_CHANNELS } from "@guizhi/shared/constants";
 import { Sidebar, TopBar, MainContent } from "./components/layout";
 import { useSettingsStore } from "./stores/settings.store";
 import { useUIStore } from "./stores/ui.store";
@@ -23,7 +22,6 @@ import { DesktopAppCommandBridge } from "./components/app/DesktopAppCommandBridg
 import { GlobalCommandPalette } from "./components/app/GlobalCommandPalette";
 import { useToast } from "./components/ui/Toast";
 import { useOperationErrorToast } from "./hooks/useOperationErrorToast";
-import { useResearchEvents } from "./hooks/useResearchEvents";
 import { useUpdaterStore } from "./stores/updater.store";
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MS,
@@ -76,7 +74,6 @@ type PageType = "home" | "settings";
 function App() {
   // store 里变更操作的失败统一在这里提示，调用点无需逐个 try/catch
   useOperationErrorToast();
-  useResearchEvents();
   useBackgroundJobClient();
   useBackupSettingsSync();
   const applyTheme = useSettingsStore((state) => state.applyTheme);
@@ -175,18 +172,6 @@ function App() {
     };
     window.api?.on?.("backup:autoStatus", handleAutoBackup);
     return () => window.api?.off?.("backup:autoStatus", handleAutoBackup);
-  }, []);
-
-  // 系统通知点击：切到导入模块并让平台发现页消费目标视图。
-  useEffect(() => {
-    if (isWebRuntime()) return;
-    const openDiscoveryView = (viewId: string) => {
-      sessionStorage.setItem("guizhi-platform-discovery-open-view", viewId);
-      useUIStore.getState().setAppModule("imports");
-      window.dispatchEvent(new CustomEvent("discovery:open-view"));
-    };
-    window.api?.on?.(IPC_CHANNELS.DISCOVERY_OPEN_VIEW, openDiscoveryView);
-    return () => window.api?.off?.(IPC_CHANNELS.DISCOVERY_OPEN_VIEW, openDiscoveryView);
   }, []);
 
   // 订阅导入任务变更（角标与任务页实时刷新）+ 初始加载

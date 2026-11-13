@@ -287,8 +287,6 @@ func main() {
 		lib.jobs.Start() // 对应 backgroundJobs.start()：自动化实例（截图/基准/AI 对拍）不跑后台任务
 	}
 	newAIProxy(lib.configuredAIHosts).register(b)
-	lib.registerIllustrationStyles(b)
-	b.registerFrozenStubs()
 	// 启动自检在窗口控制频道登记之后执行（见 WhenReady）。
 	ipcSelfCheck := func() {
 		if miss := b.unimplementedChannels(); len(miss) > 0 {

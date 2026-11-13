@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"strings"
 )
 
 func (l *Library) scalarCount(ctx context.Context, sql string) (int64, error) {
@@ -75,31 +74,6 @@ func (l *Library) inboxList(ctx context.Context) (any, error) {
 		})
 	}
 
-	candidates, err := l.db.Query(ctx, `SELECT view_id, external_id, item_json, first_seen_at
-     FROM platform_discovery_candidates WHERE state = 'new'
-     ORDER BY first_seen_at DESC LIMIT 100`)
-	if err != nil {
-		return nil, err
-	}
-	for _, r := range candidates.Values {
-		viewID, _ := r[0].(string)
-		externalID, _ := r[1].(string)
-		title := externalID
-		// 候选 JSON 损坏仍显示，不能让它从处理中心消失
-		var parsed struct {
-			Title any `json:"title"`
-		}
-		if raw, _ := r[2].(string); json.Unmarshal([]byte(raw), &parsed) == nil {
-			if s, ok := parsed.Title.(string); ok && strings.TrimFunc(s, jsSpace) != "" {
-				title = strings.TrimFunc(s, jsSpace)
-			}
-		}
-		items = append(items, map[string]any{
-			"kind": "discovery-candidate", "id": "candidate:" + viewID + ":" + externalID,
-			"viewId": viewID, "externalId": externalID, "title": title, "createdAt": r[3],
-		})
-	}
-
 	semanticPending, err := l.scalarCount(ctx, `SELECT COUNT(*) AS count FROM knowledge_items i
      WHERE i.deleted_at IS NULL AND i.status = 'active'
        AND NOT EXISTS (SELECT 1 FROM knowledge_embeddings e WHERE e.item_id = i.id)`)
@@ -117,7 +91,6 @@ func (l *Library) inboxList(ctx context.Context) (any, error) {
 		"review-required":     "SELECT COUNT(*) AS count FROM knowledge_items WHERE deleted_at IS NULL AND status = 'active' AND review_status = 'needs_review'",
 		"unclassified":        "SELECT COUNT(*) AS count FROM knowledge_items WHERE deleted_at IS NULL AND status = 'active' AND collection_id IS NULL AND review_status != 'needs_review'",
 		"import-issue":        "SELECT COUNT(*) AS count FROM import_tasks WHERE status IN ('failed','duplicate') OR (warning IS NOT NULL AND warning_acknowledged_at IS NULL)",
-		"discovery-candidate": "SELECT COUNT(*) AS count FROM platform_discovery_candidates WHERE state = 'new'",
 	} {
 		n, err := l.scalarCount(ctx, sql)
 		if err != nil {
@@ -137,9 +110,6 @@ func (l *Library) inboxList(ctx context.Context) (any, error) {
           ELSE 'import:' || id END FROM import_tasks
         WHERE status IN ('failed','duplicate')
           OR (warning IS NOT NULL AND warning_acknowledged_at IS NULL)
-        UNION
-        SELECT 'candidate:' || platform || ':' || external_id
-        FROM platform_discovery_candidates WHERE state = 'new'
       )`)
 	if err != nil {
 		return nil, err

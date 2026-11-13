@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   AlertTriangleIcon,
   CheckIcon,
-  CompassIcon,
   FolderInputIcon,
   Loader2Icon,
   NetworkIcon,
@@ -455,10 +454,8 @@ export function InboxWorkspace() {
                       ariaLabel={t("inbox.selectItem", "选择 {{title}}", { title: item.title })}
                       className="mt-1 shrink-0"
                     />
-                  ) : item.kind === "import-issue" ? (
-                    <AlertTriangleIcon className="mt-0.5 h-4 w-4 text-amber-500" />
                   ) : (
-                    <CompassIcon className="mt-0.5 h-4 w-4 text-primary" />
+                    <AlertTriangleIcon className="mt-0.5 h-4 w-4 text-amber-500" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
@@ -471,7 +468,7 @@ export function InboxWorkspace() {
                           ? t("inbox.unclassifiedReason", "尚未归入任何合集")
                           : item.kind === "import-issue"
                             ? item.message
-                            : t("inbox.discoveryReason", "定时发现的新候选，尚未采集")}
+                            : ""}
                     </p>
                   </div>
                   {itemId ? (

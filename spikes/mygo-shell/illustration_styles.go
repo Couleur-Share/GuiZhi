@@ -3,7 +3,7 @@ package main
 // 配图风格预设文件（config/illustration-styles.json）的读写。
 // 对应 packages/core/src/illustration-styles.ts 的 CoreIllustrationStyleService。
 //
-// 配图功能本身已冻结、不迁移；这里只保留配置迁移（config:export/apply）要用的那部分：
+// 配图功能本身已移除；这里只保留配置迁移（config:export/apply）要用的那部分：
 // 读取（含首次播种与新内置风格的增量补齐）、整份回写（严格校验）。
 // 内置预设来自 TS 源码的导出（illustration_builtin.json，由 spikes/mygo-db/dump-builtin-styles.mts 生成）。
 

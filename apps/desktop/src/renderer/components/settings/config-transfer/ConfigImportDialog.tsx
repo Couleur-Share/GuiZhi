@@ -69,13 +69,13 @@ export function ConfigImportDialog({
   const { t } = useTranslation();
   const [password, setPassword] = useState("");
   const [selection, setSelection] = useState<Required<ConfigApplySelection>>({
-    settings: true, uiLayout: true, illustrationStyles: true, shortcuts: true, mcpScope: true,
+    settings: true, uiLayout: true, illustrationStyles: false, shortcuts: true, mcpScope: true,
   });
 
   useEffect(() => {
     if (preview) {
       setPassword("");
-      setSelection({ settings: true, uiLayout: true, illustrationStyles: true, shortcuts: true, mcpScope: true });
+      setSelection({ settings: true, uiLayout: true, illustrationStyles: false, shortcuts: true, mcpScope: true });
     }
   }, [preview]);
 
@@ -94,12 +94,6 @@ export function ConfigImportDialog({
           label: t("settings.configImportRowRoutes", "模型路由"),
           value: t("settings.configImportRowCount", "{{count}} 条", {
             count: preview.routeCount,
-          }),
-        },
-        {
-          label: t("settings.configImportRowStyles", "配图风格"),
-          value: t("settings.configImportRowStylesValue", "{{count}} 套", {
-            count: preview.styleCount,
           }),
         },
         {
@@ -178,7 +172,6 @@ export function ConfigImportDialog({
           {([
             ["settings", t("settings.configImportSelectionSettings", "服务商、模型与通用设置")],
             ["uiLayout", t("settings.configImportSelectionLayout", "界面布局")],
-            ["illustrationStyles", t("settings.configImportSelectionStyles", "正文配图风格")],
             ["shortcuts", t("settings.configImportSelectionShortcuts", "快捷键")],
             ["mcpScope", t("settings.configImportSelectionMcp", "MCP 访问范围")],
           ] as Array<[keyof ConfigApplySelection, string]>).map(([key, label]) => (

@@ -16,7 +16,8 @@ const files: string[] = [];
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
     const p = path.join(d, e.name);
     if (e.isDirectory()) walk(p);
-    else if (p.endsWith(".ts") && !p.includes(".test.")) files.push(p);
+    // reading-graphics.ts 是 Electron 隐藏窗口（配图编译）的 preload，不暴露给应用窗口；Go 壳没有该窗口
+    else if (p.endsWith(".ts") && !p.includes(".test.") && path.basename(p) !== "reading-graphics.ts") files.push(p);
   }
 })(preloadDir);
 

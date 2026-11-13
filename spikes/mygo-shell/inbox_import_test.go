@@ -32,7 +32,17 @@ func TestInboxListParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, have := maskNow(rawToAny(t, g.Inbox)), maskNow(normalize(t, got))
+	wantAny := rawToAny(t, g.Inbox)
+	// 平台发现已从 Go 壳移除：TS 仍报告一个恒为 0 的 discovery-candidate 计数（夹具里没有候选），Go 不再提供该键
+	if root, ok := wantAny.(map[string]any); ok {
+		if counts, ok := root["counts"].(map[string]any); ok {
+			if n, _ := counts["discovery-candidate"].(float64); n != 0 {
+				t.Fatalf("夹具里不应再有发现候选：%v", counts["discovery-candidate"])
+			}
+			delete(counts, "discovery-candidate")
+		}
+	}
+	want, have := maskNow(wantAny), maskNow(normalize(t, got))
 	if !reflect.DeepEqual(want, have) {
 		w, _ := json.MarshalIndent(want, "", " ")
 		h, _ := json.MarshalIndent(have, "", " ")

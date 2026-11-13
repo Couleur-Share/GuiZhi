@@ -132,8 +132,8 @@
 
 | 验收项 | 结果 | 证据 |
 |---|---|---|
-| 渲染进程可调用的频道全部有处理器 | 215 个 invoke + 17 个 send，**0 个未实现**。清单由 `spikes/mygo-js/gen-channels.mts` 从 preload 的 `ipcRenderer.invoke/send` 生成（`ipc_channels_gen.go`），启动时自检并写入日志 `[ipc] …均已有处理器`；`migration-status.ps1` 另按字符串统计：230 个常量频道已登记 187 个、冻结 43 个、待迁 0，常量之外的字面量频道 33/33 | 离屏启动日志；`frozen_ipc_test.go` |
-| 冻结功能的处理 | 研究 / 配图 / 发现视图 / 阅读配图 / 手机收集 / 阅读同步：读取列表类频道（`research:list`、`research:baselines`、`discoveryView:list`）返回空列表，其余明确报「该功能已冻结」。**例外**：配图风格预设的读写（`illustration:styles/builtInStyles/saveStyles/revealStylesFile`）有 Go 实现（属配置迁移的一部分，设置页可用）。此前 `research:list` 在启动时被调用 3 次且无处理器，渲染进程会进入错误态——这是验收时才发现并修复的缺口 | 同上 |
+| 渲染进程可调用的频道全部有处理器 | **2026-11-13 移除冻结功能后：175 个 invoke + 15 个 send，0 个未实现**（此前 215 + 17，含 43 个冻结频道的占位处理器，现已连同界面与处理器一并删除）。清单由 `spikes/mygo-js/gen-channels.mts` 从 preload 的 `ipcRenderer.invoke/send` 生成（`ipc_channels_gen.go`），启动时自检并写入日志 `[ipc] …均已有处理器`；`migration-status.ps1` 另按字符串统计：230 个常量频道已登记 187 个、冻结 43 个、待迁 0，常量之外的字面量频道 33/33 | 离屏启动日志；`ipc_selfcheck_test.go` |
+| 冻结功能的处理 | **已于 2026-11-13 整体移除，见下方「冻结功能移除」一节。**（原做法：研究 / 配图 / 发现视图 / 阅读配图 / 手机收集 / 阅读同步：读取列表类频道（`research:list`、`research:baselines`、`discoveryView:list`）返回空列表，其余明确报「该功能已冻结」。**例外**：配图风格预设的读写（`illustration:styles/builtInStyles/saveStyles/revealStylesFile`）有 Go 实现（属配置迁移的一部分，设置页可用）。此前 `research:list` 在启动时被调用 3 次且无处理器，渲染进程会进入错误态——这是验收时才发现并修复的缺口。） | 同上 |
 | 各频道组的 TS/Go 差分 | 全部通过，带全部 golden 环境变量的 `go test -count=1 ./...` 通过（约 125 s）。仍跳过的 4 项：`TestConfigExportEncryptedDump`（需要 `GUIZHI_DUMP_DIR`，仅用于人工查看）、`TestFunasrGoldenConsumesTsDisposable`（TS 一次性目录，每次生成的 golden 只能消费一次）、`TestVideoHelperProcess`（子进程辅助入口）、`TestEvidence*` 在本次补跑 `make-golden-evidence.mts` 后通过 | `go test` 输出 |
 | 主界面在 Go 壳上的离屏验证 | `build-shell.ps1` 产出的 `GuiZhi.exe` 在隔离 `APPDATA`/userData、`-shot` 离屏下：空库显示首次引导；复制的黄金库显示完整资料库（22 条、集合/平台/标签侧栏），点击条目后右侧正文正确显示。`-shot` 新增 `-shotjs <脚本> -shotafter <时长>` 用于截图前执行交互脚本 | `%TEMP%\guizhi-final-shot2\pop.png`、`detail.png` |
 | 打包产物 | `spikes\mygo-shell\out\win-x64`：`GuiZhi.exe`（Windows x64，GUI 子系统）+ `dist` + `reading_libraries.json`，约 39.8 MB；`build-themed.mts`、`build-pipeline.mts`、`build.mts` 重新生成后与已提交的 `themed_engine.js`、`themed_pipeline.js`、`websnap_sanitize.js` 无差异 | `git status` 干净 |
@@ -261,7 +261,7 @@
 
 **结论：可小范围灰度（自己 + 少数愿意测试的人），不能作为默认更新推给全部 Electron 用户。** 依据与未验证项如下。
 
-**已验证**：214 个 invoke 与 17 个 send 全部有处理器（冻结 43 个明确报「已冻结」）；各频道组 TS/Go 差分通过；沙箱内全新安装、覆盖 Electron、卸载、应用内更新路径、localStorage 持久化与一次性导入、缺 WebView2 与数据库损坏的启动失败路径。
+**已验证**：渲染进程可调用的频道（现 175 个 invoke 与 15 个 send，冻结功能已于 2026-11-13 移除）全部有处理器；各频道组 TS/Go 差分通过；沙箱内全新安装、覆盖 Electron、卸载、应用内更新路径、localStorage 持久化与一次性导入、缺 WebView2 与数据库损坏的启动失败路径。
 
 **缺陷 5（已修，2026-11-12 晚，沙箱补验证时发现）：Go 壳遇到 `--updated`、`--hidden`、`--force-run` 会静默 exit(2)。** `main` 里用标准库 `flag.Parse()`，这三个 Electron 沿用下来的拉起参数没有定义，Go 直接报错退出；GUI 子系统下没有任何可见提示。后果：①应用内更新时，安装向导「完成」页点「完成」不会拉起应用（NSIS 经 `launchLink` 带 `--updated`）；②Electron 版登记的开机启动项带 `--hidden`，升级到 Go 壳后开机自启也会无声失败。之前「完成页拉起应用」只在非更新向导里验证过，没覆盖这条参数路径。复现（修前）：沙箱里 `GuiZhi.exe --updated` / `--hidden` / `--force-run` 都 exit=2；修前更新流程点「完成」后 15 秒内无 `GuiZhi` 进程。修复：`launch_args.go` 在解析前摘掉这三个参数（`--hidden` 仍由 `resolveLaunchVisibility` 读原始 `os.Args`），`launch_args_test.go` 含「不摘参数时 flag 解析失败」的回归。修后沙箱复验（重新打包的安装包）：三种参数均存活；应用内更新向导点「完成」后 `归知 GuiZhi` 窗口出现；缺 WebView2 弹「未检测到」对话框，点「否」→ 安装器退出码 2（NSIS Abort），`GuiZhi.exe` 前后一致，安装登记与库不变。`go vet` 与整包 `go test -count=1 .`（97 s）通过。`--hidden` 启动后窗口确实隐藏（沙箱用 `EnumWindows` 查：无参数启动主窗口 `visible=True`；`--hidden` 启动主窗口存在但 `visible=False`；`--updated` 启动 `visible=True`）。**仍未验证**：`--hidden` 隐藏后用户从托盘恢复窗口（见真机清单 B4）。
 
@@ -287,9 +287,30 @@
 2. 所有选了预览通道的 Electron 用户都会收到灰度包，没有办法单独圈人。
 3. 稳定通道的灰度用户会在主线发布更高正式版时回到 Electron；预览通道的灰度用户不会（需再发 `-go.N+1` 或手动换通道），灰度说明里要写明。
 4. 官方源（electron-updater 按 atom 发布先后取最新）与镜像源（归知 `pickPreviewFeedRelease` 按 semver 取最高）在预览通道可能选出不同版本；灰度期不要向镜像同步灰度包，或先确认镜像的同步策略。
-5. 新旧壳不能同时打开同一个库；冻结功能（手机收集、近期研究、平台发现、正文配图）在 Go 壳里不可用，升级前要在发布说明里写清并给出回退到 Electron 安装包的办法。
+5. 新旧壳不能同时打开同一个库；手机收集、近期研究、平台发现、正文配图、阅读同步在 Go 壳里已移除（界面与处理器都删除，数据仍留在库里），升级前要在发布说明里写清并给出回退到 Electron 安装包的办法。
 
 **仍未验证、可能改变结论**：真机上的 SmartScreen 与杀毒软件（安装包未签名，最大的未知）；登录态平台（小红书、抖音、LINUX DO、NodeSeek）与真实云端 ASR/LLM/OCR/生图/搜索；真实 SOCKS5/TUN；8 小时级运行与数万条以上大库；与真实 Electron 实例并存时的租约；镜像源行为。
+
+## 冻结功能移除（2026-11-13）
+
+**决定（用户）**：Go 版本里彻底移除原先「冻结」的 43 个频道及其功能，不再保留占位处理器；数据库表与数据原样保留，回退 Electron 版仍能看到。
+
+**范围（只改 `spike/mygo` 分支）**：
+- 渲染进程：删除 `components/research`、`components/illustration`、设置页的手机收集 / 阅读同步 / 正文配图、采集页的平台发现与已保存发现视图、文章工具里的配图卡、研究 store 与事件钩子；左侧入口、命令面板（平台发现、新建近期研究）、处理中心的「发现候选」筛选、快速采集的「浏览作者作品」随之移除（作者主页链接按普通网页采集）；配置导出不再勾选配图风格，导入不再应用它。
+- preload：删除 `illustration` / `mobileCapture` / `readingSync` / `research` 四个 API 和 `platformCapture` 里的发现相关方法，监听白名单去掉 `research:changed` 与 `discovery:openView`。
+- Go：删除 `frozen_ipc.go`（占位处理器与配图风格读写），`platform_ipc.go` 的发现桩；`inbox.go` 不再列出发现候选、不再把它计入角标；频道清单重新生成（215→175 invoke，17→15 send，`reading-graphics.ts` 是 Electron 隐藏窗口的 preload，不再计入）。
+- i18n：删除 243 个无引用键并更新写死中文基线；「正文配图」模型路由改称「阅读配图」（该路由现在只服务主题阅读）。
+
+**没有动的（刻意）**：
+- TS 主进程、`packages/shared`、`packages/db`、`packages/core` 与数据库迁移——Electron 回退版需要它们，库结构也必须与 Electron 一致；`illustration_styles.go` 与配置迁移里的 `illustrationStyles` 字段保留为文件格式兼容（界面不再提供）。
+- 主题阅读里的「联网查证」（research 阶段）——它与已移除的「近期研究」不是同一个功能。
+- AI 用量统计里的历史场景名（研究报告 / 配图）——历史记录仍要能显示。
+
+**行为变化**：
+- 文生图模型的连通测试（原 `illustration:testModel`）一并移除：快速配置里文生图一项标为「未验证」，模型设置里的单项测试给出明确提示；模型在主题阅读生成配图时才被真实调用。
+- 处理中心的角标与列表不再包含发现候选（库里的候选行保留）。
+
+**验证**：`pnpm typecheck`、`pnpm lint`、桌面单测 2676 项（删除 7 个只测被移除界面的测试，改写 3 个）全部通过；`go test` 全量通过（新 golden 夹具里不再放发现候选，`TestInboxListParity` 忽略 TS 恒为 0 的 `discovery-candidate` 计数）；`pnpm shot` 隔离截图确认设置导航、侧栏入口。
 
 ## 已验证的事
 

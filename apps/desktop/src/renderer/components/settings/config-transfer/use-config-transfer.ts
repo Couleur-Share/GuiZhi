@@ -33,7 +33,6 @@ export function useConfigTransfer() {
       includeSecrets: boolean;
       password: string;
       includeUiLayout: boolean;
-      includeIllustrationStyles: boolean;
       includeShortcuts: boolean;
       includeMcpScope: boolean;
     }) => {
@@ -47,7 +46,8 @@ export function useConfigTransfer() {
           includeSecrets: options.includeSecrets,
           password: options.password,
           includeUiLayout: options.includeUiLayout,
-          includeIllustrationStyles: options.includeIllustrationStyles,
+          // 正文配图已移除，导出包不再带配图风格
+          includeIllustrationStyles: false,
           includeShortcuts: options.includeShortcuts,
           includeMcpScope: options.includeMcpScope,
         });

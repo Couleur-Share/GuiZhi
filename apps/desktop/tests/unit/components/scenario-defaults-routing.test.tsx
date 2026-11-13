@@ -156,8 +156,8 @@ describe("模型路由多供应商同名模型区分", () => {
         />,
       );
 
-      // 正文配图行选中的是 GoRouter 的 gpt-image-2
-      const imageGenButton = screen.getByRole("button", { name: "正文配图" });
+      // 阅读配图行选中的是 GoRouter 的 gpt-image-2
+      const imageGenButton = screen.getByRole("button", { name: "阅读配图" });
       expect(within(imageGenButton).getByText("gpt-image-2 (GoRouter)")).toBeInTheDocument();
     });
 
@@ -174,7 +174,7 @@ describe("模型路由多供应商同名模型区分", () => {
         />,
       );
 
-      const imageGenButton = screen.getByRole("button", { name: "正文配图" });
+      const imageGenButton = screen.getByRole("button", { name: "阅读配图" });
       await user.click(imageGenButton);
 
       // 下拉菜单中应有供应商分组标题
@@ -243,7 +243,7 @@ describe("模型路由多供应商同名模型区分", () => {
         />,
       );
 
-      const imageGenButton = screen.getByRole("button", { name: "正文配图" });
+      const imageGenButton = screen.getByRole("button", { name: "阅读配图" });
       await user.click(imageGenButton);
 
       // 下拉菜单中只应有 GoRouter，不应有云雾API

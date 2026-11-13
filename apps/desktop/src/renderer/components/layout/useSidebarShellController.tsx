@@ -6,13 +6,11 @@ import {
   LibraryBigIcon,
   MessagesSquareIcon,
   NetworkIcon,
-  ScanSearchIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type AppModule } from "../../stores/ui.store";
 import { useImportStore } from "../../stores/import.store";
 import { useInboxStore } from "../../stores/inbox.store";
-import { useResearchStore } from "../../stores/research.store";
 import { isWebRuntime } from "../../runtime";
 import type { SidebarLayout, PageType } from "./sidebar-controller-types";
 import { useSidebarCollapse } from "./use-sidebar-collapse";
@@ -22,7 +20,6 @@ const APP_MODULES: readonly AppModule[] = [
   "inbox",
   "ask",
   "wiki",
-  "research",
   "imports",
 ];
 
@@ -105,8 +102,6 @@ function getRailItemLabel(
       ? t("nav.ask", "AI 问答")
       : module === "wiki"
         ? t("nav.wiki", "Wiki")
-        : module === "research"
-          ? t("nav.research", "研究")
         : t("nav.imports", "采集");
 }
 
@@ -119,8 +114,6 @@ function getRailItemIcon(module: AppModule) {
     <MessagesSquareIcon className="h-5 w-5" />
   ) : module === "wiki" ? (
     <NetworkIcon className="h-5 w-5" />
-  ) : module === "research" ? (
-    <ScanSearchIcon className="h-5 w-5" />
   ) : (
     <DownloadIcon className="h-5 w-5" />
   );
@@ -134,20 +127,9 @@ function useSidebarRailItems(
   const { t } = useTranslation();
   const activeImportCount = useImportStore((state) => state.activeCount);
   const inboxCount = useInboxStore((state) => state.total);
-  // 研究属冻结功能：已有研究记录或正位于该模块时才占用一级入口，
-  // 其余用户经命令面板「新建近期研究」进入。
-  const hasResearchRuns = useResearchStore((state) => state.runs.length > 0);
-  useEffect(() => {
-    void useResearchStore.getState().refresh();
-  }, []);
   return useMemo(
     () =>
-      APP_MODULES.filter(
-        (module) =>
-          module !== "research" ||
-          hasResearchRuns ||
-          ui.appModule === "research",
-      ).map((module) => ({
+      APP_MODULES.map((module) => ({
         key: module,
         label: getRailItemLabel(module, t),
         icon: getRailItemIcon(module),
@@ -165,7 +147,7 @@ function useSidebarRailItems(
           if (currentPage !== "home") onNavigate("home");
         },
       })),
-    [activeImportCount, inboxCount, hasResearchRuns, currentPage, onNavigate, t, ui],
+    [activeImportCount, inboxCount, currentPage, onNavigate, t, ui],
   );
 }
 

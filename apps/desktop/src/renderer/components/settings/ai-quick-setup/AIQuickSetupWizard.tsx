@@ -5,7 +5,6 @@ import type { AIProtocol } from "@guizhi/shared/types";
 import { fetchAvailableModels, normalizeApiUrlInput } from "../../../services/ai";
 import { runModelConnectionTest } from "../../../services/ai-connection-test";
 import { useSettingsStore } from "../../../stores/settings.store";
-import { ConfirmDialog } from "../../ui/ConfirmDialog";
 import { Modal } from "../../ui/Modal";
 import { Select } from "../../ui/Select";
 import { useToast } from "../../ui/Toast";
@@ -54,7 +53,6 @@ export function AIQuickSetupWizard({ isOpen, onClose }: Props) {
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paidConfirm, setPaidConfirm] = useState(false);
   const roles = useMemo(() => rolesForGoals(goals), [goals]);
   const providerName = (id: keyof typeof PROVIDERS) => {
     const preset = PROVIDERS[id];
@@ -91,14 +89,15 @@ export function AIQuickSetupWizard({ isOpen, onClose }: Props) {
     setStep(2);
   };
 
-  const testRoles = async (includePaid = false) => {
-    if (roles.includes("imageGen") && !includePaid) {
-      setPaidConfirm(true);
-      return;
-    }
+  const testRoles = async () => {
     for (const role of roles) {
       const model = selections[role]?.trim();
       if (!model) continue;
+      // 文生图模型没有连通测试（真实出图会计费），直接标为未验证，在阅读生成配图时才会被调用
+      if (role === "imageGen") {
+        setTests((current) => ({ ...current, [role]: "skipped" }));
+        continue;
+      }
       setTests((current) => ({ ...current, [role]: "running" }));
       const outcome = await runModelConnectionTest(
         { provider, apiProtocol, apiUrl: normalizeApiUrlInput(apiUrl), apiKey, model },
@@ -199,7 +198,6 @@ export function AIQuickSetupWizard({ isOpen, onClose }: Props) {
           </div>
         </div>
       </Modal>
-      <ConfirmDialog isOpen={paidConfirm} onClose={() => setPaidConfirm(false)} onConfirm={() => { setPaidConfirm(false); void testRoles(true); }} title={t("settings.quickSetupPaidTitle", "正文配图测试会产生费用")} message={t("settings.quickSetupPaidMessage", "测试会调用所选图片模型真实生成一张最低质量图片。是否继续？")} confirmText={t("settings.quickSetupPaidConfirm", "确认并测试")} cancelText={t("common.cancel", "取消")} />
     </>
   );
 }

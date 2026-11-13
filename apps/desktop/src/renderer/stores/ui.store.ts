@@ -9,7 +9,7 @@ import { persist } from "zustand/middleware";
  * - wiki：知识 Wiki
  * - imports：导入任务队列
  */
-export type AppModule = "library" | "inbox" | "ask" | "wiki" | "research" | "imports";
+export type AppModule = "library" | "inbox" | "ask" | "wiki" | "imports";
 
 /**
  * 知识库列表视图：
@@ -18,14 +18,12 @@ export type AppModule = "library" | "inbox" | "ask" | "wiki" | "research" | "imp
  */
 export type LibraryViewMode = "card" | "list";
 
-export type SettingsSectionId = "mobile-capture"
-  | "general"
+export type SettingsSectionId = "general"
   | "appearance"
   | "data"
   | "network"
   | "capture"
   | "ai"
-  | "illustration"
   | "mcp"
   | "shortcuts"
   | "about";
@@ -64,7 +62,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function normalizeAppModule(value: unknown): AppModule {
-  return value === "inbox" || value === "ask" || value === "wiki" || value === "research" || value === "imports"
+  return value === "inbox" || value === "ask" || value === "wiki" || value === "imports"
     ? value
     : "library";
 }

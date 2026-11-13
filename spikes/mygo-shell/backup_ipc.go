@@ -391,7 +391,7 @@ func (l *Library) stopServicesForRestore() {
 	if l.retireIdleThemedReading != nil {
 		l.retireIdleThemedReading()
 	}
-	// stopMobileCapture / stopReadingSync 属冻结功能，Go 壳层没有对应服务
+	// stopMobileCapture / stopReadingSync 对应的手机收集、阅读同步已移除，Go 壳层没有对应服务
 }
 
 func (l *Library) restoreGuards(ctx context.Context) string {

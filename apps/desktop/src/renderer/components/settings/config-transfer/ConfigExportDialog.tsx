@@ -25,7 +25,6 @@ export function ConfigExportDialog({
     includeSecrets: boolean;
     password: string;
     includeUiLayout: boolean;
-    includeIllustrationStyles: boolean;
     includeShortcuts: boolean;
     includeMcpScope: boolean;
   }) => void;
@@ -35,7 +34,6 @@ export function ConfigExportDialog({
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [includeUiLayout, setIncludeUiLayout] = useState(true);
-  const [includeIllustrationStyles, setIncludeIllustrationStyles] = useState(true);
   const [includeShortcuts, setIncludeShortcuts] = useState(true);
   const [includeMcpScope, setIncludeMcpScope] = useState(true);
 
@@ -45,7 +43,6 @@ export function ConfigExportDialog({
       setPassword("");
       setConfirmPassword("");
       setIncludeUiLayout(true);
-      setIncludeIllustrationStyles(true);
       setIncludeShortcuts(true);
       setIncludeMcpScope(true);
     }
@@ -141,7 +138,6 @@ export function ConfigExportDialog({
           </p>
           {[
             [includeUiLayout, setIncludeUiLayout, t("settings.configExportLayout", "界面布局与视图偏好")],
-            [includeIllustrationStyles, setIncludeIllustrationStyles, t("settings.configExportStyles", "正文配图风格")],
             [includeShortcuts, setIncludeShortcuts, t("settings.configExportShortcuts", "快捷键")],
             [includeMcpScope, setIncludeMcpScope, t("settings.configExportMcpScope", "MCP 访问范围")],
           ].map(([checked, onChange, label]) => (
@@ -175,7 +171,6 @@ export function ConfigExportDialog({
             includeSecrets,
             password,
             includeUiLayout,
-            includeIllustrationStyles,
             includeShortcuts,
             includeMcpScope,
           })}

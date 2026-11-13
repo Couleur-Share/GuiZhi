@@ -371,7 +371,7 @@ func (rt *themedRuntime) execute(ctx context.Context, task *jsObj) error {
 			return errors.New("指定图片未能替换，原页面和图片已保留")
 		}
 	}
-	// 说明：compileReadingVisuals 属于已冻结的 reading-graphics 功能；v3 管线只产出 svg 图形，无需编译（见 MYGO-MIGRATION 决定 e）。
+	// 说明：compileReadingVisuals 属于已移除的 reading-graphics 配图编排；v3 管线只产出 svg 图形，无需编译（见 MYGO-MIGRATION 决定 e）。
 	view, err := l.themedInspectImages(version)
 	if err != nil {
 		return err

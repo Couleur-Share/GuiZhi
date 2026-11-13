@@ -97,13 +97,8 @@ database.run(
   "INSERT INTO platform_discovery_views (id, name, platform, mode, query, created_at, updated_at) VALUES ('v1', '视图一', 'douyin', 'keyword', 'q', ?, ?)",
   [now, now],
 );
-const candidateRows: Array<[string, string, string]> = [
-  ["e1", JSON.stringify({ title: "  候选标题  " }), "new"],
-  ["e2", "{坏 json", "new"],
-  ["e3", JSON.stringify({ title: "   " }), "new"],
-  ["e4", JSON.stringify({ title: "已忽略" }), "dismissed"],
-  ["e5", JSON.stringify({ title: 123 }), "new"],
-];
+// 平台发现已从 Go 壳移除，处理中心不再列出发现候选；TS 侧仍有该功能，所以夹具里不再放候选，两边的处理中心输出才可对拍
+const candidateRows: Array<[string, string, string]> = [];
 candidateRows.forEach(([ext, json, state], n) => {
   database.run(
     "INSERT INTO platform_discovery_candidates (view_id, platform, external_id, item_json, state, first_seen_at, last_seen_at) VALUES ('v1', 'douyin', ?, ?, ?, ?, ?)",

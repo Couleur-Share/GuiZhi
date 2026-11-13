@@ -32,16 +32,8 @@ export async function runModelConnectionTest(
     }
   }
   if (capabilities?.imageGeneration === true) {
-    const result = await window.api.illustration.testModel({
-      apiUrl: config.apiUrl,
-      apiKey: config.apiKey,
-      model: config.model,
-      apiProtocol: config.apiProtocol,
-      provider: config.provider,
-    });
-    return result.success
-      ? { status: "success", latency: result.latency ?? 0 }
-      : { status: "failed", message: result.error || "" };
+    // 文生图测试要真实出图并产生费用，随「正文配图」一并移除；模型在主题阅读生成配图时才会被实际调用
+    return { status: "failed", message: "本版本不提供文生图模型的连通测试，请在主题阅读生成配图时验证" };
   }
   const result = await testAIConnection(config);
   return result.success

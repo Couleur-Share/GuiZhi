@@ -9,7 +9,6 @@ import { useSettingsStore } from "../../stores/settings.store";
 import { stripEphemeralSettings } from "../../stores/settings/settings-persistence";
 import { useUIStore, type SettingsSectionId } from "../../stores/ui.store";
 import { useWikiStore } from "../../stores/wiki.store";
-import { DISCOVERY_DRAFT_KEY } from "../imports/platform-discovery-draft";
 import { useToast } from "../ui/Toast";
 
 type Result = { key: string; group: string; title: string; subtitle?: string; run: () => void | Promise<void> };
@@ -94,8 +93,6 @@ export function GlobalCommandPalette() {
       }) },
       { key: "action:index", group: groups.actions, title: t("commandPalette.buildSemanticIndex", "立即建立语义索引"), run: closeAnd(() => void useSemanticStore.getState().runIndexing()) },
       { key: "action:wiki", group: groups.actions, title: t("commandPalette.compileWiki", "立即编译 Wiki"), run: closeAnd(() => useWikiStore.getState().openCompileDialog()) },
-      { key: "action:discovery", group: groups.actions, title: t("commandPalette.platformDiscovery", "平台发现"), run: closeAnd(() => { sessionStorage.setItem(DISCOVERY_DRAFT_KEY, "{}"); useUIStore.getState().setAppModule("imports"); window.dispatchEvent(new CustomEvent("discovery:open-view")); }) },
-      { key: "action:research", group: groups.actions, title: t("commandPalette.newResearch", "新建近期研究"), run: closeAnd(() => useUIStore.getState().setAppModule("research")) },
     ].filter((item) => !normalized || item.title.toLowerCase().includes(normalized));
     for (const item of remote.knowledge) items.push({ key: `knowledge:${item.id}`, group: groups.knowledge, title: item.title, subtitle: item.snippet, run: closeAnd(async () => { useUIStore.getState().setAppModule("library"); useKnowledgeStore.getState().setScope("all"); await useKnowledgeStore.getState().selectItem(item.id); }) });
     for (const page of remote.wiki) items.push({ key: `wiki:${page.id}`, group: "Wiki", title: page.title, subtitle: page.summary, run: closeAnd(async () => { useUIStore.getState().setAppModule("wiki"); await useWikiStore.getState().selectPage(page.id); }) });

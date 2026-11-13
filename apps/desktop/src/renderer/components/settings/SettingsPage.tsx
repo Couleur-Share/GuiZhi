@@ -13,17 +13,13 @@ import {
   InfoIcon,
   ArrowLeftIcon,
   BrainIcon,
-  ImageIcon,
   KeyboardIcon,
   PlugIcon,
   WifiIcon,
   RadioTowerIcon,
-  SmartphoneIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useUIStore, type SettingsSectionId } from "../../stores/ui.store";
-import { useSettingsStore } from "../../stores/settings.store";
-import { resolveRouteModel } from "../../services/ai-defaults";
 // 直接指向文件而不走 ui 的桶文件：桶文件会把 ModelIcons 连同二十来个
 // provider SVG 一起拖进设置页的首屏依赖，dev 下每个都是一次单独请求
 import { Spinner } from "../ui/Spinner";
@@ -39,11 +35,9 @@ const SETTINGS_MENU = [
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "network", labelKey: "settings.network", icon: WifiIcon },
-  { id: "mobile-capture", labelKey: "settings.mobileCapture", icon: SmartphoneIcon },
   { id: "capture", labelKey: "settings.captureAndTranscription", icon: RadioTowerIcon },
   { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
-  { id: "illustration", labelKey: "settings.illustration", icon: ImageIcon },
-  // 紧跟模型服务与正文配图：找 MCP 时的心理模型是「跟 AI 有关的设置」，
+  // 紧跟模型服务：找 MCP 时的心理模型是「跟 AI 有关的设置」，
   // 而它与「数据」那边「把内容搬出去」是两回事
   { id: "mcp", labelKey: "settings.mcp", icon: PlugIcon },
   { id: "shortcuts", labelKey: "settings.shortcuts", icon: KeyboardIcon },
@@ -58,8 +52,6 @@ const loadDataSettings = () => import("./DataSettings");
 const loadNetworkSettings = () => import("./NetworkSettings");
 const loadCaptureSettings = () => import("./CaptureSettings");
 const loadAISettings = () => import("./AISettingsPrototype");
-const loadIllustrationSettings = () => import("./IllustrationSettings");
-const MobileCaptureSettings = lazy(() => import("./MobileCaptureSettings").then(m => ({ default: m.MobileCaptureSettings })));
 const loadMcpSettings = () => import("./mcp/McpSettings");
 
 const GeneralSettings = lazy(() =>
@@ -100,11 +92,6 @@ const AISettingsPrototype = lazy(() =>
     default: module.AISettingsPrototype,
   })),
 );
-const IllustrationSettings = lazy(() =>
-  loadIllustrationSettings().then((module) => ({
-    default: module.IllustrationSettings,
-  })),
-);
 const McpSettings = lazy(() =>
   loadMcpSettings().then((module) => ({
     default: module.McpSettings,
@@ -125,7 +112,6 @@ export function prefetchSettingsSections(): void {
     loadNetworkSettings,
     loadCaptureSettings,
     loadAISettings,
-    loadIllustrationSettings,
     loadMcpSettings,
   ]) {
     void loadSection().catch(() => {});
@@ -151,23 +137,7 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
     useState<SettingsSectionId>("general");
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
-  // 正文配图属于冻结功能：已配置文生图模型（说明在用）或正被打开时才进导航，
-  // 其余用户不在一级导航里看到它。
-  const illustrationInUse = useSettingsStore(
-    (state) =>
-      resolveRouteModel(
-        state.aiModels,
-        state.modelRouteDefaults,
-        "imageGen",
-        state.aiProviders,
-      ) !== null,
-  );
-  const menuItems = SETTINGS_MENU.filter(
-    (item) =>
-      item.id !== "illustration" ||
-      illustrationInUse ||
-      activeSection === "illustration",
-  );
+  const menuItems = SETTINGS_MENU;
 
   useEffect(() => {
     if (!pendingSettingsSection) {
@@ -199,13 +169,10 @@ export function SettingsPage({ onBack }: SettingsPageProps) {
         return <DataSettings />;
       case "network":
         return <NetworkSettings />;
-      case "mobile-capture": return <MobileCaptureSettings />;
       case "capture":
         return <CaptureSettings />;
       case "ai":
         return <AISettingsPrototype />;
-      case "illustration":
-        return <IllustrationSettings />;
       case "mcp":
         return <McpSettings />;
       case "shortcuts":

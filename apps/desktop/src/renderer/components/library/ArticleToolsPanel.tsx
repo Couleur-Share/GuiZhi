@@ -6,7 +6,6 @@ import { useKnowledgeStore } from "../../stores/knowledge.store";
 import { AiHandoffButton } from "./AiHandoffButton";
 import { AiOcrCard } from "./AiOcrCard";
 import { AiSummaryCard } from "./AiSummaryCard";
-import { IllustrationCard } from "./IllustrationCard";
 import { MediaPreview } from "./MediaPreview";
 import { SourceCommentsCard } from "./SourceCommentsCard";
 import { TagEditor } from "./TagEditor";
@@ -126,7 +125,6 @@ export function ArticleToolsPanel({
           <div className="flex flex-wrap items-center gap-2">
             {item.itemType === "image" ? <AiOcrCard item={item} /> : null}
             {!media ? <AiSummaryCard item={item} /> : null}
-            <IllustrationCard item={item} />
             <SourceCommentsCard />
           </div>
         </section>
