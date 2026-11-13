@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import { THEMED_READING_BRIDGE } from "../../src/main/services/themed-reading/theme-bridge";
+import { THEMED_READING_BRIDGE } from "../services/themed-reading/theme-bridge";
 
 const opened: JSDOM[] = [];
 afterEach(() => { for (const dom of opened.splice(0)) dom.window.close(); });

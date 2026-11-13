@@ -6,7 +6,7 @@ import { parseHTML } from "linkedom";
 import { evaluateReadingExpression } from "@guizhi/shared/utils/reading-expression";
 import { readingSourceText, replaceReadingSource } from "@guizhi/shared/utils/reading-source";
 import { validateThemedReadingVersion } from "@guizhi/db/themed-reading-validation";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { themedReadingDocument } from "../services/themed-reading/document";
 
 describe("旧格式重构阅读页的阅读与导出", () => {
   it("未知格式明确拒绝，离线公式运行时与主进程解析器一致", () => {

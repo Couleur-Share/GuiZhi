@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { validateReadingReconstruction } from "@guizhi/shared/utils/reading-reconstruction";
 import { reconstructionFixture } from "./reading-reconstruction-fixture";
-import { nativeSearchResults } from "../../src/main/services/themed-reading/native-search-response";
-import { prepareResearchRetry } from "../../src/main/services/themed-reading/research-pipeline";
-import { runV3Research } from "../../src/main/services/themed-reading/v3-research";
+import { prepareResearchRetry } from "../services/themed-reading/research-pipeline";
+import { runV3Research } from "../services/themed-reading/v3-research";
 
 const mocks = vi.hoisted(() => ({ search: vi.fn(), capture: vi.fn() }));
-vi.mock("../../src/main/services/themed-reading/search-service", () => ({ searchReadingWeb: mocks.search }));
-vi.mock("../../src/main/services/web-capture/web-capture", () => ({ captureWebPage: mocks.capture }));
+vi.mock("../services/themed-reading/search-service", () => ({ searchReadingWeb: mocks.search }));
+vi.mock("../services/web-capture/web-capture", () => ({ captureWebPage: mocks.capture }));
 const url = (name: string) => `https://example.org/${name}`;
 const result = (name: string) => ({ title: name, url: url(name), text: "搜索服务返回的入口介绍。".repeat(30) });
 const captured = { complete: true, markdown: "完整原始资料，包含定义、适用条件和原始证据。".repeat(100) };
@@ -31,16 +30,13 @@ function v3Page() {
 
 describe("AI 阅读查证恢复", () => {
   beforeEach(() => { mocks.search.mockReset(); mocks.capture.mockReset().mockResolvedValue(captured); });
-  it("原生工具引用经正文采集进入查证，生成摘要不能替代网页正文", async () => {
+  it("只有标题与 URL 的搜索结果经正文采集进入查证", async () => {
     const page = v3Page();
-    mocks.search.mockResolvedValue(nativeSearchResults({ status: "completed", output: [
-      { type: "web_search_call", status: "completed", action: { type: "search" } },
-      { type: "message", content: [{ type: "output_text", text: "模型生成的摘要".repeat(100), annotations: [{ type: "url_citation", title: "直接来源", url: url("native") }] }] },
-    ] }));
+    // 搜索服务只给出标题与 URL（原生搜索的摘要文本由 Electron 侧 native-reading-search 测试覆盖），正文必须经网页采集取得。
+    mocks.search.mockResolvedValue([{ title: "直接来源", url: url("native") }]);
     const call = vi.fn().mockResolvedValueOnce({ urls: [url("native")] }).mockResolvedValueOnce(adequate);
     await runV3Research(page, call, new AbortController().signal, hooksFor(page));
     expect(page.reconstruction.references[0]).toMatchObject({ url: url("native"), text: captured.markdown, status: "ready" });
-    expect(call.mock.calls[1][0].references[0].text).not.toContain("模型生成的摘要");
     expect(page.reconstruction.researchComplete).toBe(true);
   });
 

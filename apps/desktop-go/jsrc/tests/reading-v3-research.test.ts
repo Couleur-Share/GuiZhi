@@ -1,12 +1,12 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ search: vi.fn(), capture: vi.fn() }));
-vi.mock("../../src/main/services/themed-reading/search-service", () => ({
+vi.mock("../services/themed-reading/search-service", () => ({
   searchReadingWeb: mocks.search,
 }));
-vi.mock("../../src/main/services/web-capture/web-capture", () => ({
+vi.mock("../services/web-capture/web-capture", () => ({
   captureWebPage: mocks.capture,
 }));
-import { runV3Research } from "../../src/main/services/themed-reading/v3-research";
+import { runV3Research } from "../services/themed-reading/v3-research";
 import { reconstructionFixture } from "./reading-reconstruction-fixture";
 const source = "可核对的来源正文与明确适用条件。".repeat(25);
 const result = (id: string) => ({

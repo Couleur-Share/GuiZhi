@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateReadingVisuals, validateReadingVisualResults } from "@guizhi/shared/utils/reading-visuals";
 import type { ReadingVisual } from "@guizhi/shared/types/reading-visuals";
-import { readingComponentCss } from "../../src/main/services/themed-reading/visual-components";
+import { readingComponentCss } from "../services/themed-reading/visual-components";
 const graph: ReadingVisual = { id: "process", kind: "mermaid", title: "流程", description: "完整流程说明", source: "flowchart TD\nA[开始] --> B[结束]" };
 describe("阅读视觉数据", () => {
   it("兼容未声明图形的旧页，并支持常规流程", () => { expect(() => validateReadingVisuals()).not.toThrow(); expect(() => validateReadingVisuals([graph])).not.toThrow(); });

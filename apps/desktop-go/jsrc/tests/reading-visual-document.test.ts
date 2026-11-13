@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { reconstructionFixture } from "./reading-reconstruction-fixture";
-import { normalizeReadingGraphic } from "../../src/main/services/themed-reading/visual-normalize";
-import { reconstructionDocument, validateReconstructionPage } from "../../src/main/services/themed-reading/reconstruction-document";
+import { normalizeReadingGraphic } from "../services/themed-reading/visual-normalize";
+import { reconstructionDocument, validateReconstructionPage } from "../services/themed-reading/reconstruction-document";
 import fs from "node:fs";
 import path from "node:path";
 const markup = '<svg viewBox="0 0 100 100"><defs><marker id="arrow"><path d="M0 0L4 2L0 4"/></marker></defs><path id="line" class="line" d="M0 0L90 90" marker-end="url(#arrow)"/><text x="10" y="30">中文图形</text></svg>';
 describe("图形输出边界", () => {
   it.each(["flow", "sequence", "state", "mind", "chart"])("规范化真实编译输出 %s", name => {
-    const raw = fs.readFileSync(path.resolve("tests/fixtures/reading-graphics", `${name}.svg`), "utf8");
+    const raw = fs.readFileSync(path.resolve(__dirname, "fixtures/reading-graphics", `${name}.svg`), "utf8");
     const result = normalizeReadingGraphic(raw, "", name);
     expect(result.svg).toContain("<svg"); expect(result.css).not.toContain("infinite");
     expect(normalizeReadingGraphic(result.svg, result.css, name)).toEqual(result);

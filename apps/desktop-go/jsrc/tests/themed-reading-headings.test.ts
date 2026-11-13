@@ -2,8 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
 import type { KnowledgeItem } from "@guizhi/shared/types";
-import { buildThemedReadingSource } from "../../src/main/services/themed-reading/content";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { buildThemedReadingSource } from "../services/themed-reading/content";
+import { themedReadingDocument } from "../services/themed-reading/document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 async function rendered(content: string) {

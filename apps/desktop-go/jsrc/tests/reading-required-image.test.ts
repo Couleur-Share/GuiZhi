@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { reconstructionFixture } from "./reading-reconstruction-fixture";
-import { ensureRequestedReadingImage } from "../../src/main/services/themed-reading/required-image";
-import { validateReconstructionPage } from "../../src/main/services/themed-reading/reconstruction-document";
+import { ensureRequestedReadingImage } from "../services/themed-reading/required-image";
+import { validateReconstructionPage } from "../services/themed-reading/reconstruction-document";
 
 const make = () => {
   const page = reconstructionFixture(); page.options.generateImages = true; page.options.maxImages = 3;

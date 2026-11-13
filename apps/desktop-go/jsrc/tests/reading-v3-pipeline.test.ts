@@ -8,20 +8,20 @@ vi.mock("@guizhi/core", () => ({ chatCompletion: mocks.chat }));
 vi.mock("virtual:reading-libraries", () => ({
   default: { components: {}, runtime: {} },
 }));
-vi.mock("../../src/main/services/themed-reading/design", () => ({
+vi.mock("../services/themed-reading/design", () => ({
   callDesignModel: mocks.call,
   planTheme: vi.fn(),
 }));
-vi.mock("../../src/main/services/themed-reading/v3-research", () => ({
+vi.mock("../services/themed-reading/v3-research", () => ({
   runV3Research: mocks.research,
 }));
-vi.mock("../../src/main/services/ai-usage", () => ({
+vi.mock("../services/ai-usage", () => ({
   recordMainAiUsage: vi.fn(),
 }));
 import {
   runReadingV3,
   semanticReadingChunks,
-} from "../../src/main/services/themed-reading/v3-pipeline";
+} from "../services/themed-reading/v3-pipeline";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 const body = "正文包含完整的知识解释与条件，不依赖脚本执行。".repeat(10);
 const records = [

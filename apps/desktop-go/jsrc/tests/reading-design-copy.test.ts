@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareDesignCopy } from "../../src/main/services/themed-reading/design-copy";
+import { prepareDesignCopy } from "../services/themed-reading/design-copy";
 
 const draft = [{ title: "说明", markdown: "这是**需要保留**的正文。\n\n- 第一步\n- 第二步", referenceIds: [] }];
 describe("设计复用编辑稿", () => {

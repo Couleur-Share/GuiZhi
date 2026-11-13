@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import {
   INITIAL_CAP_MS,
@@ -11,7 +12,7 @@ import {
   webSettleMode,
   type WebPageSample,
   type WebSettleEnv,
-} from "../../../src/main/services/web-capture/web-settle";
+} from "../../services/web-capture/web-settle";
 
 /** 页面时间线：以“安装探针的时刻”为 0 的虚拟毫秒。 */
 interface Timeline {

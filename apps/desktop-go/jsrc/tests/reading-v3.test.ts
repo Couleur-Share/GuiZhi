@@ -5,14 +5,14 @@ vi.mock("virtual:reading-libraries", () => ({
 import {
   ReadingRecordStream,
   readingPool,
-} from "../../src/main/services/themed-reading/v3-stream";
+} from "../services/themed-reading/v3-stream";
 import {
   normalizeV3Section,
   checkReadingScript,
   validateV3Page,
   v3InnerDocument,
   v3WrapperDocument,
-} from "../../src/main/services/themed-reading/v3-document";
+} from "../services/themed-reading/v3-document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 describe("v3 完整记录与恢复", () => {

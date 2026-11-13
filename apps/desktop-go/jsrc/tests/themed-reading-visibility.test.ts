@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
-import { cleanThemedCss } from "../../src/main/services/themed-reading/theme-css";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { cleanThemedCss } from "../services/themed-reading/theme-css";
+import { themedReadingDocument } from "../services/themed-reading/document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 describe("主题正文 CSS 可见性边界", () => {

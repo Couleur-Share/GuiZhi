@@ -9,9 +9,9 @@ import {
   cleanCss,
   sanitizeSnapshot,
   snapshotHash,
-} from "../../../src/main/services/web-capture/snapshot-sanitize";
-import { snapshotDocument } from "../../../src/main/services/web-capture/snapshot-document";
-import { SNAPSHOT_BRIDGE_HASH } from "../../../src/main/services/web-capture/snapshot-bridge";
+} from "../../services/web-capture/snapshot-sanitize";
+import { snapshotDocument } from "../../services/web-capture/snapshot-document";
+import { SNAPSHOT_BRIDGE_HASH } from "../../services/web-capture/snapshot-bridge";
 
 const fileName = `wechat-${"a".repeat(64)}.png`,
   local = `local-image://${fileName}`;

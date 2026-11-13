@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { KnowledgeItem } from "@guizhi/shared/types";
-import { buildThemedReadingSource, themedReadingContent } from "../../src/main/services/themed-reading/content";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { buildThemedReadingSource, themedReadingContent } from "../services/themed-reading/content";
+import { themedReadingDocument } from "../services/themed-reading/document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 import { parseHTML } from "linkedom";
 

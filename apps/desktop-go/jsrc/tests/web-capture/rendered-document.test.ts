@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureRenderedDocument } from "../../../src/main/services/web-capture/web-rendered-document";
+import { captureRenderedDocument } from "../../services/web-capture/web-rendered-document";
 
 afterEach(() => {
   document.body.innerHTML = "";

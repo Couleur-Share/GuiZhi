@@ -4,8 +4,8 @@ import { parseHTML } from "linkedom";
 import { createHash } from "node:crypto";
 import { validateThemedComposition } from "@guizhi/shared/utils/themed-composition";
 import { validateThemedReadingVersion } from "@guizhi/db/themed-reading";
-import { validateThemedDesign } from "../../src/main/services/themed-reading/sanitize";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { validateThemedDesign } from "../services/themed-reading/sanitize";
+import { themedReadingDocument } from "../services/themed-reading/document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 import { sampleComposition } from "./themed-reading-composition-fixture";
 

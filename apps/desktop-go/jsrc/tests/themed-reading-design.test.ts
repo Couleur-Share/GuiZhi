@@ -5,8 +5,8 @@ import { themeTestPage } from "./themed-reading-test-fixtures";
 
 const mocks = vi.hoisted(() => ({ chat: vi.fn(), usage: vi.fn() }));
 vi.mock("@guizhi/core", () => ({ chatCompletion: mocks.chat }));
-vi.mock("../../src/main/services/ai-usage", () => ({ recordMainAiUsage: mocks.usage }));
-import { callDesignModel, parseDesignJson, planTheme } from "../../src/main/services/themed-reading/design";
+vi.mock("../services/ai-usage", () => ({ recordMainAiUsage: mocks.usage }));
+import { callDesignModel, parseDesignJson, planTheme } from "../services/themed-reading/design";
 
 const config = { model: "fixture-text", apiKey: "fixture-only", apiUrl: "https://model.example" } as AIClientConfig;
 const response = (value: unknown) => ({ content: JSON.stringify(value), usage: { promptTokens: 123, completionTokens: 456 } });

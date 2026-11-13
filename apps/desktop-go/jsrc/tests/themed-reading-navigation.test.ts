@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
+import { themedReadingDocument } from "../services/themed-reading/document";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 describe("主题页目录与布局保留", () => {

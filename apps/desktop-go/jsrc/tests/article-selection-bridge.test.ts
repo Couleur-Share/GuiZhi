@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
-import { ARTICLE_SELECTION_BRIDGE } from "../../src/main/services/web-capture/article-selection-bridge";
+import { ARTICLE_SELECTION_BRIDGE } from "../services/web-capture/article-selection-bridge";
 const opened: JSDOM[] = [];
 afterEach(() => opened.splice(0).forEach(d => d.window.close()));
 function fixture() {

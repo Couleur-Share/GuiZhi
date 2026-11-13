@@ -41,7 +41,7 @@
 
 `WebSnapshotPane` 使用不开放同源权限的 sandbox iframe。来源脚本全部移除，CSP 仅授权固定桥接脚本哈希；宿主检查消息来源窗口、实例 ID 与事件结构。恢复、读入、导出重新校验快照。UI 不接收任意文件路径，也不下载图片。
 
-回归测试位于 `tests/unit/web-capture/snapshot*.test.ts` 和 `tests/unit/db/backup-repository.test.ts`。真实网络探针需显式设置 `GUIZHI_TEST_WECHAT_LIVE=1`，可用 `GUIZHI_TEST_HTTP_PROXY` 指定隔离测试代理。离屏流程使用 `tests/e2e/wechat-snapshot-shots.mjs`，先构建，再通过 `pnpm shot --steps <绝对路径> --keep-profile` 运行。
+回归测试位于 `apps/desktop-go/jsrc/tests/web-capture/snapshot*.test.ts`（TS 源码随 jsrc 迁入）和 `tests/unit/db/backup-repository.test.ts`。真实网络探针需显式设置 `GUIZHI_TEST_WECHAT_LIVE=1`，可用 `GUIZHI_TEST_HTTP_PROXY` 指定隔离测试代理。离屏流程使用 `tests/e2e/wechat-snapshot-shots.mjs`，先构建，再通过 `pnpm shot --steps <绝对路径> --keep-profile` 运行。
 
 联网探针与截图都使用独立数据目录，不更改用户真实知识库或代理设置。离屏脚本验证全图加载、问题框、宽度、宿主隔离、编辑保护、HTML 离线导出和应用进程重启；测试产物写入指定的截图目录。
 

@@ -1,16 +1,16 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ call: vi.fn() }));
-vi.mock("../../src/main/services/themed-reading/design", () => ({
+vi.mock("../services/themed-reading/design", () => ({
   callDesignModel: mocks.call,
 }));
 vi.mock("virtual:reading-libraries", () => ({
   default: { runtime: {}, components: {} },
 }));
-import { repairReadingRuntime } from "../../src/main/services/themed-reading/v3-runtime-repair";
-import { applyReadingDraftUpdates } from "../../src/main/services/themed-reading/v3-editor";
-import { reduceReadingNotes } from "../../src/main/services/themed-reading/v3-notes";
-import { completeReadingCopy } from "../../src/main/services/themed-reading/v3-copy";
-import { createReadingGeneration } from "../../src/main/services/themed-reading/v3-pipeline";
+import { repairReadingRuntime } from "../services/themed-reading/v3-runtime-repair";
+import { applyReadingDraftUpdates } from "../services/themed-reading/v3-editor";
+import { reduceReadingNotes } from "../services/themed-reading/v3-notes";
+import { completeReadingCopy } from "../services/themed-reading/v3-copy";
+import { createReadingGeneration } from "../services/themed-reading/v3-pipeline";
 import { themeTestPage } from "./themed-reading-test-fixtures";
 
 beforeEach(() => vi.clearAllMocks());

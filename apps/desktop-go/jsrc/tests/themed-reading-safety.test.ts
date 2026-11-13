@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { parseHTML } from "linkedom";
 import type { ThemedReadingAsset, ThemedReadingDesign, ThemedReadingSource, ThemedReadingVersion } from "@guizhi/shared/types/themed-reading";
-import { cleanThemedCss, themedColorContrast, THEMED_READING_CONTENT_GUARD_CSS } from "../../src/main/services/themed-reading/theme-css";
-import { cleanThemedHtml, themedAssetMapper, validateThemedDesign } from "../../src/main/services/themed-reading/sanitize";
-import { themedReadingDocument, THEMED_READING_BRIDGE_HASH } from "../../src/main/services/themed-reading/document";
+import { cleanThemedCss, themedColorContrast, THEMED_READING_CONTENT_GUARD_CSS } from "../services/themed-reading/theme-css";
+import { cleanThemedHtml, themedAssetMapper, validateThemedDesign } from "../services/themed-reading/sanitize";
+import { themedReadingDocument, THEMED_READING_BRIDGE_HASH } from "../services/themed-reading/document";
 
 const source: ThemedReadingSource = {
   title: "啤酒知识", content: "# 生啤\n\n完整正文与限定条件", sourceUri: null, fingerprint: "fingerprint",

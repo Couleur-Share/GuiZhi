@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseHTML } from "linkedom";
-import { themedReadingDocument } from "../../src/main/services/themed-reading/document";
-import { cleanReconstructionCss, cleanReconstructionHtml } from "../../src/main/services/themed-reading/reconstruction-document";
+import { themedReadingDocument } from "../services/themed-reading/document";
+import { cleanReconstructionCss, cleanReconstructionHtml } from "../services/themed-reading/reconstruction-document";
 import { readingSvgFixture } from "./reading-svg-fixture";
 
 describe("阅读页 SVG 图解", () => {
