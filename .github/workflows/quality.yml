@@ -144,3 +144,16 @@ jobs:
       - name: Go tests
         working-directory: apps/desktop-go
         run: go test -count=1 ./...
+
+      # Go 壳 UI 烟雾检查：隔离构建 → 离屏启动 → 经 CDP 驱动真实界面（启动、渲染、IPC、SQLite、列表/详情交互、导航）。
+      # 此时 apps/desktop/src/main 已被删除，所以它同时证明 shot:go 不依赖 Electron 主进程。
+      - name: Go shell UI smoke
+        run: pnpm shot:go --steps apps/desktop-go/scripts/smoke-steps.mjs --out ${{ runner.temp }}/go-smoke
+
+      - name: Upload Go shell UI smoke screenshots
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: go-shell-ui-smoke
+          path: ${{ runner.temp }}/go-smoke/*.png
+          if-no-files-found: ignore
