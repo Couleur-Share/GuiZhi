@@ -158,6 +158,13 @@ func main() {
 	if ud == "" {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
 	}
+	// 自动化实例（截图/对拍/基准）绝不能共用真实安装的 WebView2 配置（%LOCALAPPDATA%\GuiZhi\WebView2）：
+	// 渲染进程的 localStorage（设置、网络代理、语言等）存在那里，测试写进去会让真实安装“首次导入旧设置”失效、
+	// 还会把默认值同步进真实数据库。2026-11-13 实际发生过。没有显式指定时，把配置放进该次运行的 userData 下。
+	// Automation runs must never share the real install's WebView2 profile; keep it under the run's userData.
+	if automation && os.Getenv("WEBVIEW2_USER_DATA_FOLDER") == "" {
+		os.Setenv("WEBVIEW2_USER_DATA_FOLDER", filepath.Join(ud, "webview2"))
+	}
 	// 结构初始化/迁移先于插件打开数据库：租约 → 完整性检查 → 升级前备份 → 建表迁移（db_init.go）
 	lease, err := initDatabaseFile(ctx, *dbPath, dbInitOptions{BackupsDir: (Paths{UserData: ud}).BackupsDir()})
 	if err != nil {
