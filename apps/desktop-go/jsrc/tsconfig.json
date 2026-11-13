@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": false,
+    "baseUrl": ".",
+    "paths": {
+      "@guizhi/core": ["../../../packages/core/src/index.ts"],
+      "@guizhi/core/*": ["../../../packages/core/src/*"],
+      "@shared/*": ["../../../packages/shared/*"],
+      "@guizhi/shared/*": ["../../../packages/shared/*"],
+      "@guizhi/db": ["../../../packages/db/src/index.ts"],
+      "@guizhi/db/*": ["../../../packages/db/src/*"]
+    }
+  },
+  "include": ["**/*"]
+}
