@@ -73,7 +73,10 @@ function linkDependencies(sourceRoot, root, relativeDir) {
   }
 }
 
-export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true } = {}) {
+/**
+ * extraSourcePaths：在默认源码范围之外追加要复制的路径（如 Go 壳的 apps/desktop-go）。默认为空，既有调用不受影响。
+ */
+export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true, extraSourcePaths = [] } = {}) {
   sourceRoot = fs.realpathSync(sourceRoot);
   // macOS 的临时目录可能含 /var -> /private/var 链接，统一实路径以匹配模块路径。
   const tempRoot = fs.realpathSync(os.tmpdir());
@@ -108,6 +111,7 @@ export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true } =
         "--exclude-standard",
         "--",
         ...SOURCE_PATHS,
+        ...extraSourcePaths,
       ],
       { cwd: sourceRoot, maxBuffer: 16 * 1024 * 1024 },
     );
@@ -141,6 +145,7 @@ export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true } =
     for (const relativeDir of [
       "",
       "apps/desktop",
+      "apps/desktop-go",
       "packages/core",
       "packages/db",
       "packages/shared",
