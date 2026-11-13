@@ -111,6 +111,11 @@ func TestThemedRuntimeDifferential(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// 基准里各场景的 delta 都在 1 秒内到达、只落一次进度快照；真实时钟下，CI 机器停顿超过 1 秒就会多落几次。
+	prevInterval := themedDesignProgressInterval
+	themedDesignProgressInterval = time.Hour
+	t.Cleanup(func() { themedDesignProgressInterval = prevInterval })
+
 	user := t.TempDir()
 	l := &Library{paths: Paths{UserData: user}, configDir: filepath.Join(user, "config")}
 	if err := os.MkdirAll(l.configDir, 0o755); err != nil {

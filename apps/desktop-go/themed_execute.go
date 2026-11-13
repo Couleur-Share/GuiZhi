@@ -29,6 +29,10 @@ func themedSame(a, b any) bool {
 	return a == b
 }
 
+// themedDesignProgressInterval 是设计阶段进度快照的最小保存间隔（与 TS 的 1000ms 一致），避免流式 delta 每个字符都写库。
+// 对拍测试会把它调大：TS 基准是在「几次 delta 都在 1 秒内到达」的条件下录制的，真实时钟下机器停顿超过 1 秒就会多落快照。
+var themedDesignProgressInterval = time.Second
+
 func (rt *themedRuntime) pipelineServices() pipelineServices {
 	l := rt.l
 	chat, search := aiChatFunc(l.chatCompletion), l.searchReadingWeb
@@ -227,7 +231,7 @@ func (rt *themedRuntime) execute(ctx context.Context, task *jsObj) error {
 				if err := rt.assertCurrent(ctx, task); err != nil {
 					return err
 				}
-				if chars != 0 && time.Since(lastProgress) < time.Second {
+				if chars != 0 && time.Since(lastProgress) < themedDesignProgressInterval {
 					return nil
 				}
 				lastProgress = time.Now()
