@@ -1,7 +1,7 @@
 // 打进 goja 的入口：直接引用 TS 原文件，保证净化行为与 Electron 版逐字节一致（升级 sanitize-html/css-tree 后重新打包即可）。
-import { cleanHtml, cleanCss, sanitizeSnapshot, snapshotHash } from "../../desktop/src/main/services/web-capture/snapshot-sanitize";
-import { snapshotDocument, escapeSnapshotText } from "../../desktop/src/main/services/web-capture/snapshot-document";
-import { SNAPSHOT_BRIDGE } from "../../desktop/src/main/services/web-capture/snapshot-bridge";
+import { cleanHtml, cleanCss, sanitizeSnapshot, snapshotHash } from "../jsrc/services/web-capture/snapshot-sanitize";
+import { snapshotDocument, escapeSnapshotText } from "../jsrc/services/web-capture/snapshot-document";
+import { SNAPSHOT_BRIDGE } from "../jsrc/services/web-capture/snapshot-bridge";
 
 /** 资源映射以普通对象传入（原始 URL → 本快照资源 URL），避免跨 JS/Go 边界传函数。 */
 const mapper = (table: Record<string, string>) => (url: string) => Object.prototype.hasOwnProperty.call(table, url) ? table[url] : undefined;

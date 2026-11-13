@@ -3,14 +3,14 @@
 import "./text-polyfill";
 import "./url-polyfill";
 import { parseHTML } from "linkedom";
-import { themedReadingDocument } from "../../desktop/src/main/services/themed-reading/document";
+import { themedReadingDocument } from "../jsrc/services/themed-reading/document";
 import { validateThemedReadingVersion, validateThemedReadingTask } from "../../../packages/db/src/themed-reading-validation";
-import { renderThemedReadingBlocks } from "../../desktop/src/main/services/themed-reading/content";
-import { ensureRequestedReadingImage } from "../../desktop/src/main/services/themed-reading/required-image";
-import { prepareResearchRetry } from "../../desktop/src/main/services/themed-reading/research-pipeline";
+import { renderThemedReadingBlocks } from "../jsrc/services/themed-reading/content";
+import { ensureRequestedReadingImage } from "../jsrc/services/themed-reading/required-image";
+import { prepareResearchRetry } from "../jsrc/services/themed-reading/research-pipeline";
 import { validateReadingVisuals } from "../../../packages/shared/utils/reading-visuals";
 import { isSafeAssetFileName } from "../../../packages/shared/utils/media-refs";
-import { v3InnerDocument, v3WrapperDocument, validateV3Page, normalizeV3Section, cleanV3Html, checkReadingScript, ReadingPageError } from "../../desktop/src/main/services/themed-reading/v3-document";
+import { v3InnerDocument, v3WrapperDocument, validateV3Page, normalizeV3Section, cleanV3Html, checkReadingScript, ReadingPageError } from "../jsrc/services/themed-reading/v3-document";
 
 /** ReadingPageError 是可修复的页面问题（回传给模型修复），其余异常原样抛出。 */
 function guarded<T>(fn: () => T): { ok: T } | { issue: unknown } {

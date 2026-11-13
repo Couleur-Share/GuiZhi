@@ -3,8 +3,8 @@
 import "./text-polyfill";
 import "./url-polyfill";
 import "./async-polyfill";
-import { runReadingV3 } from "../../desktop/src/main/services/themed-reading/v3-pipeline";
-import { repairReadingRuntime } from "../../desktop/src/main/services/themed-reading/v3-runtime-repair";
+import { runReadingV3 } from "../jsrc/services/themed-reading/v3-pipeline";
+import { repairReadingRuntime } from "../jsrc/services/themed-reading/v3-runtime-repair";
 import { hostAsync, hostCallback, hostSync } from "./pipeline-host";
 
 const controllers = new Map<number, AbortController>();

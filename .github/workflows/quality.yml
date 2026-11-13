@@ -113,6 +113,23 @@ jobs:
           go-version-file: apps/desktop-go/go.mod
           cache-dependency-path: apps/desktop-go/go.sum
 
+      # 门禁：Go 壳的生成、构建与测试不得依赖 Electron 主进程目录。依赖已装好，此处删掉后再往下走，
+      # 任何重新引入的依赖（含 jsgen 的 TS 源码）都会在这里之后立刻失败。
+      - name: Remove Electron main process sources
+        shell: pwsh
+        run: Remove-Item apps/desktop/src/main -Recurse -Force
+
+      # goja 产物（themed_engine.js 等）由 apps/desktop-go/jsrc 的 TS 源码生成；重新生成必须与入库版本逐字节一致。
+      - name: Regenerate goja bundles and verify committed output
+        shell: pwsh
+        run: |
+          foreach ($s in 'build-themed', 'build-pipeline', 'build', 'build-render-scripts') {
+            pnpm dlx tsx "apps/desktop-go/jsgen/$s.mts"
+            if ($LASTEXITCODE) { throw "$s 失败" }
+          }
+          git diff --exit-code -- apps/desktop-go
+          if ($LASTEXITCODE) { throw "重新生成的产物与入库版本不一致：改了 jsrc 或 jsgen 后需重新生成并提交" }
+
       # 构建脚本同时产出测试依赖的 dist/ 与 reading_libraries.json，必须先于 go test 运行
       - name: Build Go shell
         shell: pwsh

@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, "..", "..", "..");
-const cap = path.join(root, "apps", "desktop", "src", "main", "services", "web-capture");
+const cap = path.join(root, "apps", "desktop-go", "jsrc", "services", "web-capture");
 const entry = `export { installSettleProbe, readSettleProbe } from ${JSON.stringify(path.join(cap, "web-settle.ts"))};
 export { captureRenderedDocument } from ${JSON.stringify(path.join(cap, "web-rendered-document.ts"))};`;
 const res = await build({
