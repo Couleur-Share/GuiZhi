@@ -286,7 +286,7 @@ export function AboutSettings() {
                   type="button"
                   onClick={checkWebUpdate}
                   disabled={updateState === "checking"}
-                  className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
+                  className="h-8 shrink-0 whitespace-nowrap px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors disabled:opacity-60 inline-flex items-center gap-1.5"
                 >
                   <RefreshCwIcon
                     aria-hidden="true"
@@ -330,7 +330,9 @@ export function AboutSettings() {
                 onClick={() =>
                   window.dispatchEvent(new CustomEvent("open-update-dialog"))
                 }
-                className="h-8 px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
+                // shrink-0 + whitespace-nowrap：状态描述（如失败原因）很长时，
+                // 按钮不被 flex 压窄、文字不折行
+                className="h-8 shrink-0 whitespace-nowrap px-4 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors"
               >
                 {t("settings.checkUpdate")}
               </button>
