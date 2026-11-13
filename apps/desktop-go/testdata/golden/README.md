@@ -40,6 +40,8 @@ Go 壳的差分测试把 Go 实现与原 Electron/TS 实现逐项对拍。这里
 
 `TestAppRuntimeParity/log` 会在测试内固定 `USERPROFILE`，不依赖运行机器的用户名。
 
+另外，基准在 UTC+8 的机器上生成，备份文件名、MCP 条目的 `updated` 日期等都按本地时区格式化。`TestMain` 把 `time.Local` 固定为 UTC+8，因此测试结果与运行机器的时区无关（在 UTC 的 CI 上不固定会差 8 小时、日期错一天，已实测复现）。重新生成基准时须在同一时区进行。
+
 ## 重新生成
 
 TS 主进程退役后无法在主线重新生成。确需对照，从 `electron-final-0.28.x` 检出 TS 终版，再用 `pnpm dlx tsx`（需 tsx ≥ 4.23，

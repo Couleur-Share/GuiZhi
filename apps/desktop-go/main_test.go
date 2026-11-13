@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // frozenGoldenDirs：环境变量 -> testdata/golden 下冻结的对拍基准子目录。
@@ -46,5 +47,8 @@ func TestMain(m *testing.M) {
 		return
 	}
 	useFrozenGoldens()
+	// 冻结基准由 TS 实现在 UTC+8 的机器上生成：备份文件名、MCP 的 updated 日期等都按本地时区格式化。
+	// 固定为 UTC+8（中国无夏令时），对拍结果就不依赖运行机器的时区——否则 UTC 的 CI 上会差 8 小时、日期错一天。
+	time.Local = time.FixedZone("CST", 8*3600)
 	os.Exit(m.Run())
 }
