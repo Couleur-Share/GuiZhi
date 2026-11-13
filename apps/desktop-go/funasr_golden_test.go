@@ -77,6 +77,8 @@ func loadFunasrGolden(t *testing.T) funasrGolden {
 	if g.Funasr == nil {
 		t.Skip("golden 里没有 funasr 段，请重新生成")
 	}
+	// 体积估算用的目录树随 golden 一起冻结在同级目录里；JSON 里记录的是生成时那台机器上的绝对路径，这里改指向现有副本。
+	g.Funasr.TreeDir = filepath.Join(dir, filepath.Base(g.Funasr.TreeDir))
 	return *g.Funasr
 }
 
@@ -134,9 +136,14 @@ func TestFunasrGoldenLogsAndProxy(t *testing.T) {
 
 func TestFunasrGoldenFilesystem(t *testing.T) {
 	g := loadFunasrGolden(t)
-	id, err := readDirectoryIdentity(g.IDDir)
-	if err != nil || id != g.Identity {
-		t.Errorf("目录身份：Go %+v (%v)，TS %+v", id, err, g.Identity)
+	// 目录身份（设备号、inode、创建时间）只对生成时的那个目录有意义：冻结基准被检出到别处后原目录不存在，只能跳过。
+	if _, statErr := os.Stat(g.IDDir); statErr == nil {
+		id, err := readDirectoryIdentity(g.IDDir)
+		if err != nil || id != g.Identity {
+			t.Errorf("目录身份：Go %+v (%v)，TS %+v", id, err, g.Identity)
+		}
+	} else {
+		t.Log("冻结基准：生成时的目录不存在，跳过目录身份对拍")
 	}
 	for name, bs := range map[string]int64{"b512": 512, "b4096": 4096, "b65536": 65536} {
 		got, err := measureFunasrEnvironment(g.TreeDir, bs)
@@ -183,7 +190,11 @@ func TestFunasrGoldenBackupManifest(t *testing.T) {
 	if !reBackupName.MatchString(filepath.Base(b.Directory)) {
 		t.Errorf("备份目录名不符合约定：%s", b.Directory)
 	}
-	// TS 写下的清单：能解析，且其中的身份与现存目录一致
+	// TS 写下的清单：能解析，且其中的身份与现存目录一致。依赖生成时的目录树，冻结基准被检出到别处后跳过。
+	if _, statErr := os.Stat(g.Backup.Root); statErr != nil {
+		t.Log("冻结基准：TS 留下的备份目录树不在本机，跳过清单身份对拍")
+		return
+	}
 	rootID, err := readDirectoryIdentity(g.Backup.Root)
 	if err != nil || rootID != g.Backup.RootIdentity {
 		t.Errorf("TS 备份根目录身份：Go %+v (%v)，清单 %+v", rootID, err, g.Backup.RootIdentity)

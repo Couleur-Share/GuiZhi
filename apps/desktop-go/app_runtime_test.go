@@ -205,6 +205,10 @@ func TestAppRuntimeParity(t *testing.T) {
 		}
 	})
 	t.Run("log", func(t *testing.T) {
+		// 日志脱敏会把用户主目录替换成 ~。golden 里的消息带的是生成基准时的主目录（已统一改写为 C:\Users\user），
+		// 所以这里固定主目录，不依赖运行机器的用户名；否则换一台机器（例如 CI）就不会触发脱敏。
+		t.Setenv("USERPROFILE", `C:\Users\user`)
+		t.Setenv("HOME", `C:\Users\user`)
 		send := b.sends["log:appError"]
 		send(nil)
 		for _, e := range g.LogEntries {
