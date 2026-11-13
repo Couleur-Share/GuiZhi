@@ -1,6 +1,6 @@
 {
-  "$comment": "Bundle size budgets for the desktop renderer. Sizes are gzipped bytes, measured at apps/desktop/out/renderer/. Budgets sit ~5-10% above the actual baseline so organic small changes do not red-flag the CI; they are intentionally NOT a hard ratchet. Tighten an entry only when a deliberate optimization landed and we want to lock in the win.",
-  "rendererOutDir": "out/renderer",
+  "$comment": "Bundle size budgets for the desktop renderer. Sizes are gzipped bytes, measured at apps/desktop-go/dist/renderer/ (output of the Go shell build). Budgets sit ~5-10% above the actual baseline so organic small changes do not red-flag the CI; they are intentionally NOT a hard ratchet. Tighten an entry only when a deliberate optimization landed and we want to lock in the win. 2026-11-13: Electron 构建已退役，渲染产物改由 Go 壳的 vite 配置构建且不再做 vendor 分包，原 markdown/ui/react/icons/i18n vendor 五个入口随之移除。",
+  "rendererOutDir": "../desktop-go/dist/renderer",
   "entries": [
     {
       "name": "main entry (index-*.js)",
@@ -15,13 +15,6 @@
       "aggregation": "max",
       "maxGzipBytes": 184320,
       "$baseline": "15.75 KB after v0.20 interaction-level lazy loading; hard target stays below 180 KiB."
-    },
-    {
-      "name": "markdown vendor",
-      "pattern": "assets/markdown-vendor-*.js",
-      "maxGzipBytes": 122880,
-      "required": false,
-      "$baseline": "100 KB on 2026-05-16. P6 removes this manual chunk; entry becomes optional after that."
     },
     {
       "name": "settings page bundle",
@@ -40,30 +33,6 @@
       "pattern": "assets/AISettingsPrototype-*.js",
       "maxGzipBytes": 33792,
       "$baseline": "27.07 KB after 2026-06-06 route-level settings section lazy loading; budget raised 32 KB → 33 KB on 2026-11-07 (actual 32.02 KB after model-service status card / primary-action emphasis changes)."
-    },
-    {
-      "name": "ui vendor (dnd-kit)",
-      "pattern": "assets/ui-vendor-*.js",
-      "maxGzipBytes": 22528,
-      "$baseline": "16.35 KB on 2026-05-16 after framer-motion was removed; budget locks in the ~38 KB savings with a small headroom."
-    },
-    {
-      "name": "react vendor",
-      "pattern": "assets/react-vendor-*.js",
-      "maxGzipBytes": 51200,
-      "$baseline": "45 KB on 2026-05-16."
-    },
-    {
-      "name": "icons (lucide-react)",
-      "pattern": "assets/icons-*.js",
-      "maxGzipBytes": 18432,
-      "$baseline": "14 KB on 2026-05-16."
-    },
-    {
-      "name": "i18n vendor",
-      "pattern": "assets/i18n-vendor-*.js",
-      "maxGzipBytes": 20480,
-      "$baseline": "15 KB on 2026-05-16."
     },
     {
       "name": "renderer css total",

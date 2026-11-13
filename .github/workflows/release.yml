@@ -7,8 +7,8 @@ name: Desktop Build and Release
 #   预发布（版本号带 -xxx 后缀，例如 0.30.0-rc.1）：gh release edit <tag> --draft=false --prerelease
 # 对外发布。版本号带后缀的 tag 自动按预发布创建，稳定通道用户不会收到。
 #
-# Electron 版已停止维护：旧流水线保留为 release-electron-legacy.yml（仅手动触发，紧急回退用）。
-# 仅 Windows x64；安装包未做代码签名（与 Electron 版一致）。
+# Electron 版已退役（终版见标签 electron-final-0.28.x）。
+# 仅 Windows x64；安装包未做代码签名。
 
 on:
   push:
@@ -82,9 +82,20 @@ jobs:
         shell: pwsh
         run: ./apps/desktop-go/scripts/build-shell.ps1
 
+      # 体积门禁：渲染层 gzip 预算（apps/desktop/bundle-budget.json）与安装包上限（config/package-size-budget.json）。
+      - name: Check renderer bundle budget
+        run: pnpm --filter @guizhi/desktop bundle:budget
+
       - name: Build installer
         shell: pwsh
         run: ./apps/desktop-go/scripts/build-installer.ps1
+
+      - name: Check installer size budget
+        shell: pwsh
+        run: |
+          $version = node -p "require('./apps/desktop/package.json').version"
+          node scripts/check-package-size.mjs --installer "apps/desktop-go/out/installer/GuiZhi-Setup-$version-x64.exe"
+          if ($LASTEXITCODE) { throw "安装包体积超出预算" }
 
       # 在全新的 WebView2 配置和临时数据目录里离屏启动一次：
       # 验证 exe、内置 SQLite 原生库、渲染产物齐全，且全部 IPC 频道都有处理器、首次安装界面为中文。

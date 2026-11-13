@@ -1,4 +1,4 @@
-// Go 壳（MyGo + WebView2）的隔离验证入口：与 isolated-desktop.mjs 同一套思路。
+// Go 壳（MyGo + WebView2）的隔离验证入口：复制当前源码到临时目录构建并离屏运行，不碰开发目录的 dist/out 与用户数据。
 //
 //   node scripts/isolated-go.mjs shot [--steps <文件>] [--out <目录>] [--data-db <knowledge.db>] [--keep-profile]
 //
@@ -98,6 +98,8 @@ async function buildInSnapshot(snapshot, env) {
   const steps = [
     ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.preload.config.ts"], snapshot.desktopRoot],
     ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.renderer.config.ts"], snapshot.desktopRoot],
+    // 新产物必须在体积预算内（失败即中止，避免带着超预算的包去做截图）
+    ["包体预算", process.execPath, ["--experimental-strip-types", "scripts/check-bundle-budget.mts"], snapshot.desktopRoot],
     ["阅读库", process.execPath, [tsx, "apps/desktop-go/jsgen/build-reading-libs.mts"], root],
     [
       "Go 壳",

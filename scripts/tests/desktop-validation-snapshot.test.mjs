@@ -8,7 +8,6 @@ import {
   createDesktopSnapshot,
   isValidationSnapshot,
 } from "../desktop-validation-snapshot.mjs";
-import { validationEnv } from "../isolated-desktop.mjs";
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-snapshot-test-"));
@@ -172,20 +171,4 @@ test("两个验证实例的构建目录互不覆盖", (t) => {
     first.cleanup();
     second.cleanup();
   }
-});
-
-test("验证子进程不继承用户开发服务地址和用户数据目录", () => {
-  const env = {
-    VITE_DEV_SERVER_URL: "http://127.0.0.1:5173",
-    ELECTRON_RUN_AS_NODE: "1",
-    GUIZHI_E2E_USER_DATA_DIR: "user-data",
-    GUIZHI_E2E_RENDERER_URL: "dev-url",
-    PATH: "tools",
-  };
-  const isolated = validationEnv(env);
-  assert.equal(isolated.PATH, "tools");
-  assert.equal(isolated.GUIZHI_WINDOW_MODE, "offscreen");
-  for (const key of Object.keys(env).filter((key) => key !== "PATH"))
-    assert.equal(isolated[key], undefined);
-  assert.equal(env.GUIZHI_E2E_USER_DATA_DIR, "user-data");
 });

@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths: ['apps/capture-*/**', 'packages/shared/**', 'packages/db/**', 'apps/desktop/src/main/services/mobile-capture/**', 'apps/desktop/src/main/services/import/**', 'apps/desktop/src/main/ipc/mobile-capture.ipc.ts', 'apps/desktop/src/preload/api/mobile-capture.ts', 'apps/desktop/src/renderer/components/settings/MobileCaptureSettings.tsx', 'apps/desktop/tests/unit/**/mobile-capture*.test.ts', 'deploy/capture/**', '.github/workflows/capture-quality.yml', 'pnpm-lock.yaml']
+    paths: ['apps/capture-*/**', 'packages/shared/**', 'packages/db/**', 'deploy/capture/**', '.github/workflows/capture-quality.yml', 'pnpm-lock.yaml']
   workflow_dispatch:
 permissions: { contents: read }
 jobs:

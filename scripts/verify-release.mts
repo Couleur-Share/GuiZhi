@@ -14,9 +14,13 @@ type Check = {
 const checks: Check[] = [
   { id: "workspace-lint", label: "全仓文件门禁与桌面 ESLint", args: ["lint"], profile: "quick" },
   { id: "workspace-typecheck", label: "全部工作区类型检查", args: ["typecheck"], profile: "quick" },
-  { id: "desktop-unit", label: "验证工具与桌面全量单测", args: ["test:unit"], profile: "quick" },
-  { id: "desktop-build", label: "隔离生产构建与包体预算", args: ["build:isolated"], profile: "quick" },
-  { id: "desktop-e2e-smoke", label: "隔离生产构建、包体预算与 Electron 冒烟", args: ["test:e2e:smoke"], profile: "release" },
+  { id: "desktop-unit", label: "验证工具、桌面与 Go 壳 TS 层全量单测", args: ["test:unit"], profile: "quick" },
+  {
+    id: "go-shell-smoke",
+    label: "隔离构建 Go 壳（含包体预算）并做界面冒烟",
+    args: ["shot", "--steps", "apps/desktop-go/scripts/steps/smoke-steps.mjs"],
+    profile: "quick",
+  },
 ];
 
 function getProfile(): Profile {
@@ -75,8 +79,6 @@ function formatDuration(startedAt: number): string {
 }
 
 function shouldRun(check: Check, profile: Profile): boolean {
-  // 完整检查由冒烟入口构建一次，避免重复编译；两种模式都检查新产物预算。
-  if (profile === "release" && check.id === "desktop-build") return false;
   return profile === "release" || check.profile === "quick";
 }
 

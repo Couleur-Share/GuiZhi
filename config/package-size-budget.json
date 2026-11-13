@@ -1,7 +1,7 @@
 {
-  "$comment": "交付体积预算，由 scripts/check-package-size.mjs 在发版工作流的安装包构建后判定。单位为字节。上限取实测值上浮约 8%，正常波动不报警；有意增长（升级 Electron、新增随包组件）时，在同一个提交里修改预算并写明原因，先确认新增内容确实会在运行时被加载。renderer 的 gzip 预算见 apps/desktop/bundle-budget.json。仅 Windows x64 是官方发布目标。",
+  "$comment": "交付体积预算，由 scripts/check-package-size.mjs 在发版工作流的安装包构建后判定。单位为字节。上限取实测值上浮约 8%，正常波动不报警；有意增长（新增随包组件等）时，在同一个提交里修改预算并写明原因，先确认新增内容确实会在运行时被加载。renderer 的 gzip 预算见 apps/desktop/bundle-budget.json。仅 Windows x64 是官方发布目标。",
   "installer": {
-    "maxBytes": 128000000,
-    "$baseline": "2026-11-07 移除随包 Crawl4AI（网页正文改由 Node 线程用 Readability 提取）：本地 pnpm electron:build:win 打包的 GuiZhi-Setup-0.26.0-x64.exe 为 118,117,982 字节（112.6 MiB），上限约 +8%。同为 Electron 45.2.3，移除前为 159,948,002 字节（152.5 MiB），减少 41,830,020 字节；win-unpacked 由 626,791,382 字节 / 8,209 个文件降到 424,024,485 字节 / 105 个文件，减少的 202,766,897 字节都在 resources（原 crawl4ai 运行包 203,122,983 字节 / 8,099 个文件与 crawl4ai-worker 23,532 字节，新增提取线程约 0.47 MB 在 app.asar 内），resources 以外的 Electron 文件仍为 374,036,010 字节。运行包预算随运行包一并取消。此前基线：Electron 33.4.11 → 45.2.3 时 159,948,002 字节；2026-09-29 Electron 33 打包 132,016,967 字节；已发布的 v0.26.0（运行包未裁剪）218,470,612 字节。"
+    "maxBytes": 13700000,
+    "$baseline": "2026-11-13 Go + WebView2 外壳（electron-builder --prepackaged 的 NSIS 安装包）：GuiZhi-Setup-0.29.0-go.1-x64.exe 实测 12,666,440 字节（12.1 MiB），上限约 +8%。此前 Electron 版为 118,117,982 字节（0.26.0），预算 128,000,000 字节；Electron 退役后改以 Go 壳为基线。"
   }
 }

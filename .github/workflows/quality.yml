@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # 渲染层与工具链的快速检查（Linux）。仅为通用质量检查，不代表 Linux 桌面版获得官方支持。
   desktop-verify:
     runs-on: ubuntu-latest
 
@@ -41,36 +42,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Electron 42 起安装依赖不再下载二进制，首次启动时才按需下载；预先下载让冒烟测试不受下载时机影响
-      - name: Download Electron binary
-        run: pnpm --filter @guizhi/desktop exec install-electron --no
-
       - name: Lint
         run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
 
+      # 验证工具（node:test）与渲染进程 / 共享包单测。Go 壳 TS 层（jsrc）的单测在 desktop-go 作业里跑。
       - name: Unit tests
-        run: pnpm test:unit
-
-      - name: Build
-        run: pnpm --filter @guizhi/desktop build
-
-      - name: Check renderer bundle budget
-        run: pnpm --filter @guizhi/desktop bundle:budget
-
-      # Electron 在 Linux 上必须有显示服务器；无 Xvfb 时窗口起不来，
-      # firstWindow / locator 会一直等到测试超时。构建步骤已经产出 out/，
-      # 这里只跑用例，避免再编一遍。
-      - name: Install Xvfb for Electron smoke
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-
-      - name: Electron smoke tests
-        working-directory: apps/desktop
-        env:
-          ELECTRON_DISABLE_SANDBOX: "1"
-        run: xvfb-run -a pnpm exec playwright test smoke.spec.ts
+        run: |
+          pnpm test:validation
+          pnpm --filter @guizhi/desktop test:unit
 
   # Go 壳（主线）：构建渲染层与 Go 壳后，跑 vet 与全量单测。
   # 全量测试会拉起真实 WebView2 隐藏窗口（采集、渲染、阅读视图），所以必须在 Windows 上跑，约 2 分钟。
@@ -113,12 +95,6 @@ jobs:
           go-version-file: apps/desktop-go/go.mod
           cache-dependency-path: apps/desktop-go/go.sum
 
-      # 门禁：Go 壳的生成、构建与测试不得依赖 Electron 主进程目录。依赖已装好，此处删掉后再往下走，
-      # 任何重新引入的依赖（含 jsgen 的 TS 源码）都会在这里之后立刻失败。
-      - name: Remove Electron main process sources
-        shell: pwsh
-        run: Remove-Item apps/desktop/src/main -Recurse -Force
-
       # goja 产物（themed_engine.js 等）由 apps/desktop-go/jsrc 的 TS 源码生成；重新生成必须与入库版本逐字节一致。
       - name: Regenerate goja bundles and verify committed output
         shell: pwsh
@@ -128,7 +104,7 @@ jobs:
           git diff --exit-code -- apps/desktop-go
           if ($LASTEXITCODE) { throw "重新生成的产物与入库版本不一致：改了 jsrc 或 jsgen 后需重新生成并提交" }
 
-      # jsrc 里 TS 源码的单测（原先在 apps/desktop 下，随源码迁来）。在删除 src/main 之后运行，证明它们不依赖 Electron 主进程。
+      # jsrc 里 TS 源码的单测（goja 嵌入产物的输入）。
       - name: jsrc unit tests
         run: pnpm --filter @guizhi/desktop-go test
 
@@ -146,9 +122,9 @@ jobs:
         run: go test -count=1 ./...
 
       # Go 壳 UI 烟雾检查：隔离构建 → 离屏启动 → 经 CDP 驱动真实界面（启动、渲染、IPC、SQLite、列表/详情交互、导航）。
-      # 此时 apps/desktop/src/main 已被删除，所以它同时证明 shot:go 不依赖 Electron 主进程。
+      # 构建过程同时检查渲染层包体预算。
       - name: Go shell UI smoke
-        run: pnpm shot:go --steps apps/desktop-go/scripts/smoke-steps.mjs --out ${{ runner.temp }}/go-smoke
+        run: pnpm shot --steps apps/desktop-go/scripts/steps/smoke-steps.mjs --out ${{ runner.temp }}/go-smoke
 
       - name: Upload Go shell UI smoke screenshots
         if: always()
