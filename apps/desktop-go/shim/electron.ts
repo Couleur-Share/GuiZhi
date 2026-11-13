@@ -9,6 +9,9 @@ installMediaUrlRewrite();
 
 type Listener = (event: unknown, ...args: any[]) => void;
 
+// preload 回调的首个参数类型。Go 壳不传递真实事件对象（始终是 {}），保留该名字让 preload 源码的类型标注不变。
+export interface IpcRendererEvent {}
+
 declare global {
   interface Window {
     mygo: {

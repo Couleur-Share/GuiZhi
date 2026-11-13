@@ -2,7 +2,7 @@ import { compareVersions } from "./version";
 
 /**
  * 版本标题正则，兼容 `## v0.4.0`、`## 0.4.0` 与 `## [0.4.0]` 三种写法。
- * electron-builder.config.cjs 里有一份等价副本，改这里要同步改那边。
+ * apps/desktop-go/electron-builder.mygo.cjs 里有一份等价副本，改这里要同步改那边。
  */
 const VERSION_HEADING_SOURCE =
   "^## \\[?v?(\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?)\\]?";

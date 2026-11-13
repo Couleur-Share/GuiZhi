@@ -25,7 +25,8 @@
       "@guizhi/shared/*": ["../../packages/shared/*"],
       "@guizhi/db": ["../../packages/db/src/index.ts"],
       "@guizhi/db/*": ["../../packages/db/src/*"],
-      "@renderer/*": ["src/renderer/*"]
+      "@renderer/*": ["src/renderer/*"],
+      "electron": ["../desktop-go/shim/electron.ts"]
     }
   },
   "include": ["src/**/*", "../../packages/**/*"],

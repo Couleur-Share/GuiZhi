@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import { aiApi } from "./api/ai";
 import { settingsApi } from "./api/settings";
@@ -216,7 +216,7 @@ contextBridge.exposeInMainWorld("electron", {
     getPlatform: () => ipcRenderer.invoke("updater:platform"),
     openReleases: () => ipcRenderer.invoke("updater:openReleases"),
     onStatus: (callback: (status: any) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, status: any) =>
+      const listener = (_event: IpcRendererEvent, status: any) =>
         callback(status);
       ipcRenderer.on("updater:status", listener);
       return () => {
@@ -244,7 +244,7 @@ contextBridge.exposeInMainWorld("electron", {
   // Shortcut trigger events
   // 快捷键触发事件
   onShortcutTriggered: (callback: (action: string) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, action: string) =>
+    const listener = (_event: IpcRendererEvent, action: string) =>
       callback(action);
     ipcRenderer.on("shortcut:triggered", listener);
     return () => {
@@ -260,7 +260,7 @@ contextBridge.exposeInMainWorld("electron", {
     callback: (shortcuts: Record<string, string>) => void,
   ) => {
     const listener = (
-      _event: Electron.IpcRendererEvent,
+      _event: IpcRendererEvent,
       shortcuts: Record<string, string>,
     ) => callback(shortcuts);
     ipcRenderer.on("shortcuts:updated", listener);

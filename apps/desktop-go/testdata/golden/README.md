@@ -6,7 +6,7 @@ Go 壳的差分测试把 Go 实现与原 Electron/TS 实现逐项对拍。这里
 ## 来源
 
 - 由 Electron 终版（标签 `electron-final-0.28.x`，分支 `electron-final`）的 TS 代码，加上 Go 壳分支 `refactor/go-mainline`
-  上的生成脚本（`spikes/mygo-db/`、`spikes/mygo-ai/`）生成，日期 2026-11-13。
+  上的生成脚本（`spikes/mygo-db/`、`spikes/mygo-ai/`，现保存在标签 `pre-electron-removal`）生成，日期 2026-11-13。
 - 冻结当天用这批基准做过一次全量对拍：298 通过、12 跳过（均为需联网/真机/压测的手动项）、0 失败。
 - 生成时的绝对路径里出现的本机用户名已统一改写为 `user`（`C:\Users\user\...`）。
 - 这些文件按字节比较（含 CRLF 正文、SQLite 与备份文件），`.gitattributes` 对本目录设置了 `-text`，不要让编辑器或 git 改行尾。
@@ -44,6 +44,6 @@ Go 壳的差分测试把 Go 实现与原 Electron/TS 实现逐项对拍。这里
 
 ## 重新生成
 
-TS 主进程退役后无法在主线重新生成。确需对照，从 `electron-final-0.28.x` 检出 TS 终版，再用 `pnpm dlx tsx`（需 tsx ≥ 4.23，
+TS 主进程与 `spikes/` 生成器已从主线删除，无法在主线重新生成。确需对照，检出标签 `pre-electron-removal`（它同时含 TS 主进程、`spikes/` 生成器和 `apps/desktop-go/verify` 验收脚本；`electron-final-0.28.x` 只含 TS 终版、没有生成器），再用 `pnpm dlx tsx`（需 tsx ≥ 4.23，
 本地旧版 tsx 对 CJS 命名导出的处理不同会失败）运行 `spikes/mygo-db/make-golden.mts <目录>` 与各 `run-golden-*.mts <目录>`，
 然后用上表的环境变量指向新目录运行 `go test`，与本目录对比。

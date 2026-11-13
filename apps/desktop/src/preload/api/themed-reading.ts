@@ -1,4 +1,4 @@
-import { ipcRenderer } from "electron";
+import { ipcRenderer, type IpcRendererEvent } from "electron";
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type { ThemedReadingAPI, ThemedReadingTask } from "@guizhi/shared/types/themed-reading";
 
@@ -9,7 +9,7 @@ export const themedReadingApi: ThemedReadingAPI = {
   updateView: input => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_VIEW_UPDATE,input),
   commandView: input => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_VIEW_COMMAND,input),
   destroyView: id => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_VIEW_DESTROY,id),
-  onViewEvent: callback => { const receive=(_e:Electron.IpcRendererEvent,value:import("@guizhi/shared/types/reading-page-v3").ReadingViewEvent)=>callback(value);ipcRenderer.on(IPC_CHANNELS.THEMED_READING_VIEW_EVENT,receive);return()=>ipcRenderer.removeListener(IPC_CHANNELS.THEMED_READING_VIEW_EVENT,receive); },
+  onViewEvent: callback => { const receive=(_e:IpcRendererEvent,value:import("@guizhi/shared/types/reading-page-v3").ReadingViewEvent)=>callback(value);ipcRenderer.on(IPC_CHANNELS.THEMED_READING_VIEW_EVENT,receive);return()=>ipcRenderer.removeListener(IPC_CHANNELS.THEMED_READING_VIEW_EVENT,receive); },
   getState: input => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_STATE, input),
   references: input => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_REFERENCES, input),
   searchConfig: input => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_SEARCH_CONFIG, input),
@@ -24,7 +24,7 @@ export const themedReadingApi: ThemedReadingAPI = {
   exportHtml: (input) => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_EXPORT, input),
   listTasks: () => ipcRenderer.invoke(IPC_CHANNELS.THEMED_READING_LIST_TASKS),
   onProgress: (callback) => {
-    const listener = (_event: Electron.IpcRendererEvent, task: ThemedReadingTask) => callback(task);
+    const listener = (_event: IpcRendererEvent, task: ThemedReadingTask) => callback(task);
     ipcRenderer.on(IPC_CHANNELS.THEMED_READING_PROGRESS, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.THEMED_READING_PROGRESS, listener);
   },

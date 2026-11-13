@@ -1,6 +1,0 @@
-import libraries from "virtual:reading-libraries";
-const vars = `:root{--theme-visual-surface:#e5eef8;--theme-visual-1:#4477aa;--theme-visual-2:#228866;--theme-visual-3:#aa6677;--theme-visual-4:#997733;--theme-visual-5:#8866aa;--theme-visual-6:#337788}html[data-theme=dark]{--theme-visual-surface:#243448;--theme-visual-1:#82b0e2;--theme-visual-2:#72c7a8;--theme-visual-3:#e6a1b2;--theme-visual-4:#e1c16a;--theme-visual-5:#b69be5;--theme-visual-6:#7cbacb}.gz-reading-components{--color-base-100:var(--theme-surface);--color-base-200:var(--theme-visual-surface);--color-base-300:var(--theme-visual-1);--color-base-content:var(--theme-text);--color-primary:var(--theme-visual-1);--color-primary-content:var(--theme-surface);--radius-box:12px;--radius-field:8px;--radius-selector:6px;--border:1px;--size-field:.25rem;--depth:0;--noise:0;--tw-border-style:solid;--tw-font-weight:400;--spacing:.25rem}.gz-ui-timeline,.gz-ui-steps{padding:0}.gz-ui-timeline-end,.gz-ui-timeline-start{font-size:1em}.gz-ui-stat-value{font-size:1.5em}.gz-ui-card-body{padding:1.25em}.gz-ui-table{font-size:1em}.gz-ui-alert{display:block;padding:1em}`;
-export function readingComponentCss(html: string): string {
-  const used = Object.entries(libraries.components).filter(([name]) => new RegExp(`\\bgz-ui-${name}(?:s|[\\s"-])`).test(html));
-  return vars + used.map(([, css]) => css).join("\n");
-}

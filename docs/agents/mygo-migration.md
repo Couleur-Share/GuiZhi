@@ -1,5 +1,7 @@
 # 归知迁移到 MyGo：spike 结论与进度
 
+> **历史资料（2026-11-13 归档）。** 本文记录迁移期间的探索与取舍；文中提到的 `spikes/`、`apps/desktop/src/main`、`apps/desktop/src/mcp`、Electron 构建与 `apps/desktop-go/verify` 里依赖 TS 主进程的脚本，均已随 Electron 退役删除，完整代码保存在标签 `electron-final-0.28.x`（分支 `electron-final`）。当前行为以源码与实测为准，现行开发约定见仓库根 `AGENTS.md`。
+
 分支 `spike/mygo`，代码都在 `spikes/` 下，不改动主线任何文件。本文是阶段性成果的收束，不是迁移方案定稿。
 
 ## 结论

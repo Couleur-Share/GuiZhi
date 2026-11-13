@@ -1,4 +1,4 @@
-import { ipcRenderer } from "electron";
+import { ipcRenderer, type IpcRendererEvent } from "electron";
 
 import { IPC_CHANNELS } from "@guizhi/shared/constants/ipc-channels";
 import type {
@@ -42,7 +42,7 @@ export const aiApi = {
     const requestId = request.requestId || createRequestId();
 
     const chunkListener = (
-      _event: Electron.IpcRendererEvent,
+      _event: IpcRendererEvent,
       payload: AITransportStreamChunk,
     ) => {
       if (payload.requestId !== requestId) {
@@ -52,7 +52,7 @@ export const aiApi = {
     };
 
     const errorListener = (
-      _event: Electron.IpcRendererEvent,
+      _event: IpcRendererEvent,
       payload: AITransportStreamError,
     ) => {
       if (payload.requestId !== requestId) {
