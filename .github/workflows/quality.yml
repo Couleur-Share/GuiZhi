@@ -123,12 +123,14 @@ jobs:
       - name: Regenerate goja bundles and verify committed output
         shell: pwsh
         run: |
-          foreach ($s in 'build-themed', 'build-pipeline', 'build', 'build-render-scripts') {
-            pnpm dlx tsx "apps/desktop-go/jsgen/$s.mts"
-            if ($LASTEXITCODE) { throw "$s 失败" }
-          }
+          pnpm --filter @guizhi/desktop-go gen
+          if ($LASTEXITCODE) { throw "重新生成 goja 产物失败" }
           git diff --exit-code -- apps/desktop-go
           if ($LASTEXITCODE) { throw "重新生成的产物与入库版本不一致：改了 jsrc 或 jsgen 后需重新生成并提交" }
+
+      # jsrc 里 TS 源码的单测（原先在 apps/desktop 下，随源码迁来）。在删除 src/main 之后运行，证明它们不依赖 Electron 主进程。
+      - name: jsrc unit tests
+        run: pnpm --filter @guizhi/desktop-go test
 
       # 构建脚本同时产出测试依赖的 dist/ 与 reading_libraries.json，必须先于 go test 运行
       - name: Build Go shell
