@@ -194,6 +194,47 @@ function writeCleanShutdownMarker(dbPath: string, checkedAt: number): void {
 }
 
 /**
+ * 数据库文件存在但是 0 字节（常见于磁盘写满或写入被中断）时，若有可恢复的备份就拒绝启动，
+ * 而不是静默新建空库——用户看到的会是「资料全没了」。没有任何备份时按空库启动。
+ * 两种情况都不改动该文件；用户恢复备份，或删除这个空文件后重启即可明确地新建空库。
+ * 备份来源：宿主给出的备份文件，加上库旁的完整性备份 `<db>.integrity-backup-*`；0 字节的备份不算。
+ */
+function refuseEmptyDatabaseWithBackups(
+  dbPath: string,
+  findRecoverableBackups?: () => string[],
+): void {
+  let stat: fs.Stats;
+  try {
+    stat = fs.statSync(dbPath);
+  } catch {
+    return;
+  }
+  if (!stat.isFile() || stat.size !== 0) return;
+
+  const dir = path.dirname(dbPath);
+  const prefix = `${path.basename(dbPath)}.integrity-backup-`;
+  const siblings = fs
+    .readdirSync(dir)
+    .filter((name) => name.startsWith(prefix))
+    .map((name) => path.join(dir, name));
+  const candidates = [...(findRecoverableBackups?.() ?? []), ...siblings];
+  const usable = candidates.filter((file) => {
+    try {
+      const s = fs.statSync(file);
+      return s.isFile() && s.size > 0;
+    } catch {
+      return false;
+    }
+  });
+  if (usable.length === 0) return;
+
+  throw new Error(
+    `数据库文件为空（0 字节）：${dbPath}。这通常是磁盘写满或写入被中断造成的，原有资料可能还在备份里。` +
+      `已找到 ${usable.length} 份可恢复的备份（例如 ${usable[0]}）。` +
+      `请先从备份恢复；如果确实要从空库开始，请删除这个空文件后重新启动。`,
+  );
+}
+/**
  * 启动完整性检查。
  *
  * 这一步在窗口创建之前同步执行，`quick_check` 的耗时与库体积成正比——
@@ -293,6 +334,11 @@ export interface InitDatabaseHooks {
    * single-instance guarantee may enable this; shared callers default to false.
    */
   recoverUnregisteredLock?: boolean;
+  /**
+   * 列出可用于恢复的备份文件路径（由宿主按自己的备份目录与命名规则给出）。
+   * 数据库文件为 0 字节而这里有可恢复备份时，启动会被拒绝而不是静默新建空库。
+   */
+  findRecoverableBackups?: () => string[];
 }
 
 let db: Database.Database | null = null;
@@ -332,6 +378,7 @@ export function initDatabase(
     recoverUnregisteredLock: hooks?.recoverUnregisteredLock,
   });
   try {
+    refuseEmptyDatabaseWithBackups(dbPath, hooks?.findRecoverableBackups);
     ensureDatabaseIntegrity(dbPath);
     db = new Database(dbPath);
 
