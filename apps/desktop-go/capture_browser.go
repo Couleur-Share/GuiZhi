@@ -33,9 +33,14 @@ const captureChildEnv = "GUIZHI_CAPTURE_CHILD"
 // 任何漏过拦截的请求（含 WebSocket）到这里都会解析失败，而不是直连网络或内网。
 const captureHostRules = `--host-resolver-rules="MAP * ~NOTFOUND"`
 
-func findDevToolsPortFile(dir string, wait time.Duration) string {
+// readDevToolsPort 等待用户数据目录里的 DevToolsActivePort 写完整，返回端口与浏览器 WebSocket 路径；超时返回空串。
+// Chromium 先创建该文件、再写入内容，两步之间读到的是空文件或只有端口行的半成品：只看「文件是否存在」
+// 会把这种瞬间误判为浏览器没有调试端口（CI 负载高时实测命中，表现为 ERR no-port）。必须等两行都齐。
+// readDevToolsPort waits until DevToolsActivePort is fully written (port line + browser ws path line); the file
+// is created before it is filled, so existence alone is not enough.
+func readDevToolsPort(dir string, wait time.Duration) (port, wsPath string) {
 	end := time.Now().Add(wait)
-	for time.Now().Before(end) {
+	for {
 		var found string
 		filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() && d.Name() == "DevToolsActivePort" {
@@ -44,11 +49,18 @@ func findDevToolsPortFile(dir string, wait time.Duration) string {
 			return nil
 		})
 		if found != "" {
-			return found
+			if raw, err := os.ReadFile(found); err == nil {
+				lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+				if len(lines) >= 2 && strings.TrimSpace(lines[0]) != "" && strings.TrimSpace(lines[1]) != "" {
+					return strings.TrimSpace(lines[0]), strings.TrimSpace(lines[1])
+				}
+			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		if !time.Now().Before(end) {
+			return "", ""
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
-	return ""
 }
 
 // runCaptureChildIfRequested 在 main / TestMain 最开头调用：是采集子进程则运行到结束并返回 true。
@@ -107,15 +119,13 @@ func runCaptureChild(userData string) {
 	mygo.App.WhenReady(func() {
 		newCaptureChildWindow()
 		go func() {
-			f := findDevToolsPortFile(userData, 15*time.Second)
-			raw, _ := os.ReadFile(f)
-			lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-			if len(lines) < 2 {
+			port, wsPath := readDevToolsPort(userData, 15*time.Second)
+			if port == "" {
 				fmt.Println("ERR no-port")
 				mygo.App.Quit()
 				return
 			}
-			fmt.Printf("READY %s %s\n", strings.TrimSpace(lines[0]), strings.TrimSpace(lines[1]))
+			fmt.Printf("READY %s %s\n", port, wsPath)
 			// 控制通道：主进程发 NEW 就新建一个隐藏窗口（页池里的一个），主进程退出或关闭管道即结束。
 			sc := bufio.NewScanner(os.Stdin)
 			for sc.Scan() {
