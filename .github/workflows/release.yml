@@ -12,6 +12,8 @@ on:
   push:
     tags:
       - "v*"
+      # Go 壳灰度版（v*-go.*）由 release-go.yml 负责，这里不构建 Electron 包
+      - "!v*-go.*"
   workflow_dispatch:
 
 jobs:
