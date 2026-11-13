@@ -141,16 +141,22 @@ func (e *impTestEnv) extract(ctx context.Context, task map[string]any, onStage f
 }
 
 // settle 等到队列静止：所有在跑的任务要么结束，要么阻塞在 hold 上，且没有可起跑的待处理任务。
-func (e *impTestEnv) settle() {
+//
+// 上限 60 秒且超时必须失败：CI 的 Windows 机器慢时整套写入对拍可达 65 秒，旧的 10 秒上限到期后静默返回，
+// 随后快照到「还没跑完」的中间态，报出看似行为不一致、实为等待不足的误导性差异。
+func (e *impTestEnv) settle(t *testing.T) {
+	t.Helper()
 	q := e.l.imports
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(60 * time.Second)
 	stable := 0
+	var running, pending, held, conc int
+	var paused bool
 	for time.Now().Before(deadline) {
 		q.mu.Lock()
-		running, pending, paused, conc := len(q.running), len(q.pending), q.paused, q.concurrency
+		running, pending, paused, conc = len(q.running), len(q.pending), q.paused, q.concurrency
 		q.mu.Unlock()
 		e.mu.Lock()
-		held := len(e.holds)
+		held = len(e.holds)
 		e.mu.Unlock()
 		if running == held && (pending == 0 || paused || running >= conc) {
 			stable++
@@ -162,6 +168,7 @@ func (e *impTestEnv) settle() {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	t.Fatalf("导入队列 60 秒内未静止：running=%d held=%d pending=%d paused=%v concurrency=%d", running, held, pending, paused, conc)
 }
 
 // resolveTaskArgs 把参数里的 {"__taskOf": 输入} / {"__itemOfTask": 输入} 换成对应任务 id / 其入库条目 id。
@@ -214,7 +221,7 @@ func (e *impTestEnv) run(ctx context.Context, t *testing.T, fn string, args []js
 	t.Helper()
 	switch fn {
 	case "settle":
-		e.settle()
+		e.settle(t)
 		return nil, nil
 	case "recover":
 		return nil, e.l.imports.Recover(ctx)
