@@ -1,0 +1,33 @@
+{
+  "name": "@guizhi/desktop-go",
+  "version": "0.0.0",
+  "private": true,
+  "description": "归知 Go 壳（MyGo + WebView2）。本包只承载 jsrc 里被打进 goja 的 TS 源码的第三方依赖与单测；Go 代码本身由 go.mod 管理。",
+  "scripts": {
+    "gen": "tsx jsgen/build-themed.mts && tsx jsgen/build-pipeline.mts && tsx jsgen/build.mts && tsx jsgen/build-render-scripts.mts",
+    "test": "vitest run --config jsrc/vitest.config.ts"
+  },
+  "dependencies": {
+    "css-tree": "^3.2.1",
+    "linkedom": "^0.18.13",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark-cjk-friendly": "2.3.1",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "sanitize-html": "^2.17.7",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/css-tree": "^3.2.0",
+    "@types/node": "^24.0.0",
+    "@types/sanitize-html": "^2.16.1",
+    "esbuild": "^0.25.12",
+    "jsdom": "^27.3.0",
+    "tsx": "4.21.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.0.0"
+  }
+}
