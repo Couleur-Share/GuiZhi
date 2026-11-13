@@ -11,13 +11,12 @@
 
 ## 来源与约定
 
-- 2026-11-13 从 `apps/desktop/src/main/services/{themed-reading,web-capture}` **原样复制**（逐字节一致），目的是让 Go 壳的 TS 产物不再依赖 Electron 主进程目录；
-  复制期间两处并存，Electron 终版已冻结（`electron-final-0.28.x`），两边不应再各自修改。主进程目录删除后这里是唯一来源。
+- 2026-11-13 从 `apps/desktop/src/main/services/{themed-reading,web-capture}` **原样复制**而来；Electron 主进程目录已于同日删除（标签 `pre-electron-removal` 可查旧位置），这里是唯一来源。
 - 保留 `services/` 层级，源文件里的相对导入（`./x`、`../web-capture/x`）无需改动。`../ai-usage`、`../search-service`、
   `web-capture/web-capture`、`@guizhi/core` 由 `jsgen` 的插件换成 shim，不需要对应文件。
 - `@guizhi/shared`、`@guizhi/db` 的别名由本目录 `tsconfig.json`（构建）与 `vitest.config.ts`（单测）解析；第三方依赖
   （linkedom、css-tree、sanitize-html、unified 等）由 `apps/desktop-go/package.json` 声明。`apps/desktop/package.json`
-  里的同名声明在主进程目录删除前保留，届时一并去掉。
+  里残留的 linkedom、css-tree、sanitize-html 声明已无使用方，可择机清理（需同步更新 lockfile）。
 
 ## 验证
 
@@ -36,15 +35,13 @@ pnpm --filter @guizhi/desktop-go test
 
 配置见 `vitest.config.ts`：`virtual:reading-libraries` 复用 `apps/desktop/scripts/reading-libraries-plugin.mjs`；
 被 shim 的模块与 `jsgen` 解析到同一批 shim，因此测试里的 `vi.mock` 与源码指向同一个模块。
-CI 的 `desktop-go` job 在删除 `apps/desktop/src/main` 之后运行它们，证明不依赖 Electron 主进程。
+CI 的 `desktop-go` job 会运行它们。
 
 ## 已知限制
 
 - 这里的源码没有独立的类型检查：原先由 `apps/desktop` 的 `tsc --noEmit` 覆盖，而 `ai-usage`、`search-service`、
-  `virtual:reading-libraries` 等被构建期替换的模块，以及 `web-settle.ts` 仅类型引用的 `web-network-activity`（Electron 侧文件），
-  在本目录里 `tsc` 解析不到（试跑共 8 处 TS2307，均属此类）。补齐需要为这些模块提供类型声明，留待主进程目录删除时处理。
-- 迁来的单测只有 24 个文件；其余测试同时依赖 Electron 专有模块（如 `native-search-response`），留在 `apps/desktop/tests/unit`，
-  随主进程目录一起处理。
+  `virtual:reading-libraries` 等被构建期替换的模块，以及 `web-settle.ts` 仅类型引用的 `web-network-activity`（该文件随 Electron 主进程已删除，引用现在是悬空的），
+  在本目录里 `tsc` 解析不到（试跑共 8 处 TS2307，均属此类）。补齐需要为这些模块提供类型声明或清理悬空引用。
+- 单测只有 24 个文件：其余依赖 Electron 专有模块的旧测试已随主进程删除（见标签 `pre-electron-removal`）。
   - `reading-research-recovery` 里原先借 `nativeSearchResults` 造搜索结果的那条用例，迁移时改为直接给出标题与 URL；
-    原生搜索响应的解析本身仍由 `apps/desktop/tests/unit/native-reading-search.test.ts` 覆盖。
-  - `jsrc/tests` 下的 4 个 fixture 与 `fixtures/reading-graphics` 是从 `apps/desktop/tests` **复制**的，Electron 侧脚本仍在使用原件。
+    原生搜索响应的解析在 Go 壳中由 Go 测试覆盖。

@@ -1,26 +1,19 @@
 # 归知 GuiZhi — 开发约定
 
-归知是本地优先的 AI 个人知识库，采用 Electron + React + TypeScript、pnpm monorepo。
-应用骨架源自 PromptHub v0.5.9；AGPL-3.0 归属说明见 `NOTICE`。具体依赖版本以当前 `package.json` 为准。
-
-## 当前主线（2026-11-13 起，迁移过渡期）
-
-桌面端的唯一主线是 Go + WebView2 外壳 `apps/desktop-go`（基于 MyGo）；Electron 版停止维护，终版保存在分支 `electron-final` 与标签 `electron-final-0.28.x`。以下条目在退役第 3 阶段改写本文前，优先于后文的 Electron 描述：
-
-- **构建与验证**：`.\apps\desktop-go\scripts\build-shell.ps1` 构建（产物在 `apps/desktop-go/out/win-x64`）；`.\apps\desktop-go\scripts\build-installer.ps1` 打安装包（需先构建）；Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...`（全量约 2 分钟，会拉起真实 WebView2 隐藏窗口）。
-- **界面源码仍是一份**：`apps/desktop/src/renderer` 与 `preload` 是界面唯一来源，Go 壳用 `apps/desktop-go/vite.*.config.ts` 构建它们，经 `apps/desktop-go/shim` 把 Electron API 接到 Go 服务。
-- **`apps/desktop/src/main` 与 `packages/` 暂不能删**：其中一部分 TS 是 `apps/desktop-go/jsgen` 生成嵌入产物（主题阅读管线、快照净化、渲染脚本、IPC 频道清单、建表 SQL）的输入，另一部分是 `spikes/mygo-db` 等对拍脚本的基准。冻结 golden 与剥离生成输入完成前，不要整体删除。
-- **发布**：`v*` tag 触发 `release.yml` 构建 Go 壳并创建 Draft；`release-electron-legacy.yml` 只能手动触发，仅供紧急回退。发版仍读取 `.cursor/skills/guizhi-release/SKILL.md`，其中 Electron 专属步骤以本节为准。
-- 下文的 `pnpm electron:dev`、`pnpm shot`、`pnpm build:isolated`、`pnpm test:e2e` 仍针对 `apps/desktop` 的 Electron 实现，不验证 Go 壳。
+归知是本地优先的 AI 个人知识库：Go + WebView2 桌面外壳（基于 MyGo）加 React + TypeScript 界面，pnpm monorepo。
+界面骨架源自 PromptHub v0.5.9；AGPL-3.0 归属说明见 `NOTICE`。具体依赖版本以当前 `package.json` 与 `apps/desktop-go/go.mod` 为准。
+Electron 版已于 2026-11-13 退役，终版保存在分支 `electron-final`、标签 `electron-final-0.28.x`；删除主进程前的完整状态是标签 `pre-electron-removal`。
 
 ## 源码与数据边界
 
-- `apps/desktop/src/main`：窗口、IPC、采集、AI 请求及桌面服务；`preload`：contextBridge 白名单；`renderer`：React 界面和状态。
-- `packages/core`：AI 配置与客户端；`packages/db`：SQLite schema 与适配器；`packages/shared`：跨进程类型和 IPC 常量。
-- 渲染进程不直接访问 Node API，系统能力走 preload 白名单。IPC 频道集中在 `packages/shared/constants/ipc-channels.ts`，main 注册于 `main/ipc/index.ts`。
-- 数据库在用户数据目录的 `data/knowledge.db`；旧 .NET 数据库仅作只读迁移源。AI 配置在 `config/ai-models.json`，AI HTTP/流式请求经主进程代理。
-- 远程抓取经过 `main/services/net-safety.ts` 的 SSRF 防护。不要把 API Key、代理口令等机密写入日志或普通导出；配置迁移中离开数据目录的机密字段必须加密。数据库备份与 Markdown 导出不携带 AI 配置。
-- 手机收集桌面凭证例外：仅主进程 safeStorage 加密保存于 `.machine/mobile-capture.json`；不通过 IPC 返回，不加入备份、导出或目录迁移白名单。Linux basic_text 或安全存储不可用时仅保存在当前进程内存，禁止明文回落。
+- `apps/desktop-go`：桌面外壳——窗口、托盘、IPC 处理器、SQLite、采集、AI 请求代理、备份、更新器，以及构建、安装包与截图工具链。
+- `apps/desktop/src/renderer`：React 界面与状态；`apps/desktop/src/preload`：`window.api` 白名单，经 `apps/desktop-go/shim` 接到 Go 处理器。
+- `packages/core`：AI 配置与客户端；`packages/db`：SQLite schema 与迁移；`packages/shared`：跨进程类型和 IPC 常量。
+- 渲染进程不直接访问系统能力，一律走 preload 白名单。IPC 频道集中在 `packages/shared/constants/ipc-channels.ts`；`apps/desktop-go/ipc_channels_gen.go` 由 preload 扫描生成，新增频道必须同时补 Go 处理器。
+- 数据库在用户数据目录的 `data/knowledge.db`；旧 .NET 数据库仅作只读迁移源。AI 配置在 `config/ai-models.json`，AI HTTP/流式请求经 Go 壳代理。
+- 远程抓取经过 `apps/desktop-go/net_safety.go`（含 `safe_fetch.go`）的 SSRF 防护。不要把 API Key、代理口令等机密写入日志或普通导出；配置迁移中离开数据目录的机密字段必须加密（Windows DPAPI）。数据库备份与 Markdown 导出不携带 AI 配置。
+- 手机收集已从桌面端移除（见 `docs/product-scope.md`）：桌面端不保存手机收集凭证；`apps/capture-*` 仍在仓库中，其约束见下文各节。
+- `apps/desktop-go/jsrc` 的 TS 经 `jsgen` 生成嵌入 goja 的产物，**产物入库**，CI 要求与重新生成的结果一致：改了 `jsrc`/`jsgen` 后运行 `pnpm --filter @guizhi/desktop-go gen` 并一起提交。
 
 ## UI 与错误处理
 
@@ -33,34 +26,35 @@
 
 ## 平台支持政策
 
-- 官方仅为 Windows 11+ x64 提供安装包、平台测试与维护支持；Windows ARM64 不提供当前版本安装包。
-- Linux / macOS 不再提供官方安装包、平台测试及兼容性保证。保留现有适配代码与构建入口供用户自行构建，不保证构建成功或功能完整。
+- 官方仅为 Windows 11+ x64 提供安装包、平台测试与维护支持；Windows ARM64 不提供当前版本安装包。外壳依赖 WebView2 运行时。
+- Linux / macOS 没有桌面外壳：Go 壳只面向 Windows，不再保留 Electron 的跨平台构建入口，也不提供官方安装包与兼容性保证。
 - 平台专属问题不属于官方维护范围；欢迎可验证的社区 PR，不承诺修复或合并时限。未经用户明确要求，不将 Linux / macOS 加回官方发布矩阵。
-- Linux 上的通用质量检查不代表 Linux 桌面版获得官方支持。
+- Linux 上的通用质量检查（含手机收集服务预检）不代表 Linux 桌面版获得官方支持。
 
 ## 开发与验证
 
 ```bash
-pnpm electron:dev        # 开发，连接用户数据目录，启动前注意当前实例
 pnpm typecheck
-pnpm test:unit
+pnpm test:unit           # 校验脚本 + 渲染层 vitest + jsrc 单测
 pnpm lint
-pnpm shot                # 使用独立临时数据目录的离屏截图
-pnpm build:isolated      # 当前源码副本中构建，不覆盖开发实例的 out/
-pnpm electron:build:win
+pnpm shot                # 隔离副本构建 Go 壳 + 离屏启动 + 截图（含渲染层包体预算）
+pnpm build               # 原位构建到 apps/desktop-go/out/win-x64（需要 pwsh 7）
+pnpm build:installer     # 在 build 产物上打 NSIS 安装包
+pnpm verify:release      # 发版前验证组合
 ```
 
-按改动范围选择验证；发版按发版流程完成门禁。报告区分源码/隔离测试、真实第三方流程和已发布状态。
+Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...`（约 2 分钟，会拉起真实 WebView2 隐藏窗口，需先 `pnpm build`）。
+没有 HMR 开发服务：改完界面源码用 `pnpm shot` 看效果。按改动范围选择验证；发版按发版流程完成门禁。报告区分源码/隔离测试、真实第三方流程和已发布状态。
 
-- UI 验证使用 `pnpm shot`，自动复制当前源码（含未提交改动）到系统临时目录、构建并离屏启动。需要交互时用 `--steps <file>`；无需先在开发目录 build，不得用 `--stale-ok` 验证新改动。根目录 `pnpm test:e2e` / `pnpm test:e2e:smoke` 同样走隔离副本。
-- 保留现有屏幕外窗口 + `showInactive()` 的截图实现及临时 userData 隔离，不能简单改成隐藏窗口；平台差异见下方桌面开发参考。
+- UI 验证使用 `pnpm shot`，自动复制当前源码（含未提交改动）到系统临时目录、构建并离屏启动。需要交互时用 `--steps <file>`（示例在 `apps/desktop-go/scripts/steps/`）；无需先在开发目录 build。
+- 保留屏幕外窗口 + `showInactive()` 的截图实现及临时 userData 隔离，不能改成隐藏窗口（隐藏窗口的合成器停摆，截图拿不到新帧）；细节见桌面开发参考。
 - 默认采用串行开发：用户在代理执行任务期间不使用归知，任务完成后再启动；无需管理工作副本或候选版本。代理开始前仍须检查实例，不得自行关闭用户应用。
-- 用户的 `electron:dev` 可能正在运行。开始修改前先检查当前目录的开发服务；并行使用时，源码修改与验证必须在独立 worktree/工作副本中进行（包含本任务所需的未提交改动，并保留原目录改动）。不要在被监听的目录改 main/preload/renderer、共享包、Vite 配置或依赖文件；仅减少写入次数不能避免干扰。完成后先交付差异，待用户切换版本时再回写原目录。
-- 验证不得停掉、重启或复用用户实例，不得按进程名称批量结束 Electron/Node，也不得连接用户的 Vite 端口或使用其数据目录。开发目录仍有服务时，不运行原地 `pnpm build`、子包 `test:e2e`、依赖 install/rebuild；构建检查用 `pnpm build:isolated`，打包等必须在独立工作副本运行。
+- 用户可能正在运行归知（安装版或自行构建的 `GuiZhi.exe`）。并行使用时，源码修改与验证必须在独立 worktree/工作副本中进行（包含本任务所需的未提交改动，并保留原目录改动）；完成后先交付差异，待用户切换版本时再回写原目录。
+- 验证不得停掉、重启或复用用户实例，不得按进程名称批量结束 `GuiZhi.exe`/Node，不得使用用户数据目录：直接运行构建出的 `GuiZhi.exe` 不带 `-userdata` 会指向真实 `%APPDATA%\GuiZhi`。不要原位覆盖用户正在运行的 `apps/desktop-go/out/win-x64/GuiZhi.exe`；构建检查用 `pnpm shot`，打包等放在独立工作副本。
 
 ## 按需参考
 
-- 改架构、IPC、错误处理或截图工具时，查阅 [桌面开发细节](docs/agents/desktop-development.md) 中对应章节；其中源码路径相对于仓库根目录。
+- 改架构、IPC、错误处理、截图工具或安装包时，查阅 [桌面开发细节](docs/agents/desktop-development.md) 中对应章节；其中源码路径相对于仓库根目录。Electron 时代的旧实现笔记在 [electron-era-development.md](docs/agents/electron-era-development.md)（历史资料）。
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
 - 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。

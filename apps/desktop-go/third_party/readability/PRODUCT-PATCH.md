@@ -7,4 +7,4 @@
 2. `Parser.KeepTitleHeader`：为真时不删除与标题重复的首个 h1/h2（产品把 `_headerDuplicatesTitle` 改成恒 false）。
 
 改动位置见 `parser.go` 中的 `LinkDensityModifier`、`KeepTitleHeader`。已删去测试页、`cmd/` 与 CI 配置。
-升级上游时参照 `spikes/mygo-readability/prepare-patched.ps1` 重新生成副本，并用 `spikes/mygo-readability/cmd/compare-extract` 对拍。
+升级上游时参照 `spikes/mygo-readability/prepare-patched.ps1` 重新生成副本，并用 `spikes/mygo-readability/cmd/compare-extract` 对拍（`spikes/` 已从主线删除，检出标签 `pre-electron-removal` 可取得这两份脚本）。

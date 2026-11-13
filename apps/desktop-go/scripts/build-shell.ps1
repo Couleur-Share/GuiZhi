@@ -1,6 +1,6 @@
 # 构建 MyGo 壳的 Windows x64 发布目录：<out>\GuiZhi.exe + dist\{renderer,preload} + reading_libraries.json
 # 用法（仓库根）：.\apps\desktop-go\scripts\build-shell.ps1 [-Out apps\desktop-go\out\win-x64]
-# 不碰 apps\desktop\out（Electron 构建产物），可在开发服务运行时执行。
+# 产物写入 -Out 指定目录；不要覆盖用户正在运行的 GuiZhi.exe（验证用 pnpm shot，它在隔离副本里构建）。
 param([string]$Out = "apps\desktop-go\out\win-x64")
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path "$PSScriptRoot\..\..\..").Path

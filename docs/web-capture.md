@@ -65,4 +65,4 @@
 - 单测：`tests/unit/web-capture/web-extract-article.test.ts`（每条提取规则）、`web-node-extractor.test.ts`（线程生命周期与网络禁用）、`web-storage.test.ts`（引擎变化保护）。
 - 离线集成（真实 Electron 加单独打包的提取线程，发版工作流在构建前运行）：`GUIZHI_TEST_WEB_CAPTURE=1 pnpm --filter @guizhi/desktop exec vitest run tests/integration/web-capture-runtime.test.ts`。50 页批次用 `GUIZHI_TEST_50_PAGE_BATCH=1` 运行 `web-capture-batch.test.ts`。
 - 公网对照：`GUIZHI_TEST_LIVE_CRAWLER=1` 运行 `web-capture-live.test.ts`，样本在 `config/web-capture/public-samples.json`，结果写到 `artifacts/web-capture/`。需要显式代理时设 `GUIZHI_TEST_HTTP_PROXY`。
-- 渲染窗口的出口、沉降、请求身份与惰性图片探测见 [桌面开发细节](agents/desktop-development.md)，经 `pnpm shot --steps` 运行，不依赖公网。
+- 渲染窗口的出口、沉降、请求身份与惰性图片探测见 [Electron 时代开发参考](agents/electron-era-development.md)（历史资料；Go 壳的沉降与采集实现以源码为准），不依赖公网。
