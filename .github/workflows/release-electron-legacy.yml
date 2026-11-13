@@ -1,19 +1,14 @@
-name: Desktop Build and Release
+name: Desktop Build and Release (Legacy Electron, manual only)
 
-# 打 v* tag 触发构建并创建 Draft Release；验证通过后维护者手动执行
-#   gh release edit <tag> --draft=false --latest
-# 正式对外发布。
+# 【已停用自动触发】自 Go 壳成为主线起，v* tag 由 release.yml 构建 Go 壳。
+# 本文件只保留 Electron 终版（分支 electron-final / 标签 electron-final-0.28.x）的手动构建能力，
+# 仅供紧急回退使用，只能手动触发（workflow_dispatch）；Electron 主进程代码彻底移除后一并删除本文件。
 #
 # 官方发布与维护仅限 Windows x64。
 # Linux / macOS 不再提供官方安装包、平台测试或兼容性保证；
 # 保留现有平台构建分支，供源码自行构建参考，不加入官方发布矩阵。
 
 on:
-  push:
-    tags:
-      - "v*"
-      # Go 壳灰度版（v*-go.*）由 release-go.yml 负责，这里不构建 Electron 包
-      - "!v*-go.*"
   workflow_dispatch:
 
 jobs:

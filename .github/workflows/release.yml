@@ -1,19 +1,19 @@
-name: Desktop Build and Release (Go shell)
+name: Desktop Build and Release
 
-# Go + WebView2 外壳（spikes/mygo-shell）的灰度发布流水线。
-# 打 v*-go.* tag（例如 v0.29.0-go.1）触发：构建 Go 壳 → NSIS 安装包 → 离屏启动冒烟 →
-# 校验更新清单 → 创建 Draft 预发布。验证通过后维护者手动执行
-#   gh release edit <tag> --draft=false --prerelease
-# 对外发布。
+# Go + WebView2 外壳（apps/desktop-go）的发布流水线，Go 壳是唯一的桌面主线。
+# 打 v* tag 触发：构建 Go 壳 → NSIS 安装包 → 离屏启动冒烟 → 校验更新清单 → 创建 Draft Release。
+# 验证通过后维护者手动执行
+#   正式版：gh release edit <tag> --draft=false --latest
+#   预发布（版本号带 -xxx 后缀，例如 0.30.0-rc.1）：gh release edit <tag> --draft=false --prerelease
+# 对外发布。版本号带后缀的 tag 自动按预发布创建，稳定通道用户不会收到。
 #
-# 与 release.yml 的分工：release.yml 排除了 *-go.* tag，只负责 Electron 版；
-# 本文件只负责 Go 壳。Go 壳版本号必须带 -go.N 后缀，这样更新通道把它当预发布线，稳定通道用户不会收到。
+# Electron 版已停止维护：旧流水线保留为 release-electron-legacy.yml（仅手动触发，紧急回退用）。
 # 仅 Windows x64；安装包未做代码签名（与 Electron 版一致）。
 
 on:
   push:
     tags:
-      - "v*-go.*"
+      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -34,9 +34,10 @@ jobs:
         run: |
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          # 版本号带连字符后缀（如 0.30.0-rc.1）视为预发布，否则为正式版
           case "${VERSION}" in
-            *-go.*) ;;
-            *) echo "Go 壳版本号必须带 -go.N 后缀（当前 ${VERSION}）"; exit 1 ;;
+            *-*) echo "PRERELEASE=true" >> "$GITHUB_ENV" ;;
+            *) echo "PRERELEASE=false" >> "$GITHUB_ENV" ;;
           esac
           if [[ "${GITHUB_REF}" == refs/tags/* ]] && [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
             echo "标签 ${GITHUB_REF_NAME} 与 apps/desktop/package.json 版本 v${VERSION} 不一致"
@@ -71,19 +72,19 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: spikes/mygo-shell/go.mod
-          cache-dependency-path: spikes/mygo-shell/go.sum
+          go-version-file: apps/desktop-go/go.mod
+          cache-dependency-path: apps/desktop-go/go.sum
 
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Build Go shell
         shell: pwsh
-        run: ./spikes/build-shell.ps1
+        run: ./apps/desktop-go/scripts/build-shell.ps1
 
       - name: Build installer
         shell: pwsh
-        run: ./spikes/build-installer.ps1
+        run: ./apps/desktop-go/scripts/build-installer.ps1
 
       # 在全新的 WebView2 配置和临时数据目录里离屏启动一次：
       # 验证 exe、内置 SQLite 原生库、渲染产物齐全，且全部 IPC 频道都有处理器、首次安装界面为中文。
@@ -93,7 +94,7 @@ jobs:
           $t = Join-Path $env:RUNNER_TEMP "mygo-smoke"
           New-Item -ItemType Directory -Force $t | Out-Null
           $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $t "wv"
-          $p = Start-Process -FilePath "spikes\mygo-shell\out\win-x64\GuiZhi.exe" `
+          $p = Start-Process -FilePath "apps\desktop-go\out\win-x64\GuiZhi.exe" `
             -ArgumentList "-userdata", "$t\ud", "-appdata", $t, "-shot", "$t\a.png" `
             -PassThru -Wait -RedirectStandardError "$t\err.txt" -RedirectStandardOutput "$t\out.txt"
           Get-Content "$t\err.txt", "$t\out.txt" | Select-Object -First 40
@@ -109,7 +110,7 @@ jobs:
         working-directory: apps/desktop
         run: |
           mkdir -p ../../release_assets
-          INSTALLER="../../spikes/mygo-shell/out/installer"
+          INSTALLER="../../apps/desktop-go/out/installer"
           cp "${INSTALLER}/GuiZhi-Setup-${VERSION}-x64.exe" ../../release_assets/
           cp "${INSTALLER}/latest.yml" ../../release_assets/latest.yml
           node scripts/fix-latest-yml.js --file ../../release_assets/latest.yml --arch x64
@@ -138,10 +139,10 @@ jobs:
           if (!headings[0][0].startsWith(`## v${version}`)) throw new Error(`CHANGELOG 顶部小节不是 v${version}`);
           const body = text.slice(headings[0].index, headings[1]?.index).trim();
           const url = `https://github.com/Couleur-Share/GuiZhi/releases/download/v${version}/GuiZhi-Setup-${version}-x64.exe`;
-          fs.writeFileSync('release_notes.md', `[下载 Windows x64 安装包（Go 壳灰度预览版）](${url})\n\n${body}\n`);
+          fs.writeFileSync('release_notes.md', `[下载 Windows x64 安装包](${url})\n\n${body}\n`);
           NODE
 
-          # 始终是预发布；创建或更新 Draft（验证后手动 promote）
+          # 创建或更新 Draft（验证后手动 promote）；预发布标记由版本号后缀决定
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             echo "Release ${GITHUB_REF_NAME} already exists. Updating assets in place..."
             IS_DRAFT=$(gh release view "${GITHUB_REF_NAME}" --json isDraft -q .isDraft)
@@ -149,16 +150,16 @@ jobs:
               --title "归知 GuiZhi ${VERSION}" \
               --notes-file release_notes.md \
               --draft=${IS_DRAFT} \
-              --prerelease=true
+              --prerelease=${PRERELEASE}
             gh release upload "${GITHUB_REF_NAME}" release_assets/* --clobber
           else
-            echo "Creating DRAFT prerelease..."
+            echo "Creating DRAFT release (prerelease=${PRERELEASE})..."
             gh release create "${GITHUB_REF_NAME}" \
               release_assets/* \
               --title "归知 GuiZhi ${VERSION}" \
               --notes-file release_notes.md \
               --draft=true \
-              --prerelease=true
+              --prerelease=${PRERELEASE}
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

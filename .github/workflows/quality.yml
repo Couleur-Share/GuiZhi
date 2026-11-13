@@ -71,3 +71,57 @@ jobs:
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
         run: xvfb-run -a pnpm exec playwright test smoke.spec.ts
+
+  # Go 壳（主线）：构建渲染层与 Go 壳后，跑 vet 与全量单测。
+  # 全量测试会拉起真实 WebView2 隐藏窗口（采集、渲染、阅读视图），所以必须在 Windows 上跑，约 2 分钟。
+  desktop-go:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/desktop-go/go.mod
+          cache-dependency-path: apps/desktop-go/go.sum
+
+      # 构建脚本同时产出测试依赖的 dist/ 与 reading_libraries.json，必须先于 go test 运行
+      - name: Build Go shell
+        shell: pwsh
+        run: ./apps/desktop-go/scripts/build-shell.ps1
+
+      - name: Go vet
+        working-directory: apps/desktop-go
+        run: go vet ./...
+
+      - name: Go tests
+        working-directory: apps/desktop-go
+        run: go test -count=1 ./...
