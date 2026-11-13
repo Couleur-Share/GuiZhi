@@ -151,3 +151,6 @@ config/crawl4ai/downloads/
 
 # MyGo 主题阅读渲染引擎的内置库（由 apps/desktop-go/jsgen/build-reading-libs.mts 生成，数 MB）
 apps/desktop-go/reading_libraries.json
+
+# Go 壳对拍基准（冻结自 Electron 终版 TS 实现）：其中的 .db / .log 是对拍输入，必须入库，不受上方通配规则影响
+!apps/desktop-go/testdata/golden/**

@@ -1,0 +1,111 @@
+{
+  "kind": "guizhi-config",
+  "version": 1,
+  "exportedAt": "2026-11-13T06:31:00.162Z",
+  "appVersion": "0.28.0",
+  "settings": {
+    "theme": "dark",
+    "language": "zh",
+    "aiApiKey": "",
+    "networkProxy": {
+      "enabled": true,
+      "host": "h",
+      "password": ""
+    },
+    "aiProviders": [
+      {
+        "id": "p-a",
+        "provider": "A",
+        "name": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1"
+      },
+      {
+        "id": "p-b",
+        "provider": "B",
+        "name": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1"
+      }
+    ],
+    "aiModels": [
+      {
+        "id": "m-a",
+        "providerId": "p-a",
+        "provider": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1",
+        "model": "ma"
+      },
+      {
+        "id": "m-b",
+        "providerId": "p-b",
+        "provider": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1",
+        "model": "mb"
+      }
+    ],
+    "modelRouteDefaults": {
+      "mainText": "m-a",
+      "fastText": "m-b",
+      "audioText": "  "
+    }
+  },
+  "settingsVersion": 7,
+  "uiLayout": {
+    "ui-storage": {
+      "a": 1
+    },
+    "guizhi-library-table-config": "x"
+  },
+  "illustrationStyles": [
+    {
+      "id": "mine",
+      "name": "我的风格",
+      "description": "d",
+      "group": "自定",
+      "visualDna": "dna",
+      "character": "",
+      "negative": "n",
+      "aspectRatio": "4:3",
+      "maxShots": 3,
+      "maxLabels": 2
+    }
+  ],
+  "shortcuts": {
+    "accelerators": {
+      "showApp": "Alt+X",
+      "newItem": "Alt+Y",
+      "search": "Alt+Z",
+      "settings": "Alt+W"
+    },
+    "modes": {
+      "showApp": "global",
+      "newItem": "local",
+      "search": "local",
+      "settings": "local"
+    }
+  },
+  "mcpScope": {
+    "mode": "selected",
+    "allowedCollectionIds": [
+      "c1",
+      "c2"
+    ],
+    "allowUncategorized": false
+  },
+  "encryption": {
+    "algo": "aes-256-gcm",
+    "kdf": "scrypt",
+    "salt": "AA==",
+    "n": 2048,
+    "r": 8,
+    "p": 1,
+    "canary": "x"
+  }
+}

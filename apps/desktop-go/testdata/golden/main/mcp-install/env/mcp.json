@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "guizhi": {
+      "command": "/usr/bin/x",
+      "args": [
+        "m.mjs"
+      ],
+      "env": {
+        "ELECTRON_RUN_AS_NODE": "1",
+        "K": "v \"q\""
+      }
+    }
+  }
+}

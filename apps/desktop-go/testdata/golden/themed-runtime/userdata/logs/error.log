@@ -1,0 +1,4 @@
+{"ts":"2026-11-13T06:28:55.255Z","pid":37448,"version":"0.28.0","platform":"win32","scope":"themedReading","action":"asset","itemId":"c","message":"图片服务异常"}
+{"ts":"2026-11-13T06:28:55.904Z","pid":37448,"version":"0.28.0","platform":"win32","scope":"themedReading","action":"generate","itemId":"b","message":"网络断开"}
+{"ts":"2026-11-13T06:28:56.050Z","pid":37448,"version":"0.28.0","platform":"win32","scope":"themedReading","action":"generate","itemId":"b","message":"继续生成重复了已完成章节"}
+{"ts":"2026-11-13T06:28:56.914Z","pid":37448,"version":"0.28.0","platform":"win32","scope":"themedReading","action":"generate","itemId":"c","message":"搜索服务不可用"}

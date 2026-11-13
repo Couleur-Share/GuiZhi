@@ -1,0 +1,6 @@
+{
+  // 我的服务器
+  "mcpServers": {
+    "other": { "command": "x" }, // 行尾注释
+  },
+}

@@ -1,0 +1,60 @@
+{
+  "kind": "guizhi-config",
+  "version": 1,
+  "exportedAt": "2026-11-13T06:31:00.414Z",
+  "appVersion": "0.28.0",
+  "settings": {
+    "theme": "dark",
+    "language": "zh",
+    "aiApiKey": "",
+    "networkProxy": {
+      "enabled": true,
+      "host": "h",
+      "password": ""
+    },
+    "aiProviders": [
+      {
+        "id": "p-a",
+        "provider": "A",
+        "name": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1"
+      },
+      {
+        "id": "p-b",
+        "provider": "B",
+        "name": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1"
+      }
+    ],
+    "aiModels": [
+      {
+        "id": "m-a",
+        "providerId": "p-a",
+        "provider": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1",
+        "model": "ma"
+      },
+      {
+        "id": "m-b",
+        "providerId": "p-b",
+        "provider": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1",
+        "model": "mb"
+      }
+    ],
+    "modelRouteDefaults": {
+      "mainText": "m-a",
+      "fastText": "m-b",
+      "audioText": "  "
+    }
+  },
+  "settingsVersion": 7
+}

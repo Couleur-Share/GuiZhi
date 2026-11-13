@@ -1,0 +1,1241 @@
+{
+ "cases": [
+  {
+   "name": "full",
+   "url": "http://mp.weixin.qq.com/s/full",
+   "pages": {
+    "http://mp.weixin.qq.com/s/full": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>页面标题</title><meta property=\"og:title\" content=\" OG 标题 \"><meta property=\"og:image\" content=\"http://mmbiz.qpic.cn/cover.png\">\n<meta name=\"author\" content=\" 作者甲 \"><meta property=\"article:published_time\" content=\"2024-05-01T12:00:00+08:00\">\n<style>.title{color:#333;font-size:20px}#js_content img{max-width:100%}.bg{background:url(http://mmbiz.qpic.cn/bg.jpg)}@import url(http://evil.test/a.css);.x{position:fixed}</style></head><body>\n<h1 id=\"activity-name\"> 文章标题 </h1><a id=\"js_name\"> 公众号乙 </a>\n<div id=\"js_content\" style=\"visibility: hidden; opacity: 0; display: none; color: red;\"><p style=\"text-align:center\">第一段 <strong>加粗</strong> <em>斜体</em> <a href=\"/s/other\">相对链接</a> <a href=\"#top\">锚点</a> <a href=\"javascript:alert(1)\">脚本</a> <a href=\"http://example.com/x?y=1&z=2\">外链</a></p>\n<section class=\"bg\" style=\"background-image:url(http://mmbiz.qpic.cn/bg.jpg);padding:8px\"><img data-src=\"http://mmbiz.qpic.cn/a.png\" src=\"data:image/gif;base64,R0lGOD\" alt=\"甲\"><img src=\"http://mmbiz.qpic.cn/b.jpg\" alt=\"乙\"></section>\n<p><img data-src=\"http://mmbiz.qpic.cn/c.gif\"><img src=\"http://mmbiz.qpic.cn/d.webp\"><img src=\"http://mmbiz.qpic.cn/bad.png\"></p>\n<h2>小节</h2><ul><li>一</li><li>二<ul><li>二点一</li></ul></li></ul><ol><li>甲</li><li>乙</li></ol>\n<blockquote>引用文字</blockquote><pre><code class=\"language-js\">const a = 1;\nconsole.log(a);</code></pre><table><tr><th>表头</th><th>列</th></tr><tr><td>单元</td><td>格</td></tr></table>\n<iframe src=\"https://v.qq.com/x\"></iframe><video poster=\"http://mmbiz.qpic.cn/poster.png\" src=\"https://x/y.mp4\"></video><mpvoice name=\"语音\"></mpvoice></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/a.png": {
+     "b64": "iVBORw0KGgpJSERSYQ=="
+    },
+    "http://mmbiz.qpic.cn/b.jpg": {
+     "b64": "/9j/4EpGSUZi"
+    },
+    "http://mmbiz.qpic.cn/c.gif": {
+     "b64": "R0lGODlhYw=="
+    },
+    "http://mmbiz.qpic.cn/d.webp": {
+     "b64": "UklGRgAAAABXRUJQZA=="
+    },
+    "http://mmbiz.qpic.cn/cover.png": {
+     "b64": "iVBORw0KGgpJSERSY292ZXI="
+    },
+    "http://mmbiz.qpic.cn/bg.jpg": {
+     "b64": "/9j/4EpGSUZiZw=="
+    },
+    "http://mmbiz.qpic.cn/poster.png": {
+     "b64": "iVBORw0KGgpJSERScG9zdGVy"
+    }
+   },
+   "result": {
+    "taskId": "task-full",
+    "entryUrl": "http://mp.weixin.qq.com/s/full",
+    "finalUrl": "http://mp.weixin.qq.com/s/full",
+    "title": "文章标题",
+    "author": "作者甲",
+    "publishedAt": 1714536000000,
+    "dateConfidence": "exact",
+    "markdown": "第一段 **加粗** _斜体_ [相对链接](http://mp.weixin.qq.com/s/other) [锚点](#top) 脚本 [外链](http://example.com/x?y=1&z=2)\n\n![甲](local-image://wechat-6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3.png)![乙](local-image://wechat-0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366.jpg)\n\n![](local-image://wechat-d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b.gif)![](local-image://wechat-0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff.webp)\n\n[图片未保存]\n\n## 小节\n\n*   一\n*   二\n    *   二点一\n\n1.  甲\n2.  乙\n\n> 引用文字\n\n```js\nconst a = 1;\nconsole.log(a);\n```\n\n表头\n\n列\n\n单元\n\n格\n\n音视频或互动内容：请打开原文查看\n\n音视频或互动内容：请打开原文查看![](local-image://wechat-5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d.png)\n\n音视频或互动内容：请打开原文查看\n\n---\n\n来源：<http://mp.weixin.qq.com/s/full>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "第一段 **加粗** _斜体_ [相对链接](http://mp.weixin.qq.com/s/other) [锚点](#top) 脚本 [外链](http://example.com/x?y=1&z=2)"
+     },
+     {
+      "id": "p2",
+      "text": "![甲](local-image://wechat-6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3.png)![乙](local-image://wechat-0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366.jpg)"
+     },
+     {
+      "id": "p3",
+      "text": "![](local-image://wechat-d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b.gif)![](local-image://wechat-0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff.webp)"
+     },
+     {
+      "id": "p4",
+      "text": "[图片未保存]"
+     },
+     {
+      "id": "p5",
+      "text": "## 小节"
+     },
+     {
+      "id": "p6",
+      "text": "*   一\n*   二\n    *   二点一"
+     },
+     {
+      "id": "p7",
+      "text": "1.  甲\n2.  乙"
+     },
+     {
+      "id": "p8",
+      "text": "> 引用文字"
+     },
+     {
+      "id": "p9",
+      "text": "```js\nconst a = 1;\nconsole.log(a);\n```"
+     },
+     {
+      "id": "p10",
+      "text": "表头"
+     },
+     {
+      "id": "p11",
+      "text": "列"
+     },
+     {
+      "id": "p12",
+      "text": "单元"
+     },
+     {
+      "id": "p13",
+      "text": "格"
+     },
+     {
+      "id": "p14",
+      "text": "音视频或互动内容：请打开原文查看"
+     },
+     {
+      "id": "p15",
+      "text": "音视频或互动内容：请打开原文查看![](local-image://wechat-5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d.png)"
+     },
+     {
+      "id": "p16",
+      "text": "音视频或互动内容：请打开原文查看"
+     },
+     {
+      "id": "p17",
+      "text": "---"
+     },
+     {
+      "id": "p18",
+      "text": "来源：<http://mp.weixin.qq.com/s/full>"
+     }
+    ],
+    "contentHash": "90c671a640050ab6a72ed9ee01f3b847abc8f4c384a0d39bb17ae89f183252f9",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": false,
+    "truncated": false,
+    "warnings": [
+     "音视频或互动内容仅保留说明与原文入口",
+     "1 个图片资源未保存，可重试补采"
+    ],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\" style=\"color:red\"><p style=\"text-align:center\">第一段 <strong>加粗</strong> <em>斜体</em> <a href=\"http://mp.weixin.qq.com/s/other\">相对链接</a> <a href=\"#top\">锚点</a> <a>脚本</a> <a href=\"http://example.com/x?y=1&amp;z=2\">外链</a></p>\n<section class=\"bg\" style=\"background-image:url(local-image://wechat-17000172c239ee74acd08e16715ffa94b688525abb442ef3d3e1ffed858852b0.jpg);padding:8px\"><img src=\"local-image://wechat-6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3.png\" alt=\"甲\" /><img src=\"local-image://wechat-0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366.jpg\" alt=\"乙\" /></section>\n<p><img src=\"local-image://wechat-d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b.gif\" /><img src=\"local-image://wechat-0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff.webp\" /><img alt=\"图片未保存\" /></p>\n<h2>小节</h2><ul><li>一</li><li>二<ul><li>二点一</li></ul></li></ul><ol><li>甲</li><li>乙</li></ol>\n<blockquote>引用文字</blockquote><pre><code class=\"language-js\">const a = 1;\nconsole.log(a);</code></pre><table><tr><th>表头</th><th>列</th></tr><tr><td>单元</td><td>格</td></tr></table>\n<p>音视频或互动内容：请打开原文查看</p><p>音视频或互动内容：请打开原文查看<img src=\"local-image://wechat-5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d.png\" /></p><p>音视频或互动内容：请打开原文查看</p></div>",
+     "css": ".title{color:#333;font-size:20px}#js_content img{max-width:100%}.bg{background:url(local-image://wechat-17000172c239ee74acd08e16715ffa94b688525abb442ef3d3e1ffed858852b0.jpg)}.x{}",
+     "hash": "60819c2b7f450df9cfd25c4cffea163d1ecde119c3e40800f484879b01d5533e",
+     "account": "公众号乙",
+     "author": "作者甲",
+     "publishedAt": 1714536000000,
+     "assets": [
+      {
+       "fileName": "wechat-0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff.webp",
+       "sha256": "0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff",
+       "sourceUrl": "http://mmbiz.qpic.cn/d.webp",
+       "bytes": 13
+      },
+      {
+       "fileName": "wechat-6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3.png",
+       "sha256": "6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3",
+       "sourceUrl": "http://mmbiz.qpic.cn/a.png",
+       "bytes": 13
+      },
+      {
+       "fileName": "wechat-76f4fe2ef619b6e1638192504071d31f4a164a4fa846b00130c80e1b774e2bec.png",
+       "sha256": "76f4fe2ef619b6e1638192504071d31f4a164a4fa846b00130c80e1b774e2bec",
+       "sourceUrl": "http://mmbiz.qpic.cn/cover.png",
+       "bytes": 17
+      },
+      {
+       "fileName": "wechat-17000172c239ee74acd08e16715ffa94b688525abb442ef3d3e1ffed858852b0.jpg",
+       "sha256": "17000172c239ee74acd08e16715ffa94b688525abb442ef3d3e1ffed858852b0",
+       "sourceUrl": "http://mmbiz.qpic.cn/bg.jpg",
+       "bytes": 10
+      },
+      {
+       "fileName": "wechat-5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d.png",
+       "sha256": "5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d",
+       "sourceUrl": "http://mmbiz.qpic.cn/poster.png",
+       "bytes": 18
+      },
+      {
+       "fileName": "wechat-d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b.gif",
+       "sha256": "d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b",
+       "sourceUrl": "http://mmbiz.qpic.cn/c.gif",
+       "bytes": 7
+      },
+      {
+       "fileName": "wechat-0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366.jpg",
+       "sha256": "0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366",
+       "sourceUrl": "http://mmbiz.qpic.cn/b.jpg",
+       "bytes": 9
+      }
+     ],
+     "failures": [
+      {
+       "url": "http://mmbiz.qpic.cn/bad.png",
+       "reason": "HTTP 404"
+      }
+     ],
+     "warnings": [
+      "音视频或互动内容仅保留说明与原文入口"
+     ],
+     "cover": "local-image://wechat-76f4fe2ef619b6e1638192504071d31f4a164a4fa846b00130c80e1b774e2bec.png"
+    }
+   },
+   "files": [
+    "wechat-0632f1f3e4610331bb09b50da6290ffbce03770013134caac4ea444244c8b366.jpg",
+    "wechat-0eb33765989b42cfc39016c9c537264299dc66631365f9288eb30bd7e0a119ff.webp",
+    "wechat-17000172c239ee74acd08e16715ffa94b688525abb442ef3d3e1ffed858852b0.jpg",
+    "wechat-5fa933b0bc5704551e6f6ec6d2ca13d7aecdd006c5e0050a2dc80a990cd6f64d.png",
+    "wechat-6b358f7169e58a700c64848e066cd150e530ff2d11f77d7ad040b4870bef6cf3.png",
+    "wechat-76f4fe2ef619b6e1638192504071d31f4a164a4fa846b00130c80e1b774e2bec.png",
+    "wechat-d4115efb0a08cbe6391f3850fb08d3d1c5d5f29ceb7d472b758029073ccf660b.gif"
+   ]
+  },
+  {
+   "name": "title-og",
+   "url": "http://mp.weixin.qq.com/s/t-og",
+   "pages": {
+    "http://mp.weixin.qq.com/s/t-og": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta property=\"og:title\" content=\"只有 OG\"></head><body>\n\n<div id=\"js_content\"><p>正文</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-title-og",
+    "entryUrl": "http://mp.weixin.qq.com/s/t-og",
+    "finalUrl": "http://mp.weixin.qq.com/s/t-og",
+    "title": "只有 OG",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "正文\n\n---\n\n来源：<http://mp.weixin.qq.com/s/t-og>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "正文"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/t-og>"
+     }
+    ],
+    "contentHash": "d7389d5091f92b5b0af56b70f14781af6d9475b1b7716bca5be896880f33adf8",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>正文</p></div>",
+     "css": "",
+     "hash": "8add71e68ab52169625de0ab5f6524690380621958269714579d21b27d7e4a05",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "title-doc",
+   "url": "http://mp.weixin.qq.com/s/t-doc",
+   "pages": {
+    "http://mp.weixin.qq.com/s/t-doc": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>文档标题</title></head><body>\n\n<div id=\"js_content\"><p>正文</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-title-doc",
+    "entryUrl": "http://mp.weixin.qq.com/s/t-doc",
+    "finalUrl": "http://mp.weixin.qq.com/s/t-doc",
+    "title": "文档标题",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "正文\n\n---\n\n来源：<http://mp.weixin.qq.com/s/t-doc>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "正文"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/t-doc>"
+     }
+    ],
+    "contentHash": "5b14898b8e8844c3593880c9c03ca6f3968c71b32ab405f9d10ab3649e6770de",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>正文</p></div>",
+     "css": "",
+     "hash": "8add71e68ab52169625de0ab5f6524690380621958269714579d21b27d7e4a05",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "title-url",
+   "url": "http://mp.weixin.qq.com/s/t-url",
+   "pages": {
+    "http://mp.weixin.qq.com/s/t-url": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n\n<div id=\"js_content\"><p>正文</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-title-url",
+    "entryUrl": "http://mp.weixin.qq.com/s/t-url",
+    "finalUrl": "http://mp.weixin.qq.com/s/t-url",
+    "title": "http://mp.weixin.qq.com/s/t-url",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "正文\n\n---\n\n来源：<http://mp.weixin.qq.com/s/t-url>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "正文"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/t-url>"
+     }
+    ],
+    "contentHash": "ed78e6755eca028ba959e3cdf4d055dcf868e663632c3749528de9c2f20e5cff",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>正文</p></div>",
+     "css": "",
+     "hash": "8add71e68ab52169625de0ab5f6524690380621958269714579d21b27d7e4a05",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "date-no-tz",
+   "url": "http://mp.weixin.qq.com/s/d1",
+   "pages": {
+    "http://mp.weixin.qq.com/s/d1": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta property=\"article:published_time\" content=\"2024-05-01T12:00:00\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-date-no-tz",
+    "entryUrl": "http://mp.weixin.qq.com/s/d1",
+    "finalUrl": "http://mp.weixin.qq.com/s/d1",
+    "title": "T",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/d1>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/d1>"
+     }
+    ],
+    "contentHash": "06d0d42eaa91d897cecd82d1caba9a4f1796832001465d9bc6f9e89f283c804f",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>x</p></div>",
+     "css": "",
+     "hash": "00bff30d76ee00ac3311e4f0b205c2dfc4b5d684d456cbabbb5e393bdf8c8e35",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "date-z",
+   "url": "http://mp.weixin.qq.com/s/d2",
+   "pages": {
+    "http://mp.weixin.qq.com/s/d2": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta property=\"article:published_time\" content=\"2024-05-01T12:00:00Z\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-date-z",
+    "entryUrl": "http://mp.weixin.qq.com/s/d2",
+    "finalUrl": "http://mp.weixin.qq.com/s/d2",
+    "title": "T",
+    "author": "",
+    "publishedAt": 1714564800000,
+    "dateConfidence": "exact",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/d2>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/d2>"
+     }
+    ],
+    "contentHash": "04fbef05719f85cf0556453c6094137e999bc383f7e1fbb1216ac1cdba95efc1",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>x</p></div>",
+     "css": "",
+     "hash": "9034cac2fefc276d1e915354111c94b01be41176c06d50a044987a30a460e4cb",
+     "account": "",
+     "author": "",
+     "publishedAt": 1714564800000,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "date-bad",
+   "url": "http://mp.weixin.qq.com/s/d3",
+   "pages": {
+    "http://mp.weixin.qq.com/s/d3": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta property=\"article:published_time\" content=\"2024-13-45T99:00:00Z\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-date-bad",
+    "entryUrl": "http://mp.weixin.qq.com/s/d3",
+    "finalUrl": "http://mp.weixin.qq.com/s/d3",
+    "title": "T",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/d3>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/d3>"
+     }
+    ],
+    "contentHash": "7460ee648c6341f9fd78cb4dd97e69b9db99cde25f6fbacf33edeeea53015744",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>x</p></div>",
+     "css": "",
+     "hash": "00bff30d76ee00ac3311e4f0b205c2dfc4b5d684d456cbabbb5e393bdf8c8e35",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "no-body",
+   "url": "http://mp.weixin.qq.com/s/nb",
+   "pages": {
+    "http://mp.weixin.qq.com/s/nb": {
+     "html": "<html><body><div id=\"other\">x</div></body></html>"
+    }
+   },
+   "images": {},
+   "error": "未获取到公众号正文，页面可能要求验证、已失效或受访问限制；请打开原文确认后重试",
+   "files": []
+  },
+  {
+   "name": "blank-body",
+   "url": "http://mp.weixin.qq.com/s/bb",
+   "pages": {
+    "http://mp.weixin.qq.com/s/bb": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n\n<div id=\"js_content\">   \n  </div></body></html>"
+    }
+   },
+   "images": {},
+   "error": "未获取到公众号正文，页面可能要求验证、已失效或受访问限制；请打开原文确认后重试",
+   "files": []
+  },
+  {
+   "name": "img-only",
+   "url": "http://mp.weixin.qq.com/s/io",
+   "pages": {
+    "http://mp.weixin.qq.com/s/io": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> 图集 </h1>\n<div id=\"js_content\"><img data-src=\"http://mmbiz.qpic.cn/only.png\"></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/only.png": {
+     "b64": "iVBORw0KGgpJSERSb25seQ=="
+    }
+   },
+   "result": {
+    "taskId": "task-img-only",
+    "entryUrl": "http://mp.weixin.qq.com/s/io",
+    "finalUrl": "http://mp.weixin.qq.com/s/io",
+    "title": "图集",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "![](local-image://wechat-38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7.png)\n\n---\n\n来源：<http://mp.weixin.qq.com/s/io>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "![](local-image://wechat-38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7.png)"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/io>"
+     }
+    ],
+    "contentHash": "fda88c6e9797d68f4e9f9afb067583bdf2e148cbe4f4e84cf96f5b69f221c839",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><img src=\"local-image://wechat-38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7.png\" /></div>",
+     "css": "",
+     "hash": "d8037689c68a3ce25fb714a3075c8693e05d30d0841dce9dac918c49c3f16f3e",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [
+      {
+       "fileName": "wechat-38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7.png",
+       "sha256": "38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7",
+       "sourceUrl": "http://mmbiz.qpic.cn/only.png",
+       "bytes": 16
+      }
+     ],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": [
+    "wechat-38e94399900c4644d155d3319c1f7e2494e504a489f3b812be8f1fffad7308e7.png"
+   ]
+  },
+  {
+   "name": "svg-motion",
+   "url": "http://mp.weixin.qq.com/s/svg",
+   "pages": {
+    "http://mp.weixin.qq.com/s/svg": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> SVG </h1>\n<div id=\"js_content\"><svg width=\"10\" height=\"10\"><circle r=\"3\"><animate attributeName=\"r\" from=\"3\" to=\"6\" dur=\"1s\"/></circle></svg><p>文字</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-svg-motion",
+    "entryUrl": "http://mp.weixin.qq.com/s/svg",
+    "finalUrl": "http://mp.weixin.qq.com/s/svg",
+    "title": "SVG",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "文字\n\n---\n\n来源：<http://mp.weixin.qq.com/s/svg>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "文字"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/svg>"
+     }
+    ],
+    "contentHash": "a45244b9a93fdc2fb485bafdab157bbe20f6ae997bab2513461dfbd5bd45620c",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": false,
+    "truncated": false,
+    "warnings": [
+     "动态 SVG 装饰已降级为静态内容"
+    ],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><svg width=\"10\" height=\"10\"><circle r=\"3\"></circle></svg><p>文字</p></div>",
+     "css": "",
+     "hash": "64426253da8d8117edc8a9cf7a7f457b155068230cde00e0c5a10f6f1ab565c6",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": [
+      "动态 SVG 装饰已降级为静态内容"
+     ]
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "unsupported-urls",
+   "url": "http://mp.weixin.qq.com/s/uns",
+   "pages": {
+    "http://mp.weixin.qq.com/s/uns": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> 资源 </h1>\n<div id=\"js_content\"><p style=\"background:url(ftp://x/y.png)\"><img src=\"blob:abc\"><img src=\"http://mmbiz.qpic.cn/ok.png\"><a href=\"mailto:a@b.c\">邮件</a></p></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/ok.png": {
+     "b64": "iVBORw0KGgpJSERSb2s="
+    }
+   },
+   "result": {
+    "taskId": "task-unsupported-urls",
+    "entryUrl": "http://mp.weixin.qq.com/s/uns",
+    "finalUrl": "http://mp.weixin.qq.com/s/uns",
+    "title": "资源",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "[图片未保存]\n\n![](local-image://wechat-5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06.png)邮件\n\n---\n\n来源：<http://mp.weixin.qq.com/s/uns>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "[图片未保存]"
+     },
+     {
+      "id": "p2",
+      "text": "![](local-image://wechat-5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06.png)邮件"
+     },
+     {
+      "id": "p3",
+      "text": "---"
+     },
+     {
+      "id": "p4",
+      "text": "来源：<http://mp.weixin.qq.com/s/uns>"
+     }
+    ],
+    "contentHash": "c8e3cec7b153f8cd4849992b90f361ce9a6b2be302bb9eae9a0ddee922610465",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": false,
+    "truncated": false,
+    "warnings": [
+     "2 个图片资源未保存，可重试补采"
+    ],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p><img alt=\"图片未保存\" /><img src=\"local-image://wechat-5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06.png\" /><a>邮件</a></p></div>",
+     "css": "",
+     "hash": "859bbe3fa7b573f6f8caded0ff711ff0ae6ba2f5dbaa04fb858edb33f8b47e23",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [
+      {
+       "fileName": "wechat-5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06.png",
+       "sha256": "5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06",
+       "sourceUrl": "http://mmbiz.qpic.cn/ok.png",
+       "bytes": 14
+      }
+     ],
+     "failures": [
+      {
+       "url": "blob:abc",
+       "reason": "图片或样式资源地址不支持离线保存"
+      },
+      {
+       "url": "ftp://x/y.png",
+       "reason": "图片或样式资源地址不支持离线保存"
+      }
+     ],
+     "warnings": []
+    }
+   },
+   "files": [
+    "wechat-5c6264b701c4ca1c738686146c40fba0aaf1436a55e520b18caa1524832a0b06.png"
+   ]
+  },
+  {
+   "name": "not-image",
+   "url": "http://mp.weixin.qq.com/s/ni",
+   "pages": {
+    "http://mp.weixin.qq.com/s/ni": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> 非图 </h1>\n<div id=\"js_content\"><img src=\"http://mmbiz.qpic.cn/text.png\"></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/text.png": {
+     "b64": "bm90IGFuIGltYWdlIGF0IGFsbA=="
+    }
+   },
+   "result": {
+    "taskId": "task-not-image",
+    "entryUrl": "http://mp.weixin.qq.com/s/ni",
+    "finalUrl": "http://mp.weixin.qq.com/s/ni",
+    "title": "非图",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "[图片未保存]\n\n---\n\n来源：<http://mp.weixin.qq.com/s/ni>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "[图片未保存]"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/ni>"
+     }
+    ],
+    "contentHash": "ac32d48a71e0de3a2978c7fa0430099ab1344a91f9ff46b056ec4c2a86f4d790",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": false,
+    "truncated": false,
+    "warnings": [
+     "1 个图片资源未保存，可重试补采"
+    ],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><img alt=\"图片未保存\" /></div>",
+     "css": "",
+     "hash": "48620a3875465457d3d6a4da9157dcbd17f06abca5344e67058af57c659bab2b",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [
+      {
+       "url": "http://mmbiz.qpic.cn/text.png",
+       "reason": "资源不是支持的图片格式"
+      }
+     ],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "redirect-away",
+   "url": "http://mp.weixin.qq.com/s/ra",
+   "pages": {
+    "http://mp.weixin.qq.com/s/ra": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\"><p>x</p></div></body></html>",
+     "finalUrl": "http://example.com/other"
+    }
+   },
+   "images": {},
+   "error": "公众号地址跳转到了其他平台",
+   "files": []
+  },
+  {
+   "name": "dup-assets",
+   "url": "http://mp.weixin.qq.com/s/dup",
+   "pages": {
+    "http://mp.weixin.qq.com/s/dup": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> 重复 </h1>\n<div id=\"js_content\"><img src=\"http://mmbiz.qpic.cn/one.png\"><img data-src=\"http://mmbiz.qpic.cn/two.png\" src=\"http://mmbiz.qpic.cn/ignored.png\"></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/one.png": {
+     "b64": "iVBORw0KGgpJSERSc2FtZQ=="
+    },
+    "http://mmbiz.qpic.cn/two.png": {
+     "b64": "iVBORw0KGgpJSERSc2FtZQ=="
+    },
+    "http://mmbiz.qpic.cn/ignored.png": {
+     "b64": "iVBORw0KGgpJSERSaWdub3JlZA=="
+    }
+   },
+   "result": {
+    "taskId": "task-dup-assets",
+    "entryUrl": "http://mp.weixin.qq.com/s/dup",
+    "finalUrl": "http://mp.weixin.qq.com/s/dup",
+    "title": "重复",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "![](local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png)![](local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png)\n\n---\n\n来源：<http://mp.weixin.qq.com/s/dup>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "![](local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png)![](local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png)"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/dup>"
+     }
+    ],
+    "contentHash": "a05b5bfdd043d8c3c91d1bd5cfc1c7dced628a1eaa01d20d38c0e62843640bb4",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><img src=\"local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png\" /><img src=\"local-image://wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png\" /></div>",
+     "css": "",
+     "hash": "7c9ab66da7451f0a6386c0873c89b87506a569083471ae46a482dac4720647f8",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [
+      {
+       "fileName": "wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png",
+       "sha256": "df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769",
+       "sourceUrl": "http://mmbiz.qpic.cn/two.png",
+       "bytes": 16
+      },
+      {
+       "fileName": "wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png",
+       "sha256": "df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769",
+       "sourceUrl": "http://mmbiz.qpic.cn/one.png",
+       "bytes": 16
+      }
+     ],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": [
+    "wechat-df79a7a3fc27251c093bbdcaa5cb346bbddfe8536cc5451177a4d4d81238f769.png"
+   ]
+  },
+  {
+   "name": "style-only-hidden",
+   "url": "http://mp.weixin.qq.com/s/soh",
+   "pages": {
+    "http://mp.weixin.qq.com/s/soh": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\" style=\"visibility:hidden\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-style-only-hidden",
+    "entryUrl": "http://mp.weixin.qq.com/s/soh",
+    "finalUrl": "http://mp.weixin.qq.com/s/soh",
+    "title": "T",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/soh>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/soh>"
+     }
+    ],
+    "contentHash": "8fa3279304a08f3f42d5ed162057595f67bbb22799227ee7af5bcaf61c050d6e",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>x</p></div>",
+     "css": "",
+     "hash": "00bff30d76ee00ac3311e4f0b205c2dfc4b5d684d456cbabbb5e393bdf8c8e35",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "style-display-block",
+   "url": "http://mp.weixin.qq.com/s/sdb",
+   "pages": {
+    "http://mp.weixin.qq.com/s/sdb": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\" style=\"display:block;opacity:.5\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-style-display-block",
+    "entryUrl": "http://mp.weixin.qq.com/s/sdb",
+    "finalUrl": "http://mp.weixin.qq.com/s/sdb",
+    "title": "T",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/sdb>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/sdb>"
+     }
+    ],
+    "contentHash": "92e8b2c532127a5183db11e1a2f099432ac7abfed9f0a0f3b8f28be29e3839e4",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\" style=\"display:block\"><p>x</p></div>",
+     "css": "",
+     "hash": "a27da99fddfe5bb7470e37cea6bbd8949dc2cf80923ee0b4906b6d6a6e6bf603",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "style-important",
+   "url": "http://mp.weixin.qq.com/s/simp",
+   "pages": {
+    "http://mp.weixin.qq.com/s/simp": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>\n<h1 id=\"activity-name\"> T </h1>\n<div id=\"js_content\" style=\"display: none !important; visibility: hidden !important\"><p>x</p></div></body></html>"
+    }
+   },
+   "images": {},
+   "result": {
+    "taskId": "task-style-important",
+    "entryUrl": "http://mp.weixin.qq.com/s/simp",
+    "finalUrl": "http://mp.weixin.qq.com/s/simp",
+    "title": "T",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "x\n\n---\n\n来源：<http://mp.weixin.qq.com/s/simp>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "x"
+     },
+     {
+      "id": "p2",
+      "text": "---"
+     },
+     {
+      "id": "p3",
+      "text": "来源：<http://mp.weixin.qq.com/s/simp>"
+     }
+    ],
+    "contentHash": "cedc34dc51cb3c4d2ea67a04fb3d892287d86614ebdea58d0238456ef1f3c738",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\" style=\"display:none!important\"><p>x</p></div>",
+     "css": "",
+     "hash": "4195c1fb8d932d22045e3e5c63301b426e277dd996407009b79eef128bba1e0b",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": []
+  },
+  {
+   "name": "messy-html",
+   "url": "http://mp.weixin.qq.com/s/messy",
+   "pages": {
+    "http://mp.weixin.qq.com/s/messy": {
+     "html": "<!doctype html><html><head><meta charset=\"utf-8\"><style>@font-face{font-family:x;src:url(http://mmbiz.qpic.cn/f.png)}@media(max-width:1px){.a{background:url(\"http://mmbiz.qpic.cn/m.png\")}}.b{background:url('//mmbiz.qpic.cn/n.png') !important}</style></head><body>\n<h1 id=\"activity-name\"> 脏页面 </h1>\n<div id=\"js_content\"><p>未闭合<p>第二段<div>块<span>跨<b>粗</b></span>体</div><br><BR/><P CLASS=A>大写</P><img src=\"//mmbiz.qpic.cn/p.png\">\n<table><tr><td>无 tbody</td></tr></table><table><tbody><tr><td>有 tbody</td></tr></tbody></table><table><thead><tr><th>头</th></tr></thead><tr><td>体</td></tr></table>\n&nbsp;&amp;&lt;&gt;&copy;&#x4e2d;<span style=\"background:url('//mmbiz.qpic.cn/n.png') !important;color:#f00\">样式</span><!-- 注释 --><script>var x = \"<div id='js_content'>\";</script></div></body></html>"
+    }
+   },
+   "images": {
+    "http://mmbiz.qpic.cn/f.png": {
+     "b64": "iVBORw0KGgpJSERSZg=="
+    },
+    "http://mmbiz.qpic.cn/m.png": {
+     "b64": "iVBORw0KGgpJSERSbQ=="
+    },
+    "http://mmbiz.qpic.cn/n.png": {
+     "b64": "iVBORw0KGgpJSERSbg=="
+    },
+    "http://mmbiz.qpic.cn/p.png": {
+     "b64": "iVBORw0KGgpJSERScA=="
+    }
+   },
+   "result": {
+    "taskId": "task-messy-html",
+    "entryUrl": "http://mp.weixin.qq.com/s/messy",
+    "finalUrl": "http://mp.weixin.qq.com/s/messy",
+    "title": "脏页面",
+    "author": "",
+    "publishedAt": null,
+    "dateConfidence": "unknown",
+    "markdown": "未闭合\n\n第二段\n\n块跨**粗**体\n\n  \n  \n\n大写\n\n![](local-image://wechat-9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273.png)\n\n无 tbody\n\n有 tbody\n\n头\n\n体\n\n &<>©中样式\n\n---\n\n来源：<http://mp.weixin.qq.com/s/messy>",
+    "links": [],
+    "paragraphs": [
+     {
+      "id": "p1",
+      "text": "未闭合"
+     },
+     {
+      "id": "p2",
+      "text": "第二段"
+     },
+     {
+      "id": "p3",
+      "text": "块跨**粗**体"
+     },
+     {
+      "id": "p4",
+      "text": "大写"
+     },
+     {
+      "id": "p5",
+      "text": "![](local-image://wechat-9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273.png)"
+     },
+     {
+      "id": "p6",
+      "text": "无 tbody"
+     },
+     {
+      "id": "p7",
+      "text": "有 tbody"
+     },
+     {
+      "id": "p8",
+      "text": "头"
+     },
+     {
+      "id": "p9",
+      "text": "体"
+     },
+     {
+      "id": "p10",
+      "text": " &<>©中样式"
+     },
+     {
+      "id": "p11",
+      "text": "---"
+     },
+     {
+      "id": "p12",
+      "text": "来源：<http://mp.weixin.qq.com/s/messy>"
+     }
+    ],
+    "contentHash": "3f828b1df4e1598cc1df5b61c1829ea57926ffda17dd27675c92fb0263629040",
+    "capturedAt": 0,
+    "engineVersion": "wechat-html/1",
+    "complete": true,
+    "truncated": false,
+    "warnings": [],
+    "snapshot": {
+     "formatVersion": 1,
+     "policyVersion": 1,
+     "adapterVersion": "wechat-html/1",
+     "html": "<div id=\"js_content\"><p>未闭合</p><p>第二段</p><div>块<span>跨<b>粗</b></span>体</div><br /><br /><p class=\"A\">大写</p><img src=\"local-image://wechat-9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273.png\" />\n<table><tr><td>无 tbody</td></tr></table><table><tbody><tr><td>有 tbody</td></tr></tbody></table><table><thead><tr><th>头</th></tr></thead><tr><td>体</td></tr></table>\n &amp;&lt;&gt;©中<span style=\"background:url(local-image://wechat-754484416b8ea8e433957feb52793930a2ac21226d99f52ab1b1d6d9d568e2d9.png)!important;color:#f00\">样式</span></div>",
+     "css": ".b{background:url(local-image://wechat-754484416b8ea8e433957feb52793930a2ac21226d99f52ab1b1d6d9d568e2d9.png)!important}",
+     "hash": "714e3e9e09dffad66855be5cba37031bba9c03315fd2491c339a019d09f22e07",
+     "account": "",
+     "author": "",
+     "publishedAt": null,
+     "assets": [
+      {
+       "fileName": "wechat-754484416b8ea8e433957feb52793930a2ac21226d99f52ab1b1d6d9d568e2d9.png",
+       "sha256": "754484416b8ea8e433957feb52793930a2ac21226d99f52ab1b1d6d9d568e2d9",
+       "sourceUrl": "http://mmbiz.qpic.cn/n.png",
+       "bytes": 13
+      },
+      {
+       "fileName": "wechat-9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273.png",
+       "sha256": "9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273",
+       "sourceUrl": "http://mmbiz.qpic.cn/p.png",
+       "bytes": 13
+      },
+      {
+       "fileName": "wechat-bca06ae80f2a193e372d317e9adc6675e28dc4aa1cea196bf3a5ae711aaee0ce.png",
+       "sha256": "bca06ae80f2a193e372d317e9adc6675e28dc4aa1cea196bf3a5ae711aaee0ce",
+       "sourceUrl": "http://mmbiz.qpic.cn/f.png",
+       "bytes": 13
+      },
+      {
+       "fileName": "wechat-3edb1a3667109094b1bdfe1f269bf0f900739c17960980c6cebcd569afec7695.png",
+       "sha256": "3edb1a3667109094b1bdfe1f269bf0f900739c17960980c6cebcd569afec7695",
+       "sourceUrl": "http://mmbiz.qpic.cn/m.png",
+       "bytes": 13
+      }
+     ],
+     "failures": [],
+     "warnings": []
+    }
+   },
+   "files": [
+    "wechat-3edb1a3667109094b1bdfe1f269bf0f900739c17960980c6cebcd569afec7695.png",
+    "wechat-754484416b8ea8e433957feb52793930a2ac21226d99f52ab1b1d6d9d568e2d9.png",
+    "wechat-9eaf7199e5882fa3e7098e101d1d075e7b142a558d187b996d6f4578c82e7273.png",
+    "wechat-bca06ae80f2a193e372d317e9adc6675e28dc4aa1cea196bf3a5ae711aaee0ce.png"
+   ]
+  }
+ ]
+}

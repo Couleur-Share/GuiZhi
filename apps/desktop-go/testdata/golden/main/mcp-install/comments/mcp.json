@@ -1,0 +1,15 @@
+{
+  // 我的服务器
+  "mcpServers": {
+    "other": {
+      "command": "x"
+    },
+    "guizhi": {
+      "command": "C:\\Program Files\\GuiZhi\\GuiZhi.exe",
+      "args": [
+        "--mcp",
+        "a b"
+      ]
+    }, // 行尾注释
+  },
+}

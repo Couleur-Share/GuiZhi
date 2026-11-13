@@ -1,0 +1,25 @@
+{
+  "schema": 2,
+  "kind": "guizhi-funasr-update",
+  "directory": "update-backup-WrhW6b",
+  "ownerPid": 44060,
+  "createdAt": "2026-11-13T06:31:23.538Z",
+  "phase": "copying",
+  "original": {
+    "funasrVersion": "1.3.29",
+    "pythonVersion": "Python 3.12.13",
+    "flavor": "python",
+    "installedAt": "2026-01-02T03:04:05.000Z"
+  },
+  "targetVersion": "1.3.30",
+  "rootIdentity": {
+    "device": "347694414",
+    "inode": "17169973583348686",
+    "birthtime": "1794551483536257900"
+  },
+  "directoryIdentity": {
+    "device": "347694414",
+    "inode": "11540474049135567",
+    "birthtime": "1794551483538256800"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "kind": "guizhi-config",
+  "version": 1,
+  "exportedAt": "2026-11-13T06:31:00.162Z",
+  "appVersion": "0.28.0",
+  "settings": {
+    "theme": "dark",
+    "language": "zh",
+    "aiApiKey": "",
+    "networkProxy": {
+      "enabled": true,
+      "host": "h",
+      "password": ""
+    }
+  },
+  "settingsVersion": 7,
+  "uiLayout": {
+    "ui-storage": {
+      "a": 1
+    },
+    "guizhi-library-table-config": "x"
+  },
+  "illustrationStyles": [
+    {
+      "id": "mine",
+      "name": "我的风格",
+      "description": "d",
+      "group": "自定",
+      "visualDna": "dna",
+      "character": "",
+      "negative": "n",
+      "aspectRatio": "4:3",
+      "maxShots": 3,
+      "maxLabels": 2
+    }
+  ],
+  "shortcuts": {
+    "accelerators": {
+      "showApp": "Alt+X",
+      "newItem": "Alt+Y",
+      "search": "Alt+Z",
+      "settings": "Alt+W"
+    },
+    "modes": {
+      "showApp": "global",
+      "newItem": "local",
+      "search": "local",
+      "settings": "local"
+    }
+  },
+  "mcpScope": {
+    "mode": "selected",
+    "allowedCollectionIds": [
+      "c1",
+      "c2"
+    ],
+    "allowUncategorized": false
+  }
+}

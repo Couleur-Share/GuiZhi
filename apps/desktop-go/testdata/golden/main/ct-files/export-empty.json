@@ -1,0 +1,183 @@
+{
+  "kind": "guizhi-config",
+  "version": 1,
+  "exportedAt": "2026-11-13T06:31:00.286Z",
+  "appVersion": "0.28.0",
+  "settings": {
+    "theme": "dark",
+    "language": "zh",
+    "aiApiKey": "",
+    "networkProxy": {
+      "enabled": true,
+      "host": "h",
+      "password": ""
+    },
+    "aiProviders": [
+      {
+        "id": "p-a",
+        "provider": "A",
+        "name": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1"
+      },
+      {
+        "id": "p-b",
+        "provider": "B",
+        "name": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1"
+      }
+    ],
+    "aiModels": [
+      {
+        "id": "m-a",
+        "providerId": "p-a",
+        "provider": "A",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://a.example/v1",
+        "model": "ma"
+      },
+      {
+        "id": "m-b",
+        "providerId": "p-b",
+        "provider": "B",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://b.example/v1",
+        "model": "mb"
+      }
+    ],
+    "modelRouteDefaults": {
+      "mainText": "m-a",
+      "fastText": "m-b",
+      "audioText": "  "
+    }
+  },
+  "settingsVersion": 7,
+  "uiLayout": {
+    "ui-storage": {
+      "a": 1
+    },
+    "guizhi-library-table-config": "x"
+  },
+  "illustrationStyles": [
+    {
+      "id": "hand-note",
+      "name": "手绘笔记",
+      "description": "白底黑色手绘线稿，用一个动作讲清方法、判断与常见误区",
+      "group": "通用",
+      "visualDna": "Pure white background with lively black pen lines, slightly uneven and visibly hand-drawn. Use a heavier contour for the main subject and finer strokes for supporting objects. Build one compact scene around a clear physical action; silhouettes and contact between objects carry the explanation before any words are read. Keep roughly a third of the canvas as open background and leave comfortable margins. Use one muted orange accent on the decisive object or action; add red only when the supplied idea explicitly involves a warning. If labels are supplied, use neat, medium-weight Chinese handwriting beside the relevant object, with clear separation from the drawing. The result feels like a thoughtful sketch in a working notebook, readable at article-column size.",
+      "character": "",
+      "negative": "No decorative arrows, rainbow annotations, tiny scribbles, paper ruling, paper grain, gradients or drop shadows. No slide layout, icon collection, mascot poster, photorealism or interface screenshot.",
+      "aspectRatio": "16:9",
+      "maxShots": 5,
+      "maxLabels": 3
+    },
+    {
+      "id": "ink-sketch",
+      "name": "淡墨速写",
+      "description": "白底浓淡墨色与疏朗留白，适合随笔、思考与抽象观点",
+      "group": "通用",
+      "visualDna": "Clean white background. Draw the main subject in expressive charcoal-black ink contours with a few pale grey brush washes to establish volume. Reserve the darkest ink for the action or point of contact; supporting objects fade into lighter, simpler strokes. Use one off-centre cluster, an asymmetric balance and broad untouched space. Keep the key silhouette recognisable and the relationship physically readable, even when details are omitted. Convey restraint through selective marks and soft brush edges. If labels are supplied, set them in small but legible plain Chinese handwriting in dark ink, separated from the washes. A quiet contemporary editorial ink sketch, not a decorative landscape.",
+      "character": "",
+      "negative": "No colour, ornamental mountains or bamboo added as filler, calligraphy seals, aged-paper effects, dense cross-hatching, framing borders, photorealism or elaborate scenery.",
+      "aspectRatio": "16:9",
+      "maxShots": 4,
+      "maxLabels": 2
+    },
+    {
+      "id": "blueprint-dark",
+      "name": "深色蓝图",
+      "description": "深靛蓝底青白线描，一处琥珀强调，适合机制、管线与系统瓶颈",
+      "group": "技术与系统",
+      "visualDna": "Solid deep indigo background, including all empty space. Draw recognisable physical components in crisp cyan-white technical pen lines: stronger outer contours and fewer, finer internal details. Arrange a single readable mechanism with visible contact points, openings or connections; the viewer should see what passes, blocks or changes. Use one restrained amber accent on the decisive component or segment. Keep at least a third of the frame bare indigo, with clear separation between parts. Lines must remain visible at article-column size. If labels are supplied, use clean upright Chinese lettering in cyan-white beside the relevant part. An engineer's conceptual cutaway sketch, with tangible objects rather than a network of labelled boxes.",
+      "character": "",
+      "negative": "No white background, graph-paper grid, dimension lines, blueprint title block, decorative circuitry, neon glow, HUD, starfield, gradient background, dashboard, code screenshot or metallic rendering.",
+      "aspectRatio": "16:9",
+      "maxShots": 5,
+      "maxLabels": 4
+    },
+    {
+      "id": "warm-life",
+      "name": "暖调生活",
+      "description": "奶油底、陶土橙与鼠尾草绿，适合消费、习惯与日常选择",
+      "group": "生活与人物",
+      "visualDna": "Warm cream background. Use softly irregular brown outlines and opaque flat gouache-like fills in terracotta, muted ochre and sage green. Give the main object a clear, substantial silhouette; simplify the supporting objects and keep their shapes familiar. Stage a small everyday scene around the supplied action, on one simple ground line or surface when needed. Warmth comes from rounded edges and balanced colours rather than decorative accessories. Leave broad cream margins and comfortable gaps. If labels are supplied, use legible warm-brown Chinese handwriting on clear background beside the object. A calm lifestyle editorial illustration with a tactile painted feel and no photographic lighting.",
+      "character": "",
+      "negative": "No glossy product advertising, brand logos, elaborate packaging text, busy interior decoration, stock office characters, exaggerated mascot proportions, watery bleeding, heavy paper grain or photorealism.",
+      "aspectRatio": "16:9",
+      "maxShots": 5,
+      "maxLabels": 3
+    },
+    {
+      "id": "duo-figure",
+      "name": "双色小人",
+      "description": "珊瑚红与灰蓝简笔人物，用姿态和距离表现关系、情绪与沟通",
+      "group": "生活与人物",
+      "visualDna": "Pure white background. Use spare hand-drawn human figures with rounded heads and simple, proportionate bodies. One coral figure carries the main action; when a second person is needed, use a slate-blue figure. Keep each figure's colour and visual role consistent. Express the idea through body direction, reach, distance and interaction with the specified props. Draw props in a lighter charcoal outline so they support the action without competing. Maintain an easy-to-read silhouette and generous open space around the gesture. If labels are supplied, use plain black Chinese handwriting beside the relevant figure or prop. The emotional tone is humane and understated.",
+      "character": "A simple coral human figure with a round head, economical limbs and minimal facial detail performs the main action. Add a matching slate-blue figure only when the supplied scene requires another person. Preserve the same proportions and colours; their posture and interaction carry the meaning.",
+      "negative": "No detailed portraits, exaggerated facial expressions, emotion icons, speech bubbles, thought clouds, decorative hearts, crowd scenes, oversized mascot heads, dramatic spotlights or photorealism.",
+      "aspectRatio": "16:9",
+      "maxShots": 4,
+      "maxLabels": 2
+    },
+    {
+      "id": "iso-space",
+      "name": "等距场景",
+      "description": "白底轻等距立体场景，适合设备摆位、空间关系与部署连接",
+      "group": "技术与系统",
+      "visualDna": "Pure white background. Use a consistent light isometric view, roughly 30 degrees, with parallel edges and no vanishing point. Draw the specified objects as recognisable solid volumes with clean charcoal contours, flat warm-grey faces and one muted teal accent on the key object or connection. Show only the detail needed to understand position, containment or contact. A cutaway may reveal a relevant interior; keep every connection visibly attached to its intended endpoints and preserve the supplied direction. Group the scene on a compact footprint with generous blank margins. If labels are supplied, place upright dark Chinese lettering on the background beside each relevant volume. A precise illustrated miniature, readable without decorative technical detail.",
+      "character": "",
+      "negative": "No glossy 3D rendering, ray tracing, realistic materials, floor grid, floating unconnected cables, crowded miniature city, icon-pack layout, gradients, glow or device logos.",
+      "aspectRatio": "16:9",
+      "maxShots": 5,
+      "maxLabels": 4
+    },
+    {
+      "id": "paper-cut",
+      "name": "剪纸层叠",
+      "group": "创意与观点",
+      "description": "米白底、纸片轮廓与浅层叠压，适合边界、筛选与积累类概念",
+      "visualDna": "Warm ivory background. Construct the specified objects from a few large, recognisable cut-paper silhouettes in muted teal, ochre and terracotta. Edges show a slight handmade irregularity; two or three shallow overlapping layers create depth, with only a delicate contact shadow where sheets actually overlap. Use overlap, an opening or a visible point of contact to express the supplied action, keeping foreground and background roles unambiguous. Keep one focal cluster, broad quiet margins and crisp separation of shapes at article-column size. The medium is matte coloured paper, not folded origami or a digital interface. If labels are supplied, use clean dark Chinese lettering on an uncluttered background area beside the relevant object.",
+      "character": "",
+      "negative": "No intricate lace cutting, decorative confetti, tiled colour swatches, glossy plastic, deep cast shadows, photographic tabletop, craft tools, greeting-card border or decorative text.",
+      "aspectRatio": "16:9",
+      "maxShots": 4,
+      "maxLabels": 2
+    },
+    {
+      "id": "editorial-collage",
+      "name": "编辑拼贴",
+      "group": "创意与观点",
+      "description": "暖灰底、单色剪影与朱红强调，适合认知偏差、社会观察与评论",
+      "visualDna": "Flat warm light-grey background. Create a restrained editorial collage from monochrome illustrated cutouts of the specified subjects, with a very light halftone texture inside the cutouts only. Use one vermilion accent shape to focus attention on the decisive action or obstruction. Build a single coherent encounter between objects with deliberate overlap and one clearly dominant silhouette. A modest scale shift may clarify the supplied metaphor, but must not change factual quantities, ranking or relationships. Keep plenty of plain background and avoid a scrapbook layout. If labels are supplied, set them in clear upright dark Chinese lettering, separate from the cutouts. The tone is thoughtful, sharp and suitable for a long-form essay.",
+      "character": "",
+      "negative": "No newspaper clippings, ransom-note lettering, torn text fragments, celebrity portraits, invented logos, decorative eyes or hands, busy mood-board arrangement, heavy distressing or sensational poster typography.",
+      "aspectRatio": "16:9",
+      "maxShots": 4,
+      "maxLabels": 2
+    }
+  ],
+  "shortcuts": {
+    "accelerators": {
+      "showApp": "Alt+Shift+P",
+      "newItem": "Alt+Shift+N",
+      "search": "Alt+Shift+F",
+      "settings": "Alt+Shift+S"
+    },
+    "modes": {
+      "showApp": "global",
+      "newItem": "local",
+      "search": "local",
+      "settings": "local"
+    }
+  },
+  "mcpScope": {
+    "mode": "all",
+    "allowedCollectionIds": [],
+    "allowUncategorized": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "other": {
+      "command": "x",
+      "args": ["a"]
+    }
+  }
+}

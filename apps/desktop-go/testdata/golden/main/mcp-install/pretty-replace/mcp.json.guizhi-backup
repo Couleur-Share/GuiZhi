@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "guizhi": {
+      "command": "old",
+      "args": ["o"]
+    },
+    "other": { "command": "x" }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "other": {
+      "command": "x",
+      "args": ["a"]
+    },
+    "guizhi": {
+      "command": "C:\\Program Files\\GuiZhi\\GuiZhi.exe",
+      "args": [
+        "--mcp",
+        "a b"
+      ]
+    }
+  }
+}

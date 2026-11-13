@@ -1,3 +1,5 @@
 # Keep Linux preflight entrypoints usable after a Windows checkout.
 scripts/wslc/** text eol=lf
 apps/desktop-go/funasr_server.py -text
+# 冻结的对拍基准按字节比较（含 CRLF 正文、SQLite 与压缩文件），禁止 git 做换行转换
+apps/desktop-go/testdata/golden/** -text
