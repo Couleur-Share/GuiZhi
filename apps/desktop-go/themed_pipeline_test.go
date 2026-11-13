@@ -10,12 +10,45 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 var rePipeMaskKey = regexp.MustCompile(`At$|updated`)
+
+// pipeOrderedLog 记录服务调用，输出按「JS 发起顺序」排列，并发写入安全。
+// 管线里 Promise.all 同时发起的调用各在独立 goroutine 执行，进入服务函数的先后取决于调度；
+// TS 单线程，记录顺序天然等于发起顺序。这里按 themed_pipeline.go 注入的调用序号还原该顺序，
+// 否则 a、b 两次抓取的记录顺序会随机颠倒（本机重复 400 次约失败 10 次）。
+type pipeOrderedLog struct {
+	mu    sync.Mutex
+	items []pipeLogEntry
+}
+
+type pipeLogEntry struct {
+	seq int64
+	v   any
+}
+
+func (l *pipeOrderedLog) add(ctx context.Context, v any) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.items = append(l.items, pipeLogEntry{seq: pipelineCallSeq(ctx), v: v})
+}
+
+func (l *pipeOrderedLog) values() []any {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	sort.SliceStable(l.items, func(i, j int) bool { return l.items[i].seq < l.items[j].seq })
+	out := make([]any, len(l.items))
+	for i, it := range l.items {
+		out[i] = it.v
+	}
+	return out
+}
 
 // pipeMask 与 TS 基线的 mask 一致：时间戳字段（大于 1e11 的数字）抹成 "NOW"。
 func pipeMask(v any) any {
@@ -119,10 +152,11 @@ func TestThemedPipelineDifferential(t *testing.T) {
 			cfgJSON, _ := json.Marshal(in.Config)
 			for i, rawRun := range in.Runs {
 				run := pipeDecode[pipeRun](t, rawRun)
-				var events, calls, usage []any
-				searches, captures := []any{}, []any{}
+				var events, usage []any
+				var calls, searches, captures pipeOrderedLog
 				lastCheckpoint := ""
 				ctx, cancel := context.WithCancelCause(context.Background())
+				var usedMu sync.Mutex // 并发的聊天调用共用规则计数
 				used := map[int]int{}
 				chat := func(c context.Context, cfg aiClientConfig, msgs []aiChatMessage, opts aiChatOptions) (aiChatResult, error) {
 					var sys, user string
@@ -149,7 +183,7 @@ func TestThemedPipelineDifferential(t *testing.T) {
 					if opts.Stream {
 						o["stream"] = true
 					}
-					calls = append(calls, map[string]any{"config": map[string]any{"provider": cfg.Provider, "apiProtocol": cfg.APIProtocol, "apiKey": cfg.APIKey, "apiUrl": cfg.APIURL, "model": cfg.Model}, "messages": mm, "options": o})
+					calls.add(c, map[string]any{"config": map[string]any{"provider": cfg.Provider, "apiProtocol": cfg.APIProtocol, "apiKey": cfg.APIKey, "apiUrl": cfg.APIURL, "model": cfg.Model}, "messages": mm, "options": o})
 					for idx, rule := range run.Rules {
 						if rule.System == "editor" && !strings.HasPrefix(sys, "你是专题文章编辑") || rule.System == "design" && !strings.HasPrefix(sys, "你是阅读页设计师") {
 							continue
@@ -157,10 +191,15 @@ func TestThemedPipelineDifferential(t *testing.T) {
 						if rule.UserIncludes != "" && !strings.Contains(user, rule.UserIncludes) {
 							continue
 						}
-						if rule.Times != nil && used[idx] >= *rule.Times {
+						usedMu.Lock()
+						exhausted := rule.Times != nil && used[idx] >= *rule.Times
+						if !exhausted {
+							used[idx]++
+						}
+						usedMu.Unlock()
+						if exhausted {
 							continue
 						}
-						used[idx]++
 						rp := rule.Reply
 						if rp.Abort {
 							cancel(errors.New("This operation was aborted"))
@@ -198,7 +237,8 @@ func TestThemedPipelineDifferential(t *testing.T) {
 				}
 				vi := 0
 				svc := pipelineServices{
-					Chat: chat,
+					Ordered: true, // 复现 TS 单线程下确定的完成顺序，见 pipelineServices.Ordered
+					Chat:    chat,
 					Usage: func(scenario, model string, p, c *float64, failed bool) {
 						u := map[string]any{"scenario": scenario, "model": model}
 						if p != nil {
@@ -213,7 +253,7 @@ func TestThemedPipelineDifferential(t *testing.T) {
 						usage = append(usage, u)
 					},
 					Search: func(c context.Context, query, scenario string) ([]readingSearchResult, error) {
-						searches = append(searches, query)
+						searches.add(c, query)
 						for k, msg := range run.Search.ThrowOn {
 							if strings.Contains(query, k) {
 								return nil, errors.New(msg)
@@ -225,7 +265,7 @@ func TestThemedPipelineDifferential(t *testing.T) {
 						return run.Search.Default, nil
 					},
 					Capture: func(c context.Context, req webCaptureRequest) (webCaptureResult, error) {
-						captures = append(captures, map[string]any{"url": req.URL, "purpose": req.Purpose, "taskId": req.TaskID})
+						captures.add(c, map[string]any{"url": req.URL, "purpose": req.Purpose, "taskId": req.TaskID})
 						spec := run.Capture.Default
 						if v, ok := run.Capture.ByURL[req.URL]; ok {
 							spec = v
@@ -282,7 +322,7 @@ func TestThemedPipelineDifferential(t *testing.T) {
 				args, _ := json.Marshal(map[string]any{"version": json.RawMessage(version), "config": json.RawMessage(cfgJSON)})
 				result, runErr := eng.Run(ctx, op, string(args), hooks, svc)
 				cancel(nil)
-				got := map[string]any{"calls": nilToEmpty(calls), "events": nilToEmpty(events), "usage": nilToEmpty(usage), "searches": searches, "captures": captures}
+				got := map[string]any{"calls": calls.values(), "events": nilToEmpty(events), "usage": nilToEmpty(usage), "searches": searches.values(), "captures": captures.values()}
 				if runErr != nil {
 					got["error"] = runErr.Error()
 					got["result"] = nil

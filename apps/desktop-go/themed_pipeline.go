@@ -44,6 +44,11 @@ type pipelineServices struct {
 	Usage   func(scenario, model string, prompt, completion *float64, failed bool)
 	// Verify 在隔离环境运行已生成的页面，返回故障说明（空串 = 通过）。
 	Verify func(ctx context.Context, versionJSON string) (string, error)
+	// Ordered 仅供对拍测试：宿主调用严格按 JS 发起顺序串行执行、按同一顺序投回结果。
+	// 管线用 readingPool 并发抓取来源，一个来源限流会中止其余来源，结果取决于「谁先完成」。
+	// TS 版里测试替身是立即完成的 Promise，完成顺序由微任务队列决定、天然确定；Go 每个调用在独立 goroutine，
+	// 完成顺序随机。生产环境谁先返回本来就取决于网络，不需要也不应该串行；测试开启它才能与 TS 基线逐项对拍。
+	Ordered bool
 }
 
 type pipelineError struct {
@@ -60,6 +65,18 @@ type pipelineRun struct {
 	mu       sync.Mutex
 	cancels  map[int64]context.CancelFunc
 	hookErr  error
+	seq      atomic.Int64 // 异步宿主调用的序号发生器，见 pipelineCallSeq
+	lastDone chan struct{} // Ordered 模式下上一个调用的完成信号（mu 保护）
+}
+
+type pipelineCallSeqKey struct{}
+
+// pipelineCallSeq 返回异步宿主调用的序号（按 JS 发起顺序，从 1 起；非管线调用返回 0）。
+// 每个异步宿主调用在独立 goroutine 里执行，Promise.all 同时发起的几次调用谁先进入服务函数由调度器决定；
+// TS 版单线程，服务被调用的先后天然等于 JS 发起的先后。需要还原这一先后的调用方（测试记录、诊断日志）按序号排序即可。
+func pipelineCallSeq(ctx context.Context) int64 {
+	n, _ := ctx.Value(pipelineCallSeqKey{}).(int64)
+	return n
 }
 
 type pipelineEngine struct {
@@ -199,13 +216,28 @@ func (e *pipelineEngine) hostAsync(kind, args string, id int64) goja.Value {
 		return e.rt.ToValue(promise)
 	}
 	cctx, cancel := context.WithCancel(run.ctx)
+	// 序号必须在循环线程（此处，JS 调用的当下）取，不能放进 goroutine 里取。
+	cctx = context.WithValue(cctx, pipelineCallSeqKey{}, run.seq.Add(1))
 	run.mu.Lock()
 	run.cancels[id] = cancel
+	// Ordered（仅测试）：本调用等上一个调用的结果投回后才开始，自己的结果投回后放行下一个。
+	var prev <-chan struct{}
+	var mine chan struct{}
+	if run.services.Ordered {
+		mine = make(chan struct{})
+		prev, run.lastDone = run.lastDone, mine
+	}
 	run.mu.Unlock()
 	go func() {
+		if prev != nil {
+			<-prev
+		}
 		out, err := e.serve(cctx, run, kind, args, id)
 		cancel()
 		e.post(func() {
+			if mine != nil {
+				defer close(mine)
+			}
 			run.mu.Lock()
 			delete(run.cancels, id)
 			run.mu.Unlock()
