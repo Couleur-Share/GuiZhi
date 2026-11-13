@@ -280,7 +280,7 @@
 
 **镜像源事实（读代码，未联网）：** 「镜像」不是自有服务器，也不在 GatewaySentry 文档站里（文档站只有手机收集中转 `guizhi-capture`）。它是四个公共 GitHub 代理（`ghfast.top`、`gh-proxy.com`、`hub.gitmirror.com`、`cors.isteed.cc`）加 `github.com/Couleur-Share/GuiZhi/releases/{latest/download | download/<tag>}`，**没有同步步骤，请求时实时回源 GitHub**。所以：稳定通道走 `latest/download`，GitHub 的 latest 不含预发布，灰度包不会被稳定用户的镜像检查看到；预览通道对预发布按 tag 钉到 `download/<tag>`，且镜像（generic）固定读 `latest.yml`。
 
-**发布工作流缺口（读 `.github/workflows/release.yml` 与 electron-builder 26.15.7 源码，未实际跑）：** `electron-builder` 对带后缀的版本（如 `0.29.0-go.1`）按版本里的后缀产出 `go.yml` 而不是 `latest.yml`（`channelFromAppVersion`），而现有 `release.yml` 只上传 `latest.yml`、`latest-x64.yml`、`latest-arm64.yml` 等。结果：灰度预发布不带清单，预览通道检查报错（G2）；镜像读 `latest.yml` 同样 404。灰度发布前须在流程里补一步：让预发布 tag 下存在 `latest.yml`（构建时把发布通道固定为 `latest`，或上传时把 `go.yml` 复制成 `latest.yml`）。**已在主线 `release.yml` 的「Normalize Windows update metadata」里补上：带后缀的版本且缺 `latest.yml` 时，把唯一的通道清单复制成 `latest.yml`（0 个或多个则失败）；已用 Git Bash 对 5 种构建输出目录模拟验证，尚未在真实 CI 里跑过预发布 tag。**
+**发布工作流（2026-11-13 真实 CI 实测，结论已推翻之前的推断）：** 曾读源码推断带后缀的版本会让 electron-builder 产出 `go.yml` 而非 `latest.yml`，导致预发布没有清单。真实跑 tag `v0.28.1-ci.1`（预发布，Windows x64 构建）的结果是：现有 `release.yml` 原样即产出并上传 `latest.yml` 与 `latest-x64.yml`，清单校验通过，草稿发布里资产齐全。原因：工作流用 `--publish never` 构建，不走“按版本后缀取通道”的发布配置分支（该分支只在发布模式下生效）。所以此处**没有缺口**，也没有改工作流；G2（预发布 tag 下既无 `go.yml` 也无 `latest.yml`）只会在人手建发布且漏传清单时出现。测试用的 tag、分支和草稿发布已删除。
 
 **约束**：
 1. 灰度包必须发成带后缀的 GitHub 预发布（如 `v0.29.0-go.1`）。当前打出的安装包版本是 0.28.0，与主线同号，不能直接发：同号时预览通道偏好正式版，灰度包会被忽略。
