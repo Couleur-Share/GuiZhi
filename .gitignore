@@ -137,6 +137,9 @@ tmp-*
 # 任务验证产物（截图、基线快照、堆快照、临时 userData 等），仅本地留存，不入库
 /artifacts/
 
+# 维护者个人的非业务工作日志（预检清退、环境清理等），仅本地留存，不入公开仓库
+/非业务维护历史.md
+
 # 手机收集的本地运行数据与凭证
 deploy/capture/.env
 deploy/capture/data/
