@@ -19,7 +19,7 @@ const electronStub = new Proxy(
 const moduleLoader = Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown };
 const originalLoad = moduleLoader._load;
 moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
-  if (request === "virtual:reading-libraries") { const libs = JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..", "mygo-shell", "reading_libraries.json"), "utf8")); return { __esModule: true, default: { compiler: "", animation: "", components: libs.components, runtime: libs.runtime } }; }
+  if (request === "virtual:reading-libraries") { const libs = JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..", "..", "apps", "desktop-go", "reading_libraries.json"), "utf8")); return { __esModule: true, default: { compiler: "", animation: "", components: libs.components, runtime: libs.runtime } }; }
   return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);
 };
 

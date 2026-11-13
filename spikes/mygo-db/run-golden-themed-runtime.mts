@@ -22,7 +22,7 @@ const moduleLoader = Module as unknown as { _load: (request: string, ...rest: un
 const originalLoad = moduleLoader._load;
 moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
   if (request === "virtual:reading-libraries") {
-    const libs = JSON.parse(fs.readFileSync(path.join(here, "..", "mygo-shell", "reading_libraries.json"), "utf8"));
+    const libs = JSON.parse(fs.readFileSync(path.join(here, "..", "..", "apps", "desktop-go", "reading_libraries.json"), "utf8"));
     return { __esModule: true, default: { compiler: "", animation: "", components: libs.components, runtime: libs.runtime } };
   }
   if (request === "@guizhi/core") {

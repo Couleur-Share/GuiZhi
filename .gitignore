@@ -149,5 +149,5 @@ apps/capture-web/playwright-report/
 apps/desktop/resources/crawl4ai/
 config/crawl4ai/downloads/
 
-# MyGo 主题阅读渲染引擎的内置库（由 spikes/mygo-js/build-reading-libs.mts 生成，数 MB）
-spikes/mygo-shell/reading_libraries.json
+# MyGo 主题阅读渲染引擎的内置库（由 apps/desktop-go/jsgen/build-reading-libs.mts 生成，数 MB）
+apps/desktop-go/reading_libraries.json

@@ -1,0 +1,3 @@
+# 本地构建与截图产物（原 spikes/.gitignore 的规则随目录迁入）
+/*.exe
+/shell*.png

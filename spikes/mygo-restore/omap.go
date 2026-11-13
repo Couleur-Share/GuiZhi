@@ -1,6 +1,6 @@
 package main
 
-// 保持键序的 JSON 对象（从 mygo-shell/aiconfig.go 复制）：恢复时合并渲染进程设置要求输出的字段顺序与 JS 的 JSON.stringify 一致。
+// 保持键序的 JSON 对象（从 apps/desktop-go/aiconfig.go 复制）：恢复时合并渲染进程设置要求输出的字段顺序与 JS 的 JSON.stringify 一致。
 
 import (
 	"bytes"

@@ -45,5 +45,5 @@ for (const [name, value] of Object.entries(consts)) {
   out += `const ${name} = ${goRaw(value)}\n\n`;
 }
 out += `// migrationNames 是 TS 迁移清单的名称与顺序（schema_version = 条数）。\nvar migrationNames = []string{\n${MIGRATIONS.map((m: any) => `\t${JSON.stringify(m.name)},`).join("\n")}\n}\n`;
-fs.writeFileSync(new URL("../mygo-shell/schema_gen.go", import.meta.url), out);
+fs.writeFileSync(new URL("../../apps/desktop-go/schema_gen.go", import.meta.url), out);
 console.log(`schema_gen.go: ${Object.keys(consts).length} 个常量，${MIGRATIONS.length} 条迁移`);

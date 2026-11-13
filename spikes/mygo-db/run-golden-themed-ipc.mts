@@ -22,7 +22,7 @@ const originalLoad = moduleLoader._load;
 const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
 moduleLoader._load = function (this: unknown, request: string, ...rest: unknown[]) {
   if (request === "virtual:reading-libraries") {
-    const libs = JSON.parse(fs.readFileSync(path.join(here, "..", "mygo-shell", "reading_libraries.json"), "utf8"));
+    const libs = JSON.parse(fs.readFileSync(path.join(here, "..", "..", "apps", "desktop-go", "reading_libraries.json"), "utf8"));
     return { __esModule: true, default: { compiler: "", animation: "", components: libs.components, runtime: libs.runtime } };
   }
   return request === "electron" ? electronStub : originalLoad.call(this, request, ...rest);

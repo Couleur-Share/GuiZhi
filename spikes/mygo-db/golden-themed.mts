@@ -1,5 +1,5 @@
 // 主题阅读渲染层差分基线：真实 content.ts / document.ts / v3-document.ts / export.ts 的 HTML 组装部分（tsx 直接加载）。
-// Go 侧用 goja 打包产物（spikes/mygo-js/build-themed.mts）跑同样的输入，逐字节比对：这里验证的是
+// Go 侧用 goja 打包产物（apps/desktop-go/jsgen/build-themed.mts）跑同样的输入，逐字节比对：这里验证的是
 // 「goja 里的 TS 原文件」与「V8 里的 TS 原文件」行为一致（正则、Unicode、序列化差异）。
 // 用法：run-golden-themed.mts <输出目录>
 import { parseHTML } from "linkedom";
