@@ -97,7 +97,7 @@ func TestUpdaterGrayPrereleaseFallsBackToLatestYml(t *testing.T) {
 }
 
 // G2：预发布 tag 下既没有 go.yml 也没有 latest.yml（electron-builder 产出 go.yml，但现有发布工作流只上传 latest*.yml）
-// → 预览通道检查失败；稳定通道不受影响。这是灰度发布前必须补的 CI 缺口，不是更新器的缺陷。
+// → 预览通道检查失败；稳定通道不受影响。release-go.yml 与 release.yml 都会上传 latest.yml，此情形只会出现在人手建发布且漏传清单时。
 func TestUpdaterGrayPrereleaseWithoutManifestFails(t *testing.T) {
 	f := newUpdaterFixture(t, "0.28.0")
 	setupGray(f, "v0.29.0-go.1", "v0.28.0")
@@ -122,5 +122,39 @@ func TestUpdaterGrayMirrorAndOfficialDiverge(t *testing.T) {
 	}
 	if f.u.lastFeed.tag != "v0.29.0-go.1" {
 		t.Fatalf("镜像应钉 go.1（按 semver 取最高），实际 %+v", f.u.lastFeed)
+	}
+}
+
+// G4：用 release-go.yml 真实产出的清单形态（安装包名 GuiZhi-Setup-<ver>-x64.exe、files 条目没有 size、
+// releaseNotes 是带 \r\n 转义的中文双引号串）走完 预览通道 检查 → 下载 → 校验和。
+// 2026-11-13 真实 CI 草稿 v0.29.0-go.1 的 latest.yml 即此形态。
+func TestUpdaterGrayRealCIManifestShape(t *testing.T) {
+	f := newUpdaterFixture(t, "0.28.0")
+	setupGray(f, "v0.29.0-go.1", "v0.28.0")
+	f.ymlOK = func(tag, file string) bool { return file == "latest.yml" }
+	f.manifest = func(tag string) string {
+		sum := sha512b64(f.installer)
+		return "version: 0.29.0-go.1\nfiles:\n  - url: GuiZhi-Setup-0.29.0-go.1-x64.exe\n    sha512: " + sum + "\n" +
+			"path: GuiZhi-Setup-0.29.0-go.1-x64.exe\nsha512: " + sum + "\n" +
+			"releaseNotes: \"## v0.29.0-go.1\\r\\n\\r\\n**灰度预览版（Go + WebView2 新外壳）。**\\r\\n\\r\\n- 回退办法：安装 v0.28.0\"\n" +
+			"releaseDate: '2026-11-13T03:44:03.877Z'\n"
+	}
+	ctx := context.Background()
+	res := f.u.Check(ctx, rawOpts(map[string]any{"channel": "preview"}))
+	if res["success"] != true || res["updateAvailable"] != true {
+		t.Fatalf("check = %v", res)
+	}
+	if got := res["result"].(map[string]any)["updateInfo"].(map[string]any)["version"]; got != "0.29.0-go.1" {
+		t.Fatalf("version = %v", got)
+	}
+	info := f.statuses[len(f.statuses)-1]["info"].(simpleUpdateInfo)
+	if !strings.Contains(info.ReleaseNotes, "灰度预览版") || info.ReleaseDate != "2026-11-13T03:44:03.877Z" {
+		t.Fatalf("info = %+v", info)
+	}
+	if r := f.u.Download(ctx, rawOpts(map[string]any{"channel": "preview"})); r["success"] != true {
+		t.Fatalf("download = %v", r)
+	}
+	if sum, _ := fileSHA512(f.u.installerPath); sum != sha512b64(f.installer) {
+		t.Fatal("下载文件校验和不一致")
 	}
 }
