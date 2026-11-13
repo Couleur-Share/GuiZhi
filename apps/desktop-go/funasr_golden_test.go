@@ -145,8 +145,17 @@ func TestFunasrGoldenFilesystem(t *testing.T) {
 	} else {
 		t.Log("冻结基准：生成时的目录不存在，跳过目录身份对拍")
 	}
+	// git 不保存空目录，而体积估算把每个目录算一块：复制到临时目录并补回生成时的空目录 empty，
+	// 既还原夹具原貌，也不往源码目录里写东西。
+	tree := t.TempDir()
+	if err := os.CopyFS(tree, os.DirFS(g.TreeDir)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tree, "empty"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	for name, bs := range map[string]int64{"b512": 512, "b4096": 4096, "b65536": 65536} {
-		got, err := measureFunasrEnvironment(g.TreeDir, bs)
+		got, err := measureFunasrEnvironment(tree, bs)
 		if err != nil || got != g.Measure[name] {
 			t.Errorf("体积估算 %s：Go %d (%v)，TS %d", name, got, err, g.Measure[name])
 		}
