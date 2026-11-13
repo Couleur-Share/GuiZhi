@@ -3,6 +3,16 @@
 归知是本地优先的 AI 个人知识库，采用 Electron + React + TypeScript、pnpm monorepo。
 应用骨架源自 PromptHub v0.5.9；AGPL-3.0 归属说明见 `NOTICE`。具体依赖版本以当前 `package.json` 为准。
 
+## 当前主线（2026-11-13 起，迁移过渡期）
+
+桌面端的唯一主线是 Go + WebView2 外壳 `apps/desktop-go`（基于 MyGo）；Electron 版停止维护，终版保存在分支 `electron-final` 与标签 `electron-final-0.28.x`。以下条目在退役第 3 阶段改写本文前，优先于后文的 Electron 描述：
+
+- **构建与验证**：`.\apps\desktop-go\scripts\build-shell.ps1` 构建（产物在 `apps/desktop-go/out/win-x64`）；`.\apps\desktop-go\scripts\build-installer.ps1` 打安装包（需先构建）；Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...`（全量约 2 分钟，会拉起真实 WebView2 隐藏窗口）。
+- **界面源码仍是一份**：`apps/desktop/src/renderer` 与 `preload` 是界面唯一来源，Go 壳用 `apps/desktop-go/vite.*.config.ts` 构建它们，经 `apps/desktop-go/shim` 把 Electron API 接到 Go 服务。
+- **`apps/desktop/src/main` 与 `packages/` 暂不能删**：其中一部分 TS 是 `apps/desktop-go/jsgen` 生成嵌入产物（主题阅读管线、快照净化、渲染脚本、IPC 频道清单、建表 SQL）的输入，另一部分是 `spikes/mygo-db` 等对拍脚本的基准。冻结 golden 与剥离生成输入完成前，不要整体删除。
+- **发布**：`v*` tag 触发 `release.yml` 构建 Go 壳并创建 Draft；`release-electron-legacy.yml` 只能手动触发，仅供紧急回退。发版仍读取 `.cursor/skills/guizhi-release/SKILL.md`，其中 Electron 专属步骤以本节为准。
+- 下文的 `pnpm electron:dev`、`pnpm shot`、`pnpm build:isolated`、`pnpm test:e2e` 仍针对 `apps/desktop` 的 Electron 实现，不验证 Go 壳。
+
 ## 源码与数据边界
 
 - `apps/desktop/src/main`：窗口、IPC、采集、AI 请求及桌面服务；`preload`：contextBridge 白名单；`renderer`：React 界面和状态。
