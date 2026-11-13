@@ -218,28 +218,6 @@ jobs:
         shell: bash
         working-directory: apps/desktop
         run: |
-          # 预发布版本（如 0.29.0-go.1）：electron-builder 按版本后缀产出 <通道>.yml（如 go.yml）而不是 latest.yml，
-          # 后续的清单规范化、上传与镜像回源都只认 latest*.yml。补一份 latest.yml，使预发布 tag 下也有可读的更新清单。
-          # 只对带后缀的版本生效；稳定版缺少 latest.yml 仍由后续步骤报错，不被这里掩盖。
-          VERSION="$(node -p "require('./package.json').version")"
-          if [[ "$VERSION" == *-* ]] && [ ! -f "dist/latest.yml" ]; then
-            shopt -s nullglob
-            CHANNEL_MANIFESTS=()
-            for file in dist/*.yml; do
-              case "$(basename "$file")" in
-                latest*.yml|builder-*.yml) ;;
-                *) CHANNEL_MANIFESTS+=("$file") ;;
-              esac
-            done
-            if [ "${#CHANNEL_MANIFESTS[@]}" -eq 1 ]; then
-              cp "${CHANNEL_MANIFESTS[0]}" dist/latest.yml
-              echo "Prerelease $VERSION: copied ${CHANNEL_MANIFESTS[0]} to dist/latest.yml"
-            else
-              echo "Prerelease $VERSION: expected exactly one channel manifest in dist/, found ${#CHANNEL_MANIFESTS[@]}:"
-              printf '  %s\n' "${CHANNEL_MANIFESTS[@]}"
-              exit 1
-            fi
-          fi
           # 为每个架构生成对应的 electron-updater 清单文件
           if [ "${{ matrix.arch }}" = "arm64" ]; then
             if [ -f "dist/latest.yml" ]; then
