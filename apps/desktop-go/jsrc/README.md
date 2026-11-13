@@ -16,7 +16,7 @@
   `web-capture/web-capture`、`@guizhi/core` 由 `jsgen` 的插件换成 shim，不需要对应文件。
 - `@guizhi/shared`、`@guizhi/db` 的别名由本目录 `tsconfig.json`（构建）与 `vitest.config.ts`（单测）解析；第三方依赖
   （linkedom、css-tree、sanitize-html、unified 等）由 `apps/desktop-go/package.json` 声明。`apps/desktop/package.json`
-  里残留的 linkedom、css-tree、sanitize-html 声明已无使用方，可择机清理（需同步更新 lockfile）。
+  里的同名声明已于 2026-11-13 清理。
 
 ## 验证
 

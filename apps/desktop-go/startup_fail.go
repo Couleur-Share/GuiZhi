@@ -15,7 +15,7 @@ import (
 const startupErrorTitle = "Startup Error / 启动错误"
 
 // reportStartupFailure 记录启动失败原因。userData 为空时只打日志、不给出目录指引；
-// interactive 为 false（-shot/-bench/-aitest 等自动化实例）时绝不弹模态框，避免无人值守的验证被挂起。
+// interactive 为 false（-shot/-bench 等自动化实例）时绝不弹模态框，避免无人值守的验证被挂起。
 func reportStartupFailure(userData string, err error, interactive bool, show func(title, text string)) {
 	log.Printf("启动失败：%v", err)
 	if userData == "" {

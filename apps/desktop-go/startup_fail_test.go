@@ -49,7 +49,7 @@ func TestReportStartupFailureNonInteractiveNeverShowsDialog(t *testing.T) {
 	called := false
 	reportStartupFailure(t.TempDir(), errors.New("boom"), false, func(string, string) { called = true })
 	if called {
-		t.Fatal("自动化实例（-shot/-bench/-aitest）不得弹出模态对话框，否则无人值守的验证会永久挂起")
+		t.Fatal("自动化实例（-shot/-bench）不得弹出模态对话框，否则无人值守的验证会永久挂起")
 	}
 }
 

@@ -120,10 +120,6 @@ func main() {
 	shotJS := flag.String("shotjs", "", "截图前在页面里执行的脚本文件（同步脚本，可自行 setTimeout；用于离屏验证交互后的界面）")
 	shotAfter := flag.Duration("shotafter", 3*time.Second, "执行 -shotjs 之后、截图之前的等待时间")
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
-	aiTest := flag.String("aitest", "", "AI 代理对拍：模拟服务地址（如 http://127.0.0.1:4827）；跑完 -aiscen 里的场景后把结果写到 -aiout 并退出")
-	aiScen := flag.String("aiscen", "", "-aitest 的场景文件 scenarios.json")
-	aiRunner := flag.String("airunner", "", "-aitest 的运行器 runner.mjs")
-	aiOut := flag.String("aiout", "", "-aitest 的结果输出文件")
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
 	// 摘掉 --updated / --hidden / --force-run：它们是拉起参数，不是开关，见 launch_args.go
@@ -144,11 +140,11 @@ func main() {
 		return
 	}
 	if *dist == "" || *dbPath == "" {
-		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && *aiTest == "" && !*bench)
+		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && !*bench)
 	}
 
 	waitForRelaunchParent()
-	automation := *shot != "" || *aiTest != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
+	automation := *shot != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
 	if !automation && !mygo.App.RequestSingleInstanceLock() {
 		return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
 	}
@@ -329,7 +325,7 @@ func main() {
 		launch := windowLaunchState{ShouldMaximize: false, Bounds: windowBounds{Width: 1280, Height: 800}}
 		opts := mygo.WindowOptions{
 			Title: "归知 GuiZhi（MyGo spike）", Width: 1280, Height: 800, URL: origin + "/",
-			Hidden: *shot != "" || *aiTest != "",
+			Hidden: *shot != "",
 			X:      benchX(*bench), Y: benchX(*bench),
 			Page: mygo.PageOptions{
 				PreloadScript:  legacyPreload + string(preload),
@@ -354,7 +350,7 @@ func main() {
 		b.registerWindow(win)
 		ipcSelfCheck()
 		p := win.Page()
-		skipGlobal := *shot != "" || *aiTest != "" || *bench // 自动化实例不抢用户正在用的系统级快捷键
+		skipGlobal := *shot != "" || *bench // 自动化实例不抢用户正在用的系统级快捷键
 		if !skipGlobal {
 			lib.sc.mu.Lock()
 			lib.sc.native = newMygoShortcutNative(lib, win)
@@ -386,18 +382,6 @@ func main() {
 					time.Sleep(10 * time.Millisecond)
 				}
 			}()
-		}
-		if *aiTest != "" {
-			go func() {
-				err := runAITest(p, *aiTest, *aiScen, *aiRunner, *aiOut, 120*time.Second)
-				if err != nil {
-					fmt.Println("[FAIL] aitest：", err)
-					os.Exit(1)
-				}
-				fmt.Println("[ OK ] aitest 结果已写入", *aiOut)
-				mygo.App.Quit()
-			}()
-			return
 		}
 		if *shot == "" {
 			return
