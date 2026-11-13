@@ -165,6 +165,7 @@ pnpm typecheck           # TS 全量检查
 pnpm test:unit           # vitest 单测
 pnpm lint                # eslint + 文件行数门禁
 pnpm shot                # 界面截图（窗口在屏幕外，不打扰用户）
+pnpm shot:go             # Go 壳界面截图（隔离构建 + WebView2 经 CDP 交给 Playwright）
 pnpm build:isolated      # 在当前源码副本中构建，不覆盖开发目录产物
 pnpm test:e2e:smoke      # 根目录入口自动隔离构建与 E2E
 pnpm electron:build:win  # Windows 打包
@@ -253,6 +254,35 @@ Vite 缓存目录各自独立，`@guizhi/*` 指向副本内源码。环境文件
 `mainEntry`：需要重启验证应用时必须使用这个绝对入口，不得再拼原目录的 `out/`。
 `--executable` 验收指定安装包时直接使用候选程序，仍隔离数据和窗口，不做源码构建。
 fixture 脚本自身的外部读写仍由脚本负责，不能借步骤脚本操作用户实例或用户库。
+
+### Go 壳界面截图（`pnpm shot:go`）
+
+Go 壳是 WebView2，Playwright 的 `_electron` 驱动不了，所以另有一套入口，思路与 `pnpm shot` 相同：
+`scripts/isolated-go.mjs` 把当前源码（含未提交改动）复制到系统临时目录，在副本里构建渲染进程、
+preload、阅读库和 Go 壳（约 30 秒），再调用 `apps/desktop-go/scripts/shot.mjs` 离屏启动并截图。开发目录的
+`dist/`、`out/` 与数据目录都不参与。
+
+```bash
+pnpm shot:go                          # 首页截一张
+pnpm shot:go --steps my-steps.mjs     # 走到指定界面再截
+pnpm shot:go --data-db path/knowledge.db --out ./shots --keep-profile
+```
+
+原理：以 `-bench` 方式启动（自动化实例：窗口在屏幕外，不占单实例锁、不建托盘、不抢快捷键），环境变量
+`WEBVIEW2_USER_DATA_FOLDER` 指向一次性目录，`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=0`
+打开随机 CDP 端口，端口从 `<userData>/webview2/EBWebView/DevToolsActivePort` 读取（两行写全才有效），
+Playwright `connectOverCDP` 接管页面；就绪判据与 Electron 版一致（`topbar-search`）。
+
+步骤脚本的参数是 `{ win, shot, outDir, userDataDir }`，`win` 是 Playwright 的 Page，不依赖主进程的脚本无需改动
+（例如 `apps/desktop/tests/e2e/content-panel-switch-shots.mjs` 原样可跑）。与 Electron 版的差异：
+
+- **没有 `app`**。依赖 `app.evaluate`（ipcMain / BrowserWindow / session 等）的旧脚本会得到说明性错误，需要改写，
+  例如在页面里拦截 `window.electron.ipcRenderer.invoke` 来代替替换主进程的 IPC 处理器。`apps/desktop/tests/e2e`
+  与 `scripts/*steps*.mjs` 共 45 个步骤脚本里，13 个不依赖 `app`，其余 32 个依赖。
+- `shot()` 只截宿主页面：阅读子视图是独立的 WebView2，不会被合成进截图（Electron 版会合成）。
+- 退出时直接结束本次启动的进程树，不等待优雅关闭；临时目录随后删除（`--keep-profile` 保留）。
+- `pnpm shot:go` 不经过 PowerShell。单独手动运行 `apps/desktop-go/scripts/build-shell.ps1` 时必须用 `pwsh`：
+  脚本含中文且无 BOM，Windows PowerShell 5.1 会解析失败。
 
 ### 并行写代码必须隔离源码
 
