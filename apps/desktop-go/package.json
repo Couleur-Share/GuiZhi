@@ -24,6 +24,7 @@
     "@types/css-tree": "^3.2.0",
     "@types/node": "^24.0.0",
     "@types/sanitize-html": "^2.16.1",
+    "electron-builder": "^26.15.7",
     "esbuild": "^0.25.12",
     "jsdom": "^27.3.0",
     "tsx": "4.21.0",

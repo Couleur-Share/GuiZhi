@@ -18,7 +18,7 @@ $stage = Join-Path $root "apps\desktop-go\out\installer-stage"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 Copy-Item $shellDir $stage -Recurse
 New-Item -ItemType Directory -Force (Join-Path $stage "resources") | Out-Null
-Push-Location (Join-Path $root "apps\desktop")
+Push-Location (Join-Path $root "apps\desktop-go")
 try { pnpm exec electron-builder --config $cfg --prepackaged $stage --win nsis --x64 --publish never } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw "electron-builder 失败（退出码 $LASTEXITCODE）" }
 Get-ChildItem $out -File | Select-Object Name, @{n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
