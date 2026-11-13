@@ -79,7 +79,9 @@ function linkDependencies(sourceRoot, root, relativeDir) {
 export function createDesktopSnapshot(sourceRoot, { reuseDependencies = true, extraSourcePaths = [] } = {}) {
   sourceRoot = fs.realpathSync(sourceRoot);
   // macOS 的临时目录可能含 /var -> /private/var 链接，统一实路径以匹配模块路径。
-  const tempRoot = fs.realpathSync(os.tmpdir());
+  // 必须用 native：Windows 上用户名超过 8 个字符时 os.tmpdir() 是 8.3 短路径（C:\Users\RUNNER~1\...），
+  // 普通 realpathSync 不会展开它，而 Vite 按长路径解析模块，两者对不上会报 html-inline-proxy 找不到模块。
+  const tempRoot = fs.realpathSync.native(os.tmpdir());
   const root = fs.mkdtempSync(path.join(tempRoot, SNAPSHOT_PREFIX));
   const cleanup = () => {
     // 只移除本次 mkdtemp 的直接子目录；rm 不跟随包目录的 junction/symlink。

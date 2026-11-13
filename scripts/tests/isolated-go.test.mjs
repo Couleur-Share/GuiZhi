@@ -55,6 +55,8 @@ test("快照默认不复制 apps/desktop-go 源码；extraSourcePaths 追加后�
   try {
     assert.equal(fs.existsSync(path.join(plain.root, "apps/desktop-go/main.go")), false, "默认范围不含 Go 源码");
     assert.equal(fs.existsSync(path.join(plain.root, "apps/desktop-go/package.json")), true, "但仍含各 app 的 package.json");
+    // 副本根目录必须是展开后的实路径（Windows 8.3 短路径会让 Vite 的模块解析对不上，CI 上出现过）。
+    assert.equal(plain.root, fs.realpathSync.native(plain.root));
   } finally {
     plain.cleanup();
   }
