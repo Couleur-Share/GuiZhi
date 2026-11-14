@@ -133,7 +133,9 @@ func newUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-func nowMs() int64 { return time.Now().UnixMilli() }
+// nowMs 取当前毫秒时间戳。声明为变量仅供测试固定时钟（见 write_test.go 的 pinClock）：
+// 冻结基准里的种子数据带绝对日期，依赖真实时钟的聚合（如 AI 用量按天汇总）会随日期滚动而失配。
+var nowMs = func() int64 { return time.Now().UnixMilli() }
 
 // normalizeTagNames：去空白、按小写去重、保留首次出现的写法。
 func normalizeTagNames(names []string) []string {

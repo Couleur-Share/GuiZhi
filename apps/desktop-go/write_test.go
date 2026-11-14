@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/plugins/sqlite"
 )
@@ -318,6 +319,19 @@ func normalizeScenario(t *testing.T, baseItems, baseTags, baseCollections, baseW
 	return resAny, normalized
 }
 
+// goldenClockMs 是冻结基准的生成时刻：2026-11-13 12:00（UTC+8，TestMain 已固定本地时区）。
+// 基准库的 ai_usage_daily 种子按这一天的相对偏移造出绝对日期（10-14、11-08、11-12 等），
+// 而 TS 侧的写入记在 11-13；Go 若用真实时钟，过了一天 7 天汇总窗口就滑掉 11-08 那行。
+var goldenClockMs = time.Date(2026, 11, 13, 12, 0, 0, 0, time.FixedZone("CST", 8*3600)).UnixMilli()
+
+// pinClock 把 nowMs 固定为 ms，测试结束后恢复。
+func pinClock(t *testing.T, ms int64) {
+	t.Helper()
+	prev := nowMs
+	nowMs = func() int64 { return ms }
+	t.Cleanup(func() { nowMs = prev })
+}
+
 func TestWriteParity(t *testing.T) {
 	dir := os.Getenv("GUIZHI_GOLDEN_DIR")
 	if dir == "" {
@@ -343,6 +357,9 @@ func TestWriteParity(t *testing.T) {
 	for _, name := range names {
 		sc := g.Writes[name]
 		t.Run(name, func(t *testing.T) {
+			if strings.HasPrefix(name, "ai.") {
+				pinClock(t, goldenClockMs) // AI 用量按天聚合，须与基准生成日对齐
+			}
 			base := "knowledge.db"
 			switch {
 			case strings.HasPrefix(name, "sel."):
