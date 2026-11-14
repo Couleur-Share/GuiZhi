@@ -112,7 +112,13 @@ async function main() {
   const userDataDir = fs.mkdtempSync(path.join(args.keepProfile ? args.out : os.tmpdir(), "guizhi-go-shot-"));
   const dbFile = path.join(userDataDir, "data", "knowledge.db");
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
-  if (args.dataDb) fs.copyFileSync(args.dataDb, dbFile);
+  if (args.dataDb) {
+    fs.copyFileSync(args.dataDb, dbFile);
+    // WAL 模式下最近的写入可能还在 -wal 里：只拷主文件会静默丢数据，旁文件一起带上。
+    // -shm 是可重建的索引，不用拷。源库须已关闭（见 docs/agents/desktop-development.md）。
+    const walSrc = `${args.dataDb}-wal`;
+    if (fs.existsSync(walSrc) && fs.statSync(walSrc).size > 0) fs.copyFileSync(walSrc, `${dbFile}-wal`);
+  }
 
   const taken = [];
   let child = null;

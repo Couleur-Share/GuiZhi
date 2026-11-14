@@ -114,6 +114,9 @@ Playwright `connectOverCDP` 接管页面；就绪判据是 `topbar-search` 出�
 `createDesktopSnapshot` 用 `fs.realpathSync.native` 取临时目录：Windows 的 8.3 短路径会让 Vite 解析 HTML 模块失败。
 `--steps`、`--data-db`、`--out` 的相对路径按调用目录解析。
 
+`--data-db` 会把 `<db>` 和存在的 `<db>-wal` 一起复制进一次性目录（数据库是 WAL 模式，最近的写入可能还在 `-wal` 里）。
+源库须已关闭：库仍被应用打开时，主文件与 `-wal` 不是同一时刻的快照，复制出来的副本可能不一致；需要保留现场时用 `VACUUM INTO` 出一份。
+
 ### 协作与进程约束
 
 - 用户可能正在运行归知（安装版或自行构建的 `GuiZhi.exe`）。验证不得停止、重启或复用它，不得按 `GuiZhi.exe` / `node.exe` 名称批量结束进程，
