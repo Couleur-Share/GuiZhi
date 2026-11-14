@@ -359,7 +359,7 @@ func TestIntegrityMarkerAndRepair(t *testing.T) {
 	l.release()
 
 	// 标记新鲜：跳过校验，且标记被消费
-	lastIntegrityAtMs = 0
+	resetIntegrityState(t)
 	now := time.Now()
 	os.WriteFile(work+".clean", []byte(fmt.Sprint(now.UnixMilli()-1000)), 0o644)
 	if err := ensureDatabaseIntegrity(ctx, work, func() time.Time { return now }); err != nil {
@@ -371,13 +371,20 @@ func TestIntegrityMarkerAndRepair(t *testing.T) {
 	if lastIntegrityAtMs != now.UnixMilli()-1000 {
 		t.Fatalf("应沿用标记里的时刻，实际 %d", lastIntegrityAtMs)
 	}
-	// 标记过期（>7 天）：重新校验
-	os.WriteFile(work+".clean", []byte(fmt.Sprint(now.Add(-8*24*time.Hour).UnixMilli())), 0o644)
+	if integrityRecheckDue.Load() {
+		t.Fatal("标记新鲜时不应要求后台复检")
+	}
+	// 标记过期（>7 天）：干净退出过，启动不再同步校验（不阻塞），交给后台复检；校验时刻沿用旧值
+	stale := now.Add(-8 * 24 * time.Hour).UnixMilli()
+	os.WriteFile(work+".clean", []byte(fmt.Sprint(stale)), 0o644)
 	if err := ensureDatabaseIntegrity(ctx, work, func() time.Time { return now }); err != nil {
 		t.Fatal(err)
 	}
-	if lastIntegrityAtMs != now.UnixMilli() {
-		t.Fatal("过期标记应触发重新校验并更新时刻")
+	if !integrityRecheckDue.Load() {
+		t.Fatal("过期标记应交给后台复检")
+	}
+	if lastIntegrityAtMs != stale {
+		t.Fatalf("同步路径不应更新校验时刻，应沿用标记里的旧值 %d，实际 %d", stale, lastIntegrityAtMs)
 	}
 	// 无标记：校验；乱码文件：报错而不是静默通过
 	bad := filepath.Join(t.TempDir(), "bad.db")

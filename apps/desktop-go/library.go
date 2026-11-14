@@ -21,18 +21,20 @@ type Library struct {
 	// 让慢查询不再占住 db 这条连接而拖住其他 IPC；为 nil 时 rdb() 回落到 db（MCP 与单测）。
 	// 注意：写入后的读取仍然安全——SQLite 每条语句读取已提交数据，ro 看得到 db 上已提交的写入。
 	// ro is a read-only connection to the same file for hot read paths; nil falls back to db.
-	ro         *sqlite.DB
-	writeMu    sync.Mutex
-	configDir  string // 对应 userData/config，放 ai-models.json
-	sem        semanticState
-	paths      Paths
-	images     imageState
-	openDialog openDialogFn // 选择图片的对话框；测试里替换
-	relaunch   func()       // 重启应用；测试里替换
-	jobs       *BackgroundJobRuntime
-	imports    *importQueue
-	crawl      *crawlService // 文档批次调度（crawl_service.go）
-	toolsHTTP  *http.Client  // 托管工具下载/版本查询用的 HTTP 客户端；空则按网络代理设置新建（测试注入）
+	ro *sqlite.DB
+	// integrityStop 停止后台完整性复检（db_integrity_bg.go）；换库前必须先停，它持有数据库文件的句柄。nil 表示没在跑。
+	integrityStop func()
+	writeMu       sync.Mutex
+	configDir     string // 对应 userData/config，放 ai-models.json
+	sem           semanticState
+	paths         Paths
+	images        imageState
+	openDialog    openDialogFn // 选择图片的对话框；测试里替换
+	relaunch      func()       // 重启应用；测试里替换
+	jobs          *BackgroundJobRuntime
+	imports       *importQueue
+	crawl         *crawlService // 文档批次调度（crawl_service.go）
+	toolsHTTP     *http.Client  // 托管工具下载/版本查询用的 HTTP 客户端；空则按网络代理设置新建（测试注入）
 	// 导入管线的可替换环节：url 类抽取（采集一族接入点）、抽取产物的清理、热门评论采集、文件选择、测试用整体替换
 	extractURL        func(ctx context.Context, task map[string]any, onStage func(string)) (*extractedContent, error)
 	disposeExtracted  func(*extractedContent)
@@ -100,6 +102,9 @@ func (l *Library) rdb() *sqlite.DB {
 // closeDatabases 关闭主连接与只读连接。换库、退出前必须一起关：
 // Windows 上任何一个句柄还开着，都会让换库的文件改名失败。返回第一个错误，但两个都会尝试关闭。
 func (l *Library) closeDatabases() error {
+	if l.integrityStop != nil {
+		l.integrityStop() // 后台复检有自己的连接，先停并等它关掉
+	}
 	var first error
 	if l.ro != nil {
 		if err := l.ro.Close(); err != nil {

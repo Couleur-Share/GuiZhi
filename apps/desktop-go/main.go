@@ -170,7 +170,8 @@ func main() {
 		}
 		failStartup(ud, fmt.Errorf("数据库初始化失败：%w", err), !automation) // GUI 子系统无控制台，必须弹窗并落盘
 	}
-	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{})
+	// 读写连接放宽等待锁的上限：后台完整性复检期间提交要等当前那张表检查完（见 db_integrity_bg.go）。
+	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{BusyTimeout: dbWriteBusyTimeout})
 	if err != nil {
 		lease.release()
 		failStartup(ud, fmt.Errorf("打开数据库失败：%w", err), !automation)
@@ -184,8 +185,15 @@ func main() {
 		log.Printf("[db] 打开只读连接失败，读查询回落到读写连接：%v", roErr)
 		roDB = nil
 	}
-	// 正常退出：先关库，再留「干净关闭」标记（下次启动据此跳过 quick_check），最后释放租约
+	// 干净退出但距上次校验超过一周：不阻塞启动，窗口出现并等启动期查询跑完后在后台复检（db_integrity_bg.go）。
+	// 自动化实例（截图/对拍/基准）不跑，保持结果确定。
+	var bgIntegrity *integrityBackground
+	if integrityRecheckDue.Load() && !automation {
+		bgIntegrity = startBackgroundIntegrityCheck(ctx, *dbPath, integrityBgStartDelay, time.Now)
+	}
+	// 正常退出：先停后台复检、关库，再留「干净关闭」标记（下次启动据此跳过 quick_check），最后释放租约
 	shutdownDB := sync.OnceFunc(func() {
+		bgIntegrity.Stop() // 先停：它有自己的连接，且结论决定要不要写标记
 		if roDB != nil {
 			roDB.Close()
 		}
@@ -196,7 +204,7 @@ func main() {
 	defer shutdownDB()
 
 	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
-	lib := &Library{db: db, ro: roDB, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
+	lib := &Library{db: db, ro: roDB, integrityStop: bgIntegrity.Stop, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
 	// 网页渲染：采集浏览器子进程按需启动（首次需要渲染时），空闲 90 s 后自动退出。
 	rh := newRenderHost(func() *safeFetcher { return lib.webFetcher })
 	lib.webRenderer = rh

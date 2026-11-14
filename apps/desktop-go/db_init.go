@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -25,10 +26,16 @@ const (
 )
 
 var (
-	quickCheckHeader  = regexp.MustCompile(`^\*{3} in database .+ \*{3}$`)
-	freelistMismatch  = regexp.MustCompile(`^Freelist: size is \d+ but should be \d+$`)
-	indexEntryWrong   = regexp.MustCompile(`^wrong # of entries in index (.+)$`)
-	lastIntegrityAtMs int64 // 最近一次真正跑过 quick_check 的时刻，正常退出时写进标记文件
+	quickCheckHeader = regexp.MustCompile(`^\*{3} in database .+ \*{3}$`)
+	freelistMismatch = regexp.MustCompile(`^Freelist: size is \d+ but should be \d+$`)
+	indexEntryWrong  = regexp.MustCompile(`^wrong # of entries in index (.+)$`)
+	// 最近一次真正跑过 quick_check 的时刻，正常退出时写进标记文件。
+	// 后台复检会在另一个 goroutine 里更新它，生产代码一律用 atomic 读写。
+	lastIntegrityAtMs int64
+	// 干净退出但距上次校验已超过一周：启动不再同步校验，由后台复检接手（db_integrity_bg.go）。
+	integrityRecheckDue atomic.Bool
+	// 后台复检发现了问题：退出时不写「干净关闭」标记，下次启动按崩溃路径做完整校验与自动修复。
+	integrityProblemFound atomic.Bool
 )
 
 type dbInitOptions struct {
@@ -276,21 +283,30 @@ func writeCleanShutdownMarker(dbPath string) {
 	if dbPath == "" {
 		return
 	}
-	if err := os.WriteFile(cleanShutdownMarkerPath(dbPath), []byte(strconv.FormatInt(lastIntegrityAtMs, 10)), 0o644); err != nil {
+	// 后台复检发现过问题：故意不留标记，下次启动就会像崩溃后一样做完整校验与自动修复。
+	if integrityProblemFound.Load() {
+		log.Printf("[DB] 本次运行的后台复检发现了问题，不写干净关闭标记；下次启动将做完整校验")
+		return
+	}
+	if err := os.WriteFile(cleanShutdownMarkerPath(dbPath), []byte(strconv.FormatInt(atomic.LoadInt64(&lastIntegrityAtMs), 10)), 0o644); err != nil {
 		log.Printf("[DB] 未能写入干净关闭标记：%v", err)
 	}
 }
 
-// ensureDatabaseIntegrity：只在上次没能正常退出（或距上次校验超过一周）时跑 quick_check，
-// 因为它耗时与库体积成正比（2 万条 364MB 约 920ms），会拖慢启动。
+// ensureDatabaseIntegrity：只在上次没能正常退出时同步跑 quick_check，因为它耗时与库体积成正比
+// （实测 1.5 万条 / 379 MB 约 5 s，其中约 65% 在全文索引表），会拖慢启动。
+// 上次是干净退出、只是距上次校验超过一周时，不再阻塞启动：标记 integrityRecheckDue，由后台复检接手。
 func ensureDatabaseIntegrity(ctx context.Context, dbPath string, now func() time.Time) error {
 	previous, hadMarker := consumeCleanShutdownMarker(dbPath)
 	st, err := os.Stat(dbPath)
 	if err != nil || st.Size() == 0 {
 		return nil
 	}
-	if hadMarker && now().UnixMilli()-previous < integrityRecheckPeriod.Milliseconds() {
-		lastIntegrityAtMs = previous
+	if hadMarker {
+		atomic.StoreInt64(&lastIntegrityAtMs, previous)
+		if now().UnixMilli()-previous >= integrityRecheckPeriod.Milliseconds() {
+			integrityRecheckDue.Store(true)
+		}
 		return nil
 	}
 	started := now()
@@ -298,7 +314,7 @@ func ensureDatabaseIntegrity(ctx context.Context, dbPath string, now func() time
 	if err != nil {
 		return err
 	}
-	lastIntegrityAtMs = started.UnixMilli()
+	atomic.StoreInt64(&lastIntegrityAtMs, started.UnixMilli())
 	if time.Since(started) > time.Second {
 		log.Printf("[DB] 启动完整性检查耗时 %dms（此期间主进程无响应）", time.Since(started).Milliseconds())
 	}
