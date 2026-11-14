@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/egoist/mygo/plugins/sqlite"
 )
 
 // ListQuery 对应 KnowledgeItemQuery。可选字段用指针，以区分「未传」与「空串」（指纹要区分 null 与 ""）。
@@ -274,7 +276,7 @@ func (l *Library) knowledgeList(ctx context.Context, q ListQuery) (any, error) {
 	}
 	fp := q.fingerprint()
 
-	totalRows, err := l.db.Query(ctx, "SELECT COUNT(*) AS count FROM knowledge_items i "+join+" "+where, params...)
+	totalRows, err := l.rdb().Query(ctx, "SELECT COUNT(*) AS count FROM knowledge_items i "+join+" "+where, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +337,7 @@ func (l *Library) knowledgeList(ctx context.Context, q ListQuery) (any, error) {
               %s AS sort_value
        FROM knowledge_items i %s %s %s LIMIT ? OFFSET ?`, sourceLen, projection, rankCol, sortColumn, join, pageWhere, order)
 	args := append(append(append([]any{}, projectionParams...), pageParams...), int64(limit)+1, int64(offset))
-	rows, err := l.db.Query(ctx, sql, args...)
+	rows, err := l.rdb().Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +351,7 @@ func (l *Library) knowledgeList(ctx context.Context, q ListQuery) (any, error) {
 	for i, r := range values {
 		ids[i], _ = r[0].(string)
 	}
-	tagsByItem, err := l.loadTagsFor(ctx, ids)
+	tagsByItem, err := l.loadTagsOn(ctx, l.rdb(), ids) // 列表本身是只读连接上的慢读，标签随它走同一条连接
 	if err != nil {
 		return nil, err
 	}
@@ -416,12 +418,19 @@ func parseReviewReasons(v any) []string {
 	return out
 }
 
+// loadTagsFor 在主连接上取标签：写入路径与 knowledge:get 等轻量调用用它。
+// 不能放到只读连接上——它会排在列表、计数等慢读后面，让轻量调用跟着变慢。
 func (l *Library) loadTagsFor(ctx context.Context, ids []string) (map[string][]map[string]any, error) {
+	return l.loadTagsOn(ctx, l.db, ids)
+}
+
+// loadTagsOn 在指定连接上取标签；列表这类本身就走只读连接的慢读，随自己的连接取标签。
+func (l *Library) loadTagsOn(ctx context.Context, conn *sqlite.DB, ids []string) (map[string][]map[string]any, error) {
 	result := map[string][]map[string]any{}
 	if len(ids) == 0 {
 		return result, nil
 	}
-	rows, err := l.db.Query(ctx, `SELECT kit.item_id AS item_id, t.id, t.name, t.color_key, t.created_at, t.updated_at
+	rows, err := conn.Query(ctx, `SELECT kit.item_id AS item_id, t.id, t.name, t.color_key, t.created_at, t.updated_at
        FROM knowledge_item_tags kit
        JOIN tags t ON t.id = kit.tag_id
        WHERE kit.item_id IN (`+placeholders(len(ids), ", ")+`)

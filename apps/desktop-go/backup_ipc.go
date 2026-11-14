@@ -381,7 +381,7 @@ func (l *Library) scheduleRelaunch(delay time.Duration) {
 
 // closeDatabaseForRestore 对应 closeDatabase()：换库前必须释放文件句柄。
 func (l *Library) closeDatabaseForRestore() {
-	if err := l.db.Close(); err != nil {
+	if err := l.closeDatabases(); err != nil { // 含只读连接：任何句柄没关都会让换库改名失败
 		log.Printf("[backup] 关闭数据库：%v", err)
 	}
 }

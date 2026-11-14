@@ -16,7 +16,12 @@ import (
 
 // writeMu 串行化写操作：MyGo 事务不能穿插读取，写入采用先读后写，需保证读到写之间无他人插入。
 type Library struct {
-	db         *sqlite.DB
+	db *sqlite.DB
+	// ro 是同一个库文件上的只读连接，专给纯读的热路径（列表、检索、计数）使用，
+	// 让慢查询不再占住 db 这条连接而拖住其他 IPC；为 nil 时 rdb() 回落到 db（MCP 与单测）。
+	// 注意：写入后的读取仍然安全——SQLite 每条语句读取已提交数据，ro 看得到 db 上已提交的写入。
+	// ro is a read-only connection to the same file for hot read paths; nil falls back to db.
+	ro         *sqlite.DB
 	writeMu    sync.Mutex
 	configDir  string // 对应 userData/config，放 ai-models.json
 	sem        semanticState
@@ -83,8 +88,32 @@ func asInt(v any) int64 {
 	return 0
 }
 
+// rdb 返回纯读查询应使用的连接：有只读连接用只读连接，否则用主连接。
+// 只有不写库、也不依赖 writeMu 的查询才能走它；写事务与"先读后写"仍用 l.db。
+func (l *Library) rdb() *sqlite.DB {
+	if l.ro != nil {
+		return l.ro
+	}
+	return l.db
+}
+
+// closeDatabases 关闭主连接与只读连接。换库、退出前必须一起关：
+// Windows 上任何一个句柄还开着，都会让换库的文件改名失败。返回第一个错误，但两个都会尝试关闭。
+func (l *Library) closeDatabases() error {
+	var first error
+	if l.ro != nil {
+		if err := l.ro.Close(); err != nil {
+			first = err
+		}
+	}
+	if err := l.db.Close(); err != nil && first == nil {
+		first = err
+	}
+	return first
+}
+
 func (l *Library) collectionList(ctx context.Context) (any, error) {
-	rows, err := l.db.Query(ctx, `SELECT c.id, c.name, c.icon, c.sort_order, c.created_at, c.updated_at, (
+	rows, err := l.rdb().Query(ctx, `SELECT c.id, c.name, c.icon, c.sort_order, c.created_at, c.updated_at, (
 		 SELECT COUNT(*) FROM knowledge_items i
 		 WHERE i.collection_id = c.id AND i.deleted_at IS NULL
 	   ) AS item_count
@@ -103,7 +132,7 @@ func (l *Library) collectionList(ctx context.Context) (any, error) {
 }
 
 func (l *Library) tagList(ctx context.Context) (any, error) {
-	rows, err := l.db.Query(ctx, `SELECT t.id, t.name, t.color_key, t.created_at, t.updated_at, (
+	rows, err := l.rdb().Query(ctx, `SELECT t.id, t.name, t.color_key, t.created_at, t.updated_at, (
 		 SELECT COUNT(*) FROM knowledge_item_tags kit
 		 JOIN knowledge_items i ON i.id = kit.item_id
 		 WHERE kit.tag_id = t.id AND i.deleted_at IS NULL
@@ -195,7 +224,7 @@ func buildFacetCountSql(q FacetCountsQuery, omit string) facetSQL {
 }
 
 func (l *Library) knowledgeCounts(ctx context.Context, q FacetCountsQuery) (any, error) {
-	scope, err := l.db.Query(ctx, `SELECT
+	scope, err := l.rdb().Query(ctx, `SELECT
 		 SUM(CASE WHEN deleted_at IS NULL AND collection_id IS NULL AND status != 'archived' THEN 1 ELSE 0 END),
 		 SUM(CASE WHEN deleted_at IS NULL AND status != 'archived' THEN 1 ELSE 0 END),
 		 SUM(CASE WHEN deleted_at IS NULL AND is_favorite = 1 THEN 1 ELSE 0 END),
@@ -206,7 +235,7 @@ func (l *Library) knowledgeCounts(ctx context.Context, q FacetCountsQuery) (any,
 		return nil, err
 	}
 	group := func(sql string, p facetSQL) (map[string]int64, error) {
-		rows, err := l.db.Query(ctx, sql, p.params...)
+		rows, err := l.rdb().Query(ctx, sql, p.params...)
 		if err != nil {
 			return nil, err
 		}

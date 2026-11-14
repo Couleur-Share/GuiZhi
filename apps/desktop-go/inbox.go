@@ -8,7 +8,7 @@ import (
 )
 
 func (l *Library) scalarCount(ctx context.Context, sql string) (int64, error) {
-	rows, err := l.db.Query(ctx, sql)
+	rows, err := l.rdb().Query(ctx, sql)
 	if err != nil {
 		return 0, err
 	}
@@ -21,7 +21,7 @@ func (l *Library) scalarCount(ctx context.Context, sql string) (int64, error) {
 func (l *Library) inboxList(ctx context.Context) (any, error) {
 	items := []map[string]any{}
 
-	review, err := l.db.Query(ctx, `SELECT id, title, review_reasons, created_at FROM knowledge_items
+	review, err := l.rdb().Query(ctx, `SELECT id, title, review_reasons, created_at FROM knowledge_items
      WHERE deleted_at IS NULL AND status = 'active' AND review_status = 'needs_review'
      ORDER BY created_at DESC LIMIT 100`)
 	if err != nil {
@@ -35,7 +35,7 @@ func (l *Library) inboxList(ctx context.Context) (any, error) {
 		})
 	}
 
-	unclassified, err := l.db.Query(ctx, `SELECT id, title, created_at FROM knowledge_items
+	unclassified, err := l.rdb().Query(ctx, `SELECT id, title, created_at FROM knowledge_items
      WHERE deleted_at IS NULL AND status = 'active' AND collection_id IS NULL
        AND review_status != 'needs_review'
      ORDER BY created_at DESC LIMIT 100`)
@@ -49,7 +49,7 @@ func (l *Library) inboxList(ctx context.Context) (any, error) {
 		})
 	}
 
-	issues, err := l.db.Query(ctx, `SELECT id, display_name, status, error, warning, result_item_id,
+	issues, err := l.rdb().Query(ctx, `SELECT id, display_name, status, error, warning, result_item_id,
             duplicate_item_id, created_at
      FROM import_tasks
      WHERE status IN ('failed','duplicate')

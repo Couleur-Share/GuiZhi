@@ -175,8 +175,20 @@ func main() {
 		lease.release()
 		failStartup(ud, fmt.Errorf("打开数据库失败：%w", err), !automation)
 	}
+	// 只读连接：专给列表、检索、计数等纯读热路径，让慢查询不占住读写连接、不拖住其他 IPC。
+	// 打开失败不致命：回落到读写连接（行为与之前一致），只记日志。必须在读写连接打开之后：
+	// 只读连接无法恢复遗留的回滚日志，而读写连接的首次访问会完成恢复。
+	// Read-only connection for hot read paths; failure falls back to the read-write connection.
+	roDB, roErr := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{ReadOnly: true})
+	if roErr != nil {
+		log.Printf("[db] 打开只读连接失败，读查询回落到读写连接：%v", roErr)
+		roDB = nil
+	}
 	// 正常退出：先关库，再留「干净关闭」标记（下次启动据此跳过 quick_check），最后释放租约
 	shutdownDB := sync.OnceFunc(func() {
+		if roDB != nil {
+			roDB.Close()
+		}
 		db.Close()
 		writeCleanShutdownMarker(*dbPath)
 		lease.release()
@@ -184,7 +196,7 @@ func main() {
 	defer shutdownDB()
 
 	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
-	lib := &Library{db: db, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
+	lib := &Library{db: db, ro: roDB, dbPath: *dbPath, configDir: *configDir, paths: Paths{UserData: ud}, appData: *appData}
 	// 网页渲染：采集浏览器子进程按需启动（首次需要渲染时），空闲 90 s 后自动退出。
 	rh := newRenderHost(func() *safeFetcher { return lib.webFetcher })
 	lib.webRenderer = rh
