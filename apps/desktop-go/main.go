@@ -178,7 +178,7 @@ func main() {
 	}
 	// 只读连接：专给列表、检索、计数等纯读热路径，让慢查询不占住读写连接、不拖住其他 IPC。
 	// 打开失败不致命：回落到读写连接（行为与之前一致），只记日志。必须在读写连接打开之后：
-	// 只读连接无法恢复遗留的回滚日志，而读写连接的首次访问会完成恢复。
+	// 只读连接无法恢复遗留的回滚日志/WAL，而读写连接的首次访问会完成恢复。
 	// Read-only connection for hot read paths; failure falls back to the read-write connection.
 	roDB, roErr := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{ReadOnly: true})
 	if roErr != nil {

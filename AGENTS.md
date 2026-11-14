@@ -10,7 +10,7 @@ Electron 版已于 2026-11-13 退役，终版保存在分支 `electron-final`、
 - `apps/desktop/src/renderer`：React 界面与状态；`apps/desktop/src/preload`：`window.api` 白名单，经 `apps/desktop-go/shim` 接到 Go 处理器。
 - `packages/core`：AI 配置与客户端；`packages/db`：SQLite schema 与迁移；`packages/shared`：跨进程类型和 IPC 常量。
 - 渲染进程不直接访问系统能力，一律走 preload 白名单。IPC 频道集中在 `packages/shared/constants/ipc-channels.ts`；`apps/desktop-go/ipc_channels_gen.go` 由 preload 扫描生成，新增频道必须同时补 Go 处理器。
-- 数据库在用户数据目录的 `data/knowledge.db`；旧 .NET 数据库仅作只读迁移源。AI 配置在 `config/ai-models.json`，AI HTTP/流式请求经 Go 壳代理。
+- 数据库在用户数据目录的 `data/knowledge.db`，WAL 模式（`db_wal.go`）：库打开时不要只拷主文件（最近的写入可能还在 `-wal`），备份用 `VACUUM INTO`，字节级保存现场用 `copyDatabaseFiles`，换库前用 `checkpointLiveWAL`；旧 .NET 数据库仅作只读迁移源。AI 配置在 `config/ai-models.json`，AI HTTP/流式请求经 Go 壳代理。
 - 远程抓取经过 `apps/desktop-go/net_safety.go`（含 `safe_fetch.go`）的 SSRF 防护。不要把 API Key、代理口令等机密写入日志或普通导出；配置迁移中离开数据目录的机密字段必须加密（Windows DPAPI）。数据库备份与 Markdown 导出不携带 AI 配置。
 - 手机收集已从桌面端移除（见 `docs/product-scope.md`）：桌面端不保存手机收集凭证；`apps/capture-*` 仍在仓库中，其约束见下文各节。
 - `apps/desktop-go/jsrc` 的 TS 经 `jsgen` 生成嵌入 goja 的产物，**产物入库**，CI 要求与重新生成的结果一致：改了 `jsrc`/`jsgen` 后运行 `pnpm --filter @guizhi/desktop-go gen` 并一起提交。

@@ -248,7 +248,7 @@ func TestCloseDatabasesStopsBackgroundIntegrityCheckFirst(t *testing.T) {
 }
 
 // TestWritesDuringBackgroundIntegrityCheck 度量并守住「后台复检期间写入不失败」：
-// 回滚日志模式下读连接持 SHARED 锁，写提交要等它放开，靠 dbWriteBusyTimeout 兜底。
+// 夹具默认是 WAL 库（读写互不阻塞）；若回落到回滚日志模式，读连接持 SHARED 锁、写提交要等它放开，靠 dbWriteBusyTimeout 兜底。
 // 规模可用 GUIZHI_BG_ROWS 调大（默认 20000 行 ≈ 35 MB）。
 func TestWritesDuringBackgroundIntegrityCheck(t *testing.T) {
 	resetIntegrityState(t)

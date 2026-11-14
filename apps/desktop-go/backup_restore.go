@@ -8,6 +8,7 @@ package main
 // 原文快照的 HTML/CSS 清理（TS 里也只是校验、结果丢弃——这里只移植了结构校验）。
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -305,6 +306,11 @@ func applyPreparedRepositoryRestore(p *preparedRestore, t restoreTargets) (err e
 		os.RemoveAll(rollbackDir)
 	}()
 	run := func() error {
+		// WAL 模式：换库前先把旧库的 -wal 合进主文件并截断，换进来的新库不会遇到旧库的 WAL；
+		// 回滚时放回的旧主文件也是完整的（db_wal.go）
+		if err := checkpointLiveWAL(context.Background(), t.DatabasePath); err != nil {
+			return err
+		}
 		if err := replacePath(p.DatabasePath, t.DatabasePath, rollbackDir, &records); err != nil {
 			return err
 		}

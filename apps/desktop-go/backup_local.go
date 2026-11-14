@@ -7,6 +7,7 @@ package main
 // 所以不移植；`backup:autoStatus` 推送因此也无触发源。
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -258,6 +259,10 @@ func (b *localBackups) performRestoreSwap(backupFilePath string) (preRestoreFile
 		}
 		preRestoreFileName = b.resolveBackupFileName("pre-restore")
 		preRestorePath = filepath.Join(b.backupsDir, preRestoreFileName)
+		// WAL 模式：先把 -wal 合进主文件，否则只拷主文件会丢最近的写入（db_wal.go）
+		if err = checkpointLiveWAL(context.Background(), databasePath); err != nil {
+			return "", fmt.Errorf("保存换库前的快照失败：%w", err)
+		}
 		if err = copyFile(databasePath, preRestorePath); err != nil {
 			return "", err
 		}

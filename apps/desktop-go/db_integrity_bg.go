@@ -9,7 +9,8 @@ package main
 //     这类损坏仍由「崩溃后没有干净关闭标记」的同步整库检查发现并自动修复。
 //   - 发现问题不当场修复（修复要独占数据库）：记 integrityProblemFound，退出时不写干净关闭标记，
 //     下次启动就按崩溃路径做完整校验与自动修复。
-//   - 回滚日志模式下，读语句持有读锁期间写入的提交要等待；逐表检查把单次持锁缩短到最大那张表的耗时，
+//   - 数据库默认是 WAL 模式（db_wal.go），读写互不阻塞，复检几乎不影响写入。仍保留两道保险以防回落到回滚日志模式
+//     （不支持 WAL 的位置）：该模式下读语句持有读锁期间写入的提交要等待，所以逐表检查把单次持锁缩短到最大那张表的耗时，
 //     读写连接的 BusyTimeout 另行放宽到 dbWriteBusyTimeout，保证写入是等待而不是失败。
 // Background integrity re-check on a dedicated native read-only connection, table by table.
 

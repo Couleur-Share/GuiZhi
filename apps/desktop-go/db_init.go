@@ -156,7 +156,7 @@ func createIntegrityBackup(dbPath string, now time.Time) (string, error) {
 	stamp := now.UTC().Format("2006-01-02T15:04:05.000Z")
 	stamp = strings.NewReplacer(":", "-", ".", "-").Replace(stamp)
 	p := dbPath + ".integrity-backup-" + stamp
-	return p, copyFile(dbPath, p)
+	return p, copyDatabaseFiles(dbPath, p) // WAL 模式下必须连 -wal 一起存，见 db_wal.go
 }
 
 func repairFreelistIntegrity(ctx context.Context, dbPath string, diag []string, now time.Time) error {
@@ -482,6 +482,14 @@ func initDatabaseFile(ctx context.Context, dbPath string, opt dbInitOptions) (le
 		return
 	}
 	defer conn.Close()
+
+	// 切到 WAL（持久写入文件头，每次启动都确认一次：也覆盖从回滚日志模式的旧备份恢复出来的库）。
+	// 切换失败不致命：回落到原有模式，只是读写仍会互相等待。
+	if mode, werr := ensureWALMode(ctx, conn); werr != nil {
+		log.Printf("[DB] 切换 WAL 模式失败，沿用当前日志模式：%v", werr)
+	} else if mode != "wal" {
+		log.Printf("[DB] 该位置不支持 WAL（日志模式=%s），沿用原模式；数据库目录是否在网络盘？", mode)
+	}
 
 	if opt.BackupsDir != "" {
 		if err = backupPendingSchemaUpgrade(ctx, conn, dbPath, opt.BackupsDir, opt.Now); err != nil {
