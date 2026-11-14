@@ -1,6 +1,6 @@
 {
   "name": "@guizhi/desktop",
-  "version": "0.29.0-go.2",
+  "version": "0.29.0",
   "private": true,
   "description": "GuiZhi Desktop - local-first AI personal knowledge base",
   "files": [
