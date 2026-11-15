@@ -106,7 +106,7 @@ func safeStorageEnsureMasterKey(userData string) error {
 	if err := os.WriteFile(tmp, out, 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	return renameReplace(tmp, path)
 }
 
 func safeStorageDecrypt(userData string, wrapped []byte) ([]byte, error) {

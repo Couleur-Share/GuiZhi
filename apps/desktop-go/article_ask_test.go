@@ -392,4 +392,17 @@ func TestThemedReadingSearchConfigIPC(t *testing.T) {
 	if r["success"] != false || r["error"] != "搜索服务无效" {
 		t.Fatalf("%v", r)
 	}
+	// 无参读取：渲染层 searchConfig() 不带参数，桥把 undefined 序列化成 null；缺省参数同样补 null。
+	// 两者都必须是只读状态查询（回归：曾被误报“搜索配置格式无效”，设置页读取与联网问答前的检查都会失败）。
+	for name, args := range map[string][]json.RawMessage{"null": {json.RawMessage("null")}, "缺省": {}} {
+		out, err := b.handlers["themedReading:searchConfig"](context.Background(), args)
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		got := toGeneric(t, out).(map[string]any)
+		s, _ := got["search"].(map[string]any)
+		if got["success"] != true || s["provider"] != "tavily" || s["configured"] != true {
+			t.Fatalf("%s 应返回此前保存的状态：%v", name, got)
+		}
+	}
 }

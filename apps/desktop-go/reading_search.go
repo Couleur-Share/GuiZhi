@@ -259,7 +259,7 @@ func (l *Library) readingSearchPersist(cfg readingSearchConfig) error {
 	if werr != nil {
 		return werr
 	}
-	if err := os.Rename(staging, file); err != nil {
+	if err := renameReplace(staging, file); err != nil {
 		return err
 	}
 	st.transient = nil
@@ -268,7 +268,9 @@ func (l *Library) readingSearchPersist(cfg readingSearchConfig) error {
 
 // configureReadingSearch 连接测试先验证候选配置；失败时保留之前可用的服务和密钥。
 func (l *Library) configureReadingSearch(ctx context.Context, input any) (readingSearchStatus, error) {
-	if input == jsUndefined {
+	// 对应 TS 的 `input ?? {}`：渲染层 searchConfig() 不带参数时，桥把 undefined 序列化成 null（argAt 对缺省参数也补 null），
+	// 所以 null 必须与缺省一样当作“只读状态”，否则设置页读取与联网问答前的检查都会被误报“格式无效”。
+	if input == jsUndefined || input == jsNull {
 		input = newObj()
 	}
 	if _, ok := input.(*jsObj); !ok {

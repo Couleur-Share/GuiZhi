@@ -96,7 +96,7 @@ func markFunasrBackup(b *funasrBackup, phase funasrBackupPhase) error {
 	if err := assertBackupIdentity(b); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, filepath.Join(b.Directory, funasrBackupManifestName)); err != nil {
+	if err := renameReplace(tmp, filepath.Join(b.Directory, funasrBackupManifestName)); err != nil {
 		return err
 	}
 	b.Manifest = next

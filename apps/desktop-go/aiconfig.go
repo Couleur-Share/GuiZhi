@@ -440,7 +440,7 @@ func (l *Library) replaceAIConfig(providers, models []any, routes any) error {
 	if err := os.WriteFile(tmp, []byte(text), 0o600); err != nil {
 		return err
 	}
-	return os.Rename(tmp, l.aiConfigPath())
+	return renameReplace(tmp, l.aiConfigPath())
 }
 
 func omapList(ms []*omap) []any {

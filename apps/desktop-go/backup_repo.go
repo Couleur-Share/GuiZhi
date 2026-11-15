@@ -211,7 +211,7 @@ func atomicWrite(path string, data []byte) error {
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	return renameReplace(tmp, path)
 }
 
 func gzipBytes(b []byte) []byte {
