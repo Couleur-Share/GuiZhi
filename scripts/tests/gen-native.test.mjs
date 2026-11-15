@@ -1,6 +1,7 @@
 // 原生界面生成器（apps/desktop-go/scripts/gen-native-*.mjs）的单测：解析函数的边界，以及它们对真实渲染层源码的冒烟。
 // 不调用 gofmt、不写文件；产物是否与源一致由 CI 的「重新生成后 git diff」把关。
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
@@ -272,4 +273,34 @@ test("brand: 真实渲染层源码能被生成器完整解析", async () => {
   const doubao = providers.find((p) => p.key === "doubao");
   assert.equal(doubao.raster.canvas, 120, "豆包是套了壳的位图，必须走位图通道");
   assert.ok(providers.filter((p) => p.svg).every((p) => !p.svg.includes("\r") && !p.svg.includes("`")));
+});
+
+// ───────────────────────── Tailwind 色阶对拍 ─────────────────────────
+// 渲染层的 Toast、对话框、平台 logo 直接用了 Tailwind 的色阶（不是主题令牌）。
+// 原生界面里抄下来的几处必须逐项对得上 tailwindcss/colors：抄错一位十六进制或升级后色值变了，这里先红。
+
+const tailwindColors = () => createRequire(path.join(ROOT, "apps/desktop/package.json"))("tailwindcss/colors");
+
+function tailwindHex(colors, name) {
+  const m = name.match(/^([a-z]+)-(\d+)$/);
+  assert.ok(m, `色阶名 ${name} 格式不对`);
+  const hex = colors[m[1]]?.[m[2]];
+  assert.ok(hex, `tailwindcss/colors 里没有 ${name}`);
+  return hex.toLowerCase();
+}
+
+test("tailwind: native/kit/tailwind.go 的色阶与 tailwindcss/colors 逐项一致", async () => {
+  const src = await read("apps/desktop-go/native/kit/tailwind.go");
+  const block = src.match(/var tailwindPalette = map\[string\]string\{([\s\S]*?)\n\}/);
+  assert.ok(block, "找不到 tailwindPalette 的定义，写法变了就同步改这条测试");
+  const entries = [...block[1].matchAll(/"([a-z]+-\d+)":\s*"(#[0-9a-fA-F]{6})"/g)];
+  assert.ok(entries.length >= 25, `只解析出 ${entries.length} 项，解析规则可能失效`);
+  const colors = tailwindColors();
+  for (const [, name, hex] of entries) assert.equal(hex.toLowerCase(), tailwindHex(colors, name), name);
+});
+
+test("tailwind: 品牌图标生成器的 TAILWIND 表与 tailwindcss/colors 一致", async () => {
+  const { TAILWIND } = await scripts("gen-native-brand-icons.mjs");
+  const colors = tailwindColors();
+  for (const [name, hex] of Object.entries(TAILWIND)) assert.equal(hex.toLowerCase(), tailwindHex(colors, name), name);
 });

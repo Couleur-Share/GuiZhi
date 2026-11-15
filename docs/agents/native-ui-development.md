@@ -2,7 +2,7 @@
 
 > 本文随分支存在，切换（见评估文档 §六 阶段 4）后并入桌面开发细节。
 > 立项依据、关卡与止损条件：[native-ui-evaluation.md](native-ui-evaluation.md)；产品边界：[product-scope.md](../product-scope.md)。
-> 当前阶段：阶段 1「地基」。已迁移的模块只有「采集（imports）」的只读列表，其余页面是如实说明未迁移的占位；外观桥（主题、字号、动效、壁纸）、文案目录与图标流水线已就位，共享控件（Toast、确认对话框等）与设置的 Go 化在后面。
+> 当前阶段：阶段 1「地基」。已迁移的模块只有「采集（imports）」的只读列表，其余页面是如实说明未迁移的占位；外观桥（主题、字号、动效、壁纸）、文案目录、图标流水线与共享控件（Toast、失败处理、确认/未保存对话框、命令面板、快捷键录制、窗格与表格列持久化）已就位，设置的 Go 化（`PrefStore` 的真实实现与旧 localStorage 导入）在后面。
 
 ## 1. 一句话
 
@@ -116,13 +116,58 @@ pnpm shot:native --matrix appearance                          # 一次构建拍�
 
 **品牌图标与渲染层的已知差异**：Gemini 的 SVG 靠 `<filter>` 柔化光晕，MyGo 不画滤镜，所以原生版是不带柔化的四色星（形与色相近，边缘更硬）；豆包的 SVG 只是给一张 PNG 套了壳（MyGo 不画 SVG 里的 `<image>`），生成器把 PNG 抽出来按位图通道绘制；特殊分类图标的阴影与 `strokeWidth=2.2` 没有复刻（lucide 图标固定 2）。
 
+### 共享控件（`native/kit`）
+
+页面不自己造提示、对话框和偏好持久化；一律用下面这些件。它们的行为逐条对照渲染层的同名组件，测试里有对拍的地方都写明了。
+
+| 件 | 入口 | 对应渲染层 | 要点 |
+| --- | --- | --- | --- |
+| 提示 | `Notifier`（`App.Notifier()`）+ `ToastViewport` | `Toast` / `showToast` | 任意 goroutine 可发；成功/信息自动消失，错误/警告不消失；`WithDetail` 出「查看详情」并可复制原文；`Undo` 给撤销窗口；同时只露出最新 3 条，其余排队 |
+| 失败处理 | `Guard`（`App.Guard()`） | `runGuardedMutation` + `logAppError` | `Run(动作, fn) bool`：失败既弹带详情的提示又留日志，成功返回 true，调用方据此决定是否继续；`Go` 在后台跑并回调结果；`Background` 只留痕。panic 也被收住并按失败处理 |
+| 加载失败 | `LoadErrorState(message, retry)` | `LoadErrorState` | 错误不是空态，必须可重试 |
+| 确认 / 未保存 | `Confirm`、`Unsaved` | `ConfirmDialog`、`UnsavedChangesDialog` | 初始焦点在「取消」（防止一路回车误删）；Enter 在任何位置都确认、Esc/点遮罩取消；异步 `Action`/`Save` 期间显示加载、不响应 Esc/Enter，失败则留着对话框重试；关闭后焦点回到打开前的位置 |
+| 命令面板 | `Palette` + `PaletteSource` | `GlobalCommandPalette` | 面板只管输入、高亮与键盘；结果由 `PaletteSource.Items(query)` 给出，`QueryChanged` 每次输入变化只通知一次（远程搜索的 150 ms 去抖由来源做，M3 实现） |
+| 快捷键录制 | `ShortcutField` + `Accelerator` / `NormalizeAccelerator` / `FormatAccelerator` | `ShortcutItem` | 产出 MyGo `GlobalShortcut` 接受的加速键字符串（词表与 `internal/accelerator` 对拍）；录制期间 `KeyCaptureActive()` 为 true，**应用级快捷键必须据此让路** |
+| 窗格宽度 | `Pane`（`PaneSidebar` / `PaneItemList` / `PaneWikiCatalog`） | `ui.store.ts` 的三条宽度 | 规格与渲染层常量逐项对拍；`Split` 接 `ui.Split`，拖动、方向键、双击恢复默认都落到 `Set`（夹紧、去抖保存） |
+| 表格列 | `ColumnSet` + `ColumnDef` | `useItemTableConfig` | 只有「是否显示」和「宽度」是用户的，范围与可调性永远以代码为准；`MergeStoredColumns` 逐条对照渲染层 `mergeStoredColumns`（含怪癖）；与 `ui.Table` 的用法见下 |
+
+**偏好存取**：窗格与表格列只依赖窄接口 `PrefStore`（JSON 键值，键用点分命名如 `ui.itemListPaneWidth`），写入在去抖定时器的 goroutine 里发生，实现必须并发安全。测试用 `MemStore`；真实实现随 Go 侧设置（`settings-go`）提供，首次启动从旧 WebView2 的 localStorage 导入。保存是 400 ms 去抖，窗口关闭前要对每个 `Pane`/`ColumnSet` 调 `Flush`，否则最后一次拖动会丢。
+
+**`ColumnSet` 与 `ui.Table`**：每帧用 `cs.TableColumns(title)` 生成列，建完表后 `if cs.Sync(&state.Columns) { c.Invalidate() }`。偏好（`ColumnSet`）是真相源，表格在 `ListState.Columns` 里另存的布局每帧被读回偏好；代码改了偏好（`Resize`、`Reset`）后布局过时，下一次 `Sync` 以偏好为准重写它，否则「恢复默认」会被表格里留着的旧宽度覆盖回去。`Sync` 还清掉表头拖出来的列顺序（渲染层的列顺序固定）。默认宽度会先夹进范围（渲染层的操作列默认 84、下限 148，实际显示 148），读写才稳定。
+
+**与渲染层的有意差异（对等台账登记项，延续上一节的编号）**：
+
+7. 提示同时只露出最新 3 条（MyGo 的上限），更早的排队等位——持久的错误关掉一条后下一条才露出来，批量失败时不会有哪条在读到之前被挤掉。
+8. 提示、对话框、面板的底色按「模糊后接近底色」预先合成为不透明（没有 backdrop-blur，壁纸模式里同样）。
+9. 对话框在异步操作进行中不响应遮罩点击、Esc、Enter（渲染层的遮罩点击仍会关）；异步操作失败时对话框保持打开以便重试，而不是关闭后只剩一条提示。
+10. 命令面板按 combobox + listbox 暴露可访问语义（`ActiveDescendant` / `Controls`），渲染层是普通列表。
+11. 快捷键录制：点击、Enter、空格开始录制；Esc 取消；Tab 离开（不再被输入框吞掉）；方向键记为 `Up/Down/Left/Right`（渲染层记成 `ARROWUP` 这种 MyGo 不接受的写法）；Win 键记为 `Meta`/显示「Win」（渲染层把它记成 Ctrl）；录制中实时显示已按住的修饰键；窗口失去键盘时取消。
+12. 窗格分隔条的外观与键盘行为是 MyGo 自带的，不是渲染层 `ColumnResizer` 的逐像素复刻；双击表格列边缘会「适应内容宽度」（MyGo 自带，渲染层没有），适应的结果同样夹进列范围并保存。
+13. 确认框默认（非危险）确认钮的前景取 `PrimaryForeground`；渲染层写死 `text-white`，在深色模式的浅色主色上对比度不足（见下）。
+
+**渲染层既有缺陷（两端共享，未在 main 上修）**：深色危险按钮白字压红底 4.39:1；深色 `text-destructive` 压对话框底 4.06 / 3.74；green、teal 预设的浅色悬停态 `accent` 3.85 / 3.77、`primary/90` 悬停 4.42 / 4.34；快捷键录制写出 `ARROWUP` 这类无效加速键、把 Win 键记成 Ctrl、Tab 与 Esc 被吞；确认框在深色浅主色上用 `text-white`。其中对比度类已登记在 `look_test.go` 的 `knownContrastDebt`，修好后测试会提示删除登记。
+
+**核对**：`GUIZHI_WIDGET_SHEET=<前缀> go test ./native/kit -run TestWidgetsSheet` 把各控件的各种状态（提示堆叠与展开详情、确认/危险确认/未保存、命令面板含查询、快捷键录制中/未设置）在明、暗两种外观下各画一张 PNG；Tailwind 色阶由 `gen-native.test.mjs` 用 `tailwindcss/colors` 逐项对拍（`native/kit/tailwind.go` 与品牌图标生成器的 `TAILWIND` 表）。
+
+### MyGo 即时模式的踩坑记录
+
+- **文本默认折行**：`ui.Text` 本来就折行，`.Wrap()` 是容器的 flex-wrap，对文本是空操作（已全部移除）。单行截断用 `MaxLines(1).Ellipsis("…")` 或 `SingleLine()`。
+- **对话框的焦点**：`ui.DialogBase` 在内容建完之后才记录「打开前的焦点」，所以对话框里**不能** `AutoFocus()`（会让恢复焦点失效）；等 `DialogBase` 返回后，只在第一帧调一次 `el.Focus()`。
+- **输入框自己吃 Enter**：`ui.TextInputBase` 把 Enter 当成 `Submitted()`，祖先上的 `Shortcut(0, KeyEnter)` 拿不到；要响应回车就用 `input.Submitted()`。祖先快捷键只对输入框自己不处理的键优先。
+- **Toast 按钮**：`ToastBase` 的 `ActionButton()`/`CloseButton()` 在创建时就检查 `Clicked()`，对它们调 `.Key()` 会让点击失效。
+- **剪贴板回调**：`c.WriteClipboardThen` 的 done 回调不在帧里运行，不能在里面直接改视图状态，用标志位让下一帧去读。
+- **窗口失焦要用 `FocusLeft()`**：窗口失去键盘时 `FocusWithin()` 仍指向原来的元素、`WindowActive()` 是另一件事（窗口是否画成激活态）；「焦点离开了这个元素，包括窗口失去键盘」就是 `Element.FocusLeft()`。
+- **Tester 的时钟不会自己走**：同一位置紧挨着的两次按下会被当成双击；测拖动前先 `tr.Advance(2 * time.Second)`。
+- **表格布局**：`ListState.Columns`（`ui.TableLayout`）的 `Widths`/`Order` 必须「变化时换新的切片与映射」，ui.Table 靠这个判断一次拖动改没改布局；原地改会让它拿着的拖动起点一起变掉。
+- **快捷键词表**：MyGo 的加速键接受 `command/cmd/super/meta/win`、`control/ctrl`、`commandorcontrol/cmdorctrl`、`alt/option/altgr`、`shift` 与单个字符、`F1–F24`、`Up/Down/Left/Right`、`Return/Enter`、`Escape/Esc`、`Plus`、`Space` 等具名键（大小写不敏感）；设置里存的是 Electron 风格的字符串（`Alt+Shift+P`），`NormalizeAccelerator` 负责互转。
+
 ## 6. 测试
 
 | 范围 | 命令 | 说明 |
 | --- | --- | --- |
 | 原生界面 | `go test -count=1 ./native/...`（在 `apps/desktop-go`） | `ui.Tester` 无窗口；Compose 测输入法路径；用假服务注入各种状态 |
-| 适配器 | `go test -count=1 -run 'TestNative\|TestPushHub\|TestImportsAdapter\|TestCallAs' .` | 对真实处理器与真实库 |
-| 隔离脚本与生成器 | `pnpm test:validation`（含 `scripts/tests/isolated-go.test.mjs`、`gen-native.test.mjs`） | `shot-native` 参数与环境解析；四个生成器的解析边界，以及对真实渲染层源码的冒烟 |
+| 适配器 | `go test -count=1 -run 'TestNative\|TestPushHub\|TestImportsAdapter\|TestLogAdapter\|TestCallAs' .` | 对真实处理器与真实库 |
+| 隔离脚本与生成器 | `pnpm test:validation`（含 `scripts/tests/isolated-go.test.mjs`、`gen-native.test.mjs`） | `shot-native` 参数与环境解析；四个生成器的解析边界，对真实渲染层源码的冒烟，以及 Tailwind 色阶对拍 |
 | 整包 | `go vet ./...`、`go test -count=1 ./...` | 与 AGENTS.md 一致（需先 `pnpm build`，约 2 分钟） |
 
 每个模块的完成定义（M4 验收逐项核对）：Tester 用例、IME Compose 用例、`Access` 断言、亮/暗 × 中/英的截图、加载/空/错误/重试四态、帧预算、无中文字面量、内存增量。

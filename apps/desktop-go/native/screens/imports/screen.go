@@ -278,6 +278,6 @@ func (s *Screen) empty(c *ui.Context, t *kit.Look, q query) {
 			return
 		}
 		ui.Text(c, locales.ImportsEmpty()).FontSize(14).FontWeight(500)
-		ui.Text(c, locales.ImportsEmptyDesc()).FontSize(12).TextColor(t.TextMuted).MaxWidth(420).Wrap()
+		ui.Text(c, locales.ImportsEmptyDesc()).FontSize(12).TextColor(t.TextMuted).MaxWidth(420)
 	})
 }

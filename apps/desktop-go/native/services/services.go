@@ -14,6 +14,9 @@ import "time"
 type Services struct {
 	Imports Imports
 
+	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
+	Log Logger
+
 	// Now 返回当前时间；测试注入固定值，nil 时用 time.Now。
 	Now func() time.Time
 }

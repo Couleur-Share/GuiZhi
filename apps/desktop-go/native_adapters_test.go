@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -114,6 +115,50 @@ func TestImportsAdapterAgainstRealHandler(t *testing.T) {
 	found, err := svc.List(ctx, services.ImportQuery{Query: "egoist"})
 	if err != nil || len(found.Entries) != 1 || found.Entries[0].ID != "t-run" {
 		t.Fatalf("按关键词搜索：%+v %v", found, err)
+	}
+}
+
+// 原生界面的错误日志必须落进渲染进程用的同一个 error.log，且走同一套截断与脱敏。
+func TestLogAdapterWritesThroughTheRendererHandler(t *testing.T) {
+	paths := Paths{UserData: t.TempDir()}
+	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}}
+	l := &Library{paths: paths}
+	l.registerAppRuntime(b)
+	log := newNativeServices(b, newPushHub()).Log
+
+	home, _ := os.UserHomeDir()
+	log.AppError("native", "保存设置", `写入 `+home+`\config\x.json 失败`)
+	log.AppError("native", "超长", strings.Repeat("长", 3000))
+	log.AppError("native", "空消息", "   ") // 与渲染进程一致：空消息不记
+
+	raw, err := os.ReadFile(filepath.Join(paths.LogsDir(), "error.log"))
+	if err != nil {
+		t.Fatalf("应写出 error.log：%v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("应有 2 条日志（空消息不记）：%d\n%s", len(lines), raw)
+	}
+	var first, second map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(lines[1]), &second); err != nil {
+		t.Fatal(err)
+	}
+	if first["scope"] != "native" || first["action"] != "保存设置" {
+		t.Errorf("范围/动作不对：%v", first)
+	}
+	msg, _ := first["message"].(string)
+	if home != "" && strings.Contains(strings.ToLower(msg), strings.ToLower(home)) {
+		t.Errorf("家目录应被脱敏成 ~：%s", msg)
+	}
+	if !strings.Contains(msg, "~") {
+		t.Errorf("脱敏后应含 ~：%s", msg)
+	}
+	long, _ := second["message"].(string)
+	if n := utf16Len(long); n != 2000 {
+		t.Errorf("超长内容应截到 2000 个 UTF-16 码元：%d", n)
 	}
 }
 

@@ -35,7 +35,7 @@ const OUT_ICONS = path.join(REPO_ROOT, "apps/desktop-go/native/kit/icons/brand_g
 const OUT_KIT = path.join(REPO_ROOT, "apps/desktop-go/native/kit/brand_gen.go");
 
 /** Tailwind 默认色板里渲染层实际用到的色阶；用到新的色阶时在这里补，不会悄悄取错色。 */
-const TAILWIND = { "green-600": "#16a34a", "green-400": "#4ade80" };
+export const TAILWIND = { "green-600": "#16a34a", "green-400": "#4ade80" };
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 

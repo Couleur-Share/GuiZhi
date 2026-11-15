@@ -109,9 +109,23 @@ func orStr(s, def string) string {
 	return s
 }
 
+// logAdapter 把原生界面的错误留痕交给渲染进程用的同一个 log:appError 处理器：
+// 同样的字段截断（范围/动作 64、内容 2000）、同样的家目录脱敏、同样写进 error.log 与轮转，
+// 两套界面的日志格式只有一个来源。
+type logAdapter struct{ b *Bridge }
+
+func (a logAdapter) AppError(scope, action, message string) {
+	encoded, err := json.Marshal([]any{map[string]string{"scope": scope, "action": action, "message": message}})
+	if err != nil {
+		return
+	}
+	a.b.Send("log:appError", string(encoded))
+}
+
 // newNativeServices 装配原生界面依赖的全部能力。
 func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 	return services.Services{
 		Imports: importsAdapter{b: b, hub: hub},
+		Log:     logAdapter{b: b},
 	}
 }

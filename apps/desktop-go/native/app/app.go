@@ -79,6 +79,10 @@ type App struct {
 
 	startRoute Route // 创建时的页面，创建后不变；Ready 只看它（可在任意 goroutine 读）
 	imports    *importsscreen.Screen
+
+	// 窗口级的提示与失败处理：所有页面共用一个队列、一套留痕规则，可在任意 goroutine 使用。
+	notifier *kit.Notifier
+	guard    kit.Guard
 }
 
 // lookKey 是装配外观的全部输入；任何一项变了才重新装配。
@@ -98,6 +102,8 @@ func New(o Options) *App {
 		a.route = RouteLibrary
 	}
 	a.startRoute = a.route
+	a.notifier = kit.NewNotifier(a.invalidate)
+	a.guard = kit.Guard{Notify: a.notifier, Log: o.Services.Log}
 	a.imports = importsscreen.New(importsscreen.Options{
 		Imports:    o.Services.Imports,
 		Invalidate: a.invalidate,
@@ -105,6 +111,13 @@ func New(o Options) *App {
 	})
 	return a
 }
+
+// Notifier 返回窗口的提示队列：页面与后台任务的成功/失败提示都从这里发，可在任意 goroutine 调用。
+func (a *App) Notifier() *kit.Notifier { return a.notifier }
+
+// Guard 返回窗口共用的失败处理：Run/Go 包住一次用户操作，失败时既弹出可复制详情的提示，
+// 又写进诊断日志；后台失败用 Background 只留痕。页面通过 Options 拿到它，不自己拼装。
+func (a *App) Guard() kit.Guard { return a.guard }
 
 // AttachHost 注入窗口，并让系统绘制的部分先跟上应用外观（窗口显示前调用，避免先闪一下系统外观）。
 func (a *App) AttachHost(h Host) {
@@ -205,6 +218,7 @@ func (a *App) View(c *ui.Context) {
 			})
 		})
 	})
+	kit.ToastViewport(c, l, a.notifier) // 覆盖层，放在最后
 }
 
 // topBar 是顶栏：整条可拖动窗口；右侧给窗口控制按钮让出位置。
@@ -228,7 +242,7 @@ func (a *App) content(c *ui.Context, l *kit.Look) {
 func (a *App) notMigrated(c *ui.Context, l *kit.Look) {
 	ui.Column(c).Fill().Center().Gap(8).Padding(24).Children(func() {
 		ui.Text(c, locales.NativeShellNotMigrated(routeLabel(a.route))).FontSize(14).FontWeight(500).TextColor(l.T.Foreground)
-		ui.Text(c, locales.NativeShellNotMigratedHint()).FontSize(12).TextColor(l.T.MutedForeground).MaxWidth(420).Wrap()
+		ui.Text(c, locales.NativeShellNotMigratedHint()).FontSize(12).TextColor(l.T.MutedForeground).MaxWidth(420)
 	})
 }
 

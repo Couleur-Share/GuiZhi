@@ -73,6 +73,12 @@ var knownContrastDebt = map[string]float64{
 	"*/dark/危险按钮文字":        4.3, // 白字压在 0 70% 55% 的红上：4.39
 	"green/light/强调背景上的文字": 3.8, // 悬停态：hsl(150 30% 40%) 压在 hsl(150 15% 94%) 上：3.85
 	"teal/light/强调背景上的文字":  3.7, // 同上：3.77
+
+	// 对话框按钮（渲染层 ConfirmDialog / UnsavedChangesDialog 的写法，原样照搬）：
+	"green/light/对话框确认钮悬停文字": 4.4, // bg-primary/90 压在面板上：4.42
+	"teal/light/对话框确认钮悬停文字":  4.3, // 4.34
+	"*/dark/对话框不保存钮文字":       4.0, // text-destructive（暗色下是深红）压在暗色面板上：4.06
+	"*/dark/对话框不保存钮悬停文字":     3.7, // 3.74
 }
 
 // 6 个主题色预设 × 明暗：主按钮（主题色底、PrimaryForeground 字）与正文都要达到 WCAG AA。
@@ -85,17 +91,35 @@ func TestPresetsMeetContrast(t *testing.T) {
 	for _, p := range HuePresets {
 		for _, mode := range []Mode{ModeLight, ModeDark} {
 			l := NewLook(specFor(p, mode), Env{})
-			checks := []struct {
+			type check struct {
 				what      string
 				fg, bg    ui.Color
 				threshold float64
-			}{
+			}
+			panel := l.solid(l.T.UiPanelStrongBg)
+			checks := []check{
 				{"主按钮文字", l.T.PrimaryForeground, l.T.Primary, 4.5},
 				{"正文", l.T.Foreground, l.T.Background, 7},
 				{"卡片正文", l.T.CardForeground, l.T.Card, 7},
 				{"次要文字", l.T.MutedForeground, l.T.Background, 4.5},
 				{"强调背景上的文字", l.T.AccentForeground, l.T.Accent, 4.5},
 				{"危险按钮文字", l.T.DestructiveForeground, l.T.Destructive, 4.5},
+				{"对话框说明文字", l.T.MutedForeground, panel, 4.5},
+				{"对话框标题文字", l.T.Foreground, panel, 7},
+			}
+			// 对话框的四种按钮，常态与悬停态各查一次
+			for _, d := range []struct {
+				what string
+				kind dialogButtonKind
+			}{{"对话框确认钮", btnPrimary}, {"对话框危险钮", btnDestructive}, {"对话框取消钮", btnSecondary}, {"对话框不保存钮", btnDiscard}} {
+				for _, hover := range []bool{false, true} {
+					bg, fg, _ := l.dialogButtonColors(d.kind, hover)
+					what := d.what + "文字"
+					if hover {
+						what = d.what + "悬停文字"
+					}
+					checks = append(checks, check{what, fg, l.solid(bg), 4.5})
+				}
 			}
 			for _, c := range checks {
 				got := contrast(c.fg, c.bg)

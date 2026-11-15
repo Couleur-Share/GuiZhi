@@ -53,7 +53,11 @@ func newTestAppWithHost(t *testing.T, opts Options) (*App, *servicestest.Imports
 		Entries: []services.ImportTask{{ID: "a", Status: "completed", SourceKind: "url", SourceInput: "https://example.com/p", DisplayName: "示例文章", CreatedAt: 1, UpdatedAt: 2}},
 		Total:   1, Counts: map[string]int64{"completed": 1},
 	}, nil)
-	opts.Services = services.Services{Imports: fake, Now: func() time.Time { return time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC) }}
+	opts.Services = services.Services{
+		Imports: fake,
+		Log:     &servicestest.Logger{},
+		Now:     func() time.Time { return time.Date(2026, 11, 15, 12, 0, 0, 0, time.UTC) },
+	}
 	a := New(opts)
 	host := &fakeHost{}
 	a.AttachHost(host)
@@ -239,6 +243,85 @@ func TestFontSizeZoomChangesLayoutSize(t *testing.T) {
 	}
 	if !tr.HasText(locales.NativeShellNotMigrated(locales.NavLibrary())) {
 		t.Fatal("放大后内容仍应正常绘制")
+	}
+}
+
+func appLog(a *App) *servicestest.Logger { return a.svc.Log.(*servicestest.Logger) }
+
+// 后台 goroutine 发的提示必须让窗口重绘并显示出来：提示是窗口级的，不属于某个页面。
+func TestToastFromBackgroundGoroutineAppears(t *testing.T) {
+	a, _, tr, host := newTestAppWithHost(t, Options{})
+	tr.Frame()
+	before := host.invalidations.Load()
+
+	done := make(chan struct{})
+	go func() {
+		a.Notifier().Success("导入完成")
+		close(done)
+	}()
+	<-done
+	if host.invalidations.Load() == before {
+		t.Error("后台发的提示应请求重绘")
+	}
+	tr.Frame()
+	if !tr.HasText("导入完成") {
+		t.Fatalf("后台发的提示应显示出来：%v", tr.Texts())
+	}
+}
+
+// 提示是覆盖层：换到任何页面都画在最上面。
+func TestToastsAreDrawnOverEveryPage(t *testing.T) {
+	a, _, tr := newTestApp(t, Options{})
+	tr.Frame()
+	a.Notifier().Info("全局提示")
+	for _, name := range []string{locales.NavWiki(), locales.NavImports(), locales.HeaderSettings()} {
+		if err := tr.Click(name); err != nil {
+			t.Fatalf("点击 %s：%v", name, err)
+		}
+		tr.Frame()
+		if !tr.HasText("全局提示") {
+			t.Errorf("切到 %s 后提示应仍然可见", name)
+		}
+	}
+}
+
+// 用户操作失败：既弹出带可复制详情的提示，又写进诊断日志；成功什么都不留。
+func TestGuardFailureToastsAndLogs(t *testing.T) {
+	a, _, tr := newTestApp(t, Options{})
+	tr.Frame()
+
+	if !a.Guard().Run("保存设置", func() error { return nil }) {
+		t.Fatal("成功应返回 true")
+	}
+	tr.Frame()
+	if len(appLog(a).Entries()) != 0 || tr.HasText(locales.CommonOperationFailed("保存设置")) {
+		t.Fatal("成功时不该弹提示或留日志")
+	}
+
+	if a.Guard().Run("保存设置", func() error { return errors.New("磁盘已满") }) {
+		t.Fatal("失败应返回 false，调用方据此决定要不要继续")
+	}
+	tr.Frame()
+	if !tr.HasText(locales.CommonOperationFailed("保存设置")) {
+		t.Errorf("失败应弹出提示：%v", tr.Texts())
+	}
+	got := appLog(a).Entries()
+	if len(got) != 1 || got[0].Scope != "native" || got[0].Action != "保存设置" || got[0].Message != "磁盘已满" {
+		t.Errorf("失败应留一条日志：%+v", got)
+	}
+}
+
+// 后台失败没有用户在看：只留痕，不弹提示。
+func TestBackgroundFailureOnlyLogs(t *testing.T) {
+	a, _, tr := newTestApp(t, Options{})
+	tr.Frame()
+	a.Guard().Background("刷新列表", errors.New("连接中断"))
+	tr.Frame()
+	if got := appLog(a).Entries(); len(got) != 1 || got[0].Action != "刷新列表" {
+		t.Errorf("后台失败应留一条日志：%+v", got)
+	}
+	if tr.HasText(locales.CommonOperationFailed("刷新列表")) {
+		t.Error("后台失败不该弹提示")
 	}
 }
 

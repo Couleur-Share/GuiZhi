@@ -15,7 +15,7 @@ func LoadErrorState(c *ui.Context, l *Look, message string, retry func()) {
 	ui.Column(c).Grow(1).Center().Gap(10).Padding(40, 24).Role(ui.RoleAlert).Children(func() {
 		Icon(c, icons.TriangleAlert, 28).TextColor(l.T.Destructive.Alpha(0.6))
 		ui.Text(c, locales.CommonLoadFailed()).FontSize(14).FontWeight(500)
-		ui.Text(c, message).FontSize(12).TextColor(l.TextMuted).Selectable().MaxWidth(448).Wrap()
+		ui.Text(c, message).FontSize(12).TextColor(l.TextMuted).Selectable().MaxWidth(448)
 		if retry != nil && OutlineButton(c, l, icons.RotateCcw, locales.CommonRetry()) {
 			retry()
 		}
