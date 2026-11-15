@@ -340,3 +340,18 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
     spike 的宿主空闲 5–11 MB 只是空壳；生产版带 SQLite 与缓存，实际值由检查点 1 验证。
     **新增记账规则**：岛的底价约 120 MB + 宿主约 40 MB 不回落，每个里程碑记录「用过岛后回到库列表」的附加读数（不作验收线）。
   - **仍待用户**：S1 实机清单（M2 前）、S2 实机清单（M2 前）、托盘态是否单独销毁 WebView（上文 0.1 已记）、AAC 的 LGPL 取舍（M2 前）。
+- 2026-11-15（1.1 分支骨架，完成）：分支 `feat/native-ui`（worktree `D:\Project\GuiZhi-native`，提交 `3ae1bd5f` 起，未推送），开发约定见该分支的 `docs/agents/native-ui-development.md`。
+  - **结构**：`apps/desktop-go/native/{app,kit,screens,services,locales}` 加主包的 `native_boot.go`、`native_adapters.go`、`native_demo.go`。`-native` 与 React 版共用 `main()` 里到处理器登记为止的全部初始化和统一收尾，之后开一个无 WebView 的窗口；
+    界面只依赖 `native/services` 的窄接口，主包适配器经 `Bridge.call` 复用现有 IPC 处理器（行为只有一个来源），`pushHub` 把 `setPush` 的单监听扇出给订阅者。`go test ./native/...` 不拉起 WebView2、不需要数据库，暖启动约 2 秒。
+  - **已有的东西**：外壳（rail、顶栏、路由，未迁移页面如实占位）、采集页只读列表（过滤、搜索、计数口径与渲染层一致，陈旧响应丢弃，错误不渲染成空态）、主题桥种子（亮/暗 + 色相）、137 枚 lucide 图标（生成）、
+    1895 条文案（由渲染层 i18next 目录生成 ARB 与类型化函数，键与占位符对等校验）、按应用语言的时间格式化（MyGo 自带 CLDR，与 `Intl` 的 8 个用例一致）。
+  - **验证（源码/隔离环境）**：`go vet ./...` 干净；`go test ./native/...` 4 个有测试的包通过；适配器测试对真实处理器与真实库通过；`node --test scripts/tests/isolated-go.test.mjs` 6 项通过；两个生成器的 `--check` 通过。
+    `pnpm shot:native` 只构建 Go 壳（不需要 vite 与 node_modules），隔离构建 10–15 秒、总计 10–22 秒出图；已用亮/暗 × 中/英截图核对渲染、图标、主题、文案与时间格式。**未验证**：真实第三方流程（用户机器）。
+  - **空闲内存的第一个读数（骨架，3 次、静置 30 秒，非正式口径；同一份 13.4 MB 合成库）：可见态 57.4 MB（57.4–57.8），托盘态 57.3 MB（57.2–66.5），2 个进程**（GuiZhi 56.2 MB 加测量脚本重定向输出带出的 conhost 1.2 MB；私有字节 121.6 MB），CPU 0%。
+    约为 React 基线 341.8 / 337.1 MB 的 16.8% / 17.0%，检查点 1 的线是 45%。**不能外推**：现在只有采集页的 100 行；库列表、阅读区、编辑器、AI 编排、设置、全部图标与文案的使用面都还没进来。
+    这个数的用处是证明地基没有把空闲底价抬高：单进程原生壳加 SQLite、全部处理器和后台服务的底价约 56 MB。
+  - **踩过的坑**：
+    1. `pwsh -File` 无法给 `string[]` 参数传多个值（`-ExtraArgs '-native','-native-module','imports'` 会变成一整串，应用于是当成 React 版启动、报找不到渲染产物）；测量脚本要写成 `pwsh -Command "& script.ps1 -ExtraArgs @('-native','-native-module','imports')"`。
+    2. Windows 检出（`core.autocrlf=true`）的工作区文件是 CRLF，`gofmt -l` 会把几乎所有文件列为未格式化（索引里是 LF，CI 不受影响）；检查要先归一化为 LF。生成器的 `--check` 同理，已修。
+    3. rail 的「处理中心」在 MyGo 里折行（浏览器里 48 DIP 刚好放下，MyGo 的文本度量不让）；横向内边距从 8 改成 4。贴边布局要留余量。
+    4. MyGo 的悬停：构建时读 `Hovered()`，指针进出就重建整个视图；在 `Draw` 回调里读只重画上一帧的元素。列表行的悬停高亮必须走后者（文档的 `Element.Hovered` 有明确说明）。
