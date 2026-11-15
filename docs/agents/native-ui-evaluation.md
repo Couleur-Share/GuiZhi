@@ -355,3 +355,22 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
     2. Windows 检出（`core.autocrlf=true`）的工作区文件是 CRLF，`gofmt -l` 会把几乎所有文件列为未格式化（索引里是 LF，CI 不受影响）；检查要先归一化为 LF。生成器的 `--check` 同理，已修。
     3. rail 的「处理中心」在 MyGo 里折行（浏览器里 48 DIP 刚好放下，MyGo 的文本度量不让）；横向内边距从 8 改成 4。贴边布局要留余量。
     4. MyGo 的悬停：构建时读 `Hovered()`，指针进出就重建整个视图；在 `Draw` 回调里读只重画上一帧的元素。列表行的悬停高亮必须走后者（文档的 `Element.Hovered` 有明确说明）。
+- 2026-11-15（1.2 主题桥、无字面量测试与品牌图标流水线，完成；分支提交 `8b4d5672`、`02b31283`，未推送）：
+  - **主题桥**：令牌不手抄，`gen-native-theme.mjs` 按浏览器的方式对 `globals.css` 求值后生成 `kit/tokens_gen.go`——每个自定义属性在「声明它的那个元素」上求值（html 级 `:root` / `:root ← .dark`；壁纸模式是元素级 `.app-background-mode-image`，没重写的令牌沿用 html 已算好的值），
+    色相/饱和度是函数参数；壁纸模式里被 `!important` 改成半透明的 `.bg-X` 规则单独抽成 `FillX` 令牌。产物：84 个颜色/阴影令牌 × 4 种模式（亮、暗、壁纸亮、壁纸暗）、6 个色相预设、3 个字号档、5 档动效时长（17 个渐变/滤镜类令牌不发射，4 个在个别模式取透明，`--verbose` 可列出）。
+    运行时是 `ThemeSpec + Env → kit.NewLook → *kit.Look`（嵌入 `*ui.Theme`，带 `T Tokens`、`Glass`、`Zoom`、`Level`），作为参数显式传给视图函数，没有全局注册表；`app.App.View` 只在外观变化时才 `SetTheme`/`SetZoom`；窗口侧经 `Host` 接系统明暗与 `mygo.Theme.OnUpdated`。
+    动效三档与 CSS 一致（标准无视系统的减少动态效果；关闭/跟随系统且系统要求减少时近乎瞬切；减弱为 60% 时长；`LoadingDelay` 250 ms 不压缩）。
+  - **验证（源码/隔离环境）**：`go test ./native/...` 全过，其中包括 6 个预设 × 亮/暗的对比度检查、令牌逐值断言、动效解析、壁纸解码与玻璃底绘制；`pnpm shot:native` 新增外观参数（色相、字号、动效、壁纸及不透明度/模糊）与 `--matrix appearance|fonts|glass`，
+    一次构建拍多格（12 格约 30 秒）。已逐张核对：6 色相 × 亮/暗 12 张、3 个字号档、壁纸（含模糊 12）亮/暗 4 张——壁纸能透过半透明的 rail、行、搜索框与分段控件，内容可读。**未验证**：真实第三方流程（用户机器、系统高对比度与文字缩放、多显示器 DPI）。
+  - **与渲染层的有意差异**（待建对等台账后登记，现记在 `docs/agents/native-ui-development.md` §5）：字号档用整窗缩放实现，写死 px 的值也会缩放；没有背景模糊（MyGo 无 backdrop-filter，只有左 rail 的玻璃模糊没有对应物）；系统文字大小只作用于 MyGo 控件的默认字号；选区只改高亮底色；系统窗口按钮的明暗跟随应用设置。
+  - **顺带发现的渲染层缺陷（两端共有，未改 main）**：暗色危险按钮白字压红底对比度 4.39:1（< 4.5）；浅色下 green、teal 预设悬停态 `accent-foreground` 压 `accent` 3.85 / 3.77；暗色主题下 OpenAI（GPT）与 Moonshot 的黑色 logo 压深色底几乎看不见（`<img>` 无任何暗色处理）。
+    前三项写在 `globals.css` 令牌里，在那里修一次两端同时好；测试里用 `knownContrastDebt` 登记下限，修好后测试会提示删登记。需要修哪几项由用户定，未排期。
+  - **文案**：新增 `native/nocjk_test.go`——用 Go AST 扫 `native/` 下手写的非测试文件，字符串/字符字面量含中日韩字符即失败，放行注释与 `fmt.Errorf`/`errors.New`/`log.*`/`panic` 的参数（日志与错误按仓库约定用中文，不是给用户读的标签）；
+    自带 11 个检查器用例，扫描到的文件数过少也会失败（防止目录挪动后空转）。`native/locales/locales_test.go` 在 Go 侧再守一遍已入库 ARB 的键对等与占位符一致（生成器里已有同样的校验，这里让 `go test` 不依赖 Node 也能发现手改）。
+  - **品牌图标流水线**：`gen-native-brand-icons.mjs` 严格解析 `PlatformLogos.tsx`（只接受 `<svg>` 里的 `<path>`）、`platform-meta.tsx`（平台名称键、图标、着色 class）、`ModelIcons.tsx`（分类表、特殊分类、香蕉与字母兜底样式）、`assets/providers/*.svg`，
+    生成 `kit/icons/brand_gen.go`（9 个平台 logo + 15 个厂商图标）与 `kit/brand_gen.go`（13 个平台 + 17 个模型分类）；渲染层结构变了会抛带位置的错误，不悄悄漏图标。控件：`kit.PlatformIcon/PlatformLabel`、`kit.ModelIcon/HasModelIcon`，复刻渲染层的优先级、兜底与着色（`text-foreground`、`text-current`、固定品牌色、明暗成对色）。
+    联系表（`GUIZHI_BRAND_SHEET=… go test ./native/kit -run TestBrandSheet`）已逐张核对亮/暗：平台与厂商图标、香蕉彩色 emoji、字母兜底、特殊分类都正确。**已知差异**：Gemini 靠 `<filter>` 柔化光晕、MyGo 不画滤镜，原生版是不带柔化的四色星；
+    豆包的 SVG 只是给 PNG 套了壳（MyGo 不画 SVG 里的 `<image>`），生成器把 PNG 抽出来走位图通道；特殊分类的阴影与 `strokeWidth=2.2` 未复刻。
+  - **生成器接进 CI**：`pnpm --filter @guizhi/desktop-go gen` 现在依次运行 jsrc 的生成与 `gen:native`（主题、lucide、品牌图标、文案；文案加 `--force`，否则只在 ARB 变化时才重跑 `mygo generate`，MyGo 升级后生成器输出变了也发现不了），
+    CI 既有的「重新生成后 `git diff --exit-code -- apps/desktop-go`」自动覆盖这四个产物。新增 `scripts/tests/gen-native.test.mjs`（21 项，已加入 `test:validation`）：解析函数的边界（含故意写坏的输入必须抛错）与对真实渲染层源码的冒烟。
+  - **踩过的坑**：1. `pwsh -File` 传 `string[]` 参数的老问题又踩了一次（联系表脚本），在当前 shell 里用 `& script.ps1 -Files @(...)` 调用；2. `mygo generate` 只在 ARB 变化时才跑，所以 CI 用的 `gen` 必须 `--force`；3. Windows 上 Go 原始字符串会丢掉 `\r`，生成器读取渲染层文件时必须先把 CRLF 归一成 LF，否则产物随检出换行而不同。
