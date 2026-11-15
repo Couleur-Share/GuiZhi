@@ -2,6 +2,7 @@
 
 > 本文随分支存在，切换（见评估文档 §六 阶段 4）后并入桌面开发细节。
 > 立项依据、关卡与止损条件：[native-ui-evaluation.md](native-ui-evaluation.md)；产品边界：[product-scope.md](../product-scope.md)。
+> **2026-11-15 状态变更：除 `aiflow` 外的界面层工作暂停（不做 M1 及之后），界面工具包改为先验证 Viva。** `native/kit`、主题桥、命令面板、`native/screens` 等依赖 MyGo 控件接口的部分原样保留在本分支、不删；`aiflow`、`native/services`、`native/settings` 与 `scripts/measure-idle.ps1` 与界面工具包无关，继续有效。新的第一步是限时验证（输入法、空闲内存、WebView2 岛销毁回落），结论出来之前不重启 UI 层工作。下文关于 MyGo 控件的约定仍然成立，但只对本分支上已有的代码负责。
 > 当前阶段：阶段 1「地基」。已迁移的模块只有「采集（imports）」的只读列表，其余页面是如实说明未迁移的占位；外观桥（主题、字号、动效、壁纸）、文案目录、图标流水线、共享控件（Toast、失败处理、确认/未保存对话框、命令面板、快捷键录制、窗格与表格列持久化）与设置的 Go 化（单一真相源、`PrefStore` 的真实实现、首次启动导入旧 localStorage）已就位；设置页面本身与设置→外观的实时订阅在 M1 切片里做。
 
 ## 1. 一句话
@@ -219,3 +220,42 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 - 每周 `git merge main` 进分支（不 rebase）。`scripts/native-parity-diff.mjs` 列出渲染层在 main 上的变化并维护 `native-parity-ledger.md`（阶段 4 前补齐）。
 - main 冻结新功能，只接缺陷、安全与数据修复；这类修复在两边各做一次，台账里记一行。
 - 渲染层目录、IPC 频道、处理器、数据库迁移都是共享资产：改它们的提交必须在 main 上先落地，再合并进分支。
+
+## 8. 无头 AI 编排 `aiflow`（与界面工具包无关）
+
+`apps/desktop-go/aiflow` 是渲染层 AI 编排与后台任务的 Go 重写：**不依赖任何界面工具包，也不 import package main**，只经窄接口（`Transport` / `ConfigSource` / `UsageSink` / `Logger` / `ImageReader`）与外界相连。界面工具包选 MyGo 还是 Viva，都不影响它。主包里已有的 `ai_chat.go`、`ai_protocol.go`、`ocr.go`、`media_summary.go`、`forum_summary.go` 是另一套 Go AI 代码；`aiflow` 不能 import 它们（循环依赖），合并去重留到切换阶段（让主包改为薄包装 `aiflow`），现在两套并存。
+
+### 8.1 对拍方式
+
+1. vitest 驱动**真实的 TS 代码**（伪造 `window.api.ai` 传输），把请求体、请求头、超时、用量记录、告警、结果和错误写成 JSON golden：`apps/desktop-go/aiflow/testdata/golden/*.json`，TS 侧在 `apps/desktop/tests/unit/knowledge-ai/aiflow-golden-*.test.ts`。
+2. Go 侧用同一份脚本重放（`scriptStep`、`fakeTransport`、`usageRecorder`、`warnRecorder`），逐项比较；请求体按键顺序逐字节比（`ordered.go` 的有序 JSON）。
+3. `UPDATE_GOLDEN=1 pnpm --filter '@guizhi/desktop' exec vitest run <文件>` 重新导出；改了 TS 行为就必须重导并让 Go 侧红灯。
+4. JS 语义一律走 `jsx.go` 里的辅助（UTF-16 长度与切片 `u16Len/u16Slice/u16At`、`jsTrim`、`jsSpace`/`jsSpaceClass`、`jsLower/jsUpper`、`jsNFKC`、`jsNumber`、`jsQuote`、`jsonIndent`），不要直接用 Go 的字符串长度与 `strings.TrimSpace`。
+
+### 8.2 进度（截至 2026-11-15）
+
+| 块 | Go 文件 | 对拍 | 状态 |
+| --- | --- | --- | --- |
+| 客户端栈：聊天、流式、重试、错误文案、协议与端点、模型列表、配置归一化、场景路由与 `runScenarioChat`、embeddings | `chat.go` `stream.go` `protocol.go` `errors.go` `models.go` `config.go` `invoke.go` `embed.go` `transport.go` | 8 份 golden（`client` `protocol` `errors` `text` `config` `invoke` `models` `embed`）逐字节 | **完成**（提交 `fc379061`） |
+| 提示词常量与拼装、摘要、标签建议、OCR、收件箱 AI 分类 | `prompts.go` `summarize.go` `tags.go` `ocr.go` `classify.go` | **无** | 已写、gofmt/vet/build 通过；**未与 TS 对拍，不得当作完成**（WIP 提交，见下） |
+| 语义索引与检索、Wiki 驱动、文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
+
+### 8.3 上一行「未对拍」的收尾清单
+
+- 提示词常量（`SummarySystemPrompt`、`TagSuggestionSystemPrompt`、`QASystemPrompt`、`QAAgentSystemPrompt` 及各版本号）用 TS 导出的字符串逐字节核对，别靠肉眼。
+- `BuildUserPrompt`、`ChunkContent`、`BuildSummaryMapPrompt`、`BuildSummaryReducePrompt`、`BuildQaUserPrompt`、`BuildQaAgentPrompt`：喂含代理对（emoji）、孤立代理项、全角空格、超长内容的输入，对比 TS 输出。
+- `ParseTagResponse`、`ParseCollectionClassificationResponse`、`BuildOcrRequestBody`、`ParseOcrResponse`、`NormalizeAICollectionName`：对真实 TS 导出输入输出；`GenerateSummary`/`SuggestTags`/`RecognizeImageText`/`ClassifyInboxItems` 用伪造传输重放（含分块边界、取消、重试、错误文案）。
+- 补完后把本节的状态改为「完成」并去掉「WIP」标注。
+
+### 8.4 与 TS 的有意差异（对拍时的豁免项，改动前先读）
+
+1. 聊天选项只移植用到的；TS 里没有调用方的选项不移植。
+2. Anthropic 路径尊重 `ctx` 取消（TS 版这条路径没有挂取消信号，Go 统一尊重，属有意改进；对拍脚本不覆盖取消）。
+3. Go 的字符串无法表示孤立代理项：切点落在代理对中间时输出 U+FFFD（含 `ChunkContent`）；TS 会保留半个代理项。
+4. `localeCompare` 对非 ASCII 字符只做近似。
+5. `JSON.parse` 与 `TypeError` 的原文不复刻（返回等价但文字不同的错误）。
+6. embeddings 出现重复或小数 `index` 时报「索引不连续」。
+7. `prompt_tokens` 为 `Infinity` 时按 0 记。
+8. `timeoutMs: 0` 表示使用默认超时。
+9. OCR 的用量记录在响应带 `usage` 时记录 token（TS 只记次数）。
+10. `FetchModelsResult.Status` 是 `*int`：解析失败（没有 HTTP 状态）时为 `nil`，TS 里同一情形没有 `status` 字段。

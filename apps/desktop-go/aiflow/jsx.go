@@ -34,6 +34,10 @@ func jsSpace(r rune) bool {
 	return r >= 0x2000 && r <= 0x200a
 }
 
+// jsSpaceClass 是 jsSpace 的正则字符类写法（放进 [...] 里用），给需要 \s 的 JS 语义的 Go 正则用——
+// RE2 的 \s 只有 ASCII 空白，会漏掉 U+00A0、全角空格等。
+const jsSpaceClass = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}`
+
 func jsTrim(s string) string      { return strings.TrimFunc(s, jsSpace) }
 func jsTrimStart(s string) string { return strings.TrimLeftFunc(s, jsSpace) }
 

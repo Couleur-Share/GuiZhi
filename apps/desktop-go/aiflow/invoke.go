@@ -27,8 +27,9 @@ type UsageSink interface {
 type Runner struct {
 	Client *Client
 	Config ConfigSource
-	Usage  UsageSink // 可为 nil
-	Log    Logger    // 可为 nil
+	Usage  UsageSink   // 可为 nil
+	Log    Logger      // 可为 nil
+	Images ImageReader // 可为 nil；只有 OCR 需要
 }
 
 func (r *Runner) logger() Logger {

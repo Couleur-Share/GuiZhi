@@ -132,6 +132,81 @@ func writeJS(b *strings.Builder, v any) {
 	}
 }
 
+// jsonIndent 对应 JSON.stringify(v, null, spaces)：子元素各占一行并缩进，键值之间是 ": "，
+// 空数组与空对象仍写成 [] 与 {}。
+func jsonIndent(v any, spaces int) string {
+	var b strings.Builder
+	writeJSIndent(&b, v, strings.Repeat(" ", spaces), 0)
+	return b.String()
+}
+
+// asAnySlice 把受支持的切片类型统一成 []any，便于递归时共用一份缩进逻辑。
+func asAnySlice(v any) ([]any, bool) {
+	switch x := v.(type) {
+	case []any:
+		return x, true
+	case []string:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = e
+		}
+		return out, true
+	case []*obj:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = e
+		}
+		return out, true
+	}
+	return nil, false
+}
+
+func writeJSIndent(b *strings.Builder, v any, unit string, depth int) {
+	newline := func(level int) {
+		b.WriteByte('\n')
+		for i := 0; i < level; i++ {
+			b.WriteString(unit)
+		}
+	}
+	if o, ok := v.(*obj); ok {
+		if len(o.keys) == 0 {
+			b.WriteString("{}")
+			return
+		}
+		b.WriteByte('{')
+		for i, k := range o.keys {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			newline(depth + 1)
+			b.WriteString(jsQuote(k))
+			b.WriteString(": ")
+			writeJSIndent(b, o.vals[k], unit, depth+1)
+		}
+		newline(depth)
+		b.WriteByte('}')
+		return
+	}
+	if list, ok := asAnySlice(v); ok {
+		if len(list) == 0 {
+			b.WriteString("[]")
+			return
+		}
+		b.WriteByte('[')
+		for i, e := range list {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			newline(depth + 1)
+			writeJSIndent(b, e, unit, depth+1)
+		}
+		newline(depth)
+		b.WriteByte(']')
+		return
+	}
+	writeJS(b, v)
+}
+
 // jsQuote 对应 JSON.stringify(string)：不转义 < > & 与 U+2028/2029，控制字符用小写 \u00xx，
 // 非法 UTF-8 字节按 U+FFFD 输出。
 func jsQuote(s string) string {
