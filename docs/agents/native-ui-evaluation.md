@@ -1,0 +1,260 @@
+# 原生 UI（MyGo `ui` 包）评估与迁移方案
+
+> 评估日期 2026-11-15。**决策（2026-11-15）：采用长期分支 `feat/native-ui` 整体重写；验收线是同一台机器、同一份库副本、
+> 同一 MyGo 版本下，整个进程树空闲私有工作集比 React 基线低 40% 以上。** 立项理由已写入 [产品边界](../product-scope.md)。
+> 执行记录见第十节。证据代码在分支 `spike/native-imports`（提交 `35134715`、`ee3cd715`，未推送），
+> 在 `apps/desktop-go/native_imports.go`、`native_reader.go` 及对应测试里；评估数据全部来自合成语料与一台机器。
+
+## 一、背景与前提
+
+归知桌面端已经是 MyGo 外壳，但**界面仍然是 React，跑在一个常驻的 WebView2 里**，没有用 MyGo 的原生 UI（`ui.View`）。
+所以问题是「哪些页面从 React 迁到原生」，不是换框架。
+
+触发这次评估的是 V2EX 帖子 [「从 Wails 迁到 MyGo 原生 GUI」](https://www.v2ex.com/t/1253950)。帖子里与归知相关的坑见下文第五节。
+帖子里「跨平台一致性」「构建链变短」两项对归知基本不适用：官方只支持 Windows，且外壳早已是 Go 构建。
+
+**目标**：降低空闲内存。这个目标决定了方案形状，见下节。
+
+**决策记录**：评估阶段推荐的是「混合外壳」（原生侧栏 + 按需 WebView 载入未迁移的 React 模块，逐模块迁移、随时可停）。
+2026-11-15 用户选择了**长期分支整体重写**：分支上做完整原生版，对等后一次切换；没有混合外壳，没有中间可用版本。
+代价是：早期纠偏只能靠第一个可跑的纵向切片和两个内存检查点（第六节阶段 3）；React 侧的修复要在两边各做一次。
+
+## 二、实验事实
+
+| 编号 | 测量 | 结果 |
+|---|---|---|
+| E1 | 纯原生窗口（无 WebView，1000 行列表） | 42 MB，2 个进程 |
+| E2 | 同一窗口常驻 1 个 WebView（仅一个简单页面） | 150–152 MB，8 个进程 |
+| E3 | 12 秒后创建 WebView，再 12 秒后 `Destroy` | 42 → 151–153 → 45 MB，进程 2 → 8 → 2：**销毁后基本退还** |
+| E4 | 完整 Go 壳 + 原生导入页（600 条，每 2 秒刷新活动任务） | 约 65 MB，2 个进程 |
+| E5 | 完整 Go 壳 + 原生阅读区（200 KB 分段 + 2000 层） | 108 MB（启动 14 秒时采样，未必稳定）；整篇渲染 162 MB |
+| E6 | 既有文档里 React 壳空闲 | 218 MB、8 个进程（`mygo-migration.md`，2026-11-11 原型口径，**当前版本未重测**） |
+
+口径：Windows 私有工作集，进程树合计；显存不计入；窗口在屏幕外；单机；E4–E5 与 E6 不同时间、不同口径，只能当量级。
+
+**由此得到的结论**：WebView 的固定开销约 108 MB、6 个进程，且可以按需创建、释放。
+所以内存收益是「全有或全无」的：只要主窗口里还常驻一个 WebView，原生页面只会让内存**略增**。
+只有侧栏、条目列表、条目详情、问答、导入、设置这些常用界面都是原生，并且打开网页快照或 AI 主题阅读页之前不创建 WebView，才可能得到收益。
+
+## 三、可行性与缺口
+
+### 导入队列页（E4，约 370 行 Go 的子集）
+
+- 数据直接调用 `Library.importListPage`，不经过 IPC 与 JSON；测试用 `ui.Tester`，0.2–0.3 秒一个，不依赖 WebView2。
+- `Compose` 模拟输入法组词通过：组词期间查询词不变，提交后才更新（**模拟，不是真实微软拼音**）。
+- 读屏名称可以用 `tt.Access` 断言。
+- 设计令牌用 `hsl()` 映射成 `ui.Theme`，页面用到的 9 个令牌足够得到接近的外观。
+- 子集：没有图标、详情弹窗、批量条、重试和撤销、文档站点面板、i18n。**不能用行数反推全量迁移成本。**
+
+### 阅读区（E5，约 230 行 Go）
+
+整篇 `markdown.View` 每帧为所有块构建控件，文档本身也建议长文分节显示。实测（Core Ultra 9 185H，`ui.Tester` 同步渲染）：
+
+| 文章 | 整篇：稳定帧 / 滚动一步 | 分段 + 虚拟列表：稳定帧 / 滚动一步 |
+|---|---|---|
+| 50 KB | 2.0 / 5.0 ms | 0.40 / 2.0 ms |
+| 200 KB | 16 / 34 ms | 0.43 / 2.1 ms |
+| 1000 KB | 101 / 199 ms | 0.42 / 1.9 ms |
+
+首屏：1 MB 整篇 979 ms，分段 39 ms。2000 层论坛列表只构建约 30 个文本节点。
+
+**取舍**
+1. 分段后全选复制只能复制已构建部分（100 KB 文章：整篇 89%，分段 3%）→ 需要「复制全文」按钮，直接复制库里的源文本。
+2. 论坛楼层之间不能跨楼层拖选。
+
+**缺口（需要补）**
+- 行内 `<span class="forum-color-*">` 以字面标签显示；`<details>` 默认当文本（原型里用 `HTML` 钩子做了展开显示的近似，没有点击折叠）。
+- 分段使跨段的引用式链接定义与脚注失效。
+- 目录跳转、文内查找要自己做（按标题建索引 + `ListState.ScrollTo`）。
+- 内置文案默认英文（如 "Search"），中文版要逐处补。
+- 窗口主题要在系统明暗变化后重新断言（`SetTheme`）。
+- `go.mod` 会多出 `github.com/go-text/typesetting`、`golang.org/x/image` 两个间接依赖。
+
+**已确认一致**：中文标点紧贴的强调（`**结论。**后文`）、表格、任务项、代码块（语言标签与复制按钮）、行内代码、链接、引用、本地图片（复用 `resolveLocalMediaPath`）、读屏标题角色。
+
+### 必须留在 WebView 的部分（「WebView 岛」）
+
+AI 主题阅读页（沙箱 iframe `srcDoc`）、网页快照（`WebSnapshotPane`）、Mermaid/ECharts 的离线编译不属于界面。
+Wiki 图谱（`react-force-graph-2d`）：MyGo 没有力导向布局，倾向留在 WebView。
+CodeMirror 编辑器与媒体播放：见第四节 S1、S4，由阶段 0 的实测决定走原生还是走岛。
+
+岛的规则（MyGo `docs/frontend.md`「Untrusted pages」）：
+- 一律 `PageOptions.Untrusted`，只加载 Go 生成的文档；用户或第三方 HTML 不进入可信页。
+- 不可信页不能调用 Go，但可以向自有 scheme 发 POST，处理器用 `mygo.CallerPage` 识别来源，Go 用 `EmitPage` 回复；消息限 64 KiB。
+- 关闭即 `Destroy`；同时存在的岛数量设上限（阅读视图现有上限 3）；缺 WebView2 的机器上岛显示可理解的提示，其余功能不受影响。
+
+### 补充调研（2026-11-15，源码与文档核对）
+
+1. **后台任务依赖渲染进程**：Go 负责调度，但 Wiki 编译与语义索引的模型调用在渲染进程执行
+   （`apps/desktop/src/renderer/hooks/useBackgroundJobClient.ts`）。原生版空闲时没有渲染进程，这两类任务必须搬到 Go。
+2. **渲染层约 7–8k 行 TS 业务逻辑没有 Go 对应**：全局 Ask 引擎 `services/knowledge-ai/qa.ts` 791 行、AI 客户端栈约 1.45k、
+   设置约 1.9k、语义索引约 310、Wiki 驱动约 320、摘要/标签/OCR/分类约 580。不用 goja 托管：单线程，
+   要给 zustand 与 `window.api` 写垫片，引擎常驻占内存，与目标冲突。
+3. **设置真相源分裂**：`settings.go` 只白名单了 19 个键，AI 供应商与模型在 `ai-models.json`；
+   主题色相、字号、动效、窗格宽度、表格列等只在 WebView 的 localStorage。原生版需要 Go 侧单一存储，
+   并在首次启动导入旧值（可复用 `legacy_localstorage.go` 的 leveldb 读取器）。
+4. **MyGo 很新**：仓库 2026-09-26 创建，仍是 0.x，近三周发了十余个版本；最新 0.9.0（11-11），归知锁在 0.8.3。
+   0.9.0 带来原生视频（Windows 走 Media Foundation）、AAC/FLAC 解码、中文字体修复、列表每帧更省，
+   但 SQLite 改走 native module，`build-shell.ps1` 复制 `mygo-sqlite3.dll` 的逻辑要重做
+   （旧版曾因漏带该 DLL 导致全新机器首启必败，见 `mygo-migration.md` 缺陷 1）。
+5. **工具链全部绑在 React 上**：`pnpm shot`（Playwright + CDP）、`apps/desktop/tests/unit` 的 140 个 vitest 文件约 650–700 用例、
+   包体预算、`check-i18n`、IPC 频道生成（扫描 preload）、`release.yml` 的冒烟断言。
+
+## 四、未验证的事（可能直接否决方案）
+
+1. **真实输入法**（S1，阶段 0）：微软拼音在原生输入框、搜索框、编辑器里的候选窗位置、组词、快捷键冲突。自动测试只覆盖 MyGo 的事件路径，真实输入法必须由人在可见窗口里验证。
+2. **Narrator / NVDA**（阶段 4 手工清单）：能否操作搜索框、列表、复选框；MyGo 文档说明 WebView2 的页面元素在 Narrator 里位于单独窗口。
+3. **真实库的分布**：文章字节数、论坛楼层数、图片占比，决定「整篇/分段」阈值与取舍的实际影响。试点只用了合成语料。
+4. **当前版本 React 壳的真实空闲内存**（阶段 0.1）：要在同一台机器、同一份库副本上重测，才能给出真实收益。
+5. **主题体系**：6 个色相预设、自定义色相与饱和度、背景图、3 档字号、动效偏好，原生侧用一套机制实现（阶段 1 主题桥）。
+6. ~~导航状态同步~~：混合外壳方案才有此问题；整体重写后不适用。
+7. **测试与截图工具链**：`pnpm shot` 依赖 DOM 的 `Eval` 与 `CapturePage`；原生窗口用 `ui.Tester` 与窗口级 `CapturePage`（阶段 1 的 `pnpm shot:native`）。
+8. **整体 CPU**：导入页每 2 秒刷新时偶发 5–16% 的采样值，没有做过剖析。
+9. **阅读岛**（S2，阶段 0）：Untrusted WebView + 自有 scheme 通道能否承载 v3 阅读外壳与网页快照的高度、查找、选区、链接、图片事件，销毁后内存是否回落。
+10. **媒体格式**（S4，阶段 0）：0.9.0 的 `ui/video` 与音频解码对 mp4/webm/mov/avi/mkv、mp3/wav/m4a/aac/ogg/flac 的实际支持。
+11. **无渲染的后台任务**（S3，阶段 0）：Wiki 编译与语义索引在 Go 里能否独立运行，prompt 与 TS 逐字节一致。
+12. **旧 localStorage 的位置**：WebView2 配置目录里 Local Storage 的路径与 origin，决定首次启动导入能否复用现有 leveldb 读取器。
+
+## 五、帖子里的坑与本方案的对应
+
+| 坑 | 对应做法 |
+|---|---|
+| 渲染函数每帧重跑，别在里面做重活 | 展示模型（`importRowVM`）在加载时一次算好；长文分段；列表一律用 `ui.List` |
+| 复用组件的焦点、键盘、浮层、滚动，别重写 | 不自己画选择器、对话框、菜单；换成 MyGo 的 `Select`、`Dialog`、`Popover` |
+| WebView 要按需创建、限数量、用完释放 | 本方案的核心约束；E3 已证明销毁能退还内存 |
+| 自绘不等于像素一致，输入法、字体、DPI 仍要逐项检查 | 第四节的 1、2 两项作为阶段 0 与阶段 4 的门槛 |
+| pprof 看不到 WebView 子进程 | 内存验收用任务管理器口径的私有工作集，不用 pprof 代替 |
+| 插件化与 Web 生态 | 主题阅读页、快照留在 WebView 岛，不为此重写 |
+
+与 `AGENTS.md` 的关系：「不引入原生 select、color picker 或 alert/confirm/prompt」针对的是浏览器原生控件。
+MyGo 的 `ui` 控件由框架自绘，不属于这一条，但仍要遵循「语义令牌、`showToast` 的 `detail`、`LoadErrorState`」等约定，
+在 Go 侧需要对应实现；上下文菜单用 `PopoverMenus` 呈现，不用系统菜单。
+
+## 六、方案：长期分支整体重写
+
+**总原则**：main 继续发 React 版，分支上做完整原生版；对等且过线后一次切换，再删除 React 渲染层。
+空闲时不得存在任何 WebView；每个阶段结束都有关卡，不过线就停。
+
+### 验收线与测量规范
+
+- **G-final**：同一台机器、同一份库副本、同一 MyGo 版本下，整个进程树（含 WebView2 子进程）的空闲私有工作集，
+  比 React 基线低 40% 以上，即不超过基线的 60%。
+- 测两种空闲态，各 5 次取中位，静置 60 秒后采样：窗口可见并停在知识库列表；窗口隐藏到托盘。
+- 浸泡：30 分钟内切模块 200 次、开关 WebView 岛 50 次，内存回落到基线 ±10 MB 内，用来抓泄漏。
+- 库副本用备份还原件或脚本合成的数据，**不读真实 `%APPDATA%\GuiZhi`，也不动正在运行的实例**；只统计自己启动的进程树。
+- 检查点：M1 不超过基线的 45%，M2 不超过 55%，最终 60%。基线若仍是 218 MB，最终线是 131 MB。
+
+### 目标架构
+
+- 界面放子包 `apps/desktop-go/native/...`（`app` 窗口与路由、`kit` 应用级控件、`screens` 各模块界面），经窄接口 `Services` 调 Go 能力，
+  主包写适配器；`go test ./native/...` 不拉 WebView2，目标 10 秒内。根包 `package main` 已有约 5.3 万行源码与 2.1 万行测试，不再往里塞界面。
+- `apps/desktop-go/aiflow/`：无 UI 的 Go 包，装 AI 编排；主进程的后台任务执行器直接调用，取代渲染进程里的 `useBackgroundJobClient`。
+- 界面代码不直接散落调用易变的 MyGo API，统一经 `native/kit` 的少量应用级控件，把框架版本变动限制在一处。
+- 岛的规则见第三节。
+
+### 阶段 0：证据与前置（不开始大规模移植）
+
+- 0.1 现状基线：隔离 worktree 构建 main 的 React 版，在库副本上按上述规范测空闲私有工作集；测量脚本入库 `apps/desktop-go/scripts/measure-idle.ps1`。
+- 0.2 在 main 上独立升级 MyGo 到 0.9.x：重做 SQLite 原生库的打包逻辑，全新环境、无网络启动验证，`go vet`、`go test`、`pnpm shot` 通过。
+  升级后基线重测，此后以升级后的为准（原生版也跑在 0.9.x 上）。
+- 0.3 四项硬风险验证，各限一个会话，给出通过/失败：
+  - S1 编辑器：`ui/editor` + Markdown + 中文输入法。`Tester.Compose` 自动测，另需人用微软拼音实机验证。
+    决定编辑器走原生，还是退回 CodeMirror 小包放进岛（编辑时多约 108 MB，空闲不受影响）。
+  - S2 阅读岛：Untrusted WebView + 自有 scheme 通道，跑通 v3 阅读外壳与快照文档的高度、查找、选区、链接、图片事件；创建到销毁的内存回落；与原生滚动联动。
+  - S3 无渲染后台任务：用 Go 移植 `wiki-v2.ts` 与 `semantic-index.ts` 骨架，对假 AI 服务跑通，prompt 与 TS 对拍。
+  - S4 媒体：0.9.0 `ui/video` 与音频解码，对导入过的格式逐个实测，不支持的走岛。
+- **关卡 G0**：基线有数；S1–S4 各有明确走向；任一项导致「空闲态必须常驻 WebView」则停止并回报。
+
+### 阶段 1：地基（分支 `feat/native-ui`）
+
+- 从 main 拉分支与独立 worktree；试点分支 `spike/native-imports` 的导入页、阅读区、主题函数作为种子代码迁入，不整体合并。
+- 骨架：`native/app`、`native/kit`、各模块 `Services` 接口与主包适配器；`pnpm shot:native`。
+- 主题桥：6 个色相预设 × 明暗 × 3 档字号 × 动效偏好 × 壁纸（透明度、模糊），用令牌快照测试锁定；系统外观变化后重设 `SetTheme`。
+- i18n：从 `zh.json`、`en.json` 生成目录，键对等测试；Go AST 测试禁止界面代码出现中文字面量；MyGo 内置控件的英文字串全部覆盖。
+- 图标：约 140 个 lucide 图标加平台与模型图标，脚本生成 `go:embed` 与常量。
+- 共享件：Toast（详情 + 复制）、`guard.Run`（`runGuardedMutation` 语义，返回 bool）、LoadErrorState、确认与未保存对话框、命令面板、快捷键录制、窗格宽度与表格列持久化。
+- 设置：Go 侧 typed 设置服务，覆盖今天只在 localStorage 的偏好；首次启动导入旧值，保留持久化 v3 迁移与归一化规则。
+
+### 阶段 2：Go 侧无头化 `aiflow`（与阶段 1、3 并行）
+
+- 顺序：AI 客户端栈（`ai.ts`、流解析、默认路由、错误文案、`ai-invoke`）→ 摘要、标签、OCR、收件箱分类 → 语义索引、混合检索、查询向量 → Wiki 编译驱动 → 文章问答 → 全局 Ask 引擎。
+- 每块都做：prompt 与 TS 用 fixtures 逐字节对拍（沿用 `apps/desktop-go/testdata/golden` 模式）；流式用 `httptest` 假服务；取消、超时、错误文案、日志脱敏；API Key 不进日志。
+- 后台任务执行器上线后，才能在没有渲染进程时运行 Wiki 与语义任务。
+
+### 阶段 3：按模块移植与里程碑
+
+- M1 纵向切片：窗口外壳（无边框标题栏、侧栏 rail + 面板、窗格宽度）、导入队列、设置的通用与外观页。**检查点 1**：空闲私有内存不超过基线的 45%。
+- M2 知识库：列表与表格（列配置、排序、批量）、侧栏（集合、智能视图、标签）、详情阅读、论坛楼层、搜索、编辑（依 S1）、阅读岛、媒体（依 S4）。**检查点 2**：不超过基线的 55%。
+- M3 其余：Ask、Wiki（图谱走岛）、收件箱、采集对话框、其余设置（AI 工作台约 3.4k 行最重，另有网络、采集、MCP、快捷键、数据与备份、关于）、更新/迁移/设置清单/关闭对话框、命令面板。
+- M4 对等验收：对等清单逐项关闭；人工做手工清单；帧预算与浸泡测试；最终测量 G-final。
+- 每个模块的完成定义：对等清单逐项对照；`ui.Tester` 覆盖点击、键盘、输入法 `Compose`、无障碍名 `Access`；明暗两套金样截图；
+  加载、空、错误、重试四态；稳态帧 ≤ 2 ms、滚动一步 ≤ 6 ms（提议值，1 万条库 Tester 基准）；无中文字面量；记录该模块的内存增量。
+- 阅读区策略：不超过 64 KB 整篇渲染（试点实测 50 KB 稳态 2.0 ms、滚动 5.0 ms）；更长则分块 + 虚拟列表（稳态约 0.4 ms），
+  选区不能跨块，补「复制全文」按钮，并处理参考式链接与脚注在分块处失效。
+
+### 阶段 4：切换
+
+- 用旧版 WebView2 profile 的副本验证首次导入（设置、表格列、保存的视图、阅读记忆）；先备份，发布前 schema 保持向后兼容。
+- 次版本发布：安装包不再带 `dist/renderer`；WebView2 运行时仍是按需依赖。发布按 `guizhi-release` 流程，需要用户明确要求。
+- 打 `react-ui-final-<版本>` 标签与分支后，删除 `apps/desktop/src/renderer`、对应 vitest、包体预算、`check-i18n`；
+  保留 `reading-graphics`、`jsrc`、岛所需的 shim 部分。更新 `AGENTS.md`、`docs/agents/desktop-development.md`、CI、`verify:release`、实机清单。
+
+### 主线同步与对等账本
+
+- 分支每周 `git merge main`（不 rebase，避免改写长期分支历史）。
+- `scripts/native-parity-diff.mjs`：列出自上个 `native-sync/N` 标签以来 main 在这些路径的变更并追加到 `docs/agents/native-parity-ledger.md`：
+  `apps/desktop/src/renderer/**`、`i18n/locales/*.json`、`apps/desktop/src/preload/**`、`apps/desktop-go/shim/**`、
+  `packages/shared/**`、`apps/desktop/tests/unit/**`（新测试意味着新行为）、`docs/product-scope.md`、`CHANGELOG.md`。
+  账本条目：行为、React 来源、原生状态、对应测试。
+- Go 侧（处理器、数据库、导入、AI 代理）的改动靠 merge 同时作用于两套界面；布局、导航、表单校验、客户端缓存不会自动流动。
+- 迁移期间 main 只收缺陷、安全、数据修复；新功能推迟到原生版，除非用户点名。
+
+### 验证与工具链替换
+
+- `pnpm shot` 保留命令名，换成原生实现：隔离副本构建，屏幕外真窗口（沿用 X=-2400 且不隐藏），`CapturePage` 截图；步骤脚本改成 Go 函数。
+- 单元层用 `ui.Tester`，以 `tt.Advance` 控制时间而不是 `Sleep`（试点里的 `waitText` 要改）；金样用 `Tester.Image()`，容差自定（MyGo 文档未给内置阈值）。
+- 手工清单由人执行：微软拼音在搜索框、编辑器、评论框，候选窗跟随光标；Narrator；125%、150%、200% 缩放与双屏；高对比度。
+- CI：`quality.yml` 的 desktop-go 作业去掉 Vite 构建与 Playwright 冒烟，加快速 Go 测试与金样；`desktop-verify` 在切换前继续守 main 的 React；
+  `release.yml` 删包体预算，冒烟断言改为原生启动特征。
+- IPC：`ipc_channels_gen.go` 收缩到岛所需频道，原生界面走 Go 接口；保留 `ipc_selfcheck` 对剩余频道的校验。
+- 不 1:1 搬 650 个 vitest 用例：35 个 DB 用例继续守 `packages/db`，其余行为进账本并逐项转成 Tester 测试。
+
+## 七、止损条件
+
+任一成立即停，保留分支与本文档：
+1. G0 失败：S1–S4 任一项使空闲态必须常驻 WebView（例如阅读岛销毁后内存不回落）。
+2. 检查点超线（M1 > 45%、M2 > 55%）且一个会话内无法归因修复。
+3. G-final 不足 40%：不切换，React 继续，分支留作资料。
+4. 中文输入法在编辑器出现无法绕过的缺陷：编辑器改岛；搜索框出现同类缺陷且无法修复：停止。
+5. MyGo 阻塞性缺陷需上游修复，且 5 个工作日内无绕过：暂停，提 issue 或派生补丁后再评估。
+6. 对等账本积压超过 30 条未回灌项：冻结 main 的界面变更。
+7. 超出帧预算的页面不合并，先改设计。MyGo 版本只在里程碑边界升级，升级前读发布说明。
+8. 单个模块的实际成本超过估计的 2 倍（估计与实际都要写进第十节）。
+
+## 八、规模参考
+
+渲染层约 4 万行 TS（不含测试）：设置 1.1 万、条目库 1 万、通用控件 4 千、导入 3 千、问答 1.5 千、Wiki 1.5 千、布局 1 千、
+收件箱 600、主题阅读 2.1 千（留在 WebView 岛）。另有约 7–8k 行 TS 业务逻辑要搬到 `aiflow`。
+
+**推断（非实测）**：新增 Go 约 3–5 万行（界面 2.5–4 万、`aiflow` 0.8–1.2 万），测试另计。Go 行数与 TS 行数的比例没有验证；
+既有迁移文档对主进程的经验值是 1–1.8 倍，界面层未必相同。
+
+**时间**：代码产出不是瓶颈（11-11 与 11-12 两天 Go/TS 新增约 9.9 万行，含测试与移植）；瓶颈是对等性验证、人工验收和 MyGo 缺陷。
+按每个里程碑一轮验收估，约 3–6 周日历时间，阶段 0 结束后按 S1–S4 结果重估。
+
+## 九、复现
+
+```powershell
+# 在 spike/native-imports 工作副本的 apps/desktop-go 下；全部使用隔离的 -db / -userdata
+$env:CGO_ENABLED='0'
+go test -count=1 -v -run 'TestNativeImports|TestNativeReader' .
+go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
+# 原生窗口（屏幕外）：-native-imports -native-imports-seed 600，或 -native-reader 200 -native-reader-floors 2000
+# 环境变量 SPIKE_SHOT=<png> 截图，SPIKE_DARK=1 / SPIKE_TAB=1 切换深色与讨论页
+```
+
+## 十、执行记录
+
+按时间顺序追加，每条写日期、做了什么、实测数据与结论；未验证的内容明确标注。
+
+- 2026-11-15：方案确认（长期分支整体重写，40% 验收线）。阶段 0 开始。
