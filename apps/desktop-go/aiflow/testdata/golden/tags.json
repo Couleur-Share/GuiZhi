@@ -1,0 +1,1045 @@
+{
+  "parse": [
+    {
+      "input": "",
+      "tags": []
+    },
+    {
+      "input": "   ",
+      "tags": []
+    },
+    {
+      "input": "AI，人工智能，知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "AI,人工智能,知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "AI、人工智能、知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "AI;人工智能；知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "AI\n人工智能\n知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "1. AI\n2. 人工智能\n3. 知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "1、AI，2、人工智能",
+      "tags": [
+        "1",
+        "AI",
+        "2",
+        "人工智能"
+      ]
+    },
+    {
+      "input": "1) AI，2) 人工智能",
+      "tags": [
+        "AI",
+        "人工智能"
+      ]
+    },
+    {
+      "input": "#AI，#人工智能，# 知识库",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库"
+      ]
+    },
+    {
+      "input": "  3.  #标签  ",
+      "tags": [
+        "标签"
+      ]
+    },
+    {
+      "input": "12. 十二号标签，007、前导零",
+      "tags": [
+        "十二号标签",
+        "007",
+        "前导零"
+      ]
+    },
+    {
+      "input": "1.2 不是编号",
+      "tags": [
+        "2 不是编号"
+      ]
+    },
+    {
+      "input": "第1名，Top 3",
+      "tags": [
+        "第1名",
+        "Top 3"
+      ]
+    },
+    {
+      "input": "\"AI\"，'人工智能'，「知识库」，『笔记』，`代码`",
+      "tags": [
+        "AI",
+        "人工智能",
+        "知识库",
+        "笔记",
+        "代码"
+      ]
+    },
+    {
+      "input": "“弯引号保留”，‘单弯引号保留’",
+      "tags": [
+        "“弯引号保留”",
+        "‘单弯引号保留’"
+      ]
+    },
+    {
+      "input": "重复，重复，重复，另一个，重复",
+      "tags": [
+        "重复",
+        "另一个"
+      ]
+    },
+    {
+      "input": "一，二，三，四，五，六，七，八",
+      "tags": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五"
+      ]
+    },
+    {
+      "input": "一，二，三，四，一，二，五，六",
+      "tags": [
+        "一",
+        "二",
+        "三",
+        "四",
+        "五"
+      ]
+    },
+    {
+      "input": "十二个字的标签正好十二个字啊，这个标签超过了十二个字的长度限制所以丢弃，短",
+      "tags": [
+        "短"
+      ]
+    },
+    {
+      "input": "abcdefghijkl，abcdefghijklm",
+      "tags": [
+        "abcdefghijkl"
+      ]
+    },
+    {
+      "input": "😀😀😀😀😀😀，😀😀😀😀😀😀😀",
+      "tags": [
+        "😀😀😀😀😀😀"
+      ]
+    },
+    {
+      "input": " 标签 ，﻿另一个﻿，　全角空白　， 行分隔 ",
+      "tags": [
+        "标签",
+        "另一个",
+        "全角空白",
+        "行分隔"
+      ]
+    },
+    {
+      "input": "​零宽空格，᠎蒙古文元音分隔符",
+      "tags": [
+        "​零宽空格",
+        "᠎蒙古文元音分隔符"
+      ]
+    },
+    {
+      "input": "标签一，，，标签二，，",
+      "tags": [
+        "标签一",
+        "标签二"
+      ]
+    },
+    {
+      "input": "，，，",
+      "tags": []
+    },
+    {
+      "input": "。，！，？",
+      "tags": [
+        "。",
+        "！",
+        "？"
+      ]
+    },
+    {
+      "input": "标签 带空格，tag with spaces，  两侧空白  ",
+      "tags": [
+        "标签 带空格",
+        "两侧空白"
+      ]
+    },
+    {
+      "input": "AI 人工智能 知识库",
+      "tags": [
+        "AI 人工智能 知识库"
+      ]
+    },
+    {
+      "input": "- 列表项，* 星号项",
+      "tags": [
+        "- 列表项",
+        "* 星号项"
+      ]
+    },
+    {
+      "input": "标签：AI，人工智能",
+      "tags": [
+        "标签：AI",
+        "人工智能"
+      ]
+    },
+    {
+      "input": "Tags: AI, ML, DL",
+      "tags": [
+        "Tags: AI",
+        "ML",
+        "DL"
+      ]
+    },
+    {
+      "input": "1\n2\n3\n4\n5\n6\n7",
+      "tags": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ]
+    },
+    {
+      "input": "\r\nAI\r\n人工智能\r\n",
+      "tags": [
+        "AI",
+        "人工智能"
+      ]
+    },
+    {
+      "input": "#1，##2，#  3",
+      "tags": [
+        "1",
+        "#2",
+        "3"
+      ]
+    },
+    {
+      "input": "０１２全角数字，１．全角编号",
+      "tags": [
+        "０１２全角数字",
+        "１．全角编号"
+      ]
+    },
+    {
+      "input": "5. ",
+      "tags": []
+    },
+    {
+      "input": "#",
+      "tags": []
+    },
+    {
+      "input": "1.",
+      "tags": []
+    },
+    {
+      "input": "A#B，#A#B",
+      "tags": [
+        "A#B"
+      ]
+    },
+    {
+      "input": "“引号内，逗号”，「「嵌套」」",
+      "tags": [
+        "“引号内",
+        "逗号”",
+        "嵌套"
+      ]
+    },
+    {
+      "input": "编程，Programming，PROGRAMMING，programming",
+      "tags": [
+        "编程",
+        "Programming",
+        "PROGRAMMING",
+        "programming"
+      ]
+    },
+    {
+      "input": "标\t签",
+      "tags": [
+        "标\t签"
+      ]
+    },
+    {
+      "input": "标签\t，\t标签二",
+      "tags": [
+        "标签",
+        "标签二"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "name": "正常：解析逗号分隔的标签",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "  Rust 入门  ",
+      "content": "  Rust 是一门系统编程语言。  ",
+      "input": {
+        "length": 19,
+        "sha256": "4e00ecb6855f8b92d34788c186bbcea75a4682ba19568bf9a7fefce499fbb874",
+        "head": "  Rust 是一门系统编程语言",
+        "tail": "ust 是一门系统编程语言。  "
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"编程语言，Rust，系统编程\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":80,\"completion_tokens\":12}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：Rust 入门\\n\\n内容：\\nRust 是一门系统编程语言。\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 80,
+            "completionTokens": 12
+          }
+        ],
+        "warnings": [],
+        "result": [
+          "编程语言",
+          "Rust",
+          "系统编程"
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "标题与正文都为空：报错，不发请求",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "  ",
+      "content": " \n ",
+      "input": {
+        "length": 3,
+        "sha256": "cd686159289a5e43faaaa62c47b7ade385f9d234ea501782d39959d35a8183f6",
+        "head": " \n ",
+        "tail": " \n "
+      },
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "内容为空，无法建议标签",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "只有标题：正文留空",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "只有标题",
+      "content": "  ",
+      "input": {
+        "length": 2,
+        "sha256": "6c179f21e6f62b629055d8ab40f454ed02e48b68563913473b857d3638e23b28",
+        "head": "  ",
+        "tail": "  "
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"标题标签\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":5}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：只有标题\\n\\n内容：\\n\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 5,
+            "completionTokens": 5
+          }
+        ],
+        "warnings": [],
+        "result": [
+          "标题标签"
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "只有正文：标题落到「无标题」",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "",
+      "content": "只有正文",
+      "input": {
+        "length": 4,
+        "sha256": "45860b6fa6311990feaef94f83407a01a3ca8f9f480cfad1007e1b3d9fbdb321",
+        "head": "只有正文",
+        "tail": "只有正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"1. 正文标签\\n2. 第二个\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":5}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：无标题\\n\\n内容：\\n只有正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 5,
+            "completionTokens": 5
+          }
+        ],
+        "warnings": [],
+        "result": [
+          "正文标签",
+          "第二个"
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "长正文被截断并附「已截断」标注",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "长文",
+      "content": [
+        {
+          "cjk": 9000
+        }
+      ],
+      "input": {
+        "length": 9000,
+        "sha256": "48d054183e61f4ce211104bea85e170a5f80b4212f31077995aeda191f317eea",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "要标签分类检索问答知识库归纳整理"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"长文，截断\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":6000,\"completion_tokens\":6}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6263,
+              "sha256": "2dab95e2e91068997e3af7df47ff7fdc4ef462adadf2faaf8916e472edb13604",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":2048}"
+            }
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 6000,
+            "completionTokens": 6
+          }
+        ],
+        "warnings": [],
+        "result": [
+          "长文",
+          "截断"
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "模型输出无法解析出标签：报错",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  \\n  \"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：标题\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "模型返回了空正文（finish_reason=stop）",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "输出被截断：警告 + 照常解析",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"半截，标签\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":2048}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：标题\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 5,
+            "completionTokens": 2048
+          }
+        ],
+        "warnings": [
+          "[ai] tagging 输出被 max_tokens 截断（上限 2048），结果可能不完整"
+        ],
+        "result": [
+          "半截",
+          "标签"
+        ],
+        "error": null
+      }
+    },
+    {
+      "name": "请求失败：抛错并记失败用量",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "status": 429,
+          "body": "{\"error\":{\"message\":\"rate limited\"}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：标题\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "rate limited",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "未配置 AI",
+      "settings": {},
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "AI_NOT_CONFIGURED",
+          "aborted": false,
+          "notConfigured": true
+        }
+      }
+    },
+    {
+      "name": "标签超过 5 个只取前 5 个",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"一，二，三，四，五，六，七\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。\"},{\"role\":\"user\",\"content\":\"标题：标题\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 1,
+            "completionTokens": 1
+          }
+        ],
+        "warnings": [],
+        "result": [
+          "一",
+          "二",
+          "三",
+          "四",
+          "五"
+        ],
+        "error": null
+      }
+    }
+  ]
+}

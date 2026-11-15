@@ -223,7 +223,7 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 
 ## 8. 无头 AI 编排 `aiflow`（与界面工具包无关）
 
-`apps/desktop-go/aiflow` 是渲染层 AI 编排与后台任务的 Go 重写：**不依赖任何界面工具包，也不 import package main**，只经窄接口（`Transport` / `ConfigSource` / `UsageSink` / `Logger` / `ImageReader`）与外界相连。界面工具包选 MyGo 还是 Viva，都不影响它。主包里已有的 `ai_chat.go`、`ai_protocol.go`、`ocr.go`、`media_summary.go`、`forum_summary.go` 是另一套 Go AI 代码；`aiflow` 不能 import 它们（循环依赖），合并去重留到切换阶段（让主包改为薄包装 `aiflow`），现在两套并存。
+`apps/desktop-go/aiflow` 是渲染层 AI 编排与后台任务的 Go 重写：**不依赖任何界面工具包，也不 import package main**，只经窄接口（`Transport` / `ConfigSource` / `UsageSink` / `Logger`，以及语义域的 `SemanticIndexStore` / `HybridSource`）与外界相连。界面工具包选 MyGo 还是 Viva，都不影响它。主包里已有的 `ai_chat.go`、`ai_protocol.go`、`ocr.go`、`media_summary.go`、`forum_summary.go` 是另一套 Go AI 代码；`aiflow` 不能 import 它们（循环依赖），合并去重留到切换阶段（让主包改为薄包装 `aiflow`），现在两套并存。**OCR 是例外：不进 `aiflow`，见 §8.3。**
 
 ### 8.1 对拍方式
 
@@ -232,20 +232,18 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 3. `UPDATE_GOLDEN=1 pnpm --filter '@guizhi/desktop' exec vitest run <文件>` 重新导出；改了 TS 行为就必须重导并让 Go 侧红灯。
 4. JS 语义一律走 `jsx.go` 里的辅助（UTF-16 长度与切片 `u16Len/u16Slice/u16At`、`jsTrim`、`jsSpace`/`jsSpaceClass`、`jsLower/jsUpper`、`jsNFKC`、`jsNumber`、`jsQuote`、`jsonIndent`），不要直接用 Go 的字符串长度与 `strings.TrimSpace`。
 
-### 8.2 进度（截至 2026-11-15）
+### 8.2 进度（截至 2026-11-16）
 
 | 块 | Go 文件 | 对拍 | 状态 |
 | --- | --- | --- | --- |
 | 客户端栈：聊天、流式、重试、错误文案、协议与端点、模型列表、配置归一化、场景路由与 `runScenarioChat`、embeddings | `chat.go` `stream.go` `protocol.go` `errors.go` `models.go` `config.go` `invoke.go` `embed.go` `transport.go` | 8 份 golden（`client` `protocol` `errors` `text` `config` `invoke` `models` `embed`）逐字节 | **完成**（提交 `fc379061`） |
-| 提示词常量与拼装、摘要、标签建议、OCR、收件箱 AI 分类 | `prompts.go` `summarize.go` `tags.go` `ocr.go` `classify.go` | **无** | 已写、gofmt/vet/build 通过；**未与 TS 对拍，不得当作完成**（WIP 提交，见下） |
-| 语义索引与检索、Wiki 驱动、文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
+| 提示词常量与拼装、摘要（单发 / map-reduce）、标签建议、收件箱 AI 分类 | `prompts.go` `summarize.go` `tags.go` `classify.go` | 4 份 golden（`prompts` `summary` `tags` `classify`），Go 侧 `knowledge_golden_test.go` | **完成** |
+| 语义索引（分块、批量索引循环）、查询向量缓存、混合检索（RRF 融合与 3 秒超时降级） | `semantic.go` `queryvec.go` `hybrid.go` | 4 份 golden（`semantic` `semantic-index` `query-vectors` `hybrid`），Go 侧 `semantic_golden_test.go`；并发语义另有 Go 独有测试 `queryvec_test.go` | **完成** |
+| Wiki 驱动、文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
 
-### 8.3 上一行「未对拍」的收尾清单
+### 8.3 OCR 不进 `aiflow`
 
-- 提示词常量（`SummarySystemPrompt`、`TagSuggestionSystemPrompt`、`QASystemPrompt`、`QAAgentSystemPrompt` 及各版本号）用 TS 导出的字符串逐字节核对，别靠肉眼。
-- `BuildUserPrompt`、`ChunkContent`、`BuildSummaryMapPrompt`、`BuildSummaryReducePrompt`、`BuildQaUserPrompt`、`BuildQaAgentPrompt`：喂含代理对（emoji）、孤立代理项、全角空格、超长内容的输入，对比 TS 输出。
-- `ParseTagResponse`、`ParseCollectionClassificationResponse`、`BuildOcrRequestBody`、`ParseOcrResponse`、`NormalizeAICollectionName`：对真实 TS 导出输入输出；`GenerateSummary`/`SuggestTags`/`RecognizeImageText`/`ClassifyInboxItems` 用伪造传输重放（含分块边界、取消、重试、错误文案）。
-- 补完后把本节的状态改为「完成」并去掉「WIP」标注。
+主包 `ocr.go`（`buildOcrRequestBody`、`parseOcrResponse`、`Library.recognizeImageFile`）已经在生产里用于图文采集（`image_note.go`），请求体与响应解析已由 `image_note_golden_test.go` 与 TS 对拍。`aiflow` 再写一份只会多出一份要对拍和维护的代码，所以 `aiflow/ocr.go` 已删除：原生界面里需要 OCR 的地方直接调用主包的实现（经主包适配层），不经 `aiflow`。合并去重（让主包的 `ai_chat.go` / `ai_protocol.go` 变成 `aiflow` 的薄包装）仍留到切换阶段。
 
 ### 8.4 与 TS 的有意差异（对拍时的豁免项，改动前先读）
 
@@ -257,5 +255,9 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 6. embeddings 出现重复或小数 `index` 时报「索引不连续」。
 7. `prompt_tokens` 为 `Infinity` 时按 0 记。
 8. `timeoutMs: 0` 表示使用默认超时。
-9. OCR 的用量记录在响应带 `usage` 时记录 token（TS 只记次数）。
+9. 取消类错误在语义域的 golden 里只比 `aborted`、不比文案：TS 的 `signal.throwIfAborted()` 抛出的 reason 在 Node 与 Chromium 里文案不同。收件箱归类在批间检查点发现取消时返回 `ErrClassificationAborted`（文案 `AI_CLASSIFICATION_ABORTED`，`errors.Is(err, context.Canceled)` 成立），与 TS 的 `abortIfRequested` 一致。（原第 9 条「OCR 用量记 token」随 `aiflow/ocr.go` 删除而作废，见 §8.3。）
 10. `FetchModelsResult.Status` 是 `*int`：解析失败（没有 HTTP 状态）时为 `nil`，TS 里同一情形没有 `status` 字段。
+11. 查询向量缓存的并发语义（相同键合并成一次请求、一方取消不影响其他等待者、全部取消才中止底层请求、被取消的结果不入缓存）无法在 TS 里确定性复现——两个并发请求的发出顺序取决于 `crypto.subtle.digest` 的完成顺序——改由 Go 独有测试 `queryvec_test.go` 验证；golden 只覆盖串行下的命中 / 过期 / LRU 淘汰 / 取消，并发的不同查询按请求体排序后比较。结果与取消同时就绪时，Go 统一按「已取消」返回。
+12. 语义索引对存储的两个调用（`ListPending`、`ApplyEmbeddings`）使用脱离调用方取消的 `context`：取消只中断循环与 embeddings 请求，不中断已发出的落库，与 TS 里 IPC 不接收 signal 一致。
+13. 混合检索里 FTS 与语义检索并行；FTS 失败或调用方取消时尽早返回该错误，并保证返回之后不再回调 `onWarning`（TS 靠 Promise 的结算顺序隐含了这一点，Go 显式收尾）。语义等待上限对应 `Hybrid.SemanticTimeout`（默认 3 秒），golden 里 TS 把 3000 毫秒缩成 150 毫秒、Go 测试同样缩短。
+14. `BuildEmbeddingChunks` 的窗口落在代理对中间时同第 3 条（U+FFFD），固定在 `semantic_test.go`，golden 不覆盖。

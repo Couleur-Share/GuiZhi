@@ -1,0 +1,1742 @@
+{
+  "cases": [
+    {
+      "name": "短文单发：标题与正文先 trim，温度 0.3、max_tokens 4096",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "  我的标题  ",
+      "content": "  \n正文内容第一行\n第二行  \t",
+      "input": {
+        "length": 17,
+        "sha256": "c11741d013873a7b21baad02b531c05f7fa02d8f4acd750fdcc1ca018f624307",
+        "head": "  \n正文内容第一行\n第二行  ",
+        "tail": " \n正文内容第一行\n第二行  \t"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"\\n- 要点一\\n- 要点二\\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":120,\"completion_tokens\":30}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：我的标题\\n\\n内容：\\n正文内容第一行\\n第二行\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 120,
+            "completionTokens": 30
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 要点一\n- 要点二",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "标题为空白：落到「无标题」",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": " \t ",
+      "content": "有正文",
+      "input": {
+        "length": 3,
+        "sha256": "757b5d2962c31168c19466070e5824a827045f70bc3faa5dd7656079bb8ca09d",
+        "head": "有正文",
+        "tail": "有正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 只有一条\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":5}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：无标题\\n\\n内容：\\n有正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 10,
+            "completionTokens": 5
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 只有一条",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "正文只有空白：直接报错，不发请求",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "标题",
+      "content": " \n\t　 ",
+      "input": {
+        "length": 5,
+        "sha256": "1d6c820cbc18838b806e2a17c06abf19783948045aa1a6dcd12891e32eedac09",
+        "head": " \n\t　 ",
+        "tail": " \n\t　 "
+      },
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "内容为空，无法生成摘要",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "恰好 6000 个码元仍是单发",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "边界",
+      "content": [
+        {
+          "cjk": 6000
+        }
+      ],
+      "input": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 单发\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":6100,\"completion_tokens\":20}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6250,
+              "sha256": "1c03c4ccebb9da0d47c1afb17f525bbafefa6058f4c0512c6b9f6f7296456e3a",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 6100,
+            "completionTokens": 20
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 单发",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "6001 个码元：map-reduce，两片",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "边界",
+      "content": [
+        {
+          "cjk": 6001
+        }
+      ],
+      "input": {
+        "length": 6001,
+        "sha256": "f97963c92003e86bac375d4305be06760764e5265c817270cce46f154bb8f6ad",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "识库归纳整理摘要标签分类检索问答"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段2要点甲\\n- 片段2要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":12}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 合并后的要点\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":300,\"completion_tokens\":40}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "7bbf8cbf0a89dfa4feed7af6b8ac4a6cde7ae4ad613c7a0b0704249b396d342b",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。\"},{\"role\":\"user\",\"content\":\"《边界》片段 2/2：\\n答\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：边界\\n\\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\\n- 片段1要点甲\\n- 片段1要点乙\\n- 片段2要点甲\\n- 片段2要点乙\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 102,
+            "completionTokens": 12
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 300,
+            "completionTokens": 40
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 合并后的要点",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "前后空白不计入长度：trim 后 6000 仍单发",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "边界",
+      "content": [
+        {
+          "lit": "   "
+        },
+        {
+          "cjk": 6000
+        },
+        {
+          "lit": "   "
+        }
+      ],
+      "input": {
+        "length": 6006,
+        "sha256": "baac50900d0d4813a99397e542b08f76d3ba2f1bc83267d797381a114a57fccf",
+        "head": "   知识库归纳整理摘要标签分类",
+        "tail": "归纳整理摘要标签分类检索问   "
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 单发\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6250,
+              "sha256": "1c03c4ccebb9da0d47c1afb17f525bbafefa6058f4c0512c6b9f6f7296456e3a",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 1,
+            "completionTokens": 1
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 单发",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "超长正文：封顶 8 片，超出部分丢弃",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "超长",
+      "content": [
+        {
+          "ascii": 60000
+        }
+      ],
+      "input": {
+        "length": 60000,
+        "sha256": "a571f6cd70278c560ce2a39c6ff0a264837d614a4f33b56bc6cd04d724164891",
+        "head": "abcdefghijabcdef",
+        "tail": "efghijabcdefghij"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段2要点甲\\n- 片段2要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":12}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段3要点甲\\n- 片段3要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":103,\"completion_tokens\":13}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段4要点甲\\n- 片段4要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":104,\"completion_tokens\":14}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段5要点甲\\n- 片段5要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":105,\"completion_tokens\":15}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段6要点甲\\n- 片段6要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":106,\"completion_tokens\":16}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段7要点甲\\n- 片段7要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":107,\"completion_tokens\":17}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段8要点甲\\n- 片段8要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":108,\"completion_tokens\":18}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 综合\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":500,\"completion_tokens\":50}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "819151b1195e2ed6b6a84b1e10f44b5a42da3fe9641ccb24274fe08233c5d401",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "be4c4944ea402361a4643b60e09f44c3512151daf11df62dc5ce1a6c46e5d0c0",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "643f6902923c9e4844284a1b1205ff214edcff3f739f06df23c1157a112cb6aa",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "aca08d5399191bf424d9dc0b89dd9450f7c666993754e8973aa70ce0de00628e",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "3d8c2a24ca9bbdffc8ece8c633d302bfceae531b51942f9648a3fc0267ca1792",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "7bdcf74e72833763c0360c3e40b60c22f90e2f32e9f31d0c5f6f945f6597c2ee",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "90485e93e9a53d7182826cb5f3c0450182082751e72bb3c46d504f4b7eb78710",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "69712c0650a021172612c17f10654f4a2465dcf5664313f15ab76d0661ce30f9",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：超长\\n\\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\\n- 片段1要点甲\\n- 片段1要点乙\\n- 片段2要点甲\\n- 片段2要点乙\\n- 片段3要点甲\\n- 片段3要点乙\\n- 片段4要点甲\\n- 片段4要点乙\\n- 片段5要点甲\\n- 片段5要点乙\\n- 片段6要点甲\\n- 片段6要点乙\\n- 片段7要点甲\\n- 片段7要点乙\\n- 片段8要点甲\\n- 片段8要点乙\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 102,
+            "completionTokens": 12
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 103,
+            "completionTokens": 13
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 104,
+            "completionTokens": 14
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 105,
+            "completionTokens": 15
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 106,
+            "completionTokens": 16
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 107,
+            "completionTokens": 17
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 108,
+            "completionTokens": 18
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 500,
+            "completionTokens": 50
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 综合",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "含代理对的长文（切口不在代理对中间）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "emoji 😀",
+      "content": [
+        {
+          "cjk": 5998
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "cjk": 30
+        }
+      ],
+      "input": {
+        "length": 6030,
+        "sha256": "8854a022ba68f30245cda1305d7e532c471a205e09e6a5b7d6f7a290a156f8f1",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "索问答知识库归纳整理摘要标签分类"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段2要点甲\\n- 片段2要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":12}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 含 emoji 😀 的综合\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":2,\"completion_tokens\":3}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6244,
+              "sha256": "cfad56d50b3a99a37f820638ed610d01d360b4250f89913a43dd62f9aae901b0",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。\"},{\"role\":\"user\",\"content\":\"《emoji 😀》片段 2/2：\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：emoji 😀\\n\\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\\n- 片段1要点甲\\n- 片段1要点乙\\n- 片段2要点甲\\n- 片段2要点乙\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 102,
+            "completionTokens": 12
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 2,
+            "completionTokens": 3
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 含 emoji 😀 的综合",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "单发输出被截断：truncated=true，并留下截断警告",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "截断",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 半句\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":4096}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：截断\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 50,
+            "completionTokens": 4096
+          }
+        ],
+        "warnings": [
+          "[ai] summary 输出被 max_tokens 截断（上限 4096），结果可能不完整"
+        ],
+        "result": {
+          "text": "- 半句",
+          "truncated": true
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "map 阶段有一片被截断：reduce 正常也算 truncated",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "截断",
+      "content": [
+        {
+          "cjk": 13000
+        }
+      ],
+      "input": {
+        "length": 13000,
+        "sha256": "3c077a8a36794224cac3cff7d652011f457c029eacff933a11aba64b44027cf1",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "检索问答知识库归纳整理摘要标签分"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段2要点甲\\n- 片段2要点乙  \\n\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":12}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段3要点甲\\n- 片段3要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":103,\"completion_tokens\":13}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 综合\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "2426a46e3fab78d799d2e92b0b7706f32cc5fdd98f88fbc1aca2a5502211ac88",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "bdc37def00468ab4f4f2db325e0b7897862ca4b3a192495e5e2156db14caf6a4",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。\"},{\"role\":\"user\",\"content\":\"《截断》片段 3/3：\\n问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：截断\\n\\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\\n- 片段1要点甲\\n- 片段1要点乙\\n- 片段2要点甲\\n- 片段2要点乙\\n- 片段3要点甲\\n- 片段3要点乙\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 102,
+            "completionTokens": 12
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 103,
+            "completionTokens": 13
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 1,
+            "completionTokens": 1
+          }
+        ],
+        "warnings": [
+          "[ai] summary 输出被 max_tokens 截断（上限 4096），结果可能不完整"
+        ],
+        "result": {
+          "text": "- 综合",
+          "truncated": true
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "只有 reduce 被截断",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "截断",
+      "content": [
+        {
+          "cjk": 7000
+        }
+      ],
+      "input": {
+        "length": 7000,
+        "sha256": "78888b718862974eb6aafb2d07d46be58b0700bbea0450b7bf6eabafb2019791",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "索问答知识库归纳整理摘要标签分类"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段2要点甲\\n- 片段2要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":102,\"completion_tokens\":12}}"
+        },
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 综合半句\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":1}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "1bd1be55f1a9f711285b36f36664351d5b67ef2f2d770f61eb1c9c7ab0296a99",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。\"},{\"role\":\"user\",\"content\":\"《截断》片段 2/2：\\n答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：截断\\n\\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\\n- 片段1要点甲\\n- 片段1要点乙\\n- 片段2要点甲\\n- 片段2要点乙\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 102,
+            "completionTokens": 12
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 1,
+            "completionTokens": 1
+          }
+        ],
+        "warnings": [
+          "[ai] summary 输出被 max_tokens 截断（上限 4096），结果可能不完整"
+        ],
+        "result": {
+          "text": "- 综合半句",
+          "truncated": true
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "第二片请求失败：整体抛错，已发请求与失败用量都留痕",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "失败",
+      "content": [
+        {
+          "cjk": 7000
+        }
+      ],
+      "input": {
+        "length": 7000,
+        "sha256": "78888b718862974eb6aafb2d07d46be58b0700bbea0450b7bf6eabafb2019791",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "索问答知识库归纳整理摘要标签分类"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"  - 片段1要点甲\\n- 片段1要点乙  \\n\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":101,\"completion_tokens\":11}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "bodyDigest": {
+              "length": 6238,
+              "sha256": "7f36194826b14a86dfcfdebb58226685c0f702338c0f93026eeb8aee68dd3308",
+              "head": "{\"model\":\"model-",
+              "tail": "ax_tokens\":4096}"
+            }
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。\"},{\"role\":\"user\",\"content\":\"《失败》片段 2/2：\\n答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 101,
+            "completionTokens": 11
+          },
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "upstream down",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "传输层失败（超时）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "失败",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "status": 0,
+          "ok": false,
+          "error": "请求超时"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：失败\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "请求超时",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "模型只回空白：trim 后为空串，照常返回",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "空回答",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"   \\n \"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：空回答\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "模型返回了空正文（finish_reason=stop）",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "未配置 AI：抛 AI_NOT_CONFIGURED，不发请求",
+      "settings": {},
+      "title": "未配置",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "AI_NOT_CONFIGURED",
+          "aborted": false,
+          "notConfigured": true
+        }
+      }
+    },
+    {
+      "name": "旧版单模型字段兜底",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiKey": "sk-legacy",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "title": "旧版",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 兜底模型\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://legacy.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-legacy"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"legacy-1\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：旧版\\n\\n内容：\\n正文\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "legacy-1",
+            "promptTokens": 3,
+            "completionTokens": 4
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 兜底模型",
+          "truncated": false
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "标题与正文含引号、换行与控制字符",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "title": "带\"引号\"\n与换行",
+      "content": "正文\n含 <tag> & 符号   与 \u0001 控制字符",
+      "input": {
+        "length": 26,
+        "sha256": "b1d4695fbb85bfa296402600abaa998210290b6cd3d4f092fc02c7837b8df350",
+        "head": "正文\n含 <tag> & 符号 ",
+        "tail": " & 符号   与 \u0001 控制字符"
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"- 好\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":4}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。\"},{\"role\":\"user\",\"content\":\"标题：带\\\"引号\\\"\\n与换行\\n\\n内容：\\n正文\\n含 <tag> & 符号   与 \\u0001 控制字符\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 3,
+            "completionTokens": 4
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "text": "- 好",
+          "truncated": false
+        },
+        "error": null
+      }
+    }
+  ]
+}

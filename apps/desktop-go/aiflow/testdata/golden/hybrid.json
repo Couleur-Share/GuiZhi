@@ -1,0 +1,1648 @@
+{
+  "cases": [
+    {
+      "name": "未配置 embedding：只返回 FTS，不做语义调用",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "query": "知识库怎么用",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "甲的摘录"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "乙的摘录"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "never",
+            "title": "语义标题-never",
+            "snippet": "命中段-never",
+            "score": 0.9
+          }
+        ]
+      },
+      "abort": null,
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "甲的摘录"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "乙的摘录"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "知识库怎么用",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "FTS 为空、语义命中：用语义结果（matchText 等于命中段）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "知识库怎么用",
+      "limit": 5,
+      "fts": {
+        "entries": []
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "s1",
+            "title": "语义标题-s1",
+            "snippet": "命中段-s1",
+            "score": 0.8
+          },
+          {
+            "itemId": "s2",
+            "title": "语义标题-s2",
+            "snippet": "命中段-s2",
+            "score": 0.6
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"知识库怎么用\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "s1",
+            "title": "语义标题-s1",
+            "snippet": "命中段-s1",
+            "matchText": "命中段-s1"
+          },
+          {
+            "id": "s2",
+            "title": "语义标题-s2",
+            "snippet": "命中段-s2",
+            "matchText": "命中段-s2"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "知识库怎么用",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "两路融合：FTS 元数据优先，语义独有命中追加",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "知识库怎么用",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "甲的摘录"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "乙的摘录"
+          },
+          {
+            "id": "c",
+            "title": "丙",
+            "snippet": null
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "c",
+            "title": "语义标题-c",
+            "snippet": "命中段-c",
+            "score": 0.9
+          },
+          {
+            "itemId": "d",
+            "title": "语义标题-d",
+            "snippet": "命中段-d",
+            "score": 0.7
+          },
+          {
+            "itemId": "a",
+            "title": "语义标题-a",
+            "snippet": "命中段-a",
+            "score": 0.5
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1,2,2]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"知识库怎么用\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "甲的摘录",
+            "matchText": "命中段-a"
+          },
+          {
+            "id": "c",
+            "title": "丙",
+            "snippet": "",
+            "matchText": "命中段-c"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "乙的摘录"
+          },
+          {
+            "id": "d",
+            "title": "语义标题-d",
+            "snippet": "命中段-d",
+            "matchText": "命中段-d"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "知识库怎么用",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.3333333333333333,
+              0.6666666666666666,
+              0.6666666666666666
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "语义分数低于 0.25 的被过滤，恰为 0.25 的保留",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "keep-edge",
+            "title": "语义标题-keep-edge",
+            "snippet": "命中段-keep-edge",
+            "score": 0.25
+          },
+          {
+            "itemId": "drop",
+            "title": "语义标题-drop",
+            "snippet": "命中段-drop",
+            "score": 0.2499
+          },
+          {
+            "itemId": "keep",
+            "title": "语义标题-keep",
+            "snippet": "命中段-keep",
+            "score": 0.9
+          },
+          {
+            "itemId": "drop-neg",
+            "title": "语义标题-drop-neg",
+            "snippet": "命中段-drop-neg",
+            "score": -0.5
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          },
+          {
+            "id": "keep-edge",
+            "title": "语义标题-keep-edge",
+            "snippet": "命中段-keep-edge",
+            "matchText": "命中段-keep-edge"
+          },
+          {
+            "id": "keep",
+            "title": "语义标题-keep",
+            "snippet": "命中段-keep",
+            "matchText": "命中段-keep"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "语义全被过滤：返回 FTS 原样（不经融合与截断）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 1,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "t"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "x",
+            "title": "语义标题-x",
+            "snippet": "命中段-x",
+            "score": 0.1
+          },
+          {
+            "itemId": "y",
+            "title": "语义标题-y",
+            "snippet": "命中段-y",
+            "score": 0.2
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "t"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 1
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 1
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "limit 同时作用于两路与融合结果",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 2,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "1"
+          },
+          {
+            "id": "b",
+            "title": "乙",
+            "snippet": "2"
+          },
+          {
+            "id": "c",
+            "title": "丙",
+            "snippet": "3"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "d",
+            "title": "语义标题-d",
+            "snippet": "命中段-d",
+            "score": 0.9
+          },
+          {
+            "itemId": "c",
+            "title": "语义标题-c",
+            "snippet": "命中段-c",
+            "score": 0.8
+          },
+          {
+            "itemId": "e",
+            "title": "语义标题-e",
+            "snippet": "命中段-e",
+            "score": 0.7
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "c",
+            "title": "丙",
+            "snippet": "3",
+            "matchText": "命中段-c"
+          },
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "1"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 2
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 2
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "标题缺省补「无标题」，摘录缺省补空串，审核信息透传",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "",
+            "snippet": null,
+            "reviewStatus": "needs_review",
+            "reviewReasons": [
+              "来源不可信"
+            ]
+          },
+          {
+            "id": "b",
+            "snippet": "无 title 字段"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "c",
+            "title": "",
+            "snippet": "命中段-c",
+            "score": 0.9,
+            "reviewStatus": "clear",
+            "reviewReasons": []
+          },
+          {
+            "itemId": "a",
+            "title": "语义标题-a",
+            "snippet": "命中段-a",
+            "score": 0.8,
+            "reviewStatus": "clear"
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "reviewStatus": "needs_review",
+            "reviewReasons": [
+              "来源不可信"
+            ],
+            "title": "无标题",
+            "snippet": "",
+            "matchText": "命中段-a"
+          },
+          {
+            "id": "c",
+            "reviewStatus": "clear",
+            "reviewReasons": [],
+            "title": "无标题",
+            "snippet": "命中段-c",
+            "matchText": "命中段-c"
+          },
+          {
+            "id": "b",
+            "title": "无标题",
+            "snippet": "无 title 字段"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "语义检索抛错：告警并退回 FTS",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "throws": "semantic index is rebuilding"
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ]
+      }
+    },
+    {
+      "name": "查询向量失败（HTTP 500）：告警并退回 FTS，不调用语义检索",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "never",
+            "title": "语义标题-never",
+            "snippet": "命中段-never",
+            "score": 0.9
+          }
+        ]
+      },
+      "abort": null,
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [],
+        "onWarnings": [
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ]
+      }
+    },
+    {
+      "name": "语义检索挂起超过 3 秒：告警并退回 FTS",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "hang": true
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ],
+        "error": null,
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索等待超过 3 秒，本次使用本地关键词结果。"
+        ]
+      }
+    },
+    {
+      "name": "FTS 抛错：整体失败（此时未配置 embedding，避免后台任务干扰记录）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "throws": "fts index corrupted"
+      },
+      "semantic": {
+        "hits": []
+      },
+      "abort": null,
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "fts index corrupted",
+          "aborted": false
+        },
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "调用前已取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "never",
+            "title": "语义标题-never",
+            "snippet": "命中段-never",
+            "score": 0.9
+          }
+        ]
+      },
+      "abort": "before",
+      "script": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "",
+          "aborted": true
+        },
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": []
+      }
+    },
+    {
+      "name": "语义检索进行中取消：整体抛取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "query": "q",
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "甲",
+            "snippet": "s"
+          }
+        ]
+      },
+      "semantic": {
+        "abortThenHang": true
+      },
+      "abort": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"q\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "",
+          "aborted": true
+        },
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "q",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": []
+      }
+    }
+  ]
+}

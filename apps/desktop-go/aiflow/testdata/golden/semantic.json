@@ -1,0 +1,2100 @@
+{
+  "constants": {
+    "chunkSize": 700,
+    "chunkOverlap": 80,
+    "maxChunks": 24
+  },
+  "chunks": [
+    {
+      "name": "全空",
+      "title": "",
+      "content": "",
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "transcript": null
+      },
+      "count": 0,
+      "lengths": [],
+      "chunks": []
+    },
+    {
+      "name": "只有空白",
+      "title": "  ",
+      "content": " \n\t ",
+      "transcript": "\n",
+      "inputs": {
+        "title": {
+          "length": 2,
+          "sha256": "6c179f21e6f62b629055d8ab40f454ed02e48b68563913473b857d3638e23b28",
+          "head": "  ",
+          "tail": "  "
+        },
+        "content": {
+          "length": 4,
+          "sha256": "6e1fc4ba122ef0a03d00de4e34a3b87b28f4aeadfbe3e51562fe6bc7dd23a4c6",
+          "head": " \n\t ",
+          "tail": " \n\t "
+        },
+        "transcript": {
+          "length": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+          "head": "\n",
+          "tail": "\n"
+        }
+      },
+      "count": 0,
+      "lengths": [],
+      "chunks": []
+    },
+    {
+      "name": "只有标题",
+      "title": "仅标题",
+      "content": "",
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 3,
+          "sha256": "9522cc3124092a20dc18d054f11ec7f1c34a7c2329ca903fbb2773e089c889b0",
+          "head": "仅标题",
+          "tail": "仅标题"
+        },
+        "content": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        3
+      ],
+      "chunks": [
+        "仅标题"
+      ]
+    },
+    {
+      "name": "标题与正文首尾空白被修剪",
+      "title": "  标题  ",
+      "content": "  正文  ",
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 6,
+          "sha256": "63afb386213dc42317225cc0cc4dbae6e2c6061a4c068e28131e146764541975",
+          "head": "  标题  ",
+          "tail": "  标题  "
+        },
+        "content": {
+          "length": 6,
+          "sha256": "ab293a84540f5ab5f521c941422c11c3654ab46376d22afc9c57ca0d3531cd10",
+          "head": "  正文  ",
+          "tail": "  正文  "
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        7
+      ],
+      "chunks": [
+        "《标题》\n正文"
+      ]
+    },
+    {
+      "name": "无标题短正文",
+      "title": "",
+      "content": "短正文",
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 3,
+          "sha256": "01019c2b519b3e7569bf0a382db59b94d08092df118694c946573902bef4cfa0",
+          "head": "短正文",
+          "tail": "短正文"
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        3
+      ],
+      "chunks": [
+        "短正文"
+      ]
+    },
+    {
+      "name": "短正文加转写稿",
+      "title": "T",
+      "content": "正文",
+      "transcript": "转写内容",
+      "inputs": {
+        "title": {
+          "length": 1,
+          "sha256": "e632b7095b0bf32c260fa4c539e9fd7b852d0de454e9be26f24d0d6f91d069d3",
+          "head": "T",
+          "tail": "T"
+        },
+        "content": {
+          "length": 2,
+          "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+          "head": "正文",
+          "tail": "正文"
+        },
+        "transcript": {
+          "length": 4,
+          "sha256": "c9d88d3da0b4c7ce105920fb7f383d78660828bc50a9f07f02511606c6cf409d",
+          "head": "转写内容",
+          "tail": "转写内容"
+        }
+      },
+      "count": 1,
+      "lengths": [
+        19
+      ],
+      "chunks": [
+        "《T》\n正文\n【口播转写稿】\n转写内容"
+      ]
+    },
+    {
+      "name": "只有转写稿",
+      "title": "T",
+      "content": "",
+      "transcript": "只有转写",
+      "inputs": {
+        "title": {
+          "length": 1,
+          "sha256": "e632b7095b0bf32c260fa4c539e9fd7b852d0de454e9be26f24d0d6f91d069d3",
+          "head": "T",
+          "tail": "T"
+        },
+        "content": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "transcript": {
+          "length": 4,
+          "sha256": "00d70e99785c392c69a0116b9680c04508fa154f3168a02292778e51031ea969",
+          "head": "只有转写",
+          "tail": "只有转写"
+        }
+      },
+      "count": 1,
+      "lengths": [
+        16
+      ],
+      "chunks": [
+        "《T》\n【口播转写稿】\n只有转写"
+      ]
+    },
+    {
+      "name": "转写稿全是空白被忽略",
+      "title": "T",
+      "content": "正文",
+      "transcript": "   ",
+      "inputs": {
+        "title": {
+          "length": 1,
+          "sha256": "e632b7095b0bf32c260fa4c539e9fd7b852d0de454e9be26f24d0d6f91d069d3",
+          "head": "T",
+          "tail": "T"
+        },
+        "content": {
+          "length": 2,
+          "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+          "head": "正文",
+          "tail": "正文"
+        },
+        "transcript": {
+          "length": 3,
+          "sha256": "0aad7da77d2ed59c396c99a74e49f3a4524dcdbcb5163251b1433d640247aeb4",
+          "head": "   ",
+          "tail": "   "
+        }
+      },
+      "count": 1,
+      "lengths": [
+        6
+      ],
+      "chunks": [
+        "《T》\n正文"
+      ]
+    },
+    {
+      "name": "转写稿首尾空白被修剪",
+      "title": "",
+      "content": "正文",
+      "transcript": "\n 转写 \n",
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 2,
+          "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+          "head": "正文",
+          "tail": "正文"
+        },
+        "transcript": {
+          "length": 6,
+          "sha256": "e1c42de2617883349470d825981a4e5f1ba71ba4b422e639657ad9d13aee468e",
+          "head": "\n 转写 \n",
+          "tail": "\n 转写 \n"
+        }
+      },
+      "count": 1,
+      "lengths": [
+        13
+      ],
+      "chunks": [
+        "正文\n【口播转写稿】\n转写"
+      ]
+    },
+    {
+      "name": "JS 空白集：NBSP、BOM、全角空格",
+      "title": " 标题﻿",
+      "content": "﻿ 正文　",
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 4,
+          "sha256": "40ab883b676768f39adcc392b50459123a65e61429aeb630b8424b50ce5789d7",
+          "head": " 标题﻿",
+          "tail": " 标题﻿"
+        },
+        "content": {
+          "length": 5,
+          "sha256": "21ac54bd6580871917619927cf4c9d068e4855f7d360840b01e8f4d63db6ce62",
+          "head": "﻿ 正文　",
+          "tail": "﻿ 正文　"
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        7
+      ],
+      "chunks": [
+        "《标题》\n正文"
+      ]
+    },
+    {
+      "name": "恰好 700 码元不分块",
+      "title": "",
+      "content": [
+        {
+          "cjk": 700
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        700
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        }
+      ]
+    },
+    {
+      "name": "701 码元分两块",
+      "title": "",
+      "content": [
+        {
+          "cjk": 701
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 701,
+          "sha256": "6e48ddcdb796af08a4bff914a6a23c706b580519e1808d04203e2838f43d4143",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "整理摘要标签分类检索问答知识库归"
+        },
+        "transcript": null
+      },
+      "count": 2,
+      "lengths": [
+        700,
+        81
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        "要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归"
+      ]
+    },
+    {
+      "name": "带标题的 700 码元（标题不占窗口）",
+      "title": "标题",
+      "content": [
+        {
+          "cjk": 700
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 2,
+          "sha256": "c3405f8c7d9d392aa3e2d073d5793bce795353c5f7ef0d27f3d6c1c8d2832681",
+          "head": "标题",
+          "tail": "标题"
+        },
+        "content": {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        "transcript": null
+      },
+      "count": 1,
+      "lengths": [
+        705
+      ],
+      "chunks": [
+        {
+          "length": 705,
+          "sha256": "1168cd7026af136c0b0a265c5a92a553046412d4d9bddb5efd1f0a85db09eb9a",
+          "head": "《标题》\n知识库归纳整理摘要标签",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        }
+      ]
+    },
+    {
+      "name": "1320 码元：两窗恰好覆盖",
+      "title": "",
+      "content": [
+        {
+          "cjk": 1320
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 1320,
+          "sha256": "bd5281f783eba0e04073c1c623eab8ba888a4197b13a58e953d1dfcae98ba3bc",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        "transcript": null
+      },
+      "count": 2,
+      "lengths": [
+        700,
+        700
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 700,
+          "sha256": "5236a1ad5c10a1410d27cd2d61b535944ec5f45e161ea0bf4f6dee1642b38abb",
+          "head": "要标签分类检索问答知识库归纳整理",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        }
+      ]
+    },
+    {
+      "name": "1321 码元：三块",
+      "title": "标题",
+      "content": [
+        {
+          "cjk": 1321
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 2,
+          "sha256": "c3405f8c7d9d392aa3e2d073d5793bce795353c5f7ef0d27f3d6c1c8d2832681",
+          "head": "标题",
+          "tail": "标题"
+        },
+        "content": {
+          "length": 1321,
+          "sha256": "d230b0e81ad8a2ceff190f594305be50ff20d8df76f0d37f7011e970cc217a56",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        "transcript": null
+      },
+      "count": 3,
+      "lengths": [
+        705,
+        705,
+        86
+      ],
+      "chunks": [
+        {
+          "length": 705,
+          "sha256": "1168cd7026af136c0b0a265c5a92a553046412d4d9bddb5efd1f0a85db09eb9a",
+          "head": "《标题》\n知识库归纳整理摘要标签",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 705,
+          "sha256": "d7e40cb288dd9d9e6d9009e8b026eeec968c41127a5fc8f7fb35d90f8e249652",
+          "head": "《标题》\n要标签分类检索问答知识",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        "《标题》\n答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分"
+      ]
+    },
+    {
+      "name": "恰好 24 块的边界",
+      "title": "",
+      "content": [
+        {
+          "cjk": 14960
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 14960,
+          "sha256": "c54d70bd875e7fdfd957da50dd41f2cca5b6737f51e7c2ab92fb17cec88d950d",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        },
+        "transcript": null
+      },
+      "count": 24,
+      "lengths": [
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 700,
+          "sha256": "5236a1ad5c10a1410d27cd2d61b535944ec5f45e161ea0bf4f6dee1642b38abb",
+          "head": "要标签分类检索问答知识库归纳整理",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 700,
+          "sha256": "8144a691574f0d67059538a4f47d815d33b9d3dbc4dd719a9416bfb899c5dc58",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 700,
+          "sha256": "8b46f7f80455f387de5ddfdc7274990d04006f0e3bd69b7d04577dc250028788",
+          "head": "摘要标签分类检索问答知识库归纳整",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 700,
+          "sha256": "3e29ae2164685d0d98f13327c1c1ef9c7d21a589dcee58f6f347e8b96f7f3909",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 700,
+          "sha256": "12e61bfd99dcf1d5ab31563a233a4d160bb4d462916c9a41b14ff1d1ed097ef6",
+          "head": "理摘要标签分类检索问答知识库归纳",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 700,
+          "sha256": "a388f89d6f2d7ce28bce8bfd355dbf4ac7f72a65b9af434ac491ae27d3c665f5",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        },
+        {
+          "length": 700,
+          "sha256": "92b7a138dc8d936a496b241511f3ab09e93cd0944dacc42ad3113865d41da021",
+          "head": "整理摘要标签分类检索问答知识库归",
+          "tail": "标签分类检索问答知识库归纳整理摘"
+        },
+        {
+          "length": 700,
+          "sha256": "bc00591421d3757707d3ac6f7102a58da8b0bb6e755e6d83cff5a2c604a3f3d8",
+          "head": "检索问答知识库归纳整理摘要标签分",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 700,
+          "sha256": "3154973c38d022455f4bb8acdfca30bc7bcd3c492d983c392e1ec86868931f94",
+          "head": "纳整理摘要标签分类检索问答知识库",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        },
+        {
+          "length": 700,
+          "sha256": "e771090db359d77071eb1566c81e758c1e2f1eeff05febc39e5677b3d66f6cc8",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 700,
+          "sha256": "1aded50d5c126745ba95b141aec3ab63d42f05cdddb98f985210cebb0c34db33",
+          "head": "归纳整理摘要标签分类检索问答知识",
+          "tail": "摘要标签分类检索问答知识库归纳整"
+        },
+        {
+          "length": 700,
+          "sha256": "d29618c398fc15d98a6970f36b41df4371120f76a9563eae1fab380e60b88968",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 700,
+          "sha256": "0ff9525a12433ee55b8eb5c964a8bba69975a5b2cd4e2e450d68472726c91338",
+          "head": "库归纳整理摘要标签分类检索问答知",
+          "tail": "理摘要标签分类检索问答知识库归纳"
+        },
+        {
+          "length": 700,
+          "sha256": "ea8e0f04be15ac36fbcd4c4b9cf18b4a0f5f2dc7541804e440df0de33fa19992",
+          "head": "签分类检索问答知识库归纳整理摘要",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 700,
+          "sha256": "a327ac4ccd1f206d5c707cb7d4210bd57f36e6c76f43c366eb83d90ae7672ebc",
+          "head": "识库归纳整理摘要标签分类检索问答",
+          "tail": "整理摘要标签分类检索问答知识库归"
+        },
+        {
+          "length": 700,
+          "sha256": "fe9f95d71808fd3aff025304b84cc66a59cd343335b5345aec9c6741b07c0e6d",
+          "head": "标签分类检索问答知识库归纳整理摘",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 700,
+          "sha256": "5236a1ad5c10a1410d27cd2d61b535944ec5f45e161ea0bf4f6dee1642b38abb",
+          "head": "要标签分类检索问答知识库归纳整理",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 700,
+          "sha256": "8144a691574f0d67059538a4f47d815d33b9d3dbc4dd719a9416bfb899c5dc58",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 700,
+          "sha256": "8b46f7f80455f387de5ddfdc7274990d04006f0e3bd69b7d04577dc250028788",
+          "head": "摘要标签分类检索问答知识库归纳整",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 700,
+          "sha256": "3e29ae2164685d0d98f13327c1c1ef9c7d21a589dcee58f6f347e8b96f7f3909",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 700,
+          "sha256": "12e61bfd99dcf1d5ab31563a233a4d160bb4d462916c9a41b14ff1d1ed097ef6",
+          "head": "理摘要标签分类检索问答知识库归纳",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 700,
+          "sha256": "a388f89d6f2d7ce28bce8bfd355dbf4ac7f72a65b9af434ac491ae27d3c665f5",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        }
+      ]
+    },
+    {
+      "name": "25 块被截断到 24 块",
+      "title": "",
+      "content": [
+        {
+          "cjk": 14961
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 14961,
+          "sha256": "e3548ae2484b5234a5a04ec8089a998e310ce5548bb555fa31d5a99c770ef2c4",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        "transcript": null
+      },
+      "count": 24,
+      "lengths": [
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700,
+        700
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 700,
+          "sha256": "5236a1ad5c10a1410d27cd2d61b535944ec5f45e161ea0bf4f6dee1642b38abb",
+          "head": "要标签分类检索问答知识库归纳整理",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 700,
+          "sha256": "8144a691574f0d67059538a4f47d815d33b9d3dbc4dd719a9416bfb899c5dc58",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 700,
+          "sha256": "8b46f7f80455f387de5ddfdc7274990d04006f0e3bd69b7d04577dc250028788",
+          "head": "摘要标签分类检索问答知识库归纳整",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 700,
+          "sha256": "3e29ae2164685d0d98f13327c1c1ef9c7d21a589dcee58f6f347e8b96f7f3909",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 700,
+          "sha256": "12e61bfd99dcf1d5ab31563a233a4d160bb4d462916c9a41b14ff1d1ed097ef6",
+          "head": "理摘要标签分类检索问答知识库归纳",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 700,
+          "sha256": "a388f89d6f2d7ce28bce8bfd355dbf4ac7f72a65b9af434ac491ae27d3c665f5",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        },
+        {
+          "length": 700,
+          "sha256": "92b7a138dc8d936a496b241511f3ab09e93cd0944dacc42ad3113865d41da021",
+          "head": "整理摘要标签分类检索问答知识库归",
+          "tail": "标签分类检索问答知识库归纳整理摘"
+        },
+        {
+          "length": 700,
+          "sha256": "bc00591421d3757707d3ac6f7102a58da8b0bb6e755e6d83cff5a2c604a3f3d8",
+          "head": "检索问答知识库归纳整理摘要标签分",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 700,
+          "sha256": "3154973c38d022455f4bb8acdfca30bc7bcd3c492d983c392e1ec86868931f94",
+          "head": "纳整理摘要标签分类检索问答知识库",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        },
+        {
+          "length": 700,
+          "sha256": "e771090db359d77071eb1566c81e758c1e2f1eeff05febc39e5677b3d66f6cc8",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 700,
+          "sha256": "1aded50d5c126745ba95b141aec3ab63d42f05cdddb98f985210cebb0c34db33",
+          "head": "归纳整理摘要标签分类检索问答知识",
+          "tail": "摘要标签分类检索问答知识库归纳整"
+        },
+        {
+          "length": 700,
+          "sha256": "d29618c398fc15d98a6970f36b41df4371120f76a9563eae1fab380e60b88968",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 700,
+          "sha256": "0ff9525a12433ee55b8eb5c964a8bba69975a5b2cd4e2e450d68472726c91338",
+          "head": "库归纳整理摘要标签分类检索问答知",
+          "tail": "理摘要标签分类检索问答知识库归纳"
+        },
+        {
+          "length": 700,
+          "sha256": "ea8e0f04be15ac36fbcd4c4b9cf18b4a0f5f2dc7541804e440df0de33fa19992",
+          "head": "签分类检索问答知识库归纳整理摘要",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 700,
+          "sha256": "a327ac4ccd1f206d5c707cb7d4210bd57f36e6c76f43c366eb83d90ae7672ebc",
+          "head": "识库归纳整理摘要标签分类检索问答",
+          "tail": "整理摘要标签分类检索问答知识库归"
+        },
+        {
+          "length": 700,
+          "sha256": "fe9f95d71808fd3aff025304b84cc66a59cd343335b5345aec9c6741b07c0e6d",
+          "head": "标签分类检索问答知识库归纳整理摘",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 700,
+          "sha256": "19cf5ebfac1c6920b3d2d397aaf2303df88218b2ecf04927ee692f1240bd0612",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 700,
+          "sha256": "5236a1ad5c10a1410d27cd2d61b535944ec5f45e161ea0bf4f6dee1642b38abb",
+          "head": "要标签分类检索问答知识库归纳整理",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 700,
+          "sha256": "8144a691574f0d67059538a4f47d815d33b9d3dbc4dd719a9416bfb899c5dc58",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 700,
+          "sha256": "8b46f7f80455f387de5ddfdc7274990d04006f0e3bd69b7d04577dc250028788",
+          "head": "摘要标签分类检索问答知识库归纳整",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 700,
+          "sha256": "3e29ae2164685d0d98f13327c1c1ef9c7d21a589dcee58f6f347e8b96f7f3909",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 700,
+          "sha256": "12e61bfd99dcf1d5ab31563a233a4d160bb4d462916c9a41b14ff1d1ed097ef6",
+          "head": "理摘要标签分类检索问答知识库归纳",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 700,
+          "sha256": "a388f89d6f2d7ce28bce8bfd355dbf4ac7f72a65b9af434ac491ae27d3c665f5",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        }
+      ]
+    },
+    {
+      "name": "超长内容截断",
+      "title": "长文",
+      "content": [
+        {
+          "cjk": 30000
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 2,
+          "sha256": "8308fb848eea6004987d9fdb1c3cfb48de9a8789d4026396ca04583db9238ed6",
+          "head": "长文",
+          "tail": "长文"
+        },
+        "content": {
+          "length": 30000,
+          "sha256": "d76b3524845f0c292ff3e1e117326bcd13ee3a34f823c607b8ed10de25ce45a2",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        "transcript": null
+      },
+      "count": 24,
+      "lengths": [
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705,
+        705
+      ],
+      "chunks": [
+        {
+          "length": 705,
+          "sha256": "d2ab8bb066f85b2ee10bb0f6f1d855bdbe62227bc0907c2793f72cbe4795da30",
+          "head": "《长文》\n知识库归纳整理摘要标签",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 705,
+          "sha256": "163c253dff844754d36ce3095ef9591448446f10aa57be177d1219b2e4a04630",
+          "head": "《长文》\n要标签分类检索问答知识",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 705,
+          "sha256": "2d06fc4eba427ecf6fe575bc92d715eb7352832d02a93d665c81fea6a02fd481",
+          "head": "《长文》\n答知识库归纳整理摘要标",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 705,
+          "sha256": "01ad3d55286ac283bc94f1ef38c8844e8673aad29bec1a17d62f1e14282365b4",
+          "head": "《长文》\n摘要标签分类检索问答知",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 705,
+          "sha256": "ff573337c19ab69c892d2461a39e22787c7e3a3ab872032bcf831135b53b88f8",
+          "head": "《长文》\n问答知识库归纳整理摘要",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 705,
+          "sha256": "f8663300bb97b938663023b6e4024c671e422850759a8b838b6574459eb807c3",
+          "head": "《长文》\n理摘要标签分类检索问答",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 705,
+          "sha256": "6a24d85e071f6ed05e4390bb06e5723fd99651de67761abbf66846e8171f47bb",
+          "head": "《长文》\n索问答知识库归纳整理摘",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        },
+        {
+          "length": 705,
+          "sha256": "5b626fabeb09d6556f034b5faa3a4a3e9cc0873d89ee375592445159ed83e5c6",
+          "head": "《长文》\n整理摘要标签分类检索问",
+          "tail": "标签分类检索问答知识库归纳整理摘"
+        },
+        {
+          "length": 705,
+          "sha256": "8276e6301e117098d5ba4b8b5293ceb29424116603327e029066562a1b7e4782",
+          "head": "《长文》\n检索问答知识库归纳整理",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 705,
+          "sha256": "45dc12da5799f87130b8647a2d0ee728cfd54e6f82239fb71ca99e6c26bb0942",
+          "head": "《长文》\n纳整理摘要标签分类检索",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        },
+        {
+          "length": 705,
+          "sha256": "e64c8df7f2323c9a74c9224481efdc549eff200346f8347d8bca4c7a025a0f08",
+          "head": "《长文》\n类检索问答知识库归纳整",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 705,
+          "sha256": "701cce606986e2a2cf4cce62b59e5f5ef85b6f02e4a48e0ed4496ac2ef701bbb",
+          "head": "《长文》\n归纳整理摘要标签分类检",
+          "tail": "摘要标签分类检索问答知识库归纳整"
+        },
+        {
+          "length": 705,
+          "sha256": "700922f9032c76e3b8e1618f80eba7c2f550fb6734f05593412ff7b6cf0eaf97",
+          "head": "《长文》\n分类检索问答知识库归纳",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 705,
+          "sha256": "95e79366d3ff45567539739d7e0de8c7b83d4a894a2121977ac7309d4848c997",
+          "head": "《长文》\n库归纳整理摘要标签分类",
+          "tail": "理摘要标签分类检索问答知识库归纳"
+        },
+        {
+          "length": 705,
+          "sha256": "7cffe27d12eb2c9e1fee9581c8c97a9c8521cee1d3600dbecee1fc4abdca8481",
+          "head": "《长文》\n签分类检索问答知识库归",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 705,
+          "sha256": "de639a735867c76dae549e584e4beced93703079ac21a3b2b72f107f67bf7de5",
+          "head": "《长文》\n识库归纳整理摘要标签分",
+          "tail": "整理摘要标签分类检索问答知识库归"
+        },
+        {
+          "length": 705,
+          "sha256": "6577a143fa1465bc0c35b4a9c1b37831284c36132518d1d612c2d2178ee0ed02",
+          "head": "《长文》\n标签分类检索问答知识库",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 705,
+          "sha256": "d2ab8bb066f85b2ee10bb0f6f1d855bdbe62227bc0907c2793f72cbe4795da30",
+          "head": "《长文》\n知识库归纳整理摘要标签",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        {
+          "length": 705,
+          "sha256": "163c253dff844754d36ce3095ef9591448446f10aa57be177d1219b2e4a04630",
+          "head": "《长文》\n要标签分类检索问答知识",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 705,
+          "sha256": "2d06fc4eba427ecf6fe575bc92d715eb7352832d02a93d665c81fea6a02fd481",
+          "head": "《长文》\n答知识库归纳整理摘要标",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        },
+        {
+          "length": 705,
+          "sha256": "01ad3d55286ac283bc94f1ef38c8844e8673aad29bec1a17d62f1e14282365b4",
+          "head": "《长文》\n摘要标签分类检索问答知",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 705,
+          "sha256": "ff573337c19ab69c892d2461a39e22787c7e3a3ab872032bcf831135b53b88f8",
+          "head": "《长文》\n问答知识库归纳整理摘要",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        },
+        {
+          "length": 705,
+          "sha256": "f8663300bb97b938663023b6e4024c671e422850759a8b838b6574459eb807c3",
+          "head": "《长文》\n理摘要标签分类检索问答",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        },
+        {
+          "length": 705,
+          "sha256": "6a24d85e071f6ed05e4390bb06e5723fd99651de67761abbf66846e8171f47bb",
+          "head": "《长文》\n索问答知识库归纳整理摘",
+          "tail": "识库归纳整理摘要标签分类检索问答"
+        }
+      ]
+    },
+    {
+      "name": "含表情与扩展汉字（窗口避开代理对）",
+      "title": [
+        {
+          "lit": "😀标题"
+        }
+      ],
+      "content": [
+        {
+          "ascii": 100
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "ascii": 547
+        },
+        {
+          "lit": "𠀀"
+        },
+        {
+          "cjk": 700
+        }
+      ],
+      "transcript": null,
+      "inputs": {
+        "title": {
+          "length": 4,
+          "sha256": "b78daec0d8db82d00af3bff9ed9281baf3bf14a733bac725511ede241ec1695e",
+          "head": "😀标题",
+          "tail": "😀标题"
+        },
+        "content": {
+          "length": 1351,
+          "sha256": "e180f6347e84fc737fe837c88c47e640dcb08fa8b52758377fe9990110d61435",
+          "head": "abcdefghijabcdef",
+          "tail": "纳整理摘要标签分类检索问答知识库"
+        },
+        "transcript": null
+      },
+      "count": 3,
+      "lengths": [
+        707,
+        707,
+        118
+      ],
+      "chunks": [
+        {
+          "length": 707,
+          "sha256": "c9a681abfa2ad704f99948fdc40f8fc868923d1f50576d8fca5a33dd44fe9fee",
+          "head": "《😀标题》\nabcdefghi",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 707,
+          "sha256": "a1ddcfaab93215b78aa1c9e0782791410a8062ff702ef953ec1fc1112d493a92",
+          "head": "《😀标题》\nijabcdefg",
+          "tail": "摘要标签分类检索问答知识库归纳整"
+        },
+        "《😀标题》\n分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库"
+      ]
+    },
+    {
+      "name": "转写稿拼接后跨窗口",
+      "title": "访谈",
+      "content": [
+        {
+          "cjk": 500
+        }
+      ],
+      "transcript": [
+        {
+          "cjk": 500
+        }
+      ],
+      "inputs": {
+        "title": {
+          "length": 2,
+          "sha256": "93f4a1f8a42a41e1c4d2bb9afb9055306668acf7141fe8f4c30858eb47a60052",
+          "head": "访谈",
+          "tail": "访谈"
+        },
+        "content": {
+          "length": 500,
+          "sha256": "96cf82243d6e74d2b8918ff2c44e29ebd75a0d16f4116f4c6a0966bea8e01a33",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        },
+        "transcript": {
+          "length": 500,
+          "sha256": "96cf82243d6e74d2b8918ff2c44e29ebd75a0d16f4116f4c6a0966bea8e01a33",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        }
+      },
+      "count": 2,
+      "lengths": [
+        705,
+        394
+      ],
+      "chunks": [
+        {
+          "length": 705,
+          "sha256": "cab45ade369ad7e98b1c893c9898339682d108c49c79aac3cde1c1450be16755",
+          "head": "《访谈》\n知识库归纳整理摘要标签",
+          "tail": "整理摘要标签分类检索问答知识库归"
+        },
+        {
+          "length": 394,
+          "sha256": "80ac95b9b9069bb633611ebed6568e8c1dc181fb54b746f8443c22c40db16e7d",
+          "head": "《访谈》\n标签分类检索问答知识库",
+          "tail": "要标签分类检索问答知识库归纳整理"
+        }
+      ]
+    },
+    {
+      "name": "正文很长而转写稿很短",
+      "title": "",
+      "content": [
+        {
+          "ascii": 900
+        }
+      ],
+      "transcript": "短",
+      "inputs": {
+        "title": {
+          "length": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "head": "",
+          "tail": ""
+        },
+        "content": {
+          "length": 900,
+          "sha256": "e7c3a90af3045ac3fc172d2983f220dc16291ed099ebfd1f81bc72901a54b39b",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        "transcript": {
+          "length": 1,
+          "sha256": "4ca8d4f77574e43a0b515436ee0a86ca80c4f397ac1fc1b396ec05eaedef3d7d",
+          "head": "短",
+          "tail": "短"
+        }
+      },
+      "count": 2,
+      "lengths": [
+        700,
+        290
+      ],
+      "chunks": [
+        {
+          "length": 700,
+          "sha256": "3c97367858032e7ebdd4987f745a306e02027aae79d863b06c2135baa3e4e47f",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\n【口播转写稿】\n短"
+      ]
+    }
+  ],
+  "merge": [
+    {
+      "name": "两路都空",
+      "fts": [],
+      "semantic": [],
+      "limit": 10,
+      "result": []
+    },
+    {
+      "name": "只有 FTS",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ],
+      "semantic": [],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ]
+    },
+    {
+      "name": "只有语义（元数据取语义自身）",
+      "fts": [],
+      "semantic": [
+        {
+          "id": "x",
+          "title": "标题-x",
+          "snippet": "摘录-x",
+          "matchText": "命中段"
+        },
+        {
+          "id": "y",
+          "title": "标题-y",
+          "snippet": "摘录-y"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "x",
+          "title": "标题-x",
+          "snippet": "摘录-x",
+          "matchText": "命中段"
+        },
+        {
+          "id": "y",
+          "title": "标题-y",
+          "snippet": "摘录-y"
+        }
+      ]
+    },
+    {
+      "name": "两路顺序相同",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ]
+    },
+    {
+      "name": "两路顺序相反：a 与 c 同分，按先出现排前",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ]
+    },
+    {
+      "name": "元数据归 FTS、matchText 取语义",
+      "fts": [
+        {
+          "id": "a",
+          "title": "FTS 标题",
+          "snippet": "FTS 摘录"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "a",
+          "title": "语义标题",
+          "snippet": "语义摘录",
+          "matchText": "语义命中段"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "FTS 标题",
+          "snippet": "FTS 摘录",
+          "matchText": "语义命中段"
+        }
+      ]
+    },
+    {
+      "name": "两路都带 matchText 时取先到的（FTS）",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "matchText": "FTS 命中"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "matchText": "语义命中"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "matchText": "FTS 命中"
+        }
+      ]
+    },
+    {
+      "name": "matchText 为空串不算数",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "matchText": ""
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        }
+      ]
+    },
+    {
+      "name": "limit 截断",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        },
+        {
+          "id": "d",
+          "title": "标题-d",
+          "snippet": "摘录-d"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "d",
+          "title": "标题-d",
+          "snippet": "摘录-d"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ],
+      "limit": 2,
+      "result": [
+        {
+          "id": "d",
+          "title": "标题-d",
+          "snippet": "摘录-d"
+        },
+        {
+          "id": "c",
+          "title": "标题-c",
+          "snippet": "摘录-c"
+        }
+      ]
+    },
+    {
+      "name": "limit 为 0 按 1 算",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ],
+      "limit": 0,
+      "result": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ]
+    },
+    {
+      "name": "limit 为负数按 1 算",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ],
+      "limit": -3,
+      "result": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ]
+    },
+    {
+      "name": "limit 大于结果数",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ],
+      "limit": 100,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ]
+    },
+    {
+      "name": "同一路内重复 id：分数累加、元数据取后者",
+      "fts": [
+        {
+          "id": "a",
+          "title": "第一次",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        },
+        {
+          "id": "a",
+          "title": "第二次",
+          "snippet": "摘录-a"
+        }
+      ],
+      "semantic": [],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "第二次",
+          "snippet": "摘录-a"
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b"
+        }
+      ]
+    },
+    {
+      "name": "审核状态与原因透传",
+      "fts": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "来源不可信",
+            "内容过短"
+          ]
+        }
+      ],
+      "semantic": [
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b",
+          "reviewStatus": "clear",
+          "reviewReasons": []
+        },
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "reviewStatus": "clear"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "a",
+          "title": "标题-a",
+          "snippet": "摘录-a",
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "来源不可信",
+            "内容过短"
+          ]
+        },
+        {
+          "id": "b",
+          "title": "标题-b",
+          "snippet": "摘录-b",
+          "reviewStatus": "clear",
+          "reviewReasons": []
+        }
+      ]
+    },
+    {
+      "name": "25 对 25 的交叠",
+      "fts": [
+        {
+          "id": "f1",
+          "title": "标题-f1",
+          "snippet": "摘录-f1"
+        },
+        {
+          "id": "f2",
+          "title": "标题-f2",
+          "snippet": "摘录-f2"
+        },
+        {
+          "id": "f3",
+          "title": "标题-f3",
+          "snippet": "摘录-f3"
+        },
+        {
+          "id": "f4",
+          "title": "标题-f4",
+          "snippet": "摘录-f4"
+        },
+        {
+          "id": "f5",
+          "title": "标题-f5",
+          "snippet": "摘录-f5"
+        },
+        {
+          "id": "f6",
+          "title": "标题-f6",
+          "snippet": "摘录-f6"
+        },
+        {
+          "id": "f7",
+          "title": "标题-f7",
+          "snippet": "摘录-f7"
+        },
+        {
+          "id": "f8",
+          "title": "标题-f8",
+          "snippet": "摘录-f8"
+        },
+        {
+          "id": "f9",
+          "title": "标题-f9",
+          "snippet": "摘录-f9"
+        },
+        {
+          "id": "f10",
+          "title": "标题-f10",
+          "snippet": "摘录-f10"
+        },
+        {
+          "id": "f11",
+          "title": "标题-f11",
+          "snippet": "摘录-f11"
+        },
+        {
+          "id": "f12",
+          "title": "标题-f12",
+          "snippet": "摘录-f12"
+        },
+        {
+          "id": "f13",
+          "title": "标题-f13",
+          "snippet": "摘录-f13"
+        },
+        {
+          "id": "f14",
+          "title": "标题-f14",
+          "snippet": "摘录-f14"
+        },
+        {
+          "id": "f15",
+          "title": "标题-f15",
+          "snippet": "摘录-f15"
+        },
+        {
+          "id": "f16",
+          "title": "标题-f16",
+          "snippet": "摘录-f16"
+        },
+        {
+          "id": "f17",
+          "title": "标题-f17",
+          "snippet": "摘录-f17"
+        },
+        {
+          "id": "f18",
+          "title": "标题-f18",
+          "snippet": "摘录-f18"
+        },
+        {
+          "id": "f19",
+          "title": "标题-f19",
+          "snippet": "摘录-f19"
+        },
+        {
+          "id": "f20",
+          "title": "标题-f20",
+          "snippet": "摘录-f20"
+        },
+        {
+          "id": "f21",
+          "title": "标题-f21",
+          "snippet": "摘录-f21"
+        },
+        {
+          "id": "f22",
+          "title": "标题-f22",
+          "snippet": "摘录-f22"
+        },
+        {
+          "id": "f23",
+          "title": "标题-f23",
+          "snippet": "摘录-f23"
+        },
+        {
+          "id": "f24",
+          "title": "标题-f24",
+          "snippet": "摘录-f24"
+        },
+        {
+          "id": "f25",
+          "title": "标题-f25",
+          "snippet": "摘录-f25"
+        }
+      ],
+      "semantic": [
+        {
+          "id": "f1",
+          "title": "标题-f1",
+          "snippet": "摘录-f1",
+          "matchText": "片段-1"
+        },
+        {
+          "id": "s2",
+          "title": "标题-s2",
+          "snippet": "摘录-s2",
+          "matchText": "片段-2"
+        },
+        {
+          "id": "s3",
+          "title": "标题-s3",
+          "snippet": "摘录-s3",
+          "matchText": "片段-3"
+        },
+        {
+          "id": "f4",
+          "title": "标题-f4",
+          "snippet": "摘录-f4",
+          "matchText": "片段-4"
+        },
+        {
+          "id": "s5",
+          "title": "标题-s5",
+          "snippet": "摘录-s5",
+          "matchText": "片段-5"
+        },
+        {
+          "id": "s6",
+          "title": "标题-s6",
+          "snippet": "摘录-s6",
+          "matchText": "片段-6"
+        },
+        {
+          "id": "f7",
+          "title": "标题-f7",
+          "snippet": "摘录-f7",
+          "matchText": "片段-7"
+        },
+        {
+          "id": "s8",
+          "title": "标题-s8",
+          "snippet": "摘录-s8",
+          "matchText": "片段-8"
+        },
+        {
+          "id": "s9",
+          "title": "标题-s9",
+          "snippet": "摘录-s9",
+          "matchText": "片段-9"
+        },
+        {
+          "id": "f10",
+          "title": "标题-f10",
+          "snippet": "摘录-f10",
+          "matchText": "片段-10"
+        },
+        {
+          "id": "s11",
+          "title": "标题-s11",
+          "snippet": "摘录-s11",
+          "matchText": "片段-11"
+        },
+        {
+          "id": "s12",
+          "title": "标题-s12",
+          "snippet": "摘录-s12",
+          "matchText": "片段-12"
+        },
+        {
+          "id": "f13",
+          "title": "标题-f13",
+          "snippet": "摘录-f13",
+          "matchText": "片段-13"
+        },
+        {
+          "id": "s14",
+          "title": "标题-s14",
+          "snippet": "摘录-s14",
+          "matchText": "片段-14"
+        },
+        {
+          "id": "s15",
+          "title": "标题-s15",
+          "snippet": "摘录-s15",
+          "matchText": "片段-15"
+        },
+        {
+          "id": "f16",
+          "title": "标题-f16",
+          "snippet": "摘录-f16",
+          "matchText": "片段-16"
+        },
+        {
+          "id": "s17",
+          "title": "标题-s17",
+          "snippet": "摘录-s17",
+          "matchText": "片段-17"
+        },
+        {
+          "id": "s18",
+          "title": "标题-s18",
+          "snippet": "摘录-s18",
+          "matchText": "片段-18"
+        },
+        {
+          "id": "f19",
+          "title": "标题-f19",
+          "snippet": "摘录-f19",
+          "matchText": "片段-19"
+        },
+        {
+          "id": "s20",
+          "title": "标题-s20",
+          "snippet": "摘录-s20",
+          "matchText": "片段-20"
+        },
+        {
+          "id": "s21",
+          "title": "标题-s21",
+          "snippet": "摘录-s21",
+          "matchText": "片段-21"
+        },
+        {
+          "id": "f22",
+          "title": "标题-f22",
+          "snippet": "摘录-f22",
+          "matchText": "片段-22"
+        },
+        {
+          "id": "s23",
+          "title": "标题-s23",
+          "snippet": "摘录-s23",
+          "matchText": "片段-23"
+        },
+        {
+          "id": "s24",
+          "title": "标题-s24",
+          "snippet": "摘录-s24",
+          "matchText": "片段-24"
+        },
+        {
+          "id": "f25",
+          "title": "标题-f25",
+          "snippet": "摘录-f25",
+          "matchText": "片段-25"
+        }
+      ],
+      "limit": 10,
+      "result": [
+        {
+          "id": "f1",
+          "title": "标题-f1",
+          "snippet": "摘录-f1",
+          "matchText": "片段-1"
+        },
+        {
+          "id": "f4",
+          "title": "标题-f4",
+          "snippet": "摘录-f4",
+          "matchText": "片段-4"
+        },
+        {
+          "id": "f7",
+          "title": "标题-f7",
+          "snippet": "摘录-f7",
+          "matchText": "片段-7"
+        },
+        {
+          "id": "f10",
+          "title": "标题-f10",
+          "snippet": "摘录-f10",
+          "matchText": "片段-10"
+        },
+        {
+          "id": "f13",
+          "title": "标题-f13",
+          "snippet": "摘录-f13",
+          "matchText": "片段-13"
+        },
+        {
+          "id": "f16",
+          "title": "标题-f16",
+          "snippet": "摘录-f16",
+          "matchText": "片段-16"
+        },
+        {
+          "id": "f19",
+          "title": "标题-f19",
+          "snippet": "摘录-f19",
+          "matchText": "片段-19"
+        },
+        {
+          "id": "f22",
+          "title": "标题-f22",
+          "snippet": "摘录-f22",
+          "matchText": "片段-22"
+        },
+        {
+          "id": "f25",
+          "title": "标题-f25",
+          "snippet": "摘录-f25",
+          "matchText": "片段-25"
+        },
+        {
+          "id": "f2",
+          "title": "标题-f2",
+          "snippet": "摘录-f2"
+        }
+      ]
+    }
+  ]
+}

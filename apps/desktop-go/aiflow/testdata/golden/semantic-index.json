@@ -1,0 +1,3690 @@
+{
+  "cases": [
+    {
+      "name": "未配置 embedding 模型：静默跳过",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "skipped": true,
+          "indexed": 0,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "只有旧版单模型：不算配置了 embedding",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiKey": "sk-legacy",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "skipped": true,
+          "indexed": 0,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "单批两条目成功",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1,2,2]}],\"usage\":{\"prompt_tokens\":11,\"total_tokens\":11}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 11,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 2,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 3,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.3333333333333333,
+                  0.6666666666666666,
+                  0.6666666666666666
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "多批：第二批取到新条目，第三批空",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ],
+        [
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 3,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-3",
+            "contentHash": "hash-3",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题3》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "name": "落库返回 false 的条目仍 pending：去重后停止，不死循环",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ],
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {
+        "item-1": false
+      },
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 1,
+          "lastError": "向量未保存：资料可能已修改或删除，请重新索引最新内容"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": []
+      }
+    },
+    {
+      "name": "没有可嵌入文本的条目被静默跳过（不计成功也不计失败）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "",
+            "content": "  ",
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 2,
+            "sha256": "6c179f21e6f62b629055d8ab40f454ed02e48b68563913473b857d3638e23b28",
+            "head": "  ",
+            "tail": "  "
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "长正文：多块一次请求，向量按 L2 归一化",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "长文",
+            "content": [
+              {
+                "cjk": 2000
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1,2,2]},{\"object\":\"embedding\",\"index\":1,\"embedding\":[1,2,2]},{\"object\":\"embedding\",\"index\":2,\"embedding\":[1,2,2]},{\"object\":\"embedding\",\"index\":3,\"embedding\":[1,2,2]}],\"usage\":{\"prompt_tokens\":321,\"total_tokens\":321}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 2000,
+            "sha256": "d6a49ee4f382694413a12e20c23ea86679391923063e7e9d6dd28533946e91e2",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "类检索问答知识库归纳整理摘要标签"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "bodyDigest": {
+              "length": 2309,
+              "sha256": "fdb890399f01b34795922a71f05c3ee031b37fbdd9305e9053451d91353265f2",
+              "head": "{\"model\":\"model-",
+              "tail": "问答知识库归纳整理摘要标签\"]}"
+            }
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 321,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 3,
+            "chunks": [
+              {
+                "text": {
+                  "length": 705,
+                  "sha256": "d2ab8bb066f85b2ee10bb0f6f1d855bdbe62227bc0907c2793f72cbe4795da30",
+                  "head": "《长文》\n知识库归纳整理摘要标签",
+                  "tail": "纳整理摘要标签分类检索问答知识库"
+                },
+                "vector": [
+                  0.3333333333333333,
+                  0.6666666666666666,
+                  0.6666666666666666
+                ]
+              },
+              {
+                "text": {
+                  "length": 705,
+                  "sha256": "163c253dff844754d36ce3095ef9591448446f10aa57be177d1219b2e4a04630",
+                  "head": "《长文》\n要标签分类检索问答知识",
+                  "tail": "类检索问答知识库归纳整理摘要标签"
+                },
+                "vector": [
+                  0.3333333333333333,
+                  0.6666666666666666,
+                  0.6666666666666666
+                ]
+              },
+              {
+                "text": {
+                  "length": 705,
+                  "sha256": "2d06fc4eba427ecf6fe575bc92d715eb7352832d02a93d665c81fea6a02fd481",
+                  "head": "《长文》\n答知识库归纳整理摘要标",
+                  "tail": "归纳整理摘要标签分类检索问答知识"
+                },
+                "vector": [
+                  0.3333333333333333,
+                  0.6666666666666666,
+                  0.6666666666666666
+                ]
+              },
+              {
+                "text": "《长文》\n摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签",
+                "vector": [
+                  0.3333333333333333,
+                  0.6666666666666666,
+                  0.6666666666666666
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "带转写稿的条目",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "访谈",
+            "content": [
+              {
+                "cjk": 500
+              }
+            ],
+            "transcript": [
+              {
+                "cjk": 500
+              }
+            ],
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]},{\"object\":\"embedding\",\"index\":1,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 500,
+            "sha256": "96cf82243d6e74d2b8918ff2c44e29ebd75a0d16f4116f4c6a0966bea8e01a33",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": {
+            "length": 500,
+            "sha256": "96cf82243d6e74d2b8918ff2c44e29ebd75a0d16f4116f4c6a0966bea8e01a33",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          }
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《访谈》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\\n【口播转写稿】\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归\",\"《访谈》\\n标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": {
+                  "length": 705,
+                  "sha256": "cab45ade369ad7e98b1c893c9898339682d108c49c79aac3cde1c1450be16755",
+                  "head": "《访谈》\n知识库归纳整理摘要标签",
+                  "tail": "整理摘要标签分类检索问答知识库归"
+                },
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "text": {
+                  "length": 394,
+                  "sha256": "80ac95b9b9069bb633611ebed6568e8c1dc181fb54b746f8443c22c40db16e7d",
+                  "head": "《访谈》\n标签分类检索问答知识库",
+                  "tail": "要标签分类检索问答知识库归纳整理"
+                },
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "嵌入失败一次后继续下一条",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 1,
+          "lastError": "Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "连续 3 次失败即中止本轮",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          },
+          {
+            "id": "item-4",
+            "title": "标题4",
+            "content": [
+              {
+                "cjk": 44
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-4"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-4",
+          "content": {
+            "length": 44,
+            "sha256": "1fd2b424ef19a5dadb25f5ca2fae7b26a5c3a8eae07aa8fd3757f8340491f837",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "分类检索问答知识库归纳整理摘要标"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          }
+        ],
+        "unusedScript": 1,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+          "[semantic] 条目嵌入失败（item-2）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+          "[semantic] 条目嵌入失败（item-3）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 3,
+          "lastError": "Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "成功会重置连续失败计数：失败 2 次、成功、失败 2 次不中止",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          },
+          {
+            "id": "item-4",
+            "title": "标题4",
+            "content": [
+              {
+                "cjk": 44
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-4"
+          },
+          {
+            "id": "item-5",
+            "title": "标题5",
+            "content": [
+              {
+                "cjk": 45
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-5"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-4",
+          "content": {
+            "length": 44,
+            "sha256": "1fd2b424ef19a5dadb25f5ca2fae7b26a5c3a8eae07aa8fd3757f8340491f837",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "分类检索问答知识库归纳整理摘要标"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-5",
+          "content": {
+            "length": 45,
+            "sha256": "c455cf90428759bc4242187ef75d9e6fd1d181ee5627decb92c30c418879f02a",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "类检索问答知识库归纳整理摘要标签"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题4》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题5》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+          "[semantic] 条目嵌入失败（item-2）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+          "[semantic] 条目嵌入失败（item-4）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+          "[semantic] 条目嵌入失败（item-5）: Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 4,
+          "lastError": "Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-3",
+            "contentHash": "hash-3",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题3》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "落库返回 false 不计入连续失败：4 条都不中止",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          },
+          {
+            "id": "item-4",
+            "title": "标题4",
+            "content": [
+              {
+                "cjk": 44
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-4"
+          }
+        ]
+      ],
+      "applies": {
+        "item-1": false,
+        "item-2": false,
+        "item-3": false,
+        "item-4": false
+      },
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-4",
+          "content": {
+            "length": 44,
+            "sha256": "1fd2b424ef19a5dadb25f5ca2fae7b26a5c3a8eae07aa8fd3757f8340491f837",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "分类检索问答知识库归纳整理摘要标"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题4》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 4,
+          "lastError": "向量未保存：资料可能已修改或删除，请重新索引最新内容"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-3",
+            "contentHash": "hash-3",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题3》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-4",
+            "contentHash": "hash-4",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题4》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": []
+      }
+    },
+    {
+      "name": "落库抛错计入连续失败：3 条后中止",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          },
+          {
+            "id": "item-4",
+            "title": "标题4",
+            "content": [
+              {
+                "cjk": 44
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-4"
+          }
+        ]
+      ],
+      "applies": {
+        "item-1": {
+          "throws": "database is locked"
+        },
+        "item-2": {
+          "throws": "database is locked"
+        },
+        "item-3": {
+          "throws": "database is locked"
+        }
+      },
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-4",
+          "content": {
+            "length": 44,
+            "sha256": "1fd2b424ef19a5dadb25f5ca2fae7b26a5c3a8eae07aa8fd3757f8340491f837",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "分类检索问答知识库归纳整理摘要标"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          }
+        ],
+        "unusedScript": 1,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: database is locked",
+          "[semantic] 条目嵌入失败（item-2）: database is locked",
+          "[semantic] 条目嵌入失败（item-3）: database is locked"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 3,
+          "lastError": "database is locked"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          },
+          {
+            "itemId": "item-3",
+            "contentHash": "hash-3",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题3》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": []
+      }
+    },
+    {
+      "name": "嵌入响应数量不匹配按条目失败处理",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "长",
+            "content": [
+              {
+                "cjk": 1000
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 1000,
+            "sha256": "1cd015bb3eb52e694c034d8a932049ad48175e9fd0f337fdd52e0db7dc609e43",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "问答知识库归纳整理摘要标签分类检"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《长》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库\",\"《长》\\n要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: Embeddings 响应数量不匹配：期望 2，实际 1"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 1,
+          "lastError": "Embeddings 响应数量不匹配：期望 2，实际 1"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-2",
+            "contentHash": "hash-2",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题2》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "鉴权失败：错误原因带回结果",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"Incorrect API key provided\"}}"
+        },
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"Incorrect API key provided\"}}"
+        },
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"Incorrect API key provided\"}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题2》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题3》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: Embeddings 请求失败 (HTTP 401): {\"error\":{\"message\":\"Incorrect API key provided\"}}",
+          "[semantic] 条目嵌入失败（item-2）: Embeddings 请求失败 (HTTP 401): {\"error\":{\"message\":\"Incorrect API key provided\"}}",
+          "[semantic] 条目嵌入失败（item-3）: Embeddings 请求失败 (HTTP 401): {\"error\":{\"message\":\"Incorrect API key provided\"}}"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 3,
+          "lastError": "Embeddings 请求失败 (HTTP 401): {\"error\":{\"message\":\"Incorrect API key provided\"}}"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "开始前已取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": "before",
+      "abortAfterIndexed": null,
+      "script": [],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "第 1 条落库后取消：不再处理后面的条目",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          },
+          {
+            "id": "item-3",
+            "title": "标题3",
+            "content": [
+              {
+                "cjk": 43
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-3"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": 1,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-3",
+          "content": {
+            "length": 43,
+            "sha256": "0e648d97e73c5deebab5243f0ae5492342bdf7a3567b0c5851029702e66a5194",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "签分类检索问答知识库归纳整理摘要"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          }
+        ],
+        "unusedScript": 2,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "skipped": false,
+          "indexed": 1,
+          "failed": 0
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "嵌入请求进行中取消：该条按失败计，随后退出",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          },
+          {
+            "id": "item-2",
+            "title": "标题2",
+            "content": [
+              {
+                "cjk": 42
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-2"
+          }
+        ]
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}",
+          "abortDuring": true
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        },
+        {
+          "id": "item-2",
+          "content": {
+            "length": 42,
+            "sha256": "bb298373225a3bb2ea1a2e6b32373b7cb120391e4c691fc5ed8c04674a38e327",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          }
+        ],
+        "unusedScript": 1,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [
+          "[semantic] 条目嵌入失败（item-1）: 已取消"
+        ],
+        "result": {
+          "skipped": false,
+          "indexed": 0,
+          "failed": 1,
+          "lastError": "已取消"
+        },
+        "error": null,
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "listPending 抛错直接向上抛",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        {
+          "throws": "database is locked"
+        }
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [],
+      "inputs": [],
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "database is locked",
+          "aborted": false
+        },
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [],
+        "progress": []
+      }
+    },
+    {
+      "name": "第二次 listPending 抛错：已处理的不回滚，错误向上抛",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "batches": [
+        [
+          {
+            "id": "item-1",
+            "title": "标题1",
+            "content": [
+              {
+                "cjk": 41
+              }
+            ],
+            "transcript": null,
+            "contentHash": "hash-1"
+          }
+        ],
+        {
+          "throws": "disk I/O error"
+        }
+      ],
+      "applies": {},
+      "abort": null,
+      "abortAfterIndexed": null,
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "inputs": [
+        {
+          "id": "item-1",
+          "content": {
+            "length": 41,
+            "sha256": "7651aeb2cfaece6b1e6c403cc490f0663585480babc894a23e0d2e96903f14f3",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          },
+          "transcript": null
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"《标题1》\\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "disk I/O error",
+          "aborted": false
+        },
+        "listCalls": [
+          {
+            "model": "model-embed",
+            "limit": 10
+          },
+          {
+            "model": "model-embed",
+            "limit": 10
+          }
+        ],
+        "applyCalls": [
+          {
+            "itemId": "item-1",
+            "contentHash": "hash-1",
+            "model": "model-embed",
+            "dims": 2,
+            "chunks": [
+              {
+                "text": "《标题1》\n知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理",
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "progress": [
+          1
+        ]
+      }
+    }
+  ]
+}

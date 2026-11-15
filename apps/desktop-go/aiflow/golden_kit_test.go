@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // loadGolden 读取 testdata/golden/<name>.json。
@@ -131,7 +132,7 @@ func (f *fakeTransport) take() (scriptStep, error) {
 	return step, nil
 }
 
-func (f *fakeTransport) Request(_ context.Context, req TransportRequest) (TransportResponse, error) {
+func (f *fakeTransport) Request(ctx context.Context, req TransportRequest) (TransportResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("request", req)
@@ -144,11 +145,22 @@ func (f *fakeTransport) Request(_ context.Context, req TransportRequest) (Transp
 	}
 	if step.AbortDuring && f.cancel != nil {
 		f.cancel()
+		awaitCancellation(ctx)
 	}
 	return step.response(), nil
 }
 
-func (f *fakeTransport) RequestStream(_ context.Context, req TransportRequest, h StreamHandler) (TransportResponse, error) {
+// awaitCancellation 等取消传到本次请求的 ctx。TS 里 abort 事件是同步送达的，请求返回时取消早已传到；
+// Go 里取消经由别的协程转发（例如查询向量缓存里「最后一个等待者离开 → 取消底层请求」），
+// 不等它到位，「请求返回时是否已被取消」就成了竞态，对拍不稳定。ctx 本来就是被取消的那个时立即返回。
+func awaitCancellation(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-time.After(2 * time.Second):
+	}
+}
+
+func (f *fakeTransport) RequestStream(ctx context.Context, req TransportRequest, h StreamHandler) (TransportResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record("stream", req)
@@ -167,6 +179,7 @@ func (f *fakeTransport) RequestStream(_ context.Context, req TransportRequest, h
 	}
 	if step.AbortDuring && f.cancel != nil {
 		f.cancel()
+		awaitCancellation(ctx)
 	}
 	return step.response(), nil
 }

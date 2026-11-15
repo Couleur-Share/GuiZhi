@@ -20,6 +20,18 @@ const (
 	classificationTemperature = 0.1
 )
 
+// classificationAbortedError 对应 abortIfRequested 抛出的错误：message 为 AI_CLASSIFICATION_ABORTED、name 为 AbortError，
+// 上层据此识别为「已停止」。与客户端栈里的 AbortError（message「已取消」）不同：这是归类流程自己在批间检查点发现取消。
+type classificationAbortedError struct{}
+
+func (classificationAbortedError) Error() string { return "AI_CLASSIFICATION_ABORTED" }
+
+// Is 让 errors.Is(err, context.Canceled) 成立，IsAborted 据此识别。
+func (classificationAbortedError) Is(target error) bool { return target == context.Canceled }
+
+// ErrClassificationAborted 是归类流程在批间检查点发现取消时返回的错误。
+var ErrClassificationAborted error = classificationAbortedError{}
+
 var reservedNewCollectionNames = map[string]bool{
 	"全部": true, "未分类": true, "未归知识库": true, "收藏": true, "归档": true, "回收站": true,
 }
@@ -210,7 +222,7 @@ func (c *orderedCatalog) names() []string {
 }
 
 // ClassifyInboxItems 分批请求模型，返回与 items 同序的分类计划。onProgress 在每批完成后回调（已完成批数、总批数）。
-// 取消走 ctx：每批前后各检查一次，已取消返回 ErrAborted。
+// 取消走 ctx：每批前后各检查一次，已取消返回 ErrClassificationAborted；请求进行中被取消则由客户端栈返回 ErrAborted。
 func (r *Runner) ClassifyInboxItems(
 	ctx context.Context,
 	items []InboxAIClassificationSource,
@@ -236,7 +248,7 @@ func (r *Runner) ClassifyInboxItems(
 
 	for start := 0; start < len(items); start += classificationBatchSize {
 		if ctx.Err() != nil {
-			return nil, ErrAborted
+			return nil, ErrClassificationAborted
 		}
 		batch := items[start:min(start+classificationBatchSize, len(items))]
 		temperature := classificationTemperature
@@ -248,7 +260,7 @@ func (r *Runner) ClassifyInboxItems(
 			return nil, err
 		}
 		if ctx.Err() != nil {
-			return nil, ErrAborted
+			return nil, ErrClassificationAborted
 		}
 		ids := make([]string, len(batch))
 		for i, item := range batch {

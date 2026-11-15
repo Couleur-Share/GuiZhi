@@ -1,0 +1,4719 @@
+{
+  "configs": {
+    "A": {
+      "id": "embed",
+      "provider": "custom",
+      "apiProtocol": "openai",
+      "apiUrl": "https://embed.example.com/v1",
+      "model": "model-embed",
+      "apiKey": "sk-embed"
+    },
+    "B": {
+      "id": "embed",
+      "provider": "custom",
+      "apiProtocol": "openai",
+      "apiUrl": "https://embed.example.com/v1",
+      "model": "model-embed",
+      "apiKey": "sk-other"
+    },
+    "C": {
+      "id": "embed",
+      "provider": "custom",
+      "apiProtocol": "openai",
+      "apiUrl": "https://embed.example.com/v1",
+      "model": "model-embed-large",
+      "apiKey": "sk-embed"
+    },
+    "D": {
+      "id": "embed",
+      "provider": "custom",
+      "apiProtocol": "openai",
+      "apiUrl": "https://embed2.example.com/v1",
+      "model": "model-embed",
+      "apiKey": "sk-embed"
+    }
+  },
+  "cases": [
+    {
+      "name": "同一查询第二次走缓存",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":5,\"total_tokens\":5}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "1",
+          "config": "A",
+          "query": "你好"
+        },
+        {
+          "op": "query",
+          "id": "2",
+          "config": "A",
+          "query": "你好"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "1",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "2",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          1
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 5,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "不同查询各自请求",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[0,2]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "1",
+          "config": "A",
+          "query": "甲"
+        },
+        {
+          "op": "query",
+          "id": "2",
+          "config": "A",
+          "query": "乙"
+        },
+        {
+          "op": "query",
+          "id": "3",
+          "config": "A",
+          "query": "甲"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "1",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "2",
+            "ok": true,
+            "vector": [
+              0,
+              1
+            ]
+          },
+          {
+            "id": "3",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2,
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"甲\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"乙\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "配置的任一字段不同都不共用缓存",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "a",
+          "config": "A",
+          "query": "同一问题"
+        },
+        {
+          "op": "query",
+          "id": "b",
+          "config": "B",
+          "query": "同一问题"
+        },
+        {
+          "op": "query",
+          "id": "c",
+          "config": "C",
+          "query": "同一问题"
+        },
+        {
+          "op": "query",
+          "id": "d",
+          "config": "D",
+          "query": "同一问题"
+        },
+        {
+          "op": "query",
+          "id": "a2",
+          "config": "A",
+          "query": "同一问题"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "a",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "b",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "c",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "d",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "a2",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2,
+          3,
+          4,
+          4
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"同一问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-other"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"同一问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed-large\",\"input\":[\"同一问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed2.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"同一问题\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed-large",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "5 分钟过期：299999 毫秒仍命中，300000 毫秒起过期",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "t0",
+          "config": "A",
+          "query": "问题"
+        },
+        {
+          "op": "advance",
+          "ms": 299999
+        },
+        {
+          "op": "query",
+          "id": "t299999",
+          "config": "A",
+          "query": "问题"
+        },
+        {
+          "op": "advance",
+          "ms": 1
+        },
+        {
+          "op": "query",
+          "id": "t300000",
+          "config": "A",
+          "query": "问题"
+        },
+        {
+          "op": "advance",
+          "ms": 300000
+        },
+        {
+          "op": "query",
+          "id": "t600000",
+          "config": "A",
+          "query": "问题"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "t0",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "t299999",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "t300000",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "t600000",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          1,
+          2,
+          3
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"问题\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "命中不续期：只刷新 LRU 位置，过期时间沿用首次写入",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "t0",
+          "config": "A",
+          "query": "问题"
+        },
+        {
+          "op": "advance",
+          "ms": 200000
+        },
+        {
+          "op": "query",
+          "id": "t200000",
+          "config": "A",
+          "query": "问题"
+        },
+        {
+          "op": "advance",
+          "ms": 100000
+        },
+        {
+          "op": "query",
+          "id": "t300000",
+          "config": "A",
+          "query": "问题"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "t0",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "t200000",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "t300000",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          1,
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"问题\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"问题\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "容量 100 条，LRU 淘汰：命中会刷新位置",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "fill-1",
+          "config": "A",
+          "query": "查询-1"
+        },
+        {
+          "op": "query",
+          "id": "fill-2",
+          "config": "A",
+          "query": "查询-2"
+        },
+        {
+          "op": "query",
+          "id": "fill-3",
+          "config": "A",
+          "query": "查询-3"
+        },
+        {
+          "op": "query",
+          "id": "fill-4",
+          "config": "A",
+          "query": "查询-4"
+        },
+        {
+          "op": "query",
+          "id": "fill-5",
+          "config": "A",
+          "query": "查询-5"
+        },
+        {
+          "op": "query",
+          "id": "fill-6",
+          "config": "A",
+          "query": "查询-6"
+        },
+        {
+          "op": "query",
+          "id": "fill-7",
+          "config": "A",
+          "query": "查询-7"
+        },
+        {
+          "op": "query",
+          "id": "fill-8",
+          "config": "A",
+          "query": "查询-8"
+        },
+        {
+          "op": "query",
+          "id": "fill-9",
+          "config": "A",
+          "query": "查询-9"
+        },
+        {
+          "op": "query",
+          "id": "fill-10",
+          "config": "A",
+          "query": "查询-10"
+        },
+        {
+          "op": "query",
+          "id": "fill-11",
+          "config": "A",
+          "query": "查询-11"
+        },
+        {
+          "op": "query",
+          "id": "fill-12",
+          "config": "A",
+          "query": "查询-12"
+        },
+        {
+          "op": "query",
+          "id": "fill-13",
+          "config": "A",
+          "query": "查询-13"
+        },
+        {
+          "op": "query",
+          "id": "fill-14",
+          "config": "A",
+          "query": "查询-14"
+        },
+        {
+          "op": "query",
+          "id": "fill-15",
+          "config": "A",
+          "query": "查询-15"
+        },
+        {
+          "op": "query",
+          "id": "fill-16",
+          "config": "A",
+          "query": "查询-16"
+        },
+        {
+          "op": "query",
+          "id": "fill-17",
+          "config": "A",
+          "query": "查询-17"
+        },
+        {
+          "op": "query",
+          "id": "fill-18",
+          "config": "A",
+          "query": "查询-18"
+        },
+        {
+          "op": "query",
+          "id": "fill-19",
+          "config": "A",
+          "query": "查询-19"
+        },
+        {
+          "op": "query",
+          "id": "fill-20",
+          "config": "A",
+          "query": "查询-20"
+        },
+        {
+          "op": "query",
+          "id": "fill-21",
+          "config": "A",
+          "query": "查询-21"
+        },
+        {
+          "op": "query",
+          "id": "fill-22",
+          "config": "A",
+          "query": "查询-22"
+        },
+        {
+          "op": "query",
+          "id": "fill-23",
+          "config": "A",
+          "query": "查询-23"
+        },
+        {
+          "op": "query",
+          "id": "fill-24",
+          "config": "A",
+          "query": "查询-24"
+        },
+        {
+          "op": "query",
+          "id": "fill-25",
+          "config": "A",
+          "query": "查询-25"
+        },
+        {
+          "op": "query",
+          "id": "fill-26",
+          "config": "A",
+          "query": "查询-26"
+        },
+        {
+          "op": "query",
+          "id": "fill-27",
+          "config": "A",
+          "query": "查询-27"
+        },
+        {
+          "op": "query",
+          "id": "fill-28",
+          "config": "A",
+          "query": "查询-28"
+        },
+        {
+          "op": "query",
+          "id": "fill-29",
+          "config": "A",
+          "query": "查询-29"
+        },
+        {
+          "op": "query",
+          "id": "fill-30",
+          "config": "A",
+          "query": "查询-30"
+        },
+        {
+          "op": "query",
+          "id": "fill-31",
+          "config": "A",
+          "query": "查询-31"
+        },
+        {
+          "op": "query",
+          "id": "fill-32",
+          "config": "A",
+          "query": "查询-32"
+        },
+        {
+          "op": "query",
+          "id": "fill-33",
+          "config": "A",
+          "query": "查询-33"
+        },
+        {
+          "op": "query",
+          "id": "fill-34",
+          "config": "A",
+          "query": "查询-34"
+        },
+        {
+          "op": "query",
+          "id": "fill-35",
+          "config": "A",
+          "query": "查询-35"
+        },
+        {
+          "op": "query",
+          "id": "fill-36",
+          "config": "A",
+          "query": "查询-36"
+        },
+        {
+          "op": "query",
+          "id": "fill-37",
+          "config": "A",
+          "query": "查询-37"
+        },
+        {
+          "op": "query",
+          "id": "fill-38",
+          "config": "A",
+          "query": "查询-38"
+        },
+        {
+          "op": "query",
+          "id": "fill-39",
+          "config": "A",
+          "query": "查询-39"
+        },
+        {
+          "op": "query",
+          "id": "fill-40",
+          "config": "A",
+          "query": "查询-40"
+        },
+        {
+          "op": "query",
+          "id": "fill-41",
+          "config": "A",
+          "query": "查询-41"
+        },
+        {
+          "op": "query",
+          "id": "fill-42",
+          "config": "A",
+          "query": "查询-42"
+        },
+        {
+          "op": "query",
+          "id": "fill-43",
+          "config": "A",
+          "query": "查询-43"
+        },
+        {
+          "op": "query",
+          "id": "fill-44",
+          "config": "A",
+          "query": "查询-44"
+        },
+        {
+          "op": "query",
+          "id": "fill-45",
+          "config": "A",
+          "query": "查询-45"
+        },
+        {
+          "op": "query",
+          "id": "fill-46",
+          "config": "A",
+          "query": "查询-46"
+        },
+        {
+          "op": "query",
+          "id": "fill-47",
+          "config": "A",
+          "query": "查询-47"
+        },
+        {
+          "op": "query",
+          "id": "fill-48",
+          "config": "A",
+          "query": "查询-48"
+        },
+        {
+          "op": "query",
+          "id": "fill-49",
+          "config": "A",
+          "query": "查询-49"
+        },
+        {
+          "op": "query",
+          "id": "fill-50",
+          "config": "A",
+          "query": "查询-50"
+        },
+        {
+          "op": "query",
+          "id": "fill-51",
+          "config": "A",
+          "query": "查询-51"
+        },
+        {
+          "op": "query",
+          "id": "fill-52",
+          "config": "A",
+          "query": "查询-52"
+        },
+        {
+          "op": "query",
+          "id": "fill-53",
+          "config": "A",
+          "query": "查询-53"
+        },
+        {
+          "op": "query",
+          "id": "fill-54",
+          "config": "A",
+          "query": "查询-54"
+        },
+        {
+          "op": "query",
+          "id": "fill-55",
+          "config": "A",
+          "query": "查询-55"
+        },
+        {
+          "op": "query",
+          "id": "fill-56",
+          "config": "A",
+          "query": "查询-56"
+        },
+        {
+          "op": "query",
+          "id": "fill-57",
+          "config": "A",
+          "query": "查询-57"
+        },
+        {
+          "op": "query",
+          "id": "fill-58",
+          "config": "A",
+          "query": "查询-58"
+        },
+        {
+          "op": "query",
+          "id": "fill-59",
+          "config": "A",
+          "query": "查询-59"
+        },
+        {
+          "op": "query",
+          "id": "fill-60",
+          "config": "A",
+          "query": "查询-60"
+        },
+        {
+          "op": "query",
+          "id": "fill-61",
+          "config": "A",
+          "query": "查询-61"
+        },
+        {
+          "op": "query",
+          "id": "fill-62",
+          "config": "A",
+          "query": "查询-62"
+        },
+        {
+          "op": "query",
+          "id": "fill-63",
+          "config": "A",
+          "query": "查询-63"
+        },
+        {
+          "op": "query",
+          "id": "fill-64",
+          "config": "A",
+          "query": "查询-64"
+        },
+        {
+          "op": "query",
+          "id": "fill-65",
+          "config": "A",
+          "query": "查询-65"
+        },
+        {
+          "op": "query",
+          "id": "fill-66",
+          "config": "A",
+          "query": "查询-66"
+        },
+        {
+          "op": "query",
+          "id": "fill-67",
+          "config": "A",
+          "query": "查询-67"
+        },
+        {
+          "op": "query",
+          "id": "fill-68",
+          "config": "A",
+          "query": "查询-68"
+        },
+        {
+          "op": "query",
+          "id": "fill-69",
+          "config": "A",
+          "query": "查询-69"
+        },
+        {
+          "op": "query",
+          "id": "fill-70",
+          "config": "A",
+          "query": "查询-70"
+        },
+        {
+          "op": "query",
+          "id": "fill-71",
+          "config": "A",
+          "query": "查询-71"
+        },
+        {
+          "op": "query",
+          "id": "fill-72",
+          "config": "A",
+          "query": "查询-72"
+        },
+        {
+          "op": "query",
+          "id": "fill-73",
+          "config": "A",
+          "query": "查询-73"
+        },
+        {
+          "op": "query",
+          "id": "fill-74",
+          "config": "A",
+          "query": "查询-74"
+        },
+        {
+          "op": "query",
+          "id": "fill-75",
+          "config": "A",
+          "query": "查询-75"
+        },
+        {
+          "op": "query",
+          "id": "fill-76",
+          "config": "A",
+          "query": "查询-76"
+        },
+        {
+          "op": "query",
+          "id": "fill-77",
+          "config": "A",
+          "query": "查询-77"
+        },
+        {
+          "op": "query",
+          "id": "fill-78",
+          "config": "A",
+          "query": "查询-78"
+        },
+        {
+          "op": "query",
+          "id": "fill-79",
+          "config": "A",
+          "query": "查询-79"
+        },
+        {
+          "op": "query",
+          "id": "fill-80",
+          "config": "A",
+          "query": "查询-80"
+        },
+        {
+          "op": "query",
+          "id": "fill-81",
+          "config": "A",
+          "query": "查询-81"
+        },
+        {
+          "op": "query",
+          "id": "fill-82",
+          "config": "A",
+          "query": "查询-82"
+        },
+        {
+          "op": "query",
+          "id": "fill-83",
+          "config": "A",
+          "query": "查询-83"
+        },
+        {
+          "op": "query",
+          "id": "fill-84",
+          "config": "A",
+          "query": "查询-84"
+        },
+        {
+          "op": "query",
+          "id": "fill-85",
+          "config": "A",
+          "query": "查询-85"
+        },
+        {
+          "op": "query",
+          "id": "fill-86",
+          "config": "A",
+          "query": "查询-86"
+        },
+        {
+          "op": "query",
+          "id": "fill-87",
+          "config": "A",
+          "query": "查询-87"
+        },
+        {
+          "op": "query",
+          "id": "fill-88",
+          "config": "A",
+          "query": "查询-88"
+        },
+        {
+          "op": "query",
+          "id": "fill-89",
+          "config": "A",
+          "query": "查询-89"
+        },
+        {
+          "op": "query",
+          "id": "fill-90",
+          "config": "A",
+          "query": "查询-90"
+        },
+        {
+          "op": "query",
+          "id": "fill-91",
+          "config": "A",
+          "query": "查询-91"
+        },
+        {
+          "op": "query",
+          "id": "fill-92",
+          "config": "A",
+          "query": "查询-92"
+        },
+        {
+          "op": "query",
+          "id": "fill-93",
+          "config": "A",
+          "query": "查询-93"
+        },
+        {
+          "op": "query",
+          "id": "fill-94",
+          "config": "A",
+          "query": "查询-94"
+        },
+        {
+          "op": "query",
+          "id": "fill-95",
+          "config": "A",
+          "query": "查询-95"
+        },
+        {
+          "op": "query",
+          "id": "fill-96",
+          "config": "A",
+          "query": "查询-96"
+        },
+        {
+          "op": "query",
+          "id": "fill-97",
+          "config": "A",
+          "query": "查询-97"
+        },
+        {
+          "op": "query",
+          "id": "fill-98",
+          "config": "A",
+          "query": "查询-98"
+        },
+        {
+          "op": "query",
+          "id": "fill-99",
+          "config": "A",
+          "query": "查询-99"
+        },
+        {
+          "op": "query",
+          "id": "fill-100",
+          "config": "A",
+          "query": "查询-100"
+        },
+        {
+          "op": "query",
+          "id": "fill-101",
+          "config": "A",
+          "query": "查询-101"
+        },
+        {
+          "op": "query",
+          "id": "hit-2",
+          "config": "A",
+          "query": "查询-2"
+        },
+        {
+          "op": "query",
+          "id": "miss-1",
+          "config": "A",
+          "query": "查询-1"
+        },
+        {
+          "op": "query",
+          "id": "miss-3",
+          "config": "A",
+          "query": "查询-3"
+        },
+        {
+          "op": "query",
+          "id": "hit-2-again",
+          "config": "A",
+          "query": "查询-2"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "fill-1",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-2",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-3",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-4",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-5",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-6",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-7",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-8",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-9",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-10",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-11",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-12",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-13",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-14",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-15",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-16",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-17",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-18",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-19",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-20",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-21",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-22",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-23",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-24",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-25",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-26",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-27",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-28",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-29",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-30",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-31",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-32",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-33",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-34",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-35",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-36",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-37",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-38",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-39",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-40",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-41",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-42",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-43",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-44",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-45",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-46",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-47",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-48",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-49",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-50",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-51",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-52",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-53",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-54",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-55",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-56",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-57",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-58",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-59",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-60",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-61",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-62",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-63",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-64",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-65",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-66",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-67",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-68",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-69",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-70",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-71",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-72",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-73",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-74",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-75",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-76",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-77",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-78",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-79",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-80",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-81",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-82",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-83",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-84",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-85",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-86",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-87",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-88",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-89",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-90",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-91",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-92",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-93",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-94",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-95",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-96",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-97",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-98",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-99",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-100",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "fill-101",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "hit-2",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "miss-1",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "miss-3",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "hit-2-again",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69,
+          70,
+          71,
+          72,
+          73,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          82,
+          83,
+          84,
+          85,
+          86,
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          94,
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          101,
+          102,
+          103,
+          103
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-1\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-2\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-3\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-4\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-5\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-6\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-7\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-8\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-9\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-10\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-11\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-12\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-13\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-14\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-15\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-16\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-17\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-18\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-19\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-20\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-21\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-22\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-23\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-24\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-25\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-26\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-27\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-28\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-29\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-30\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-31\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-32\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-33\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-34\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-35\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-36\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-37\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-38\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-39\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-40\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-41\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-42\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-43\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-44\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-45\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-46\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-47\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-48\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-49\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-50\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-51\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-52\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-53\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-54\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-55\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-56\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-57\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-58\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-59\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-60\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-61\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-62\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-63\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-64\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-65\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-66\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-67\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-68\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-69\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-70\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-71\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-72\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-73\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-74\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-75\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-76\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-77\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-78\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-79\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-80\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-81\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-82\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-83\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-84\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-85\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-86\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-87\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-88\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-89\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-90\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-91\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-92\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-93\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-94\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-95\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-96\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-97\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-98\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-99\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-100\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-101\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-1\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"查询-3\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "并发相同查询只发一次请求",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "concurrent",
+          "id": "c",
+          "queries": [
+            "同一个",
+            "同一个",
+            "同一个",
+            "同一个"
+          ]
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "c",
+            "results": [
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "requestCounts": [
+          1
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"同一个\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "并发不同查询各发一次",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "concurrent",
+          "id": "c",
+          "queries": [
+            "甲",
+            "乙"
+          ]
+        }
+      ],
+      "unorderedRequests": true,
+      "expect": {
+        "steps": [
+          {
+            "id": "c",
+            "results": [
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "ok": true,
+                "vector": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        ],
+        "requestCounts": [
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"乙\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"甲\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "reset 清空缓存",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "1",
+          "config": "A",
+          "query": "你好"
+        },
+        {
+          "op": "reset"
+        },
+        {
+          "op": "query",
+          "id": "2",
+          "config": "A",
+          "query": "你好"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "1",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "2",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "失败不入缓存，重试会再次请求",
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "fail",
+          "config": "A",
+          "query": "你好"
+        },
+        {
+          "op": "query",
+          "id": "retry",
+          "config": "A",
+          "query": "你好"
+        },
+        {
+          "op": "query",
+          "id": "cached",
+          "config": "A",
+          "query": "你好"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "fail",
+            "ok": false,
+            "error": {
+              "message": "Embeddings 请求失败 (HTTP 500): {\"error\":{\"message\":\"upstream down\"}}",
+              "aborted": false
+            }
+          },
+          {
+            "id": "retry",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "cached",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2,
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "嵌入响应畸形",
+      "script": [
+        {
+          "body": "{\"data\":[{\"index\":0}]}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "bad",
+          "config": "A",
+          "query": "你好"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "bad",
+            "ok": false,
+            "error": {
+              "message": "Embeddings 响应缺少向量数据",
+              "aborted": false
+            }
+          }
+        ],
+        "requestCounts": [
+          1
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "调用前已取消：不发请求",
+      "script": [],
+      "steps": [
+        {
+          "op": "query",
+          "id": "pre",
+          "config": "A",
+          "query": "你好",
+          "abort": "before"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "pre",
+            "ok": false,
+            "error": {
+              "message": "",
+              "aborted": true
+            }
+          }
+        ],
+        "requestCounts": [
+          0
+        ],
+        "requests": [],
+        "unusedScript": 0,
+        "usage": []
+      }
+    },
+    {
+      "name": "请求进行中取消：不缓存，下次重新请求",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}",
+          "abortDuring": true
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "during",
+          "config": "A",
+          "query": "你好",
+          "abort": "during"
+        },
+        {
+          "op": "query",
+          "id": "again",
+          "config": "A",
+          "query": "你好"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "during",
+            "ok": false,
+            "error": {
+              "message": "",
+              "aborted": true
+            }
+          },
+          {
+            "id": "again",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"你好\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消后其他查询不受影响",
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}",
+          "abortDuring": true
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "steps": [
+        {
+          "op": "query",
+          "id": "during",
+          "config": "A",
+          "query": "甲",
+          "abort": "during"
+        },
+        {
+          "op": "query",
+          "id": "other",
+          "config": "A",
+          "query": "乙"
+        },
+        {
+          "op": "query",
+          "id": "again",
+          "config": "A",
+          "query": "甲"
+        }
+      ],
+      "unorderedRequests": false,
+      "expect": {
+        "steps": [
+          {
+            "id": "during",
+            "ok": false,
+            "error": {
+              "message": "",
+              "aborted": true
+            }
+          },
+          {
+            "id": "other",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          },
+          {
+            "id": "again",
+            "ok": true,
+            "vector": [
+              0.6,
+              0.8
+            ]
+          }
+        ],
+        "requestCounts": [
+          1,
+          2,
+          3
+        ],
+        "requests": [
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"甲\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"乙\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "body": "{\"model\":\"model-embed\",\"input\":[\"甲\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ]
+      }
+    }
+  ]
+}

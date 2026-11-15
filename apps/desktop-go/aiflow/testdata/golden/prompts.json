@@ -1,0 +1,1467 @@
+{
+  "constants": {
+    "SUMMARY_PROMPT_VERSION": "summary-v1",
+    "SUMMARY_SYSTEM_PROMPT": "你是一个知识管理助手。请用简体中文将用户提供的内容总结为 2~4 条要点：每条独立一行并以「- 」开头，总字数不超过 200 字，只输出要点本身，不要输出任何前言、标题或结尾说明。",
+    "SUMMARY_MAP_SYSTEM_PROMPT": "你是知识管理助手。下面是长文的一个片段，请提取其中的关键信息，用简体中文列成 3~6 条要点，每条独立一行以「- 」开头，只输出要点本身，不要输出前言或结尾。",
+    "TAG_SUGGESTION_PROMPT_VERSION": "autotag-v2",
+    "TAG_SUGGESTION_SYSTEM_PROMPT": "你是一个知识管理助手。请为用户提供的内容生成 2~3 个简短的中文标签，每个标签 2~6 个字、概括最核心的主题或领域。只输出标签本身，标签之间用中文逗号分隔，不要输出编号、井号或任何其他文字。",
+    "QA_PROMPT_VERSION": "qa-v3",
+    "QA_SYSTEM_PROMPT": "你是一个个人知识库问答助手。用户会提供编号资料与问题。资料由自动检索获得，可能包含与问题无关的条目：请先甄别，只依据真正相关的资料用简体中文回答，无关资料直接忽略。引用资料时在句末标注编号（如 [1]），只标注支撑该句结论的资料，编号必须来自资料列表，不要编造编号；资料不足以回答时明确说明缺少哪方面的信息，不要编造资料中不存在的内容；回答保持简洁，不要复述资料原文。回答可使用 Markdown 排版（如要点列表、**加粗**、`代码`），层级不超过两层，不要输出一级标题。",
+    "QA_AGENT_PROMPT_VERSION": "qa-agent-v1",
+    "QA_AGENT_SYSTEM_PROMPT": "你是个人知识库的问答助手，通过工具在知识库中检索资料来回答用户问题。知识库包含两类资料：知识条目（用户采集的原文）与 Wiki 页面（AI 编译的结构化知识）。\n你每轮只输出一个 JSON 对象（不要输出任何其他文字或代码块标记），从以下三种动作中选一种：\n{\"action\":\"search\",\"query\":\"检索关键词\"} —— 搜索知识库，返回带编号的资料列表\n{\"action\":\"read\",\"target\":3} —— 阅读指定编号的资料内容\n{\"action\":\"answer\",\"text\":\"最终回答\"} —— 给出最终回答并结束\n纪律：\n1. 给出回答前必须至少阅读过一份资料；回答中引用资料在句末标注编号（如 [1]），只标注真正支撑该句结论、且你阅读过的资料编号，不要编造编号；\n2. search 使用简短关键词（不要整句照抄），没有命中就换一组关键词；资料不足以回答时在 answer 中明确说明缺少哪方面的信息，不得编造内容；\n3. Wiki 页面适合获取总览与关联线索，知识条目适合细节与原文出处；阅读 Wiki 页面后可以继续阅读它关联的资料；\n4. answer 的 text 用简体中文，可使用 Markdown 排版（要点列表、**加粗**），层级不超过两层，不要输出一级标题，回答保持简洁、不要复述资料原文。",
+    "MAX_CONTENT_LENGTH": 6000,
+    "SUMMARY_CHUNK_SIZE": 6000,
+    "SUMMARY_MAX_CHUNKS": 8
+  },
+  "truncate": [
+    {
+      "name": "空串",
+      "text": "",
+      "input": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "limit": 10,
+      "plain": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "withNote": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "plainText": "",
+      "withNoteText": ""
+    },
+    {
+      "name": "短于上限",
+      "text": "abc",
+      "input": {
+        "length": 3,
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "head": "abc",
+        "tail": "abc"
+      },
+      "limit": 10,
+      "plain": {
+        "length": 3,
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "head": "abc",
+        "tail": "abc"
+      },
+      "withNote": {
+        "length": 3,
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "head": "abc",
+        "tail": "abc"
+      },
+      "plainText": "abc",
+      "withNoteText": "abc"
+    },
+    {
+      "name": "恰好等于上限",
+      "text": "abcde",
+      "input": {
+        "length": 5,
+        "sha256": "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c",
+        "head": "abcde",
+        "tail": "abcde"
+      },
+      "limit": 5,
+      "plain": {
+        "length": 5,
+        "sha256": "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c",
+        "head": "abcde",
+        "tail": "abcde"
+      },
+      "withNote": {
+        "length": 5,
+        "sha256": "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c",
+        "head": "abcde",
+        "tail": "abcde"
+      },
+      "plainText": "abcde",
+      "withNoteText": "abcde"
+    },
+    {
+      "name": "超出一位",
+      "text": "abcdef",
+      "input": {
+        "length": 6,
+        "sha256": "bef57ec7f53a6d40beb640a780a639c83bc29ac8a9816f1fc6c5c6dcd93c4721",
+        "head": "abcdef",
+        "tail": "abcdef"
+      },
+      "limit": 5,
+      "plain": {
+        "length": 5,
+        "sha256": "36bbe50ed96841d10443bcb670d6554f0a34b761be67ec9c4a8ad2c0c44ca42c",
+        "head": "abcde",
+        "tail": "abcde"
+      },
+      "withNote": {
+        "length": 11,
+        "sha256": "66e4133c314042fa2486b69d2c05c7141e964f8dafc9a08d6a8bf8168201fce1",
+        "head": "abcde…（已截断）",
+        "tail": "abcde…（已截断）"
+      },
+      "plainText": "abcde",
+      "withNoteText": "abcde…（已截断）"
+    },
+    {
+      "name": "上限为 0",
+      "text": "abc",
+      "input": {
+        "length": 3,
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "head": "abc",
+        "tail": "abc"
+      },
+      "limit": 0,
+      "plain": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "withNote": {
+        "length": 6,
+        "sha256": "0903d2daac2d248b14566a4f5621cb68eec1315bd177cc5872bf1206f30ca3d3",
+        "head": "…（已截断）",
+        "tail": "…（已截断）"
+      },
+      "plainText": "",
+      "withNoteText": "…（已截断）"
+    },
+    {
+      "name": "上限为 1 且首字是代理对：退到 0",
+      "text": [
+        {
+          "lit": "😀"
+        },
+        {
+          "lit": "abc"
+        }
+      ],
+      "input": {
+        "length": 5,
+        "sha256": "34fe23ed3807c88f68b5c146fc9970db9475a32b5c17fbbdcff760626b482bf4",
+        "head": "😀abc",
+        "tail": "😀abc"
+      },
+      "limit": 1,
+      "plain": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "withNote": {
+        "length": 6,
+        "sha256": "0903d2daac2d248b14566a4f5621cb68eec1315bd177cc5872bf1206f30ca3d3",
+        "head": "…（已截断）",
+        "tail": "…（已截断）"
+      },
+      "plainText": "",
+      "withNoteText": "…（已截断）"
+    },
+    {
+      "name": "上限为 2 且首字是代理对：整字保留",
+      "text": [
+        {
+          "lit": "😀"
+        },
+        {
+          "lit": "abc"
+        }
+      ],
+      "input": {
+        "length": 5,
+        "sha256": "34fe23ed3807c88f68b5c146fc9970db9475a32b5c17fbbdcff760626b482bf4",
+        "head": "😀abc",
+        "tail": "😀abc"
+      },
+      "limit": 2,
+      "plain": {
+        "length": 2,
+        "sha256": "f0443a342c5ef54783a111b51ba56c938e474c32324d90c3a60c9c8e3a37e2d9",
+        "head": "😀",
+        "tail": "😀"
+      },
+      "withNote": {
+        "length": 8,
+        "sha256": "fb8822b24de91f4337af9bedac20888b6005f7aa8736b2c91157c8855e771b17",
+        "head": "😀…（已截断）",
+        "tail": "😀…（已截断）"
+      },
+      "plainText": "😀",
+      "withNoteText": "😀…（已截断）"
+    },
+    {
+      "name": "切口落在代理对中间：退一位",
+      "text": [
+        {
+          "lit": "ab"
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "lit": "cd"
+        }
+      ],
+      "input": {
+        "length": 6,
+        "sha256": "1305b9b74af9a1cf19b99e9a54bfcffcea2f4102f59b29407b41ddeb25a69994",
+        "head": "ab😀cd",
+        "tail": "ab😀cd"
+      },
+      "limit": 3,
+      "plain": {
+        "length": 2,
+        "sha256": "fb8e20fc2e4c3f248c60c39bd652f3c1347298bb977b8b4d5903b85055620603",
+        "head": "ab",
+        "tail": "ab"
+      },
+      "withNote": {
+        "length": 8,
+        "sha256": "d46141a7f944e3bfeb1f3f914a36a53f35b7788bf157a426704079c640500800",
+        "head": "ab…（已截断）",
+        "tail": "ab…（已截断）"
+      },
+      "plainText": "ab",
+      "withNoteText": "ab…（已截断）"
+    },
+    {
+      "name": "切口落在代理对之后：保留整字",
+      "text": [
+        {
+          "lit": "ab"
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "lit": "cd"
+        }
+      ],
+      "input": {
+        "length": 6,
+        "sha256": "1305b9b74af9a1cf19b99e9a54bfcffcea2f4102f59b29407b41ddeb25a69994",
+        "head": "ab😀cd",
+        "tail": "ab😀cd"
+      },
+      "limit": 4,
+      "plain": {
+        "length": 4,
+        "sha256": "3f081536ae8da48f2006638654672fb6bc6fe7f5917c6332717c030cb21013d5",
+        "head": "ab😀",
+        "tail": "ab😀"
+      },
+      "withNote": {
+        "length": 10,
+        "sha256": "c6acc5dc810df61436453f9638a5ff6ecaa9814f0a56ebb9c8c7c3b5819e6452",
+        "head": "ab😀…（已截断）",
+        "tail": "ab😀…（已截断）"
+      },
+      "plainText": "ab😀",
+      "withNoteText": "ab😀…（已截断）"
+    },
+    {
+      "name": "扩展汉字同理",
+      "text": [
+        {
+          "cjk": 5
+        },
+        {
+          "lit": "𠀀"
+        },
+        {
+          "cjk": 4
+        }
+      ],
+      "input": {
+        "length": 11,
+        "sha256": "35e34d1e1237c8c461aec0ce5fa4c850a4704d58e02526d87a0857bfa1618e47",
+        "head": "知识库归纳𠀀知识库归",
+        "tail": "知识库归纳𠀀知识库归"
+      },
+      "limit": 6,
+      "plain": {
+        "length": 5,
+        "sha256": "ee8cb0ae2b72a2dfc877fcf016852eeb68c97520e87e2bc78a5807628d719c73",
+        "head": "知识库归纳",
+        "tail": "知识库归纳"
+      },
+      "withNote": {
+        "length": 11,
+        "sha256": "3da2caf2dd49e9c5b0cbe20c727b57e94758bfa1faa17ff78011a9dd4c595767",
+        "head": "知识库归纳…（已截断）",
+        "tail": "知识库归纳…（已截断）"
+      },
+      "plainText": "知识库归纳",
+      "withNoteText": "知识库归纳…（已截断）"
+    },
+    {
+      "name": "含代理对且长度恰好等于上限时不截断",
+      "text": [
+        {
+          "ascii": 5
+        },
+        {
+          "lit": "😀"
+        }
+      ],
+      "input": {
+        "length": 7,
+        "sha256": "5834408075737d9503d61c0f92c9fb7789b93a73187935288c90604c041f70f3",
+        "head": "abcde😀",
+        "tail": "abcde😀"
+      },
+      "limit": 7,
+      "plain": {
+        "length": 7,
+        "sha256": "5834408075737d9503d61c0f92c9fb7789b93a73187935288c90604c041f70f3",
+        "head": "abcde😀",
+        "tail": "abcde😀"
+      },
+      "withNote": {
+        "length": 7,
+        "sha256": "5834408075737d9503d61c0f92c9fb7789b93a73187935288c90604c041f70f3",
+        "head": "abcde😀",
+        "tail": "abcde😀"
+      },
+      "plainText": "abcde😀",
+      "withNoteText": "abcde😀"
+    },
+    {
+      "name": "5999 个码元（上限 6000）",
+      "text": [
+        {
+          "cjk": 5999
+        }
+      ],
+      "input": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "limit": 6000,
+      "plain": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "withNote": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "plainText": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "withNoteText": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      }
+    },
+    {
+      "name": "6000 个码元",
+      "text": [
+        {
+          "cjk": 6000
+        }
+      ],
+      "input": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "limit": 6000,
+      "plain": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "withNote": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "plainText": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "withNoteText": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      }
+    },
+    {
+      "name": "6001 个码元",
+      "text": [
+        {
+          "cjk": 6001
+        }
+      ],
+      "input": {
+        "length": 6001,
+        "sha256": "f97963c92003e86bac375d4305be06760764e5265c817270cce46f154bb8f6ad",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "识库归纳整理摘要标签分类检索问答"
+      },
+      "limit": 6000,
+      "plain": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "withNote": {
+        "length": 6006,
+        "sha256": "4b4f21b94900a6e01144301c7518fbce8bd40e7be320c2c1dd020894f587277b",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "理摘要标签分类检索问…（已截断）"
+      },
+      "plainText": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "withNoteText": {
+        "length": 6006,
+        "sha256": "4b4f21b94900a6e01144301c7518fbce8bd40e7be320c2c1dd020894f587277b",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "理摘要标签分类检索问…（已截断）"
+      }
+    },
+    {
+      "name": "6001 个码元，切口在代理对中间",
+      "text": [
+        {
+          "cjk": 5999
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "cjk": 10
+        }
+      ],
+      "input": {
+        "length": 6011,
+        "sha256": "040d809c7d0aaf9cac41002fa19da658b08669f6515421cdde2061880d41a19c",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "分类检索😀知识库归纳整理摘要标"
+      },
+      "limit": 6000,
+      "plain": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "withNote": {
+        "length": 6005,
+        "sha256": "18956579bfde71f3c94fd997377835fddaefd7486cd3166e3c168813766f91ef",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "整理摘要标签分类检索…（已截断）"
+      },
+      "plainText": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "withNoteText": {
+        "length": 6005,
+        "sha256": "18956579bfde71f3c94fd997377835fddaefd7486cd3166e3c168813766f91ef",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "整理摘要标签分类检索…（已截断）"
+      }
+    },
+    {
+      "name": "6001 个码元，切口在代理对之后",
+      "text": [
+        {
+          "cjk": 5998
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "cjk": 10
+        }
+      ],
+      "input": {
+        "length": 6010,
+        "sha256": "472be34b28ba88db9ce953d5e84ebf7e66af0dd2ac7bb084032fad27cf0435b1",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "签分类检😀知识库归纳整理摘要标"
+      },
+      "limit": 6000,
+      "plain": {
+        "length": 6000,
+        "sha256": "ddcf10c47379605e2c166d9f052f17ef5bc405a097330df48785f5bc3deccfcb",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检😀"
+      },
+      "withNote": {
+        "length": 6006,
+        "sha256": "d0173d6e219f21830f2e87d3da9d5e0b198346be6ea3862061b0c52d2eeeada3",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "理摘要标签分类检😀…（已截断）"
+      },
+      "plainText": {
+        "length": 6000,
+        "sha256": "ddcf10c47379605e2c166d9f052f17ef5bc405a097330df48785f5bc3deccfcb",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检😀"
+      },
+      "withNoteText": {
+        "length": 6006,
+        "sha256": "d0173d6e219f21830f2e87d3da9d5e0b198346be6ea3862061b0c52d2eeeada3",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "理摘要标签分类检😀…（已截断）"
+      }
+    },
+    {
+      "name": "混合文本",
+      "text": [
+        {
+          "lit": "标题 "
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "lit": " mixed 文字 "
+        },
+        {
+          "lit": "𠀀"
+        },
+        {
+          "lit": " "
+        },
+        {
+          "ascii": 40
+        }
+      ],
+      "input": {
+        "length": 58,
+        "sha256": "70e62c2cf0a8c7ad7f6bc27b1894af5d8f5040b4d1a9f14736b48d6b62489bc6",
+        "head": "标题 😀 mixed 文字 \ud840",
+        "tail": "efghijabcdefghij"
+      },
+      "limit": 20,
+      "plain": {
+        "length": 20,
+        "sha256": "1b60aed5df09a9eca3dbe13ab4d8ef99436744f34c3d8118031a046a2badb29f",
+        "head": "标题 😀 mixed 文字 \ud840",
+        "tail": "\ude00 mixed 文字 𠀀 ab"
+      },
+      "withNote": {
+        "length": 26,
+        "sha256": "c0cbd3d83b0fe7d5d2ec86ddb7ab15581929f5c803b1ee78e4e27b9b4136d41e",
+        "head": "标题 😀 mixed 文字 \ud840",
+        "tail": "d 文字 𠀀 ab…（已截断）"
+      },
+      "plainText": "标题 😀 mixed 文字 𠀀 ab",
+      "withNoteText": "标题 😀 mixed 文字 𠀀 ab…（已截断）"
+    }
+  ],
+  "userPrompts": [
+    {
+      "name": "普通",
+      "title": "标题",
+      "content": "正文",
+      "input": {
+        "length": 2,
+        "sha256": "d661c3d96d53ebc0ca8a55aae24b5df4a4d1bf28d37337b982fe8ebf54846eeb",
+        "head": "正文",
+        "tail": "正文"
+      },
+      "prompt": {
+        "length": 13,
+        "sha256": "973edc1910b2880cf605f325709315ad45b288fae1a83ac64a6983782078e20d",
+        "head": "标题：标题\n\n内容：\n正文",
+        "tail": "标题：标题\n\n内容：\n正文"
+      },
+      "promptText": "标题：标题\n\n内容：\n正文"
+    },
+    {
+      "name": "空正文",
+      "title": "只有标题",
+      "content": "",
+      "input": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "prompt": {
+        "length": 13,
+        "sha256": "91a52430be6a81f2fd193ba38b68afdeec6c88dd97adc7823b34a7c7e7ae5929",
+        "head": "标题：只有标题\n\n内容：\n",
+        "tail": "标题：只有标题\n\n内容：\n"
+      },
+      "promptText": "标题：只有标题\n\n内容：\n"
+    },
+    {
+      "name": "标题含换行与引号",
+      "title": "带\"引号\"\n换行",
+      "content": "内容\n第二行",
+      "input": {
+        "length": 6,
+        "sha256": "b6c5a8720b8d25aa0ba967a4c58fc858177d4b907b236a12eebd532171572792",
+        "head": "内容\n第二行",
+        "tail": "内容\n第二行"
+      },
+      "prompt": {
+        "length": 23,
+        "sha256": "f63b4308cf54a106eb9622fa813ec6a7936844801b810452d107199c9b44109f",
+        "head": "标题：带\"引号\"\n换行\n\n内容：",
+        "tail": "\"\n换行\n\n内容：\n内容\n第二行"
+      },
+      "promptText": "标题：带\"引号\"\n换行\n\n内容：\n内容\n第二行"
+    },
+    {
+      "name": "正文恰好 6000",
+      "title": "边界",
+      "content": [
+        {
+          "cjk": 6000
+        }
+      ],
+      "input": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "prompt": {
+        "length": 6011,
+        "sha256": "ffae1eda2d7de3105351e45e6018f03820c3eacdd1bcbe57f3cda3b6768abf48",
+        "head": "标题：边界\n\n内容：\n知识库归纳",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "promptText": {
+        "length": 6011,
+        "sha256": "ffae1eda2d7de3105351e45e6018f03820c3eacdd1bcbe57f3cda3b6768abf48",
+        "head": "标题：边界\n\n内容：\n知识库归纳",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      }
+    },
+    {
+      "name": "正文 6001 被截断并附标注",
+      "title": "边界",
+      "content": [
+        {
+          "cjk": 6001
+        }
+      ],
+      "input": {
+        "length": 6001,
+        "sha256": "f97963c92003e86bac375d4305be06760764e5265c817270cce46f154bb8f6ad",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "识库归纳整理摘要标签分类检索问答"
+      },
+      "prompt": {
+        "length": 6017,
+        "sha256": "88633df9236d12e70af43308f21198f32434e3f072af11ef71eb78b78f1eb2e9",
+        "head": "标题：边界\n\n内容：\n知识库归纳",
+        "tail": "理摘要标签分类检索问…（已截断）"
+      },
+      "promptText": {
+        "length": 6017,
+        "sha256": "88633df9236d12e70af43308f21198f32434e3f072af11ef71eb78b78f1eb2e9",
+        "head": "标题：边界\n\n内容：\n知识库归纳",
+        "tail": "理摘要标签分类检索问…（已截断）"
+      }
+    },
+    {
+      "name": "截断点在代理对中间",
+      "title": "代理对",
+      "content": [
+        {
+          "cjk": 5999
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "cjk": 8
+        }
+      ],
+      "input": {
+        "length": 6009,
+        "sha256": "e64b6b3a5dd9b0745bd7812651ab0d052b0d256d2c5649ecaa1468534ebb9f51",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "标签分类检索😀知识库归纳整理摘"
+      },
+      "prompt": {
+        "length": 6017,
+        "sha256": "dbf4395c8c870a5e1f36f3c65dad059b31d431ad5212cc0ad8a05f630df6344d",
+        "head": "标题：代理对\n\n内容：\n知识库归",
+        "tail": "整理摘要标签分类检索…（已截断）"
+      },
+      "promptText": {
+        "length": 6017,
+        "sha256": "dbf4395c8c870a5e1f36f3c65dad059b31d431ad5212cc0ad8a05f630df6344d",
+        "head": "标题：代理对\n\n内容：\n知识库归",
+        "tail": "整理摘要标签分类检索…（已截断）"
+      }
+    },
+    {
+      "name": "长英文",
+      "title": "english",
+      "content": [
+        {
+          "ascii": 20000
+        }
+      ],
+      "input": {
+        "length": 20000,
+        "sha256": "05980480f0a686b9c41113bced084163842f1ad175c6b22143e013cfd2627754",
+        "head": "abcdefghijabcdef",
+        "tail": "efghijabcdefghij"
+      },
+      "prompt": {
+        "length": 6022,
+        "sha256": "3c2911039a1fe6b356e2abe7617132de6870a4f48d61ff34daa0c8c3b09cd8f9",
+        "head": "标题：english\n\n内容：\n",
+        "tail": "abcdefghij…（已截断）"
+      },
+      "promptText": {
+        "length": 6022,
+        "sha256": "3c2911039a1fe6b356e2abe7617132de6870a4f48d61ff34daa0c8c3b09cd8f9",
+        "head": "标题：english\n\n内容：\n",
+        "tail": "abcdefghij…（已截断）"
+      }
+    }
+  ],
+  "chunks": [
+    {
+      "name": "空串",
+      "content": "",
+      "input": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "count": 0,
+      "lengths": [],
+      "digests": [],
+      "coveredLength": 0,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "1 个码元",
+      "content": "a",
+      "input": {
+        "length": 1,
+        "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+        "head": "a",
+        "tail": "a"
+      },
+      "count": 1,
+      "lengths": [
+        1
+      ],
+      "digests": [
+        {
+          "length": 1,
+          "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "head": "a",
+          "tail": "a"
+        }
+      ],
+      "coveredLength": 1,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "5999",
+      "content": [
+        {
+          "cjk": 5999
+        }
+      ],
+      "input": {
+        "length": 5999,
+        "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "答知识库归纳整理摘要标签分类检索"
+      },
+      "count": 1,
+      "lengths": [
+        5999
+      ],
+      "digests": [
+        {
+          "length": 5999,
+          "sha256": "9860ef2d35afeb39d2c97d62af1e1d8a7bfe630ebdc8b1ea7110019edd240b8f",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        }
+      ],
+      "coveredLength": 5999,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "6000",
+      "content": [
+        {
+          "cjk": 6000
+        }
+      ],
+      "input": {
+        "length": 6000,
+        "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "知识库归纳整理摘要标签分类检索问"
+      },
+      "count": 1,
+      "lengths": [
+        6000
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        }
+      ],
+      "coveredLength": 6000,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "6001：第二块只有 1 个码元",
+      "content": [
+        {
+          "cjk": 6001
+        }
+      ],
+      "input": {
+        "length": 6001,
+        "sha256": "f97963c92003e86bac375d4305be06760764e5265c817270cce46f154bb8f6ad",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "识库归纳整理摘要标签分类检索问答"
+      },
+      "count": 2,
+      "lengths": [
+        6000,
+        1
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 1,
+          "sha256": "10ec8c161aac40d535cd9375e8c212b970f5622e9db38d78f6f38f2e183bccdf",
+          "head": "答",
+          "tail": "答"
+        }
+      ],
+      "coveredLength": 6001,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "12000",
+      "content": [
+        {
+          "ascii": 12000
+        }
+      ],
+      "input": {
+        "length": 12000,
+        "sha256": "2b77d8dc5fae039969f27ca5141674a2013e0cda7e5c998185f8d55a8b37e1e8",
+        "head": "abcdefghijabcdef",
+        "tail": "efghijabcdefghij"
+      },
+      "count": 2,
+      "lengths": [
+        6000,
+        6000
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        }
+      ],
+      "coveredLength": 12000,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "12001",
+      "content": [
+        {
+          "ascii": 12001
+        }
+      ],
+      "input": {
+        "length": 12001,
+        "sha256": "2845e323f7562b8cbc8d0b90b690a559a5d3cdcec1767dd022b9336996ee3108",
+        "head": "abcdefghijabcdef",
+        "tail": "fghijabcdefghija"
+      },
+      "count": 3,
+      "lengths": [
+        6000,
+        6000,
+        1
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 1,
+          "sha256": "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+          "head": "a",
+          "tail": "a"
+        }
+      ],
+      "coveredLength": 12001,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "47999",
+      "content": [
+        {
+          "cjk": 47999
+        }
+      ],
+      "input": {
+        "length": 47999,
+        "sha256": "de85c04d4611d3146f750a127b6c21533900e33327e8611d94208d73196bb777",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "标签分类检索问答知识库归纳整理摘"
+      },
+      "count": 8,
+      "lengths": [
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        5999
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 6000,
+          "sha256": "5a2bcd92b74f55699ac9bf146fb39a681b353bbbd9eadd5bb0c6eb19f12eb2ec",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 6000,
+          "sha256": "6204539883c6d030a61f9f8d500b25798c5e7aeba6088832ca1f6d3e7ab872e7",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 6000,
+          "sha256": "738029a4839c9a8e5922c8a38cc29c246c7144c5caad9baff3627ff336b8bfbf",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 6000,
+          "sha256": "ddef2e6e997fbf0bc363dca8b41178476f87d3a592ff9535d579c51ba366c1e2",
+          "head": "检索问答知识库归纳整理摘要标签分",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 6000,
+          "sha256": "c0aaa2d226de01a89acbb1e47ceb88dd46f7502252a0ea13904321f0982d997e",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 6000,
+          "sha256": "75dc1a31c22bf1025e0c7794a01963939124ca26d3c243ee69677e4ce30b4115",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 5999,
+          "sha256": "7ef6b4fd01ec08340ef3f885527d71261044ae1c4bdf4aba7f1969c9fce7d01e",
+          "head": "签分类检索问答知识库归纳整理摘要",
+          "tail": "标签分类检索问答知识库归纳整理摘"
+        }
+      ],
+      "coveredLength": 47999,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "48000（恰好 8 块）",
+      "content": [
+        {
+          "cjk": 48000
+        }
+      ],
+      "input": {
+        "length": 48000,
+        "sha256": "8fc9c4be2aa9536855e3cbd8a63fff7cc97d0bcbe3b0c3e711b09ca056fac309",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "签分类检索问答知识库归纳整理摘要"
+      },
+      "count": 8,
+      "lengths": [
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 6000,
+          "sha256": "5a2bcd92b74f55699ac9bf146fb39a681b353bbbd9eadd5bb0c6eb19f12eb2ec",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 6000,
+          "sha256": "6204539883c6d030a61f9f8d500b25798c5e7aeba6088832ca1f6d3e7ab872e7",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 6000,
+          "sha256": "738029a4839c9a8e5922c8a38cc29c246c7144c5caad9baff3627ff336b8bfbf",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 6000,
+          "sha256": "ddef2e6e997fbf0bc363dca8b41178476f87d3a592ff9535d579c51ba366c1e2",
+          "head": "检索问答知识库归纳整理摘要标签分",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 6000,
+          "sha256": "c0aaa2d226de01a89acbb1e47ceb88dd46f7502252a0ea13904321f0982d997e",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 6000,
+          "sha256": "75dc1a31c22bf1025e0c7794a01963939124ca26d3c243ee69677e4ce30b4115",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 6000,
+          "sha256": "bc1c64f3ca3a439d628da4a5d74795d357b795b8baaeb49b0f015da1aacf07c0",
+          "head": "签分类检索问答知识库归纳整理摘要",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        }
+      ],
+      "coveredLength": 48000,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "48001（超出部分丢弃）",
+      "content": [
+        {
+          "cjk": 48001
+        }
+      ],
+      "input": {
+        "length": 48001,
+        "sha256": "fbefa586028fc1ace3ab65f26672577be12601972edd9ce12f04d6ea806a3a28",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "分类检索问答知识库归纳整理摘要标"
+      },
+      "count": 8,
+      "lengths": [
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "86d6b00d28a9cbc69cd43858bf6d4d497324fee9aa49387fb977cdd38d522cfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "知识库归纳整理摘要标签分类检索问"
+        },
+        {
+          "length": 6000,
+          "sha256": "5a2bcd92b74f55699ac9bf146fb39a681b353bbbd9eadd5bb0c6eb19f12eb2ec",
+          "head": "答知识库归纳整理摘要标签分类检索",
+          "tail": "答知识库归纳整理摘要标签分类检索"
+        },
+        {
+          "length": 6000,
+          "sha256": "6204539883c6d030a61f9f8d500b25798c5e7aeba6088832ca1f6d3e7ab872e7",
+          "head": "问答知识库归纳整理摘要标签分类检",
+          "tail": "问答知识库归纳整理摘要标签分类检"
+        },
+        {
+          "length": 6000,
+          "sha256": "738029a4839c9a8e5922c8a38cc29c246c7144c5caad9baff3627ff336b8bfbf",
+          "head": "索问答知识库归纳整理摘要标签分类",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        },
+        {
+          "length": 6000,
+          "sha256": "ddef2e6e997fbf0bc363dca8b41178476f87d3a592ff9535d579c51ba366c1e2",
+          "head": "检索问答知识库归纳整理摘要标签分",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 6000,
+          "sha256": "c0aaa2d226de01a89acbb1e47ceb88dd46f7502252a0ea13904321f0982d997e",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 6000,
+          "sha256": "75dc1a31c22bf1025e0c7794a01963939124ca26d3c243ee69677e4ce30b4115",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        },
+        {
+          "length": 6000,
+          "sha256": "bc1c64f3ca3a439d628da4a5d74795d357b795b8baaeb49b0f015da1aacf07c0",
+          "head": "签分类检索问答知识库归纳整理摘要",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        }
+      ],
+      "coveredLength": 48000,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "100000（封顶 8 块）",
+      "content": [
+        {
+          "ascii": 100000
+        }
+      ],
+      "input": {
+        "length": 100000,
+        "sha256": "c42e56e9b1236bde39e905b351a6bb4da957f36911b24cfabb81e075fbe3e486",
+        "head": "abcdefghijabcdef",
+        "tail": "efghijabcdefghij"
+      },
+      "count": 8,
+      "lengths": [
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000,
+        6000
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 6000,
+          "sha256": "e56d7f572910b8511d39a4dd3def275c15e3fb76d0f09a6f09a99f4639d4436c",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        }
+      ],
+      "coveredLength": 48000,
+      "coveredIsPrefix": true
+    },
+    {
+      "name": "块内含代理对（不在边界上）",
+      "content": [
+        {
+          "cjk": 100
+        },
+        {
+          "lit": "😀"
+        },
+        {
+          "cjk": 5000
+        },
+        {
+          "lit": "𠀀"
+        },
+        {
+          "cjk": 7000
+        }
+      ],
+      "input": {
+        "length": 12104,
+        "sha256": "6c1ad824b58e2fd9d2d3411c1c2e80e880c787c58a5710aa3e1b8152f773b01a",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "索问答知识库归纳整理摘要标签分类"
+      },
+      "count": 3,
+      "lengths": [
+        6000,
+        6000,
+        104
+      ],
+      "digests": [
+        {
+          "length": 6000,
+          "sha256": "3b5f551d09efc00cde0a30a4e7a223846fc80c223ed546d5171a0f725b51d8d8",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        },
+        {
+          "length": 6000,
+          "sha256": "c0aaa2d226de01a89acbb1e47ceb88dd46f7502252a0ea13904321f0982d997e",
+          "head": "类检索问答知识库归纳整理摘要标签",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 104,
+          "sha256": "1bbaf6d617a452597ab94692567099dbefefd4412b485d07f7889ee2b1eeb9af",
+          "head": "分类检索问答知识库归纳整理摘要标",
+          "tail": "索问答知识库归纳整理摘要标签分类"
+        }
+      ],
+      "coveredLength": 12104,
+      "coveredIsPrefix": true
+    }
+  ],
+  "mapReduce": {
+    "map": [
+      {
+        "title": "标题",
+        "chunk": "片段正文",
+        "index": 1,
+        "total": 3,
+        "prompt": "《标题》片段 1/3：\n片段正文"
+      },
+      {
+        "title": "",
+        "chunk": "",
+        "index": 8,
+        "total": 8,
+        "prompt": "《》片段 8/8：\n"
+      },
+      {
+        "title": "带\n换行",
+        "chunk": "多行\n片段",
+        "index": 2,
+        "total": 2,
+        "prompt": "《带\n换行》片段 2/2：\n多行\n片段"
+      }
+    ],
+    "reduce": [
+      {
+        "title": "标题",
+        "partials": [
+          "- 一",
+          "- 二\n- 三"
+        ],
+        "prompt": "标题：标题\n\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\n- 一\n- 二\n- 三"
+      },
+      {
+        "title": "单片",
+        "partials": [
+          "- 只有一片"
+        ],
+        "prompt": "标题：单片\n\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果：\n- 只有一片"
+      },
+      {
+        "title": "空",
+        "partials": [],
+        "prompt": "标题：空\n\n以下是全文各片段的要点，请综合、去重后按要求的格式输出完整结果："
+      }
+    ]
+  },
+  "qa": {
+    "user": [
+      {
+        "name": "无资料无历史",
+        "question": "问题？",
+        "blocks": [],
+        "prompt": "资料：\n问题：问题？"
+      },
+      {
+        "name": "有资料无历史",
+        "question": "问题？",
+        "blocks": [
+          "[1] 标题一\n内容一",
+          "[2] 标题二\n内容二"
+        ],
+        "prompt": "资料：\n[1] 标题一\n内容一\n\n[2] 标题二\n内容二\n\n问题：问题？"
+      },
+      {
+        "name": "空历史数组",
+        "question": "问题？",
+        "blocks": [
+          "[1] 甲"
+        ],
+        "history": [],
+        "prompt": "资料：\n[1] 甲\n\n问题：问题？"
+      },
+      {
+        "name": "有资料有历史",
+        "question": "问题？",
+        "blocks": [
+          "[1] 甲",
+          "[2] 乙"
+        ],
+        "history": [
+          {
+            "question": "第一问",
+            "answer": "第一答"
+          },
+          {
+            "question": "第二问\n含换行",
+            "answer": "第二答 [1]"
+          }
+        ],
+        "prompt": "资料：\n[1] 甲\n\n[2] 乙\n\n此前对话：\n问：第一问\n答：第一答\n问：第二问\n含换行\n答：第二答 [1]\n\n问题：问题？"
+      }
+    ],
+    "agent": [
+      {
+        "name": "无历史无轨迹",
+        "question": "问题？",
+        "transcript": [],
+        "prompt": "用户问题：问题？\n\n已执行的动作与结果：\n（尚未执行任何动作）\n\n请输出下一步动作（只输出一个 JSON 对象）："
+      },
+      {
+        "name": "空历史有轨迹",
+        "question": "问题？",
+        "history": [],
+        "transcript": [
+          "搜索「甲」→ 命中 2 条",
+          "阅读 [1]"
+        ],
+        "prompt": "用户问题：问题？\n\n已执行的动作与结果：\n搜索「甲」→ 命中 2 条\n阅读 [1]\n\n请输出下一步动作（只输出一个 JSON 对象）："
+      },
+      {
+        "name": "有历史有轨迹",
+        "question": "问题？",
+        "history": [
+          {
+            "question": "第一问",
+            "answer": "第一答"
+          },
+          {
+            "question": "第二问\n含换行",
+            "answer": "第二答 [1]"
+          }
+        ],
+        "transcript": [
+          "动作 1",
+          "动作 2"
+        ],
+        "prompt": "此前对话：\n问：第一问\n答：第一答\n问：第二问\n含换行\n答：第二答 [1]\n\n用户问题：问题？\n\n已执行的动作与结果：\n动作 1\n动作 2\n\n请输出下一步动作（只输出一个 JSON 对象）："
+      }
+    ]
+  }
+}
