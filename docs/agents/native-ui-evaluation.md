@@ -374,3 +374,27 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
   - **生成器接进 CI**：`pnpm --filter @guizhi/desktop-go gen` 现在依次运行 jsrc 的生成与 `gen:native`（主题、lucide、品牌图标、文案；文案加 `--force`，否则只在 ARB 变化时才重跑 `mygo generate`，MyGo 升级后生成器输出变了也发现不了），
     CI 既有的「重新生成后 `git diff --exit-code -- apps/desktop-go`」自动覆盖这四个产物。新增 `scripts/tests/gen-native.test.mjs`（21 项，已加入 `test:validation`）：解析函数的边界（含故意写坏的输入必须抛错）与对真实渲染层源码的冒烟。
   - **踩过的坑**：1. `pwsh -File` 传 `string[]` 参数的老问题又踩了一次（联系表脚本），在当前 shell 里用 `& script.ps1 -Files @(...)` 调用；2. `mygo generate` 只在 ARB 变化时才跑，所以 CI 用的 `gen` 必须 `--force`；3. Windows 上 Go 原始字符串会丢掉 `\r`，生成器读取渲染层文件时必须先把 CRLF 归一成 LF，否则产物随检出换行而不同。
+- 2026-11-15（1.3 共享件，完成；分支提交 `46d4f77e`，未推送）：页面共用的件落在 `native/kit`，行为逐条对照渲染层同名组件，细节与对等差异见分支的 `docs/agents/native-ui-development.md` §5「共享控件」。
+  - **件**：提示 `Notifier` + `ToastViewport`（任意 goroutine 可发；成功/信息自动消失，错误/警告不消失；可展开详情并复制；撤销窗口；同时只露最新 3 条，其余排队）；
+    失败处理 `Guard`（`Run`/`Go`/`Background`，失败既弹带详情的提示又留日志，panic 按失败处理；日志经适配器复用渲染进程的 `log:appError` 处理器，截断与家目录脱敏同一份，写进同一个 `error.log`）；
+    确认与未保存对话框（初始焦点在取消、Enter 全局确认、异步操作失败可重试、关闭后焦点归位）；命令面板（`Palette` + `PaletteSource`，combobox/listbox 语义）；
+    快捷键录制（`ShortcutField` + 加速键互转，录制期间 `KeyCaptureActive()` 让应用级快捷键让路）；窗格宽度 `Pane` 与表格列 `ColumnSet`（经窄接口 `PrefStore` 去抖保存，真实实现随 Go 侧设置提供）。
+    外壳 `App` 持有 `Notifier` 与 `Guard`，提示作为覆盖层画在视图最后；`services` 增加 `Logger` 接口与假实现。
+  - **验证（源码/隔离环境）**：`go vet ./native/...` 干净；`go test -count=1 ./native/...` 153 个顶层测试通过（kit 125、app 14、采集页 8；另有 2 个靠环境变量开启的联系表测试默认跳过）；适配器测试对真实处理器验证日志的截断与脱敏；
+    `node --test scripts/tests/gen-native.test.mjs` 23 项通过；四个生成器 `--check`、文件行数门禁、gofmt（按 LF 归一化）通过。
+    **对拍**：窗格的默认值与上下限对 `ui.store.ts` 的九个常量；`MergeStoredColumns` 的 29 个用例对照渲染层 `mergeStoredColumns`（含宽度写成字符串或 null、数组里混进非对象元素只跳过那一项、重复 id 取第一条、操作列保存了小于下限的宽度会被夹成 148 这类怪癖）；
+    加速键词表对 MyGo 的 `internal/accelerator`（每个能录出来的键 MyGo 都接受，默认快捷键全部规范且被接受）；Tailwind 色阶新增对 `tailwindcss/colors` 逐项对拍（Go 调色板 31 项加品牌图标生成器的表；故意改错一位十六进制确认会红）。
+    **真实 `ui.Table`**：拖表头边缘改宽、夹进上下限、固定列拖不动、拖表头调换列顺序会被还原、恢复默认与代码改宽后以偏好为准、双击列边缘适应内容后同样夹进范围并保存。
+    联系表（`GUIZHI_WIDGET_SHEET=… go test ./native/kit -run TestWidgetsSheet`）明/暗各 9 格已逐张核对：提示堆叠与展开详情、撤销、确认/危险确认/未保存、命令面板（含查询）、快捷键录制中/未设置/清除钮。
+  - **踩过的坑**：
+    1. `ColumnSet.Reset` 最初只改偏好，而 `ui.Table` 自己在 `ListState.Columns` 里还留着拖出来的宽度，下一帧 `Sync` 把旧宽度当作用户新拖的写回偏好，「恢复默认」就失效了。是真实 Table 的测试抓到的；现在偏好是真相源，代码改偏好后布局过时，下一次 `Sync` 以偏好为准重写它。
+    2. 检测窗口失焦：`WindowActive()` 与 `FocusWithin()` 都不对（窗口失去键盘时后者仍指向原元素），要用 `Element.FocusLeft()`。
+    3. `ui.Tester` 的时钟不会自己走，同一位置紧挨着的两次按下被当成双击，触发 MyGo 表格自带的「适应内容宽度」把列缩到下限；测拖动要先 `Advance`。
+    4. `MergeStoredColumns` 第一版把 `columns` 解成 `[]map[string]any`，数组里混进一个数字就让整份配置作废；渲染层只跳过那一项，改成 `[]any` 逐项判断。窗格宽度存成 JSON `null` 时渲染层取默认值而不是下限，同样对齐。
+    5. 渲染层的操作列默认 84、下限 148：保存 84 再读回会变 148。`NewColumnSet` 先把默认宽度夹进范围，读写才稳定。
+    6. MyGo 控件的几处约定（对话框内不能 `AutoFocus`、输入框自己吃 Enter、`.Wrap()` 对文本是空操作、`ToastBase` 按钮不能 `.Key()`）已记入开发约定。
+  - **顺带发现的渲染层缺陷（两端共有，未改 main）**：暗色危险按钮白字压红底 4.39:1；暗色 `text-destructive` 压对话框底 4.06 / 3.74；green、teal 预设的浅色 `primary/90` 悬停 4.42 / 4.34；确认框在深色模式的浅色主色上写死 `text-white`；
+    快捷键录制写出 `ARROWUP` 这类 MyGo 不接受的加速键、把 Win 键记成 Ctrl、Tab 与 Esc 被输入框吞掉。对比度类已用 `knownContrastDebt` 登记。需要修哪几项由用户定，未排期。
+  - **未验证**：真实微软拼音下命令面板输入框（组词中的 Enter 不应选中结果，并入 S1 清单）；讲述人对对话框、面板、提示的朗读；150% / 200% DPI 下的对话框与面板；真实指针的拖动手感（现在是 `Tester` 合成事件）；
+    这些件加入后空闲内存的增量（不单独测，由检查点 1 一并验证）。
+  - **仍待用户**（沿用）：S1、S2 实机清单（M2 前）、托盘态是否单独销毁 WebView、AAC 的 LGPL 取舍（M2 前）、渲染层缺陷修哪几项。
