@@ -93,10 +93,11 @@ CodeMirror 编辑器与媒体播放：见第四节 S1、S4，由阶段 0 的实�
 3. **设置真相源分裂**：`settings.go` 只白名单了 19 个键，AI 供应商与模型在 `ai-models.json`；
    主题色相、字号、动效、窗格宽度、表格列等只在 WebView 的 localStorage。原生版需要 Go 侧单一存储，
    并在首次启动导入旧值（可复用 `legacy_localstorage.go` 的 leveldb 读取器）。
-4. **MyGo 很新**：仓库 2026-09-26 创建，仍是 0.x，近三周发了十余个版本；最新 0.9.0（11-11），归知锁在 0.8.3。
+4. **MyGo 很新**：仓库 2026-09-26 创建，仍是 0.x，近三周发了十余个版本；评估时最新 0.9.0（11-11），归知锁在 0.8.3。
    0.9.0 带来原生视频（Windows 走 Media Foundation）、AAC/FLAC 解码、中文字体修复、列表每帧更省，
    但 SQLite 改走 native module，`build-shell.ps1` 复制 `mygo-sqlite3.dll` 的逻辑要重做
    （旧版曾因漏带该 DLL 导致全新机器首启必败，见 `mygo-migration.md` 缺陷 1）。
+   **已在 main 完成**：升到 0.9.1，打包逻辑改为 `Sqlitecore.dll` 并经全新沙盒无网络安装验证，见第十节「0.2」。
 5. **工具链全部绑在 React 上**：`pnpm shot`（Playwright + CDP）、`apps/desktop/tests/unit` 的 140 个 vitest 文件约 650–700 用例、
    包体预算、`check-i18n`、IPC 频道生成（扫描 preload）、`release.yml` 的冒烟断言。
 
@@ -145,8 +146,9 @@ MyGo 的 `ui` 控件由框架自绘，不属于这一条，但仍要遵循「语
 - 检查点：M1 不超过基线的 45%，M2 不超过 55%，最终 60%。
 - 测量脚本 `apps/desktop-go/scripts/measure-idle.ps1`，库副本由 `seed_library_test.go` 生成（默认 520 条、13.4 MB，与真实库同一量级；1200 条约 50 MB 作大库对照）。
   **必须关闭 Chromium 的遮挡检测**（脚本默认带 `--disable-features=CalculateNativeWinOcclusion`），否则同一个版本的读数随「有没有被别的窗口盖住」漂移约 50 MB。
-- **基线（React 0.29.0，MyGo 0.8.3，2026-11-15，5 次中位数，静置 60 秒）**：可见态 333 MB（321–337，7 个进程），托盘态 330 MB（265–334）。
-  据此 G-final 的线是可见态 ≤ 200 MB、托盘态 ≤ 198 MB；检查点 1（45%）150 / 149 MB，检查点 2（55%）183 / 182 MB。MyGo 升级到 0.9.x 后重测，此后以升级后的为准。
+- **基线（React 0.29.0，MyGo 0.9.1，2026-11-15，5 次中位数，静置 60 秒；以此为准）**：可见态 341.8 MB（336.0–392.9，7 个进程），托盘态 337.1 MB（269.8–346.9）。
+  据此 G-final 的线是可见态 ≤ 205.1 MB、托盘态 ≤ 202.3 MB；检查点 1（45%）153.8 / 151.7 MB，检查点 2（55%）188.0 / 185.4 MB。
+  （升级前 MyGo 0.8.3 的读数是 333.3 / 330.0 MB，差 +2.6% / +2.2%，在其自身波动之内，仅作历史记录。）
 
 ### 目标架构
 
@@ -270,4 +272,26 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
     关掉遮挡检测（`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-features=CalculateNativeWinOcclusion`，脚本已内置，并核对该参数确实出现在 WebView2 浏览器进程的命令行里）后，可见态收敛到 321–337 MB。
     另一条：静置 10 秒与 60 秒差别很大（10 秒时 383 MB，60 秒后 333 MB），所以必须静置满 60 秒。
   - 合成库生成器的副产品观察（未深究）：`knowledge:create` 的耗时随条目数超线性增长（400 条 2 秒、1200 条 51 秒）。与本方案无关，只在这里留个记号。
-  - 误导性数字更正：此前文档里「React 外壳 218 MB」是旧口径（空库、10 秒后采样），不能与本基线比较；本节起一律以 333 / 330 MB 为准。
+  - 误导性数字更正：此前文档里「React 外壳 218 MB」是旧口径（空库、10 秒后采样），不能与本基线比较；本节起一律以 333 / 330 MB 为准（0.2 升级后的复测见下，以复测为准）。
+- 2026-11-15（0.2 MyGo 升级，完成；已提交 main：`85c60a66`、`7dcf1423`，未推送）：0.8.3 → 0.9.1。0.9.1 当天发布，带 `ListState.EndReached`、`Handle.SelectAll`、`markdown.Options.OnTask/AnchorBlock/CodeLink`、
+  感知输入法的 `Tester`、`ListState.RowHeight`、`Element.TruncateStart`、`mygo_nowebview` 构建标签等，原生版会用到。
+  - **SQLite 原生库改了**：0.9.x 的 SQLite 是 native module `Sqlitecore`（`Sqlitecore.dll`，2.19 MB，sha256 `029fd2db48c3…`），不再是 `mygo-sqlite3.dll`。
+    MyGo 找库的顺序：环境变量 `MYGO_NATIVE_SQLITECORE` → 应用资源目录 → exe 同目录 → 本地 `.mygo/native`（仅非打包态）→ `%LOCALAPPDATA%\mygo\natives\<sha256>\` 缓存 → 联网下载（`-tags mygo_nodownload` 编译掉）。
+    **`-trimpath` 构建读不到插件清单，缓存与下载两条路都失效，DLL 必须与 exe 同目录**；缺失时 MyGo 只报 `native: ffi: Sqlitecore has no build for windows-amd64`，用户无从判断。
+  - **打包逻辑重做**：新脚本 `apps/desktop-go/scripts/ensure-sqlitecore.ps1`（`go list -m` 找模块清单 → 取缓存或下载并校验 sha256 → 复制进输出目录并复验）由 `build-shell.ps1` 与 `scripts/isolated-go.mjs`（`pnpm shot` 的隔离构建）共用，
+    构建加 `-tags mygo_nodownload`（运行时永不联网取库）；`build-installer.ps1` 与实机清单改查 `Sqlitecore.dll`。新增 `native_sqlite.go`：库缺失时给出「找不到 SQLite 原生库 Sqlitecore.dll（应与 GuiZhi.exe 放在同一目录）……请重新安装，或从安全软件的隔离区还原它」。
+  - **验证（源码/隔离环境）**：`go vet ./...` 通过；`go test -count=1 ./...` 153 秒通过；`pnpm test:validation` 22 项通过；行数门禁通过；`pnpm shot` 冒烟通过（界面正常渲染）。
+    宿主隔离的全新环境检查 `verify/run-fresh-sqlite.ps1`：无环境变量、无网络、空 `%LOCALAPPDATA%\mygo` 下启动发布目录 6.4 秒起来；删掉 DLL 后 0.2 秒内失败并给出上述中文说明。
+  - **验证（真实第三方流程）**：Windows Sandbox（无网络、干净 Win11 26100、无 VC++ 运行库）静默安装最终安装包（12.3 MB）并首次启动通过（`verify/run-sandbox-fresh-install.ps1` + `sandbox-fresh-install-guest.ps1`）。
+    **未做**：用户真实机上的覆盖升级；发布状态（未发版）。
+  - **顺带修的两个 main 缺陷（均带回归测试）**：
+    1. `themedReading:searchConfig` 不带参数调用返回「搜索配置格式无效」。Go 的 `argAt` 对缺省参数给 `null`，TS 是 `input ?? {}`；`configureReadingSearch` 现把 null 与缺省同样当作「只读状态」（回归测试先在未修复时确认会失败）。
+    2. Windows 上 `os.Rename` 覆盖目标时，杀毒或索引器短暂持有目标会返回 ACCESS_DENIED / SHARING_VIOLATION / LOCK_VIOLATION，既让 `TestSettingsParity/aiSetProvidersOnly` 偶发失败，生产里同样会让 AI 配置、备份等原子写偶发失败。
+       新增 `fs_rename.go` 的 `renameReplace`：只对这三个错误码重试（2 ms 起翻倍到 100 ms，总预算 2 秒），用到 `aiconfig.go`、`reading_search.go`、`safestorage_windows.go`、`backup_repo.go`、`funasr_update_backup.go`。
+- 2026-11-15（0.1 升级后复测，完成）：同一台机器、同一份库副本（13.4 MB）、同一脚本，只换 MyGo 0.9.1（发布目录构建，标签 `react-0.9.1`）。
+  - **新基线（此后以此为准）：可见态 341.8 MB（336.0–392.9），托盘态 337.1 MB（269.8–346.9），7 个进程。** 比 0.8.3 的 333.3 / 330.0 MB 高 8.5 / 7.1 MB（+2.6% / +2.2%），在 0.8.3 自身 321–337 MB 的波动之内。
+    第 1 次可见态偏高（392.9 MB，渲染进程 266 MB，比其余四次的 211–217 MB 多约 50 MB），原因未定位（同一时刻我在建 worktree，但没有证据表明相关）；
+    该次托盘态偏低（269.8 MB）与 0.8.3 第 1 次的 265.2 MB 同类，即上文已记录的「隐藏后偶尔释放内存」。中位数不受这两个离群值影响。
+  - 进程构成（第 2–5 次可见态）：WebView2 渲染进程 211–217 MB，另一个 WebView2 进程 48–55 MB，WebView2 浏览器进程 31–35 MB，Go 壳 32–33 MB，其余三个工具进程共约 11 MB。
+    Go 壳从 0.8.3 的约 26 MB 到约 32 MB，增加来源未单独定位。
+  - **新的线**：G-final 可见态 ≤ 205.1 MB、托盘态 ≤ 202.3 MB；检查点 1（45%）153.8 / 151.7 MB；检查点 2（55%）188.0 / 185.4 MB。
