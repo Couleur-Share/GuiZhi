@@ -1,0 +1,1028 @@
+{
+  "cases": [
+    {
+      "name": "缺 key 或缺地址",
+      "apiUrl": "https://api.example.com",
+      "apiKey": "",
+      "protocol": null,
+      "script": [],
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "Please fill in API Key and API URL first"
+          }
+        ]
+      }
+    },
+    {
+      "name": "缺地址",
+      "apiUrl": "",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [],
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "Please fill in API Key and API URL first"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenAI：按 id 排序，缺 id 的丢弃，字段透传",
+      "apiUrl": "https://api.example.com",
+      "apiKey": "sk-abc",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"object\":\"list\",\"data\":[{\"id\":\"gpt-4o\",\"owned_by\":\"openai\",\"created\":1715367049},{\"id\":\"GPT-4\",\"owned_by\":\"openai\"},{\"id\":\"gpt-4-turbo\",\"created\":1712361441},{\"owned_by\":\"nobody\"},{\"id\":\"\"},{\"id\":\"o1-mini\",\"owned_by\":\"system\",\"created\":1725649008},{\"id\":\"text-embedding-3-small\"},{\"id\":\"gpt-4.1\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://api.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-abc"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "GPT-4",
+                "name": "GPT-4",
+                "owned_by": "openai"
+              },
+              {
+                "id": "gpt-4-turbo",
+                "name": "gpt-4-turbo",
+                "created": 1712361441
+              },
+              {
+                "id": "gpt-4.1",
+                "name": "gpt-4.1"
+              },
+              {
+                "id": "gpt-4o",
+                "name": "gpt-4o",
+                "owned_by": "openai",
+                "created": 1715367049
+              },
+              {
+                "id": "o1-mini",
+                "name": "o1-mini",
+                "owned_by": "system",
+                "created": 1725649008
+              },
+              {
+                "id": "text-embedding-3-small",
+                "name": "text-embedding-3-small"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Anthropic：display_name、created_at 与固定的 owned_by",
+      "apiUrl": "https://api.anthropic.com",
+      "apiKey": "sk-ant",
+      "protocol": "anthropic",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"claude-sonnet-4-5\",\"display_name\":\"Claude Sonnet 4.5\",\"created_at\":\"2025-09-29T00:00:00Z\"},{\"id\":\"claude-3-5-haiku\",\"display_name\":\"\",\"created_at\":\"2024-10-22T00:00:00Z\"},{\"id\":\"claude-opus-4\",\"display_name\":\"Claude Opus 4\"},{\"id\":5},{\"display_name\":\"无 id\"}],\"has_more\":false}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://api.anthropic.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "sk-ant",
+              "anthropic-version": "2023-06-01"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "claude-3-5-haiku",
+                "name": "claude-3-5-haiku",
+                "owned_by": "Anthropic",
+                "created": 1729555200000
+              },
+              {
+                "id": "claude-opus-4",
+                "name": "Claude Opus 4",
+                "owned_by": "Anthropic"
+              },
+              {
+                "id": "claude-sonnet-4-5",
+                "name": "Claude Sonnet 4.5",
+                "owned_by": "Anthropic",
+                "created": 1759104000000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "协议是 anthropic 但响应是 OpenAI 形态：按 Anthropic 分支处理（缺 display_name 回落到 id）",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": "anthropic",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"b-model\",\"owned_by\":\"x\"},{\"id\":\"a-model\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "k",
+              "anthropic-version": "2023-06-01"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "a-model",
+                "name": "a-model",
+                "owned_by": "Anthropic"
+              },
+              {
+                "id": "b-model",
+                "name": "b-model",
+                "owned_by": "Anthropic"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "协议是 openai 但响应带 display_name：按 OpenAI 分支处理",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"b-model\",\"display_name\":\"B\"},{\"id\":\"a-model\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "a-model",
+                "name": "a-model"
+              },
+              {
+                "id": "b-model",
+                "name": "b-model"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Gemini：去 models/ 前缀，displayName 拼进名称，请求用 x-goog-api-key",
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "apiKey": "AIza-key",
+      "protocol": "gemini",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"models\":[{\"name\":\"models/gemini-2.5-pro\",\"displayName\":\"Gemini 2.5 Pro\",\"description\":\"强\"},{\"name\":\"models/gemini-2.5-flash\",\"displayName\":\"Gemini 2.5 Flash\"},{\"name\":\"models/embedding-001\"},{\"displayName\":\"无 name\"},{\"name\":\"tunedModels/x\",\"displayName\":\"Tuned\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://generativelanguage.googleapis.com/v1beta/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-goog-api-key": "AIza-key"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "embedding-001",
+                "name": "embedding-001",
+                "owned_by": "Google"
+              },
+              {
+                "id": "gemini-2.5-flash",
+                "name": "Gemini 2.5 Flash (gemini-2.5-flash)",
+                "owned_by": "Google"
+              },
+              {
+                "id": "gemini-2.5-pro",
+                "name": "Gemini 2.5 Pro (gemini-2.5-pro)",
+                "owned_by": "Google",
+                "description": "强"
+              },
+              {
+                "id": "tunedModels/x",
+                "name": "Tuned (tunedModels/x)",
+                "owned_by": "Google"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "裸数组：id 或 model 任一即可，name 回落",
+      "apiUrl": "https://gw.example.com/v1",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "[{\"id\":\"zeta\",\"name\":\"Zeta 模型\"},{\"model\":\"alpha\"},{\"id\":\"beta\",\"model\":\"ignored\",\"name\":\"\"},{\"name\":\"只有名字\"},{}]"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "zeta",
+                "name": "Zeta 模型"
+              },
+              {
+                "id": "alpha",
+                "name": "alpha"
+              },
+              {
+                "id": "beta",
+                "name": "beta"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "空数组与空 data 都算成功",
+      "apiUrl": "https://gw.example.com/v1",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "[]"
+        },
+        {
+          "status": 200,
+          "body": "{\"data\":[]}"
+        }
+      ],
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": []
+          },
+          {
+            "success": true,
+            "models": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "无法识别的 JSON 对象",
+      "apiUrl": "https://gw.example.com/v1",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"foo\":1}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "无法解析模型列表响应",
+            "reason": "unsupported",
+            "endpoint": "https://gw.example.com/v1/models"
+          }
+        ]
+      }
+    },
+    {
+      "name": "401 / 403 归为 auth",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":\"bad\"}"
+        },
+        {
+          "status": 403,
+          "body": "forbidden"
+        }
+      ],
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 401 - {\"error\":\"bad\"}",
+            "reason": "auth",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 401
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 403 - forbidden",
+            "reason": "auth",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 403
+          }
+        ]
+      }
+    },
+    {
+      "name": "404 / 405 / 501 归为 unsupported",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 404,
+          "body": "nf"
+        },
+        {
+          "status": 405,
+          "body": "na"
+        },
+        {
+          "status": 501,
+          "body": "ni"
+        }
+      ],
+      "calls": 3,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 404 - nf",
+            "reason": "unsupported",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 404
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 405 - na",
+            "reason": "unsupported",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 405
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 501 - ni",
+            "reason": "unsupported",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 501
+          }
+        ]
+      }
+    },
+    {
+      "name": "其他 HTTP 错误归为 http，正文截 100 个 UTF-16 单元",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 500,
+          "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长长"
+        },
+        {
+          "status": 429,
+          "body": ""
+        }
+      ],
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 500 - xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx长长长长长长长长长长长长长长长长长长长长",
+            "reason": "http",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 500
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "获取模型列表失败: 429 - ",
+            "reason": "http",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 429
+          }
+        ]
+      }
+    },
+    {
+      "name": "传输层失败：超时归 network，其余归 http，文案截 120",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 0,
+          "ok": false,
+          "error": "AI 请求超时（12000ms）"
+        },
+        {
+          "status": 0,
+          "ok": false,
+          "error": "dial tcp: lookup gw.example.com: no such host"
+        },
+        {
+          "status": 0,
+          "ok": false,
+          "error": "TIMEOUT yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+        },
+        {
+          "status": 0,
+          "ok": false,
+          "error": ""
+        }
+      ],
+      "calls": 4,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "AI 请求超时（12000ms）",
+            "reason": "http",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 0
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "dial tcp: lookup gw.example.com: no such host",
+            "reason": "http",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 0
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "TIMEOUT yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+            "reason": "network",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 0
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "",
+            "reason": "http",
+            "endpoint": "https://gw.example.com/v1/models",
+            "status": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "# 结尾的显式地址不补 /v1/models",
+      "apiUrl": "https://gw.example.com/custom/list#",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"m\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/custom/list",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "m",
+                "name": "m"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "地址带 /v1/chat/completions 时回到根再拼 /models",
+      "apiUrl": "https://gw.example.com/v1/chat/completions",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"m\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "m",
+                "name": "m"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Gemini 地址带 /openai 与版本段",
+      "apiUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "apiKey": "k",
+      "protocol": "gemini",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"models\":[{\"name\":\"models/a\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://generativelanguage.googleapis.com/v1beta/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-goog-api-key": "k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "a",
+                "name": "a",
+                "owned_by": "Google"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "Anthropic 地址以 /messages 结尾",
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "apiKey": "k",
+      "protocol": "anthropic",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"data\":[{\"id\":\"c\"}]}"
+        }
+      ],
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://api.anthropic.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "k",
+              "anthropic-version": "2023-06-01"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": true,
+            "models": [
+              {
+                "id": "c",
+                "name": "c",
+                "owned_by": "Anthropic"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "传输层抛错：message 透传并分类",
+      "apiUrl": "https://gw.example.com",
+      "apiKey": "k",
+      "protocol": null,
+      "script": [
+        {
+          "throws": "Failed to fetch"
+        },
+        {
+          "throws": "socket hang up"
+        },
+        {
+          "throws": "Network is unreachable"
+        }
+      ],
+      "calls": 3,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          },
+          {
+            "kind": "request",
+            "method": "GET",
+            "url": "https://gw.example.com/v1/models",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer k"
+            },
+            "timeoutMs": 12000
+          }
+        ],
+        "results": [
+          {
+            "success": false,
+            "models": [],
+            "error": "Failed to fetch",
+            "reason": "network"
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "socket hang up",
+            "reason": "http"
+          },
+          {
+            "success": false,
+            "models": [],
+            "error": "Network is unreachable",
+            "reason": "network"
+          }
+        ]
+      }
+    }
+  ],
+  "previews": [
+    {
+      "apiUrl": "",
+      "protocol": null,
+      "expect": ""
+    },
+    {
+      "apiUrl": "https://api.openai.com",
+      "protocol": null,
+      "expect": "https://api.openai.com/v1/chat/completions"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "protocol": null,
+      "expect": "https://api.openai.com/v1/chat/completions"
+    },
+    {
+      "apiUrl": "https://gw.example.com/custom#",
+      "protocol": null,
+      "expect": "https://gw.example.com/custom"
+    },
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "protocol": "gemini",
+      "expect": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com",
+      "protocol": "anthropic",
+      "expect": "https://api.anthropic.com/v1/messages"
+    },
+    {
+      "apiUrl": "  https://x.example.com/v1/chat/completions  ",
+      "protocol": null,
+      "expect": "https://x.example.com/v1/chat/completions"
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "cases": [
+    {
+      "name": "空体",
+      "response": {
+        "status": 500,
+        "body": ""
+      },
+      "expect": "API 请求失败 (500)"
+    },
+    {
+      "name": "自定义 fallback 与 operation",
+      "response": {
+        "status": 504,
+        "body": "x"
+      },
+      "options": {
+        "operation": "Embeddings 请求",
+        "fallback": "失败了"
+      },
+      "expect": "Embeddings 请求 gateway timed out (504). The provider or proxy did not finish before its own timeout."
+    },
+    {
+      "name": "html 取 title",
+      "response": {
+        "status": 502,
+        "body": "<html><TITLE lang='x'>Bad  <b>gw</b></TITLE></html>"
+      },
+      "options": {
+        "fallback": "上游错误"
+      },
+      "expect": "上游错误: Bad <b>gw</b>"
+    },
+    {
+      "name": "content-type 声明 html",
+      "response": {
+        "status": 500,
+        "body": "oops",
+        "headers": {
+          "CONTENT-TYPE": "Text/HTML"
+        }
+      },
+      "expect": "API 请求失败 (500)"
+    },
+    {
+      "name": "html 没有 title",
+      "response": {
+        "status": 500,
+        "body": "<!doctype html><p>hi</p>"
+      },
+      "expect": "API 请求失败 (500)"
+    },
+    {
+      "name": "文本截断（自定义长度）",
+      "response": {
+        "status": 500,
+        "body": "0123456789"
+      },
+      "options": {
+        "maxTextLength": 4
+      },
+      "expect": "0123"
+    },
+    {
+      "name": "结构化：error 是数组",
+      "response": {
+        "status": 400,
+        "body": "{\"error\":[\"a\"]}"
+      },
+      "expect": "{\"error\":[\"a\"]}"
+    },
+    {
+      "name": "结构化：message 是对象",
+      "response": {
+        "status": 400,
+        "body": "{\"error\":{\"message\":{\"a\":1}}}"
+      },
+      "expect": "[object Object]"
+    },
+    {
+      "name": "结构化：数字 code",
+      "response": {
+        "status": 400,
+        "body": "{\"error\":{\"message\":\"m\",\"code\":42}}"
+      },
+      "expect": "m (code: 42)"
+    },
+    {
+      "name": "结构化：code 为 0 视为没有",
+      "response": {
+        "status": 400,
+        "body": "{\"error\":{\"message\":\"m\",\"code\":0,\"type\":\"t\"}}"
+      },
+      "expect": "[t] m"
+    },
+    {
+      "name": "结构化：JSON null",
+      "response": {
+        "status": 400,
+        "body": "null"
+      },
+      "expect": "null"
+    },
+    {
+      "name": "结构化：JSON 字符串",
+      "response": {
+        "status": 400,
+        "body": "\"just text\""
+      },
+      "expect": "\"just text\""
+    },
+    {
+      "name": "结构化：error 为空串回落到 message",
+      "response": {
+        "status": 400,
+        "body": "{\"error\":\"\",\"message\":\"top\"}"
+      },
+      "expect": "top"
+    },
+    {
+      "name": "error 字段优先于 body",
+      "response": {
+        "status": 0,
+        "body": "ignored",
+        "error": "代理拒绝：目标地址不允许"
+      },
+      "expect": "代理拒绝：目标地址不允许"
+    },
+    {
+      "name": "error 为空串也算有值",
+      "response": {
+        "status": 502,
+        "body": "上游错误正文",
+        "error": ""
+      },
+      "expect": "API 请求失败 (502)"
+    }
+  ]
+}

@@ -1,0 +1,2178 @@
+{
+  "resolveProtocol": [
+    {
+      "config": {
+        "apiProtocol": "openai",
+        "provider": "anthropic",
+        "apiUrl": ""
+      },
+      "expect": "openai"
+    },
+    {
+      "config": {
+        "apiProtocol": "anthropic",
+        "provider": "openai",
+        "apiUrl": ""
+      },
+      "expect": "anthropic"
+    },
+    {
+      "config": {
+        "apiProtocol": "gemini"
+      },
+      "expect": "gemini"
+    },
+    {
+      "config": {
+        "provider": "Anthropic"
+      },
+      "expect": "anthropic"
+    },
+    {
+      "config": {
+        "provider": "x",
+        "apiUrl": "https://API.ANTHROPIC.com/v1"
+      },
+      "expect": "anthropic"
+    },
+    {
+      "config": {
+        "provider": "Google"
+      },
+      "expect": "gemini"
+    },
+    {
+      "config": {
+        "provider": "GEMINI"
+      },
+      "expect": "gemini"
+    },
+    {
+      "config": {
+        "provider": "x",
+        "apiUrl": "https://generativelanguage.googleapis.com/v1beta"
+      },
+      "expect": "gemini"
+    },
+    {
+      "config": {
+        "provider": "deepseek",
+        "apiUrl": "https://api.deepseek.com"
+      },
+      "expect": "openai"
+    },
+    {
+      "config": {},
+      "expect": "openai"
+    },
+    {
+      "config": {
+        "apiProtocol": "bogus",
+        "provider": "gemini"
+      },
+      "expect": "gemini"
+    }
+  ],
+  "baseUrls": [
+    {
+      "url": "",
+      "getBaseUrl": "",
+      "normalizeApiUrlInput": ""
+    },
+    {
+      "url": "  ",
+      "getBaseUrl": "",
+      "normalizeApiUrlInput": ""
+    },
+    {
+      "url": "https://api.openai.com",
+      "getBaseUrl": "https://api.openai.com",
+      "normalizeApiUrlInput": "https://api.openai.com"
+    },
+    {
+      "url": "https://api.openai.com/",
+      "getBaseUrl": "https://api.openai.com",
+      "normalizeApiUrlInput": "https://api.openai.com"
+    },
+    {
+      "url": "https://api.openai.com/v1",
+      "getBaseUrl": "https://api.openai.com/v1",
+      "normalizeApiUrlInput": "https://api.openai.com/v1"
+    },
+    {
+      "url": "https://api.openai.com/v1/",
+      "getBaseUrl": "https://api.openai.com/v1",
+      "normalizeApiUrlInput": "https://api.openai.com/v1"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "getBaseUrl": "https://api.openai.com/v1",
+      "normalizeApiUrlInput": "https://api.openai.com/v1"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions/",
+      "getBaseUrl": "https://api.openai.com/v1",
+      "normalizeApiUrlInput": "https://api.openai.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/completions",
+      "getBaseUrl": "https://x.com/v1",
+      "normalizeApiUrlInput": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/models",
+      "getBaseUrl": "https://x.com/v1",
+      "normalizeApiUrlInput": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/embeddings",
+      "getBaseUrl": "https://x.com/v1",
+      "normalizeApiUrlInput": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/images/generations",
+      "getBaseUrl": "https://x.com/v1",
+      "normalizeApiUrlInput": "https://x.com/v1"
+    },
+    {
+      "url": "  https://x.com/v1  ",
+      "getBaseUrl": "https://x.com/v1",
+      "normalizeApiUrlInput": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/custom#",
+      "getBaseUrl": "https://x.com/custom",
+      "normalizeApiUrlInput": "https://x.com/custom#"
+    },
+    {
+      "url": "https://x.com/custom/#",
+      "getBaseUrl": "https://x.com/custom/",
+      "normalizeApiUrlInput": "https://x.com/custom#"
+    },
+    {
+      "url": "https://x.com/v1/chat/completions#",
+      "getBaseUrl": "https://x.com/v1/chat/completions",
+      "normalizeApiUrlInput": "https://x.com/v1#"
+    },
+    {
+      "url": "#",
+      "getBaseUrl": "",
+      "normalizeApiUrlInput": "#"
+    },
+    {
+      "url": "  #  ",
+      "getBaseUrl": "",
+      "normalizeApiUrlInput": "#"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com",
+      "getBaseUrl": "https://generativelanguage.googleapis.com",
+      "normalizeApiUrlInput": "https://generativelanguage.googleapis.com"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta",
+      "getBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "normalizeApiUrlInput": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "getBaseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "normalizeApiUrlInput": "https://generativelanguage.googleapis.com/v1beta/openai"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1/",
+      "getBaseUrl": "https://generativelanguage.googleapis.com/v1",
+      "normalizeApiUrlInput": "https://generativelanguage.googleapis.com/v1"
+    },
+    {
+      "url": "https://api.anthropic.com",
+      "getBaseUrl": "https://api.anthropic.com",
+      "normalizeApiUrlInput": "https://api.anthropic.com"
+    },
+    {
+      "url": "https://api.anthropic.com/v1",
+      "getBaseUrl": "https://api.anthropic.com/v1",
+      "normalizeApiUrlInput": "https://api.anthropic.com/v1"
+    },
+    {
+      "url": "https://api.anthropic.com/v1/messages",
+      "getBaseUrl": "https://api.anthropic.com/v1/messages",
+      "normalizeApiUrlInput": "https://api.anthropic.com/v1/messages"
+    },
+    {
+      "url": "https://gw.example.com/anthropic/messages",
+      "getBaseUrl": "https://gw.example.com/anthropic/messages",
+      "normalizeApiUrlInput": "https://gw.example.com/anthropic/messages"
+    },
+    {
+      "url": "https://x.com/v2",
+      "getBaseUrl": "https://x.com/v2",
+      "normalizeApiUrlInput": "https://x.com/v2"
+    },
+    {
+      "url": "https://x.com/v10/",
+      "getBaseUrl": "https://x.com/v10",
+      "normalizeApiUrlInput": "https://x.com/v10"
+    },
+    {
+      "url": "https://x.com/v1beta",
+      "getBaseUrl": "https://x.com/v1beta",
+      "normalizeApiUrlInput": "https://x.com/v1beta"
+    },
+    {
+      "url": "https://x.com/openai",
+      "getBaseUrl": "https://x.com/openai",
+      "normalizeApiUrlInput": "https://x.com/openai"
+    }
+  ],
+  "endpoints": [
+    {
+      "url": "",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  ",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  ",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  ",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "https://api.openai.com",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1beta/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1beta/openai/embeddings",
+      "models": "https://api.openai.com/v1beta/models"
+    },
+    {
+      "url": "https://api.openai.com",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1beta/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1beta/openai/embeddings",
+      "models": "https://api.openai.com/v1beta/models"
+    },
+    {
+      "url": "https://api.openai.com/",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1/openai/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1/openai/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1/openai/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions/",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/chat/completions",
+      "embeddings": "https://api.openai.com/v1/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions/",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/openai/chat/completions",
+      "embeddings": "https://api.openai.com/v1/openai/embeddings",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://api.openai.com/v1/chat/completions/",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.openai.com/v1"
+      },
+      "chat": "https://api.openai.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.openai.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/completions",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/chat/completions",
+      "embeddings": "https://x.com/v1/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/completions",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/openai/chat/completions",
+      "embeddings": "https://x.com/v1/openai/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/completions",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/models",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/chat/completions",
+      "embeddings": "https://x.com/v1/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/models",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/openai/chat/completions",
+      "embeddings": "https://x.com/v1/openai/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/models",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/embeddings",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/chat/completions",
+      "embeddings": "https://x.com/v1/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/embeddings",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/openai/chat/completions",
+      "embeddings": "https://x.com/v1/openai/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/embeddings",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/images/generations",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/chat/completions",
+      "embeddings": "https://x.com/v1/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/images/generations",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/openai/chat/completions",
+      "embeddings": "https://x.com/v1/openai/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/v1/images/generations",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "  https://x.com/v1  ",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/chat/completions",
+      "embeddings": "https://x.com/v1/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "  https://x.com/v1  ",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/openai/chat/completions",
+      "embeddings": "https://x.com/v1/openai/embeddings",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "  https://x.com/v1  ",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1/models"
+    },
+    {
+      "url": "https://x.com/custom#",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/custom#",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/custom#",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/custom/#",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/custom/#",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/custom/#",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": true,
+        "baseUrl": "https://x.com/custom"
+      },
+      "chat": "https://x.com/custom",
+      "embeddings": "https://x.com/custom",
+      "models": "https://x.com/custom"
+    },
+    {
+      "url": "https://x.com/v1/chat/completions#",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": true,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1",
+      "embeddings": "https://x.com/v1",
+      "models": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/chat/completions#",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": true,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1",
+      "embeddings": "https://x.com/v1",
+      "models": "https://x.com/v1"
+    },
+    {
+      "url": "https://x.com/v1/chat/completions#",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": true,
+        "baseUrl": "https://x.com/v1"
+      },
+      "chat": "https://x.com/v1",
+      "embeddings": "https://x.com/v1",
+      "models": "https://x.com/v1"
+    },
+    {
+      "url": "#",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "#",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "#",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  #  ",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  #  ",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "  #  ",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": true,
+        "baseUrl": ""
+      },
+      "chat": "",
+      "embeddings": "",
+      "models": ""
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1beta/openai/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1beta/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1/messages",
+      "embeddings": "",
+      "models": "https://generativelanguage.googleapis.com/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/v1/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1beta/v1/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1beta/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1beta/openai/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1beta/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/v1/messages",
+      "embeddings": "",
+      "models": "https://generativelanguage.googleapis.com/v1beta/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1beta/openai/v1/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1beta/openai/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1beta/openai/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1beta/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1beta/openai/v1/messages",
+      "embeddings": "",
+      "models": "https://generativelanguage.googleapis.com/v1beta/openai/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1/",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1/",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1/openai/chat/completions",
+      "embeddings": "https://generativelanguage.googleapis.com/v1/openai/embeddings",
+      "models": "https://generativelanguage.googleapis.com/v1/models"
+    },
+    {
+      "url": "https://generativelanguage.googleapis.com/v1/",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://generativelanguage.googleapis.com/v1"
+      },
+      "chat": "https://generativelanguage.googleapis.com/v1/messages",
+      "embeddings": "",
+      "models": "https://generativelanguage.googleapis.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com"
+      },
+      "chat": "https://api.anthropic.com/v1/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1/embeddings",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com"
+      },
+      "chat": "https://api.anthropic.com/v1beta/openai/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1beta/openai/embeddings",
+      "models": "https://api.anthropic.com/v1beta/models"
+    },
+    {
+      "url": "https://api.anthropic.com",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com"
+      },
+      "chat": "https://api.anthropic.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1"
+      },
+      "chat": "https://api.anthropic.com/v1/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1/embeddings",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1"
+      },
+      "chat": "https://api.anthropic.com/v1/openai/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1/openai/embeddings",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1"
+      },
+      "chat": "https://api.anthropic.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1/messages",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1/messages"
+      },
+      "chat": "https://api.anthropic.com/v1/messages/v1/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1/messages/v1/embeddings",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1/messages",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1/messages"
+      },
+      "chat": "https://api.anthropic.com/v1/messages/v1beta/openai/chat/completions",
+      "embeddings": "https://api.anthropic.com/v1/messages/v1beta/openai/embeddings",
+      "models": "https://api.anthropic.com/v1/messages/v1beta/models"
+    },
+    {
+      "url": "https://api.anthropic.com/v1/messages",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://api.anthropic.com/v1/messages"
+      },
+      "chat": "https://api.anthropic.com/v1/messages",
+      "embeddings": "",
+      "models": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "url": "https://gw.example.com/anthropic/messages",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://gw.example.com/anthropic/messages"
+      },
+      "chat": "https://gw.example.com/anthropic/messages/v1/chat/completions",
+      "embeddings": "https://gw.example.com/anthropic/messages/v1/embeddings",
+      "models": "https://gw.example.com/anthropic/v1/models"
+    },
+    {
+      "url": "https://gw.example.com/anthropic/messages",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://gw.example.com/anthropic/messages"
+      },
+      "chat": "https://gw.example.com/anthropic/messages/v1beta/openai/chat/completions",
+      "embeddings": "https://gw.example.com/anthropic/messages/v1beta/openai/embeddings",
+      "models": "https://gw.example.com/anthropic/messages/v1beta/models"
+    },
+    {
+      "url": "https://gw.example.com/anthropic/messages",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://gw.example.com/anthropic/messages"
+      },
+      "chat": "https://gw.example.com/anthropic/messages",
+      "embeddings": "",
+      "models": "https://gw.example.com/anthropic/v1/models"
+    },
+    {
+      "url": "https://x.com/v2",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v2"
+      },
+      "chat": "https://x.com/v2/chat/completions",
+      "embeddings": "https://x.com/v2/embeddings",
+      "models": "https://x.com/v2/models"
+    },
+    {
+      "url": "https://x.com/v2",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v2"
+      },
+      "chat": "https://x.com/v2/openai/chat/completions",
+      "embeddings": "https://x.com/v2/openai/embeddings",
+      "models": "https://x.com/v2/models"
+    },
+    {
+      "url": "https://x.com/v2",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v2"
+      },
+      "chat": "https://x.com/v2/messages",
+      "embeddings": "",
+      "models": "https://x.com/v2/models"
+    },
+    {
+      "url": "https://x.com/v10/",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v10"
+      },
+      "chat": "https://x.com/v10/chat/completions",
+      "embeddings": "https://x.com/v10/embeddings",
+      "models": "https://x.com/v10/models"
+    },
+    {
+      "url": "https://x.com/v10/",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v10"
+      },
+      "chat": "https://x.com/v10/openai/chat/completions",
+      "embeddings": "https://x.com/v10/openai/embeddings",
+      "models": "https://x.com/v10/models"
+    },
+    {
+      "url": "https://x.com/v10/",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v10"
+      },
+      "chat": "https://x.com/v10/messages",
+      "embeddings": "",
+      "models": "https://x.com/v10/models"
+    },
+    {
+      "url": "https://x.com/v1beta",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1beta"
+      },
+      "chat": "https://x.com/v1beta/v1/chat/completions",
+      "embeddings": "https://x.com/v1beta/v1/embeddings",
+      "models": "https://x.com/v1beta/v1/models"
+    },
+    {
+      "url": "https://x.com/v1beta",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1beta"
+      },
+      "chat": "https://x.com/v1beta/openai/chat/completions",
+      "embeddings": "https://x.com/v1beta/openai/embeddings",
+      "models": "https://x.com/v1beta/models"
+    },
+    {
+      "url": "https://x.com/v1beta",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/v1beta"
+      },
+      "chat": "https://x.com/v1beta/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/v1beta/v1/models"
+    },
+    {
+      "url": "https://x.com/openai",
+      "protocol": "openai",
+      "resolved": {
+        "protocol": "openai",
+        "explicit": false,
+        "baseUrl": "https://x.com/openai"
+      },
+      "chat": "https://x.com/openai/v1/chat/completions",
+      "embeddings": "https://x.com/openai/v1/embeddings",
+      "models": "https://x.com/openai/v1/models"
+    },
+    {
+      "url": "https://x.com/openai",
+      "protocol": "gemini",
+      "resolved": {
+        "protocol": "gemini",
+        "explicit": false,
+        "baseUrl": "https://x.com/openai"
+      },
+      "chat": "https://x.com/openai/chat/completions",
+      "embeddings": "https://x.com/openai/embeddings",
+      "models": "https://x.com/v1beta/models"
+    },
+    {
+      "url": "https://x.com/openai",
+      "protocol": "anthropic",
+      "resolved": {
+        "protocol": "anthropic",
+        "explicit": false,
+        "baseUrl": "https://x.com/openai"
+      },
+      "chat": "https://x.com/openai/v1/messages",
+      "embeddings": "",
+      "models": "https://x.com/openai/v1/models"
+    }
+  ],
+  "headers": [
+    {
+      "protocol": "openai",
+      "options": null,
+      "expect": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "openai",
+      "options": {
+        "accept": "text/event-stream"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "openai",
+      "options": {
+        "contentType": false
+      },
+      "expect": {
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "openai",
+      "options": {
+        "useNativeGeminiAuth": true,
+        "accept": "application/json"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "gemini",
+      "options": null,
+      "expect": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "gemini",
+      "options": {
+        "accept": "text/event-stream"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "gemini",
+      "options": {
+        "contentType": false
+      },
+      "expect": {
+        "Authorization": "Bearer sk-abc"
+      }
+    },
+    {
+      "protocol": "gemini",
+      "options": {
+        "useNativeGeminiAuth": true,
+        "accept": "application/json"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "x-goog-api-key": "sk-abc"
+      }
+    },
+    {
+      "protocol": "anthropic",
+      "options": null,
+      "expect": {
+        "Content-Type": "application/json",
+        "x-api-key": "sk-abc",
+        "anthropic-version": "2023-06-01"
+      }
+    },
+    {
+      "protocol": "anthropic",
+      "options": {
+        "accept": "text/event-stream"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "x-api-key": "sk-abc",
+        "anthropic-version": "2023-06-01"
+      }
+    },
+    {
+      "protocol": "anthropic",
+      "options": {
+        "contentType": false
+      },
+      "expect": {
+        "x-api-key": "sk-abc",
+        "anthropic-version": "2023-06-01"
+      }
+    },
+    {
+      "protocol": "anthropic",
+      "options": {
+        "useNativeGeminiAuth": true,
+        "accept": "application/json"
+      },
+      "expect": {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "x-api-key": "sk-abc",
+        "anthropic-version": "2023-06-01"
+      }
+    }
+  ],
+  "usage": [
+    {
+      "payload": null,
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": null,
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": null,
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": 5,
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": 5,
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": 5,
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": "x",
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": "x",
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": "x",
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": [],
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": [],
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": [],
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": {},
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {},
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {},
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": null
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": null
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": null
+      },
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": 0
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": 0
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": 0
+      },
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {}
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {}
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {}
+      },
+      "protocol": "gemini",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 20
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 10,
+        "completionTokens": 20
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 20
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 20
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 10,
+        "completionTokens": 20
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": "10",
+          "completion_tokens": "x"
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 10,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": "10",
+          "completion_tokens": "x"
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": "10",
+          "completion_tokens": "x"
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 10,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": null
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 0,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": null
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "prompt_tokens": null
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 0,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "completion_tokens": 7
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 0,
+        "completionTokens": 7
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "completion_tokens": 7
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "completion_tokens": 7
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 0,
+        "completionTokens": 7
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 4,
+          "prompt_tokens": 100
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 100,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 4,
+          "prompt_tokens": 100
+        }
+      },
+      "protocol": "anthropic",
+      "expect": {
+        "promptTokens": 3,
+        "completionTokens": 4
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "input_tokens": 3,
+          "output_tokens": 4,
+          "prompt_tokens": 100
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 100,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usageMetadata": {
+          "promptTokenCount": 8,
+          "candidatesTokenCount": 9
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 8,
+        "completionTokens": 9
+      }
+    },
+    {
+      "payload": {
+        "usageMetadata": {
+          "promptTokenCount": 8,
+          "candidatesTokenCount": 9
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usageMetadata": {
+          "promptTokenCount": 8,
+          "candidatesTokenCount": 9
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 8,
+        "completionTokens": 9
+      }
+    },
+    {
+      "payload": {
+        "usage": null,
+        "usageMetadata": {
+          "promptTokenCount": 8
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 8,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": null,
+        "usageMetadata": {
+          "promptTokenCount": 8
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": null,
+        "usageMetadata": {
+          "promptTokenCount": 8
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 8,
+        "completionTokens": 0
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "promptTokenCount": 1,
+          "candidatesTokenCount": 2
+        }
+      },
+      "protocol": "openai",
+      "expect": {
+        "promptTokens": 1,
+        "completionTokens": 2
+      }
+    },
+    {
+      "payload": {
+        "usage": {
+          "promptTokenCount": 1,
+          "candidatesTokenCount": 2
+        }
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": {
+          "promptTokenCount": 1,
+          "candidatesTokenCount": 2
+        }
+      },
+      "protocol": "gemini",
+      "expect": {
+        "promptTokens": 1,
+        "completionTokens": 2
+      }
+    },
+    {
+      "payload": {
+        "usage": [
+          1,
+          2
+        ]
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": [
+          1,
+          2
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "usage": [
+          1,
+          2
+        ]
+      },
+      "protocol": "gemini",
+      "expect": null
+    }
+  ],
+  "text": [
+    {
+      "payload": null,
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": null,
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": "x",
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": "x",
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": [],
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": [],
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {},
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {},
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": []
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": []
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": "x"
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": "x"
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {}
+        ]
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {}
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": "你好"
+            }
+          }
+        ]
+      },
+      "protocol": "openai",
+      "expect": "你好"
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": "你好"
+            }
+          }
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "a"
+                },
+                {
+                  "text": null
+                },
+                {
+                  "text": 5
+                },
+                "s",
+                null,
+                {
+                  "x": 1
+                },
+                {
+                  "text": {
+                    "o": 1
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "protocol": "openai",
+      "expect": "a5[object Object]"
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "a"
+                },
+                {
+                  "text": null
+                },
+                {
+                  "text": 5
+                },
+                "s",
+                null,
+                {
+                  "x": 1
+                },
+                {
+                  "text": {
+                    "o": 1
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": 5
+            }
+          }
+        ]
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          {
+            "message": {
+              "content": 5
+            }
+          }
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          null
+        ]
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "choices": [
+          null
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": null
+    },
+    {
+      "payload": {
+        "content": [
+          {
+            "type": "text",
+            "text": "claude"
+          },
+          {
+            "type": "tool_use"
+          }
+        ]
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "content": [
+          {
+            "type": "text",
+            "text": "claude"
+          },
+          {
+            "type": "tool_use"
+          }
+        ]
+      },
+      "protocol": "anthropic",
+      "expect": "claude"
+    },
+    {
+      "payload": {
+        "content": "plain"
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "content": "plain"
+      },
+      "protocol": "anthropic",
+      "expect": "plain"
+    },
+    {
+      "payload": {
+        "content": 5
+      },
+      "protocol": "openai",
+      "expect": null
+    },
+    {
+      "payload": {
+        "content": 5
+      },
+      "protocol": "anthropic",
+      "expect": null
+    }
+  ]
+}

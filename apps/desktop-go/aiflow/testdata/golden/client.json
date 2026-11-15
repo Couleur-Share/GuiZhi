@@ -1,0 +1,2945 @@
+{
+  "chat": [
+    {
+      "name": "openai 非流式：max_completion_tokens、转义字符与超时透传",
+      "config": {
+        "id": "m-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini"
+      },
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是助手。\n请用中文回答。"
+        },
+        {
+          "role": "user",
+          "content": "总结：<b>天气</b> & \"引号\"   末尾"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 512,
+        "timeoutMs": 120000
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"你好\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":3}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"你是助手。\\n请用中文回答。\"},{\"role\":\"user\",\"content\":\"总结：<b>天气</b> & \\\"引号\\\"   末尾\"}],\"temperature\":0.2,\"stream\":false,\"max_completion_tokens\":512}",
+            "timeoutMs": 120000
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "你好",
+            "finishReason": "stop",
+            "usage": {
+              "promptTokens": 12,
+              "completionTokens": 3
+            }
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "temperature 为 0 也要原样带上（?? 而不是 ||）",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "temperature": 0
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "deepseek 缺 /v1 自动补全，默认 0.7 / 2048，内容块数组取 text 拼接",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"甲\"},{\"type\":\"image_url\"},{\"type\":\"text\",\"text\":\"乙\"},{\"type\":\"text\"}]},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "甲乙",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "非流式：reasoning_content 与 usage",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"答案\",\"reasoning_content\":\"先想一想\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":34}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "答案",
+            "thinkingContent": "先想一想",
+            "finishReason": "stop",
+            "usage": {
+              "promptTokens": 12,
+              "completionTokens": 34
+            }
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "usage 是空对象时按 0 计，usage 为 null 时不返回",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"a\"},\"finish_reason\":\"stop\"}],\"usage\":{}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"b\"},\"finish_reason\":\"stop\"}],\"usage\":null}"
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "a",
+            "finishReason": "stop",
+            "usage": {
+              "promptTokens": 0,
+              "completionTokens": 0
+            }
+          },
+          {
+            "content": "b",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "gemini：去掉 models/ 前缀并走兼容层端点",
+      "config": {
+        "id": "m-gemini",
+        "provider": "google",
+        "apiProtocol": "gemini",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://generativelanguage.googleapis.com",
+        "model": "models/gemini-2.5-flash"
+      },
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是助手。\n请用中文回答。"
+        },
+        {
+          "role": "user",
+          "content": "总结：<b>天气</b> & \"引号\"   末尾"
+        }
+      ],
+      "options": {
+        "maxTokens": 100
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"你好\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gemini-2.5-flash\",\"messages\":[{\"role\":\"system\",\"content\":\"你是助手。\\n请用中文回答。\"},{\"role\":\"user\",\"content\":\"总结：<b>天气</b> & \\\"引号\\\"   末尾\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":100}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "你好",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "anthropic：system 提到顶层，assistant 保留，其余按 user",
+      "config": {
+        "id": "m-claude",
+        "provider": "anthropic",
+        "apiProtocol": "anthropic",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-5"
+      },
+      "messages": [
+        {
+          "role": "system",
+          "content": "系统提示"
+        },
+        {
+          "role": "system",
+          "content": "第二条 system 被忽略"
+        },
+        {
+          "role": "user",
+          "content": "问题一"
+        },
+        {
+          "role": "assistant",
+          "content": "回答一"
+        },
+        {
+          "role": "user",
+          "content": "问题二"
+        }
+      ],
+      "options": {
+        "maxTokens": 300,
+        "stream": true,
+        "timeoutMs": 90000
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"content\":[{\"type\":\"text\",\"text\":\"你\"},{\"type\":\"thinking\",\"thinking\":\"x\"},{\"type\":\"text\",\"text\":\"好\"}],\"stop_reason\":\"end_turn\"}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.anthropic.com/v1/messages",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "sk-test-0123456789",
+              "anthropic-version": "2023-06-01"
+            },
+            "body": "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":300,\"messages\":[{\"role\":\"user\",\"content\":\"问题一\"},{\"role\":\"assistant\",\"content\":\"回答一\"},{\"role\":\"user\",\"content\":\"问题二\"}],\"stream\":false,\"system\":\"系统提示\"}",
+            "timeoutMs": 90000
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "你好",
+            "finishReason": "end_turn"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "anthropic：max_tokens 截断归一成 length，无 system 时不带该字段",
+      "config": {
+        "id": "m-claude",
+        "provider": "anthropic",
+        "apiProtocol": "anthropic",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-5"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "写长文"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"content\":[{\"type\":\"text\",\"text\":\"半截\"}],\"stop_reason\":\"max_tokens\",\"usage\":{\"input_tokens\":5,\"output_tokens\":9}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.anthropic.com/v1/messages",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "sk-test-0123456789",
+              "anthropic-version": "2023-06-01"
+            },
+            "body": "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":2048,\"messages\":[{\"role\":\"user\",\"content\":\"写长文\"}],\"stream\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "半截",
+            "finishReason": "length"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "anthropic：空正文按失败处理",
+      "config": {
+        "id": "m-claude",
+        "provider": "anthropic",
+        "apiProtocol": "anthropic",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-5"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "x"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"content\":[],\"stop_reason\":\"end_turn\"}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.anthropic.com/v1/messages",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "sk-test-0123456789",
+              "anthropic-version": "2023-06-01"
+            },
+            "body": "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":2048,\"messages\":[{\"role\":\"user\",\"content\":\"x\"}],\"stream\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "模型返回了空正文（finish_reason=end_turn）",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "anthropic：结构化错误带 type 前缀",
+      "config": {
+        "id": "m-claude",
+        "provider": "anthropic",
+        "apiProtocol": "anthropic",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.anthropic.com",
+        "model": "claude-sonnet-4-5"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "x"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"max_tokens: required\"}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.anthropic.com/v1/messages",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "x-api-key": "sk-test-0123456789",
+              "anthropic-version": "2023-06-01"
+            },
+            "body": "{\"model\":\"claude-sonnet-4-5\",\"max_tokens\":2048,\"messages\":[{\"role\":\"user\",\"content\":\"x\"}],\"stream\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "[invalid_request_error] max_tokens: required",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "qwen 非流式：enable_thinking 强制 false",
+      "config": {
+        "id": "m-qwen",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "enableThinking": true
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"qwen-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "qwen 流式：enable_thinking 可以为 true",
+      "config": {
+        "id": "m-qwen",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "enableThinking": true,
+        "stream": true
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"好\"}}]}\ndata: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"的\"},\"finish_reason\":\"stop\"}]}\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"qwen-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048,\"enable_thinking\":true}"
+          }
+        ],
+        "streamed": [
+          "好",
+          "的"
+        ],
+        "warnings": [],
+        "results": [
+          {
+            "content": "好的",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "其他模型 enableThinking 直接带 true（deepseek 类）",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "enableThinking": true
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":true}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "流式：半条事件跨块、CRLF、reasoning、usage 收尾事件与 [DONE]",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true,
+        "timeoutMs": 120000
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"想\"}}]}\r\ndata: {\"choices\":[{\"inde",
+            "x\":0,\"delta\":{\"content\":\"你\"}}]}\r\n\r\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{}}]}\ndata: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"好\"}}]}\ndata: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\",\"reasoning_content\":\"\"}}]}\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"！\"},\"finish_reason\":\"stop\"}]}\n",
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":\"7\",\"completion_tokens\":2}}\ndata: [DONE]\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "streamed": [
+          "你",
+          "好",
+          "！"
+        ],
+        "warnings": [],
+        "results": [
+          {
+            "content": "你好！",
+            "thinkingContent": "想",
+            "finishReason": "stop",
+            "usage": {
+              "promptTokens": 7,
+              "completionTokens": 2
+            }
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "流式：非 data: 行、无空格的 data:、坏 JSON 全部忽略，末行无换行靠 flush 收尾",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "script": [
+        {
+          "chunks": [
+            ": keep-alive\n",
+            "event: message\n",
+            "data:{\"choices\":[{\"delta\":{\"content\":\"忽略\"}}]}\n",
+            "data: {not json}\n",
+            "data: 123\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"保留\"}}]}\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"尾巴\"},\"finish_reason\":\"stop\"}]}"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [
+          "保留",
+          "尾巴"
+        ],
+        "warnings": [],
+        "results": [
+          {
+            "content": "保留尾巴",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "流式：finish_reason 为 length 与 usage 字符串被数字化",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true,
+        "maxTokens": 50
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"被截\"}}]}\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\ndata: {\"choices\":[{\"delta\":{},\"finish_reason\":\"\"}],\"usage\":{\"prompt_tokens\":\"abc\",\"completion_tokens\":null}}\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":50}"
+          }
+        ],
+        "streamed": [
+          "被截"
+        ],
+        "warnings": [],
+        "results": [
+          {
+            "content": "被截",
+            "finishReason": "length",
+            "usage": {
+              "promptTokens": 0,
+              "completionTokens": 0
+            }
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "流式：读流失败经 onError 抛出",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"半\"}}]}\n"
+          ],
+          "streamError": "流读取中断"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [
+          "半"
+        ],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "流读取中断",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "流式：HTTP 错误响应走统一的错误文案",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"Incorrect API key provided\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "Incorrect API key provided (code: invalid_api_key)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "流式：没有正文（只有思考）按失败处理，原因恒为 unknown",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true,
+        "maxTokens": 64
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"一直在想\"}}]}\ndata: {\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"length\"}]}\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":64}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "模型返回了空正文（finish_reason=unknown）",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "token 参数重试：openai 系先 max_completion_tokens，被拒后换成 max_tokens（键移到末尾）",
+      "config": {
+        "id": "m-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "maxTokens": 256,
+        "enableThinking": true
+      },
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"Unsupported parameter: 'max_completion_tokens' is not supported with this model. Use 'max_tokens' instead.\",\"type\":\"invalid_request_error\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":256,\"enable_thinking\":true}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"enable_thinking\":true,\"max_tokens\":256}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] Token parameter mismatch detected: \"[invalid_request_error] Unsupported parameter: 'max_completion_tokens' is not supported with this model. Use 'max_tokens' instead.\". Retrying with alternative parameter..."
+        ],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "token 参数重试：自定义模型先 max_tokens，被拒后换成 max_completion_tokens",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.example.com/v1",
+        "model": "my-reasoner"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "maxTokens": 256
+      },
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.\",\"type\":\"invalid_request_error\",\"code\":\"unsupported_parameter\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":256}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":256}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] Token parameter mismatch detected: \"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead. (code: unsupported_parameter)\". Retrying with alternative parameter..."
+        ],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "token 参数重试：重试后仍失败，报第二次的错误",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.example.com/v1",
+        "model": "my-reasoner"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"'max_tokens' is not supported\"}}"
+        },
+        {
+          "status": 429,
+          "body": "{\"error\":{\"message\":\"Rate limit reached\",\"type\":\"rate_limit_error\"}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] Token parameter mismatch detected: \"'max_tokens' is not supported\". Retrying with alternative parameter..."
+        ],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "[rate_limit_error] Rate limit reached",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "token 参数重试：流式请求重试后仍是流式",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.example.com/v1",
+        "model": "my-reasoner"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"Use 'max_completion_tokens' instead\"}}"
+        },
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"成功\"},\"finish_reason\":\"stop\"}]}\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"my-reasoner\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_completion_tokens\":2048}"
+          }
+        ],
+        "streamed": [
+          "成功"
+        ],
+        "warnings": [
+          "[AI Service] Token parameter mismatch detected: \"Use 'max_completion_tokens' instead\". Retrying with alternative parameter..."
+        ],
+        "results": [
+          {
+            "content": "成功",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "enable_thinking 重试：qwen 非流式被拒后强制 false 再发",
+      "config": {
+        "id": "m-qwen",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "enableThinking": true
+      },
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"parameter.enable_thinking must be set to false for non-streaming calls\",\"code\":\"invalid_parameter_error\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"qwen-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":false}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"qwen-plus\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] enable_thinking parameter error detected: \"parameter.enable_thinking must be set to false for non-streaming calls (code: invalid_parameter_error)\". Retrying with enable_thinking=false..."
+        ],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "enable_thinking 重试：非 qwen 模型的 true 被改成 false，位置不变",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "enableThinking": true
+      },
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"enable_thinking only support stream mode\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":true}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048,\"enable_thinking\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] enable_thinking parameter error detected: \"enable_thinking only support stream mode\". Retrying with enable_thinking=false..."
+        ],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "enable_thinking 重试：不带该键的请求补到末尾",
+      "config": {
+        "id": "m-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"message\":\"enable_thinking must be set to false\"}}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048,\"enable_thinking\":false}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [
+          "[AI Service] enable_thinking parameter error detected: \"enable_thinking must be set to false\". Retrying with enable_thinking=false..."
+        ],
+        "results": [
+          {
+            "content": "ok",
+            "finishReason": "stop"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "错误文案：带 code 的结构化错误",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"Incorrect API key provided\",\"type\":\"invalid_request_error\",\"code\":\"invalid_api_key\"}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "Incorrect API key provided (code: invalid_api_key)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：type 与 message 相同时不加前缀；只有 status（Gemini 风格）",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 400,
+          "body": "{\"error\":{\"type\":\"overloaded\"}}"
+        },
+        {
+          "status": 429,
+          "body": "{\"error\":{\"status\":\"RESOURCE_EXHAUSTED\",\"code\":429}}"
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "overloaded",
+            "aborted": false
+          },
+          {
+            "message": "RESOURCE_EXHAUSTED (code: 429)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：顶层 message、detail 与字符串 error",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"message\":\"boom\"}"
+        },
+        {
+          "status": 404,
+          "body": "{\"detail\":\"Not Found\"}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":\"plain string error\"}"
+        }
+      ],
+      "abort": null,
+      "calls": 3,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "boom",
+            "aborted": false
+          },
+          {
+            "message": "Not Found",
+            "aborted": false
+          },
+          {
+            "message": "plain string error",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：HTML 网关页取 title，没有 title 回落到状态文案",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 502,
+          "headers": {
+            "Content-Type": "text/html; charset=utf-8"
+          },
+          "body": "<!DOCTYPE html><html><head><title>\n  502   Bad\tGateway </title></head><body>x</body></html>"
+        },
+        {
+          "status": 503,
+          "body": "  <HTML><body>no title</body></HTML>"
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "API 请求失败 (502): 502 Bad Gateway",
+            "aborted": false
+          },
+          {
+            "message": "API 请求失败 (503)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：504 网关超时",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 504,
+          "body": "gateway time-out"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "API request gateway timed out (504). The provider or proxy did not finish before its own timeout.",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：纯文本截到 200 个 UTF-16 单元，空体回落",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 500,
+          "body": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错😀误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误"
+        },
+        {
+          "status": 500,
+          "body": ""
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错错😀误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误误",
+            "aborted": false
+          },
+          {
+            "message": "API 请求失败 (500)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "错误文案：传输层失败（status 0 + error）原样返回，空 error 回落到状态文案",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 0,
+          "ok": false,
+          "error": "AI 请求超时（120000ms）"
+        },
+        {
+          "status": 0,
+          "ok": false,
+          "error": ""
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "AI 请求超时（120000ms）",
+            "aborted": false
+          },
+          {
+            "message": "API 请求失败 (0)",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "响应：choices 为空或缺失",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"choices\":[]}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"x\"}"
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "AI 返回结果为空",
+            "aborted": false
+          },
+          {
+            "message": "AI 返回结果为空",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "响应：正文为 null / 纯空白 / 缺 finish_reason 都按空正文失败",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null},\"finish_reason\":\"stop\"}]}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"  \\n\\t \"},\"finish_reason\":\"stop\"}]}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 3,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "模型返回了空正文（finish_reason=stop）",
+            "aborted": false
+          },
+          {
+            "message": "模型返回了空正文（finish_reason=stop）",
+            "aborted": false
+          },
+          {
+            "message": "模型返回了空正文（finish_reason=unknown）",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "响应：输出被截断没有正文——区分思考耗尽与普通截断",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "maxTokens": 1000
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"想了很久\"},\"finish_reason\":\"length\"}]}"
+        },
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":\"length\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 2,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":1000}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":1000}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "模型把 1000 token 的输出预算全用在思考过程上（finish_reason=length），没有产出正文。请为该场景改用非思考模型。",
+            "aborted": false
+          },
+          {
+            "message": "模型输出在 1000 token 上限处被截断，没有产出正文。",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "响应：allowEmptyContent 放行空正文",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "allowEmptyContent": true
+      },
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"想\"},\"finish_reason\":\"length\"}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          {
+            "content": "",
+            "thinkingContent": "想",
+            "finishReason": "length"
+          }
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "校验：缺 key / url / model 不发请求",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://api.example.com/v1",
+        "model": "test-model"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "API Key is not configured",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "校验：缺 url",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "",
+        "model": "test-model"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "API URL is not configured",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "校验：缺 model",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.example.com/v1",
+        "model": ""
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "No model selected",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消：请求前已取消",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [],
+      "abort": "before",
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "已取消",
+            "aborted": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消：非流式请求进行中取消",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "abortDuring": true,
+          "status": 0,
+          "ok": false,
+          "error": "已取消"
+        }
+      ],
+      "abort": "during",
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "已取消",
+            "aborted": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消：流式请求进行中取消",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {
+        "stream": true
+      },
+      "script": [
+        {
+          "abortDuring": true,
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"半\"}}]}\n"
+          ],
+          "status": 0,
+          "ok": false,
+          "error": "已取消"
+        }
+      ],
+      "abort": "during",
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":true,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [
+          "半"
+        ],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "已取消",
+            "aborted": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "传输层抛错：message 原样透出",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "options": {},
+      "script": [
+        {
+          "throws": "socket hang up"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "streamed": [],
+        "warnings": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "socket hang up",
+            "aborted": false
+          }
+        ]
+      }
+    }
+  ],
+  "testConnection": [
+    {
+      "name": "成功",
+      "config": {
+        "id": "m-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini"
+      },
+      "prompt": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"temperature\":0,\"stream\":false,\"max_completion_tokens\":8}",
+            "timeoutMs": 12000
+          }
+        ],
+        "result": {
+          "id": "m-openai",
+          "success": true,
+          "response": "OK",
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        }
+      }
+    },
+    {
+      "name": "成功：思考类模型探针正文为空也算连通",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "prompt": null,
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"reasoning_content\":\"想\"},\"finish_reason\":\"length\"}]}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"temperature\":0,\"stream\":false,\"max_tokens\":8}",
+            "timeoutMs": 12000
+          }
+        ],
+        "result": {
+          "id": "m-ds",
+          "success": true,
+          "response": "",
+          "thinkingContent": "想",
+          "model": "deepseek-chat",
+          "provider": "deepseek"
+        }
+      }
+    },
+    {
+      "name": "自定义提示词",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "prompt": "ping",
+      "script": [
+        {
+          "status": 200,
+          "body": "{\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"pong\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}],\"temperature\":0,\"stream\":false,\"max_tokens\":8}",
+            "timeoutMs": 12000
+          }
+        ],
+        "result": {
+          "id": "m-ds",
+          "success": true,
+          "response": "pong",
+          "model": "deepseek-chat",
+          "provider": "deepseek"
+        }
+      }
+    },
+    {
+      "name": "失败：401",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "prompt": null,
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"bad key\",\"code\":\"invalid_api_key\"}}"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"temperature\":0,\"stream\":false,\"max_tokens\":8}",
+            "timeoutMs": 12000
+          }
+        ],
+        "result": {
+          "id": "m-ds",
+          "success": false,
+          "error": "bad key (code: invalid_api_key)",
+          "model": "deepseek-chat",
+          "provider": "deepseek"
+        }
+      }
+    },
+    {
+      "name": "失败：未配置 key",
+      "config": {
+        "id": "m1",
+        "provider": "custom",
+        "apiProtocol": "openai",
+        "apiKey": "",
+        "apiUrl": "https://api.example.com/v1",
+        "model": "test-model"
+      },
+      "prompt": null,
+      "script": [],
+      "expect": {
+        "requests": [],
+        "result": {
+          "id": "m1",
+          "success": false,
+          "error": "API Key is not configured",
+          "model": "test-model",
+          "provider": "custom"
+        }
+      }
+    },
+    {
+      "name": "失败：传输层抛错",
+      "config": {
+        "id": "m-ds",
+        "provider": "deepseek",
+        "apiProtocol": "openai",
+        "apiKey": "sk-test-0123456789",
+        "apiUrl": "https://api.deepseek.com",
+        "model": "deepseek-chat"
+      },
+      "prompt": null,
+      "script": [
+        {
+          "throws": "ECONNRESET"
+        }
+      ],
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.deepseek.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-test-0123456789"
+            },
+            "body": "{\"model\":\"deepseek-chat\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with exactly: OK\"}],\"temperature\":0,\"stream\":false,\"max_tokens\":8}",
+            "timeoutMs": 12000
+          }
+        ],
+        "result": {
+          "id": "m-ds",
+          "success": false,
+          "error": "ECONNRESET",
+          "model": "deepseek-chat",
+          "provider": "deepseek"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,2940 @@
+{
+  "cases": [
+    {
+      "name": "空设置：什么都没配",
+      "settings": {},
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "只有旧版单模型字段：问答类场景兜底，视觉与转写不兜底",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiProtocol": "openai",
+        "aiApiKey": "sk-legacy",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-legacy",
+            "apiUrl": "https://legacy.example.com",
+            "model": "legacy-1"
+          },
+          "tagging": {
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-legacy",
+            "apiUrl": "https://legacy.example.com",
+            "model": "legacy-1"
+          },
+          "qa": {
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-legacy",
+            "apiUrl": "https://legacy.example.com",
+            "model": "legacy-1"
+          },
+          "wiki": {
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-legacy",
+            "apiUrl": "https://legacy.example.com",
+            "model": "legacy-1"
+          },
+          "research": {
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-legacy",
+            "apiUrl": "https://legacy.example.com",
+            "model": "legacy-1"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "旧版字段缺 key（全空白）视为未配置",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiKey": "   ",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "旧版字段的协议按地址推断",
+      "settings": {
+        "aiProvider": "x",
+        "aiApiProtocol": "bogus",
+        "aiApiKey": "k",
+        "aiApiUrl": "https://api.anthropic.com/v1",
+        "aiModel": "claude-x"
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "provider": "x",
+            "apiProtocol": "anthropic",
+            "apiKey": "k",
+            "apiUrl": "https://api.anthropic.com/v1",
+            "model": "claude-x"
+          },
+          "tagging": {
+            "provider": "x",
+            "apiProtocol": "anthropic",
+            "apiKey": "k",
+            "apiUrl": "https://api.anthropic.com/v1",
+            "model": "claude-x"
+          },
+          "qa": {
+            "provider": "x",
+            "apiProtocol": "anthropic",
+            "apiKey": "k",
+            "apiUrl": "https://api.anthropic.com/v1",
+            "model": "claude-x"
+          },
+          "wiki": {
+            "provider": "x",
+            "apiProtocol": "anthropic",
+            "apiKey": "k",
+            "apiUrl": "https://api.anthropic.com/v1",
+            "model": "claude-x"
+          },
+          "research": {
+            "provider": "x",
+            "apiProtocol": "anthropic",
+            "apiKey": "k",
+            "apiUrl": "https://api.anthropic.com/v1",
+            "model": "claude-x"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [],
+          "legacyProtocol": "anthropic"
+        }
+      }
+    },
+    {
+      "name": "两个对话模型：isDefault 的优先，其次第一个",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "tagging": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "qa": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "wiki": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "research": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "没有 isDefault：取第一个启用的对话模型",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            },
+            "enabled": false
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "c",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-c",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-c",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true,
+            "enabled": false
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "tagging": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "qa": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "wiki": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "research": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "路由默认优先于 isDefault；场景默认在路由默认缺失时生效",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "c",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-c",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-c",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "b"
+        },
+        "scenarioModelDefaults": {
+          "summary": "c",
+          "qa": "a",
+          "tagging": "c"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "c",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-c",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-c"
+          },
+          "tagging": {
+            "id": "c",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-c",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-c"
+          },
+          "qa": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "wiki": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "research": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "b",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "b",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "mainText": "b"
+          },
+          "scenarioDefaults": {
+            "summary": "c",
+            "qa": "a",
+            "tagging": "c"
+          },
+          "protocols": [
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "只给场景默认：据此推导路由默认（qa→mainText，summary→fastText，ocr→visionText）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "v1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-v1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-v1",
+            "capabilities": {
+              "chat": true,
+              "vision": true
+            }
+          },
+          {
+            "id": "v2",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-v2",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-v2",
+            "capabilities": {
+              "chat": true,
+              "vision": true
+            }
+          }
+        ],
+        "scenarioModelDefaults": {
+          "wiki": "b",
+          "tagging": "b",
+          "ocr": "v2"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "tagging": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "qa": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "wiki": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "research": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "transcription": null,
+          "ocr": {
+            "id": "v2",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-v2",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-v2"
+          }
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": true
+        },
+        "routes": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": "v2",
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "b",
+          "fastText": "b",
+          "visionText": "v2",
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b",
+            "v1",
+            "v2"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "mainText": "b",
+            "visionText": "v2",
+            "fastText": "b"
+          },
+          "scenarioDefaults": {
+            "wiki": "b",
+            "tagging": "b",
+            "ocr": "v2"
+          },
+          "protocols": [
+            "openai",
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "场景默认指向不存在或已停用的模型：回退到默认",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "off",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-off",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-off",
+            "capabilities": {
+              "chat": true
+            },
+            "enabled": false
+          }
+        ],
+        "scenarioModelDefaults": {
+          "qa": "gone",
+          "summary": "off"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "off"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "mainText": "gone",
+            "fastText": "off"
+          },
+          "scenarioDefaults": {
+            "qa": "gone",
+            "summary": "off"
+          },
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "视觉路由只认 vision 能力；chat:false 的模型不进对话候选",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          },
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "v1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-v1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-v1",
+            "capabilities": {
+              "chat": true,
+              "vision": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "embedding": "e1"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": {
+            "id": "v1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-v1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-v1"
+          }
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": true
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": "v1",
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": "v1",
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "e1",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "sk-e1",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-e1"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "e1",
+            "a",
+            "v1"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "embedding": "e1"
+          },
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "vision 依附于 chat：chat:false + vision:true 不算视觉模型",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "odd",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-odd",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-odd",
+            "capabilities": {
+              "chat": false,
+              "vision": true
+            }
+          },
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "odd",
+            "a"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "embedding 路由：显式默认、缺省取第一个、未配置",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          },
+          {
+            "id": "e2",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e2",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e2",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            },
+            "isDefault": true
+          }
+        ],
+        "modelRouteDefaults": {
+          "embedding": "e2"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e2",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e2",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "e2",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "sk-e2",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-e2"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "e1",
+            "e2"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "embedding": "e2"
+          },
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "embedding 缺省：没有 embedding 路由默认时取第一个候选（不看 isDefault 之外的优先）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          },
+          {
+            "id": "e2",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e2",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e2",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            },
+            "isDefault": true
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e2",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e2",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "e2",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "sk-e2",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-e2"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "e1",
+            "e2"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "音频路由：转写模型优先；只认显式设置，不回退",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "w1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-w1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-w1",
+            "capabilities": {
+              "chat": false,
+              "audioTranscription": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "audioText": "w1"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": {
+            "id": "w1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-w1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-w1"
+          },
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": true,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": "w1",
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": "w1",
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "w1"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "audioText": "w1"
+          },
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "音频路由：没有显式设置就没有结果；图像生成同理",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "w1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-w1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-w1",
+            "capabilities": {
+              "chat": false,
+              "audioTranscription": true
+            }
+          },
+          {
+            "id": "img",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-img",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-img",
+            "capabilities": {
+              "chat": false,
+              "imageGeneration": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "w1",
+            "img"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "音频路由：显式指向对话模型也可以",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "w1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-w1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-w1",
+            "capabilities": {
+              "chat": false,
+              "audioTranscription": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "audioText": "a",
+          "imageGen": "a"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": true,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": "a",
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": "a",
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "w1"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "audioText": "a",
+            "imageGen": "a"
+          },
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "供应商停用：带 providerId 的模型被排除（仅 embedding 解析传入供应商）",
+      "settings": {
+        "aiProviders": [
+          {
+            "id": "p1",
+            "name": "停用的",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-p1",
+            "apiUrl": "https://api.example.com/v1",
+            "enabled": false
+          }
+        ],
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            },
+            "providerId": "p1",
+            "isDefault": true
+          },
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            },
+            "providerId": "p1"
+          }
+        ],
+        "modelRouteDefaults": {
+          "embedding": "e1"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "e1"
+          ],
+          "providerIds": [
+            "p1"
+          ],
+          "routeDefaults": {
+            "embedding": "e1"
+          },
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "供应商停用：没有 providerId 时按 provider/协议/地址/key 匹配",
+      "settings": {
+        "aiProviders": [
+          {
+            "id": "p1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "enabled": false
+          }
+        ],
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          },
+          {
+            "id": "e2",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "other",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e2",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e2",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "e2",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "other",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-e2"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "e1",
+            "e2"
+          ],
+          "providerIds": [
+            "p1"
+          ],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "供应商匹配：provider.id 等于模型的 provider 字段",
+      "settings": {
+        "aiProviders": [
+          {
+            "id": "custom",
+            "provider": "other",
+            "apiProtocol": "openai",
+            "apiKey": "k",
+            "apiUrl": "https://z.example.com",
+            "enabled": false
+          }
+        ],
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "e1"
+          ],
+          "providerIds": [
+            "custom"
+          ],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "供应商匹配：providerId 指向不存在的供应商视为启用",
+      "settings": {
+        "aiProviders": [
+          {
+            "id": "p1",
+            "provider": "custom",
+            "apiKey": "k",
+            "apiUrl": "https://z.example.com",
+            "enabled": false
+          }
+        ],
+        "aiModels": [
+          {
+            "id": "e1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-e1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-e1",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            },
+            "providerId": "ghost"
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": null,
+          "tagging": null,
+          "qa": null,
+          "wiki": null,
+          "research": null,
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": false,
+          "tagging": false,
+          "qa": false,
+          "wiki": false,
+          "research": false,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": null,
+          "fastText": null,
+          "visionText": null,
+          "embedding": "e1",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "e1",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "sk-e1",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-e1"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "e1"
+          ],
+          "providerIds": [
+            "p1"
+          ],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "非法条目被丢弃：缺 id / 空白 id / 非字符串字段 / 数组 / null",
+      "settings": {
+        "aiModels": [
+          null,
+          5,
+          [],
+          "x",
+          {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "   ",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-blank",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-blank",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "noprovider",
+            "provider": "",
+            "apiProtocol": "openai",
+            "apiKey": "sk-noprovider",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-noprovider",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "nourl",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nourl",
+            "apiUrl": "  ",
+            "model": "model-nourl",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "nomodel",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nomodel",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": 7,
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-numid",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-numid",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "nokey",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nokey",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "numkey",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": 12345,
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-numkey",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "aiProviders": [
+          null,
+          {
+            "id": "",
+            "provider": "x",
+            "apiUrl": "u"
+          },
+          {
+            "id": "p",
+            "provider": "x",
+            "apiUrl": "https://z"
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1"
+          },
+          "tagging": {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1"
+          },
+          "qa": {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1"
+          },
+          "wiki": {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1"
+          },
+          "research": {
+            "id": "ok-1",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-ok-1",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-ok-1"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "ok-1",
+          "fastText": "ok-1",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "ok-1",
+          "fastText": "ok-1",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "ok-1",
+            "nokey",
+            "numkey"
+          ],
+          "providerIds": [
+            "p"
+          ],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "字段被 trim，协议按需推断，enabled 只有 false 才停用",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "  padded  ",
+            "provider": "  Anthropic ",
+            "apiProtocol": "weird",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": " https://x.example.com ",
+            "model": " m ",
+            "capabilities": {
+              "chat": true
+            },
+            "enabled": "no"
+          },
+          {
+            "id": "gem",
+            "provider": "google",
+            "apiKey": "sk-gem",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "models/gemini-x",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "padded",
+            "provider": "Anthropic",
+            "apiProtocol": "anthropic",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": "https://x.example.com",
+            "model": "m"
+          },
+          "tagging": {
+            "id": "padded",
+            "provider": "Anthropic",
+            "apiProtocol": "anthropic",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": "https://x.example.com",
+            "model": "m"
+          },
+          "qa": {
+            "id": "padded",
+            "provider": "Anthropic",
+            "apiProtocol": "anthropic",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": "https://x.example.com",
+            "model": "m"
+          },
+          "wiki": {
+            "id": "padded",
+            "provider": "Anthropic",
+            "apiProtocol": "anthropic",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": "https://x.example.com",
+            "model": "m"
+          },
+          "research": {
+            "id": "padded",
+            "provider": "Anthropic",
+            "apiProtocol": "anthropic",
+            "apiKey": "sk-  padded  ",
+            "apiUrl": "https://x.example.com",
+            "model": "m"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "padded",
+          "fastText": "padded",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "padded",
+          "fastText": "padded",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "padded",
+            "gem"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "anthropic",
+            "gemini"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "能力缺省：capabilities 缺失或不是对象时按纯对话模型",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          {
+            "id": "arrcap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-arrcap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-arrcap",
+            "capabilities": [
+              1
+            ]
+          },
+          {
+            "id": "strcap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-strcap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-strcap",
+            "capabilities": "chat"
+          },
+          {
+            "id": "emb",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-emb",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-emb",
+            "capabilities": {
+              "embedding": true
+            }
+          }
+        ]
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          "tagging": {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          "qa": {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          "wiki": {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          "research": {
+            "id": "nocap",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-nocap",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-nocap"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "nocap",
+          "fastText": "nocap",
+          "visionText": null,
+          "embedding": "emb",
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "nocap",
+          "fastText": "nocap",
+          "visionText": null,
+          "embedding": "emb",
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": {
+          "id": "emb",
+          "provider": "custom",
+          "apiProtocol": "openai",
+          "apiKey": "sk-emb",
+          "apiUrl": "https://api.example.com/v1",
+          "model": "model-emb"
+        },
+        "semantic": true,
+        "normalized": {
+          "modelIds": [
+            "nocap",
+            "arrcap",
+            "strcap",
+            "emb"
+          ],
+          "providerIds": [],
+          "routeDefaults": {},
+          "scenarioDefaults": {},
+          "protocols": [
+            "openai",
+            "openai",
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "场景默认与路由默认的值会 trim，未知键与非字符串值被丢弃",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "scenarioModelDefaults": {
+          "qa": "  b  ",
+          "summary": 5,
+          "unknown": "a",
+          "wiki": ""
+        },
+        "modelRouteDefaults": {
+          "mainText": " b ",
+          "fastText": null,
+          "nope": "a"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "tagging": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "qa": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "wiki": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "research": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "b",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "b",
+          "fastText": "a",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "mainText": "b"
+          },
+          "scenarioDefaults": {
+            "qa": "b"
+          },
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    },
+    {
+      "name": "路由默认全是空/非法时重新从场景默认推导",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "scenarioModelDefaults": {
+          "summary": "b"
+        },
+        "modelRouteDefaults": {
+          "mainText": "",
+          "nope": "a"
+        }
+      },
+      "expect": {
+        "scenarios": {
+          "summary": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "tagging": {
+            "id": "b",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-b",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-b"
+          },
+          "qa": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "wiki": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "research": {
+            "id": "a",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-a",
+            "apiUrl": "https://api.example.com/v1",
+            "model": "model-a"
+          },
+          "transcription": null,
+          "ocr": null
+        },
+        "configured": {
+          "summary": true,
+          "tagging": true,
+          "qa": true,
+          "wiki": true,
+          "research": true,
+          "transcription": false,
+          "ocr": false
+        },
+        "routes": {
+          "mainText": "a",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "routesWithProviders": {
+          "mainText": "a",
+          "fastText": "b",
+          "visionText": null,
+          "embedding": null,
+          "audioText": null,
+          "imageGen": null
+        },
+        "embedding": null,
+        "semantic": false,
+        "normalized": {
+          "modelIds": [
+            "a",
+            "b"
+          ],
+          "providerIds": [],
+          "routeDefaults": {
+            "fastText": "b"
+          },
+          "scenarioDefaults": {
+            "summary": "b"
+          },
+          "protocols": [
+            "openai",
+            "openai"
+          ],
+          "legacyProtocol": "openai"
+        }
+      }
+    }
+  ]
+}

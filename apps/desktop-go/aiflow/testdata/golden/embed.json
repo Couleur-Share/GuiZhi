@@ -1,0 +1,1069 @@
+{
+  "cases": [
+    {
+      "name": "空输入不发请求",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [],
+      "script": [],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "usage": [],
+        "results": [
+          []
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "成功：L2 归一化，请求体与头，记 prompt_tokens",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "第一段",
+        "second <b> & \"q\"\n"
+      ],
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]},{\"object\":\"embedding\",\"index\":1,\"embedding\":[1,0]}],\"usage\":{\"prompt_tokens\":12,\"total_tokens\":12}}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"第一段\",\"second <b> & \\\"q\\\"\\n\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 12,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              0.6,
+              0.8
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "按 index 对齐顺序（乱序返回）",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a",
+        "b",
+        "c"
+      ],
+      "script": [
+        {
+          "body": "{\"data\":[{\"index\":2,\"embedding\":[0,0,5]},{\"index\":0,\"embedding\":[2,0,0]},{\"index\":1,\"embedding\":[0,3,0]}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\",\"c\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "没有 index 字段时按位置；index 越界也按位置",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a",
+        "b"
+      ],
+      "script": [
+        {
+          "body": "{\"data\":[{\"embedding\":[1,1]},{\"index\":99,\"embedding\":[2,2]}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              0.7071067811865475,
+              0.7071067811865475
+            ],
+            [
+              0.7071067811865475,
+              0.7071067811865475
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "prompt_tokens 的各种形态：字符串、小数、负数、缺失",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}],\"usage\":{\"prompt_tokens\":\"42\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}],\"usage\":{\"prompt_tokens\":7.9}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}],\"usage\":{\"prompt_tokens\":-5}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}]}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}],\"usage\":{\"prompt_tokens\":\"abc\"}}"
+        }
+      ],
+      "abort": null,
+      "calls": 5,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 42,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ],
+          [
+            [
+              1
+            ]
+          ]
+        ],
+        "errors": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "零向量与含非数字分量的向量归一成全零",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a",
+        "b"
+      ],
+      "script": [
+        {
+          "body": "{\"data\":[{\"index\":0,\"embedding\":[0,0,0]},{\"index\":1,\"embedding\":[1,\"x\",3]}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "anthropic 不支持 embeddings",
+      "config": {
+        "id": "e1",
+        "provider": "anthropic",
+        "apiProtocol": "anthropic",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.anthropic.com",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "usage": [],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "当前协议不支持 embeddings 接口: anthropic",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "gemini 走兼容层端点",
+      "config": {
+        "id": "e1",
+        "provider": "google",
+        "apiProtocol": "gemini",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://generativelanguage.googleapis.com",
+        "model": "text-embedding-004"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1,2]}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://generativelanguage.googleapis.com/v1beta/openai/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-004\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-004",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              0.4472135954999579,
+              0.8944271909999159
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "# 结尾的显式地址",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://gw.example.com/embed#",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[1]}]}"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://gw.example.com/embed",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          [
+            [
+              1
+            ]
+          ]
+        ],
+        "errors": [
+          null
+        ]
+      }
+    },
+    {
+      "name": "HTTP 错误：详情截 300，error 字段优先于 body（空串回落）",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "status": 401,
+          "body": "{\"error\":{\"message\":\"bad key\"}}"
+        },
+        {
+          "status": 500,
+          "body": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+        },
+        {
+          "status": 0,
+          "ok": false,
+          "error": "AI 请求超时（60000ms）",
+          "body": "ignored"
+        },
+        {
+          "status": 502,
+          "ok": false,
+          "error": "",
+          "body": "上游错误"
+        }
+      ],
+      "abort": null,
+      "calls": 4,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "results": [
+          null,
+          null,
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "Embeddings 请求失败 (HTTP 401): {\"error\":{\"message\":\"bad key\"}}",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 请求失败 (HTTP 500): zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 请求失败 (HTTP 0): AI 请求超时（60000ms）",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 请求失败 (HTTP 502): 上游错误",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "响应格式错误：非 JSON、数量不符、缺向量、维度不一致",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a",
+        "b"
+      ],
+      "script": [
+        {
+          "body": "not json"
+        },
+        {
+          "body": "{\"data\":[{\"embedding\":[1]}]}"
+        },
+        {
+          "body": "{\"data\":\"x\"}"
+        },
+        {
+          "body": "{\"data\":[{\"embedding\":[1]},{\"embedding\":[]}]}"
+        },
+        {
+          "body": "{\"data\":[{\"embedding\":[1,2]},{\"embedding\":[1]}]}"
+        },
+        {
+          "body": "{\"data\":[{\"embedding\":[1]},{}]}"
+        },
+        {
+          "body": "{}"
+        }
+      ],
+      "abort": null,
+      "calls": 7,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\",\"b\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "results": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "errors": [
+          {
+            "message": "Embeddings 响应不是合法 JSON",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应数量不匹配：期望 2，实际 1",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应数量不匹配：期望 2，实际 0",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应缺少向量数据",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应向量维度不一致",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应缺少向量数据",
+            "aborted": false
+          },
+          {
+            "message": "Embeddings 响应数量不匹配：期望 2，实际 0",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "传输层抛错记失败用量",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "throws": "ECONNRESET"
+        }
+      ],
+      "abort": null,
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "ECONNRESET",
+            "aborted": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消：请求前",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [],
+      "abort": "before",
+      "calls": 1,
+      "expect": {
+        "requests": [],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "已取消",
+            "aborted": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "取消：进行中",
+      "config": {
+        "id": "e1",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "sk-emb",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small"
+      },
+      "texts": [
+        "a"
+      ],
+      "script": [
+        {
+          "abortDuring": true,
+          "status": 0,
+          "ok": false,
+          "error": "已取消"
+        }
+      ],
+      "abort": "during",
+      "calls": 1,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-emb"
+            },
+            "body": "{\"model\":\"text-embedding-3-small\",\"input\":[\"a\"]}",
+            "timeoutMs": 60000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "text-embedding-3-small",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "results": [
+          null
+        ],
+        "errors": [
+          {
+            "message": "已取消",
+            "aborted": true
+          }
+        ]
+      }
+    }
+  ]
+}

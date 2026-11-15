@@ -1,0 +1,771 @@
+{
+  "cases": [
+    {
+      "name": "未配置抛 AI_NOT_CONFIGURED，不发请求也不记用量",
+      "settings": {},
+      "scenario": "qa",
+      "options": {},
+      "script": [],
+      "abort": null,
+      "expect": {
+        "requests": [],
+        "usage": [],
+        "deltas": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "AI_NOT_CONFIGURED",
+          "aborted": false,
+          "notConfigured": true
+        }
+      }
+    },
+    {
+      "name": "摘要走 fastText 模型，默认超时 120 秒，成功记 token",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "summary",
+      "options": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"摘要结果\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":20}}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.3,\"stream\":false,\"max_tokens\":4096}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 100,
+            "completionTokens": 20
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": {
+          "content": "摘要结果",
+          "model": "model-fast",
+          "finishReason": "stop"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "问答走 mainText 模型；timeoutMs 覆盖默认值",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "qa",
+      "options": {
+        "timeoutMs": 180000
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"答案\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":7,\"completion_tokens\":8}}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-main"
+            },
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}",
+            "timeoutMs": 180000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-main",
+            "promptTokens": 7,
+            "completionTokens": 8
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": {
+          "content": "答案",
+          "model": "model-main",
+          "finishReason": "stop"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "onDelta 走流式，用量来自流末尾事件",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "qa",
+      "options": {
+        "stream": true,
+        "maxTokens": 4096,
+        "temperature": 0.2
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"delta\":{\"content\":\"流\"}}]}\ndata: {\"choices\":[{\"delta\":{\"content\":\"式\"},\"finish_reason\":\"stop\"}]}\ndata: {\"choices\":[],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":2}}\n"
+          ]
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-main"
+            },
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.2,\"stream\":true,\"max_completion_tokens\":4096}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-main",
+            "promptTokens": 11,
+            "completionTokens": 2
+          }
+        ],
+        "deltas": [
+          "流",
+          "式"
+        ],
+        "warnings": [],
+        "result": {
+          "content": "流式",
+          "model": "model-main",
+          "finishReason": "stop"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "失败也记用量（failed）并原样抛错",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "wiki",
+      "options": {},
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-main"
+            },
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "wiki",
+            "model": "model-main",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "upstream down",
+          "aborted": false
+        }
+      }
+    },
+    {
+      "name": "输出被截断：记日志并带回 finishReason=length（有 maxTokens）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "tagging",
+      "options": {
+        "maxTokens": 2048
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"被截断的半\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":1,\"completion_tokens\":2}}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "tagging",
+            "model": "model-fast",
+            "promptTokens": 1,
+            "completionTokens": 2
+          }
+        ],
+        "deltas": [],
+        "warnings": [
+          "[ai] tagging 输出被 max_tokens 截断（上限 2048），结果可能不完整"
+        ],
+        "result": {
+          "content": "被截断的半",
+          "model": "model-fast",
+          "finishReason": "length"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "输出被截断：没传 maxTokens 时日志写「默认」",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "research",
+      "options": {},
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"被截断的半\"},\"finish_reason\":\"length\"}]}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-main"
+            },
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "research",
+            "model": "model-main",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "deltas": [],
+        "warnings": [
+          "[ai] research 输出被 max_tokens 截断（上限 默认），结果可能不完整"
+        ],
+        "result": {
+          "content": "被截断的半",
+          "model": "model-main",
+          "finishReason": "length"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "旧版单模型字段兜底；用量记录用兜底模型名",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiKey": "sk-legacy",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "scenario": "summary",
+      "options": {},
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://legacy.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-legacy"
+            },
+            "body": "{\"model\":\"legacy-1\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "legacy-1",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": {
+          "content": "ok",
+          "model": "legacy-1",
+          "finishReason": "stop"
+        },
+        "error": null
+      }
+    },
+    {
+      "name": "视觉场景没有模型时不兜底",
+      "settings": {
+        "aiProvider": "custom",
+        "aiApiKey": "sk-legacy",
+        "aiApiUrl": "https://legacy.example.com",
+        "aiModel": "legacy-1"
+      },
+      "scenario": "ocr",
+      "options": {},
+      "script": [],
+      "abort": null,
+      "expect": {
+        "requests": [],
+        "usage": [],
+        "deltas": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "AI_NOT_CONFIGURED",
+          "aborted": false,
+          "notConfigured": true
+        }
+      }
+    },
+    {
+      "name": "取消：请求前已取消也记一次失败用量",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "qa",
+      "options": {},
+      "script": [],
+      "abort": "before",
+      "expect": {
+        "requests": [],
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-main",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "已取消",
+          "aborted": true
+        }
+      }
+    },
+    {
+      "name": "取消：进行中取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "qa",
+      "options": {},
+      "script": [
+        {
+          "abortDuring": true,
+          "status": 0,
+          "ok": false,
+          "error": "已取消"
+        }
+      ],
+      "abort": "during",
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-main"
+            },
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_completion_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-main",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "已取消",
+          "aborted": true
+        }
+      }
+    },
+    {
+      "name": "没有 usage 时记 0",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "scenario": "summary",
+      "options": {},
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "abort": null,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"user\",\"content\":\"问\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}",
+            "timeoutMs": 120000
+          }
+        ],
+        "usage": [
+          {
+            "scenario": "summary",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "deltas": [],
+        "warnings": [],
+        "result": {
+          "content": "ok",
+          "model": "model-fast",
+          "finishReason": "stop"
+        },
+        "error": null
+      }
+    }
+  ]
+}
