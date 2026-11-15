@@ -398,3 +398,21 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
   - **未验证**：真实微软拼音下命令面板输入框（组词中的 Enter 不应选中结果，并入 S1 清单）；讲述人对对话框、面板、提示的朗读；150% / 200% DPI 下的对话框与面板；真实指针的拖动手感（现在是 `Tester` 合成事件）；
     这些件加入后空闲内存的增量（不单独测，由检查点 1 一并验证）。
   - **仍待用户**（沿用）：S1、S2 实机清单（M2 前）、托盘态是否单独销毁 WebView、AAC 的 LGPL 取舍（M2 前）、渲染层缺陷修哪几项。
+- 2026-11-15（1.4 设置的 Go 化，完成；分支提交 `2dbb1dd4`，未推送）：设置收成「每个字段一个物理存放处、界面一份快照」，细节与对等差异见分支的 `docs/agents/native-ui-development.md` §5「设置」。
+  - **归属**：界面设置与偏好 → `config/ui-prefs.json`（放在库外，备份还原不会把主题与布局一起回滚）；Go 侧其他组件也要读的 13 个键（语言、自启、通知、代理、FlareSolverr、自动备份三项、工具路径……）→ SQLite `settings` 表，写入走现有的 `Library.settingsSet`，与渲染进程同一份校验、事务和代理即时生效；AI 连接留在 `ai-models.json`，不导入、不进设置文件。`dataPath`、`settingsUpdatedAt` 是 Electron 时代的字段，不再有。
+    读 App 设置取表里的原始行而不经 `settings:get`（后者的默认值是 Electron 时代的，且会并入 AI 连接配置）。门面先预校验再写：界面文件先写、表后写，表写失败则把文件恢复原样；订阅回调在所有锁之外调用，回调里再读写不会死锁。
+  - **首次启动导入**：WebView2 的 Local Storage 优先，其次尚未导入过的 Electron 版；`ui-prefs.json` 的写出是提交点（读不了旧数据则不写、下次重试；库里已有值不覆盖；非法键只跳过并记进导入记录，记录里只有键名与原因）。先复制再只读打开，不动原目录、不留 LOCK，所以随时可回退旧版本。
+    `ytDlpPath`/`ffmpegPath`（只接受文件选择器返回的路径）与一切 AI 字段不导入；代理口令只进 `settings` 表（与 React 版一致），不进 `ui-prefs.json`。自动化实例（截图、基准）不导入也不读已保存设置。
+  - **真实 WebView2 的 localStorage 实测事实**（用一次性 profile 启动真实 React 版写入种子再读回，夹具与生成脚本入库，不碰用户数据）：页面 origin 是 `http://guizhi.localhost`；数据在 `<用户数据目录>\EBWebView\Default\Local Storage\leveldb`（内核 157.0.4341.46）；键为 `_<origin>\0<编码字节><键>`，编码字节 0 是 UTF-16LE、1 是 Latin1，两种都出现；用户数据目录规则与 MyGo 一致（`WEBVIEW2_USER_DATA_FOLDER`，否则 `%LOCALAPPDATA%\<应用名>\WebView2`）；React 版自己没有写任何夹具之外的键。
+  - **归一化保留**：持久化 v3 迁移、旧默认值残留、壁纸文件名解码、`toFixed(1)` 取整（并列时取较大，用 `big.Rat` 精确复现）、`trim` 的空白集、`decodeURIComponent` 失败回落原串……由 TS 导出 golden（66 条设置 + 21 条 ui-storage）与 Go 逐项对拍；另有漂移守卫扫描渲染层源码里的全部 `localStorage` 键，新增未登记即失败。
+  - **验证（源码/隔离环境）**：`go test -count=1 ./native/...` 184 个顶层测试通过（2 个靠环境变量开启的联系表测试默认跳过；设置包 26 个）；主包里真实库 + 真实夹具的 40 个测试通过（界面设置文件 10、门面 9、导入与启动 13、WebView2 读取 8，含来源优先级、库里已有值优先、读取失败不写提交点且可重试、非法键只记问题、自动化实例不碰设置、并发更新一个不丢、表写失败时文件回滚）；
+    渲染层 golden、四个生成器 `--check`、`gen-native.test.mjs`（23 项）、文件行数门禁、gofmt 通过；`pnpm shot:native` 冒烟通过。**变异检查**（逐个破坏关键不变量，确认测试会红）：只导入一次、库里的值优先、表写失败时恢复文件、提前校验路径白名单、自动化实例不读设置、WebView2 有设置时优先，共 6 项全部被抓到。
+  - **踩过的坑**：
+    1. 仓库 `.gitignore` 的 `*.log` 悄悄吞掉了夹具里的 `000003.log`——它就是 leveldb 的数据文件本身，漏提交会让夹具变成一个读不出任何键的空库。已加否定规则，并用 `git archive` 导出核对提交内容与工作区逐字节一致（`.gitattributes` 的 `* -text` 保证不做换行转换）。
+    2. `fmtcheck.ps1` 必须用 `pwsh`（PowerShell 7）跑：Windows PowerShell 5.1 经管道把含中文的源码交给 gofmt 会乱码，所有文件都被误报为「需要 gofmt」。
+    3. `go test -run WebView2` 会匹配到既有的 `TestReadingProbeInWebView2`，它需要 `pnpm build` 产物 `reading_libraries.json`，未构建的工作副本里必红；筛选要写精确的测试名前缀。
+    4. `json.MarshalIndent` 会把 `json.RawMessage` 重新缩进，文件里读回的偏好与写入时字节不同；读入时统一紧凑化，内存里的值与刚写入时一致。
+    5. `native/nocjk_test.go` 拦下了设置解析里的中文诊断说明（直接当字符串字面量传给帮助函数）；改成 `errors.New`/`fmt.Errorf` 承载——诊断文字不是界面文案，这正是该测试的放行范围。
+    6. 自己写的订阅重入测试曾因 `sync.Once` 在回调里被再次通知而自锁，看起来像实现死锁，实际是测试写法的问题（改用原子标志）；实现本身在锁外通知。
+  - **已知限制**：WebView2 的 localStorage 被清空过（用户清过 profile）时，只存在于旧库里的 `updateChannel`、`autoSave` 这类界面键不会回填，回落默认值；这类用户本来就丢了 React 版的全部界面偏好，不值得为此再读旧库行。
+  - **未验证**：用户真实机器上的旧 WebView2 profile 副本导入（留到阶段 4 切换前，只用副本、绝不读用户真实 profile）；设置页本身与「设置 → 外观」的实时订阅联动、关闭窗口前 `Pane`/`ColumnSet` 的 `Flush`（M1 切片）；备份还原后 `ui-prefs.json` 与库互不回滚是有意设计，尚无实机演示。
