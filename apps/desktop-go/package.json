@@ -4,7 +4,8 @@
   "private": true,
   "description": "归知 Go 壳（MyGo + WebView2）。本包只承载 jsrc 里被打进 goja 的 TS 源码的第三方依赖与单测；Go 代码本身由 go.mod 管理。",
   "scripts": {
-    "gen": "tsx jsgen/build-themed.mts && tsx jsgen/build-pipeline.mts && tsx jsgen/build.mts && tsx jsgen/build-render-scripts.mts",
+    "gen": "tsx jsgen/build-themed.mts && tsx jsgen/build-pipeline.mts && tsx jsgen/build.mts && tsx jsgen/build-render-scripts.mts && pnpm gen:native",
+    "gen:native": "node scripts/gen-native-theme.mjs && node scripts/gen-native-icons.mjs && node scripts/gen-native-brand-icons.mjs && node scripts/gen-native-i18n.mjs --force",
     "test": "vitest run --config jsrc/vitest.config.ts"
   },
   "dependencies": {

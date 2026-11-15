@@ -78,6 +78,21 @@ function readIcon(dir, file) {
   return { canonical: m[1], nodes };
 }
 
+/**
+ * 渲染层的 lucide 导入名（GlobeIcon、Globe…）→ canonical 名（Globe，即 icons_gen.go 里的常量名）。
+ * 找不到的名字对应 undefined；品牌图标生成器用它把 platform-meta / ModelIcons 里的通用图标接到同一张清单。
+ */
+export function lucideCanonical(importNames) {
+  const dir = lucideDir();
+  const aliases = aliasMap(dir);
+  const out = new Map();
+  for (const n of importNames) {
+    const file = aliases.get(n);
+    out.set(n, file ? readIcon(dir, file).canonical : undefined);
+  }
+  return out;
+}
+
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 function toSvg(nodes) {

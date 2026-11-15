@@ -2,6 +2,7 @@
 // Convert the renderer's i18next catalogs into MyGo ARB catalogs, then generate the typed Go functions.
 //
 //   node apps/desktop-go/scripts/gen-native-i18n.mjs            # 写 native/locales/{zh-Hans,en}.json 并运行 mygo generate
+//   node apps/desktop-go/scripts/gen-native-i18n.mjs --force    # 同上，且无论 ARB 是否变化都重新运行 mygo generate（pnpm gen 用）
 //   node apps/desktop-go/scripts/gen-native-i18n.mjs --check    # 只比较：产物与当前源不一致就非零退出（供 CI / lint 使用）
 //
 // 输入：
@@ -156,6 +157,7 @@ function runMygoGenerate() {
 
 export function main(argv) {
   const check = argv.includes("--check");
+  const force = argv.includes("--force");
   const { catalogs, problems, counts } = buildCatalogs();
   if (problems.length > 0) {
     console.error(`目录转换失败（${problems.length} 个问题）：`);
@@ -180,7 +182,8 @@ export function main(argv) {
   }
   console.log(`消息数：${Object.entries(counts).map(([t, n]) => `${t} ${n}`).join("，")}`);
   if (check) return stale === 0 ? 0 : 1;
-  if (stale > 0 || !fs.existsSync(path.join(OUT_DIR, "catalog_gen.go"))) runMygoGenerate();
+  // --force：ARB 没变也重新生成 Go。MyGo 升级后生成器的输出可能变，CI 的「重新生成后 git diff」靠它发现。
+  if (force || stale > 0 || !fs.existsSync(path.join(OUT_DIR, "catalog_gen.go"))) runMygoGenerate();
   return 0;
 }
 
