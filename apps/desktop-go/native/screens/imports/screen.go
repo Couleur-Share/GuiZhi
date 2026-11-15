@@ -86,7 +86,8 @@ func (s *Screen) Start() {
 		s.cancel = s.o.Imports.OnChange(s.onChange)
 	}
 	s.mu.Unlock()
-	s.reload(query{filter: services.ImportFilterAll})
+	// 首次加载放到后台：Start 在 UI 线程上被调用，同步查库会让窗口在数据库慢或被占用时卡住不出画面。
+	go s.reload(query{filter: services.ImportFilterAll})
 }
 
 // Close 取消订阅与待执行的查询；之后到达的响应被丢弃。
@@ -170,6 +171,13 @@ func (s *Screen) snapshot() snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.snap
+}
+
+// Ready 报告首次加载是否已有结果（成功或失败都算），可在任意 goroutine 调用。
+// -bench 的就绪标记用它判断「首屏已有真实内容」。
+func (s *Screen) Ready() bool {
+	snap := s.snapshot()
+	return snap.loaded || snap.err != ""
 }
 
 // filters 是左侧「任务概览」里的过滤项（顺序与渲染层 SidebarImportsPanel 一致）。

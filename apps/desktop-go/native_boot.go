@@ -53,6 +53,7 @@ type nativeBoot struct {
 	lib        *Library
 	bridge     *Bridge
 	automation bool          // 截图/基准实例：窗口放屏幕外、不抢焦点、不碰用户状态
+	bench      bool          // 基准实例：首屏有内容后在标准输出打印 READY，之后一直运行直到被终止
 	shot       string        // 非空：启动后截图到该文件并退出
 	wait       time.Duration // 截图前等待
 }
@@ -107,6 +108,9 @@ func runNative(nb nativeBoot) error {
 		} else {
 			win.Show()
 		}
+		if nb.bench {
+			go announceReady(app.Ready)
+		}
 		if nb.shot != "" {
 			go captureAndQuit(win, nb.shot, nb.wait)
 		}
@@ -114,6 +118,16 @@ func runNative(nb nativeBoot) error {
 	err := mygo.App.Run()
 	app.Close()
 	return err
+}
+
+// announceReady 在起始页面首次加载有结果后打印 READY（与 React 版的就绪判据同义：首屏已有真实内容）。
+// 数据到达会触发重绘，多等一小段让那一帧画完，再让测量脚本开始计时。
+func announceReady(ready func() bool) {
+	for !ready() {
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	fmt.Println("READY")
 }
 
 // captureAndQuit 等待 wait 后把窗口截图写入 file，然后退出应用。

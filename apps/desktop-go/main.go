@@ -323,7 +323,7 @@ func main() {
 		}
 	}
 	if nf.enabled() { // 原生界面：到此为止的初始化全部共用，之后不建 WebView、不绑定 Bridge
-		err = runNative(nativeBoot{flags: nf, lib: lib, bridge: b, automation: automation, shot: *shot, wait: *wait})
+		err = runNative(nativeBoot{flags: nf, lib: lib, bridge: b, automation: automation, bench: *bench, shot: *shot, wait: *wait})
 		shutdownLibrary(lib, shutdownDB)
 		if err != nil {
 			log.Fatal(err)

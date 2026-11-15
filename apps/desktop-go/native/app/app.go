@@ -69,7 +69,8 @@ type App struct {
 	applied *ui.Theme
 	route   Route
 
-	imports *importsscreen.Screen
+	startRoute Route // 创建时的页面，创建后不变；Ready 只看它（可在任意 goroutine 读）
+	imports    *importsscreen.Screen
 }
 
 // New 创建外壳；页面在 Start 时才开始加载数据。
@@ -78,6 +79,7 @@ func New(o Options) *App {
 	if a.route == "" {
 		a.route = RouteLibrary
 	}
+	a.startRoute = a.route
 	a.theme = kit.Theme(a.spec)
 	a.imports = importsscreen.New(importsscreen.Options{
 		Imports:    o.Services.Imports,
@@ -108,6 +110,17 @@ func (a *App) Start() { a.imports.Start() }
 
 // Close 释放订阅与待执行的任务。
 func (a *App) Close() { a.imports.Close() }
+
+// Ready 报告起始页面的首次加载是否已有结果（成功或失败都算）；尚未迁移的占位页立即就绪。
+// 可在任意 goroutine 调用；-bench 的 READY 标记据此判断首屏已出。
+func (a *App) Ready() bool {
+	switch a.startRoute {
+	case RouteImports:
+		return a.imports.Ready()
+	default:
+		return true
+	}
+}
 
 // Route 返回当前页面（UI 线程）。
 func (a *App) Route() Route { return a.route }

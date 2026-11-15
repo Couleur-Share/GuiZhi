@@ -33,6 +33,12 @@
   pwsh -NoProfile -File apps/desktop-go/scripts/measure-idle.ps1 `
     -Exe D:\Project\GuiZhi-baseline\apps\desktop-go\out\win-x64\GuiZhi.exe `
     -DbSource D:\Project\GuiZhi-bench\seed\data\knowledge.db -Label react-0.8.3
+
+.EXAMPLE
+  # 原生版（feat/native-ui）：-native 与 -bench 同用，起始页首次加载有结果后打印 READY。
+  # 注意：pwsh -File 无法给 string[] 参数传多个值（'-native','-native-module','imports' 会变成一整串），
+  # 带 -ExtraArgs 时用 -Command 把数组原样交给脚本。
+  pwsh -NoProfile -Command "& 'apps/desktop-go/scripts/measure-idle.ps1' -Exe D:\path\GuiZhi.exe -DbSource D:\path\knowledge.db -Label native -ExtraArgs @('-native','-native-module','imports')"
 #>
 param(
   [Parameter(Mandatory)][string]$Exe,

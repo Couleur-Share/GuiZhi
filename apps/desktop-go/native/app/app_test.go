@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -84,6 +85,32 @@ func TestSettingsGearNavigates(t *testing.T) {
 	if a.Route() != RouteSettings {
 		t.Fatalf("应进入设置页，当前 %q", a.Route())
 	}
+}
+
+func TestReadyFollowsFirstLoadOfStartRoute(t *testing.T) {
+	// 未迁移的占位页没有数据要等，立即就绪
+	placeholder, _, _ := newTestApp(t, Options{Route: RouteWiki})
+	if !placeholder.Ready() {
+		t.Error("占位页应立即就绪")
+	}
+
+	// 采集页：首次加载有结果才就绪；卡住期间不能就绪
+	a, fake, tr := newTestApp(t, Options{Route: RouteImports})
+	release := fake.Hold()
+	a.Start()
+	tr.Frame()
+	time.Sleep(50 * time.Millisecond)
+	if a.Ready() {
+		t.Error("首次加载尚未返回，不应就绪")
+	}
+	release()
+	waitFor(t, a.Ready)
+
+	// 加载失败也算「首屏已出」：错误态是真实内容，-bench 不能因此一直等下去
+	failing, failFake, _ := newTestApp(t, Options{Route: RouteImports})
+	failFake.Set(services.ImportPage{}, errors.New("数据库不可用"))
+	failing.Start()
+	waitFor(t, failing.Ready)
 }
 
 func TestDarkThemeIsApplied(t *testing.T) {
