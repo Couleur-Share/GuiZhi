@@ -174,7 +174,7 @@ func main() {
 	db, err := sqlite.Open(ctx, *dbPath, sqlite.OpenOptions{BusyTimeout: dbWriteBusyTimeout})
 	if err != nil {
 		lease.release()
-		failStartup(ud, fmt.Errorf("打开数据库失败：%w", err), !automation)
+		failStartup(ud, fmt.Errorf("打开数据库失败：%w", explainSQLiteOpenError(err)), !automation)
 	}
 	// 只读连接：专给列表、检索、计数等纯读热路径，让慢查询不占住读写连接、不拖住其他 IPC。
 	// 打开失败不致命：回落到读写连接（行为与之前一致），只记日志。必须在读写连接打开之后：

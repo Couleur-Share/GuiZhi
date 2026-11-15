@@ -282,7 +282,7 @@ func (s *mcpServer) openLib(ctx context.Context) (*Library, string, error) {
 	}
 	db, err := sqlite.Open(ctx, dbPath, sqlite.OpenOptions{ReadOnly: true, BusyTimeout: 8 * time.Second})
 	if err != nil {
-		return nil, dbPath, err
+		return nil, dbPath, explainSQLiteOpenError(err)
 	}
 	s.lib = &Library{db: db}
 	return s.lib, dbPath, nil

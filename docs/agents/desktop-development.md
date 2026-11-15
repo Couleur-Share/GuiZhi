@@ -8,7 +8,7 @@
 
 - Go（模块 `guizhi-mygo-shell`）+ MyGo v0.8.3 + WebView2；官方仅支持 Windows 11+ x64
 - 界面：React 18 + TypeScript 5 + Vite 6 + Zustand 5 + Tailwind CSS 3 + i18next（zh / en），源码在 `apps/desktop/src/renderer`
-- SQLite：MyGo 提供的原生库（`mygo-sqlite3.dll`，随安装包发布），schema 与迁移来自 `packages/db`
+- SQLite：MyGo 0.9 起是原生模块（`Sqlitecore.dll`，放在 exe 同目录、随安装包发布；0.8.x 时叫 `mygo-sqlite3.dll`），schema 与迁移来自 `packages/db`
 - goja：在 Go 里运行由 TS 生成的 JS 产物（主题阅读管线、快照净化、渲染脚本），源码在 `apps/desktop-go/jsrc`
 - pnpm monorepo：`apps/desktop`（界面与预加载源码）、`apps/desktop-go`（Go 壳与构建链）、`packages/{core,db,shared}`
 
@@ -127,9 +127,13 @@ Playwright `connectOverCDP` 接管页面；就绪判据是 `topbar-search` 出�
 
 ### 安装包与发版
 
-- `pnpm build` → `apps/desktop-go/scripts/build-shell.ps1`（渲染进程与 preload、阅读库、Go 壳、`mygo-sqlite3.dll`）；
+- `pnpm build` → `apps/desktop-go/scripts/build-shell.ps1`（渲染进程与 preload、阅读库、Go 壳、`Sqlitecore.dll`；生产构建带 `-tags mygo_nodownload`，缺 DLL 时明确报错而不联网下载）；
   `pnpm build:installer` → `build-installer.ps1`：用 `electron-builder --prepackaged` 把上一步产物打成 NSIS 安装包并生成 `latest.yml`。
   这里 electron-builder 只是安装包工具，不含 Electron；配置在 `apps/desktop-go/electron-builder.mygo.cjs`，自包含。
+- **SQLite 原生库的取用与验证**：`Sqlitecore.dll` 的取库、SHA-256 校验与下载集中在 `scripts/ensure-sqlitecore.ps1`（版本、文件名、哈希、地址都取自 go.mod 所指 MyGo 模块的清单，不手写；
+  `pnpm shot` 的隔离构建共用它）。必须放在 exe 同目录：带 `-trimpath` 的二进制读不到清单，缓存与联网两条路都不通。缺库时启动报「找不到 SQLite 原生库 Sqlitecore.dll」（`native_sqlite.go`），
+  不再是 MyGo 那句看不出原因的 `Sqlitecore has no build for windows-amd64`。验证入口：`verify/run-fresh-sqlite.ps1`（宿主机隔离：空缓存 + 不可用代理，成功与缺库两条路径）；
+  `verify/run-sandbox-fresh-install.ps1`（Windows 沙盒：网络禁用，静默安装后无网络首次启动；跑完自动关沙盒，只停自己启动的那个）。发版前对最终安装包跑一遍后者。
 - **不要改 `appId`、`productName`、`nsis.guid`**：同一个 guid 让新版本作为同一产品的「升级」覆盖安装旧版本，改了老用户无法原地升级。
 - 版本号唯一来源是 `apps/desktop/package.json`（`build-shell.ps1`、安装包配置、`release.yml` 的 tag 校验都读它）；
   `apps/desktop-go/package.json` 的 `0.0.0` 不是发布版本。

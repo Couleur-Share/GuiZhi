@@ -5,7 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDesktopSnapshot } from "../desktop-validation-snapshot.mjs";
-import { goShotArgs, goValidationEnv } from "../isolated-go.mjs";
+import { goShotArgs, goValidationEnv, omitEnv } from "../isolated-go.mjs";
+
+test("omitEnv 去掉指定变量（不区分大小写），不改动传入对象", () => {
+  const env = { PATH: "tools", PSModulePath: "C:/pwsh7/Modules", other: "x" };
+  assert.deepEqual(omitEnv(env, "PSMODULEPATH"), { PATH: "tools", other: "x" });
+  assert.deepEqual(omitEnv(env, "psmodulepath"), { PATH: "tools", other: "x" });
+  assert.deepEqual(omitEnv(env, "NOPE"), env);
+  assert.equal(env.PSModulePath, "C:/pwsh7/Modules");
+});
 
 test("goValidationEnv 不继承开发服务地址、Electron 模式与 WebView2 配置，保留其余变量", () => {
   const env = {

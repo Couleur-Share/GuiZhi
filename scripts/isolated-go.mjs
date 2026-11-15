@@ -6,7 +6,7 @@
 // 开发目录的 dist/、out/ 与数据目录都不会被读写；WebView2 配置与用户数据同样落在一次性临时目录里。
 //
 // 构建步骤与 apps/desktop-go/scripts/build-shell.ps1 的 [1/4]~[3/4] 一致（那份脚本依赖 pnpm exec 与 .bin，副本里没有 .bin，
-// 所以这里用包内 CLI 的绝对路径复刻）。改了其中一处，另一处要同步。
+// 所以这里用包内 CLI 的绝对路径复刻），最后一步放置 SQLite 原生库则与它共用 ensure-sqlitecore.ps1。改了其中一处，另一处要同步。
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -34,6 +34,12 @@ export function goValidationEnv(env = process.env) {
   ])
     delete result[key];
   return result;
+}
+
+/** 返回去掉某个环境变量的副本（Windows 上变量名不区分大小写，按小写比较）。 */
+export function omitEnv(env, name) {
+  const lower = name.toLowerCase();
+  return Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== lower));
 }
 
 /** 把相对路径参数按调用方 cwd 解析成绝对路径；未指定 --out 时落到 apps/desktop-go/.tmp-shots。 */
@@ -104,9 +110,21 @@ async function buildInSnapshot(snapshot, env) {
     [
       "Go 壳",
       "go",
-      ["build", "-trimpath", "-ldflags", `-s -w -X main.appVersion=${version}`, "-o", path.join(outDir, "GuiZhi.exe"), "."],
+      // mygo_nodownload 与发布构建一致：缺原生库时立刻报错，而不是静默联网下载。
+      ["build", "-trimpath", "-tags", "mygo_nodownload", "-ldflags", `-s -w -X main.appVersion=${version}`, "-o", path.join(outDir, "GuiZhi.exe"), "."],
       goRoot,
       { ...env, GOOS: "windows", GOARCH: "amd64", CGO_ENABLED: "0" },
+    ],
+    // MyGo 0.9 起 SQLite 是原生库（Sqlitecore.dll），带 -trimpath 的二进制只会在 exe 同目录找它。
+    // 与发布构建共用同一份脚本（取自用户缓存或按清单下载并校验）；必须排在 go build 之后：它靠 go list 找已下载的 MyGo 模块。
+    // 子进程用 Windows PowerShell 5.1（一定存在）。从 pwsh 7 里启动时会继承它的 PSModulePath，5.1 会加载到 7 的核心模块而丢失
+    // Get-FileHash 等命令，所以把 PSModulePath 去掉，让 5.1 用自己的默认值。
+    [
+      "SQLite 原生库",
+      "powershell.exe",
+      ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(goRoot, "scripts/ensure-sqlitecore.ps1"), "-Out", outDir, "-GoRoot", goRoot],
+      root,
+      omitEnv(env, "PSModulePath"),
     ],
   ];
   const started = Date.now();

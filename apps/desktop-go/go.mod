@@ -8,7 +8,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.5
 	github.com/coder/websocket v1.8.15
 	github.com/dop251/goja v0.0.0-20261110204830-f493a2b600d6
-	github.com/egoist/mygo v0.8.3
+	github.com/egoist/mygo v0.9.1
 	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/refraction-networking/utls v1.8.2
 	github.com/syndtr/goleveldb v1.0.0
@@ -35,7 +35,7 @@ require (
 	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/itlightning/dateparse v0.2.1 // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
