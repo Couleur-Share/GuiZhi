@@ -5,7 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDesktopSnapshot } from "../desktop-validation-snapshot.mjs";
-import { goShotArgs, goValidationEnv, nativeShotArgs, nativeShotEnv, omitEnv } from "../isolated-go.mjs";
+import {
+  goShotArgs, goValidationEnv, huePresetIds, nativeAppearanceFlags, nativeMatrixVariants, nativeShotArgs, nativeShotEnv, omitEnv,
+} from "../isolated-go.mjs";
 
 test("omitEnv 去掉指定变量（不区分大小写），不改动传入对象", () => {
   const env = { PATH: "tools", PSModulePath: "C:/pwsh7/Modules", other: "x" };
@@ -56,7 +58,10 @@ test("nativeShotArgs：缺省值、路径按调用方目录解析、非法取值
   );
   assert.deepEqual(
     { ...custom, out: path.relative(cwd, custom.out), dataDb: path.relative(cwd, custom.dataDb) },
-    { module: "wiki", theme: "dark", lang: "en", width: 1024, height: 640, wait: "500ms", out: "o", name: "mine", dataDb: "x.db" },
+    {
+      module: "wiki", theme: "dark", lang: "en", width: 1024, height: 640, wait: "500ms", out: "o", name: "mine", dataDb: "x.db",
+      hue: null, font: null, motion: null, wallpaper: null, wallpaperOpacity: null, wallpaperBlur: null, matrix: null,
+    },
   );
 
   assert.throws(() => nativeShotArgs(["--module", "nope"], cwd), /--module 取值/);
@@ -66,6 +71,68 @@ test("nativeShotArgs：缺省值、路径按调用方目录解析、非法取值
   assert.throws(() => nativeShotArgs(["--width", "10"], cwd), /--width 需要/);
   assert.throws(() => nativeShotArgs(["--width"], cwd), /--width 缺少值/);
   assert.throws(() => nativeShotArgs(["--steps", "a.mjs"], cwd), /未知参数 --steps/);
+});
+
+test("nativeShotArgs：外观开关只在给出时透传，文件名带上偏离默认的外观项，非法取值在构建前就报错", () => {
+  const cwd = path.resolve("some", "dir");
+  const a = nativeShotArgs(
+    ["--theme", "system", "--hue", "150,30", "--font", "large", "--motion", "off", "--wallpaper", "demo", "--wallpaper-opacity", "0.6", "--wallpaper-blur", "12"],
+    cwd,
+  );
+  assert.equal(a.name, "native-imports-system-zh-Hans-hue-150x30-font-large-motion-off-wallpaper-blur12");
+  assert.deepEqual(nativeAppearanceFlags(a), [
+    "-native-hue", "150,30", "-native-font", "large", "-native-motion", "off",
+    "-native-wallpaper", "demo", "-native-wallpaper-opacity", "0.6", "-native-wallpaper-blur", "12",
+  ]);
+  assert.deepEqual(nativeAppearanceFlags(nativeShotArgs([], cwd)), [], "没给外观开关就不传，由 Go 侧默认值决定");
+  assert.equal(nativeShotArgs(["--hue", "teal"], cwd).name, "native-imports-light-zh-Hans-hue-teal");
+
+  assert.throws(() => nativeShotArgs(["--hue", "Teal Blue!"], cwd), /--hue 需要/);
+  assert.throws(() => nativeShotArgs(["--font", "huge"], cwd), /--font 取值/);
+  assert.throws(() => nativeShotArgs(["--motion", "fast"], cwd), /--motion 取值/);
+  assert.throws(() => nativeShotArgs(["--wallpaper-blur", "12"], cwd), /需要同时给出 --wallpaper/);
+  assert.throws(() => nativeShotArgs(["--wallpaper", "demo", "--wallpaper-blur", "99"], cwd), /--wallpaper-blur 需要 0–50/);
+  assert.throws(() => nativeShotArgs(["--wallpaper", "demo", "--wallpaper-opacity", ""], cwd), /--wallpaper-opacity 需要/);
+  assert.throws(() => nativeShotArgs(["--wallpaper", "no-such-file.png"], cwd), /文件不存在/);
+});
+
+test("nativeMatrixVariants：矩阵展开成完整参数，每格独立命名；没有矩阵就是原参数一格", () => {
+  const cwd = path.resolve("some", "dir");
+  const presets = ["royal-blue", "blue", "purple", "green", "orange", "teal"];
+
+  const single = nativeShotArgs(["--module", "wiki"], cwd);
+  assert.deepEqual(nativeMatrixVariants(single, presets), [single]);
+
+  const appearance = nativeMatrixVariants(nativeShotArgs(["--matrix", "appearance"], cwd), presets);
+  assert.equal(appearance.length, 12, "6 个预设 × 浅/深");
+  assert.equal(new Set(appearance.map((v) => v.name)).size, 12, "每格文件名唯一");
+  assert.ok(appearance.every((v) => v.matrix === null), "展开后的格不再带矩阵");
+  assert.deepEqual(
+    appearance.slice(0, 2).map((v) => [v.hue, v.theme, v.name]),
+    [["royal-blue", "light", "native-imports-light-zh-Hans-hue-royal-blue"], ["royal-blue", "dark", "native-imports-dark-zh-Hans-hue-royal-blue"]],
+  );
+
+  const fonts = nativeMatrixVariants(nativeShotArgs(["--matrix", "fonts", "--theme", "dark"], cwd), presets);
+  assert.deepEqual(fonts.map((v) => [v.font, v.theme]), [["small", "dark"], ["medium", "dark"], ["large", "dark"]], "字号矩阵沿用 --theme");
+
+  const glass = nativeMatrixVariants(nativeShotArgs(["--matrix", "glass"], cwd), presets);
+  assert.deepEqual(
+    glass.map((v) => v.name),
+    [
+      "native-imports-light-zh-Hans-wallpaper", "native-imports-light-zh-Hans-wallpaper-blur12",
+      "native-imports-dark-zh-Hans-wallpaper", "native-imports-dark-zh-Hans-wallpaper-blur12",
+    ],
+  );
+  assert.ok(glass.every((v) => v.wallpaper === "demo"));
+
+  assert.throws(() => nativeShotArgs(["--matrix", "nope"], cwd), /--matrix 取值/);
+  assert.throws(() => nativeShotArgs(["--matrix", "fonts", "--name", "x"], cwd), /不能同时指定 --name/);
+});
+
+test("huePresetIds 直接读渲染层设置源文件里的预设，当前是 6 个", () => {
+  const source = fs.readFileSync(path.resolve(import.meta.dirname, "../../apps/desktop/src/renderer/stores/settings/settings-appearance.ts"), "utf8");
+  assert.deepEqual(huePresetIds(source), ["royal-blue", "blue", "purple", "green", "orange", "teal"]);
+  assert.throws(() => huePresetIds("export const x = 1;"), /找不到 MORANDI_THEMES/);
 });
 
 test("nativeShotEnv 把 APPDATA 指到一次性目录并用 MYGO_LOCALE 指定语言，且不继承 WebView2 变量", () => {

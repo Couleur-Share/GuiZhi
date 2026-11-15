@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 
+	"guizhi-mygo-shell/native/kit"
 	"guizhi-mygo-shell/native/locales"
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
@@ -41,7 +42,11 @@ func newHarness(t *testing.T, page services.ImportPage, err error) *harness {
 		Debounce:   -1, // 立即查询，测试不依赖定时器
 	})
 	t.Cleanup(h.screen.Close)
-	h.tr = ui.NewTester(h.screen.View, 900, 640)
+	look := kit.NewLook(kit.DefaultThemeSpec(), kit.Env{})
+	h.tr = ui.NewTester(func(c *ui.Context) {
+		c.SetTheme(look.Theme)
+		h.screen.View(c, look)
+	}, 900, 640)
 	return h
 }
 

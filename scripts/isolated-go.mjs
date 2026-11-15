@@ -153,15 +153,71 @@ async function buildInSnapshot(snapshot, env, { renderer = true } = {}) {
 }
 
 const NATIVE_MODULES = ["library", "inbox", "ask", "wiki", "imports", "settings"];
+const NATIVE_THEMES = ["light", "dark", "system"];
+const NATIVE_FONTS = ["small", "medium", "large"];
+const NATIVE_MOTIONS = ["system", "off", "reduced", "standard"];
+const NATIVE_MATRICES = ["appearance", "fonts", "glass"];
 const NATIVE_USAGE =
-  "用法：node scripts/isolated-go.mjs shot-native [--module <library|inbox|ask|wiki|imports|settings>] [--theme light|dark] " +
+  "用法：node scripts/isolated-go.mjs shot-native [--module <library|inbox|ask|wiki|imports|settings>] [--theme light|dark|system] " +
+  "[--hue <预设 ID|色相,饱和度>] [--font small|medium|large] [--motion system|off|reduced|standard] " +
+  "[--wallpaper <demo|图片文件>] [--wallpaper-opacity <0-1>] [--wallpaper-blur <0-50>] [--matrix appearance|fonts|glass] " +
   "[--lang zh-Hans|en] [--width <DIP>] [--height <DIP>] [--wait <如 2s>] [--out <目录>] [--name <文件名>] [--data-db <db>]";
+
+/** 缺省文件名：带上所有偏离默认的外观项，多张截图互不覆盖。 */
+export function nativeShotName(args) {
+  return [
+    "native", args.module, args.theme, args.lang,
+    ...(args.hue ? [`hue-${args.hue.replace(",", "x")}`] : []),
+    ...(args.font ? [`font-${args.font}`] : []),
+    ...(args.motion ? [`motion-${args.motion}`] : []),
+    ...(args.wallpaper ? [`wallpaper${args.wallpaperBlur ? `-blur${args.wallpaperBlur}` : ""}`] : []),
+  ].join("-");
+}
+
+/** 渲染层设置里的主题色预设 ID：矩阵直接读源文件，不在脚本里再抄一份。 */
+export function huePresetIds(appearanceSource) {
+  const ids = [...appearanceSource.matchAll(/\{\s*id:\s*"([^"]+)",\s*hue:\s*\d+,\s*saturation:\s*\d+/g)].map((m) => m[1]);
+  if (ids.length === 0) throw new Error("settings-appearance.ts 里找不到 MORANDI_THEMES");
+  return ids;
+}
+
+/**
+ * 一次构建、多格截图：把 --matrix 展开成一组完整的参数。纯函数，便于单测。
+ *   appearance：每个主题色预设 × 浅/深（12 格），看色相对强调色族的影响与对比度
+ *   fonts：三个字号档（沿用 --theme）
+ *   glass：演示壁纸 × 浅/深 × 模糊 0/12（4 格），看壁纸模式的半透明面板
+ * 没有 --matrix 时就是原参数一格。
+ */
+export function nativeMatrixVariants(args, presetIds) {
+  const vary = (patch) => {
+    const v = { ...args, ...patch, matrix: null, name: null };
+    v.name = nativeShotName(v);
+    return v;
+  };
+  switch (args.matrix) {
+    case "appearance":
+      return presetIds.flatMap((hue) => ["light", "dark"].map((theme) => vary({ hue, theme })));
+    case "fonts":
+      return NATIVE_FONTS.map((font) => vary({ font }));
+    case "glass":
+      return ["light", "dark"].flatMap((theme) =>
+        [0, 12].map((blur) => vary({ theme, wallpaper: "demo", wallpaperBlur: blur, wallpaperOpacity: args.wallpaperOpacity })));
+    default:
+      return [args];
+  }
+}
 
 /** 解析并校验 shot-native 参数；路径按调用方 cwd 解析，缺省 --out 与 shot 一致。纯函数，便于单测。 */
 export function nativeShotArgs(argv, cwd) {
   const args = {
     module: "imports", theme: "light", lang: "zh-Hans", width: 1280, height: 800, wait: "2s",
     out: path.join(REPO_ROOT, "apps/desktop-go/.tmp-shots"), name: null, dataDb: null,
+    hue: null, font: null, motion: null, wallpaper: null, wallpaperOpacity: null, wallpaperBlur: null, matrix: null,
+  };
+  const ranged = (flag, text, lo, hi) => {
+    const n = Number(text);
+    if (text.trim() === "" || !Number.isFinite(n) || n < lo || n > hi) throw new Error(`${flag} 需要 ${lo}–${hi} 之间的数，得到 ${text}`);
+    return n;
   };
   const integer = (flag, text) => {
     const n = Number(text);
@@ -177,6 +233,17 @@ export function nativeShotArgs(argv, cwd) {
     switch (flag) {
       case "--module": args.module = value(); break;
       case "--theme": args.theme = value(); break;
+      case "--hue": args.hue = value(); break;
+      case "--font": args.font = value(); break;
+      case "--motion": args.motion = value(); break;
+      case "--wallpaper": {
+        const v = value();
+        args.wallpaper = v === "demo" ? v : path.resolve(cwd, v);
+        break;
+      }
+      case "--wallpaper-opacity": args.wallpaperOpacity = ranged(flag, value(), 0, 1); break;
+      case "--wallpaper-blur": args.wallpaperBlur = ranged(flag, value(), 0, 50); break;
+      case "--matrix": args.matrix = value(); break;
       case "--lang": args.lang = value(); break;
       case "--width": args.width = integer(flag, value()); break;
       case "--height": args.height = integer(flag, value()); break;
@@ -188,11 +255,35 @@ export function nativeShotArgs(argv, cwd) {
     }
   }
   if (!NATIVE_MODULES.includes(args.module)) throw new Error(`--module 取值：${NATIVE_MODULES.join("|")}，得到 ${args.module}`);
-  if (!["light", "dark"].includes(args.theme)) throw new Error(`--theme 取值：light|dark，得到 ${args.theme}`);
+  if (!NATIVE_THEMES.includes(args.theme)) throw new Error(`--theme 取值：${NATIVE_THEMES.join("|")}，得到 ${args.theme}`);
+  // 预设 ID 是否存在由 Go 侧校验（预设来自渲染层设置，这里不再抄一份）；这里只拦明显写错的格式，省下一次构建
+  if (args.hue !== null && !/^([a-z][a-z-]*|\d+(\.\d+)?,\d+(\.\d+)?)$/.test(args.hue)) {
+    throw new Error(`--hue 需要预设 ID（如 royal-blue）或「色相,饱和度」（如 150,30），得到 ${args.hue}`);
+  }
+  if (args.font !== null && !NATIVE_FONTS.includes(args.font)) throw new Error(`--font 取值：${NATIVE_FONTS.join("|")}，得到 ${args.font}`);
+  if (args.motion !== null && !NATIVE_MOTIONS.includes(args.motion)) throw new Error(`--motion 取值：${NATIVE_MOTIONS.join("|")}，得到 ${args.motion}`);
+  if (args.wallpaper === null && (args.wallpaperOpacity !== null || args.wallpaperBlur !== null)) {
+    throw new Error("--wallpaper-opacity 与 --wallpaper-blur 需要同时给出 --wallpaper");
+  }
+  if (args.wallpaper !== null && args.wallpaper !== "demo" && !fs.existsSync(args.wallpaper)) throw new Error(`--wallpaper 文件不存在：${args.wallpaper}`);
   if (!["zh-Hans", "en"].includes(args.lang)) throw new Error(`--lang 取值：zh-Hans|en，得到 ${args.lang}`);
   if (!/^\d+(\.\d+)?(ms|s|m)$/.test(args.wait)) throw new Error(`--wait 需要 Go 时长写法（如 2s、500ms），得到 ${args.wait}`);
-  args.name ??= `native-${args.module}-${args.theme}-${args.lang}`;
+  if (args.matrix !== null && !NATIVE_MATRICES.includes(args.matrix)) throw new Error(`--matrix 取值：${NATIVE_MATRICES.join("|")}，得到 ${args.matrix}`);
+  if (args.matrix !== null && args.name !== null) throw new Error("--matrix 给每一格自动命名，不能同时指定 --name");
+  args.name ??= nativeShotName(args);
   return args;
+}
+
+/** 外观相关的 Go 命令行开关：只带用户给了的项，其余交给 Go 侧的默认值。纯函数，便于单测。 */
+export function nativeAppearanceFlags(args) {
+  return [
+    ...(args.hue ? ["-native-hue", args.hue] : []),
+    ...(args.font ? ["-native-font", args.font] : []),
+    ...(args.motion ? ["-native-motion", args.motion] : []),
+    ...(args.wallpaper ? ["-native-wallpaper", args.wallpaper] : []),
+    ...(args.wallpaperOpacity !== null ? ["-native-wallpaper-opacity", String(args.wallpaperOpacity)] : []),
+    ...(args.wallpaperBlur !== null ? ["-native-wallpaper-blur", String(args.wallpaperBlur)] : []),
+  ];
 }
 
 /**
@@ -206,15 +297,10 @@ export function nativeShotEnv(env, userDataDir, lang) {
   return isolated;
 }
 
-/** 隔离构建 Go 壳并离屏启动原生界面截图。返回进程退出码。 */
-async function runIsolatedNative(argv, cwd) {
-  const args = nativeShotArgs(argv, cwd);
-  fs.mkdirSync(args.out, { recursive: true });
-  const snapshot = createDesktopSnapshot(REPO_ROOT, { extraSourcePaths: GO_SOURCE_PATHS, reuseDependencies: false });
-  console.log(`隔离验证：已复制 ${snapshot.copied} 个当前文件 → ${snapshot.root}`);
+/** 用已构建的 exe 拍一格：每格有自己一次性的用户数据目录与库，格与格之间不串状态。返回退出码。 */
+async function shootNative(exe, args) {
   const userDataDir = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "guizhi-native-shot-"));
   try {
-    const { exe } = await buildInSnapshot(snapshot, goValidationEnv(), { renderer: false });
     const dbFile = path.join(userDataDir, "data", "knowledge.db");
     fs.mkdirSync(path.dirname(dbFile), { recursive: true });
     if (args.dataDb) {
@@ -227,6 +313,7 @@ async function runIsolatedNative(argv, cwd) {
     fs.rmSync(file, { force: true });
     const exeArgs = [
       "-native", "-native-module", args.module, "-native-theme", args.theme,
+      ...nativeAppearanceFlags(args),
       "-native-width", String(args.width), "-native-height", String(args.height),
       "-userdata", userDataDir, "-db", dbFile, "-shot", file, "-wait", args.wait,
       // 没给库副本就用确定的演示数据（仅写这次的一次性库）
@@ -238,8 +325,28 @@ async function runIsolatedNative(argv, cwd) {
     console.log(`截图：${file}`);
     return 0;
   } finally {
-    snapshot.cleanup();
     fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+}
+
+/** 隔离构建 Go 壳并离屏启动原生界面截图；--matrix 时一次构建拍多格。返回进程退出码。 */
+async function runIsolatedNative(argv, cwd) {
+  const args = nativeShotArgs(argv, cwd);
+  const presets = huePresetIds(fs.readFileSync(path.join(REPO_ROOT, "apps/desktop/src/renderer/stores/settings/settings-appearance.ts"), "utf8"));
+  const variants = nativeMatrixVariants(args, presets);
+  fs.mkdirSync(args.out, { recursive: true });
+  const snapshot = createDesktopSnapshot(REPO_ROOT, { extraSourcePaths: GO_SOURCE_PATHS, reuseDependencies: false });
+  console.log(`隔离验证：已复制 ${snapshot.copied} 个当前文件 → ${snapshot.root}`);
+  try {
+    const { exe } = await buildInSnapshot(snapshot, goValidationEnv(), { renderer: false });
+    for (const variant of variants) {
+      const code = await shootNative(exe, variant);
+      if (code !== 0) return code;
+    }
+    if (variants.length > 1) console.log(`共 ${variants.length} 格，输出目录：${args.out}`);
+    return 0;
+  } finally {
+    snapshot.cleanup();
   }
 }
 

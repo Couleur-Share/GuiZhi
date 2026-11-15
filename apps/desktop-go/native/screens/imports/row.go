@@ -20,7 +20,7 @@ func sourceIcon(kind string) icons.Name {
 }
 
 // statusColor 把状态映射到主题色：降级的完成态用警告色，不能只给一枚绿色的「已完成」。
-func statusColor(t *ui.Theme, r rowVM) ui.Color {
+func statusColor(t *kit.Look, r rowVM) ui.Color {
 	switch {
 	case r.degraded:
 		return t.Warning
@@ -35,9 +35,9 @@ func statusColor(t *ui.Theme, r rowVM) ui.Color {
 }
 
 // drawRow 绘制一行任务。行内只读 rowVM，不做解析与格式化。
-func drawRow(c *ui.Context, t *ui.Theme, r rowVM) {
+func drawRow(c *ui.Context, t *kit.Look, r rowVM) {
 	ui.Row(c).Gap(12).Padding(10, 12).AlignItems(ui.Center).Radius(8).
-		Background(t.Surface).Border(1, t.Border).Key(r.id).Children(func() {
+		Background(t.T.FillCard).Border(1, t.T.Border).Key(r.id).Children(func() {
 		kit.Icon(c, sourceIcon(r.sourceKind), 14).TextColor(t.TextMuted)
 		ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
 			ui.Text(c, r.name).MaxLines(1).Ellipsis("…").FontWeight(500)

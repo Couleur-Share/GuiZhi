@@ -195,8 +195,7 @@ var filters = []struct {
 }
 
 // View 绘制页面。
-func (s *Screen) View(c *ui.Context) {
-	t := c.Theme()
+func (s *Screen) View(c *ui.Context, t *kit.Look) {
 	q := query{filter: filters[s.filterIdx].id, text: s.text}
 	if !s.started {
 		s.started, s.lastKey = true, q
@@ -214,7 +213,7 @@ func (s *Screen) View(c *ui.Context) {
 		s.toolbar(c, t, snap)
 		switch {
 		case snap.err != "":
-			kit.LoadErrorState(c, snap.err, func() { go s.reload(q) })
+			kit.LoadErrorState(c, t, snap.err, func() { go s.reload(q) })
 		case !snap.loaded:
 			ui.Column(c).Grow(1).Center().Gap(8).Children(func() {
 				ui.Spinner(c)
@@ -226,7 +225,7 @@ func (s *Screen) View(c *ui.Context) {
 	})
 }
 
-func (s *Screen) header(c *ui.Context, t *ui.Theme, snap snapshot) {
+func (s *Screen) header(c *ui.Context, t *kit.Look, snap snapshot) {
 	ui.Row(c).Padding(12, 16).Gap(12).AlignItems(ui.Center).Height(56).
 		BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
 		kit.Icon(c, icons.Download, 18).TextColor(t.TextMuted)
@@ -244,7 +243,7 @@ func (s *Screen) header(c *ui.Context, t *ui.Theme, snap snapshot) {
 	})
 }
 
-func (s *Screen) toolbar(c *ui.Context, t *ui.Theme, snap snapshot) {
+func (s *Screen) toolbar(c *ui.Context, t *kit.Look, snap snapshot) {
 	ui.Row(c).Padding(8, 16).Gap(12).AlignItems(ui.Center).Children(func() {
 		labels := make([]string, len(filters))
 		for i, f := range filters {
@@ -257,7 +256,7 @@ func (s *Screen) toolbar(c *ui.Context, t *ui.Theme, snap snapshot) {
 	})
 }
 
-func (s *Screen) body(c *ui.Context, t *ui.Theme, snap snapshot, q query) {
+func (s *Screen) body(c *ui.Context, t *kit.Look, snap snapshot, q query) {
 	if len(snap.rows) == 0 {
 		s.empty(c, t, q)
 		return
@@ -268,12 +267,12 @@ func (s *Screen) body(c *ui.Context, t *ui.Theme, snap snapshot, q query) {
 }
 
 // empty 区分「队列本来就空」和「筛选后没有」：后者给出清除筛选的出口。
-func (s *Screen) empty(c *ui.Context, t *ui.Theme, q query) {
+func (s *Screen) empty(c *ui.Context, t *kit.Look, q query) {
 	filtered := q.filter != services.ImportFilterAll || q.text != ""
 	ui.Column(c).Grow(1).Center().Gap(8).Padding(24).Children(func() {
 		if filtered {
 			ui.Text(c, locales.ImportsFilteredEmpty()).TextColor(t.TextMuted)
-			if kit.OutlineButton(c, icons.RotateCcw, locales.ImportsResetFilter()) {
+			if kit.OutlineButton(c, t, icons.RotateCcw, locales.ImportsResetFilter()) {
 				s.filterIdx, s.text = 0, ""
 			}
 			return
