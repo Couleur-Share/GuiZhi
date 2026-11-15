@@ -1,0 +1,715 @@
+{
+  "cases": [
+    {
+      "name": "普通链接",
+      "body": "见 [[Alpha]] 与 [[知识管理]]。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a",
+        "c"
+      ]
+    },
+    {
+      "name": "显示文字：取竖线之前",
+      "body": "见 [[知识管理|知识库管理]]。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "c"
+      ]
+    },
+    {
+      "name": "多个竖线只看第一个",
+      "body": "见 [[Beta 测试|甲|乙]]。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "b"
+      ]
+    },
+    {
+      "name": "标题大小写与空白不敏感",
+      "body": "见 [[ alpha ]] 与 [[beta   测试]]。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "链接里有换行，空白折叠",
+      "body": "见 [[Beta\n测试]]。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "b"
+      ]
+    },
+    {
+      "name": "重复链接只出现一次",
+      "body": "[[Alpha]] [[alpha]] [[ALPHA|显示]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a"
+      ]
+    },
+    {
+      "name": "同名目录项取第一个",
+      "body": "[[Alpha]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a"
+      ]
+    },
+    {
+      "name": "目录里没有的链接被忽略",
+      "body": "[[不存在]] [[知识管理]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "c"
+      ]
+    },
+    {
+      "name": "空链接与只有显示文字的链接被忽略",
+      "body": "[[ ]] [[|只有显示]] [[Alpha]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a"
+      ]
+    },
+    {
+      "name": "按正文出现顺序",
+      "body": "[[知识管理]] [[Alpha]] [[Beta 测试]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "c",
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "残缺的括号",
+      "body": "[[Alpha] [Alpha]] [[[Alpha]]] [[Alpha]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "a"
+      ]
+    },
+    {
+      "name": "嵌套方括号不匹配外层",
+      "body": "[[a[b]c]] [[知识管理]]",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "c"
+      ]
+    },
+    {
+      "name": "没有链接",
+      "body": "普通正文 [单括号] 没有双括号链接。",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": []
+    },
+    {
+      "name": "空正文",
+      "body": "",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "Beta 测试",
+          "normalizedTitle": "BETA 测试",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "d",
+          "title": "Alpha",
+          "normalizedTitle": "ALPHA",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": []
+    },
+    {
+      "name": "空目录",
+      "body": "[[Alpha]]",
+      "catalog": [],
+      "output": []
+    },
+    {
+      "name": "目录标题带特殊大小写映射（ß → SS）",
+      "body": "[[straße]] [[STRASSE]]",
+      "catalog": [
+        {
+          "id": "s",
+          "title": "Straße",
+          "normalizedTitle": "STRASSE",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "output": [
+        "s"
+      ]
+    }
+  ]
+}

@@ -111,7 +111,7 @@ function response(step: ScriptStep): Record<string, unknown> {
  * ai.ts 的 catch 据此原样重抛 AbortError；jsdom 的实现不继承，会让取消被误包装成「网络请求失败」，
  * 导出的 golden 就不是生产行为了。
  */
-function alignDomExceptionWithChromium(): void {
+export function alignDomExceptionWithChromium(): void {
   if (!(new DOMException("probe", "AbortError") instanceof Error)) {
     Object.setPrototypeOf(DOMException.prototype, Error.prototype);
   }

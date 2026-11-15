@@ -1,0 +1,3494 @@
+{
+  "cases": [
+    {
+      "name": "readItem：字段透传",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "OCR 未完成"
+          ],
+          "updatedAt": 1700000000123,
+          "title": "归知架构",
+          "content": "正文内容",
+          "transcript": "口播转写"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：标题为空回落「无标题」",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "OCR 未完成"
+          ],
+          "updatedAt": 1700000000123,
+          "title": "无标题",
+          "content": "正文内容",
+          "transcript": "口播转写"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：标题只有空白时原样保留",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "  ",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "OCR 未完成"
+          ],
+          "updatedAt": 1700000000123,
+          "title": "  ",
+          "content": "正文内容",
+          "transcript": "口播转写"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：条目不存在（返回 null）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": null,
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：条目不存在（返回 undefined）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": "$undefined",
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：已删除（deletedAt 有值）返回 null",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": 1700000000999
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：deletedAt 为 0 也算已删除",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": 0
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：deletedAt 缺省按未删除",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "T",
+        "content": "C"
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "title": "T",
+          "content": "C"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：转写稿为 null",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "正文内容",
+        "transcript": null,
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "OCR 未完成"
+          ],
+          "updatedAt": 1700000000123,
+          "title": "归知架构",
+          "content": "正文内容"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：审核信息与版本缺省",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "T",
+        "content": "C",
+        "transcript": "转写"
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "title": "T",
+          "content": "C",
+          "transcript": "转写"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：reviewReasons 为空数组",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "正文内容",
+        "transcript": "口播转写",
+        "reviewStatus": "clear",
+        "reviewReasons": [],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "clear",
+          "reviewReasons": [],
+          "updatedAt": 1700000000123,
+          "title": "归知架构",
+          "content": "正文内容",
+          "transcript": "口播转写"
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：正文为空也原样返回（空判断由引擎做）",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "id": "a",
+        "title": "归知架构",
+        "content": "",
+        "transcript": null,
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "OCR 未完成"
+        ],
+        "updatedAt": 1700000000123,
+        "deletedAt": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "reviewStatus": "needs_review",
+          "reviewReasons": [
+            "OCR 未完成"
+          ],
+          "updatedAt": 1700000000123,
+          "title": "归知架构",
+          "content": ""
+        },
+        "error": null,
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "readItem：读取失败向上抛出",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "readItem",
+      "id": "a",
+      "get": {
+        "throws": "knowledge.get 失败"
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "knowledge.get 失败",
+          "aborted": false
+        },
+        "getCalls": [
+          {
+            "id": "a"
+          }
+        ],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：目录原样透传",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "catalog",
+        "result": [
+          {
+            "id": "w1",
+            "title": "采集工作流",
+            "normalizedTitle": "采集工作流",
+            "kind": "topic",
+            "summary": "摘要",
+            "aliasesJson": "[\"采集\"]",
+            "manualEditedAt": null,
+            "updatedAt": 1
+          },
+          {
+            "id": "w2",
+            "title": "检索设计",
+            "normalizedTitle": "检索设计",
+            "kind": "concept",
+            "summary": "",
+            "aliasesJson": null,
+            "manualEditedAt": 5,
+            "updatedAt": 2
+          }
+        ]
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "id": "w1",
+            "title": "采集工作流",
+            "normalizedTitle": "采集工作流",
+            "kind": "topic",
+            "summary": "摘要",
+            "aliasesJson": "[\"采集\"]",
+            "manualEditedAt": null,
+            "updatedAt": 1
+          },
+          {
+            "id": "w2",
+            "title": "检索设计",
+            "normalizedTitle": "检索设计",
+            "kind": "concept",
+            "summary": "",
+            "aliasesJson": null,
+            "manualEditedAt": 5,
+            "updatedAt": 2
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "catalog"
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面检索透传检索词与条数",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "search",
+        "query": "采集 流程",
+        "limit": 4,
+        "result": [
+          {
+            "id": "w1",
+            "title": "采集工作流",
+            "kind": "entity",
+            "summary": "摘要"
+          }
+        ]
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "id": "w1",
+            "title": "采集工作流",
+            "kind": "entity",
+            "summary": "摘要"
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "search",
+            "query": "采集 流程",
+            "limit": 4
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面检索无命中",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "search",
+        "query": "无",
+        "limit": 4,
+        "result": []
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "search",
+            "query": "无",
+            "limit": 4
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面详情透传 id 与来源条目",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "getPage",
+        "id": "w1",
+        "result": {
+          "page": {
+            "id": "w1",
+            "title": "采集工作流",
+            "body": "正文 [[检索设计]]",
+            "updatedAt": 1700000000001
+          },
+          "sources": [
+            {
+              "itemId": "a",
+              "title": "归知架构"
+            },
+            {
+              "itemId": "b",
+              "title": "采集管线",
+              "reviewStatus": "needs_review",
+              "reviewReasons": [
+                "正文缺失"
+              ]
+            }
+          ]
+        }
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": {
+          "page": {
+            "id": "w1",
+            "title": "采集工作流",
+            "body": "正文 [[检索设计]]",
+            "updatedAt": 1700000000001
+          },
+          "sources": [
+            {
+              "itemId": "a",
+              "title": "归知架构"
+            },
+            {
+              "itemId": "b",
+              "title": "采集管线",
+              "reviewStatus": "needs_review",
+              "reviewReasons": [
+                "正文缺失"
+              ]
+            }
+          ]
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "getPage",
+            "id": "w1"
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面不存在",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "getPage",
+        "id": "gone",
+        "result": null
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "getPage",
+            "id": "gone"
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：目录读取失败",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "catalog",
+        "result": {
+          "throws": "目录读取失败"
+        }
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "目录读取失败",
+          "aborted": false
+        },
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "catalog"
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面检索失败",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "search",
+        "query": "x",
+        "limit": 4,
+        "result": {
+          "throws": "页面检索失败"
+        }
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "页面检索失败",
+          "aborted": false
+        },
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "search",
+            "query": "x",
+            "limit": 4
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "wiki：页面读取失败",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "wiki",
+      "wiki": {
+        "call": "getPage",
+        "id": "w1",
+        "result": {
+          "throws": "页面读取失败"
+        }
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "页面读取失败",
+          "aborted": false
+        },
+        "getCalls": [],
+        "wikiCalls": [
+          {
+            "call": "getPage",
+            "id": "w1"
+          }
+        ],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：走 qa 场景（被单独路由到 fast），选项透传",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"回答 [1]\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5}}"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 12,
+            "completionTokens": 5
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "content": "回答 [1]",
+          "model": "model-fast",
+          "finishReason": "stop"
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：qa 没有单独路由时用主模型",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"回答 [1]\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":5}}"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-main"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-main\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":false,\"max_completion_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-main",
+            "promptTokens": 12,
+            "completionTokens": 5
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "content": "回答 [1]",
+          "model": "model-main",
+          "finishReason": "stop"
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：不传选项用默认值",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"回答\"},\"finish_reason\":\"stop\"}]}"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {},
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.7,\"stream\":false,\"max_tokens\":2048}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "content": "回答",
+          "model": "model-fast",
+          "finishReason": "stop"
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：流式逐块回调",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "chunks": [
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"归知\"}}]}\n",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"基于 Electron\"},\"finish_reason\":\"stop\"}]}\n"
+          ]
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096,
+        "stream": true
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "stream",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":true,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": {
+          "content": "归知基于 Electron",
+          "model": "model-fast",
+          "finishReason": "stop"
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": [
+          "归知",
+          "基于 Electron"
+        ]
+      }
+    },
+    {
+      "name": "chat：撞上 max_tokens 记截断日志并带回 finishReason",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"choices\":[{\"message\":{\"content\":\"没写完\"},\"finish_reason\":\"length\"}],\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":4096}}"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 30,
+            "completionTokens": 4096
+          }
+        ],
+        "warnings": [
+          "[ai] qa 输出被 max_tokens 截断（上限 4096），结果可能不完整"
+        ],
+        "result": {
+          "content": "没写完",
+          "model": "model-fast",
+          "finishReason": "length"
+        },
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：未配置模型",
+      "settings": {
+        "aiModels": [],
+        "modelRouteDefaults": {}
+      },
+      "script": [],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "AI_NOT_CONFIGURED",
+          "aborted": false,
+          "notConfigured": true
+        },
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：请求失败记一笔失败用量",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"boom\"}}"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "boom",
+          "aborted": false
+        },
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：调用前已取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "abort": "before",
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "",
+          "aborted": true
+        },
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "chat：请求进行中取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {},
+        "scenarioModelDefaults": {
+          "qa": "fast"
+        }
+      },
+      "script": [
+        {
+          "abortDuring": true,
+          "status": 499,
+          "body": "",
+          "error": "已取消"
+        }
+      ],
+      "op": "chat",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是知识库助手。"
+        },
+        {
+          "role": "user",
+          "content": "归知用什么技术栈？"
+        }
+      ],
+      "options": {
+        "temperature": 0.2,
+        "maxTokens": 4096
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://fast.example.com/v1/chat/completions",
+            "headers": {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": "Bearer sk-fast"
+            },
+            "timeoutMs": 120000,
+            "body": "{\"model\":\"model-fast\",\"messages\":[{\"role\":\"system\",\"content\":\"你是知识库助手。\"},{\"role\":\"user\",\"content\":\"归知用什么技术栈？\"}],\"temperature\":0.2,\"stream\":false,\"max_tokens\":4096}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "qa",
+            "model": "model-fast",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          }
+        ],
+        "warnings": [],
+        "result": null,
+        "error": {
+          "message": "",
+          "aborted": true
+        },
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：未配置 embedding 时只返回关键词命中",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "search",
+      "queries": [
+        "归知怎么做检索"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "b",
+            "title": "语义标题-b",
+            "snippet": "命中段-b",
+            "score": 0.9
+          }
+        ]
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "归知怎么做检索",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：关键词与语义融合",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "op": "search",
+      "queries": [
+        "归知怎么做检索"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "b",
+            "title": "语义标题-b",
+            "snippet": "命中段-b",
+            "score": 0.9
+          }
+        ]
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"归知怎么做检索\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              },
+              {
+                "id": "b",
+                "title": "语义标题-b",
+                "snippet": "命中段-b",
+                "matchText": "命中段-b"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "归知怎么做检索",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：语义抛错告警，同一句话两次检索只回调一次",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "op": "search",
+      "queries": [
+        "检索词一",
+        "检索词二"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "throws": "semantic index is rebuilding"
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词一\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词二\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "检索词一",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词二",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          },
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：每个检索词各用新依赖，警告各回调一次",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "op": "search",
+      "queries": [
+        "检索词一",
+        "检索词二"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "throws": "semantic index is rebuilding"
+      },
+      "freshDeps": true,
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词一\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词二\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "检索词一",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词二",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          },
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索暂不可用，本次使用本地关键词结果。",
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：查询向量失败与语义抛错是同一句提示，只回调一次",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "status": 500,
+          "body": "{\"error\":{\"message\":\"upstream down\"}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "op": "search",
+      "queries": [
+        "检索词一",
+        "检索词二",
+        "检索词三"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "throws": "semantic index is rebuilding"
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词一\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词二\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词三\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 0,
+            "completionTokens": 0,
+            "failed": true
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "检索词一",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词二",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词三",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          },
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：超时与不可用是两句不同的提示，各回调一次",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        },
+        {
+          "body": "{\"object\":\"list\",\"data\":[{\"object\":\"embedding\",\"index\":0,\"embedding\":[3,4]}],\"usage\":{\"prompt_tokens\":7,\"total_tokens\":7}}"
+        }
+      ],
+      "op": "search",
+      "queries": [
+        "检索词一",
+        "检索词二",
+        "检索词三"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "sequence": [
+          {
+            "hang": true
+          },
+          {
+            "throws": "semantic index is rebuilding"
+          },
+          {
+            "hang": true
+          }
+        ]
+      },
+      "expect": {
+        "requests": [
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词一\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词二\"]}"
+          },
+          {
+            "kind": "request",
+            "method": "POST",
+            "url": "https://embed.example.com/v1/embeddings",
+            "headers": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer sk-embed"
+            },
+            "timeoutMs": 60000,
+            "body": "{\"model\":\"model-embed\",\"input\":[\"检索词三\"]}"
+          }
+        ],
+        "unusedScript": 0,
+        "usage": [
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          },
+          {
+            "scenario": "embedding",
+            "model": "model-embed",
+            "promptTokens": 7,
+            "completionTokens": 0
+          }
+        ],
+        "warnings": [],
+        "result": [
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          },
+          {
+            "ok": true,
+            "hits": [
+              {
+                "id": "a",
+                "title": "关键词标题-a",
+                "snippet": "关键词摘录-a"
+              }
+            ]
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "检索词一",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词二",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词三",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          },
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          },
+          {
+            "model": "model-embed",
+            "vector": [
+              0.6,
+              0.8
+            ],
+            "limit": 5
+          }
+        ],
+        "onWarnings": [
+          "语义检索等待超过 3 秒，本次使用本地关键词结果。",
+          "语义检索暂不可用，本次使用本地关键词结果。"
+        ],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：关键词检索失败整体失败，后面的检索词照常尝试",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast"
+        }
+      },
+      "script": [],
+      "op": "search",
+      "queries": [
+        "检索词一",
+        "检索词二"
+      ],
+      "limit": 5,
+      "fts": {
+        "throws": "fts index corrupted"
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "b",
+            "title": "语义标题-b",
+            "snippet": "命中段-b",
+            "score": 0.9
+          }
+        ]
+      },
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "ok": false,
+            "error": {
+              "message": "fts index corrupted",
+              "aborted": false
+            }
+          },
+          {
+            "ok": false,
+            "error": {
+              "message": "fts index corrupted",
+              "aborted": false
+            }
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [
+          {
+            "scope": "all",
+            "search": "检索词一",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          },
+          {
+            "scope": "all",
+            "search": "检索词二",
+            "searchMode": "recall",
+            "includeArchived": true,
+            "limit": 5
+          }
+        ],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    },
+    {
+      "name": "search：调用前已取消",
+      "settings": {
+        "aiModels": [
+          {
+            "id": "main",
+            "provider": "openai",
+            "apiProtocol": "openai",
+            "apiKey": "sk-main",
+            "apiUrl": "https://api.openai.com/v1",
+            "model": "model-main",
+            "capabilities": {
+              "chat": true
+            },
+            "isDefault": true
+          },
+          {
+            "id": "fast",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-fast",
+            "apiUrl": "https://fast.example.com",
+            "model": "model-fast",
+            "capabilities": {
+              "chat": true
+            }
+          },
+          {
+            "id": "embed",
+            "provider": "custom",
+            "apiProtocol": "openai",
+            "apiKey": "sk-embed",
+            "apiUrl": "https://embed.example.com/v1",
+            "model": "model-embed",
+            "capabilities": {
+              "chat": false,
+              "embedding": true
+            }
+          }
+        ],
+        "modelRouteDefaults": {
+          "mainText": "main",
+          "fastText": "fast",
+          "embedding": "embed"
+        }
+      },
+      "script": [],
+      "op": "search",
+      "queries": [
+        "归知怎么做检索"
+      ],
+      "limit": 5,
+      "fts": {
+        "entries": [
+          {
+            "id": "a",
+            "title": "关键词标题-a",
+            "snippet": "关键词摘录-a"
+          }
+        ]
+      },
+      "semantic": {
+        "hits": [
+          {
+            "itemId": "b",
+            "title": "语义标题-b",
+            "snippet": "命中段-b",
+            "score": 0.9
+          }
+        ]
+      },
+      "abort": "before",
+      "expect": {
+        "requests": [],
+        "unusedScript": 0,
+        "usage": [],
+        "warnings": [],
+        "result": [
+          {
+            "ok": false,
+            "error": {
+              "message": "",
+              "aborted": true
+            }
+          }
+        ],
+        "error": null,
+        "getCalls": [],
+        "wikiCalls": [],
+        "ftsCalls": [],
+        "semanticCalls": [],
+        "onWarnings": [],
+        "deltas": []
+      }
+    }
+  ]
+}

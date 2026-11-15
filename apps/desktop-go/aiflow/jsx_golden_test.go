@@ -15,6 +15,7 @@ func TestJSXGolden(t *testing.T) {
 			In           string   `json:"in"`
 			Trim         string   `json:"trim"`
 			TrimStart    string   `json:"trimStart"`
+			TrimEnd      string   `json:"trimEnd"`
 			Upper        string   `json:"upper"`
 			Lower        string   `json:"lower"`
 			NFKC         string   `json:"nfkc"`
@@ -60,6 +61,7 @@ func TestJSXGolden(t *testing.T) {
 	for _, c := range golden.Strings {
 		check("trim", c.In, jsTrim(c.In), c.Trim)
 		check("trimStart", c.In, jsTrimStart(c.In), c.TrimStart)
+		check("trimEnd", c.In, jsTrimEnd(c.In), c.TrimEnd)
 		check("upper", c.In, jsUpper(c.In), c.Upper)
 		check("lower", c.In, jsLower(c.In), c.Lower)
 		check("nfkc", c.In, jsNFKC(c.In), c.NFKC)

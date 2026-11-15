@@ -1,0 +1,154 @@
+{
+  "cases": [
+    {
+      "name": "空白被压过的片段",
+      "haystack": "前言。\n\n  关键结论   在这里。\n后记。",
+      "needle": "关键结论 在这里。",
+      "output": 7
+    },
+    {
+      "name": "找不到",
+      "haystack": "一段正文",
+      "needle": "不存在",
+      "output": -1
+    },
+    {
+      "name": "过短的片段不参与定位（3 个码元）",
+      "haystack": "一段正文内容",
+      "needle": "正文内",
+      "output": -1
+    },
+    {
+      "name": "恰好 4 个码元",
+      "haystack": "一段正文内容",
+      "needle": "正文内容",
+      "output": 2
+    },
+    {
+      "name": "片段首尾有空白，先归一再裁剪",
+      "haystack": "abc 关键结论在这里 def",
+      "needle": "  \n关键结论在这里\t ",
+      "output": 4
+    },
+    {
+      "name": "片段内部多种空白折叠成一个空格",
+      "haystack": "甲乙 丙丁戊己",
+      "needle": "甲乙 　\n丙丁",
+      "output": 0
+    },
+    {
+      "name": "片段只有空白",
+      "haystack": "abc def",
+      "needle": "   \n ",
+      "output": -1
+    },
+    {
+      "name": "空原文",
+      "haystack": "",
+      "needle": "关键结论在这里",
+      "output": -1
+    },
+    {
+      "name": "空片段",
+      "haystack": "一段正文内容",
+      "needle": "",
+      "output": -1
+    },
+    {
+      "name": "原文开头的空白段被丢弃",
+      "haystack": "  \n\t开头的内容是这些",
+      "needle": "开头的内容",
+      "output": 4
+    },
+    {
+      "name": "原文末尾有空白段，不影响命中",
+      "haystack": "结尾的内容是这些 \n\n",
+      "needle": "内容是这些",
+      "output": 3
+    },
+    {
+      "name": "片段末尾的空白被裁掉后只剩 3 个码元",
+      "haystack": "结尾的内容是这些 \n\n",
+      "needle": "这些 \n",
+      "output": -1
+    },
+    {
+      "name": "命中跨越原文的空白段，下标取首个字符",
+      "haystack": "前缀前缀 一二三四\n\n\n五六七八 后缀",
+      "needle": "一二三四 五六七八",
+      "output": 5
+    },
+    {
+      "name": "空白段里混用各种空白字符",
+      "haystack": "一二三四  　﻿ 五六七八",
+      "needle": "一二三四 五六七八",
+      "output": 0
+    },
+    {
+      "name": "多次出现取第一次",
+      "haystack": "重复的片段 重复的片段 重复的片段",
+      "needle": "重复的片段",
+      "output": 0
+    },
+    {
+      "name": "emoji 占两个码元，下标按码元",
+      "haystack": "😀😀前缀 命中的内容在这里",
+      "needle": "命中的内容",
+      "output": 7
+    },
+    {
+      "name": "片段含 emoji，两个 emoji 恰好 4 个码元",
+      "haystack": "前缀😀😀后缀",
+      "needle": "😀😀",
+      "output": 2
+    },
+    {
+      "name": "片段含一个 emoji 与一个字，3 个码元不够",
+      "haystack": "前缀😀字后缀",
+      "needle": "😀字",
+      "output": -1
+    },
+    {
+      "name": "长原文中段命中",
+      "haystack": {
+        "$text": [
+          {
+            "cjk": 5000
+          },
+          {
+            "lit": " 目标 定位   片段 "
+          },
+          {
+            "cjk": 5000
+          }
+        ]
+      },
+      "needle": "目标 定位 片段",
+      "output": 5001
+    },
+    {
+      "name": "长原文找不到",
+      "haystack": {
+        "$text": [
+          {
+            "cjk": 5000
+          }
+        ]
+      },
+      "needle": "不在其中的片段",
+      "output": -1
+    },
+    {
+      "name": "大小写敏感",
+      "haystack": "Hello World Example",
+      "needle": "hello world",
+      "output": -1
+    },
+    {
+      "name": "原文含 \\r\\n",
+      "haystack": "第一行内容\r\n第二行内容",
+      "needle": "第一行内容 第二行内容",
+      "output": 0
+    }
+  ]
+}

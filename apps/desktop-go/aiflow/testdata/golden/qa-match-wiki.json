@@ -1,0 +1,826 @@
+{
+  "cases": [
+    {
+      "name": "标题包含于查询",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "Electron 是什么",
+      "output": [
+        "w1",
+        "w3"
+      ]
+    },
+    {
+      "name": "别名命中",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "电子框架",
+      "output": [
+        "w1"
+      ]
+    },
+    {
+      "name": "摘要 token 命中",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "PKM",
+      "output": [
+        "w2"
+      ]
+    },
+    {
+      "name": "无命中",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "完全无关的词汇",
+      "output": []
+    },
+    {
+      "name": "空查询",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "",
+      "output": []
+    },
+    {
+      "name": "只有空白的查询",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "  　\n",
+      "output": []
+    },
+    {
+      "name": "多个 token 累计得分排序",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "Electron 采集 流程",
+      "output": [
+        "w1",
+        "w3"
+      ]
+    },
+    {
+      "name": "同分保持目录顺序（稳定排序）",
+      "catalog": [
+        {
+          "id": "a",
+          "title": "甲",
+          "normalizedTitle": "甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "b",
+          "title": "甲乙",
+          "normalizedTitle": "甲乙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "c",
+          "title": "甲丙",
+          "normalizedTitle": "甲丙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "甲",
+      "output": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    {
+      "name": "标题得分高于摘要得分",
+      "catalog": [
+        {
+          "id": "s",
+          "title": "无关",
+          "normalizedTitle": "无关",
+          "kind": "topic",
+          "summary": "归知 归知",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "t",
+          "title": "归知",
+          "normalizedTitle": "归知",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "归知",
+      "output": [
+        "t",
+        "s"
+      ]
+    },
+    {
+      "name": "大小写不敏感",
+      "catalog": [
+        {
+          "id": "w1",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "entity",
+          "summary": "跨平台桌面框架",
+          "aliasesJson": "[\"电子框架\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w2",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "PKM 方法论",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "w3",
+          "title": "采集工作流",
+          "normalizedTitle": "采集工作流",
+          "kind": "concept",
+          "summary": "网页与文件的采集流程，含 Electron 渲染进程",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "ELECTRON",
+      "output": [
+        "w1",
+        "w3"
+      ]
+    },
+    {
+      "name": "token 小写比较：土耳其语 İ",
+      "catalog": [
+        {
+          "id": "i",
+          "title": "İstanbul",
+          "normalizedTitle": "İSTANBUL",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "j",
+          "title": "istanbul",
+          "normalizedTitle": "ISTANBUL",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "İstanbul",
+      "output": [
+        "i"
+      ]
+    },
+    {
+      "name": "希腊字母 Σ 的小写（词尾 ς）",
+      "catalog": [
+        {
+          "id": "g",
+          "title": "ΟΔΥΣΣΕΥΣ",
+          "normalizedTitle": "ΟΔΥΣΣΕΥΣ",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "h",
+          "title": "ὀδυσσεύς",
+          "normalizedTitle": "ὈΔΥΣΣΕΎΣ",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "ΟΔΥΣΣΕΥΣ",
+      "output": [
+        "g"
+      ]
+    },
+    {
+      "name": "空标题的目录项总是被「查询包含标题」命中",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "",
+          "normalizedTitle": "",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "f",
+          "title": "别的",
+          "normalizedTitle": "别的",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "任意问题",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "空别名总是命中",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题",
+          "normalizedTitle": "标题",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "无关",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "别名与 token 双向包含",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题",
+          "normalizedTitle": "标题",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"知识库管理\",\"KM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "管理 km",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "别名 JSON 非法按无别名",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题",
+          "normalizedTitle": "标题",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "not json",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "别名",
+      "output": []
+    },
+    {
+      "name": "别名里混有非字符串",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题",
+          "normalizedTitle": "标题",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"有效\",1,null,[\"x\"]]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "有效",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "查询里的多种空白分词",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题甲",
+          "normalizedTitle": "标题甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "f",
+          "title": "标题乙",
+          "normalizedTitle": "标题乙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "甲 　\n乙",
+      "output": [
+        "e",
+        "f"
+      ]
+    },
+    {
+      "name": "摘要包含 token",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题",
+          "normalizedTitle": "标题",
+          "kind": "topic",
+          "summary": "这里讨论了向量检索的做法",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "向量检索",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "目录为空",
+      "catalog": [],
+      "query": "任意",
+      "output": []
+    },
+    {
+      "name": "emoji 标题",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "😀笔记",
+          "normalizedTitle": "😀笔记",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "😀笔记 怎么写",
+      "output": [
+        "e"
+      ]
+    },
+    {
+      "name": "查询里的 U+FEFF 是空白，两侧各成一个 token",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题甲",
+          "normalizedTitle": "标题甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "f",
+          "title": "标题乙",
+          "normalizedTitle": "标题乙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "甲﻿乙",
+      "output": [
+        "e",
+        "f"
+      ]
+    },
+    {
+      "name": "查询里的 U+0085 不是空白，整体是一个 token",
+      "catalog": [
+        {
+          "id": "e",
+          "title": "标题甲",
+          "normalizedTitle": "标题甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "f",
+          "title": "标题乙",
+          "normalizedTitle": "标题乙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "甲乙",
+      "output": []
+    },
+    {
+      "name": "权重：标题包含于查询（10）高于别名全包含（5+4）",
+      "catalog": [
+        {
+          "id": "b",
+          "title": "无关页面",
+          "normalizedTitle": "无关页面",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"归知检索\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "a",
+          "title": "归知",
+          "normalizedTitle": "归知",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "归知检索",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "权重：标题含词（6）高于别名包含于查询（5）",
+      "catalog": [
+        {
+          "id": "b",
+          "title": "无关",
+          "normalizedTitle": "无关",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"o b\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "a",
+          "title": "xfoox",
+          "normalizedTitle": "XFOOX",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "foo bar",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "权重：摘要含两个词（2+2）低于标题含一个词（6）",
+      "catalog": [
+        {
+          "id": "x",
+          "title": "无关一",
+          "normalizedTitle": "无关一",
+          "kind": "topic",
+          "summary": "foo bar 的说明",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "y",
+          "title": "xfoox",
+          "normalizedTitle": "XFOOX",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "foo bar",
+      "output": [
+        "y",
+        "x"
+      ]
+    },
+    {
+      "name": "权重：别名包含于查询（5）高于摘要含两个词（2+2）",
+      "catalog": [
+        {
+          "id": "b",
+          "title": "无关二",
+          "normalizedTitle": "无关二",
+          "kind": "topic",
+          "summary": "foo bar 的说明",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "a",
+          "title": "无关三",
+          "normalizedTitle": "无关三",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"o b\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "foo bar",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "权重：别名含词（4）高于摘要含一个词（2）",
+      "catalog": [
+        {
+          "id": "b",
+          "title": "无关四",
+          "normalizedTitle": "无关四",
+          "kind": "topic",
+          "summary": "foo 的说明",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "a",
+          "title": "无关五",
+          "normalizedTitle": "无关五",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"xfoox\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "query": "foo bar",
+      "output": [
+        "a",
+        "b"
+      ]
+    }
+  ]
+}

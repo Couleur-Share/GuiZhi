@@ -40,6 +40,7 @@ const jsSpaceClass = `\t\n\v\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}
 
 func jsTrim(s string) string      { return strings.TrimFunc(s, jsSpace) }
 func jsTrimStart(s string) string { return strings.TrimLeftFunc(s, jsSpace) }
+func jsTrimEnd(s string) string   { return strings.TrimRightFunc(s, jsSpace) }
 
 // u16Len 对应 s.length（UTF-16 码元数）。
 func u16Len(s string) int {

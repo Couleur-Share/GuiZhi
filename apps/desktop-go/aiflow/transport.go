@@ -9,6 +9,9 @@ package aiflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"strings"
 )
 
 // TransportRequest 对应 AITransportRequest。
@@ -64,10 +67,39 @@ func cancellable[T any](ctx context.Context, run func() (T, error)) (T, error) {
 }
 
 // parseJSON 对应 JSON.parse：把文本解码成 any（对象为 map[string]any，数组为 []any，数字为 float64）。
+//
+// 与 JSON.parse 一致的两点：多余的尾随内容报错；超出 float64 范围的数字解码为 ±Infinity，而不是整段报错
+// （encoding/json 默认会报错，那样模型输出里某个无关字段写了 1e999，整个动作就被判成无法解析）。
 func parseJSON(text string) (any, error) {
+	decoder := json.NewDecoder(strings.NewReader(text))
+	decoder.UseNumber()
 	var v any
-	if err := json.Unmarshal([]byte(text), &v); err != nil {
+	if err := decoder.Decode(&v); err != nil {
 		return nil, err
 	}
-	return v, nil
+	if _, err := decoder.Token(); err != io.EOF {
+		if err == nil {
+			err = errors.New("json: 顶层值之后还有内容")
+		}
+		return nil, err
+	}
+	return floatNumbers(v), nil
+}
+
+// floatNumbers 把 UseNumber 解出的 json.Number 换成 float64（溢出为 ±Inf）。
+func floatNumbers(v any) any {
+	switch x := v.(type) {
+	case json.Number:
+		f, _ := x.Float64() // 语法已由解码器校验；唯一的错误是溢出，此时 f 为 ±Inf
+		return f
+	case []any:
+		for i := range x {
+			x[i] = floatNumbers(x[i])
+		}
+	case map[string]any:
+		for key, entry := range x {
+			x[key] = floatNumbers(entry)
+		}
+	}
+	return v
 }

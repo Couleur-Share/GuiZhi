@@ -43,6 +43,7 @@ describe("aiflow golden：JS 语义小工具", () => {
       in: s,
       trim: s.trim(),
       trimStart: s.trimStart(),
+      trimEnd: s.trimEnd(),
       upper: s.toUpperCase(),
       lower: s.toLowerCase(),
       nfkc: s.normalize("NFKC"),

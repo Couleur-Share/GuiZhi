@@ -1,0 +1,568 @@
+{
+  "cases": [
+    {
+      "name": "search",
+      "text": "{\"action\":\"search\",\"query\":\"归知架构\"}",
+      "output": {
+        "kind": "search",
+        "query": "归知架构"
+      }
+    },
+    {
+      "name": "read",
+      "text": "{\"action\":\"read\",\"target\":3}",
+      "output": {
+        "kind": "read",
+        "target": "3"
+      }
+    },
+    {
+      "name": "answer",
+      "text": "{\"action\":\"answer\",\"text\":\"归知基于 Electron 构建 [1]。\"}",
+      "output": {
+        "kind": "answer",
+        "text": "归知基于 Electron 构建 [1]。"
+      }
+    },
+    {
+      "name": "代码围栏",
+      "text": "```json\n{\"action\":\"search\",\"query\":\"x\"}\n```",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "前后缀文字",
+      "text": "好的，我来搜索：{\"action\":\"search\",\"query\":\"x\"} 以上。",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "前缀里有花括号，解析失败",
+      "text": "说明 {示例} 之后 {\"action\":\"search\",\"query\":\"x\"}",
+      "output": null
+    },
+    {
+      "name": "两个对象，取首尾花括号后解析失败",
+      "text": "{\"action\":\"search\",\"query\":\"a\"} {\"action\":\"read\",\"target\":1}",
+      "output": null
+    },
+    {
+      "name": "数组里的对象，取到内层对象",
+      "text": "[{\"action\":\"search\",\"query\":\"x\"}]",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "空串",
+      "text": "",
+      "output": null
+    },
+    {
+      "name": "只有左花括号",
+      "text": "{",
+      "output": null
+    },
+    {
+      "name": "只有右花括号",
+      "text": "}",
+      "output": null
+    },
+    {
+      "name": "右花括号在左花括号之前",
+      "text": "} {",
+      "output": null
+    },
+    {
+      "name": "一对空花括号：没有 action",
+      "text": "{}",
+      "output": null
+    },
+    {
+      "name": "前后空白",
+      "text": "\n\n  {\"action\":\"search\",\"query\":\"x\"}  \n",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "action 大写并带空白",
+      "text": "{\"action\":\" SEARCH \",\"query\":\"q\"}",
+      "output": {
+        "kind": "search",
+        "query": "q"
+      }
+    },
+    {
+      "name": "action Read 首字母大写",
+      "text": "{\"action\":\"Read\",\"target\":2}",
+      "output": {
+        "kind": "read",
+        "target": "2"
+      }
+    },
+    {
+      "name": "action ANSWER",
+      "text": "{\"action\":\"ANSWER\",\"text\":\"t\"}",
+      "output": {
+        "kind": "answer",
+        "text": "t"
+      }
+    },
+    {
+      "name": "action 是单元素数组（String(['search'])）",
+      "text": "{\"action\":[\"search\"],\"query\":\"q\"}",
+      "output": {
+        "kind": "search",
+        "query": "q"
+      }
+    },
+    {
+      "name": "action 是嵌套数组",
+      "text": "{\"action\":[[\"read\"]],\"target\":1}",
+      "output": {
+        "kind": "read",
+        "target": "1"
+      }
+    },
+    {
+      "name": "action 是多元素数组",
+      "text": "{\"action\":[\"search\",\"read\"],\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 是含 null 的数组",
+      "text": "{\"action\":[null],\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 是数字",
+      "text": "{\"action\":1,\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 是 true",
+      "text": "{\"action\":true,\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 是 null",
+      "text": "{\"action\":null,\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 是对象",
+      "text": "{\"action\":{\"name\":\"search\"},\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "没有 action",
+      "text": "{\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "未知 action",
+      "text": "{\"action\":\"lookup\",\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "action 为空串",
+      "text": "{\"action\":\"\",\"query\":\"q\"}",
+      "output": null
+    },
+    {
+      "name": "重复键以后者为准",
+      "text": "{\"action\":\"search\",\"action\":\"read\",\"target\":2}",
+      "output": {
+        "kind": "read",
+        "target": "2"
+      }
+    },
+    {
+      "name": "__proto__ 键不影响解析",
+      "text": "{\"__proto__\":{\"action\":\"search\"},\"action\":\"read\",\"target\":1}",
+      "output": {
+        "kind": "read",
+        "target": "1"
+      }
+    },
+    {
+      "name": "query 首尾空白被去掉",
+      "text": "{\"action\":\"search\",\"query\":\"  归知  架构  \"}",
+      "output": {
+        "kind": "search",
+        "query": "归知  架构"
+      }
+    },
+    {
+      "name": "query 缺失",
+      "text": "{\"action\":\"search\"}",
+      "output": null
+    },
+    {
+      "name": "query 为空串",
+      "text": "{\"action\":\"search\",\"query\":\"\"}",
+      "output": null
+    },
+    {
+      "name": "query 只有空白",
+      "text": "{\"action\":\"search\",\"query\":\"  　\\n\"}",
+      "output": null
+    },
+    {
+      "name": "query 是数字",
+      "text": "{\"action\":\"search\",\"query\":123}",
+      "output": null
+    },
+    {
+      "name": "query 是数组",
+      "text": "{\"action\":\"search\",\"query\":[\"a\"]}",
+      "output": null
+    },
+    {
+      "name": "query 含转义与 emoji",
+      "text": "{\"action\":\"search\",\"query\":\"a\\n\\\"b\\\"\\t😀\"}",
+      "output": {
+        "kind": "search",
+        "query": "a\n\"b\"\t😀"
+      }
+    },
+    {
+      "name": "query 用 \\u 转义写中文",
+      "text": "{\"action\":\"search\",\"query\":\"\\u4e2d\\u6587\"}",
+      "output": {
+        "kind": "search",
+        "query": "中文"
+      }
+    },
+    {
+      "name": "query 里有花括号",
+      "text": "{\"action\":\"search\",\"query\":\"{x} 与 }\"}",
+      "output": {
+        "kind": "search",
+        "query": "{x} 与 }"
+      }
+    },
+    {
+      "name": "target 整数",
+      "text": "{\"action\":\"read\",\"target\":1}",
+      "output": {
+        "kind": "read",
+        "target": "1"
+      }
+    },
+    {
+      "name": "target 小数向零取整",
+      "text": "{\"action\":\"read\",\"target\":3.9}",
+      "output": {
+        "kind": "read",
+        "target": "3"
+      }
+    },
+    {
+      "name": "target 负小数向零取整",
+      "text": "{\"action\":\"read\",\"target\":-2.5}",
+      "output": {
+        "kind": "read",
+        "target": "-2"
+      }
+    },
+    {
+      "name": "target 为 0",
+      "text": "{\"action\":\"read\",\"target\":0}",
+      "output": {
+        "kind": "read",
+        "target": "0"
+      }
+    },
+    {
+      "name": "target 为 -0",
+      "text": "{\"action\":\"read\",\"target\":-0}",
+      "output": {
+        "kind": "read",
+        "target": "0"
+      }
+    },
+    {
+      "name": "target 科学计数法",
+      "text": "{\"action\":\"read\",\"target\":1e3}",
+      "output": {
+        "kind": "read",
+        "target": "1000"
+      }
+    },
+    {
+      "name": "target 超过 1e21（数字格式带指数）",
+      "text": "{\"action\":\"read\",\"target\":1e21}",
+      "output": {
+        "kind": "read",
+        "target": "1e+21"
+      }
+    },
+    {
+      "name": "target 溢出为 Infinity：不是有限数字，不当字符串处理",
+      "text": "{\"action\":\"read\",\"target\":1e999}",
+      "output": null
+    },
+    {
+      "name": "target 负溢出",
+      "text": "{\"action\":\"read\",\"target\":-1e999}",
+      "output": null
+    },
+    {
+      "name": "target 下溢为 0",
+      "text": "{\"action\":\"read\",\"target\":1e-999}",
+      "output": {
+        "kind": "read",
+        "target": "0"
+      }
+    },
+    {
+      "name": "target 数字字符串",
+      "text": "{\"action\":\"read\",\"target\":\"3\"}",
+      "output": {
+        "kind": "read",
+        "target": "3"
+      }
+    },
+    {
+      "name": "target 字符串带空白",
+      "text": "{\"action\":\"read\",\"target\":\" 3 \"}",
+      "output": {
+        "kind": "read",
+        "target": "3"
+      }
+    },
+    {
+      "name": "target 字符串里夹中文（取数字）",
+      "text": "{\"action\":\"read\",\"target\":\"第 3 条\"}",
+      "output": {
+        "kind": "read",
+        "target": "3"
+      }
+    },
+    {
+      "name": "target 字符串多段数字拼接",
+      "text": "{\"action\":\"read\",\"target\":\"a1b2\"}",
+      "output": {
+        "kind": "read",
+        "target": "12"
+      }
+    },
+    {
+      "name": "target 字符串无数字",
+      "text": "{\"action\":\"read\",\"target\":\"abc\"}",
+      "output": null
+    },
+    {
+      "name": "target 空串",
+      "text": "{\"action\":\"read\",\"target\":\"\"}",
+      "output": null
+    },
+    {
+      "name": "target 全角数字不算数字",
+      "text": "{\"action\":\"read\",\"target\":\"１２\"}",
+      "output": null
+    },
+    {
+      "name": "target 前导零",
+      "text": "{\"action\":\"read\",\"target\":\"007\"}",
+      "output": {
+        "kind": "read",
+        "target": "7"
+      }
+    },
+    {
+      "name": "target 23 位数字串（数字格式带指数）",
+      "text": "{\"action\":\"read\",\"target\":\"99999999999999999999999\"}",
+      "output": {
+        "kind": "read",
+        "target": "1e+23"
+      }
+    },
+    {
+      "name": "target 400 位数字串（溢出为 Infinity）",
+      "text": {
+        "$text": [
+          {
+            "lit": "{\"action\":\"read\",\"target\":\""
+          },
+          {
+            "lit": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999"
+          },
+          {
+            "lit": "\"}"
+          }
+        ]
+      },
+      "output": {
+        "kind": "read",
+        "target": "Infinity"
+      }
+    },
+    {
+      "name": "target 是 true",
+      "text": "{\"action\":\"read\",\"target\":true}",
+      "output": null
+    },
+    {
+      "name": "target 是 null",
+      "text": "{\"action\":\"read\",\"target\":null}",
+      "output": null
+    },
+    {
+      "name": "target 是数组",
+      "text": "{\"action\":\"read\",\"target\":[3]}",
+      "output": null
+    },
+    {
+      "name": "target 是对象",
+      "text": "{\"action\":\"read\",\"target\":{\"n\":3}}",
+      "output": null
+    },
+    {
+      "name": "target 缺失",
+      "text": "{\"action\":\"read\"}",
+      "output": null
+    },
+    {
+      "name": "answer 文本原样保留（含首尾空白）",
+      "text": "{\"action\":\"answer\",\"text\":\"  带空白的回答\\n\"}",
+      "output": {
+        "kind": "answer",
+        "text": "  带空白的回答\n"
+      }
+    },
+    {
+      "name": "answer 文本为空串",
+      "text": "{\"action\":\"answer\",\"text\":\"\"}",
+      "output": {
+        "kind": "answer",
+        "text": ""
+      }
+    },
+    {
+      "name": "answer 文本只有空白",
+      "text": "{\"action\":\"answer\",\"text\":\"   \"}",
+      "output": {
+        "kind": "answer",
+        "text": "   "
+      }
+    },
+    {
+      "name": "answer 文本是数字",
+      "text": "{\"action\":\"answer\",\"text\":1}",
+      "output": null
+    },
+    {
+      "name": "answer 文本是 null",
+      "text": "{\"action\":\"answer\",\"text\":null}",
+      "output": null
+    },
+    {
+      "name": "answer 文本缺失",
+      "text": "{\"action\":\"answer\"}",
+      "output": null
+    },
+    {
+      "name": "answer 文本含转义",
+      "text": "{\"action\":\"answer\",\"text\":\"line1\\nline2 \\\"引用\\\" \\\\ 反斜杠 😀\"}",
+      "output": {
+        "kind": "answer",
+        "text": "line1\nline2 \"引用\" \\ 反斜杠 😀"
+      }
+    },
+    {
+      "name": "answer 长文本",
+      "text": {
+        "$text": [
+          {
+            "lit": "{\"action\":\"answer\",\"text\":\""
+          },
+          {
+            "cjk": 400
+          },
+          {
+            "lit": "\"}"
+          }
+        ]
+      },
+      "output": {
+        "kind": "answer",
+        "text": {
+          "length": 400,
+          "sha256": "8bd84ee8245d721ee54999a204c648099d348c5be91f4c05501dcfabd0d3a401",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "签分类检索问答知识库归纳整理摘要"
+        }
+      }
+    },
+    {
+      "name": "尾随逗号非法",
+      "text": "{\"action\":\"search\",\"query\":\"x\",}",
+      "output": null
+    },
+    {
+      "name": "单引号非法",
+      "text": "{'action':'search','query':'x'}",
+      "output": null
+    },
+    {
+      "name": "键没有引号非法",
+      "text": "{action:\"search\",query:\"x\"}",
+      "output": null
+    },
+    {
+      "name": "注释非法",
+      "text": "{\"action\":\"search\", /* c */ \"query\":\"x\"}",
+      "output": null
+    },
+    {
+      "name": "无关字段溢出为 Infinity 不影响解析",
+      "text": "{\"action\":\"search\",\"query\":\"x\",\"extra\":1e999}",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "无关字段含深层嵌套",
+      "text": "{\"action\":\"search\",\"query\":\"x\",\"extra\":{\"a\":[1,2,{\"b\":[[[]]]}]}}",
+      "output": {
+        "kind": "search",
+        "query": "x"
+      }
+    },
+    {
+      "name": "无关字段是 NaN 写法，非法",
+      "text": "{\"action\":\"search\",\"query\":\"x\",\"extra\":NaN}",
+      "output": null
+    },
+    {
+      "name": "数字前导零非法",
+      "text": "{\"action\":\"read\",\"target\":01}",
+      "output": null
+    },
+    {
+      "name": "数字写成 1.，非法",
+      "text": "{\"action\":\"read\",\"target\":1.}",
+      "output": null
+    },
+    {
+      "name": "根是字符串（没有花括号）",
+      "text": "\"search\"",
+      "output": null
+    },
+    {
+      "name": "字符串值里有未转义换行，非法",
+      "text": "{\"action\":\"search\",\"query\":\"a\nb\"}",
+      "output": null
+    }
+  ]
+}

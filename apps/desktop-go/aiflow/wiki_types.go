@@ -27,6 +27,36 @@ type WikiCatalogEntry struct {
 	UpdatedAt       int64        `json:"updatedAt"`
 }
 
+// WikiSearchHit 对应 WikiSearchHit：页面全文检索命中（问答检索用）。
+type WikiSearchHit struct {
+	ID      string       `json:"id"`
+	Title   string       `json:"title"`
+	Kind    WikiPageKind `json:"kind"`
+	Summary string       `json:"summary"`
+}
+
+// WikiSourceRef 对应 WikiSourceRef：页面的一个来源条目引用。
+type WikiSourceRef struct {
+	ReviewStatus  string   `json:"reviewStatus,omitempty"` // 空串表示未设置
+	ReviewReasons []string `json:"reviewReasons,omitempty"`
+	ItemID        string   `json:"itemId"`
+	Title         string   `json:"title"`
+}
+
+// WikiPage 对应 WikiPage，只含问答用到的字段（正文与更新时间）；其余字段在适配层丢弃。
+type WikiPage struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Body      string `json:"body"`
+	UpdatedAt int64  `json:"updatedAt"`
+}
+
+// WikiPageDetail 对应 WikiPageDetail 里问答用到的部分：页面本体与来源条目（反向链接不需要）。
+type WikiPageDetail struct {
+	Page    WikiPage        `json:"page"`
+	Sources []WikiSourceRef `json:"sources"`
+}
+
 // WikiPageDraft 对应 WikiPageDraft：净化后的页面草稿。
 type WikiPageDraft struct {
 	Title           string       `json:"title"`
