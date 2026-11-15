@@ -1,0 +1,240 @@
+{
+  "cases": [
+    {
+      "input": "",
+      "output": null
+    },
+    {
+      "input": "https://example.com",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/path?x=1",
+      "output": "https://example.com/path?x=1"
+    },
+    {
+      "input": "https://user:pass@example.com/a",
+      "output": "https://example.com/a"
+    },
+    {
+      "input": "https://user@example.com/a",
+      "output": "https://example.com/a"
+    },
+    {
+      "input": "https://example.com/a#frag",
+      "output": "https://example.com/a"
+    },
+    {
+      "input": "https://example.com/?token=abc&x=1",
+      "output": "https://example.com/?x=1"
+    },
+    {
+      "input": "https://example.com/?x=1&api_key=SECRET",
+      "output": "https://example.com/?x=1"
+    },
+    {
+      "input": "https://example.com/?Authorization=Bearer+abc&y=2",
+      "output": "https://example.com/?y=2"
+    },
+    {
+      "input": "https://example.com/?sig=1&z=3",
+      "output": "https://example.com/?z=3"
+    },
+    {
+      "input": "https://example.com/?sigx=1",
+      "output": "https://example.com/?sigx=1"
+    },
+    {
+      "input": "https://example.com/?signature=abc",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/?X-Amz-Credential=AKIA&X-Amz-Signature=abc&keep=1",
+      "output": "https://example.com/?keep=1"
+    },
+    {
+      "input": "https://example.com/?x-goog-signature=abc",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/?password=1&secret=2&credential=3",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/?monkey=1&turkey=2&plain=3",
+      "output": "https://example.com/?plain=3"
+    },
+    {
+      "input": "https://example.com/?toKen=1&sig=3",
+      "output": "https://example.com/?to%E2%84%AAen=1"
+    },
+    {
+      "input": "https://example.com/?ſig=1&x=2",
+      "output": "https://example.com/?%C5%BFig=1&x=2"
+    },
+    {
+      "input": "https://example.com/?ſig=1&sig=2",
+      "output": "https://example.com/?%C5%BFig=1"
+    },
+    {
+      "input": "https://example.com/?token=1",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/?a=1&&b=%E4%B8%AD+x",
+      "output": "https://example.com/?a=1&&b=%E4%B8%AD+x"
+    },
+    {
+      "input": "https://example.com/?a=b c&token=1&d=中",
+      "output": "https://example.com/?a=b+c&d=%E4%B8%AD"
+    },
+    {
+      "input": "https://example.com/?a=1&token=2&a=3",
+      "output": "https://example.com/?a=1&a=3"
+    },
+    {
+      "input": "https://example.com/?TOKEN=1&Key=2",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "https://example.com/?=1&token=2&x",
+      "output": "https://example.com/?=1&x="
+    },
+    {
+      "input": "https://example.com/?",
+      "output": "https://example.com/?"
+    },
+    {
+      "input": "https://example.com/?#",
+      "output": "https://example.com/?"
+    },
+    {
+      "input": "https://EXAMPLE.com:443/",
+      "output": "https://example.com/"
+    },
+    {
+      "input": "http://EXAMPLE.com:80/x",
+      "output": "http://example.com/x"
+    },
+    {
+      "input": "http://example.com:8080/x",
+      "output": "http://example.com:8080/x"
+    },
+    {
+      "input": "https://例え.jp/パス?q=値",
+      "output": "https://xn--r8jz45g.jp/%E3%83%91%E3%82%B9?q=%E5%80%A4"
+    },
+    {
+      "input": "https://example.com/a/../b/./c",
+      "output": "https://example.com/b/c"
+    },
+    {
+      "input": "https://example.com/a b/c d",
+      "output": "https://example.com/a%20b/c%20d"
+    },
+    {
+      "input": "https://example.com/中文?q=中文",
+      "output": "https://example.com/%E4%B8%AD%E6%96%87?q=%E4%B8%AD%E6%96%87"
+    },
+    {
+      "input": " https://example.com/trim ",
+      "output": "https://example.com/trim"
+    },
+    {
+      "input": "https://exa\tmple.com/\nx",
+      "output": "https://example.com/x"
+    },
+    {
+      "input": "HTTPS://EXAMPLE.COM/Path",
+      "output": "https://example.com/Path"
+    },
+    {
+      "input": "https:\\\\example.com\\x\\y",
+      "output": "https://example.com/x/y"
+    },
+    {
+      "input": "http://0x7f.1/",
+      "output": "http://127.0.0.1/"
+    },
+    {
+      "input": "http://127.1/",
+      "output": "http://127.0.0.1/"
+    },
+    {
+      "input": "http://[::1]:8080/x",
+      "output": "http://[::1]:8080/x"
+    },
+    {
+      "input": "http://[2001:DB8::1]/",
+      "output": "http://[2001:db8::1]/"
+    },
+    {
+      "input": "https://example.com./",
+      "output": "https://example.com./"
+    },
+    {
+      "input": "ftp://example.com/",
+      "output": null
+    },
+    {
+      "input": "javascript:alert(1)",
+      "output": null
+    },
+    {
+      "input": "mailto:a@b.c",
+      "output": null
+    },
+    {
+      "input": "file:///C:/x",
+      "output": null
+    },
+    {
+      "input": "data:text/plain,hello",
+      "output": null
+    },
+    {
+      "input": "blob:https://example.com/uuid",
+      "output": null
+    },
+    {
+      "input": "not a url",
+      "output": null
+    },
+    {
+      "input": "//example.com/x",
+      "output": null
+    },
+    {
+      "input": "http://",
+      "output": null
+    },
+    {
+      "input": "http://a b.com/",
+      "output": null
+    },
+    {
+      "input": "https://:80/",
+      "output": null
+    },
+    {
+      "input": "https://example.com:99999/",
+      "output": null
+    },
+    {
+      "input": "http://exa%41mple.com/",
+      "output": "http://exaample.com/"
+    },
+    {
+      "input": "https://example.com/%zz?q=%zz",
+      "output": "https://example.com/%zz?q=%zz"
+    },
+    {
+      "input": "https://example.com/?q=%E4%B8",
+      "output": "https://example.com/?q=%E4%B8"
+    },
+    {
+      "input": "https://example.com/?q=%E4%B8&token=1",
+      "output": "https://example.com/?q=%EF%BF%BD"
+    }
+  ]
+}

@@ -1,0 +1,876 @@
+{
+  "cases": [
+    {
+      "name": "白名单内链接保留并归一目标标题（大小写差异的显示文字保留）",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "参考 [[知识管理]] 与 [[electron]]。",
+        "[[ELECTRON]] 与 [[ Electron ]] 与 [[electron|桌面框架]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "参考 [[知识管理]] 与 [[Electron|electron]]。",
+          "targets": [
+            "知识管理",
+            "ELECTRON"
+          ]
+        },
+        {
+          "body": "[[Electron|ELECTRON]] 与 [[Electron]] 与 [[Electron|桌面框架]]",
+          "targets": [
+            "ELECTRON"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "别名链接重写为规范标题（保留显示文字）",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "详见 [[PKM|个人知识管理]]。",
+        "[[km]] [[Pkm]] [[KM|KM]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "详见 [[知识管理|个人知识管理]]。",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "[[知识管理|km]] [[知识管理|Pkm]] [[知识管理|KM]]",
+          "targets": [
+            "知识管理"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "白名单外的链接降级为纯文本",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "这个 [[不存在的页面]] 会降级。",
+        "[[不存在|显示文字]] 与 [[另一个]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "这个 不存在的页面 会降级。",
+          "targets": []
+        },
+        {
+          "body": "显示文字 与 另一个",
+          "targets": []
+        }
+      ]
+    },
+    {
+      "name": "空目标与空白目标",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[|只有显示]]",
+        "[[ ]]",
+        "[[ |x]]",
+        "[[知识管理|]]",
+        "[[知识管理|知识管理]]",
+        "[[知识管理| 知识管理 ]]",
+        "前[[]]后"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "只有显示",
+          "targets": []
+        },
+        {
+          "body": "",
+          "targets": []
+        },
+        {
+          "body": "x",
+          "targets": []
+        },
+        {
+          "body": "[[知识管理]]",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "[[知识管理]]",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "[[知识管理]]",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "前[[]]后",
+          "targets": []
+        }
+      ]
+    },
+    {
+      "name": "多个相同目标只记一次，目标按首次出现排序",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[Electron]] [[知识管理]] [[electron]] [[PKM]] [[Electron|E]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[Electron]] [[知识管理]] [[Electron|electron]] [[知识管理|PKM]] [[Electron|E]]",
+          "targets": [
+            "ELECTRON",
+            "知识管理"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "括号嵌套与相邻",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[[知识管理]]]",
+        "[[知识管理]][[Electron]]",
+        "[[知识管理] ]",
+        "[ [知识管理] ]",
+        "[[知识\n管理]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[[知识管理]]]",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "[[知识管理]][[Electron]]",
+          "targets": [
+            "知识管理",
+            "ELECTRON"
+          ]
+        },
+        {
+          "body": "[[知识管理] ]",
+          "targets": []
+        },
+        {
+          "body": "[ [知识管理] ]",
+          "targets": []
+        },
+        {
+          "body": "知识\n管理",
+          "targets": []
+        }
+      ]
+    },
+    {
+      "name": "目标内含换行与多余空白：规范化后命中",
+      "catalog": [
+        {
+          "id": "page-知识 管理",
+          "title": "知识 管理",
+          "normalizedTitle": "知识 管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[知识\n   管理]]",
+        "[[ 知识\t管理 ]]",
+        "[[知识管理]]"
+      ],
+      "resolver": [
+        [
+          "知识 管理",
+          "知识 管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[知识 管理|知识\n   管理]]",
+          "targets": [
+            "知识 管理"
+          ]
+        },
+        {
+          "body": "[[知识 管理|知识\t管理]]",
+          "targets": [
+            "知识 管理"
+          ]
+        },
+        {
+          "body": "知识管理",
+          "targets": []
+        }
+      ]
+    },
+    {
+      "name": "标题优先于别名；批内页优先于目录页",
+      "catalog": [
+        {
+          "id": "page-目录页",
+          "title": "目录页",
+          "normalizedTitle": "目录页",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"共用名\",\"批内标题\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-共用名",
+          "title": "共用名",
+          "normalizedTitle": "共用名",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [
+        {
+          "title": "批内标题",
+          "normalizedTitle": "批内标题",
+          "kind": "topic",
+          "summary": "",
+          "body": "",
+          "aliasesJson": "[\"目录页别名\",\"共用名\"]"
+        }
+      ],
+      "bodies": [
+        "[[共用名]] [[批内标题]] [[目录页别名]] [[目录页]]"
+      ],
+      "resolver": [
+        [
+          "共用名",
+          "共用名"
+        ],
+        [
+          "批内标题",
+          "批内标题"
+        ],
+        [
+          "目录页",
+          "目录页"
+        ],
+        [
+          "目录页别名",
+          "批内标题"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[共用名]] [[批内标题]] [[批内标题|目录页别名]] [[目录页]]",
+          "targets": [
+            "共用名",
+            "批内标题",
+            "目录页"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "别名冲突先到先得：批内别名先于目录别名",
+      "catalog": [
+        {
+          "id": "page-甲",
+          "title": "甲",
+          "normalizedTitle": "甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"同名别名\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [
+        {
+          "title": "乙",
+          "normalizedTitle": "乙",
+          "kind": "topic",
+          "summary": "",
+          "body": "",
+          "aliasesJson": "[\"同名别名\"]"
+        }
+      ],
+      "bodies": [
+        "[[同名别名]]"
+      ],
+      "resolver": [
+        [
+          "乙",
+          "乙"
+        ],
+        [
+          "同名别名",
+          "乙"
+        ],
+        [
+          "甲",
+          "甲"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[乙|同名别名]]",
+          "targets": [
+            "乙"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "别名 JSON 异常：非法、非数组、含非字符串",
+      "catalog": [
+        {
+          "id": "page-甲",
+          "title": "甲",
+          "normalizedTitle": "甲",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "not json",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-乙",
+          "title": "乙",
+          "normalizedTitle": "乙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "{\"a\":1}",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-丙",
+          "title": "丙",
+          "normalizedTitle": "丙",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"有效\",1,null]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [
+        {
+          "title": "丁",
+          "normalizedTitle": "丁",
+          "kind": "topic",
+          "summary": "",
+          "body": "",
+          "aliasesJson": ""
+        }
+      ],
+      "bodies": [
+        "[[有效]] [[1]] [[null]] [[丁]]"
+      ],
+      "resolver": [
+        [
+          "丁",
+          "丁"
+        ],
+        [
+          "丙",
+          "丙"
+        ],
+        [
+          "乙",
+          "乙"
+        ],
+        [
+          "有效",
+          "丙"
+        ],
+        [
+          "甲",
+          "甲"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[丙|有效]] 1 null [[丁]]",
+          "targets": [
+            "丙",
+            "丁"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "替换串里的 $ 不展开",
+      "catalog": [
+        {
+          "id": "page-价格$&说明",
+          "title": "价格$&说明",
+          "normalizedTitle": "价格$&说明",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-$1 与 $$",
+          "title": "$1 与 $$",
+          "normalizedTitle": "$1 与 $$",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[价格$&说明]] [[$1 与 $$]] [[价格$&说明|显示$`]]"
+      ],
+      "resolver": [
+        [
+          "$1 与 $$",
+          "$1 与 $$"
+        ],
+        [
+          "价格$&说明",
+          "价格$&说明"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[价格$&说明]] [[$1 与 $$]] [[价格$&说明|显示$`]]",
+          "targets": [
+            "价格$&说明",
+            "$1 与 $$"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "目录标题带大小写与 Unicode 特殊字符",
+      "catalog": [
+        {
+          "id": "page-Straße",
+          "title": "Straße",
+          "normalizedTitle": "STRASSE",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-ǆ",
+          "title": "ǆ",
+          "normalizedTitle": "Ǆ",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[STRASSE]] [[straße]] [[Ǆ]] [[ǅ]]"
+      ],
+      "resolver": [
+        [
+          "STRASSE",
+          "Straße"
+        ],
+        [
+          "Ǆ",
+          "ǆ"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[Straße|STRASSE]] [[Straße|straße]] [[ǆ|Ǆ]] [[ǆ|ǅ]]",
+          "targets": [
+            "STRASSE",
+            "Ǆ"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "没有链接的正文原样返回",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "",
+        "普通正文 [x] [[ 与 ]] ]]",
+        "单个 [中括号] 与 [[未闭合"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "",
+          "targets": []
+        },
+        {
+          "body": "普通正文 [x] 与 ]]",
+          "targets": []
+        },
+        {
+          "body": "单个 [中括号] 与 [[未闭合",
+          "targets": []
+        }
+      ]
+    },
+    {
+      "name": "显示文字含竖线：只在第一个竖线处切分",
+      "catalog": [
+        {
+          "id": "page-知识管理",
+          "title": "知识管理",
+          "normalizedTitle": "知识管理",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": "[\"KM\",\"PKM\"]",
+          "manualEditedAt": null,
+          "updatedAt": 0
+        },
+        {
+          "id": "page-Electron",
+          "title": "Electron",
+          "normalizedTitle": "ELECTRON",
+          "kind": "topic",
+          "summary": "",
+          "aliasesJson": null,
+          "manualEditedAt": null,
+          "updatedAt": 0
+        }
+      ],
+      "batch": [],
+      "bodies": [
+        "[[Electron|a|b]]",
+        "[[知识管理||x]]",
+        "[[nope|a|b]]"
+      ],
+      "resolver": [
+        [
+          "ELECTRON",
+          "Electron"
+        ],
+        [
+          "KM",
+          "知识管理"
+        ],
+        [
+          "PKM",
+          "知识管理"
+        ],
+        [
+          "知识管理",
+          "知识管理"
+        ]
+      ],
+      "outputs": [
+        {
+          "body": "[[Electron|a|b]]",
+          "targets": [
+            "ELECTRON"
+          ]
+        },
+        {
+          "body": "[[知识管理||x]]",
+          "targets": [
+            "知识管理"
+          ]
+        },
+        {
+          "body": "a|b",
+          "targets": []
+        }
+      ]
+    }
+  ]
+}

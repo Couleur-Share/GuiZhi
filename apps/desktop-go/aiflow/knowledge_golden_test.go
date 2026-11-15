@@ -297,8 +297,30 @@ func compactRequests(reqs []recordedRequest) []map[string]any {
 	return out
 }
 
+// flowErrorInfo 对应 TS 的 errorInfo：错误 → 对拍用的摘要。
+// 取消类错误的文案随运行时而异，abortMessage=false 时只比 aborted（文案记为空串）。
+func flowErrorInfo(err error, abortMessage bool) map[string]any {
+	info := map[string]any{"message": err.Error(), "aborted": IsAborted(err)}
+	if IsNotConfigured(err) {
+		info["notConfigured"] = true
+	}
+	if IsAborted(err) && !abortMessage {
+		info["message"] = ""
+	}
+	return info
+}
+
 // runFlow 用脚本化的假传输跑一个流程，返回与 TS 的 FlowOutcome 同形的结果。
 func runFlow(t *testing.T, settings map[string]any, script []scriptStep, abort *string, call func(ctx context.Context, r *Runner) (any, error)) map[string]any {
+	t.Helper()
+	return runFlowWith(t, staticConfig{NormalizeAISettings(settings)}, script, abort, true,
+		func(ctx context.Context, _ context.CancelFunc, r *Runner) (any, error) { return call(ctx, r) })
+}
+
+// runFlowWith 是 runFlow 的通用形式：配置来源可变（流程里换模型），call 能拿到取消函数（流程里触发中止信号），
+// abortMessage 对应 TS runFlow 的同名选项。
+func runFlowWith(t *testing.T, config ConfigSource, script []scriptStep, abort *string, abortMessage bool,
+	call func(ctx context.Context, cancel context.CancelFunc, r *Runner) (any, error)) map[string]any {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -310,19 +332,15 @@ func runFlow(t *testing.T, settings map[string]any, script []scriptStep, abort *
 	usage := &usageRecorder{}
 	runner := &Runner{
 		Client: &Client{Transport: fake, Log: warns},
-		Config: staticConfig{NormalizeAISettings(settings)},
+		Config: config,
 		Usage:  usage,
 		Log:    warns,
 	}
 
-	result, err := call(ctx, runner)
+	result, err := call(ctx, cancel, runner)
 	var errInfo any
 	if err != nil {
-		info := map[string]any{"message": err.Error(), "aborted": IsAborted(err)}
-		if IsNotConfigured(err) {
-			info["notConfigured"] = true
-		}
-		errInfo = info
+		errInfo = flowErrorInfo(err, abortMessage)
 		result = nil
 	}
 	return map[string]any{

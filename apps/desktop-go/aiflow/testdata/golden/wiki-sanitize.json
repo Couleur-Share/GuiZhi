@@ -1,0 +1,1295 @@
+{
+  "cases": [
+    {
+      "name": "过滤空标题与空正文，批内去重，上限 4 页",
+      "pages": [
+        {
+          "title": "页面A",
+          "kind": "topic",
+          "summary": "s",
+          "body": "内容"
+        },
+        {
+          "title": "",
+          "body": "无标题被过滤"
+        },
+        {
+          "title": "页面A",
+          "body": "重复标题被过滤"
+        },
+        {
+          "title": "页面B",
+          "body": ""
+        },
+        {
+          "title": "页面C",
+          "kind": "entity",
+          "summary": "多行\n第二行",
+          "body": "c"
+        },
+        {
+          "title": "页面D",
+          "body": "d"
+        },
+        {
+          "title": "页面E",
+          "body": "e"
+        },
+        {
+          "title": "页面F",
+          "body": "f"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面A",
+            "normalizedTitle": "页面A",
+            "kind": "topic",
+            "summary": "s",
+            "body": "内容",
+            "aliasesJson": null
+          },
+          {
+            "title": "页面C",
+            "normalizedTitle": "页面C",
+            "kind": "entity",
+            "summary": "多行",
+            "body": "c",
+            "aliasesJson": null
+          },
+          {
+            "title": "页面D",
+            "normalizedTitle": "页面D",
+            "kind": "topic",
+            "summary": "",
+            "body": "d",
+            "aliasesJson": null
+          },
+          {
+            "title": "页面E",
+            "normalizedTitle": "页面E",
+            "kind": "topic",
+            "summary": "",
+            "body": "e",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "空数组",
+      "pages": [],
+      "inputDigests": [],
+      "output": {
+        "drafts": []
+      }
+    },
+    {
+      "name": "类别解析：大小写、空白与非法值",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "kind": "Entity"
+        },
+        {
+          "title": "二",
+          "body": "正文",
+          "kind": "  CONCEPT "
+        },
+        {
+          "title": "三",
+          "body": "正文",
+          "kind": "unknown"
+        },
+        {
+          "title": "四",
+          "body": "正文",
+          "kind": 5
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "entity",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "concept",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "四",
+            "normalizedTitle": "四",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "类别缺省与 null",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "kind": null
+        },
+        {
+          "title": "二",
+          "body": "正文"
+        },
+        {
+          "title": "三",
+          "body": "正文",
+          "kind": "topic"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题净化：非字符串、空白、首尾空格",
+      "pages": [
+        {
+          "title": 123,
+          "body": "正文"
+        },
+        {
+          "title": "   ",
+          "body": "正文"
+        },
+        {
+          "title": "  带空格的标题  ",
+          "body": "正文"
+        },
+        {
+          "title": null,
+          "body": "正文"
+        },
+        {
+          "title": [
+            "数组"
+          ],
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "带空格的标题",
+            "normalizedTitle": "带空格的标题",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题去重按规范化形式：大小写与空白折叠",
+      "pages": [
+        {
+          "title": "Abc Def",
+          "body": "正文"
+        },
+        {
+          "title": "ABC   DEF",
+          "body": "正文"
+        },
+        {
+          "title": " abc def ",
+          "body": "正文"
+        },
+        {
+          "title": "abc-def",
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "Abc Def",
+            "normalizedTitle": "ABC DEF",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "abc-def",
+            "normalizedTitle": "ABC-DEF",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题恰好 120 个码元",
+      "pages": [
+        {
+          "title": {
+            "$text": [
+              {
+                "cjk": 120
+              }
+            ]
+          },
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 120,
+          "sha256": "199624343d6ca626930e46c447b93517f00c4a8c39d8a78987109097e90bbcfe",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "库归纳整理摘要标签分类检索问答知"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知",
+            "normalizedTitle": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题 121 个码元：截到 120",
+      "pages": [
+        {
+          "title": {
+            "$text": [
+              {
+                "cjk": 121
+              }
+            ]
+          },
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 121,
+          "sha256": "4ae68a43b66d041e4b12afa77a0d0c4631b75162e40f56744956e4815b70d893",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "归纳整理摘要标签分类检索问答知识"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知",
+            "normalizedTitle": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题切口落在代理对中间：退一位",
+      "pages": [
+        {
+          "title": {
+            "$text": [
+              {
+                "cjk": 119
+              },
+              {
+                "lit": "😀"
+              },
+              {
+                "cjk": 5
+              }
+            ]
+          },
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 126,
+          "sha256": "bba5326635dd7fa3d17e20b9504936d832baf0e7101741a71835e2acfdde6ead",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "要标签分类检索问答😀知识库归纳"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答",
+            "normalizedTitle": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "标题切口落在代理对之后：保留整字",
+      "pages": [
+        {
+          "title": {
+            "$text": [
+              {
+                "cjk": 118
+              },
+              {
+                "lit": "😀"
+              },
+              {
+                "cjk": 5
+              }
+            ]
+          },
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 125,
+          "sha256": "fd0878c4f66b5604c90d1a116c237411518fed2ec0d0dd5e9ddf8b768ef27ada",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "摘要标签分类检索问😀知识库归纳"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问😀",
+            "normalizedTitle": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问😀",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文恰好 8000 个码元",
+      "pages": [
+        {
+          "title": "页面",
+          "body": {
+            "$text": [
+              {
+                "cjk": 8000
+              }
+            ]
+          }
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 8000,
+          "sha256": "927bd15aa59fa2c9e46e855ca014d8f9fc4d97acdf0ead2a7d0db15505f10edc",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "分类检索问答知识库归纳整理摘要标"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面",
+            "normalizedTitle": "页面",
+            "kind": "topic",
+            "summary": "",
+            "body": {
+              "length": 8000,
+              "sha256": "927bd15aa59fa2c9e46e855ca014d8f9fc4d97acdf0ead2a7d0db15505f10edc",
+              "head": "知识库归纳整理摘要标签分类检索问",
+              "tail": "分类检索问答知识库归纳整理摘要标"
+            },
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文 8001 个码元：截到 8000",
+      "pages": [
+        {
+          "title": "页面",
+          "body": {
+            "$text": [
+              {
+                "cjk": 8001
+              }
+            ]
+          }
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 8001,
+          "sha256": "68785e2ea074d9d4f4bfb5f6adc755349936b233883cbb191b4eb88917a02cf3",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面",
+            "normalizedTitle": "页面",
+            "kind": "topic",
+            "summary": "",
+            "body": {
+              "length": 8000,
+              "sha256": "927bd15aa59fa2c9e46e855ca014d8f9fc4d97acdf0ead2a7d0db15505f10edc",
+              "head": "知识库归纳整理摘要标签分类检索问",
+              "tail": "分类检索问答知识库归纳整理摘要标"
+            },
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文切口落在代理对中间",
+      "pages": [
+        {
+          "title": "页面",
+          "body": {
+            "$text": [
+              {
+                "cjk": 7999
+              },
+              {
+                "lit": "😀"
+              },
+              {
+                "cjk": 10
+              }
+            ]
+          }
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 8011,
+          "sha256": "1280a278a4b6fe77415d681317d4e2cf7ace4f225af3c7a2692b659f79bcdb68",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "整理摘要😀知识库归纳整理摘要标"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面",
+            "normalizedTitle": "页面",
+            "kind": "topic",
+            "summary": "",
+            "body": {
+              "length": 7999,
+              "sha256": "0a5bd85c4a1b028b54e720913abb620e6505e9b4a5bb5831ee0741d409d57cac",
+              "head": "知识库归纳整理摘要标签分类检索问",
+              "tail": "签分类检索问答知识库归纳整理摘要"
+            },
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文非字符串按空：整页跳过",
+      "pages": [
+        {
+          "title": "一",
+          "body": 123
+        },
+        {
+          "title": "二",
+          "body": null
+        },
+        {
+          "title": "三",
+          "body": {
+            "a": 1
+          }
+        },
+        {
+          "title": "四",
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "四",
+            "normalizedTitle": "四",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文只有空白：跳过",
+      "pages": [
+        {
+          "title": "页面",
+          "body": " \n\t "
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": []
+      }
+    },
+    {
+      "name": "正文首行与标题同名的一级标题被剥掉",
+      "pages": [
+        {
+          "title": "页面A",
+          "body": "# 页面A\n\n正文第一段\n\n## 小节\n内容"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面A",
+            "normalizedTitle": "页面A",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文第一段\n\n## 小节\n内容",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文首行同名标题（全角括号与强调符）被剥掉",
+      "pages": [
+        {
+          "title": "INP（下次绘制交互）",
+          "body": "## **INP** (下次绘制交互)\n正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "INP（下次绘制交互）",
+            "normalizedTitle": "INP（下次绘制交互）",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "正文只有同名标题：剥掉后为空，整页跳过",
+      "pages": [
+        {
+          "title": "页面A",
+          "body": "# 页面A\n\n\n"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": []
+      }
+    },
+    {
+      "name": "正文中间的同名标题不动",
+      "pages": [
+        {
+          "title": "页面A",
+          "body": "引言\n\n# 页面A\n\n后文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "页面A",
+            "normalizedTitle": "页面A",
+            "kind": "topic",
+            "summary": "",
+            "body": "引言\n\n# 页面A\n\n后文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "摘要：多行取首行并去空白",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "summary": "  第一行  \n第二行"
+        },
+        {
+          "title": "二",
+          "body": "正文",
+          "summary": "\n\n前面有空行\n后面"
+        },
+        {
+          "title": "三",
+          "body": "正文",
+          "summary": "带回车\r\n第二行"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "第一行",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "前面有空行",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "带回车",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "摘要：非字符串与缺省",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "summary": 7
+        },
+        {
+          "title": "二",
+          "body": "正文",
+          "summary": null
+        },
+        {
+          "title": "三",
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "摘要恰好 300 与 301 个码元",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "summary": {
+            "$text": [
+              {
+                "cjk": 300
+              }
+            ]
+          }
+        },
+        {
+          "title": "二",
+          "body": "正文",
+          "summary": {
+            "$text": [
+              {
+                "cjk": 301
+              }
+            ]
+          }
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 300,
+          "sha256": "cf157a30c590b5e2bf691a7e580f3653715c3bb27c959b1644ab38489936a978",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "类检索问答知识库归纳整理摘要标签"
+        },
+        {
+          "length": 301,
+          "sha256": "08eb28d6207f340d36da77cb4dc232e1bf27db5e6ccc07ff7e35649be969b49a",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "检索问答知识库归纳整理摘要标签分"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "摘要切口落在代理对中间",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "summary": {
+            "$text": [
+              {
+                "cjk": 299
+              },
+              {
+                "lit": "😀"
+              },
+              {
+                "cjk": 5
+              }
+            ]
+          }
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 306,
+          "sha256": "52176b7e3e991d62d9e35dd67f1fd8c13211dc0d14175f6ff86b8f9692e26d5d",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "识库归纳整理摘要标😀知识库归纳"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名净化：去空白、去重、剔除与标题同名的、上限 5 个",
+      "pages": [
+        {
+          "title": "归知",
+          "body": "正文",
+          "aliases": [
+            "GuiZhi",
+            "guizhi",
+            "GuiZhi",
+            "归知",
+            "a",
+            "b",
+            "c",
+            "d"
+          ]
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "归知",
+            "normalizedTitle": "归知",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": "[\"GuiZhi\",\"guizhi\",\"a\",\"b\",\"c\"]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名：非字符串、空白、过长与规范化后等于标题",
+      "pages": [
+        {
+          "title": "Alpha Beta",
+          "body": "正文",
+          "aliases": [
+            1,
+            null,
+            "",
+            "   ",
+            "  keep  ",
+            {
+              "$text": [
+                {
+                  "ascii": 60
+                }
+              ]
+            },
+            {
+              "$text": [
+                {
+                  "ascii": 61
+                }
+              ]
+            },
+            "ALPHA   beta",
+            "alpha beta",
+            [
+              "x"
+            ],
+            {
+              "a": 1
+            },
+            true
+          ]
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 60,
+          "sha256": "58beb6bb9b80b212c3dbc1c1020c696fbfa3aad8e8a4ef4d385e9b0732fc5d98",
+          "head": "abcdefghijabcdef",
+          "tail": "efghijabcdefghij"
+        },
+        {
+          "length": 61,
+          "sha256": "f0e3d36517b49ff7e204639e30b4d1b76efa199aa5828972a13f83fc17ddbe47",
+          "head": "abcdefghijabcdef",
+          "tail": "fghijabcdefghija"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "Alpha Beta",
+            "normalizedTitle": "ALPHA BETA",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": "[\"keep\",\"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\"]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名恰好 60 个码元（含代理对）",
+      "pages": [
+        {
+          "title": "T",
+          "body": "正文",
+          "aliases": [
+            {
+              "$text": [
+                {
+                  "cjk": 58
+                },
+                {
+                  "lit": "😀"
+                }
+              ]
+            },
+            {
+              "$text": [
+                {
+                  "cjk": 59
+                },
+                {
+                  "lit": "😀"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "inputDigests": [
+        {
+          "length": 60,
+          "sha256": "6836c679ddc935f2fc834e2cbf81e7a4c5168562c9a2b5a882c9ee6b0e663178",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "签分类检索问答知识库归纳整理😀"
+        },
+        {
+          "length": 61,
+          "sha256": "dd4fb9c5c18dd2fa68d277e4a75d918f1e4bc0fa055cd31036c8352c91c30c00",
+          "head": "知识库归纳整理摘要标签分类检索问",
+          "tail": "分类检索问答知识库归纳整理摘😀"
+        }
+      ],
+      "output": {
+        "drafts": [
+          {
+            "title": "T",
+            "normalizedTitle": "T",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": "[\"知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理摘要标签分类检索问答知识库归纳整理😀\"]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名不是数组：按无别名",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "aliases": "单个"
+        },
+        {
+          "title": "二",
+          "body": "正文",
+          "aliases": {
+            "a": 1
+          }
+        },
+        {
+          "title": "三",
+          "body": "正文",
+          "aliases": null
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名全部被过滤：aliasesJson 为 null",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "aliases": [
+            "",
+            "一",
+            " 一 "
+          ]
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "别名 JSON 序列化：引号、反斜杠、换行、尖括号、行分隔符与中文",
+      "pages": [
+        {
+          "title": "T",
+          "body": "正文",
+          "aliases": [
+            "带\"引号\"",
+            "反斜杠\\x",
+            "换行\n尾",
+            "<b>&",
+            " 行分隔 段分隔",
+            "中文😀",
+            "\u0001控制"
+          ]
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "T",
+            "normalizedTitle": "T",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": "[\"带\\\"引号\\\"\",\"反斜杠\\\\x\",\"换行\\n尾\",\"<b>&\",\"行分隔 段分隔\"]"
+          }
+        ]
+      }
+    },
+    {
+      "name": "非对象元素：数字、字符串、数组、布尔都按空标题跳过",
+      "pages": [
+        1,
+        "a",
+        [
+          1,
+          2
+        ],
+        true,
+        0,
+        "",
+        {
+          "title": "有效",
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "有效",
+            "normalizedTitle": "有效",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "null 元素：读 .title 抛 TypeError",
+      "pages": [
+        {
+          "title": "先有效",
+          "body": "正文"
+        },
+        null,
+        {
+          "title": "后有效",
+          "body": "正文"
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "error": "Cannot read properties of null (reading 'title')"
+      }
+    },
+    {
+      "name": "已满 4 页后的 null 元素不会被读到",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文"
+        },
+        {
+          "title": "二",
+          "body": "正文"
+        },
+        {
+          "title": "三",
+          "body": "正文"
+        },
+        {
+          "title": "四",
+          "body": "正文"
+        },
+        null
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "二",
+            "normalizedTitle": "二",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "三",
+            "normalizedTitle": "三",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          },
+          {
+            "title": "四",
+            "normalizedTitle": "四",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "第一个元素就是 null",
+      "pages": [
+        null
+      ],
+      "inputDigests": [],
+      "output": {
+        "error": "Cannot read properties of null (reading 'title')"
+      }
+    },
+    {
+      "name": "对象里的额外字段被忽略",
+      "pages": [
+        {
+          "title": "一",
+          "body": "正文",
+          "extra": {
+            "x": 1
+          },
+          "id": 5
+        }
+      ],
+      "inputDigests": [],
+      "output": {
+        "drafts": [
+          {
+            "title": "一",
+            "normalizedTitle": "一",
+            "kind": "topic",
+            "summary": "",
+            "body": "正文",
+            "aliasesJson": null
+          }
+        ]
+      }
+    }
+  ]
+}

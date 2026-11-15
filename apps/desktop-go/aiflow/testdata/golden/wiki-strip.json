@@ -1,0 +1,352 @@
+{
+  "cases": [
+    {
+      "name": "一级标题同名：剥掉并去掉紧随的空行",
+      "body": "# 页面A\n\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 9,
+        "sha256": "1bbff0b1695b2bebe89e6a29170f23bbcf17fd4170f223c4fbdccf3668f7f84a",
+        "head": "# 页面A\n\n正文",
+        "tail": "# 页面A\n\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "任意级别的标题都算（1 到 6 个井号）",
+      "body": "###### 页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 13,
+        "sha256": "9061c7b739eb5abc490cb3355e0197cbfd008f058d4db969d349b0d8b7f37602",
+        "head": "###### 页面A\n正文",
+        "tail": "###### 页面A\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "七个井号不是标题",
+      "body": "####### 页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 14,
+        "sha256": "e9c8dd8e37a81c2f2bb27da53ea15e1651e5917aa5eb825864f4c48eaa470714",
+        "head": "####### 页面A\n正文",
+        "tail": "####### 页面A\n正文"
+      },
+      "output": "####### 页面A\n正文"
+    },
+    {
+      "name": "标题文字不同：不动",
+      "body": "# 另一个标题\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 10,
+        "sha256": "769e439fc1162215df99e427ea89b960f8a1cf1e39ef8201261b5a5924b7ffa5",
+        "head": "# 另一个标题\n正文",
+        "tail": "# 另一个标题\n正文"
+      },
+      "output": "# 另一个标题\n正文"
+    },
+    {
+      "name": "第一个非空行不是标题：不动",
+      "body": "引言\n# 页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 11,
+        "sha256": "7fd6cba4a5e406bca1f68d44060ea88283ac9fb526b31ebb162de96d2460205f",
+        "head": "引言\n# 页面A\n正文",
+        "tail": "引言\n# 页面A\n正文"
+      },
+      "output": "引言\n# 页面A\n正文"
+    },
+    {
+      "name": "标题前有空行与空白行",
+      "body": "\n  \n# 页面A\n\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 13,
+        "sha256": "b9ae40608a410fa65c308ed271abe0696c88cb20173f2957b30ba2a5bc8c5168",
+        "head": "\n  \n# 页面A\n\n正文",
+        "tail": "\n  \n# 页面A\n\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "全角与半角括号视为相同",
+      "body": "# INP (下次绘制交互)\n正文",
+      "title": "INP（下次绘制交互）",
+      "input": {
+        "length": 17,
+        "sha256": "c3b3dc386266d30558fcbef9ddab6f09a01fd339e5ef39f11fb6972bfb3899fe",
+        "head": "# INP (下次绘制交互)\n正",
+        "tail": " INP (下次绘制交互)\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "全角方括号与半角方括号视为相同",
+      "body": "# 【重点】说明\n正文",
+      "title": "[重点]说明",
+      "input": {
+        "length": 11,
+        "sha256": "974ec7060d878d3343ed14b707a44156aff6d0d0bb3ba6b7ddde8c26f5808ec8",
+        "head": "# 【重点】说明\n正文",
+        "tail": "# 【重点】说明\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "强调符与反引号被忽略",
+      "body": "# **页面** _A_ `x`\n正文",
+      "title": "页面 A x",
+      "input": {
+        "length": 19,
+        "sha256": "2b1ff792090b2d814d2833c203d6ff5060ffc4170b64e33bd608f576cfaaa401",
+        "head": "# **页面** _A_ `x`",
+        "tail": "*页面** _A_ `x`\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "忽略大小写",
+      "body": "# react hooks\n正文",
+      "title": "React Hooks",
+      "input": {
+        "length": 16,
+        "sha256": "ad4b4fc08c4e36b81195c99cef96c5db01c0352f2a2b928bacb66e474233a436",
+        "head": "# react hooks\n正文",
+        "tail": "# react hooks\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "标题里的空白被整个忽略",
+      "body": "# 页 面  A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 11,
+        "sha256": "ebd269d87acf89d9d2ba4930172d0c488f3b8de0482f41b5c838b500ca444ef4",
+        "head": "# 页 面  A\n正文",
+        "tail": "# 页 面  A\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "CRLF 换行",
+      "body": "# 页面A\r\n\r\n正文\r\n第二行",
+      "title": "页面A",
+      "input": {
+        "length": 16,
+        "sha256": "6f75923dc8fa4a322c0a1f995eaa62d5ec3c38bcdc055a7ff603c887a64a7919",
+        "head": "# 页面A\r\n\r\n正文\r\n第二行",
+        "tail": "# 页面A\r\n\r\n正文\r\n第二行"
+      },
+      "output": "正文\n第二行"
+    },
+    {
+      "name": "标题之后没有正文：剥完为空串",
+      "body": "# 页面A",
+      "title": "页面A",
+      "input": {
+        "length": 5,
+        "sha256": "a8ba61f27c2f6cf49148f3b6e52bd22084fa29308985a7b8dc389bcea129f6fa",
+        "head": "# 页面A",
+        "tail": "# 页面A"
+      },
+      "output": ""
+    },
+    {
+      "name": "标题之后只有空行：剥完为空串",
+      "body": "# 页面A\n\n  \n",
+      "title": "页面A",
+      "input": {
+        "length": 10,
+        "sha256": "45e1b340318db9d2edcd347396242513158daecbfde73dd766070826e9f78c7d",
+        "head": "# 页面A\n\n  \n",
+        "tail": "# 页面A\n\n  \n"
+      },
+      "output": ""
+    },
+    {
+      "name": "标题为空或只有空白：不动",
+      "body": "# 页面A\n正文",
+      "title": "  ",
+      "input": {
+        "length": 8,
+        "sha256": "0a98b24bfb9cb05d4535bc6aa45e1a5dcbe306c1ea654fb28b93481ed255de3c",
+        "head": "# 页面A\n正文",
+        "tail": "# 页面A\n正文"
+      },
+      "output": "# 页面A\n正文"
+    },
+    {
+      "name": "正文为空：不动",
+      "body": "",
+      "title": "页面A",
+      "input": {
+        "length": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "output": ""
+    },
+    {
+      "name": "正文只有空白行：不动",
+      "body": "  \n\n",
+      "title": "页面A",
+      "input": {
+        "length": 4,
+        "sha256": "b94f13a5c07a89598ff9c517dbb26d84a29b460a8d2c3671699886e9458ccabf",
+        "head": "  \n\n",
+        "tail": "  \n\n"
+      },
+      "output": "  \n\n"
+    },
+    {
+      "name": "井号后没有空白不是标题",
+      "body": "#页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 7,
+        "sha256": "4ff23f15557ef3a1227ecdf30252431693538ffdc6b72144018d0ac497f13851",
+        "head": "#页面A\n正文",
+        "tail": "#页面A\n正文"
+      },
+      "output": "#页面A\n正文"
+    },
+    {
+      "name": "井号后只有制表符也算标题",
+      "body": "#\t页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 8,
+        "sha256": "616f59271add73a3f6cb4468d801da92f9a087db13237213a19bd9a82b486f1c",
+        "head": "#\t页面A\n正文",
+        "tail": "#\t页面A\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "井号后是不换行空格也算标题（JS 的 \\s 含 NBSP）",
+      "body": "# 页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 8,
+        "sha256": "23a6dad309fd7968f90e439f199f7f282854463b1621378ade618406358969b9",
+        "head": "# 页面A\n正文",
+        "tail": "# 页面A\n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "标题只有井号与空白：文字为空，不等于标题",
+      "body": "# \n正文",
+      "title": "页面A",
+      "input": {
+        "length": 5,
+        "sha256": "55810d35373a5b2c41b3bc4c31d4c447d5e326e711399f4bf1cfd1ca1a38698e",
+        "head": "# \n正文",
+        "tail": "# \n正文"
+      },
+      "output": "# \n正文"
+    },
+    {
+      "name": "封闭式井号不算同名",
+      "body": "# 页面A #\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 10,
+        "sha256": "25e2129fecc8746ebcfd1a6c1aaf6ac9a4586087a90b0a9e0ef31fd9fb613c79",
+        "head": "# 页面A #\n正文",
+        "tail": "# 页面A #\n正文"
+      },
+      "output": "# 页面A #\n正文"
+    },
+    {
+      "name": "行内的行分隔符让 . 不匹配：不动",
+      "body": "# 页面A 续\n正文",
+      "title": "页面A 续",
+      "input": {
+        "length": 10,
+        "sha256": "4c9725ed9c31427364787c9700c014662ed6fd893b4543222707e62660e34c16",
+        "head": "# 页面A 续\n正文",
+        "tail": "# 页面A 续\n正文"
+      },
+      "output": "# 页面A 续\n正文"
+    },
+    {
+      "name": "行内的单独回车让 . 不匹配：不动",
+      "body": "# 页面A\r续\n正文",
+      "title": "页面A\r续",
+      "input": {
+        "length": 10,
+        "sha256": "7f83b713c7f52d5cfe441f4a888c4ba30954a43f145c1569d1075a6eb706689d",
+        "head": "# 页面A\r续\n正文",
+        "tail": "# 页面A\r续\n正文"
+      },
+      "output": "# 页面A\r续\n正文"
+    },
+    {
+      "name": "缩进的标题行：先 trim 再匹配，仍被剥掉",
+      "body": "   # 页面A   \n正文",
+      "title": "页面A",
+      "input": {
+        "length": 14,
+        "sha256": "8001a43ef8af034a56519e6682787878bf71d32c146ee6e6b5a346a9d0e0674e",
+        "head": "   # 页面A   \n正文",
+        "tail": "   # 页面A   \n正文"
+      },
+      "output": "正文"
+    },
+    {
+      "name": "只剥一次：连续两个同名标题只剥第一个",
+      "body": "# 页面A\n# 页面A\n正文",
+      "title": "页面A",
+      "input": {
+        "length": 14,
+        "sha256": "be75e849dab01a252d6a49fd8e790f7f737cf510851ea7f3b991d4c2510920d6",
+        "head": "# 页面A\n# 页面A\n正文",
+        "tail": "# 页面A\n# 页面A\n正文"
+      },
+      "output": "# 页面A\n正文"
+    },
+    {
+      "name": "标题与正文之间多个空行全部去掉",
+      "body": "# 页面A\n\n\n\n正文\n\n尾",
+      "title": "页面A",
+      "input": {
+        "length": 14,
+        "sha256": "883f522ecdc086ed150a22b3d54d7b95cd5ab3bac2ca821285e9df473811ad59",
+        "head": "# 页面A\n\n\n\n正文\n\n尾",
+        "tail": "# 页面A\n\n\n\n正文\n\n尾"
+      },
+      "output": "正文\n\n尾"
+    },
+    {
+      "name": "长正文（保留尾部）",
+      "body": [
+        {
+          "lit": "# 页面A\n\n"
+        },
+        {
+          "cjk": 5000
+        }
+      ],
+      "title": "页面A",
+      "input": {
+        "length": 5007,
+        "sha256": "942d5bba83068efc7d7abc1af03128d5acce1d18e94e479c31d8af72c00de1b4",
+        "head": "# 页面A\n\n知识库归纳整理摘要",
+        "tail": "归纳整理摘要标签分类检索问答知识"
+      },
+      "output": {
+        "length": 5000,
+        "sha256": "be5d3d9599171dd827acab994411fe2e93306f71a8fbb9c801bcde6e3962ea49",
+        "head": "知识库归纳整理摘要标签分类检索问",
+        "tail": "归纳整理摘要标签分类检索问答知识"
+      }
+    }
+  ]
+}

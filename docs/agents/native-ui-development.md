@@ -231,6 +231,7 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 2. Go 侧用同一份脚本重放（`scriptStep`、`fakeTransport`、`usageRecorder`、`warnRecorder`），逐项比较；请求体按键顺序逐字节比（`ordered.go` 的有序 JSON）。
 3. `UPDATE_GOLDEN=1 pnpm --filter '@guizhi/desktop' exec vitest run <文件>` 重新导出；改了 TS 行为就必须重导并让 Go 侧红灯。
 4. JS 语义一律走 `jsx.go` 里的辅助（UTF-16 长度与切片 `u16Len/u16Slice/u16At`、`jsTrim`、`jsSpace`/`jsSpaceClass`、`jsLower/jsUpper`、`jsNFKC`、`jsNumber`、`jsQuote`、`jsonIndent`），不要直接用 Go 的字符串长度与 `strings.TrimSpace`。
+5. 带存储的驱动器（`wiki-driver`）：TS 侧伪造 `window.api.wiki`，IPC 应答按频道（`preview` `start` `next` `finish` `control` `catalog`）排队，每步可挂 `during` 钩子在应答前触发嵌套再跑、经 `control` 取消、中止信号、中途换模型；Go 侧同一份脚本驱动假的 `WikiStore`。模型身份串在 golden 里写作 `$identity`（用例数据里展开成当前身份串，输出里恰好等于身份串的字符串换回占位，golden 的 `identity` 字段另记字面值）。提交前对驱动器做过一轮变异检查（目录标题数、一轮上限、`maxTokens`、重试纠正说明、`length` 截断不重试、失败后暂停任务、逐块身份核对、预览 `ids`、取消后状态各改一处），9 处改动全部让对应用例红灯；改驱动器行为时同样先临时改一处确认 golden 能发现。
 
 ### 8.2 进度（截至 2026-11-16）
 
@@ -239,7 +240,8 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 | 客户端栈：聊天、流式、重试、错误文案、协议与端点、模型列表、配置归一化、场景路由与 `runScenarioChat`、embeddings | `chat.go` `stream.go` `protocol.go` `errors.go` `models.go` `config.go` `invoke.go` `embed.go` `transport.go` | 8 份 golden（`client` `protocol` `errors` `text` `config` `invoke` `models` `embed`）逐字节 | **完成**（提交 `fc379061`） |
 | 提示词常量与拼装、摘要（单发 / map-reduce）、标签建议、收件箱 AI 分类 | `prompts.go` `summarize.go` `tags.go` `classify.go` | 4 份 golden（`prompts` `summary` `tags` `classify`），Go 侧 `knowledge_golden_test.go` | **完成** |
 | 语义索引（分块、批量索引循环）、查询向量缓存、混合检索（RRF 融合与 3 秒超时降级） | `semantic.go` `queryvec.go` `hybrid.go` | 4 份 golden（`semantic` `semantic-index` `query-vectors` `hybrid`），Go 侧 `semantic_golden_test.go`；并发语义另有 Go 独有测试 `queryvec_test.go` | **完成** |
-| Wiki 驱动、文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
+| Wiki 全文编译：页面草稿解析与净化、链接白名单清洗、重复标题剥离、证据 URL 脱敏；驱动器（模型身份、预览、控制、逐块驱动、后台一轮） | `wiki_types.go` `wiki_compile.go` `evidence.go` `wiki_driver.go` | 6 份 golden：纯函数 5 份（`wiki-parse` `wiki-sanitize` `wiki-links` `wiki-strip` `wiki-evidence`），驱动器 1 份（`wiki-driver`，87 个用例，脚本化 IPC 应答 + `during` 钩子复现并发时序），Go 侧 `wiki_compile_golden_test.go` `wiki_driver_golden_test.go` | **完成** |
+| 文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
 
 ### 8.3 OCR 不进 `aiflow`
 
@@ -261,3 +263,8 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 12. 语义索引对存储的两个调用（`ListPending`、`ApplyEmbeddings`）使用脱离调用方取消的 `context`：取消只中断循环与 embeddings 请求，不中断已发出的落库，与 TS 里 IPC 不接收 signal 一致。
 13. 混合检索里 FTS 与语义检索并行；FTS 失败或调用方取消时尽早返回该错误，并保证返回之后不再回调 `onWarning`（TS 靠 Promise 的结算顺序隐含了这一点，Go 显式收尾）。语义等待上限对应 `Hybrid.SemanticTimeout`（默认 3 秒），golden 里 TS 把 3000 毫秒缩成 150 毫秒、Go 测试同样缩短。
 14. `BuildEmbeddingChunks` 的窗口落在代理对中间时同第 3 条（U+FFFD），固定在 `semantic_test.go`，golden 不覆盖。
+15. Wiki 驱动对存储（`WikiStore`）的所有调用都使用脱离调用方取消的 `context`：取消只中断进行中的模型请求与循环，已发出的落盘与记账照常完成，与 TS 里 IPC 不接收 signal 一致（同第 12 条）。
+16. 取消通知存储：TS 的 `cancel` 对 `control` 是 fire-and-forget；Go 的 `RunJob` 在返回前等取消通知做完，返回时存储里的任务状态已经确定。对拍里的 `abortSignal` 钩子因此要等那次 `control` 调用落账才返回，两边的调用顺序才一致。
+17. `sanitizePages` 遇到 `null` 元素时 TS 在读 `.title` 处抛 `TypeError`，文案会作为分块失败原因落账并展示给用户；Go 逐字复刻 V8 的文案（`errWikiNullPage`）。这是第 5 条「不复刻原文」的例外，因为它进入用户可见的失败记录。
+18. `aiflow/evidence.go` 的 `EvidenceURL` 是主包 `evidence.go` 的拷贝（`aiflow` 不能 import 主包），切换阶段合并去重。差异：敏感参数名用「ASCII 小写化 + 区分大小写的正则」判断。Go 的 `(?i)` 会把开尔文符号 U+212A、长 s U+017F 折叠成 ASCII，JS 的非 Unicode `/i` 不会，二者对 `ſecret` 这类参数名的判断不同，这里以 TS 为准。主包原版仍用 `(?i)`（其注释「与 Go 的 (?i) 一致」对这两个字符不成立）：多脱敏、方向安全，只影响此类异常 URL 的模型身份串，是否回修留到合并去重时。
+19. TS 的 `compileReadyWiki` 在已有任务占用驱动器时，会先在存储里建好新任务才在 `runWikiJob` 里因「已有 Wiki 编译正在执行」失败（`wiki-driver` 里有用例固定了这个次序）。这是 TS 现状而非设计目标；要改就两边同改并重导 golden。

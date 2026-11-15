@@ -1,0 +1,303 @@
+{
+  "version": "fulltext-v2",
+  "normalize": [
+    {
+      "input": "",
+      "output": ""
+    },
+    {
+      "input": "   ",
+      "output": ""
+    },
+    {
+      "input": "  知识  管理 ",
+      "output": "知识 管理"
+    },
+    {
+      "input": "React Hooks",
+      "output": "REACT HOOKS"
+    },
+    {
+      "input": "a\tb\nc\r\nd",
+      "output": "A B C D"
+    },
+    {
+      "input": " A　b C﻿",
+      "output": "A B C"
+    },
+    {
+      "input": " x y",
+      "output": "X Y"
+    },
+    {
+      "input": "straße",
+      "output": "STRASSE"
+    },
+    {
+      "input": "ǆ ǈ ǌ",
+      "output": "Ǆ Ǉ Ǌ"
+    },
+    {
+      "input": "ﬁ ﬂ ﬃ",
+      "output": "FI FL FFI"
+    },
+    {
+      "input": "ŉ",
+      "output": "ʼN"
+    },
+    {
+      "input": "ΐ ΰ",
+      "output": "Ϊ́ Ϋ́"
+    },
+    {
+      "input": "ς σ Σ",
+      "output": "Σ Σ Σ"
+    },
+    {
+      "input": "ı i İ I",
+      "output": "I I İ I"
+    },
+    {
+      "input": "ǰ ẖ ẗ",
+      "output": "J̌ H̱ T̈"
+    },
+    {
+      "input": "Ａｂｃ　全角",
+      "output": "ＡＢＣ 全角"
+    },
+    {
+      "input": "emoji 😀 mix",
+      "output": "EMOJI 😀 MIX"
+    },
+    {
+      "input": "𠀀 扩展汉字",
+      "output": "𠀀 扩展汉字"
+    },
+    {
+      "input": "ａｂｃ ＡＢＣ",
+      "output": "ＡＢＣ ＡＢＣ"
+    },
+    {
+      "input": "ß ẞ",
+      "output": "SS ẞ"
+    }
+  ],
+  "aliases": [
+    {
+      "input": null,
+      "output": []
+    },
+    {
+      "input": "",
+      "output": []
+    },
+    {
+      "input": "  ",
+      "output": []
+    },
+    {
+      "input": "[]",
+      "output": []
+    },
+    {
+      "input": "[\"a\",\"b\"]",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "[\"a\",1,null,\"b\",true,[\"n\"],{\"k\":\"v\"}]",
+      "output": [
+        "a",
+        "b"
+      ]
+    },
+    {
+      "input": "{}",
+      "output": []
+    },
+    {
+      "input": "\"str\"",
+      "output": []
+    },
+    {
+      "input": "123",
+      "output": []
+    },
+    {
+      "input": "not json",
+      "output": []
+    },
+    {
+      "input": "[\"未闭合\"",
+      "output": []
+    },
+    {
+      "input": "[ \"中文\" , \"😀\" ]",
+      "output": [
+        "中文",
+        "😀"
+      ]
+    }
+  ],
+  "parse": [
+    {
+      "name": "规范 JSON 一页",
+      "text": "{\"pages\":[{\"title\":\"归知\",\"kind\":\"entity\",\"summary\":\"s\",\"aliases\":[],\"body\":\"b\"}]}",
+      "output": [
+        {
+          "title": "归知",
+          "kind": "entity",
+          "summary": "s",
+          "aliases": [],
+          "body": "b"
+        }
+      ]
+    },
+    {
+      "name": "围栏包裹与前后缀文字",
+      "text": "好的：\n```json\n{\"pages\":[{\"title\":\"归知\",\"kind\":\"entity\",\"summary\":\"s\",\"aliases\":[],\"body\":\"b\"}]}\n```\n以上。",
+      "output": [
+        {
+          "title": "归知",
+          "kind": "entity",
+          "summary": "s",
+          "aliases": [],
+          "body": "b"
+        }
+      ]
+    },
+    {
+      "name": "不是 JSON",
+      "text": "不是 JSON",
+      "output": null
+    },
+    {
+      "name": "空串",
+      "text": "",
+      "output": null
+    },
+    {
+      "name": "缺 pages 字段",
+      "text": "{\"foo\":1}",
+      "output": null
+    },
+    {
+      "name": "pages 不是数组",
+      "text": "{\"pages\":\"x\"}",
+      "output": null
+    },
+    {
+      "name": "pages 是对象",
+      "text": "{\"pages\":{\"title\":\"x\"}}",
+      "output": null
+    },
+    {
+      "name": "空数组是合法结果",
+      "text": "{\"pages\":[]}",
+      "output": []
+    },
+    {
+      "name": "前缀里的花括号让解析失败",
+      "text": "说明 {示例} 之后 {\"pages\":[{\"title\":\"A\",\"body\":\"b\"}]}",
+      "output": null
+    },
+    {
+      "name": "只有右花括号",
+      "text": "}",
+      "output": null
+    },
+    {
+      "name": "只有左花括号",
+      "text": "{",
+      "output": null
+    },
+    {
+      "name": "右花括号在左花括号之前",
+      "text": "} {",
+      "output": null
+    },
+    {
+      "name": "一对空花括号",
+      "text": "{}",
+      "output": null
+    },
+    {
+      "name": "元素类型混杂",
+      "text": "{\"pages\":[1,\"a\",null,[1],true,{\"title\":\"T\",\"body\":\"B\"}]}",
+      "output": [
+        1,
+        "a",
+        null,
+        [
+          1
+        ],
+        true,
+        {
+          "title": "T",
+          "body": "B"
+        }
+      ]
+    },
+    {
+      "name": "重复键以后者为准",
+      "text": "{\"pages\":[],\"pages\":[{\"title\":\"x\",\"body\":\"y\"}]}",
+      "output": [
+        {
+          "title": "x",
+          "body": "y"
+        }
+      ]
+    },
+    {
+      "name": "尾随逗号非法",
+      "text": "{\"pages\":[{\"title\":\"x\",}]}",
+      "output": null
+    },
+    {
+      "name": "Unicode 与转义",
+      "text": "{\"pages\":[{\"title\":\"中文😀\",\"body\":\"\\u00e9\\n\\t\\\"q\\\"\"}]}",
+      "output": [
+        {
+          "title": "中文😀",
+          "body": "é\n\t\"q\""
+        }
+      ]
+    },
+    {
+      "name": "多个对象取首尾花括号",
+      "text": "{\"a\":1} {\"pages\":[]}",
+      "output": null
+    },
+    {
+      "name": "嵌套对象",
+      "text": "{\"pages\":[{\"title\":\"T\",\"body\":\"b\",\"extra\":{\"x\":[1,2,{\"y\":3}]}}]}",
+      "output": [
+        {
+          "title": "T",
+          "body": "b",
+          "extra": {
+            "x": [
+              1,
+              2,
+              {
+                "y": 3
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "前后空白",
+      "text": "\n\n  {\"pages\":[]}  \n",
+      "output": []
+    }
+  ],
+  "kindLabels": {
+    "topic": "主题",
+    "entity": "实体",
+    "concept": "概念"
+  }
+}
