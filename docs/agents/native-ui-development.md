@@ -232,6 +232,7 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 3. `UPDATE_GOLDEN=1 pnpm --filter '@guizhi/desktop' exec vitest run <文件>` 重新导出；改了 TS 行为就必须重导并让 Go 侧红灯。
 4. JS 语义一律走 `jsx.go` 里的辅助（UTF-16 长度与切片 `u16Len/u16Slice/u16At`、`jsTrim`、`jsSpace`/`jsSpaceClass`、`jsLower/jsUpper`、`jsNFKC`、`jsNumber`、`jsQuote`、`jsonIndent`），不要直接用 Go 的字符串长度与 `strings.TrimSpace`。
 5. 带存储的驱动器（`wiki-driver`）：TS 侧伪造 `window.api.wiki`，IPC 应答按频道（`preview` `start` `next` `finish` `control` `catalog`）排队，每步可挂 `during` 钩子在应答前触发嵌套再跑、经 `control` 取消、中止信号、中途换模型；Go 侧同一份脚本驱动假的 `WikiStore`。模型身份串在 golden 里写作 `$identity`（用例数据里展开成当前身份串，输出里恰好等于身份串的字符串换回占位，golden 的 `identity` 字段另记字面值）。提交前对驱动器做过一轮变异检查（目录标题数、一轮上限、`maxTokens`、重试纠正说明、`length` 截断不重试、失败后暂停任务、逐块身份核对、预览 `ids`、取消后状态各改一处），9 处改动全部让对应用例红灯；改驱动器行为时同样先临时改一处确认 golden 能发现。
+6. 本文问答（`article-qa`）与回答流抽取（`answer-stream`）沿用同一套：TS 侧伪造 `window.api.knowledge.get` 与 `articleAsk.context / search / cancelSearch`（IPC 应答按频道排队，`during` 钩子触发中止信号），`Date.now` 固定；Go 侧用同一份脚本驱动假的 `ArticleStore`。除请求体、用量、日志、结果与错误外，还逐条比较界面补丁序列（`patch` 回调收到的 `Partial<ArticleMessage>`）：顶层值为 `undefined` 的键记为 `"$undefined"`（`step: undefined` 的含义是「清掉步骤提示」，与「没有这个键」不同），长文本（回答、来源正文、证据正文）只记指纹。夹具里来源对象的键序决定提示词里资料的键序，构造器 `ordered()` 按生产端顺序输出并对未知字段报错，免得 Go 悄悄丢字段。回答流抽取是纯函数，用例是「分块序列 → 每块之后的输出」，含分块边界、`\u` 的 `parseInt` 怪异形态、JS 的 `\s` 与非 Unicode `/i` 的边界。这两块提交前做过 47 处变异检查（回答流 10、证据快照 7、本文问答 30），45 处被 golden 或单测发现，另 2 处是等价变异（回答后的取消检查在 TS 里同样冗余——客户端先抛取消；入参上下文的深拷贝是防御性的，现有逻辑不会就地改写）。
 
 ### 8.2 进度（截至 2026-11-16）
 
@@ -241,7 +242,8 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 | 提示词常量与拼装、摘要（单发 / map-reduce）、标签建议、收件箱 AI 分类 | `prompts.go` `summarize.go` `tags.go` `classify.go` | 4 份 golden（`prompts` `summary` `tags` `classify`），Go 侧 `knowledge_golden_test.go` | **完成** |
 | 语义索引（分块、批量索引循环）、查询向量缓存、混合检索（RRF 融合与 3 秒超时降级） | `semantic.go` `queryvec.go` `hybrid.go` | 4 份 golden（`semantic` `semantic-index` `query-vectors` `hybrid`），Go 侧 `semantic_golden_test.go`；并发语义另有 Go 独有测试 `queryvec_test.go` | **完成** |
 | Wiki 全文编译：页面草稿解析与净化、链接白名单清洗、重复标题剥离、证据 URL 脱敏；驱动器（模型身份、预览、控制、逐块驱动、后台一轮） | `wiki_types.go` `wiki_compile.go` `evidence.go` `wiki_driver.go` | 6 份 golden：纯函数 5 份（`wiki-parse` `wiki-sanitize` `wiki-links` `wiki-strip` `wiki-evidence`），驱动器 1 份（`wiki-driver`，87 个用例，脚本化 IPC 应答 + `during` 钩子复现并发时序），Go 侧 `wiki_compile_golden_test.go` `wiki_driver_golden_test.go` | **完成** |
-| 文章问答、全局 Ask、后台任务执行器 | — | — | 未开始 |
+| 本文问答：读取上下文、证据快照（链接脱敏、补指纹）、联网查证（拟搜索词、搜索、取消）、流式回答；回答流的增量抽取 | `article_types.go` `evidence_snapshot.go` `article_qa.go` `answer_stream.go` | 2 份 golden：`article-qa`（87 个用例，覆盖读取与重试、证据、历史、联网、回答阶段、各检查点取消）与 `answer-stream`（46 条分块序列），Go 侧 `article_qa_golden_test.go` `answer_stream_golden_test.go`；golden 覆盖不到或有意不同的行为在 `article_qa_test.go` | **完成** |
+| 全局 Ask、后台任务执行器 | — | — | 未开始 |
 
 ### 8.3 OCR 不进 `aiflow`
 
@@ -268,3 +270,10 @@ React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage�
 17. `sanitizePages` 遇到 `null` 元素时 TS 在读 `.title` 处抛 `TypeError`，文案会作为分块失败原因落账并展示给用户；Go 逐字复刻 V8 的文案（`errWikiNullPage`）。这是第 5 条「不复刻原文」的例外，因为它进入用户可见的失败记录。
 18. `aiflow/evidence.go` 的 `EvidenceURL` 是主包 `evidence.go` 的拷贝（`aiflow` 不能 import 主包），切换阶段合并去重。差异：敏感参数名用「ASCII 小写化 + 区分大小写的正则」判断。Go 的 `(?i)` 会把开尔文符号 U+212A、长 s U+017F 折叠成 ASCII，JS 的非 Unicode `/i` 不会，二者对 `ſecret` 这类参数名的判断不同，这里以 TS 为准。主包原版仍用 `(?i)`（其注释「与 Go 的 (?i) 一致」对这两个字符不成立）：多脱敏、方向安全，只影响此类异常 URL 的模型身份串，是否回修留到合并去重时。
 19. TS 的 `compileReadyWiki` 在已有任务占用驱动器时，会先在存储里建好新任务才在 `runWikiJob` 里因「已有 Wiki 编译正在执行」失败（`wiki-driver` 里有用例固定了这个次序）。这是 TS 现状而非设计目标；要改就两边同改并重导 golden。
+20. 本文问答里模型给的搜索词不是合法 JSON 时，TS 抛出的是 V8 的 `SyntaxError` 原文，它会进入警告并经系统提示发给模型；Go 的文案是「搜索词不是有效的 JSON：」加标准库的错误。这一路径不入 golden，行为（记警告、联网状态记失败、仍然回答）由 `article_qa_test.go` 固定。
+21. **TS 现状里的一个潜在缺陷，Go 有意不复刻**：`askArticle` 里 `context.sources = sources` 让两者成为同一个数组，随后联网资料被 `push` 进去，于是按引用合并补丁的界面状态里，保存的 `context.sources` 会带上本轮的联网资料；重试时这份「原始上下文」又被当成本文资料带回（已用探针确认）。Go 的补丁里每份快照互相独立（`context` 只含读到的本文资料），由 `TestArticlePatchSnapshotsAreIndependent` 固定。React 版里这个缺陷保持现状（切换后随渲染层一起删除，不在迁移范围内修）；原生版新写的会话记录里 `context.sources` 因此只含本文资料，读 React 版留下的旧会话（可能夹带联网资料）不受影响。
+22. 回答流抽取在代理对被拆在两块之间时，中间输出里 TS 会有孤立代理项，Go 是 U+FFFD（同第 3 条）；`answer-stream` 里这类用例标了 `lone: true`，TS 侧导出时已按 `toWellFormed` 的规则换成 U+FFFD，普通用例若产生孤立代理项会直接报错。下一块到齐后两边一致。
+23. 本文问答对存储（`ArticleStore`）的所有调用都使用脱离调用方取消的 `context`（同第 12、15 条）；联网搜索的取消改由 `context.AfterFunc` 通知 `CancelSearch`，`Ask` 返回前等这次通知发出（同第 16 条）。
+24. `askArticle` 末尾的「回答只有空白」检查在 TS 里到不了：客户端对空白正文先抛「模型返回了空正文」。Go 保留同一检查（防御性），golden 里这类用例由客户端的错误覆盖。
+25. TS 的 `Date.now()`（给没有采集时间的来源补证据快照）在 Go 里是注入的 `ArticleAsker.Now`，为 nil 时用系统时钟；golden 固定时钟。证据指纹是正文脱敏之后的 SHA-256（`TextEncoder` 与 Go 的 UTF-8 一致，golden 不含孤立代理项）。
+26. 提示词里资料对象的键序，TS 取决于来源对象自己的键序（生产端是主包 `articleSource` 的字段顺序），Go 固定为 `ordinal kind title text url target fingerprint capturedAt cleared reviewStatus reviewReasons`；`evidence` 不进提示词。

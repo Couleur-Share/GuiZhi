@@ -1,0 +1,820 @@
+{
+  "cases": [
+    {
+      "name": "动作是 answer：逐块吐出累计文本",
+      "chunks": [
+        "{\"action\"",
+        ":\"answer\",\"te",
+        "xt\":\"归知用 ",
+        "embedding 做",
+        "语义检索。\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "",
+          "归知用 ",
+          "归知用 embedding 做",
+          "归知用 embedding 做语义检索。"
+        ]
+      }
+    },
+    {
+      "name": "检索动作不吐任何内容",
+      "chunks": [
+        "{\"action\":\"search\",\"query\":\"语义检索\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "推理模型在 JSON 之前的思考不进回答区",
+      "chunks": [
+        "让我先想想用户在问什么。",
+        "好的。{\"action\":\"answer\",\"text\":\"结论是 A。\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "结论是 A。"
+        ]
+      }
+    },
+    {
+      "name": "转义序列被还原，半个转义留到下一块",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"第一行\\",
+        "n第二行 \\\"引用\\\" 结束\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "第一行",
+          "第一行\n第二行 \"引用\" 结束"
+        ]
+      }
+    },
+    {
+      "name": "字符串里的引号不会被当成结束",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"他说\\\"好\\\"，然后走了\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "他说\"好\"，然后走了"
+        ]
+      }
+    },
+    {
+      "name": "\\u 转义还原",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\u4f60\\u597d\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "你好"
+        ]
+      }
+    },
+    {
+      "name": "text 在 action 之前出现也能识别",
+      "chunks": [
+        "{\"text\":\"先给文本\",\"action\":\"answer\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "先给文本"
+        ]
+      }
+    },
+    {
+      "name": "空块不改变状态",
+      "chunks": [
+        "",
+        "{\"action\":\"answer\",\"text\":\"甲",
+        "",
+        "乙\"}",
+        ""
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "甲",
+          "甲",
+          "甲乙",
+          "甲乙"
+        ]
+      }
+    },
+    {
+      "name": "text 值为空串",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "text 值未闭合：流式中间状态",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"还没写完"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "还没写完"
+        ]
+      }
+    },
+    {
+      "name": "text 不是字符串（null）：没有可抽取的内容",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":null}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "text 的冒号与引号之间有换行",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\"\n:\n\"换行之后\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "换行之后"
+        ]
+      }
+    },
+    {
+      "name": "完成之后追加的内容不影响结果",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"完成\"}",
+        " 后面还有 {\"text\":\"别的\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "完成",
+          "完成"
+        ]
+      }
+    },
+    {
+      "name": "先检索后回答：任意位置出现 answer 动作即可",
+      "chunks": [
+        "{\"action\":\"search\",\"query\":\"x\"}",
+        "\n{\"action\":\"answer\",\"text\":\"检索后的结论\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "检索后的结论"
+        ]
+      }
+    },
+    {
+      "name": "两处 text：以第一处为准",
+      "chunks": [
+        "草稿 {\"text\": \"draft\"} 最终 ",
+        "{\"action\":\"answer\",\"text\":\"final\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "draft"
+        ]
+      }
+    },
+    {
+      "name": "全部单字符转义：n t r b f 引号 反斜杠 斜杠 与未知转义",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"a\\nb\\tc\\rd\\be\\ff\\\"g\\\\h\\/i\\qj\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "a\nb\tc\rd\be\ff\"g\\h/iqj"
+        ]
+      }
+    },
+    {
+      "name": "转义的反斜杠之后紧跟引号：字符串在此结束",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"末尾反斜杠\\\\\"}",
+        " 以后的内容忽略"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "末尾反斜杠\\",
+          "末尾反斜杠\\"
+        ]
+      }
+    },
+    {
+      "name": "转义的反斜杠后接 u：按字面处理",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\\\u4f60\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "\\u4f60"
+        ]
+      }
+    },
+    {
+      "name": "末尾孤立的反斜杠留到下一块",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"甲\\",
+        "\\乙\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "甲",
+          "甲\\乙"
+        ]
+      }
+    },
+    {
+      "name": "反斜杠后接引号被拆在两块之间",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"他说\\",
+        "\"好\\\"了\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "他说",
+          "他说\"好\"了"
+        ]
+      }
+    },
+    {
+      "name": "反斜杠后接 u 时字符串提前结束（\\u 后不足 4 位）",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"ab\\u12\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "ab"
+        ]
+      }
+    },
+    {
+      "name": "\\u 半个转义：不足 4 位时先不输出，补齐后还原",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"x\\u4",
+        "f6",
+        "0y\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "x",
+          "x",
+          "x你y"
+        ]
+      }
+    },
+    {
+      "name": "\\u 十六进制大小写混用",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\u4F60\\u597D\\u00e9\\u00C9\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "你好éÉ"
+        ]
+      }
+    },
+    {
+      "name": "\\u 后不是十六进制：NaN 不输出，继续往后",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"a\\uzzzzb\\u00zzc\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "ab\u0000c"
+        ]
+      }
+    },
+    {
+      "name": "\\u 与 parseInt 的怪异形态：前导空白、正负号、0x 前缀、尾部多余字符",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"[\\u 1a2][\\u+123][\\u-123][\\u0x12][\\u12  ][\\u1g2h][\\u-000]\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "[Ƣ][ģ][ﻝ][\u0012][\u0012][\u0001][\u0000]"
+        ]
+      }
+    },
+    {
+      "name": "\\u0000 与 \\u2028 等特殊码位",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"a\\u0000b\\u2028c\\u2029d\\u00a0e\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "a\u0000b c d e"
+        ]
+      }
+    },
+    {
+      "name": "\\u 转义拼成完整的代理对（emoji）",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\ud83d\\ude00\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "😀"
+        ]
+      }
+    },
+    {
+      "name": "代理对的两半被拆在两块之间：中间状态是孤立代理项",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\ud83d",
+        "\\ude00\"}"
+      ],
+      "lone": true,
+      "expect": {
+        "outputs": [
+          "�",
+          "😀"
+        ]
+      }
+    },
+    {
+      "name": "孤立的高代理项在末尾",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"甲\\ud83d\"}"
+      ],
+      "lone": true,
+      "expect": {
+        "outputs": [
+          "甲�"
+        ]
+      }
+    },
+    {
+      "name": "孤立的低代理项",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"甲\\ude00乙\"}"
+      ],
+      "lone": true,
+      "expect": {
+        "outputs": [
+          "甲�乙"
+        ]
+      }
+    },
+    {
+      "name": "高代理项后面不是低代理项",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\ud83dX\"}"
+      ],
+      "lone": true,
+      "expect": {
+        "outputs": [
+          "�X"
+        ]
+      }
+    },
+    {
+      "name": "低代理项在前、高代理项在后",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"\\ude00\\ud83d\"}"
+      ],
+      "lone": true,
+      "expect": {
+        "outputs": [
+          "��"
+        ]
+      }
+    },
+    {
+      "name": "原文直接含 emoji 与生僻汉字",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"😀",
+        "𠀀 好\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "😀",
+          "😀𠀀 好"
+        ]
+      }
+    },
+    {
+      "name": "冒号两侧的空格",
+      "chunks": [
+        "{\"action\" : \"answer\",\"text\" : \"有空格\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "有空格"
+        ]
+      }
+    },
+    {
+      "name": "冒号两侧是换行与制表",
+      "chunks": [
+        "{\"action\"\n\t:\r\n\"answer\",\"text\"\t:\n\"有换行\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "有换行"
+        ]
+      }
+    },
+    {
+      "name": "JS 的 \\s 含 NBSP、全角空格、U+FEFF、U+2028：都能识别",
+      "chunks": [
+        "{\"action\" :　\"answer\",\"text\"﻿: \"特殊空白\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "特殊空白"
+        ]
+      }
+    },
+    {
+      "name": "U+0085、U+200B、U+180E 不是 JS 的 \\s：不识别",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"甲\"}",
+        "{\"action\":​\"answer\",\"text\":\"乙\"}",
+        "{\"action\":᠎\"answer\",\"text\":\"丙\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "action 与 answer 不分大小写",
+      "chunks": [
+        "{\"ACTION\":\"ANSWER\",\"text\":\"大写\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "大写"
+        ]
+      }
+    },
+    {
+      "name": "混合大小写的 Action / Answer",
+      "chunks": [
+        "{\"Action\": \"Answer\",\"text\":\"混合\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "混合"
+        ]
+      }
+    },
+    {
+      "name": "text 键区分大小写：大写的 TEXT 不认",
+      "chunks": [
+        "{\"action\":\"answer\",\"TEXT\":\"大写键\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "长 s（U+017F）与无点 i（U+0131）不折叠成 ASCII：不识别",
+      "chunks": [
+        "{\"action\":\"anſwer\",\"text\":\"甲\"}",
+        "{\"actıon\":\"answer\",\"text\":\"乙\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "action 的值是别的动作但文本里提到 answer",
+      "chunks": [
+        "{\"action\":\"search\",\"query\":\"\\\"action\\\":\\\"answer\\\"\",\"text\":\"不该吐出\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          ""
+        ]
+      }
+    },
+    {
+      "name": "整段一次喂入",
+      "chunks": [
+        "{\"action\":\"answer\",\"text\":\"归知用 embedding 做语义检索。\\n第二行 \\\"引用\\\" \\u4f60\\u597d 😀 结束\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结束"
+        ]
+      }
+    },
+    {
+      "name": "逐字符喂入同一段文本：最终结果与整段一致",
+      "chunks": [
+        "{",
+        "\"",
+        "a",
+        "c",
+        "t",
+        "i",
+        "o",
+        "n",
+        "\"",
+        ":",
+        "\"",
+        "a",
+        "n",
+        "s",
+        "w",
+        "e",
+        "r",
+        "\"",
+        ",",
+        "\"",
+        "t",
+        "e",
+        "x",
+        "t",
+        "\"",
+        ":",
+        "\"",
+        "归",
+        "知",
+        "用",
+        " ",
+        "e",
+        "m",
+        "b",
+        "e",
+        "d",
+        "d",
+        "i",
+        "n",
+        "g",
+        " ",
+        "做",
+        "语",
+        "义",
+        "检",
+        "索",
+        "。",
+        "\\",
+        "n",
+        "第",
+        "二",
+        "行",
+        " ",
+        "\\",
+        "\"",
+        "引",
+        "用",
+        "\\",
+        "\"",
+        " ",
+        "\\",
+        "u",
+        "4",
+        "f",
+        "6",
+        "0",
+        "\\",
+        "u",
+        "5",
+        "9",
+        "7",
+        "d",
+        " ",
+        "😀",
+        " ",
+        "结",
+        "束",
+        "\"",
+        "}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "归",
+          "归知",
+          "归知用",
+          "归知用 ",
+          "归知用 e",
+          "归知用 em",
+          "归知用 emb",
+          "归知用 embe",
+          "归知用 embed",
+          "归知用 embedd",
+          "归知用 embeddi",
+          "归知用 embeddin",
+          "归知用 embedding",
+          "归知用 embedding ",
+          "归知用 embedding 做",
+          "归知用 embedding 做语",
+          "归知用 embedding 做语义",
+          "归知用 embedding 做语义检",
+          "归知用 embedding 做语义检索",
+          "归知用 embedding 做语义检索。",
+          "归知用 embedding 做语义检索。",
+          "归知用 embedding 做语义检索。\n",
+          "归知用 embedding 做语义检索。\n第",
+          "归知用 embedding 做语义检索。\n第二",
+          "归知用 embedding 做语义检索。\n第二行",
+          "归知用 embedding 做语义检索。\n第二行 ",
+          "归知用 embedding 做语义检索。\n第二行 ",
+          "归知用 embedding 做语义检索。\n第二行 \"",
+          "归知用 embedding 做语义检索。\n第二行 \"引",
+          "归知用 embedding 做语义检索。\n第二行 \"引用",
+          "归知用 embedding 做语义检索。\n第二行 \"引用",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\"",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结束",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结束",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结束"
+        ]
+      }
+    },
+    {
+      "name": "每 7 个码元一块",
+      "chunks": [
+        "{\"actio",
+        "n\":\"ans",
+        "wer\",\"t",
+        "ext\":\"归",
+        "知用 embe",
+        "dding 做",
+        "语义检索。\\n",
+        "第二行 \\\"引",
+        "用\\\" \\u4",
+        "f60\\u59",
+        "7d 😀 结",
+        "束\"}"
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          "",
+          "",
+          "",
+          "归",
+          "归知用 embe",
+          "归知用 embedding 做",
+          "归知用 embedding 做语义检索。\n",
+          "归知用 embedding 做语义检索。\n第二行 \"引",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" ",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结",
+          "归知用 embedding 做语义检索。\n第二行 \"引用\" 你好 😀 结束"
+        ]
+      }
+    },
+    {
+      "name": "长文本三块（输出只记指纹）",
+      "chunks": [
+        [
+          {
+            "lit": "{\"action\":\"answer\",\"text\":\""
+          },
+          {
+            "cjk": 3000
+          }
+        ],
+        [
+          {
+            "ascii": 2000
+          },
+          {
+            "lit": "\\n"
+          }
+        ],
+        [
+          {
+            "cjk": 500
+          },
+          {
+            "lit": "\"}"
+          }
+        ]
+      ],
+      "lone": false,
+      "expect": {
+        "outputs": [
+          {
+            "length": 3000,
+            "sha256": "ea8745e2979b254ffa84f902fb94416b1b0b7a22ce522afeaef77b4248a31577",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "标签分类检索问答知识库归纳整理摘"
+          },
+          {
+            "length": 5001,
+            "sha256": "6c31e546a0514efb3c0f969b63dc18a679c091603382a8ece2c2c9b7b6a0d1c1",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "fghijabcdefghij\n"
+          },
+          {
+            "length": 5501,
+            "sha256": "ccfb1600f5d788abca4f13e095c110e59b4d45b2b3dd4179b16d333f8bd1ad74",
+            "head": "知识库归纳整理摘要标签分类检索问",
+            "tail": "要标签分类检索问答知识库归纳整理"
+          }
+        ]
+      }
+    }
+  ]
+}
