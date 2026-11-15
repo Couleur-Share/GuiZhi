@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -24,7 +25,7 @@ import (
 )
 
 // nativeFlags 是原生界面的命令行开关；必须在 flag.Parse 之前声明。
-// 外观开关（theme/hue/font/motion/wallpaper*）只供开发与截图：真实运行的外观来自设置（settings-go 完成后）。
+// 外观开关（theme/hue/font/motion/wallpaper*）只供开发与截图：真实运行的外观来自设置，开关给了就覆盖设置里的对应项。
 type nativeFlags struct {
 	on        *bool
 	module    *string
@@ -44,11 +45,11 @@ func declareNativeFlags() nativeFlags {
 	return nativeFlags{
 		on:        flag.Bool("native", false, "原生界面（feat/native-ui 开发中）：用 MyGo 原生控件，不加载 WebView 与渲染进程"),
 		module:    flag.String("native-module", "imports", "原生界面的起始页：library|inbox|ask|wiki|imports|settings"),
-		theme:     flag.String("native-theme", "", "原生界面的明暗：system|light|dark；缺省时自动化实例用 light（截图可复现），否则跟随系统"),
-		hue:       flag.String("native-hue", "", "原生界面的主题色：预设 ID（royal-blue、blue、purple、green、orange、teal）或「色相,饱和度」；缺省为默认预设"),
-		font:      flag.String("native-font", "", "原生界面的字号档：small|medium|large；缺省为默认档"),
-		motion:    flag.String("native-motion", "", "原生界面的动效偏好：system|off|reduced|standard；缺省为跟随系统"),
-		wallpaper: flag.String("native-wallpaper", "", "原生界面的壁纸：图片文件路径，或 demo（内置演示壁纸）；缺省为无壁纸"),
+		theme:     flag.String("native-theme", "", "原生界面的明暗：system|light|dark；缺省时自动化实例用 light（截图可复现），否则取设置里的值"),
+		hue:       flag.String("native-hue", "", "原生界面的主题色：预设 ID（royal-blue、blue、purple、green、orange、teal）或「色相,饱和度」；缺省取设置里的值（自动化实例为默认预设）"),
+		font:      flag.String("native-font", "", "原生界面的字号档：small|medium|large；缺省取设置里的值（自动化实例为默认档）"),
+		motion:    flag.String("native-motion", "", "原生界面的动效偏好：system|off|reduced|standard；缺省取设置里的值（自动化实例为跟随系统）"),
+		wallpaper: flag.String("native-wallpaper", "", "原生界面的壁纸：图片文件路径，或 demo（内置演示壁纸）；缺省取设置里的壁纸（自动化实例为无壁纸）"),
 		wpOpacity: flag.Float64("native-wallpaper-opacity", 1, "壁纸不透明度 0–1"),
 		wpBlur:    flag.Float64("native-wallpaper-blur", 0, "壁纸模糊 0–50（同 CSS px）"),
 		width:     flag.Int("native-width", 1280, "原生窗口宽度（DIP）"),
@@ -60,19 +61,20 @@ func declareNativeFlags() nativeFlags {
 // enabled 报告是否以原生界面启动。
 func (f nativeFlags) enabled() bool { return f.on != nil && *f.on }
 
-// themeSpec 把外观开关装配成 kit.ThemeSpec；值写错时返回带可选项的错误，而不是静默落回默认。
-func (f nativeFlags) themeSpec(automation bool) (kit.ThemeSpec, error) {
-	spec := kit.DefaultThemeSpec()
+// themeSpec 在 base（真实运行取设置里的外观，自动化实例取出厂外观）上叠加外观开关，装配成 kit.ThemeSpec；
+// 开关没给就保留 base 的值，写错时返回带可选项的错误，而不是静默落回默认。
+// 自动化实例的明暗默认固定为浅色，截图才可复现。
+func (f nativeFlags) themeSpec(base kit.ThemeSpec, automation bool) (kit.ThemeSpec, error) {
+	spec := base
 	modeArg := *f.theme
-	if modeArg == "" {
-		modeArg = string(kit.ModeSystem)
-		if automation {
-			modeArg = string(kit.ModeLight)
-		}
+	if modeArg == "" && automation {
+		modeArg = string(kit.ModeLight)
 	}
 	var err error
-	if spec.Mode, err = kit.ParseMode(modeArg); err != nil {
-		return spec, err
+	if modeArg != "" {
+		if spec.Mode, err = kit.ParseMode(modeArg); err != nil {
+			return spec, err
+		}
 	}
 	if *f.hue != "" {
 		if spec.Hue, spec.Saturation, err = kit.ParseHue(*f.hue); err != nil {
@@ -126,6 +128,41 @@ var nativeRoutes = map[string]nativeapp.Route{
 	"wiki": nativeapp.RouteWiki, "imports": nativeapp.RouteImports, "settings": nativeapp.RouteSettings,
 }
 
+// baseTheme 是外观开关叠加之前的底色：真实运行取设置里的外观；自动化实例（截图/基准）固定用出厂外观，
+// 它们不读旧版 WebView2 配置、不受已保存设置影响，也不往设置存储里写任何东西。
+func (nb nativeBoot) baseTheme(ns *nativeSettings) kit.ThemeSpec {
+	if nb.automation {
+		return kit.DefaultThemeSpec()
+	}
+	return nb.loadPersistedTheme(ns)
+}
+
+// loadPersistedTheme 首次启动时导入旧版设置，然后取设置里的外观。任何一步失败都只记日志、
+// 退回出厂外观（壁纸读不出时只丢壁纸），不阻止启动；导入失败不写提交点，下次启动重试。
+func (nb nativeBoot) loadPersistedTheme(ns *nativeSettings) kit.ThemeSpec {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := ns.importLegacy(ctx, currentWebView2UserDataFolder(), nb.lib.paths.UserData); err != nil {
+		nb.reportSettingsError("导入旧版设置", err)
+	}
+	values, err := ns.Snapshot()
+	if err != nil {
+		nb.reportSettingsError("读取设置", err)
+		return kit.DefaultThemeSpec()
+	}
+	spec, err := nativeapp.ThemeSpecFromSettings(values.UI, nb.lib.paths.ImagesDir())
+	if err != nil {
+		nb.reportSettingsError("载入壁纸", err)
+	}
+	return spec
+}
+
+// reportSettingsError 把设置相关的启动期失败写进标准日志与 error.log（后者脱敏并轮转，与渲染进程同一份）。
+func (nb nativeBoot) reportSettingsError(action string, err error) {
+	log.Printf("[native-settings] %s失败：%v", action, err)
+	nb.lib.paths.logAppError("native-settings", action, err.Error(), nil)
+}
+
 // runNative 打开原生窗口并阻塞到退出。
 func runNative(nb nativeBoot) error {
 	route, ok := nativeRoutes[*nb.flags.module]
@@ -142,15 +179,21 @@ func runNative(nb nativeBoot) error {
 		}
 	}
 
-	spec, err := nb.flags.themeSpec(nb.automation)
+	// 设置：界面设置与偏好在 config/ui-prefs.json，Go 侧设置在 settings 表（见 native_settings.go）。
+	// 自动化实例（截图/基准）只用开关与出厂外观：它们不该读用户的旧 WebView2 配置，也不该受已保存设置影响。
+	store := openUIPrefsStore(filepath.Join(nb.lib.paths.ConfigDir(), uiPrefsFileName), log.Printf)
+	nset := newNativeSettings(nb.lib, store, log.Printf)
+	spec, err := nb.flags.themeSpec(nb.baseTheme(nset), nb.automation)
 	if err != nil {
 		return err
 	}
 
 	hub := newPushHub()
 	nb.lib.setPush(hub.Dispatch) // 单监听推送 → 订阅者
+	svc := newNativeServices(nb.bridge, hub)
+	svc.Settings, svc.Prefs = nset, store
 	app := nativeapp.New(nativeapp.Options{
-		Services: newNativeServices(nb.bridge, hub),
+		Services: svc,
 		Theme:    spec,
 		Route:    route,
 	})

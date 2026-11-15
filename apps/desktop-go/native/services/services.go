@@ -14,6 +14,10 @@ import "time"
 type Services struct {
 	Imports Imports
 
+	// Settings 与 Prefs 是设置与界面偏好；nil 时界面用默认值、改动只在内存里（测试里不关心设置时可以不给）。
+	Settings Settings
+	Prefs    Prefs
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 

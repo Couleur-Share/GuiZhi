@@ -1,0 +1,24 @@
+{
+  "generator": "testdata/make-webview2-localstorage.mjs",
+  "generatedAt": "2026-11-15T14:45:57.654Z",
+  "executable": "GuiZhi.exe",
+  "browserVersion": "157.0.4341.46",
+  "origin": "http://guizhi.localhost",
+  "leveldbRelativePath": "EBWebView/Default/Local Storage/leveldb",
+  "seedKeys": [
+    "guizhi-ask-active-session",
+    "guizhi-content-reading-v1",
+    "guizhi-library-smart-views-v1",
+    "guizhi-library-table-config",
+    "guizhi-migration-dismissed",
+    "guizhi-settings",
+    "guizhi-setup-dismissed",
+    "guizhi-snapshot-reading-v1",
+    "reading-ai-catalog:item-fixture-1:body",
+    "reading-original-catalog:edit-fixture-1",
+    "reading-original-catalog:edit-fixture-2",
+    "ui-storage",
+    "wechat-reader-width",
+    "无关键-fixture"
+  ]
+}

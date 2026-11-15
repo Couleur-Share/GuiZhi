@@ -45,22 +45,32 @@ type legacyLocalStorage struct {
 // readLegacyLocalStorage 读取 <userData>\Local Storage\leveldb。没有旧数据返回 (nil, nil)；
 // 读不了（损坏等）返回错误，调用方应记录后继续启动。
 func readLegacyLocalStorage(userData string) (*legacyLocalStorage, error) {
-	src := filepath.Join(userData, "Local Storage", "leveldb")
+	byOrigin, err := readLocalStorageLevelDB(filepath.Join(userData, "Local Storage", "leveldb"), "旧 Local Storage")
+	if err != nil || byOrigin == nil {
+		return nil, err
+	}
+	return pickLegacyOrigin(byOrigin), nil
+}
+
+// readLocalStorageLevelDB 读取一个 Chromium Local Storage 的 leveldb 目录，按 origin 分组返回；
+// 目录不存在返回 (nil, nil)。Electron 与 WebView2 的 Local Storage 是同一种格式，两条导入路径共用它。
+// 数据库可能正被浏览器进程持有（LOCK）：复制到临时目录（不复制 LOCK）再只读打开，既不干扰对方也不改动原数据。
+// label 只用于错误信息。
+func readLocalStorageLevelDB(src, label string) (map[string]map[string]string, error) {
 	if st, err := os.Stat(src); err != nil || !st.IsDir() {
 		return nil, nil
 	}
-	// 旧版 Electron 可能还在运行并持有 LOCK；复制到临时目录再开（不复制 LOCK），既不干扰旧版也不改动旧数据。
 	tmp, err := os.MkdirTemp("", "guizhi-legacy-ls-")
 	if err != nil {
 		return nil, err
 	}
 	defer os.RemoveAll(tmp)
 	if err := copyDirFlat(src, tmp, "LOCK"); err != nil {
-		return nil, fmt.Errorf("复制旧 Local Storage 失败：%w", err)
+		return nil, fmt.Errorf("复制%s失败：%w", label, err)
 	}
 	db, err := leveldb.OpenFile(tmp, &opt.Options{ReadOnly: true, ErrorIfMissing: true})
 	if err != nil {
-		return nil, fmt.Errorf("打开旧 Local Storage 失败：%w", err)
+		return nil, fmt.Errorf("打开%s失败：%w", label, err)
 	}
 	defer db.Close()
 
@@ -82,9 +92,9 @@ func readLegacyLocalStorage(userData string) (*legacyLocalStorage, error) {
 	}
 	it.Release()
 	if err := it.Error(); err != nil {
-		return nil, fmt.Errorf("遍历旧 Local Storage 失败：%w", err)
+		return nil, fmt.Errorf("遍历%s失败：%w", label, err)
 	}
-	return pickLegacyOrigin(byOrigin), nil
+	return byOrigin, nil
 }
 
 // pickLegacyOrigin：优先 file://（正式版）；它没有归知设置时，改取任何有归知设置的 origin（例如开发服务器）；

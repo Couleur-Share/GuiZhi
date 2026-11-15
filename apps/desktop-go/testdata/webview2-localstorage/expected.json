@@ -1,0 +1,19 @@
+{
+  "origin": "http://guizhi.localhost",
+  "entries": {
+    "guizhi-ask-active-session": "ask-session-fixture",
+    "guizhi-content-reading-v1": "{\"item-fixture-1\":{\"tab\":\"body\",\"scrollTopByTab\":{\"body\":120},\"catalogOpen\":true,\"updatedAt\":1731600000000}}",
+    "guizhi-library-smart-views-v1": "[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"name\":\"未读文章\",\"scope\":\"all\",\"collectionId\":null,\"tagId\":null,\"platform\":\"wechat\",\"createdAt\":1731600000000}]",
+    "guizhi-library-table-config": "{\"columns\":[{\"id\":\"title\",\"visible\":true,\"width\":320},{\"id\":\"tags\",\"visible\":false,\"width\":160}]}",
+    "guizhi-migration-dismissed": "1",
+    "guizhi-settings": "{\"state\":{\"themeMode\":\"dark\",\"themeColor\":\"green\",\"themeHue\":150,\"themeSaturation\":30,\"fontSize\":\"large\",\"language\":\"zh\",\"motionPreference\":\"reduced\",\"launchAtStartup\":true,\"enableNotifications\":false,\"backupAutoEnabled\":true,\"backupIntervalHours\":12,\"backupKeepCount\":20,\"networkProxy\":{\"mode\":\"manual\",\"protocol\":\"http\",\"host\":\"127.0.0.1\",\"port\":7890,\"username\":\"fixture-user\",\"password\":\"fixture-proxy-password\",\"bypass\":\"<local>,localhost\"},\"flareSolverr\":{\"enabled\":true,\"connection\":\"local\",\"port\":8191,\"sshHost\":\"\"},\"scenarioModelDefaults\":{\"summary\":\"模型-甲\",\"qa\":\"fixture-model\"},\"aiApiKey\":\"sk-fixture-not-a-real-key\"},\"version\":3}",
+    "guizhi-setup-dismissed": "1",
+    "guizhi-snapshot-reading-v1": "{\"snapshot-fixture-1\":{\"scrollTop\":64,\"updatedAt\":1731600000001}}",
+    "reading-ai-catalog:item-fixture-1:body": "true",
+    "reading-original-catalog:edit-fixture-1": "true",
+    "reading-original-catalog:edit-fixture-2": "false",
+    "ui-storage": "{\"state\":{\"appModule\":\"wiki\",\"isSidebarCollapsed\":true,\"sidebarPanelWidth\":333,\"itemListPaneWidth\":410,\"wikiCatalogPaneWidth\":250,\"libraryViewMode\":\"list\"},\"version\":0}",
+    "wechat-reader-width": "wide",
+    "无关键-fixture": "与归知无关的值"
+  }
+}

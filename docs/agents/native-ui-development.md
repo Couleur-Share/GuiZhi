@@ -2,7 +2,7 @@
 
 > 本文随分支存在，切换（见评估文档 §六 阶段 4）后并入桌面开发细节。
 > 立项依据、关卡与止损条件：[native-ui-evaluation.md](native-ui-evaluation.md)；产品边界：[product-scope.md](../product-scope.md)。
-> 当前阶段：阶段 1「地基」。已迁移的模块只有「采集（imports）」的只读列表，其余页面是如实说明未迁移的占位；外观桥（主题、字号、动效、壁纸）、文案目录、图标流水线与共享控件（Toast、失败处理、确认/未保存对话框、命令面板、快捷键录制、窗格与表格列持久化）已就位，设置的 Go 化（`PrefStore` 的真实实现与旧 localStorage 导入）在后面。
+> 当前阶段：阶段 1「地基」。已迁移的模块只有「采集（imports）」的只读列表，其余页面是如实说明未迁移的占位；外观桥（主题、字号、动效、壁纸）、文案目录、图标流水线、共享控件（Toast、失败处理、确认/未保存对话框、命令面板、快捷键录制、窗格与表格列持久化）与设置的 Go 化（单一真相源、`PrefStore` 的真实实现、首次启动导入旧 localStorage）已就位；设置页面本身与设置→外观的实时订阅在 M1 切片里做。
 
 ## 1. 一句话
 
@@ -131,7 +131,7 @@ pnpm shot:native --matrix appearance                          # 一次构建拍�
 | 窗格宽度 | `Pane`（`PaneSidebar` / `PaneItemList` / `PaneWikiCatalog`） | `ui.store.ts` 的三条宽度 | 规格与渲染层常量逐项对拍；`Split` 接 `ui.Split`，拖动、方向键、双击恢复默认都落到 `Set`（夹紧、去抖保存） |
 | 表格列 | `ColumnSet` + `ColumnDef` | `useItemTableConfig` | 只有「是否显示」和「宽度」是用户的，范围与可调性永远以代码为准；`MergeStoredColumns` 逐条对照渲染层 `mergeStoredColumns`（含怪癖）；与 `ui.Table` 的用法见下 |
 
-**偏好存取**：窗格与表格列只依赖窄接口 `PrefStore`（JSON 键值，键用点分命名如 `ui.itemListPaneWidth`），写入在去抖定时器的 goroutine 里发生，实现必须并发安全。测试用 `MemStore`；真实实现随 Go 侧设置（`settings-go`）提供，首次启动从旧 WebView2 的 localStorage 导入。保存是 400 ms 去抖，窗口关闭前要对每个 `Pane`/`ColumnSet` 调 `Flush`，否则最后一次拖动会丢。
+**偏好存取**：窗格与表格列只依赖窄接口 `PrefStore`（JSON 键值，键用点分命名如 `ui.itemListPaneWidth`），写入在去抖定时器的 goroutine 里发生，实现必须并发安全。测试用 `MemStore`；真实实现是 `uiPrefsStore`（`ui_prefs.go`，见下一节「设置」），经 `Services.Prefs` 注入，首次启动从旧 WebView2 的 localStorage 导入。保存是 400 ms 去抖，窗口关闭前要对每个 `Pane`/`ColumnSet` 调 `Flush`，否则最后一次拖动会丢。`Services.Settings`/`Services.Prefs` 为 nil 时界面用默认值、改动只在内存里（约定见 `services/services.go`），页面要容忍。
 
 **`ColumnSet` 与 `ui.Table`**：每帧用 `cs.TableColumns(title)` 生成列，建完表后 `if cs.Sync(&state.Columns) { c.Invalidate() }`。偏好（`ColumnSet`）是真相源，表格在 `ListState.Columns` 里另存的布局每帧被读回偏好；代码改了偏好（`Resize`、`Reset`）后布局过时，下一次 `Sync` 以偏好为准重写它，否则「恢复默认」会被表格里留着的旧宽度覆盖回去。`Sync` 还清掉表头拖出来的列顺序（渲染层的列顺序固定）。默认宽度会先夹进范围（渲染层的操作列默认 84、下限 148，实际显示 148），读写才稳定。
 
@@ -148,6 +148,45 @@ pnpm shot:native --matrix appearance                          # 一次构建拍�
 **渲染层既有缺陷（两端共享，未在 main 上修）**：深色危险按钮白字压红底 4.39:1；深色 `text-destructive` 压对话框底 4.06 / 3.74；green、teal 预设的浅色悬停态 `accent` 3.85 / 3.77、`primary/90` 悬停 4.42 / 4.34；快捷键录制写出 `ARROWUP` 这类无效加速键、把 Win 键记成 Ctrl、Tab 与 Esc 被吞；确认框在深色浅主色上用 `text-white`。其中对比度类已登记在 `look_test.go` 的 `knownContrastDebt`，修好后测试会提示删除登记。
 
 **核对**：`GUIZHI_WIDGET_SHEET=<前缀> go test ./native/kit -run TestWidgetsSheet` 把各控件的各种状态（提示堆叠与展开详情、确认/危险确认/未保存、命令面板含查询、快捷键录制中/未设置）在明、暗两种外观下各画一张 PNG；Tailwind 色阶由 `gen-native.test.mjs` 用 `tailwindcss/colors` 逐项对拍（`native/kit/tailwind.go` 与品牌图标生成器的 `TAILWIND` 表）。
+
+### 设置（Go 单一真相源）
+
+React 版的设置散在三处：zustand 持久化到 WebView2 的 localStorage（`guizhi-settings`、`ui-storage` 与十来个零散键）、SQLite 的 `settings` 表（`settings:get/set` 白名单里的子集）、`config/ai-models.json`。原生版收成「每个字段只有一个物理存放处，界面只有一份快照」：
+
+| 归属 | 存放处 | 谁读 | 内容 |
+| --- | --- | --- | --- |
+| `settings.UI` | `config/ui-prefs.json` 的 `settings` 段 | 原生界面 | 外观（明暗、主题色/色相/饱和度、自定义色、字号、壁纸、动效）、阅读/编辑开关、关闭行为、更新通道、场景默认模型 ID |
+| `settings.App`（13 个键） | SQLite `settings` 表（沿用 `settings:set` 的校验与事务） | Go 侧组件（备份调度、代理、工具、托盘语言、通知）与原生界面 | 语言、开机自启、启动最小化、后台任务、通知、网络代理、FlareSolverr、自动备份三项、yt-dlp / ffmpeg 路径、转写说话人分离 |
+| `Prefs`（`PrefStore`） | `config/ui-prefs.json` 的 `prefs` 段 | 窗格、表格列、阅读位置、已关闭的提示等 | 点分键 → 任意 JSON，键清单见 `native/settings/prefs.go` |
+| AI 连接 | `config/ai-models.json` | `packages/core` 客户端与 aiflow | 不在这里，也不会被导入（API Key 不进设置文件） |
+| 快捷键与模式 | `config/shortcuts.json`、`shortcut-mode.json` | 各自的服务 | 不在这里 |
+
+界面设置放在库外是有意的：备份还原只换数据库，不该把主题与布局一起回滚；Go 侧设置留在库里，是因为备份、代理这些 Go 代码直接读它，不另起第二份。`dataPath`、`settingsUpdatedAt` 是 Electron 时代的字段，原生版不再有。
+
+**代码布局**：
+
+- `native/settings`：纯逻辑（`go test` 不碰文件与库）——类型与默认值、归一化、旧 localStorage 的解析（`ParseLegacy`）。
+- `native/services`：`Settings`（`Snapshot` / `Update(fn)` / `Subscribe`）与 `Prefs` 两个窄接口，`servicestest` 有假实现。`Update` 要么整体生效要么返回错误，没有变化就不写不通知；订阅回调在写入方 goroutine 里同步调用、必须很快返回（要上 UI 线程的自己转交，如 `Host.Invalidate`）。
+- package main：`ui_prefs.go`（文件存取：原子写、保留不认识的键、损坏的文件改名成 `.corrupt-*`、比本版本新的 `version` 不降级）、`native_settings.go`（门面：先预校验 FlareSolverr 与可执行文件路径白名单，再写界面设置文件、后写表，表写失败则把文件恢复原样）、`native_settings_import.go`（首次导入）、`webview2_localstorage.go`（定位并只读读取 WebView2 的 localStorage）。
+- 读 App 设置取表里的原始行，不经 `settings:get`：后者的默认值是 Electron 时代的（`theme`、`updateChannel`……）且会并入 AI 连接配置；这里要的是渲染层的默认值，也不该碰机密。写入走 `Library.settingsSet`，与渲染进程是同一份校验、同一个事务、同样让网络代理即时生效——行为只有一个来源。
+
+**首次启动导入**（`loadPersistedTheme` → `importLegacy`；自动化实例既不导入也不读已保存的设置，由 `nativeBoot.baseTheme` 把关）：
+
+1. 来源优先级：WebView2 里有 `guizhi-settings` → 用 WebView2；否则 Electron 版还没被导入过（没有 `.machine/legacy-localstorage-imported`）且它有数据 → 用 Electron 的；否则 WebView2 里零散的键；都没有 → 全新安装（仍写出提交点，之后不再探测）。
+2. WebView2 数据位置：`<WebView2 用户数据目录>\EBWebView\Default\Local Storage\leveldb`，页面 origin 是 `http://guizhi.localhost`；用户数据目录的规则与 MyGo 一致（`WEBVIEW2_USER_DATA_FOLDER`，否则 `%LOCALAPPDATA%\<应用名>\WebView2`）。先复制到临时目录再只读打开，不动原目录、不留 LOCK，所以随时能回退到旧版本，旧版正在运行也不受影响。
+3. 提交点是 `ui-prefs.json` 的写出：读不了旧数据（损坏等）→ 返回错误、不写文件，下次启动重试；读到了（或确实没有）→ 先把 Go 侧设置补进表（库里已有值的键不覆盖；某个键非法只跳过它并记进导入记录），最后写文件。中途被打断，下次启动表里已有值，走完剩下的步骤。
+4. 不导入的：`ytDlpPath`、`ffmpegPath`（可执行文件路径只接受文件选择器返回过的值）、一切 AI 连接字段与密钥、`dataPath`/`settingsUpdatedAt`、废弃键（`guizhi-table-config`、`guizhi-legacy-ls-imported`）。代理口令随 `networkProxy` 进 `settings` 表（与 React 版一致），不进 `ui-prefs.json`，也不进导入记录；导入记录里的问题说明只有键名与原因，不含值。
+5. 归一化规则随移植保留：持久化 v3 迁移（v3 之前 `motionPreference: standard` 回落为 `system`）、旧默认值残留（`editorMarkdownPreview` 一律为 true）、壁纸文件名解码、`toFixed(1)` 取整、`trim` 的空白集、`decodeURIComponent` 失败回落原串……由 TS 导出的 golden（`apps/desktop/tests/unit/stores/settings-native-golden.test.ts` → `native/settings/testdata/golden-settings.json`：66 条设置 + 21 条 ui-storage）与 Go 逐项对拍，两边谁变了都会红；渲染层的归一化改了，用 `UPDATE_GOLDEN=1` 重新导出后再让 Go 对齐。
+
+**防漂移**：`native/settings/legacy_drift_test.go` 扫描渲染层源码里所有 `localStorage` 键（含 `TRANSFER_LOCAL_STORAGE_KEYS` 与 zustand `persist` 的名字），没登记进 `legacyExact` / `legacyPrefixes` 就失败，所以每周合并 main 时渲染层新增的键不会悄悄漏导；反过来，登记了但渲染层已不用的键也会要求清理。
+
+**夹具**：`apps/desktop-go/testdata/webview2-localstorage/` 是真实 WebView2 写出的 Local Storage（含中文、两种 Chromium 编码、合成的假密钥），`meta.json` 记着内核版本与相对路径；`TestWebView2FixtureMatchesLocatorFacts` 断言定位逻辑与夹具一致，WebView2 内核升级后换了位置会先红。重新生成：`node apps/desktop-go/testdata/make-webview2-localstorage.mjs --executable <React 版 GuiZhi.exe> [--dist <dir>] [--out <dir>]`（用一次性 profile 启动真实 WebView2 写入种子并读回，不碰用户数据）。
+
+**与渲染层的有意差异（对等台账登记项，延续上一节的编号）**：
+
+14. Go 侧多做的归一化：色相夹到 0–360、饱和度夹到 0–100、自定义色必须是合法 hex；备份间隔与保留份数在边界处就夹取（渲染层只在设置器里夹，持久化的坏值由调度器读取时再夹）。
+15. 渲染层 `migrate` 对「缺 `language` 的旧版本数据」会得到 `en` 的怪癖不复刻（导入的语料都带 `language`）。
+16. 界面设置从浏览器 localStorage 搬到 `config/ui-prefs.json`；文件损坏时改名成 `.corrupt-*` 后按默认值启动（不删数据、不阻止启动）。
 
 ### MyGo 即时模式的踩坑记录
 
@@ -167,6 +206,9 @@ pnpm shot:native --matrix appearance                          # 一次构建拍�
 | --- | --- | --- |
 | 原生界面 | `go test -count=1 ./native/...`（在 `apps/desktop-go`） | `ui.Tester` 无窗口；Compose 测输入法路径；用假服务注入各种状态 |
 | 适配器 | `go test -count=1 -run 'TestNative\|TestPushHub\|TestImportsAdapter\|TestLogAdapter\|TestCallAs' .` | 对真实处理器与真实库 |
+| 设置（纯逻辑） | `go test -count=1 ./native/settings/ ./native/services/... ./native/app/` | 与 TS golden 对拍、旧键漂移守卫、窗格范围与 kit 一致、外观映射 |
+| 设置（真实库与文件） | `go test -count=1 -run 'TestUIPrefs\|TestNativeSettings\|TestImportLegacy\|TestBoot\|TestAutomationBoot\|TestNativeFlags\|TestAppSetting\|TestWebView2\|TestReadWebView2\|TestPickWebView2\|TestSanitizeWebView2' .` | 真实 SQLite + 临时数据目录 + 真实 WebView2 夹具；**别用裸 `-run WebView2`**：它会匹配到需要 `pnpm build` 产物的 `TestReadingProbeInWebView2`。涉及 `currentWebView2UserDataFolder()` 的测试必须 `t.Setenv("WEBVIEW2_USER_DATA_FOLDER", 临时目录)`，绝不读真实的 `%LOCALAPPDATA%\GuiZhi\WebView2` |
+| TS golden | `pnpm --filter @guizhi/desktop exec vitest run tests/unit/stores/settings-native-golden.test.ts` | 渲染层归一化规则的导出与比对；`UPDATE_GOLDEN=1` 重新导出 |
 | 隔离脚本与生成器 | `pnpm test:validation`（含 `scripts/tests/isolated-go.test.mjs`、`gen-native.test.mjs`） | `shot-native` 参数与环境解析；四个生成器的解析边界，对真实渲染层源码的冒烟，以及 Tailwind 色阶对拍 |
 | 整包 | `go vet ./...`、`go test -count=1 ./...` | 与 AGENTS.md 一致（需先 `pnpm build`，约 2 分钟） |
 

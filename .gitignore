@@ -157,3 +157,6 @@ apps/desktop-go/reading_libraries.json
 
 # Go 壳对拍基准（冻结自 Electron 终版 TS 实现）：其中的 .db / .log 是对拍输入，必须入库，不受上方通配规则影响
 !apps/desktop-go/testdata/golden/**
+# 真实 Local Storage 夹具（leveldb）：000003.log 就是数据文件本身，漏提交会让夹具变成一个读不出任何键的空库
+!apps/desktop-go/testdata/legacy-localstorage/**
+!apps/desktop-go/testdata/webview2-localstorage/**
