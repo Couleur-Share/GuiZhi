@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createDesktopSnapshot } from "../desktop-validation-snapshot.mjs";
-import { goShotArgs, goValidationEnv, omitEnv } from "../isolated-go.mjs";
+import { goShotArgs, goValidationEnv, nativeShotArgs, nativeShotEnv, omitEnv } from "../isolated-go.mjs";
 
 test("omitEnv 去掉指定变量（不区分大小写），不改动传入对象", () => {
   const env = { PATH: "tools", PSModulePath: "C:/pwsh7/Modules", other: "x" };
@@ -39,6 +39,43 @@ test("goShotArgs 按调用方目录解析路径参数，缺省 --out 落到 apps
   assert.equal(path.relative(path.resolve(import.meta.dirname, "../.."), args[6]).replaceAll("\\", "/"), "apps/desktop-go/.tmp-shots");
   assert.deepEqual(goShotArgs(["--out", "o"], cwd), ["--out", path.join(cwd, "o")], "显式 --out 不再追加默认值");
   assert.throws(() => goShotArgs(["--steps"], cwd), /--steps 缺少值/);
+});
+
+test("nativeShotArgs：缺省值、路径按调用方目录解析、非法取值给出可操作的错误", () => {
+  const cwd = path.resolve("some", "dir");
+  const defaults = nativeShotArgs([], cwd);
+  assert.equal(defaults.module, "imports");
+  assert.equal(defaults.theme, "light");
+  assert.equal(defaults.lang, "zh-Hans");
+  assert.equal(defaults.name, "native-imports-light-zh-Hans", "文件名默认带上页面、主题与语言，多张截图互不覆盖");
+  assert.equal(path.relative(path.resolve(import.meta.dirname, "../.."), defaults.out).replaceAll("\\", "/"), "apps/desktop-go/.tmp-shots");
+
+  const custom = nativeShotArgs(
+    ["--module", "wiki", "--theme", "dark", "--lang", "en", "--width", "1024", "--height", "640", "--wait", "500ms", "--out", "o", "--data-db", "x.db", "--name", "mine"],
+    cwd,
+  );
+  assert.deepEqual(
+    { ...custom, out: path.relative(cwd, custom.out), dataDb: path.relative(cwd, custom.dataDb) },
+    { module: "wiki", theme: "dark", lang: "en", width: 1024, height: 640, wait: "500ms", out: "o", name: "mine", dataDb: "x.db" },
+  );
+
+  assert.throws(() => nativeShotArgs(["--module", "nope"], cwd), /--module 取值/);
+  assert.throws(() => nativeShotArgs(["--theme", "blue"], cwd), /--theme 取值/);
+  assert.throws(() => nativeShotArgs(["--lang", "fr"], cwd), /--lang 取值/);
+  assert.throws(() => nativeShotArgs(["--wait", "soon"], cwd), /--wait 需要/);
+  assert.throws(() => nativeShotArgs(["--width", "10"], cwd), /--width 需要/);
+  assert.throws(() => nativeShotArgs(["--width"], cwd), /--width 缺少值/);
+  assert.throws(() => nativeShotArgs(["--steps", "a.mjs"], cwd), /未知参数 --steps/);
+});
+
+test("nativeShotEnv 把 APPDATA 指到一次性目录并用 MYGO_LOCALE 指定语言，且不继承 WebView2 变量", () => {
+  const env = { PATH: "tools", APPDATA: "C:/Users/me/AppData/Roaming", WEBVIEW2_USER_DATA_FOLDER: "C:/real/WebView2" };
+  const isolated = nativeShotEnv(env, path.resolve("tmp", "run"), "en");
+  assert.equal(isolated.APPDATA, path.join(path.resolve("tmp", "run"), "appdata"));
+  assert.equal(isolated.MYGO_LOCALE, "en");
+  assert.equal(isolated.WEBVIEW2_USER_DATA_FOLDER, undefined);
+  assert.equal(isolated.PATH, "tools");
+  assert.equal(env.APPDATA, "C:/Users/me/AppData/Roaming", "不能改动传入的对象");
 });
 
 test("快照默认不复制 apps/desktop-go 源码；extraSourcePaths 追加后复制，并遵守 exclude", (t) => {

@@ -58,6 +58,7 @@ Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
 - 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。
+- 在 `feat/native-ui` 分支上改原生界面（`apps/desktop-go/native/`、`native_*.go`）前，先读 [原生界面开发约定](docs/agents/native-ui-development.md)；界面验证用 `pnpm shot:native`（只构建 Go 壳），立项依据与关卡见 [native-ui-evaluation.md](docs/agents/native-ui-evaluation.md)。
 - 手机收集中转服务的自托管说明见 [mobile-capture-ops.md](docs/mobile-capture-ops.md)；生产服务器的部署与升级约束属于维护者本机配置，不随仓库公开，由本机 skill `guizhi-linux-preflight` 指引。
 
 ## Linux 收集服务预检

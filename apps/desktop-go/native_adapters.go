@@ -1,0 +1,117 @@
+package main
+
+// 原生界面（native/…）与主包之间的适配层。
+//
+// native/screens、native/app 只依赖 native/services 的窄接口；这里把 Library 现有的 IPC 处理器接成这些接口。
+// 适配器经 Bridge.call 调用已登记的处理器（与渲染进程同一份逻辑、同一套错误），再把 JSON 结果解码成 DTO：
+// 行为只有一个来源，DTO 与处理器输出的对应关系由适配器测试用真实处理器守住。
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"sync"
+
+	"guizhi-mygo-shell/native/services"
+)
+
+// call 以渲染进程的方式调用已登记的 IPC 处理器：args 按 JSON 数组编码，返回处理器结果的 JSON。
+func (b *Bridge) call(ctx context.Context, channel string, args ...any) (json.RawMessage, error) {
+	encoded, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("编码 %s 的参数失败：%w", channel, err)
+	}
+	out, err := b.Invoke(ctx, channel, string(encoded))
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(out), nil
+}
+
+// callAs 调用处理器并把结果解码成 T。解码失败带上频道名，便于定位 DTO 与处理器输出对不上的地方。
+func callAs[T any](ctx context.Context, b *Bridge, channel string, args ...any) (T, error) {
+	var out T
+	raw, err := b.call(ctx, channel, args...)
+	if err != nil {
+		return out, err
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return out, fmt.Errorf("解码 %s 的结果失败：%w", channel, err)
+	}
+	return out, nil
+}
+
+// pushHub 把 Library 的单监听推送（setPush）分发给多个订阅者，供原生界面按频道订阅。
+// 回调在推送方 goroutine 上同步执行，订阅者只做轻量工作（通常是去抖地安排一次刷新）。
+type pushHub struct {
+	mu   sync.RWMutex
+	next int
+	subs map[string]map[int]func(payload any)
+}
+
+func newPushHub() *pushHub { return &pushHub{subs: map[string]map[int]func(any){}} }
+
+// Subscribe 订阅一个频道，返回取消函数（可重复调用）。
+func (h *pushHub) Subscribe(channel string, fn func(payload any)) (cancel func()) {
+	h.mu.Lock()
+	h.next++
+	id := h.next
+	if h.subs[channel] == nil {
+		h.subs[channel] = map[int]func(any){}
+	}
+	h.subs[channel][id] = fn
+	h.mu.Unlock()
+	return func() {
+		h.mu.Lock()
+		delete(h.subs[channel], id)
+		h.mu.Unlock()
+	}
+}
+
+// Dispatch 把一次推送交给该频道的全部订阅者；没有订阅者时静默丢弃，与窗口未创建时的 pushMain 一致。
+func (h *pushHub) Dispatch(channel string, payload any) {
+	h.mu.RLock()
+	fns := make([]func(any), 0, len(h.subs[channel]))
+	for _, fn := range h.subs[channel] {
+		fns = append(fns, fn)
+	}
+	h.mu.RUnlock()
+	for _, fn := range fns {
+		fn(payload)
+	}
+}
+
+// importsAdapter 把导入队列相关的处理器接成 services.Imports。
+type importsAdapter struct {
+	b   *Bridge
+	hub *pushHub
+}
+
+func (a importsAdapter) List(ctx context.Context, q services.ImportQuery) (services.ImportPage, error) {
+	arg := map[string]any{"origin": orStr(q.Origin, "all"), "status": orStr(q.Status, "all"), "query": q.Query}
+	if q.PageSize > 0 {
+		arg["pageSize"] = q.PageSize
+	}
+	if q.Cursor != "" {
+		arg["cursor"] = q.Cursor
+	}
+	return callAs[services.ImportPage](ctx, a.b, "import:list", arg)
+}
+
+func (a importsAdapter) OnChange(fn func()) func() {
+	return a.hub.Subscribe(chImportChanged, func(any) { fn() })
+}
+
+func orStr(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// newNativeServices 装配原生界面依赖的全部能力。
+func newNativeServices(b *Bridge, hub *pushHub) services.Services {
+	return services.Services{
+		Imports: importsAdapter{b: b, hub: hub},
+	}
+}

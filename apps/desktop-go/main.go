@@ -122,6 +122,7 @@ func main() {
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
+	nf := declareNativeFlags() // 原生界面（feat/native-ui）的开关，见 native_boot.go
 	// 摘掉 --updated / --hidden / --force-run：它们是拉起参数，不是开关，见 launch_args.go
 	_ = flag.CommandLine.Parse(stripLaunchArgs(os.Args[1:]))
 	if *backupCLI {
@@ -139,7 +140,7 @@ func main() {
 		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
 		return
 	}
-	if *dist == "" || *dbPath == "" {
+	if (*dist == "" && !nf.enabled()) || *dbPath == "" { // 原生界面不加载渲染产物，不需要 dist
 		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && !*bench)
 	}
 
@@ -321,6 +322,14 @@ func main() {
 			log.Printf("[ipc] 渲染进程可调用的 %d 个频道（invoke）+ %d 个（send）均已有处理器", len(rendererInvokeChannels), len(rendererSendChannels))
 		}
 	}
+	if nf.enabled() { // 原生界面：到此为止的初始化全部共用，之后不建 WebView、不绑定 Bridge
+		err = runNative(nativeBoot{flags: nf, lib: lib, bridge: b, automation: automation, shot: *shot, wait: *wait})
+		shutdownLibrary(lib, shutdownDB)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	b.registerLegacyLocalStorage(ud, log.Printf)
 	mygo.Bind(b)
 
@@ -445,6 +454,14 @@ func main() {
 		}()
 	})
 	err = mygo.App.Run()
+	shutdownLibrary(lib, shutdownDB)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// shutdownLibrary 是正常退出时的收尾：先停各后台服务，最后关库（React 版与原生版共用）。
+func shutdownLibrary(lib *Library, shutdownDB func()) {
 	if lib.crawl != nil { // 对应 closeWebCapture：先暂停运行中的批次，再关库
 		lib.crawl.close(context.Background())
 	}
@@ -457,9 +474,6 @@ func main() {
 		lib.funasrEng.stop()
 	}
 	shutdownDB()
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 // benchX 基准模式下把窗口挪到所有显示器之外（与 Electron 版的 offscreen 模式对应）。

@@ -1,0 +1,12 @@
+{
+  "native": {
+    "island": {
+      "starting": "Opening the reading view…",
+      "webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working."
+    },
+    "shell": {
+      "notMigrated": "\"{{module}}\" has not been moved to the native UI yet",
+      "notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone."
+    }
+  }
+}

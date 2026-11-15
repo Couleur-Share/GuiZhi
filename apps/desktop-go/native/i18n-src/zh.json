@@ -1,0 +1,12 @@
+{
+  "native": {
+    "island": {
+      "starting": "正在打开阅读视图…",
+      "webview2Missing": "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
+    },
+    "shell": {
+      "notMigrated": "「{{module}}」还没有迁移到原生界面",
+      "notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。"
+    }
+  }
+}

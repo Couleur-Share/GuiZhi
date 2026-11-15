@@ -28,6 +28,7 @@
     "test:unit": "pnpm test:validation && pnpm --filter @guizhi/desktop test:unit && pnpm --filter @guizhi/desktop-go test",
     "test:run": "pnpm --filter @guizhi/desktop test:run",
     "shot": "node scripts/isolated-go.mjs shot",
+    "shot:native": "node scripts/isolated-go.mjs shot-native",
     "test:release": "pnpm --filter @guizhi/desktop test:release",
     "typecheck": "pnpm -r typecheck",
     "verify:release": "node --experimental-strip-types scripts/verify-release.mts",

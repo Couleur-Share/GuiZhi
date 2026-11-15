@@ -1,6 +1,8 @@
 // Go 壳（MyGo + WebView2）的隔离验证入口：复制当前源码到临时目录构建并离屏运行，不碰开发目录的 dist/out 与用户数据。
 //
 //   node scripts/isolated-go.mjs shot [--steps <文件>] [--out <目录>] [--data-db <knowledge.db>] [--keep-profile]
+//   node scripts/isolated-go.mjs shot-native [--module <页>] [--theme light|dark] [--lang zh-Hans|en] [--out <目录>] [--data-db <db>]
+//     原生界面（feat/native-ui）：只构建 Go 壳（不需要 vite/node_modules），离屏启动 -native 并由进程自己截图，见 native_boot.go。
 //
 // 流程：复制当前源码（含未提交改动）到系统临时目录 → 在副本里构建渲染进程、preload、阅读库和 Go 壳 → 离屏启动并截图。
 // 开发目录的 dist/、out/ 与数据目录都不会被读写；WebView2 配置与用户数据同样落在一次性临时目录里。
@@ -9,6 +11,7 @@
 // 所以这里用包内 CLI 的绝对路径复刻），最后一步放置 SQLite 原生库则与它共用 ensure-sqlitecore.ps1。改了其中一处，另一处要同步。
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createDesktopSnapshot } from "./desktop-validation-snapshot.mjs";
@@ -88,8 +91,11 @@ function run(command, args, { cwd, env, logFile }) {
   });
 }
 
-/** 在副本里构建；返回 { exe, dist }，失败时抛出带日志尾部的错误。 */
-async function buildInSnapshot(snapshot, env) {
+/**
+ * 在副本里构建；返回 { exe, dist }，失败时抛出带日志尾部的错误。
+ * renderer=false 只构建 Go 壳与 SQLite 原生库（原生界面用：不加载渲染进程，不需要 vite 与 node_modules）。
+ */
+async function buildInSnapshot(snapshot, env, { renderer = true } = {}) {
   const root = snapshot.root;
   const goRoot = path.join(root, "apps/desktop-go");
   const logFile = path.join(root, "build.log");
@@ -98,15 +104,21 @@ async function buildInSnapshot(snapshot, env) {
   const version = JSON.parse(fs.readFileSync(path.join(snapshot.desktopRoot, "package.json"), "utf8")).version;
   const vite = path.join(snapshot.desktopRoot, "node_modules/vite/bin/vite.js");
   const tsx = path.join(root, "node_modules/tsx/dist/cli.mjs");
-  for (const required of [vite, tsx])
-    if (!fs.existsSync(required)) throw new Error(`缺少依赖 ${path.relative(root, required)}：请先在开发目录执行 pnpm install`);
+  if (renderer)
+    for (const required of [vite, tsx])
+      if (!fs.existsSync(required)) throw new Error(`缺少依赖 ${path.relative(root, required)}：请先在开发目录执行 pnpm install`);
 
+  const rendererSteps = renderer
+    ? [
+        ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.preload.config.ts"], snapshot.desktopRoot],
+        ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.renderer.config.ts"], snapshot.desktopRoot],
+        // 新产物必须在体积预算内（失败即中止，避免带着超预算的包去做截图）
+        ["包体预算", process.execPath, ["--experimental-strip-types", "scripts/check-bundle-budget.mts"], snapshot.desktopRoot],
+        ["阅读库", process.execPath, [tsx, "apps/desktop-go/jsgen/build-reading-libs.mts"], root],
+      ]
+    : [];
   const steps = [
-    ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.preload.config.ts"], snapshot.desktopRoot],
-    ["渲染进程与 preload（vite）", process.execPath, [vite, "build", "--config", "../desktop-go/vite.renderer.config.ts"], snapshot.desktopRoot],
-    // 新产物必须在体积预算内（失败即中止，避免带着超预算的包去做截图）
-    ["包体预算", process.execPath, ["--experimental-strip-types", "scripts/check-bundle-budget.mts"], snapshot.desktopRoot],
-    ["阅读库", process.execPath, [tsx, "apps/desktop-go/jsgen/build-reading-libs.mts"], root],
+    ...rendererSteps,
     [
       "Go 壳",
       "go",
@@ -140,9 +152,104 @@ async function buildInSnapshot(snapshot, env) {
   return { exe: path.join(outDir, "GuiZhi.exe"), dist: path.join(goRoot, "dist") };
 }
 
+const NATIVE_MODULES = ["library", "inbox", "ask", "wiki", "imports", "settings"];
+const NATIVE_USAGE =
+  "用法：node scripts/isolated-go.mjs shot-native [--module <library|inbox|ask|wiki|imports|settings>] [--theme light|dark] " +
+  "[--lang zh-Hans|en] [--width <DIP>] [--height <DIP>] [--wait <如 2s>] [--out <目录>] [--name <文件名>] [--data-db <db>]";
+
+/** 解析并校验 shot-native 参数；路径按调用方 cwd 解析，缺省 --out 与 shot 一致。纯函数，便于单测。 */
+export function nativeShotArgs(argv, cwd) {
+  const args = {
+    module: "imports", theme: "light", lang: "zh-Hans", width: 1280, height: 800, wait: "2s",
+    out: path.join(REPO_ROOT, "apps/desktop-go/.tmp-shots"), name: null, dataDb: null,
+  };
+  const integer = (flag, text) => {
+    const n = Number(text);
+    if (!Number.isInteger(n) || n < 320 || n > 7680) throw new Error(`${flag} 需要 320–7680 之间的整数，得到 ${text}`);
+    return n;
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const flag = argv[i];
+    const value = () => {
+      if (argv[i + 1] === undefined) throw new Error(`${flag} 缺少值`);
+      return argv[++i];
+    };
+    switch (flag) {
+      case "--module": args.module = value(); break;
+      case "--theme": args.theme = value(); break;
+      case "--lang": args.lang = value(); break;
+      case "--width": args.width = integer(flag, value()); break;
+      case "--height": args.height = integer(flag, value()); break;
+      case "--wait": args.wait = value(); break;
+      case "--out": args.out = path.resolve(cwd, value()); break;
+      case "--name": args.name = value(); break;
+      case "--data-db": args.dataDb = path.resolve(cwd, value()); break;
+      default: throw new Error(`未知参数 ${flag}\n${NATIVE_USAGE}`);
+    }
+  }
+  if (!NATIVE_MODULES.includes(args.module)) throw new Error(`--module 取值：${NATIVE_MODULES.join("|")}，得到 ${args.module}`);
+  if (!["light", "dark"].includes(args.theme)) throw new Error(`--theme 取值：light|dark，得到 ${args.theme}`);
+  if (!["zh-Hans", "en"].includes(args.lang)) throw new Error(`--lang 取值：zh-Hans|en，得到 ${args.lang}`);
+  if (!/^\d+(\.\d+)?(ms|s|m)$/.test(args.wait)) throw new Error(`--wait 需要 Go 时长写法（如 2s、500ms），得到 ${args.wait}`);
+  args.name ??= `native-${args.module}-${args.theme}-${args.lang}`;
+  return args;
+}
+
+/**
+ * 原生界面截图进程的环境：不继承 WebView2 变量；APPDATA 指到一次性目录，
+ * 这样 MyGo 自己的用户数据（语言偏好等，位于 %APPDATA%\归知）也碰不到真实安装；语言用 MYGO_LOCALE 临时覆盖。
+ */
+export function nativeShotEnv(env, userDataDir, lang) {
+  const isolated = goValidationEnv(env);
+  isolated.APPDATA = path.join(userDataDir, "appdata");
+  isolated.MYGO_LOCALE = lang;
+  return isolated;
+}
+
+/** 隔离构建 Go 壳并离屏启动原生界面截图。返回进程退出码。 */
+async function runIsolatedNative(argv, cwd) {
+  const args = nativeShotArgs(argv, cwd);
+  fs.mkdirSync(args.out, { recursive: true });
+  const snapshot = createDesktopSnapshot(REPO_ROOT, { extraSourcePaths: GO_SOURCE_PATHS, reuseDependencies: false });
+  console.log(`隔离验证：已复制 ${snapshot.copied} 个当前文件 → ${snapshot.root}`);
+  const userDataDir = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "guizhi-native-shot-"));
+  try {
+    const { exe } = await buildInSnapshot(snapshot, goValidationEnv(), { renderer: false });
+    const dbFile = path.join(userDataDir, "data", "knowledge.db");
+    fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+    if (args.dataDb) {
+      fs.copyFileSync(args.dataDb, dbFile);
+      // WAL 模式下最近的写入可能还在 -wal 里：旁文件一起带上（源库须已关闭）。
+      const wal = `${args.dataDb}-wal`;
+      if (fs.existsSync(wal) && fs.statSync(wal).size > 0) fs.copyFileSync(wal, `${dbFile}-wal`);
+    }
+    const file = path.join(args.out, `${args.name}.png`);
+    fs.rmSync(file, { force: true });
+    const exeArgs = [
+      "-native", "-native-module", args.module, "-native-theme", args.theme,
+      "-native-width", String(args.width), "-native-height", String(args.height),
+      "-userdata", userDataDir, "-db", dbFile, "-shot", file, "-wait", args.wait,
+      // 没给库副本就用确定的演示数据（仅写这次的一次性库）
+      ...(args.dataDb ? [] : ["-native-demo"]),
+    ];
+    const code = await run(exe, exeArgs, { cwd: userDataDir, env: nativeShotEnv(process.env, userDataDir, args.lang) });
+    if (code !== 0) return code;
+    if (!fs.existsSync(file)) throw new Error(`原生界面退出码为 0，但没有产出截图：${file}`);
+    console.log(`截图：${file}`);
+    return 0;
+  } finally {
+    snapshot.cleanup();
+    fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  }
+}
+
 /** 隔离构建并运行截图。返回进程退出码。 */
 export async function runIsolatedGo(command, argv = [], cwd = process.cwd()) {
-  if (command !== "shot") throw new Error("用法：node scripts/isolated-go.mjs shot [--steps <文件>] [--out <目录>] [--data-db <db>] [--keep-profile]");
+  if (command === "shot-native") {
+    if (process.platform !== "win32") throw new Error("Go 壳仅支持 Windows");
+    return runIsolatedNative(argv, cwd);
+  }
+  if (command !== "shot") throw new Error("用法：node scripts/isolated-go.mjs shot [--steps <文件>] [--out <目录>] [--data-db <db>] [--keep-profile]\n" + NATIVE_USAGE);
   if (process.platform !== "win32") throw new Error("Go 壳仅支持 Windows（WebView2）");
   const args = goShotArgs(argv, cwd);
   const snapshot = createDesktopSnapshot(REPO_ROOT, { extraSourcePaths: GO_SOURCE_PATHS });
