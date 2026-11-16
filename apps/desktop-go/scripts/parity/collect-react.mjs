@@ -53,17 +53,22 @@ function parseArgs(argv) {
 async function captureScene(session, sceneId, variant, outDir, suffix) {
   const scene = getScene(sceneId);
   const { page } = session;
-  await scene.enter({ win: page, session });
-  await settle(page);
-  const hovering = await parkPointer(session);
-  if (hovering !== 0) throw new Error(`场景 ${sceneId}：采集前仍有 ${hovering} 个元素处于悬停态，状态不干净`);
-  const facts = await collectFacts(session, { regionSelector: scene.region ?? null, scene: sceneId, variant });
-  const png = await captureRegionPng(session, facts.region);
-  const base = path.join(outDir, `${sceneId}${suffix}`);
-  fs.writeFileSync(`${base}.png`, png);
-  fs.writeFileSync(`${base}.facts.json`, JSON.stringify(facts, null, 1) + "\n");
-  fs.writeFileSync(`${base}.aria.yml`, facts.aria + "\n");
-  return { scene: sceneId, nodes: facts.nodes.length, textRects: facts.textRects.length, region: facts.region, png: `${base}.png` };
+  try {
+    await scene.enter({ win: page, session });
+    await settle(page);
+    const hovering = await parkPointer(session);
+    if (hovering !== 0) throw new Error(`场景 ${sceneId}：采集前仍有 ${hovering} 个元素处于悬停态，状态不干净`);
+    const facts = await collectFacts(session, { regionSelector: scene.region ?? null, scene: sceneId, variant });
+    const png = await captureRegionPng(session, facts.region);
+    const base = path.join(outDir, `${sceneId}${suffix}`);
+    fs.writeFileSync(`${base}.png`, png);
+    fs.writeFileSync(`${base}.facts.json`, JSON.stringify(facts, null, 1) + "\n");
+    fs.writeFileSync(`${base}.aria.yml`, facts.aria + "\n");
+    return { scene: sceneId, nodes: facts.nodes.length, textRects: facts.textRects.length, region: facts.region, png: `${base}.png` };
+  } finally {
+    // 场景可以登记 leave 来收拾自己留下的东西（提示场景收走提示并恢复页面）；采集失败时也要收，否则下一个场景从脏状态开始。
+    await scene.leave?.({ win: page, session });
+  }
 }
 
 async function main() {

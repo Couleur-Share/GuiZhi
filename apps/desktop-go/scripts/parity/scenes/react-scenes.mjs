@@ -6,7 +6,11 @@
  * `region`：阶段 1 校准用的区域场景（取该元素的外框，Viva 侧在同尺寸画布里只画这块）；缺省是整个视口。
  *
  * 渲染层只允许加 data-testid / aria 属性（见台账「渲染层改动登记」）；能用现有角色与名称定位的，不去改渲染层。
+ * `leave(ctx)`：可选，场景采集完后调用，把场景留下的东西收掉（提示场景用它收走提示、恢复页面）。
  */
+import fs from "node:fs";
+import path from "node:path";
+import { resetToasts, showToasts } from "../lib/react-toast.mjs";
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
 async function openSettingsSection(win, section) {
@@ -44,6 +48,29 @@ async function openBackgroundTasksDialog(win) {
   await openSettingsSection(win, "general");
   await win.getByRole("switch", { name: "后台任务", exact: true }).click();
   await win.getByRole("alertdialog").waitFor({ state: "visible" });
+}
+
+/** 提示场景的文案：与 Viva 场景共用同一份 JSON（viva/parity/testdata/toast-content.json）。 */
+const TOAST_TEXT = JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, "../../../viva/parity/testdata/toast-content.json"), "utf8"),
+);
+
+/** 提示场景：弹出一组提示（页面内容隐去，只留提示），可选再展开第一条的详情；离开时收走并恢复页面。 */
+function toastScene(specs, { expandDetail = false } = {}) {
+  return {
+    module: "ui",
+    async enter({ win }) {
+      await showToasts(win, specs);
+      if (expandDetail) {
+        await win.getByRole("button", { name: "查看详情", exact: true }).first().click();
+        await win.getByRole("button", { name: "复制", exact: true }).waitFor({ state: "visible" });
+        await win.mouse.move(2, 2);
+      }
+    },
+    async leave({ win }) {
+      await resetToasts(win);
+    },
+  };
 }
 
 /** 设置内容滚动容器：内容壳的直接父元素（没有 testid，用结构选择器）。 */
@@ -87,6 +114,20 @@ export const SCENES = {
       await openBackgroundTasksDialog(win);
     },
   },
+  // 提示（Toast）：整窗，页面内容隐去，只留右下角的提示（见 lib/react-toast.mjs）。
+  "ui.toast.success": toastScene([{ message: TOAST_TEXT.success, type: "success" }]),
+  "ui.toast.info": toastScene([{ message: TOAST_TEXT.info, type: "info" }]),
+  "ui.toast.warning": toastScene([{ message: TOAST_TEXT.warning, type: "warning" }]),
+  "ui.toast.error": toastScene([{ message: TOAST_TEXT.error, type: "error" }]),
+  "ui.toast.error-detail": toastScene([{ message: TOAST_TEXT.error, type: "error", detail: TOAST_TEXT.detail }]),
+  "ui.toast.detail-expanded": toastScene([{ message: TOAST_TEXT.error, type: "error", detail: TOAST_TEXT.detail }], { expandDetail: true }),
+  "ui.toast.action": toastScene([{ message: TOAST_TEXT.undo, undo: true }]),
+  // 三条叠在一起：带详情的错误、成功、撤销（gap-3 堆叠、同宽、最新的在最下面）。
+  "ui.toast.container": toastScene([
+    { message: TOAST_TEXT.error, type: "error", detail: TOAST_TEXT.detail },
+    { message: TOAST_TEXT.success, type: "success" },
+    { message: TOAST_TEXT.undo, undo: true },
+  ]),
   "settings.general": {
     module: "settings",
     region: SETTINGS_CONTENT_SCROLLER,

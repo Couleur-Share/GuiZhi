@@ -13,6 +13,7 @@ import (
 
 	"guizhi-mygo-shell/native/settings"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/parity"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	shellscreen "guizhi-mygo-shell/viva/screens/shell"
@@ -95,8 +96,61 @@ func openBackgroundTasksDialog(s *headless.Session) error {
 	return parity.ParkPointer(s)
 }
 
+// toastMonoWaivers 登记提示详情原文（font-mono，11px）的 A-006 偏差：Viva 的字格取整，整行偏短、字形位置累计差一个字格。
+// 折行位置与行数由 kit.WrapMono 按渲染层的规则决定，不受影响（外框、行数仍然逐项比较）。
+var toastMonoWaivers = []parity.Waiver{
+	{
+		Ledger: "A-006", Layer: parity.LayerL2, Kind: "text-width", Subject: "SQLITE_BUSY",
+		Note: "详情原文是固定间距文字，Viva 把字格取整（Consolas 11px 的 6.048→6px），整行偏短最多 2.6px",
+	},
+	{
+		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "SQLITE_BUSY",
+		Note: "同上：字格取整使每行墨迹整体偏短，字形位置累计最多差一个字格",
+	},
+}
+
+// toastScene 是「页面内容隐去，只留右下角提示」的场景，与 React 采集器的 toastScene 对应：
+// show 往通知通道里放提示，steps 可选（展开详情等）。页面只有提示宿主，背景是均匀的页面底色（台账 A-007）。
+// 提示容器是 fixed 的浮层，文字的灰度抗锯齿偏差（A-009）对它同样成立，所以场景一律带上 overlayInkWaiver。
+func toastScene(id string, show func(n *kit.Notifier, t parity.ToastTexts), steps func(s *headless.Session) error, waivers ...parity.Waiver) parity.Scene {
+	return parity.Scene{
+		ID: id,
+		Build: func(look *kit.Look) func(c ui.C) {
+			n := kit.NewNotifier(nil)
+			n.Clipboard = func(string) error { return nil } // 对照不碰系统剪贴板
+			show(n, parity.ToastContent())
+			return func(c ui.C) { look.Toasts(c, n) }
+		},
+		Steps:   steps,
+		Waivers: append([]parity.Waiver{overlayInkWaiver}, waivers...),
+	}
+}
+
+// expandToastDetail 是「点开第一条提示的『查看详情』并把指针移开」，与渲染层的 toastScene(expandDetail) 对应。
+func expandToastDetail(s *headless.Session) error {
+	if err := parity.ClickRole(s, gfx.RoleButton, "查看详情"); err != nil {
+		return err
+	}
+	return parity.ParkPointer(s)
+}
+
 // registry 是全部已登记场景。新增屏幕时在这里加一行，并在 React 采集器里登记同名场景。
 var registry = map[string]parity.Scene{
+	"ui.toast.success": toastScene("ui.toast.success", func(n *kit.Notifier, t parity.ToastTexts) { n.Success(t.Success) }, nil),
+	"ui.toast.info":    toastScene("ui.toast.info", func(n *kit.Notifier, t parity.ToastTexts) { n.Info(t.Info) }, nil),
+	"ui.toast.warning": toastScene("ui.toast.warning", func(n *kit.Notifier, t parity.ToastTexts) { n.Warning(t.Warning) }, nil),
+	"ui.toast.error":   toastScene("ui.toast.error", func(n *kit.Notifier, t parity.ToastTexts) { n.Error(t.Error, "") }, nil),
+	"ui.toast.error-detail": toastScene("ui.toast.error-detail",
+		func(n *kit.Notifier, t parity.ToastTexts) { n.Error(t.Error, t.Detail) }, nil),
+	"ui.toast.detail-expanded": toastScene("ui.toast.detail-expanded",
+		func(n *kit.Notifier, t parity.ToastTexts) { n.Error(t.Error, t.Detail) }, expandToastDetail, toastMonoWaivers...),
+	"ui.toast.action": toastScene("ui.toast.action",
+		func(n *kit.Notifier, t parity.ToastTexts) { n.Undo(t.Undo, locales.CommonUndo(), func() {}) }, nil),
+	"ui.toast.container": toastScene("ui.toast.container", func(n *kit.Notifier, t parity.ToastTexts) {
+		n.Error(t.Error, t.Detail)
+		n.Success(t.Success)
+		n.Undo(t.Undo, locales.CommonUndo(), func() {})
+	}, nil),
 	"app.window.page-settings": pageSettings("app.window.page-settings", nil),
 	"app.window.page-settings.select-close-action": pageSettings("app.window.page-settings.select-close-action",
 		openSelect("关闭窗口行为", false), overlayInkWaiver),
