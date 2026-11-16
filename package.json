@@ -23,7 +23,7 @@
     "lint:i18n:report": "node scripts/check-i18n.mjs --report",
     "format": "pnpm --filter @guizhi/desktop format",
     "test": "pnpm --filter @guizhi/desktop test",
-    "test:validation": "node --test scripts/tests/desktop-validation-snapshot.test.mjs scripts/tests/isolated-go.test.mjs scripts/tests/reading-libraries.test.mjs scripts/tests/reading-libraries-build.test.mjs scripts/tests/package-size.test.mjs scripts/tests/check-i18n.test.mjs scripts/tests/gen-native.test.mjs",
+    "test:validation": "node --test scripts/tests/desktop-validation-snapshot.test.mjs scripts/tests/isolated-go.test.mjs scripts/tests/reading-libraries.test.mjs scripts/tests/reading-libraries-build.test.mjs scripts/tests/package-size.test.mjs scripts/tests/check-i18n.test.mjs scripts/tests/gen-native.test.mjs scripts/tests/parity-inventory.test.mjs",
     "test:harmony": "node --test \"apps/capture-harmony/tests/*.test.cjs\"",
     "test:unit": "pnpm test:validation && pnpm --filter @guizhi/desktop test:unit && pnpm --filter @guizhi/desktop-go test",
     "test:run": "pnpm --filter @guizhi/desktop test:run",

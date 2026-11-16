@@ -10,7 +10,7 @@
 | --- | --- |
 | 分支与基线 | `feat/viva-ui` 从 `feat/native-ui` `3f31fb53` 拉出（本地标签 `mygo-ui-frozen` 指向该提交），已 merge main（`94b980f0`，只带入评估文档补记，渲染层无变化）；Viva 固定 `v0.6.4`；`golang.org/x/text` 因 Viva 依赖由 0.43.0 升到 0.44.0 |
 | 阶段 0 准备 | 骨架已就位（见 §8）；剩余：生成器输出端改普通 Go（随阶段 2 的主题/i18n/图标一并做，见 §6） |
-| 阶段 1 对等基础设施 | 未开始 |
+| 阶段 1 对等基础设施 | 进行中：① 盘点清单已完成（[分母](viva-parity-inventory.md)：616 个基础场景、90 个对话框/弹层、344 条交互、1891 个文案键、998 条 React 用例；脚本与守卫测试已就位）；② React 采集器、③ Viva 采集路径实验、④ 比较工具、⑤ 在 `settings.general` 上校准阈值：未开始 |
 | 阶段 2 M0 外壳与工具包层 | 未开始 |
 | 阶段 3 M1 + 检查点 1 | 未开始 |
 | V-a 中文输入法真机 | **未测，按未通过计**（用户决定推迟到整体迁移完成之后） |
@@ -193,6 +193,7 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 ## 8. 进度记录
 
 - 2026-11-16 阶段 0：建分支 `feat/viva-ui`、打 `mygo-ui-frozen`、merge main（`94b980f0`）、依赖安装；写本文并固定 §2；`measure-idle.ps1` 加 `-Gpu`；`go.mod` 加 Viva v0.6.4（钉死标签）；NOTICE 与 `third-party/viva/`；骨架包 `viva`、`viva/app`、`viva/island`（W1 封装，含导航策略与环境变量还原的单元测试）；`-viva` 启动路径与启动保护；冒烟：`-viva -bench` 在一次性目录里 READY、窗口标题正确、用户实例未受影响。
+- 2026-11-16 阶段 1 · 盘点（本条之后的采集器、比较与校准另记）：9 个并行子任务逐屏读源码写出分片（`docs/agents/viva-parity-inventory/`），再由 `scripts/parity/inventory-{stats,i18n,tests}.mjs` 机械统计并写回 [viva-parity-inventory.md](viva-parity-inventory.md)；`scripts/tests/parity-inventory.test.mjs` 守住 ID 唯一性与分母表不过期（并入 `test:validation`）。统计过程中核实到的事实：(a) React 用例实为 998 条而不是约 650，其中 514 条属于与界面无关的 `db`/`shared`/`core`/`services`，界面相关约 484 条、渲染 DOM 的 213 条；(b) zh/en 各 1891 个键完全对齐，且每个键都被渲染层引用，没有只存在于代码里的默认文案；(c) 但有 443 处 CJK 字符串字面量与 14 处 JSX 直写文本不经 `t()`，「不改文案」要求它们同样原样携带；(d) 基础场景 616 个，乘以 §2.1 的展开矩阵 108 得 66528 个完整场景——T3 的机时待采集器建成后实测，规模若不可行按 C 类上报；(e) 21 处 `(?)` 留给运行时采集核实。
 
 ## 9. 切换为产品默认之前的清单（延伸目标，非本阶段）
 
