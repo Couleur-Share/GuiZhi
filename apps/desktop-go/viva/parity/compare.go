@@ -97,7 +97,9 @@ type Report struct {
 	L2               L2Result `json:"l2"`
 	L3               L3Result `json:"l3"`
 	Issues           []Issue  `json:"issues"`
-	Pass             bool     `json:"pass"`
+	// Waived 是被台账登记的偏差覆盖、不计入未通过的问题（见 waiver.go）。
+	Waived []Waived `json:"waived,omitempty"`
+	Pass   bool     `json:"pass"`
 }
 
 func (r *Report) add(layer Layer, kind, subject, format string, args ...any) {
@@ -122,6 +124,8 @@ type Inputs struct {
 	// FactsOnly 只比 L1 与 L2 里不依赖图片的部分（外框、文字行数与宽度、折行行距），跳过墨迹与 L3 像素。
 	// 单元测试用它：React 参照的 PNG 不入库，入库的只有事实 JSON。
 	FactsOnly bool
+	// Waivers 是场景登记的已知偏差；覆盖到的问题进 Report.Waived，不使场景失败。
+	Waivers []Waiver
 }
 
 // Compare 做 L1–L3 比较，返回报告与差异图（react | viva | diff 三联图）。
@@ -150,6 +154,7 @@ func Compare(in Inputs, th Thresholds) (*Report, *image.RGBA) {
 	if !in.FactsOnly {
 		montage = compareL3(rep, in, th)
 	}
+	applyWaivers(rep, in.Waivers)
 	rep.Pass = len(rep.Issues) == 0
 	return rep, montage
 }
@@ -200,11 +205,13 @@ func (r *Report) Markdown() string {
 	}
 	if len(r.Issues) == 0 {
 		b.WriteString("无不一致。\n")
+		b.WriteString(r.waivedMarkdown())
 		return b.String()
 	}
 	fmt.Fprintf(&b, "## 不一致（%d）\n\n", len(r.Issues))
 	for _, is := range r.Issues {
 		fmt.Fprintf(&b, "- [%s/%s] %s：%s\n", is.Layer, is.Kind, is.Subject, is.Message)
 	}
+	b.WriteString(r.waivedMarkdown())
 	return b.String()
 }

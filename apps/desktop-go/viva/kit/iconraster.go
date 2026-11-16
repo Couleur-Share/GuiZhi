@@ -176,14 +176,20 @@ func capsuleSpan(s iconSeg, h, y float64) (lo, hi float64, ok bool) {
 	return lo, hi, lo <= hi
 }
 
-// rasterizeIcon 返回图标在 size×size 设备像素里的覆盖度（0–255，行优先）：每个像素被「路径的等距带」盖住的面积比。
+// rasterizeIcon 返回图标按 size×size 设备像素缩放后的覆盖度（见 rasterizeIconSide，边长取整数）。
+func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
+	return rasterizeIconSide(ic, float64(size), size, ox, oy)
+}
+
+// rasterizeIconSide 返回图标在 n×n 设备像素的掩码里的覆盖度（0–255，行优先）：每个像素被「路径的等距带」盖住的面积比。
+// side 是图标的边长（设备像素，可以带小数：渲染层的 SVG 内容按精确的 边长/视框 缩放，边长不取整），n 是掩码边长（≥ side）。
 // ox、oy 是图标原点相对像素网格的偏移（设备像素，0 表示落在整像素上）。
 //
 // 做法是扫描线：每个像素行取 iconScanlines 条水平线，每条线上各线段的等距带是一些区间，合并后按像素格切开累加。
 // 水平方向是精确的（竖直边没有量化误差），竖直方向的量化是 1/iconScanlines。
-func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
-	cov := make([]uint8, size*size)
-	scale := float64(size) / float64(ic.ViewBox)
+func rasterizeIconSide(ic gfx.Icon, side float64, n int, ox, oy float64) []uint8 {
+	cov := make([]uint8, n*n)
+	scale := side / float64(ic.ViewBox)
 	half := float64(ic.Stroke) * scale / 2
 	segs := flattenIcon(ic, scale, ox, oy)
 	if len(segs) == 0 || half <= 0 {
@@ -191,8 +197,8 @@ func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
 	}
 	type span struct{ lo, hi float64 }
 	spans := make([]span, 0, len(segs))
-	acc := make([]float64, size)
-	for y := 0; y < size; y++ {
+	acc := make([]float64, n)
+	for y := 0; y < n; y++ {
 		for i := range acc {
 			acc[i] = 0
 		}
@@ -213,8 +219,8 @@ func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
 			sort.Slice(spans, func(i, j int) bool { return spans[i].lo < spans[j].lo })
 			cur := spans[0]
 			flush := func(sp span) {
-				lo, hi := math.Max(sp.lo, 0), math.Min(sp.hi, float64(size))
-				for x := int(math.Floor(lo)); x < size && float64(x) < hi; x++ {
+				lo, hi := math.Max(sp.lo, 0), math.Min(sp.hi, float64(n))
+				for x := int(math.Floor(lo)); x < n && float64(x) < hi; x++ {
 					acc[x] += math.Min(hi, float64(x+1)) - math.Max(lo, float64(x))
 				}
 			}
@@ -228,9 +234,9 @@ func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
 			}
 			flush(cur)
 		}
-		for x := 0; x < size; x++ {
+		for x := 0; x < n; x++ {
 			v := math.Round(255 * acc[x] / iconScanlines)
-			cov[y*size+x] = uint8(math.Min(255, math.Max(0, v)))
+			cov[y*n+x] = uint8(math.Min(255, math.Max(0, v)))
 		}
 	}
 	return cov
@@ -240,7 +246,8 @@ func rasterizeIcon(ic gfx.Icon, size int, ox, oy float64) []uint8 {
 type iconRasterKey struct {
 	first *gfx.PathCommand // 命令切片首元素的地址，标识一枚（包级只读的）图标
 	count int
-	size  int
+	side  int  // 边长，单位 1/64 设备像素
+	n     int  // 掩码边长
 	ox    int8 // 原点偏移，单位 1/16 设备像素
 	oy    int8
 }
@@ -250,9 +257,14 @@ var iconRasters = struct {
 	m map[iconRasterKey][]uint8
 }{m: map[iconRasterKey][]uint8{}}
 
-// iconCoverage 取（必要时计算并缓存）图标的覆盖度。
+// iconCoverage 取（必要时计算并缓存）图标按整数边长缩放的覆盖度。
 func iconCoverage(ic gfx.Icon, size int, ox, oy float64) []uint8 {
-	key := iconRasterKey{first: &ic.Commands[0], count: len(ic.Commands), size: size,
+	return iconCoverageSide(ic, float64(size), size, ox, oy)
+}
+
+// iconCoverageSide 取（必要时计算并缓存）图标在 n×n 掩码里、按边长 side（设备像素，可带小数）缩放的覆盖度。
+func iconCoverageSide(ic gfx.Icon, side float64, n int, ox, oy float64) []uint8 {
+	key := iconRasterKey{first: &ic.Commands[0], count: len(ic.Commands), side: int(math.Round(side * 64)), n: n,
 		ox: int8(math.Round(ox * 16)), oy: int8(math.Round(oy * 16))}
 	iconRasters.Lock()
 	cov, ok := iconRasters.m[key]
@@ -260,7 +272,7 @@ func iconCoverage(ic gfx.Icon, size int, ox, oy float64) []uint8 {
 	if ok {
 		return cov
 	}
-	cov = rasterizeIcon(ic, size, float64(key.ox)/16, float64(key.oy)/16)
+	cov = rasterizeIconSide(ic, side, n, float64(key.ox)/16, float64(key.oy)/16)
 	iconRasters.Lock()
 	if len(iconRasters.m) >= iconRasterCacheMax {
 		iconRasters.m = map[iconRasterKey][]uint8{}

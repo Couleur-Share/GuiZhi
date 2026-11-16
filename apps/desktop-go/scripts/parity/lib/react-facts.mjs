@@ -60,13 +60,61 @@ const MEASURE_FN = `function (...nodes) {
 /**
  * 文字节点（schema 2）：原文、每个行片段的矩形（Range 的内容区矩形，高 = ascent+descent）、字体键、
  * 字号/字重/行高的计算值（行高 normal 时为 null）、颜色。比较端用它核对文字的宽度、行盒与基线。
+ *
+ * 单行输入框（input）里的值与占位符不是 DOM 文本节点，但它们是看得见的文字，Viva 一侧也把它们当文字画：
+ * 这里按输入框的内容盒补一条记录（值非空取值，否则取占位符；密码框不采）。
+ * 位置的算法与普通文字一致：行盒在内容盒里垂直居中，内容区（高 = 取整的 ascent + descent）在行盒里
+ * 上方留 floor((行高 − (A+D)) / 2)；宽度取 canvas 按同一字体量出的排版宽度（两者共用 Chromium 的字体匹配与整形）。
  */
 const TEXTS_EXPR = `(() => {
   const out = [];
   const round = (n) => Math.round(n * 1000) / 1000;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const measure = document.createElement("canvas").getContext("2d");
+  const skipTypes = new Set(["password", "hidden", "checkbox", "radio", "file", "range", "color", "button", "submit", "reset", "image"]);
+  const fieldText = (el) => {
+    if (el.localName !== "input" || skipTypes.has(el.type)) return null;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return null;
+    const text = el.value || el.getAttribute("placeholder") || "";
+    if (!text) return null;
+    const b = el.getBoundingClientRect();
+    if (b.width <= 0 || b.height <= 0) return null;
+    const px = (name) => parseFloat(cs.getPropertyValue(name)) || 0;
+    const left = b.x + px("border-left-width") + px("padding-left");
+    const top = b.y + px("border-top-width") + px("padding-top");
+    const contentW = b.width - px("border-left-width") - px("border-right-width") - px("padding-left") - px("padding-right");
+    const contentH = b.height - px("border-top-width") - px("border-bottom-width") - px("padding-top") - px("padding-bottom");
+    measure.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(" ");
+    const m = measure.measureText(text);
+    const ascent = Math.round(m.fontBoundingBoxAscent);
+    const descent = Math.round(m.fontBoundingBoxDescent);
+    const lh = parseFloat(cs.lineHeight);
+    const lineHeight = Number.isFinite(lh) ? lh : ascent + descent;
+    const lineTop = top + (contentH - lineHeight) / 2;
+    const y = lineTop + Math.floor((lineHeight - (ascent + descent)) / 2);
+    const width = Math.min(m.width, contentW);
+    if (width <= 0) return null;
+    return {
+      text,
+      rects: [[round(left), round(y), round(width), ascent + descent]],
+      font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),
+      size: parseFloat(cs.fontSize),
+      weight: Number(cs.fontWeight),
+      lineHeight: Number.isFinite(lh) ? lh : null,
+      color: el.value ? cs.color : getComputedStyle(el, "::placeholder").color,
+      tag: el.localName,
+      field: true,
+      testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
+    };
+  };
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   let node;
   while ((node = walker.nextNode())) {
+    if (node.nodeType === 1) {
+      const field = fieldText(node);
+      if (field) out.push(field);
+      continue;
+    }
     if (!node.data.trim()) continue;
     const el = node.parentElement;
     if (!el) continue;

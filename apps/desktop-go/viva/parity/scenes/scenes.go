@@ -13,10 +13,31 @@ import (
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/parity"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
+	shellscreen "guizhi-mygo-shell/viva/screens/shell"
 )
 
 // registry 是全部已登记场景。新增屏幕时在这里加一行，并在 React 采集器里登记同名场景。
 var registry = map[string]parity.Scene{
+	"app.window.page-settings": {
+		ID: "app.window.page-settings",
+		Build: func(look *kit.Look) func(c ui.C) {
+			w := &shellscreen.Window{
+				Look: look, Page: shellscreen.PageSettings, OwnControls: true, SearchShortcut: "Alt+Shift+F",
+				Settings: &settingsscreen.Shell{Look: look, Store: settingsscreen.NewMemStore(settings.Default())},
+			}
+			return w.View
+		},
+		Waivers: []parity.Waiver{
+			{
+				Ledger: "A-006", Layer: parity.LayerL2, Kind: "text-width", Subject: "Alt+Shift+F",
+				Note: "快捷键提示是固定间距文字，Viva 把字格宽度取整（5.498→5px），一行 11 个字符窄 5.48px；行盒与外框宽度已按渲染层留出",
+			},
+			{
+				Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "Alt+Shift+F",
+				Note: "同上：字格取整使整行墨迹整体偏短，左缘与每个字符的位置累计最多差一个字格（5.5px）",
+			},
+		},
+	},
 	"settings.shell": {
 		ID: "settings.shell",
 		Build: func(look *kit.Look) func(c ui.C) {

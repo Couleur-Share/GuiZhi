@@ -48,7 +48,7 @@ func TestScenesMatchReactFacts(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				rep, _ := parity.Compare(parity.Inputs{React: react, Viva: viva, FactsOnly: true}, th)
+				rep, _ := parity.Compare(parity.Inputs{React: react, Viva: viva, FactsOnly: true, Waivers: scene.Waivers}, th)
 				if !rep.Pass {
 					for _, is := range rep.Issues {
 						t.Errorf("[%s/%s] %s：%s", is.Layer, is.Kind, is.Subject, is.Message)
@@ -71,5 +71,34 @@ func TestEveryRegisteredSceneHasSamples(t *testing.T) {
 		if len(files) == 0 {
 			t.Errorf("场景 %s 没有入库的 React 事实样本（node apps/desktop-go/scripts/parity/export-testdata.mjs）", id)
 		}
+	}
+}
+
+// TestWaiversPointToLedger 守住「豁免必须有台账条目」：每个 Waiver 的编号要在台账里作为条目标题（### A-006 …）
+// 或表格行（| B-006 | …）真实存在，没登记的偏差不能靠 Waiver 溜过去。
+func TestWaiversPointToLedger(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "docs", "agents", "viva-parity-ledger.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledger := strings.ReplaceAll(string(data), "\r\n", "\n")
+	waivers := 0
+	for _, id := range scenes.IDs() {
+		scene, err := scenes.Get(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, w := range scene.Waivers {
+			waivers++
+			if !strings.Contains(ledger, "### "+w.Ledger+" ") && !strings.Contains(ledger, "| "+w.Ledger+" |") {
+				t.Errorf("场景 %s 的 Waiver（%s/%s %s）指向的台账条目 %s 不存在", id, w.Layer, w.Kind, w.Subject, w.Ledger)
+			}
+			if strings.TrimSpace(w.Note) == "" {
+				t.Errorf("场景 %s 的 Waiver（%s %s）没有说明", id, w.Kind, w.Subject)
+			}
+		}
+	}
+	if waivers == 0 {
+		t.Skip("没有任何场景登记 Waiver")
 	}
 }

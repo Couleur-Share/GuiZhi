@@ -141,7 +141,7 @@ func compareVariant(scene parity.Scene, reactVariantDir, outVariantDir string, t
 	if err := parity.WritePNG(base+".viva.png", vivaImg); err != nil {
 		return nil, err
 	}
-	rep, montage := parity.Compare(parity.Inputs{React: reactFacts, Viva: vivaFacts, ReactImg: reactImg, VivaImg: vivaImg}, th)
+	rep, montage := parity.Compare(parity.Inputs{React: reactFacts, Viva: vivaFacts, ReactImg: reactImg, VivaImg: vivaImg, Waivers: scene.Waivers}, th)
 	if montage != nil {
 		if err := parity.WritePNG(base+".diff.png", montage); err != nil {
 			return nil, err

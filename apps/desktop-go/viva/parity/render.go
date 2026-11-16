@@ -21,6 +21,8 @@ type Scene struct {
 	// Build 按装配好的外观返回页面函数。场景自带它需要的状态（例如内存里的设置存取），
 	// 每次渲染都应从初始状态开始，保证对照是确定的。
 	Build func(look *kit.Look) func(c ui.C)
+	// Waivers 是这个场景已在台账登记的偏差（见 waiver.go）。
+	Waivers []Waiver
 }
 
 // Spec 把变体换成外观装配的输入。

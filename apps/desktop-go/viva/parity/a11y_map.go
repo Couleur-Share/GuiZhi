@@ -175,8 +175,11 @@ func NormalizeReact(f *Facts) (out []Norm, unmapped []string) {
 			switch key {
 			case "value":
 				if role == "combobox" {
-					// 触发器当前值是按钮里的文字（Chromium 不把它放进 value）。
-					states["value"] = NormText(reactButtonText(f, i))
+					// 触发器当前值是按钮里的文字（Chromium 不把它放进 value）；没有文字（图标按钮）就是没有值，
+					// 与 Viva 一侧「空值不写」一致（空值与无值在可访问性上是同一件事，只是表示不同）。
+					if v := NormText(reactButtonText(f, i)); v != "" {
+						states["value"] = v
+					}
 				} else if v := NormText(n.Value); v != "" {
 					states["value"] = v
 				}

@@ -7,8 +7,8 @@
 
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
-| A（平台/Viva 确实做不到） | 4 | A-001…A-004 |
-| B（暂缺，已定里程碑） | 5 | B-001…B-005 |
+| A（平台/Viva 确实做不到） | 6 | A-001…A-006 |
+| B（暂缺，已定里程碑） | 7 | B-001…B-007 |
 | C（需用户裁决） | 1 | 见 C-001 |
 | 未测（按未通过计） | 5 | 见「未测项」 |
 | 验证缺口（对照工具尚未覆盖，按未验证计） | 3 | 见「验证缺口」 |
@@ -57,6 +57,22 @@
 - 已做的补偿：L1 归一化（`viva/parity/a11y_map.go`）把这四种地标放进 `reactIgnoredRoles`，无名 `image` 放进新增的 `reactIgnoredUnnamed`；它们里面的按钮、标题、输入框、开关等**照常逐个比较**（角色、名称、状态、外框）。没有放宽任何带操作或状态的节点；带名字的 `image` 仍必须逐个决定怎么映射。
 - 状态：开（引擎限制）。守卫摘要随之更新，见「变更记录」。阶段末在 `AskQuestion` 里请用户知悉这条对 L1 口径的扩展。
 
+### A-005 窗口最小化/最大化/关闭按钮的外观与宽度
+
+- 场景/模块：所有整窗场景（`app.window.*`）的真窗口；顶栏最右的三枚窗口按钮。
+- 偏差：渲染层（`TopBar.tsx`）画三枚 `w-11`（2.75rem，随根字号 38.5 / 44 / 49.5px）、`h-full` 的按钮，图标是 lucide 线性图标；Viva 在自绘标题栏里自己画这三枚按钮，宽度固定 46 逻辑像素、高度等于 `Config.TitlebarHeight`，字形是 10 单位见方、线宽 1 的内置图形，且 headless 会话不画它们。
+- 证据：`github.com/vivaui/viva@v0.6.4/internal/platform/win32_frame.go` 第 6 行 `const WindowControlWidth = 46`；`app/window_controls.go` 第 11–14 行（"width in logical pixels of each of the minimize, maximize and close buttons … as tall as Config.TitlebarHeight"）、第 197 行（按钮外框 `size.Width - (3-index)*WindowControlWidth`）、第 241 行（字形居中、边长 `glyph = 10`）；`WindowControlsStyle`（第 63–81 行）只开放前景色、悬停色、按下色、关闭色与四个名字，没有宽度与图标入口；`app/window_controls_viva.go` 第 13 行 `TitlebarInsets() (leading, trailing) = (0, 3*WindowControlWidth)`。
+- 已做的补偿：(1) 真窗口里顶栏右端的留位取「渲染层宽度」与 `3*46px` 的较大者，避免 Viva 的按钮压住「新建」（小字号档「新建」比渲染层左移 19px、中档 2px，大字号档右端多留 15px）；按钮的名字与悬停色、关闭按钮红色（red-500）按渲染层经 `WindowControlsStyle` 配置，**待真窗口接线（阶段 2 的外壳）时落实，尚未接线**；(2) 对照工具与无头测试里用 `shell.Window.OwnControls` 自己画与渲染层一致的三枚按钮，所以整窗场景的 L1–L3 是在「渲染层样式」上比较的，**真窗口里这三枚按钮的形状与宽度与渲染层不同**；(3) 备选路线（未验证）：无边框窗口加自绘三枚按钮，要自己处理拖动区域、最大化吸附与双击标题栏，代价高，待用户裁决是否值得。
+- 状态：开（引擎限制）。阶段末在 `AskQuestion` 里请用户知悉真窗口的差异并决定是否走备选路线。
+
+### A-006 固定间距文字（等宽）的字格取整
+
+- 场景/模块：顶栏搜索框右端的快捷键提示（`Alt+Shift+F`，`font-mono text-[10px]`）；今后所有 `font-mono` 文字。
+- 偏差：Chromium 把 `font-mono` 解析成 Consolas，字符前进量 0.5498 em（10px 时 5.498px），整行宽度是字符数×前进量；Viva 的固定间距行按整数字格布局（同样的 10px 得 5px），11 个字符的一行窄 5.48px，字形位置累计最多差一个字格。
+- 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 806–819 行 `MonoCellSize` 的文档（"On a canvas that knows the display scale (SetPixelScale) the width is a whole number of device pixels, rounded to the nearest and at least one"）：字格宽度取整到整设备像素，1× 缩放下 Consolas 10px 的 5.498px 变成 5px；实测 `light-royal-blue-medium-1280x800` 的快捷键提示，渲染层文字宽 60.48px、Viva 55.00px（L2 `text-width` 差 5.48px，墨迹位置差最多一个字格），见 `D:\Project\GuiZhi-bench\parity\viva-m1-t3\*\app.window.page-settings.report.md`（不入库）。
+- 已做的补偿：`kit.MonoAdvance` 按 Consolas 前进量算出渲染层的行宽，把外框与行盒做成渲染层的值（所以外框、右对齐与周围元素位置都对得上，L2 外框检查通过），字形仍按 Viva 的字格画；两条与它相关的 L2 问题（`text-width`、`ink`）在场景里以 `Waiver` 登记，报告里单列。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
+
 ## B 类：暂缺
 
 | ID | 场景/模块 | 缺什么（React 的行为） | 里程碑 |
@@ -66,6 +82,8 @@
 | B-003 | `settings.general`：下拉框 | 点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）；Viva 页只有静态触发器。 | M0 下拉弹层 → M1 设置页 |
 | B-004 | `settings.general`：悬停、聚焦、按下、禁用状态与过渡动效 | 各控件的状态样式与时长（`motion` 四种模式）；Viva 页只有静止状态。 | M0 控件状态 → L4 测试 |
 | B-005 | 图标：`Database`、`DatabaseBackup`（`settings.shell` 数据页导航项） | 这两枚图标的路径含椭圆弧（`A9 3`，rx≠ry）。Viva 的图标编译器 `tools/iconcompile/compile.go` 第 889–892 行 `controlOn` 把椭圆的切线方向写成 `(-tangent·ry·sin, tangent·rx·cos)`，正确应为 `(-tangent·rx·sin, tangent·ry·cos)`，圆弧（rx=ry）不受影响、椭圆弧的控制点错位。后果：16px 图标中心线下缘 14.909px，正确值 14.667px（偏 0.24px）。用到的 139 枚 lucide 图标里只有这两枚含椭圆弧（`<ellipse>` 元素走另一条正确的路径）。 | M0 结束前：生成器 `viva/icons/gen` 在编译前把含椭圆弧的 `d` 展开成正确的三次曲线，并加几何范围单测 |
+| B-006 | 顶栏「更新」按钮（`app.window.*` 的「有可用更新」状态） | 渲染层按钮是 `border-dashed` 虚线边框（border-primary/50）；Viva 目前画实线。Viva 的 `ui.Box.Dashed()` 能画虚线，但 Chromium 的虚线节奏（线段与间隔长度、拐角处理）还没有对照采集，所以还没法逐项核对。 | M1：先加「有更新」的场景变体并采集，再对照调整 |
+| B-007 | 顶栏「新建」旁的创建方式菜单 | 点击箭头按钮弹出 `ContextMenu`（三项：快速采集（带快捷键）、空白笔记、采集文件，各有说明文字）；点击后分别触发快速采集、新建空白条目、选文件并入采集队列后 toast。Viva 目前只有箭头按钮与 `aria-expanded` 状态，菜单本身未实现。 | M0 弹层工具包（菜单）→ M1 窗口外壳；采集与快速采集对话框在 M3 |
 
 ## C 类：需要用户裁决
 
@@ -89,6 +107,14 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 系统文件对话框、系统菜单的外观 | A | 阶段 2（对话框） |
 | 窗口圆角与阴影（自绘标题栏下） | A | 阶段 2（窗口与自绘标题栏） |
 | 浏览器级跨块选择与页内查找 | A | 阶段 4 以后（阅读岛之外的界面） |
+
+## 渲染层不可达分支（盘点备注，不是偏差）
+
+下面是在现行渲染层源码里不会被渲染的分支，Viva 不画它们；渲染层源码一改就要重新盘点。
+
+| 位置 | 内容 | 为什么不可达 |
+| --- | --- | --- |
+| `SidebarRail.tsx` 采集项 | 采集忙碌时的琥珀色呼吸圆点 | 它只在「没有角标」时出现，而忙碌条件（进行中数 > 0）恰好就是有角标的条件 |
 
 ## 验证缺口（对照工具尚未覆盖，按未验证计）
 
@@ -134,3 +160,5 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 2026-11-16 | 扩展 L1 归一化（`a11y_map.go`）：`reactIgnoredRoles` 增加 banner / complementary / navigation / main，新增 `reactIgnoredUnnamed`（无名 image）；`testdata/a11y_map.sha256` 更新为 `8cf00a9e…`。不放宽任何带操作或状态的节点 | A-004：Viva 的 `gfx.Role` 没有这些角色（`canvas.go` 第 330–361 行），无法表达，不是为让场景通过而放宽 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | **L3 遮罩扩展到图标外框**，并新增 L2 图标检查（配对、外框差、墨迹量比与位移，阈值沿用文字的 `maxDeltaPx`、`inkMassMin/Max`、`inkMaxDeltaX/Y`，`thresholds.json` 与冻结摘要 `5128b953…` 不变） | A-003：图标边缘的抗锯齿无法逐像素一致；先把图标的系统性偏差（墨迹多 17%–53%）修掉（自带栅格化，见 A-003），再把剩余的边缘差异交给 L2 墨迹检查。**这收窄了 L3 的覆盖范围（图标区域不再逐像素比较）**，由 L2 的位置与墨迹量检查补偿 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | 纠正采集口径：React 采集器改为启动参数 `--force-device-scale-factor=1`，宿主缩放 200% 时仅靠 Emulation 钉死会让排版取整带上宿主 DPI；作废此前的小/大字号档参照并重采 | 探针 324 组中 274 组与参数启动不同，见开发文档 §8 | 不需要（让参照与机器缩放无关，不是放宽） |
+| 2026-11-16 | L1 归一化（`a11y_map.go`）：React 的 combobox 节点只有在按钮文字非空时才带 `value` 状态（空值与没有值等价）。守卫摘要不变（摘要只覆盖规则表） | 「创建方式」按钮是无文字的图标按钮，渲染层把空 `value=` 记成状态而 Viva 没有对应的空值，不是放宽带操作的节点 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | 对照工具新增 `Waiver`：已在台账登记（A/B/C 类）的问题仍出现在报告里（单列「已登记的偏差」），但不使场景失败；`thresholds.json` 与冻结摘要不变 | 让「偏差已登记」与「还没处理的问题」在报告里可区分；scenes 包的测试核对每个 Waiver 的台账编号真实存在 | 不需要（没有放宽任何阈值；没有登记就不能豁免） |

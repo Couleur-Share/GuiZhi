@@ -60,9 +60,62 @@ func ChromeBaselineRow(weight float32, sizeDev, lineDev float64) int {
 	return int(math.Floor((lineDev-(a+d))/2) + a)
 }
 
+// VivaLabelRows 是 Viva 给一行文字（盒高 line 逻辑像素）分配的纹理行数：painter 先把逻辑高度四舍五入到整数
+// （app/painter.go appendTextLabel 的 roundPixel），平台再按缩放换成设备像素并向上取整。
+// 行高带 0.25 小数（例如输入框的 字号+6 = 18.25）时，四舍五入与向上取整差一行；.5 与 .75 两者相同。
+func VivaLabelRows(line, scale float32) int {
+	if scale <= 0 {
+		scale = 1
+	}
+	logical := math.Floor(float64(line) + 0.5)
+	return int(math.Ceil(logical*float64(scale) - 1e-6))
+}
+
 // VivaBaselineRow 是 Viva 把一行文字的基线放在高 rows 行的纹理里的第几行。
 func VivaBaselineRow(rows int, sizeDev float64) int {
 	return int(math.Floor(float64(rows)/2 + vivaBaselineBelowCenter*sizeDev + 1e-6))
+}
+
+// ChromeInputBaselineY 是渲染层 <input> 里一行文字的基线落在哪一设备像素行（绝对坐标）。
+//
+// <input> 的内部编辑器在框内垂直居中，而且它的基线不像普通文字那样对半行距取整：
+//
+//	基线 = 四舍五入(框顶 + 框高/2 + (A − D)/2)，A、D 是取整的 ascent、descent（与 ChromeBaselineRow 同一套取整）。
+//
+// 它与行高、边框都无关（两项在居中里抵消）。普通文字是 round(行盒顶) + floor((L−(A+D))/2) + A，两者在行盒顶带小数时差一行：
+// 2026-11-16 在 app.window.page-settings 的大字号档量到搜索框占位符比同基线的普通文字低 1 行。
+// scripts/parity/tools/probe-input-text.mjs 在 React 参照里用 1040 组（字号 × 行高 × 框高 × 顶边小数）实测，
+// testdata/chrome-input-probe.json 是夹具，TestChromeInputBaselineMatchesProbe 把本公式钉在它上面（字重 400）。
+func ChromeInputBaselineY(weight float32, sizeDev, boxTopDev, boxHeightDev float64) int {
+	f := faceOfWeight(weight)
+	a := roundHalfUp(f.ascent * sizeDev)
+	d := roundHalfUp(f.descent * sizeDev)
+	return int(math.Floor(boxTopDev + boxHeightDev/2 + (a-d)/2 + 0.5))
+}
+
+// InputPad 返回让 Viva 输入框里那一行文字落在渲染层 <input> 文字位置所需的上、下内边距（逻辑像素）。
+//
+// Viva 的输入框（components.PaintInputContent）把高 size+6 的行盒居中在「内容区」里，基线 = round(行盒顶) + VivaBaselineRow。
+// 令内容区恰好等于行盒（高 size+6），行盒顶 = 框顶 + top。取
+//
+//	top = 框高/2 + (A − D)/2 − VivaBaselineRow
+//
+// 则 Viva 的基线 = round(框顶 + top) + VivaBaselineRow = round(框顶 + 框高/2 + (A − D)/2)，与 ChromeInputBaselineY 相同，
+// 而且与框顶的小数部分无关（top 带小数，整个框平移时两边同步进位）。bottom = 框高 − 行盒高 − top。
+// 框矮到放不下行盒时返回的 bottom 会是负数，调用方应保证框高不小于 size+6。
+func InputPad(weight, size, height, scale float32) (top, bottom float32) {
+	if scale <= 0 {
+		scale = 1
+	}
+	sizeDev := float64(size) * float64(scale)
+	f := faceOfWeight(weight)
+	a := roundHalfUp(f.ascent * sizeDev)
+	d := roundHalfUp(f.descent * sizeDev)
+	line := size + 6 // components.inputLineBox：fontSize+6
+	rv := VivaBaselineRow(VivaLabelRows(line, scale), sizeDev)
+	topDev := float64(height)*float64(scale)/2 + (a-d)/2 - float64(rv)
+	top = float32(topDev / float64(scale))
+	return top, height - line - top
 }
 
 // BaselineShift 返回把 Viva 的文字基线移到渲染层基线所需的平移，单位逻辑像素（设备像素差除以缩放）。
@@ -73,7 +126,7 @@ func BaselineShift(weight float32, size, line, scale float32) float32 {
 	}
 	sizeDev := float64(size) * float64(scale)
 	lineDev := float64(line) * float64(scale)
-	rows := int(math.Ceil(lineDev - 1e-6))
+	rows := VivaLabelRows(line, scale)
 	d := ChromeBaselineRow(weight, sizeDev, lineDev) - VivaBaselineRow(rows, sizeDev)
 	return float32(d) / scale
 }

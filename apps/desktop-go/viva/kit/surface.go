@@ -52,6 +52,9 @@ type Surface struct {
 	BorderW float32 // 逻辑像素；0 表示没有边框
 	Radius  float32
 	Shadow  tokens.Shadow
+	// Clip 非零时，只画落在它里面的部分（逻辑像素，按设备像素吸附）。
+	// 用来画只有一侧有圆角的盒子（rounded-l-lg）：按整个盒子画圆角矩形，再裁到这一侧。
+	Clip gfx.Rect
 }
 
 // PaintSurface 在 d.Rect 上画出表面：阴影、背景（铺满边框盒）、边框环，都以吸附后的矩形为准。
@@ -60,6 +63,10 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	outer := SnapRect(d.Rect, d.Canvas.PixelScale())
 	if outer.Width <= 0 || outer.Height <= 0 {
 		return
+	}
+	if s.Clip.Width > 0 && s.Clip.Height > 0 {
+		d.Canvas.Clip(SnapRect(s.Clip, d.Canvas.PixelScale()))
+		defer d.Canvas.Unclip()
 	}
 	if !s.Shadow.IsZero() {
 		style, color := ShadowStyle(s.Shadow)
@@ -71,4 +78,15 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	if s.BorderW > 0 && s.Border.A > 0 {
 		d.Canvas.RoundedOutline(outer, s.Radius, s.BorderW, d.Fade(l.Col(s.Border)))
 	}
+}
+
+// PaintRing 在 d.Rect 外画一圈实心环（Tailwind 的 ring-2：box-shadow 0 0 0 Npx color）。
+// 环画在盒子之下的一圈，盒子本身随后用 PaintSurface 画；radius 是盒子的圆角。
+func (l *Look) PaintRing(d *ui.DrawContext, width float32, color tokens.Color, radius float32) {
+	outer := SnapRect(d.Rect, d.Canvas.PixelScale())
+	if outer.Width <= 0 || outer.Height <= 0 || color.A <= 0 {
+		return
+	}
+	ring := gfx.Rect{X: outer.X - width, Y: outer.Y - width, Width: outer.Width + 2*width, Height: outer.Height + 2*width}
+	d.Canvas.Rounded(ring, radius+width, d.Fade(l.Col(color)))
 }
