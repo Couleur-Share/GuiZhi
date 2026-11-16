@@ -1,0 +1,257 @@
+package parity
+
+import (
+	"fmt"
+	"image"
+	"math"
+)
+
+// compareL2 比较度量：已对齐节点的外框，以及已对齐文字的行数、宽度与墨迹外接框。
+func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []textPair) {
+	maxDelta := th.Metrics.MaxDeltaPx
+
+	// 外框：位置与尺寸各自的差都不超过阈值。
+	for _, p := range nodes {
+		if !p.React.HasBox || !p.Viva.HasBox {
+			continue
+		}
+		rep.L2.BoxPairs++
+		d := boxDelta(p.React.Box, p.Viva.Box)
+		rep.L2.MaxBoxDelta = math.Max(rep.L2.MaxBoxDelta, d)
+		if d <= maxDelta+1e-9 {
+			rep.L2.BoxWithin++
+			continue
+		}
+		rep.add(LayerL2, "box", describe(p.React), "外框差 %.2fpx（上限 %.2f）：React %s，Viva %s", d, maxDelta, fmtBox(p.React.Box), fmtBox(p.Viva.Box))
+	}
+	if rep.L1.ReactNodes > 0 {
+		rep.L2.AlignmentRate = float64(rep.L1.NodesMatched) / float64(rep.L1.ReactNodes)
+	} else {
+		rep.L2.AlignmentRate = 1
+	}
+	if rep.L2.AlignmentRate < 1 {
+		rep.add(LayerL2, "alignment", rep.Scene, "对齐率 %.1f%%，要求 100%%", rep.L2.AlignmentRate*100)
+	}
+
+	// 文字：行数、绘制宽度、墨迹外接框。
+	for _, p := range texts {
+		subject := quote(NormText(p.React.Text))
+		lines := 0
+		for _, v := range p.Viva {
+			lines += len(v.Rects)
+		}
+		if len(p.React.Rects) != lines {
+			rep.add(LayerL2, "text-lines", subject, "行数不一致：React %d，Viva %d", len(p.React.Rects), lines)
+			continue
+		}
+		checkWrappedPitch(rep, th, subject, p)
+		k := 0
+		for _, v := range p.Viva {
+			for li, vr := range v.Rects {
+				rr := p.React.Rects[k]
+				k++
+				rep.L2.TextLines++
+				painted := vr.W()
+				if li < len(v.Painted) {
+					painted = v.Painted[li]
+				}
+				// 末行以外的折行行宽取不到「不含尾随空白」的口径，只比末行与单行文字的宽度。
+				if len(p.React.Rects) == 1 || k == len(p.React.Rects) {
+					dw := math.Abs(rr.W() - painted)
+					rep.L2.MaxWidthDelta = math.Max(rep.L2.MaxWidthDelta, dw)
+					if dw <= maxDelta+1e-9 {
+						rep.L2.TextWidthOK++
+					} else {
+						rep.add(LayerL2, "text-width", subject, "绘制宽度差 %.2fpx（上限 %.2f）：React %.2f，Viva %.2f", dw, maxDelta, rr.W(), painted)
+					}
+				} else {
+					rep.L2.TextWidthOK++
+				}
+				if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
+					checkInk(rep, in, th, subject, rr)
+				}
+			}
+		}
+	}
+}
+
+// checkInk 比较同一行文字在两张图里的墨迹：区域取 React 的文字行矩形外扩 1 像素。
+//
+// 比较「行、列墨迹强度剖面」而不是墨迹外接框：两个引擎的抗锯齿在字形最外一圈强弱不同，外接框会被最浅一圈左右，
+// 而基线整体差一个像素时，剖面的最佳对齐位移一定是 ±1。所以取使剖面平方差最小的位移，上下位移必须不超过 InkMaxDeltaY，
+// 左右不超过 InkMaxDeltaX；另外墨迹总量（强度之和）的比值要落在 [InkMassMin, InkMassMax]，用来发现字重或颜色不对。
+func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box) {
+	area := image.Rect(
+		int(math.Floor(rect.X()))-1, int(math.Floor(rect.Y()))-1,
+		int(math.Ceil(rect.Right()))+1, int(math.Ceil(rect.Bottom()))+1,
+	).Intersect(in.ReactImg.Bounds())
+	if area.Empty() {
+		return
+	}
+	rp := inkProfile(in.ReactImg, area)
+	vp := inkProfile(in.VivaImg, area)
+	rep.L2.InkChecked++
+	switch {
+	case rp.mass == 0 && vp.mass == 0:
+		rep.L2.InkOK++
+		return
+	case rp.mass == 0 || vp.mass == 0:
+		rep.add(LayerL2, "ink", subject, "一侧没有墨迹：React 墨迹量 %.0f，Viva 墨迹量 %.0f", rp.mass, vp.mass)
+		return
+	}
+	dy := bestShift(rp.rows, vp.rows)
+	dx := bestShift(rp.cols, vp.cols)
+	// 左边缘在小数像素上的文字：Viva 整像素落位、渲染层子像素定位，水平最多差半个像素，允许最佳位移到 1。
+	allowX := th.Metrics.InkMaxDeltaX
+	if math.Abs(rect.X()-math.Round(rect.X())) > 1e-3 {
+		allowX = th.Metrics.InkMaxDeltaXFractional
+	}
+	ratio := vp.mass / rp.mass
+	if dx != 0 || dy != 0 {
+		rep.L2.InkShifts = append(rep.L2.InkShifts, InkShift{Subject: subject, DX: dx, DY: dy})
+	}
+	rep.L2.MaxInkDX = max(rep.L2.MaxInkDX, abs(dx))
+	rep.L2.MaxInkDY = max(rep.L2.MaxInkDY, abs(dy))
+	rep.L2.MinInkMass = minPositive(rep.L2.MinInkMass, ratio)
+	rep.L2.MaxInkMass = math.Max(rep.L2.MaxInkMass, ratio)
+	switch {
+	case abs(dx) > allowX || abs(dy) > th.Metrics.InkMaxDeltaY:
+		rep.add(LayerL2, "ink", subject, "墨迹错位：水平 %+d、垂直 %+d 像素（上限 %d、%d；正值表示 Viva 相对 React 偏右、偏下）",
+			dx, dy, allowX, th.Metrics.InkMaxDeltaY)
+	case ratio < th.Metrics.InkMassMin || ratio > th.Metrics.InkMassMax:
+		rep.add(LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
+			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)
+	default:
+		rep.L2.InkOK++
+	}
+}
+
+func minPositive(cur, v float64) float64 {
+	if cur == 0 || v < cur {
+		return v
+	}
+	return cur
+}
+
+// profile 是一块区域里墨迹强度的行剖面、列剖面与总量。
+type profile struct {
+	rows, cols []float64
+	mass       float64
+}
+
+// inkProfile 计算区域里每个像素与背景色（区域外圈众数）的最大通道差，按行、按列累加。
+func inkProfile(img image.Image, area image.Rectangle) profile {
+	bg := ringMode(img, area)
+	p := profile{rows: make([]float64, area.Dy()), cols: make([]float64, area.Dx())}
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			d := float64(rgbDistance(rgba8(img, x, y), bg))
+			p.rows[y-area.Min.Y] += d
+			p.cols[x-area.Min.X] += d
+			p.mass += d
+		}
+	}
+	return p
+}
+
+// bestShift 返回使 b 平移后与 a 的平方差最小的整数位移（b 的第 i 项对 a 的第 i-shift 项）：正值表示 b 相对 a 偏后。
+// 搜索范围 ±4；并列时取绝对值小的，再取负的。
+func bestShift(a, b []float64) int {
+	const span = 4
+	best, bestCost := 0, math.Inf(1)
+	for s := -span; s <= span; s++ {
+		cost := 0.0
+		for i := range a {
+			j := i + s
+			var bv float64
+			if j >= 0 && j < len(b) {
+				bv = b[j]
+			}
+			d := a[i] - bv
+			cost += d * d
+		}
+		if cost < bestCost-1e-6 || (math.Abs(cost-bestCost) <= 1e-6 && abs(s) < abs(best)) {
+			best, bestCost = s, cost
+		}
+	}
+	return best
+}
+
+func ringMode(img image.Image, area image.Rectangle) [3]uint8 {
+	counts := map[[3]uint8]int{}
+	add := func(x, y int) { counts[rgba8(img, x, y)]++ }
+	for x := area.Min.X; x < area.Max.X; x++ {
+		add(x, area.Min.Y)
+		add(x, area.Max.Y-1)
+	}
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		add(area.Min.X, y)
+		add(area.Max.X-1, y)
+	}
+	var best [3]uint8
+	bestN := -1
+	for c, n := range counts {
+		if n > bestN || (n == bestN && lessRGB(c, best)) {
+			best, bestN = c, n
+		}
+	}
+	return best
+}
+
+func lessRGB(a, b [3]uint8) bool {
+	if a[0] != b[0] {
+		return a[0] < b[0]
+	}
+	if a[1] != b[1] {
+		return a[1] < b[1]
+	}
+	return a[2] < b[2]
+}
+
+func rgba8(img image.Image, x, y int) [3]uint8 {
+	r, g, b, _ := img.At(x, y).RGBA()
+	return [3]uint8{uint8(r >> 8), uint8(g >> 8), uint8(b >> 8)}
+}
+
+func rgbDistance(a, b [3]uint8) int {
+	return max(abs(int(a[0])-int(b[0])), abs(int(a[1])-int(b[1])), abs(int(a[2])-int(b[2])))
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+// boxDelta 是两个外框的位置与尺寸四个分量里最大的绝对差。
+func boxDelta(a, b Box) float64 {
+	d := 0.0
+	for i := range a {
+		d = math.Max(d, math.Abs(a[i]-b[i]))
+	}
+	return d
+}
+
+func fmtBox(b Box) string {
+	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", b[0], b[1], b[2], b[3])
+}
+
+// checkWrappedPitch 比较折行文字相邻两行的行距：React 取各行 Range 矩形的 y 之差，Viva 取各行文字盒的 y 之差，
+// 两者都等于行高。行距不对说明行高或折行方式不对，单看行数和宽度发现不了。
+func checkWrappedPitch(rep *Report, th Thresholds, subject string, p textPair) {
+	var vivaRects []Box
+	for _, v := range p.Viva {
+		vivaRects = append(vivaRects, v.Rects...)
+	}
+	if len(p.React.Rects) < 2 || len(p.React.Rects) != len(vivaRects) {
+		return
+	}
+	for i := 1; i < len(vivaRects); i++ {
+		pr := p.React.Rects[i].Y() - p.React.Rects[i-1].Y()
+		pv := vivaRects[i].Y() - vivaRects[i-1].Y()
+		if d := math.Abs(pr - pv); d > th.Metrics.WrappedTextPitchPx+1e-9 {
+			rep.add(LayerL2, "wrapped-pitch", subject, "第 %d 行与上一行的行距差 %.2fpx（上限 %.2f）：React %.2f，Viva %.2f", i+1, d, th.Metrics.WrappedTextPitchPx, pr, pv)
+		}
+	}
+}

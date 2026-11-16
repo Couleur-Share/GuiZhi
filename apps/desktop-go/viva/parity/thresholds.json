@@ -1,0 +1,20 @@
+{
+  "metrics": {
+    "maxDeltaPx": 1,
+    "wrappedTextPitchPx": 0.1,
+    "inkMaxDeltaX": 0,
+    "inkMaxDeltaXFractional": 1,
+    "inkMaxDeltaY": 0,
+    "inkMassMin": 0.85,
+    "inkMassMax": 1.15
+  },
+  "pixel": {
+    "tolerance": 12,
+    "maskPad": 1,
+    "maxDiffRatio": 0.0025
+  },
+  "stability": {
+    "factor": 0.5
+  },
+  "frozenAt": "2026-11-16"
+}
