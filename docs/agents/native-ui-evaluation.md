@@ -340,3 +340,79 @@ go test -count=1 -run '^$' -bench BenchmarkReader -benchtime=200x .
     spike 的宿主空闲 5–11 MB 只是空壳；生产版带 SQLite 与缓存，实际值由检查点 1 验证。
     **新增记账规则**：岛的底价约 120 MB + 宿主约 40 MB 不回落，每个里程碑记录「用过岛后回到库列表」的附加读数（不作验收线）。
   - **仍待用户**：S1 实机清单（M2 前）、S2 实机清单（M2 前）、托盘态是否单独销毁 WebView（上文 0.1 已记）、AAC 的 LGPL 取舍（M2 前）。
+- 2026-11-15（1.1 分支骨架，完成）：分支 `feat/native-ui`（worktree `D:\Project\GuiZhi-native`，提交 `3ae1bd5f` 起，未推送），开发约定见该分支的 `docs/agents/native-ui-development.md`。
+  - **结构**：`apps/desktop-go/native/{app,kit,screens,services,locales}` 加主包的 `native_boot.go`、`native_adapters.go`、`native_demo.go`。`-native` 与 React 版共用 `main()` 里到处理器登记为止的全部初始化和统一收尾，之后开一个无 WebView 的窗口；
+    界面只依赖 `native/services` 的窄接口，主包适配器经 `Bridge.call` 复用现有 IPC 处理器（行为只有一个来源），`pushHub` 把 `setPush` 的单监听扇出给订阅者。`go test ./native/...` 不拉起 WebView2、不需要数据库，暖启动约 2 秒。
+  - **已有的东西**：外壳（rail、顶栏、路由，未迁移页面如实占位）、采集页只读列表（过滤、搜索、计数口径与渲染层一致，陈旧响应丢弃，错误不渲染成空态）、主题桥种子（亮/暗 + 色相）、137 枚 lucide 图标（生成）、
+    1895 条文案（由渲染层 i18next 目录生成 ARB 与类型化函数，键与占位符对等校验）、按应用语言的时间格式化（MyGo 自带 CLDR，与 `Intl` 的 8 个用例一致）。
+  - **验证（源码/隔离环境）**：`go vet ./...` 干净；`go test ./native/...` 4 个有测试的包通过；适配器测试对真实处理器与真实库通过；`node --test scripts/tests/isolated-go.test.mjs` 6 项通过；两个生成器的 `--check` 通过。
+    `pnpm shot:native` 只构建 Go 壳（不需要 vite 与 node_modules），隔离构建 10–15 秒、总计 10–22 秒出图；已用亮/暗 × 中/英截图核对渲染、图标、主题、文案与时间格式。**未验证**：真实第三方流程（用户机器）。
+  - **空闲内存的第一个读数（骨架，3 次、静置 30 秒，非正式口径；同一份 13.4 MB 合成库）：可见态 57.4 MB（57.4–57.8），托盘态 57.3 MB（57.2–66.5），2 个进程**（GuiZhi 56.2 MB 加测量脚本重定向输出带出的 conhost 1.2 MB；私有字节 121.6 MB），CPU 0%。
+    约为 React 基线 341.8 / 337.1 MB 的 16.8% / 17.0%，检查点 1 的线是 45%。**不能外推**：现在只有采集页的 100 行；库列表、阅读区、编辑器、AI 编排、设置、全部图标与文案的使用面都还没进来。
+    这个数的用处是证明地基没有把空闲底价抬高：单进程原生壳加 SQLite、全部处理器和后台服务的底价约 56 MB。
+  - **踩过的坑**：
+    1. `pwsh -File` 无法给 `string[]` 参数传多个值（`-ExtraArgs '-native','-native-module','imports'` 会变成一整串，应用于是当成 React 版启动、报找不到渲染产物）；测量脚本要写成 `pwsh -Command "& script.ps1 -ExtraArgs @('-native','-native-module','imports')"`。
+    2. Windows 检出（`core.autocrlf=true`）的工作区文件是 CRLF，`gofmt -l` 会把几乎所有文件列为未格式化（索引里是 LF，CI 不受影响）；检查要先归一化为 LF。生成器的 `--check` 同理，已修。
+    3. rail 的「处理中心」在 MyGo 里折行（浏览器里 48 DIP 刚好放下，MyGo 的文本度量不让）；横向内边距从 8 改成 4。贴边布局要留余量。
+    4. MyGo 的悬停：构建时读 `Hovered()`，指针进出就重建整个视图；在 `Draw` 回调里读只重画上一帧的元素。列表行的悬停高亮必须走后者（文档的 `Element.Hovered` 有明确说明）。
+- 2026-11-15（1.2 主题桥、无字面量测试与品牌图标流水线，完成；分支提交 `8b4d5672`、`02b31283`，未推送）：
+  - **主题桥**：令牌不手抄，`gen-native-theme.mjs` 按浏览器的方式对 `globals.css` 求值后生成 `kit/tokens_gen.go`——每个自定义属性在「声明它的那个元素」上求值（html 级 `:root` / `:root ← .dark`；壁纸模式是元素级 `.app-background-mode-image`，没重写的令牌沿用 html 已算好的值），
+    色相/饱和度是函数参数；壁纸模式里被 `!important` 改成半透明的 `.bg-X` 规则单独抽成 `FillX` 令牌。产物：84 个颜色/阴影令牌 × 4 种模式（亮、暗、壁纸亮、壁纸暗）、6 个色相预设、3 个字号档、5 档动效时长（17 个渐变/滤镜类令牌不发射，4 个在个别模式取透明，`--verbose` 可列出）。
+    运行时是 `ThemeSpec + Env → kit.NewLook → *kit.Look`（嵌入 `*ui.Theme`，带 `T Tokens`、`Glass`、`Zoom`、`Level`），作为参数显式传给视图函数，没有全局注册表；`app.App.View` 只在外观变化时才 `SetTheme`/`SetZoom`；窗口侧经 `Host` 接系统明暗与 `mygo.Theme.OnUpdated`。
+    动效三档与 CSS 一致（标准无视系统的减少动态效果；关闭/跟随系统且系统要求减少时近乎瞬切；减弱为 60% 时长；`LoadingDelay` 250 ms 不压缩）。
+  - **验证（源码/隔离环境）**：`go test ./native/...` 全过，其中包括 6 个预设 × 亮/暗的对比度检查、令牌逐值断言、动效解析、壁纸解码与玻璃底绘制；`pnpm shot:native` 新增外观参数（色相、字号、动效、壁纸及不透明度/模糊）与 `--matrix appearance|fonts|glass`，
+    一次构建拍多格（12 格约 30 秒）。已逐张核对：6 色相 × 亮/暗 12 张、3 个字号档、壁纸（含模糊 12）亮/暗 4 张——壁纸能透过半透明的 rail、行、搜索框与分段控件，内容可读。**未验证**：真实第三方流程（用户机器、系统高对比度与文字缩放、多显示器 DPI）。
+  - **与渲染层的有意差异**（待建对等台账后登记，现记在 `docs/agents/native-ui-development.md` §5）：字号档用整窗缩放实现，写死 px 的值也会缩放；没有背景模糊（MyGo 无 backdrop-filter，只有左 rail 的玻璃模糊没有对应物）；系统文字大小只作用于 MyGo 控件的默认字号；选区只改高亮底色；系统窗口按钮的明暗跟随应用设置。
+  - **顺带发现的渲染层缺陷（两端共有，未改 main）**：暗色危险按钮白字压红底对比度 4.39:1（< 4.5）；浅色下 green、teal 预设悬停态 `accent-foreground` 压 `accent` 3.85 / 3.77；暗色主题下 OpenAI（GPT）与 Moonshot 的黑色 logo 压深色底几乎看不见（`<img>` 无任何暗色处理）。
+    前三项写在 `globals.css` 令牌里，在那里修一次两端同时好；测试里用 `knownContrastDebt` 登记下限，修好后测试会提示删登记。需要修哪几项由用户定，未排期。
+  - **文案**：新增 `native/nocjk_test.go`——用 Go AST 扫 `native/` 下手写的非测试文件，字符串/字符字面量含中日韩字符即失败，放行注释与 `fmt.Errorf`/`errors.New`/`log.*`/`panic` 的参数（日志与错误按仓库约定用中文，不是给用户读的标签）；
+    自带 11 个检查器用例，扫描到的文件数过少也会失败（防止目录挪动后空转）。`native/locales/locales_test.go` 在 Go 侧再守一遍已入库 ARB 的键对等与占位符一致（生成器里已有同样的校验，这里让 `go test` 不依赖 Node 也能发现手改）。
+  - **品牌图标流水线**：`gen-native-brand-icons.mjs` 严格解析 `PlatformLogos.tsx`（只接受 `<svg>` 里的 `<path>`）、`platform-meta.tsx`（平台名称键、图标、着色 class）、`ModelIcons.tsx`（分类表、特殊分类、香蕉与字母兜底样式）、`assets/providers/*.svg`，
+    生成 `kit/icons/brand_gen.go`（9 个平台 logo + 15 个厂商图标）与 `kit/brand_gen.go`（13 个平台 + 17 个模型分类）；渲染层结构变了会抛带位置的错误，不悄悄漏图标。控件：`kit.PlatformIcon/PlatformLabel`、`kit.ModelIcon/HasModelIcon`，复刻渲染层的优先级、兜底与着色（`text-foreground`、`text-current`、固定品牌色、明暗成对色）。
+    联系表（`GUIZHI_BRAND_SHEET=… go test ./native/kit -run TestBrandSheet`）已逐张核对亮/暗：平台与厂商图标、香蕉彩色 emoji、字母兜底、特殊分类都正确。**已知差异**：Gemini 靠 `<filter>` 柔化光晕、MyGo 不画滤镜，原生版是不带柔化的四色星；
+    豆包的 SVG 只是给 PNG 套了壳（MyGo 不画 SVG 里的 `<image>`），生成器把 PNG 抽出来走位图通道；特殊分类的阴影与 `strokeWidth=2.2` 未复刻。
+  - **生成器接进 CI**：`pnpm --filter @guizhi/desktop-go gen` 现在依次运行 jsrc 的生成与 `gen:native`（主题、lucide、品牌图标、文案；文案加 `--force`，否则只在 ARB 变化时才重跑 `mygo generate`，MyGo 升级后生成器输出变了也发现不了），
+    CI 既有的「重新生成后 `git diff --exit-code -- apps/desktop-go`」自动覆盖这四个产物。新增 `scripts/tests/gen-native.test.mjs`（21 项，已加入 `test:validation`）：解析函数的边界（含故意写坏的输入必须抛错）与对真实渲染层源码的冒烟。
+  - **踩过的坑**：1. `pwsh -File` 传 `string[]` 参数的老问题又踩了一次（联系表脚本），在当前 shell 里用 `& script.ps1 -Files @(...)` 调用；2. `mygo generate` 只在 ARB 变化时才跑，所以 CI 用的 `gen` 必须 `--force`；3. Windows 上 Go 原始字符串会丢掉 `\r`，生成器读取渲染层文件时必须先把 CRLF 归一成 LF，否则产物随检出换行而不同。
+- 2026-11-15（1.3 共享件，完成；分支提交 `46d4f77e`，未推送）：页面共用的件落在 `native/kit`，行为逐条对照渲染层同名组件，细节与对等差异见分支的 `docs/agents/native-ui-development.md` §5「共享控件」。
+  - **件**：提示 `Notifier` + `ToastViewport`（任意 goroutine 可发；成功/信息自动消失，错误/警告不消失；可展开详情并复制；撤销窗口；同时只露最新 3 条，其余排队）；
+    失败处理 `Guard`（`Run`/`Go`/`Background`，失败既弹带详情的提示又留日志，panic 按失败处理；日志经适配器复用渲染进程的 `log:appError` 处理器，截断与家目录脱敏同一份，写进同一个 `error.log`）；
+    确认与未保存对话框（初始焦点在取消、Enter 全局确认、异步操作失败可重试、关闭后焦点归位）；命令面板（`Palette` + `PaletteSource`，combobox/listbox 语义）；
+    快捷键录制（`ShortcutField` + 加速键互转，录制期间 `KeyCaptureActive()` 让应用级快捷键让路）；窗格宽度 `Pane` 与表格列 `ColumnSet`（经窄接口 `PrefStore` 去抖保存，真实实现随 Go 侧设置提供）。
+    外壳 `App` 持有 `Notifier` 与 `Guard`，提示作为覆盖层画在视图最后；`services` 增加 `Logger` 接口与假实现。
+  - **验证（源码/隔离环境）**：`go vet ./native/...` 干净；`go test -count=1 ./native/...` 153 个顶层测试通过（kit 125、app 14、采集页 8；另有 2 个靠环境变量开启的联系表测试默认跳过）；适配器测试对真实处理器验证日志的截断与脱敏；
+    `node --test scripts/tests/gen-native.test.mjs` 23 项通过；四个生成器 `--check`、文件行数门禁、gofmt（按 LF 归一化）通过。
+    **对拍**：窗格的默认值与上下限对 `ui.store.ts` 的九个常量；`MergeStoredColumns` 的 29 个用例对照渲染层 `mergeStoredColumns`（含宽度写成字符串或 null、数组里混进非对象元素只跳过那一项、重复 id 取第一条、操作列保存了小于下限的宽度会被夹成 148 这类怪癖）；
+    加速键词表对 MyGo 的 `internal/accelerator`（每个能录出来的键 MyGo 都接受，默认快捷键全部规范且被接受）；Tailwind 色阶新增对 `tailwindcss/colors` 逐项对拍（Go 调色板 31 项加品牌图标生成器的表；故意改错一位十六进制确认会红）。
+    **真实 `ui.Table`**：拖表头边缘改宽、夹进上下限、固定列拖不动、拖表头调换列顺序会被还原、恢复默认与代码改宽后以偏好为准、双击列边缘适应内容后同样夹进范围并保存。
+    联系表（`GUIZHI_WIDGET_SHEET=… go test ./native/kit -run TestWidgetsSheet`）明/暗各 9 格已逐张核对：提示堆叠与展开详情、撤销、确认/危险确认/未保存、命令面板（含查询）、快捷键录制中/未设置/清除钮。
+  - **踩过的坑**：
+    1. `ColumnSet.Reset` 最初只改偏好，而 `ui.Table` 自己在 `ListState.Columns` 里还留着拖出来的宽度，下一帧 `Sync` 把旧宽度当作用户新拖的写回偏好，「恢复默认」就失效了。是真实 Table 的测试抓到的；现在偏好是真相源，代码改偏好后布局过时，下一次 `Sync` 以偏好为准重写它。
+    2. 检测窗口失焦：`WindowActive()` 与 `FocusWithin()` 都不对（窗口失去键盘时后者仍指向原元素），要用 `Element.FocusLeft()`。
+    3. `ui.Tester` 的时钟不会自己走，同一位置紧挨着的两次按下被当成双击，触发 MyGo 表格自带的「适应内容宽度」把列缩到下限；测拖动要先 `Advance`。
+    4. `MergeStoredColumns` 第一版把 `columns` 解成 `[]map[string]any`，数组里混进一个数字就让整份配置作废；渲染层只跳过那一项，改成 `[]any` 逐项判断。窗格宽度存成 JSON `null` 时渲染层取默认值而不是下限，同样对齐。
+    5. 渲染层的操作列默认 84、下限 148：保存 84 再读回会变 148。`NewColumnSet` 先把默认宽度夹进范围，读写才稳定。
+    6. MyGo 控件的几处约定（对话框内不能 `AutoFocus`、输入框自己吃 Enter、`.Wrap()` 对文本是空操作、`ToastBase` 按钮不能 `.Key()`）已记入开发约定。
+  - **顺带发现的渲染层缺陷（两端共有，未改 main）**：暗色危险按钮白字压红底 4.39:1；暗色 `text-destructive` 压对话框底 4.06 / 3.74；green、teal 预设的浅色 `primary/90` 悬停 4.42 / 4.34；确认框在深色模式的浅色主色上写死 `text-white`；
+    快捷键录制写出 `ARROWUP` 这类 MyGo 不接受的加速键、把 Win 键记成 Ctrl、Tab 与 Esc 被输入框吞掉。对比度类已用 `knownContrastDebt` 登记。需要修哪几项由用户定，未排期。
+  - **未验证**：真实微软拼音下命令面板输入框（组词中的 Enter 不应选中结果，并入 S1 清单）；讲述人对对话框、面板、提示的朗读；150% / 200% DPI 下的对话框与面板；真实指针的拖动手感（现在是 `Tester` 合成事件）；
+    这些件加入后空闲内存的增量（不单独测，由检查点 1 一并验证）。
+  - **仍待用户**（沿用）：S1、S2 实机清单（M2 前）、托盘态是否单独销毁 WebView、AAC 的 LGPL 取舍（M2 前）、渲染层缺陷修哪几项。
+- 2026-11-15（1.4 设置的 Go 化，完成；分支提交 `2dbb1dd4`，未推送）：设置收成「每个字段一个物理存放处、界面一份快照」，细节与对等差异见分支的 `docs/agents/native-ui-development.md` §5「设置」。
+  - **归属**：界面设置与偏好 → `config/ui-prefs.json`（放在库外，备份还原不会把主题与布局一起回滚）；Go 侧其他组件也要读的 13 个键（语言、自启、通知、代理、FlareSolverr、自动备份三项、工具路径……）→ SQLite `settings` 表，写入走现有的 `Library.settingsSet`，与渲染进程同一份校验、事务和代理即时生效；AI 连接留在 `ai-models.json`，不导入、不进设置文件。`dataPath`、`settingsUpdatedAt` 是 Electron 时代的字段，不再有。
+    读 App 设置取表里的原始行而不经 `settings:get`（后者的默认值是 Electron 时代的，且会并入 AI 连接配置）。门面先预校验再写：界面文件先写、表后写，表写失败则把文件恢复原样；订阅回调在所有锁之外调用，回调里再读写不会死锁。
+  - **首次启动导入**：WebView2 的 Local Storage 优先，其次尚未导入过的 Electron 版；`ui-prefs.json` 的写出是提交点（读不了旧数据则不写、下次重试；库里已有值不覆盖；非法键只跳过并记进导入记录，记录里只有键名与原因）。先复制再只读打开，不动原目录、不留 LOCK，所以随时可回退旧版本。
+    `ytDlpPath`/`ffmpegPath`（只接受文件选择器返回的路径）与一切 AI 字段不导入；代理口令只进 `settings` 表（与 React 版一致），不进 `ui-prefs.json`。自动化实例（截图、基准）不导入也不读已保存设置。
+  - **真实 WebView2 的 localStorage 实测事实**（用一次性 profile 启动真实 React 版写入种子再读回，夹具与生成脚本入库，不碰用户数据）：页面 origin 是 `http://guizhi.localhost`；数据在 `<用户数据目录>\EBWebView\Default\Local Storage\leveldb`（内核 157.0.4341.46）；键为 `_<origin>\0<编码字节><键>`，编码字节 0 是 UTF-16LE、1 是 Latin1，两种都出现；用户数据目录规则与 MyGo 一致（`WEBVIEW2_USER_DATA_FOLDER`，否则 `%LOCALAPPDATA%\<应用名>\WebView2`）；React 版自己没有写任何夹具之外的键。
+  - **归一化保留**：持久化 v3 迁移、旧默认值残留、壁纸文件名解码、`toFixed(1)` 取整（并列时取较大，用 `big.Rat` 精确复现）、`trim` 的空白集、`decodeURIComponent` 失败回落原串……由 TS 导出 golden（66 条设置 + 21 条 ui-storage）与 Go 逐项对拍；另有漂移守卫扫描渲染层源码里的全部 `localStorage` 键，新增未登记即失败。
+  - **验证（源码/隔离环境）**：`go test -count=1 ./native/...` 184 个顶层测试通过（2 个靠环境变量开启的联系表测试默认跳过；设置包 26 个）；主包里真实库 + 真实夹具的 40 个测试通过（界面设置文件 10、门面 9、导入与启动 13、WebView2 读取 8，含来源优先级、库里已有值优先、读取失败不写提交点且可重试、非法键只记问题、自动化实例不碰设置、并发更新一个不丢、表写失败时文件回滚）；
+    渲染层 golden、四个生成器 `--check`、`gen-native.test.mjs`（23 项）、文件行数门禁、gofmt 通过；`pnpm shot:native` 冒烟通过。**变异检查**（逐个破坏关键不变量，确认测试会红）：只导入一次、库里的值优先、表写失败时恢复文件、提前校验路径白名单、自动化实例不读设置、WebView2 有设置时优先，共 6 项全部被抓到。
+  - **踩过的坑**：
+    1. 仓库 `.gitignore` 的 `*.log` 悄悄吞掉了夹具里的 `000003.log`——它就是 leveldb 的数据文件本身，漏提交会让夹具变成一个读不出任何键的空库。已加否定规则，并用 `git archive` 导出核对提交内容与工作区逐字节一致（`.gitattributes` 的 `* -text` 保证不做换行转换）。
+    2. `fmtcheck.ps1` 必须用 `pwsh`（PowerShell 7）跑：Windows PowerShell 5.1 经管道把含中文的源码交给 gofmt 会乱码，所有文件都被误报为「需要 gofmt」。
+    3. `go test -run WebView2` 会匹配到既有的 `TestReadingProbeInWebView2`，它需要 `pnpm build` 产物 `reading_libraries.json`，未构建的工作副本里必红；筛选要写精确的测试名前缀。
+    4. `json.MarshalIndent` 会把 `json.RawMessage` 重新缩进，文件里读回的偏好与写入时字节不同；读入时统一紧凑化，内存里的值与刚写入时一致。
+    5. `native/nocjk_test.go` 拦下了设置解析里的中文诊断说明（直接当字符串字面量传给帮助函数）；改成 `errors.New`/`fmt.Errorf` 承载——诊断文字不是界面文案，这正是该测试的放行范围。
+    6. 自己写的订阅重入测试曾因 `sync.Once` 在回调里被再次通知而自锁，看起来像实现死锁，实际是测试写法的问题（改用原子标志）；实现本身在锁外通知。
+  - **已知限制**：WebView2 的 localStorage 被清空过（用户清过 profile）时，只存在于旧库里的 `updateChannel`、`autoSave` 这类界面键不会回填，回落默认值；这类用户本来就丢了 React 版的全部界面偏好，不值得为此再读旧库行。
+  - **未验证**：用户真实机器上的旧 WebView2 profile 副本导入（留到阶段 4 切换前，只用副本、绝不读用户真实 profile）；设置页本身与「设置 → 外观」的实时订阅联动、关闭窗口前 `Pane`/`ColumnSet` 的 `Flush`（M1 切片）；备份还原后 `ui-prefs.json` 与库互不回滚是有意设计，尚无实机演示。
