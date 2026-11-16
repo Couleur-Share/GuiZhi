@@ -42,3 +42,22 @@ affiliation or endorsement. The NGA, LINUX DO and Appinn glyphs are original
 marks because Simple Icons has no matching entries; 2Libra uses the balance
 glyph from its public site favicon. They are used for the same referential
 purpose and imply no affiliation or endorsement.
+
+第三方库 / Third-party libraries:
+
+  Viva — GPU-native UI toolkit for Go
+  Copyright 2026 The Viva Authors
+  https://github.com/vivaui/viva
+  Licensed under the Apache License, Version 2.0
+
+原生界面（feat/viva-ui 分支起）使用 Viva v0.6.4 绘制与布局。Viva 的许可证全文、
+NOTICE 与第三方声明（shadcn-svelte、Lucide、Unicode Character Database、Ghostty、
+purego、go-toml、golang.org/x/text）按原样收录在 third-party/viva/ 下
+（LICENSE、NOTICE、THIRD_PARTY_NOTICES.md）；发布安装包时必须随包附上这三个文件。
+
+The native UI (from the feat/viva-ui branch on) is drawn and laid out with Viva
+v0.6.4. Viva's full license text, its NOTICE and its third-party notices
+(shadcn-svelte, Lucide, the Unicode Character Database, Ghostty, purego,
+go-toml, golang.org/x/text) are kept verbatim under third-party/viva/
+(LICENSE, NOTICE, THIRD_PARTY_NOTICES.md); a release installer must ship
+these three files.

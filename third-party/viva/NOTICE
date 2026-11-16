@@ -1,0 +1,14 @@
+Viva
+Copyright 2026 The Viva Authors
+
+This product includes software developed by third parties:
+
+- shadcn-svelte (MIT License)
+- Lucide (ISC License; portions are derived from Feather under the MIT License)
+- Unicode Character Database (Unicode License V3)
+- Ghostty (MIT License)
+- github.com/ebitengine/purego (Apache License 2.0)
+- github.com/pelletier/go-toml/v2 (MIT License)
+- golang.org/x/text (BSD 3-Clause License)
+
+The complete notices and license texts are in THIRD_PARTY_NOTICES.md.

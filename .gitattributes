@@ -3,3 +3,5 @@ scripts/wslc/** text eol=lf
 apps/desktop-go/funasr_server.py -text
 # 冻结的对拍基准按字节比较（含 CRLF 正文、SQLite 与压缩文件），禁止 git 做换行转换
 apps/desktop-go/testdata/golden/** -text
+# 第三方许可证原文按字节保存（与 Viva 模块缓存里的文件逐字节一致），禁止 git 做换行转换
+third-party/viva/** -text

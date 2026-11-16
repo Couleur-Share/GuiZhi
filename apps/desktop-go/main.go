@@ -123,10 +123,16 @@ func main() {
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
 	nf := declareNativeFlags() // 原生界面（feat/native-ui）的开关，见 native_boot.go
+	vf := declareVivaFlags()   // Viva 原生界面（feat/viva-ui）的开关，见 viva_boot.go
 	// 摘掉 --updated / --hidden / --force-run：它们是拉起参数，不是开关，见 launch_args.go
 	_ = flag.CommandLine.Parse(stripLaunchArgs(os.Args[1:]))
 	if *backupCLI {
 		os.Exit(runBackupCLI(flag.Args()))
+	}
+	if vf.enabled() { // 先于数据目录解析与数据库初始化：不满足隔离要求就在碰任何数据之前退出
+		if err := vf.checkLaunch(nf.enabled(), *bench); err != nil {
+			failStartup("", err, false)
+		}
 	}
 	if *dbPath == "" { // 没有显式数据库：正式启动，路径按 Electron 版的规则推断（startup_paths.go）
 		exe, _ := os.Executable()
@@ -140,7 +146,7 @@ func main() {
 		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
 		return
 	}
-	if (*dist == "" && !nf.enabled()) || *dbPath == "" { // 原生界面不加载渲染产物，不需要 dist
+	if (*dist == "" && !nf.enabled() && !vf.enabled()) || *dbPath == "" { // 原生界面不加载渲染产物，不需要 dist
 		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && !*bench)
 	}
 
@@ -324,6 +330,14 @@ func main() {
 	}
 	if nf.enabled() { // 原生界面：到此为止的初始化全部共用，之后不建 WebView、不绑定 Bridge
 		err = runNative(nativeBoot{flags: nf, lib: lib, bridge: b, automation: automation, bench: *bench, shot: *shot, wait: *wait})
+		shutdownLibrary(lib, shutdownDB)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	if vf.enabled() { // Viva 原生界面：同样共用到此为止的初始化，之后不建 WebView、不绑定 Bridge
+		err = runViva(vivaBoot{flags: vf, lib: lib, bridge: b, automation: automation, bench: *bench})
 		shutdownLibrary(lib, shutdownDB)
 		if err != nil {
 			log.Fatal(err)

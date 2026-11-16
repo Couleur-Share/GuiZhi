@@ -9,7 +9,7 @@
 | 项 | 状态 |
 | --- | --- |
 | 分支与基线 | `feat/viva-ui` 从 `feat/native-ui` `3f31fb53` 拉出（本地标签 `mygo-ui-frozen` 指向该提交），已 merge main（`94b980f0`，只带入评估文档补记，渲染层无变化）；Viva 固定 `v0.6.4`；`golang.org/x/text` 因 Viva 依赖由 0.43.0 升到 0.44.0 |
-| 阶段 0 准备 | 进行中（本文是阶段 0 的第一个提交） |
+| 阶段 0 准备 | 骨架已就位（见 §8）；剩余：生成器输出端改普通 Go（随阶段 2 的主题/i18n/图标一并做，见 §6） |
 | 阶段 1 对等基础设施 | 未开始 |
 | 阶段 2 M0 外壳与工具包层 | 未开始 |
 | 阶段 3 M1 + 检查点 1 | 未开始 |
@@ -155,7 +155,7 @@ apps/desktop-go/scripts/parity/            React 侧事实采集器（Node + Pla
 ## 4. 统一封装与守卫
 
 - **文本输入**：`viva/kit` 提供 `TextInput`、`TextArea`、`SearchInput`、`Editor` 等封装，是**唯一**允许 import / 使用 `ui.TextField`、`ui.TextArea`、`ui.Combobox`、`components.CodeEditor`、`components.Textarea`、`components.Input` 的包。`viva/kit` 之外出现这些标识符的非测试文件，由 `viva/inputguard_test.go`（Go AST 扫描）判失败。目的：V-a 真机若失败，整体替换封装的实现而不改业务界面。
-- **岛（W1）**：`viva/kit` 的岛封装固定使用 `WebProxy` 非空的独立环境；`Open` 期间设置并还原 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`（`--disable-component-update`）；`Navigate`/`NewWindow`/`Download` 默认全部拒绝，`BridgeMainFrameOnly`；关岛后清理 `WV2Profile_viva-ephemeral-*` 残留目录并释放页面文档。安全结论见阶段 2 的 §4.7 记录。
+- **岛（W1）**：`viva/island` 固定使用 `Proxy` 非空的独立环境（`app.WebProxyDirect`）；`Open` 期间设置并还原 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`（`--disable-component-update`，进程级互斥，失败路径也还原）；`Ephemeral`、`BridgeMainFrameOnly`；`Navigate` 只放行自有 scheme（主机必须是 `doc`）与 `about:blank`/`about:srcdoc`（按解析后的 URL 判断，不用子串匹配），`NewWindow`/`Download` 不设即全部拒绝。这些默认值由 `viva/island` 的单元测试固化。`OnMessage` 没有来源信息，调用方必须把收到的文本当作不可信输入。关岛后清理 `WV2Profile_viva-ephemeral-*` 残留目录（R5）与整体安全结论在阶段 2 的 §4.7 核实里实现并记录。
 - **不引入**：原生 select、color picker、`alert`/`confirm`/`prompt`；复用 `components/ui` 对应的 Viva 件与现有语义令牌。
 
 ## 5. 外观桥、字号与动效（继承自 MyGo 路线、按 Viva 重做）
@@ -179,7 +179,10 @@ apps/desktop-go/scripts/parity/            React 侧事实采集器（Node + Pla
 - React 侧采集：`scripts/parity/collect-react.mjs`，基于 `pnpm shot` 的隔离构建与屏幕外窗口（`-bench`，保留屏幕外 + `showInactive`，不改成隐藏窗口），经 CDP 连 WebView2，视口用 `Emulation.setDeviceMetricsOverride` 钉死（设备像素比 1）。
 - Viva 侧采集：`headless.Session`；截图路径以阶段 1 的实验结论为准（记在 §8）。
 - 比较与报告：`go run ./viva/parity/cmd/vivaparity`，输出每场景 L1–L4 结果表与 react/viva/diff 三图到 `D:\Project\GuiZhi-bench\parity\`；L1/L2 的事实比较同时是 `go test ./viva/parity/...` 里的快速测试（对入库的 React 事实 JSON）。
-- 内存读数：`measure-idle.ps1`，两态各 5 次中位数、静置 60 秒，同时记录 GPU 共享内存与进程数。
+- 内存读数：`measure-idle.ps1`，两态各 5 次中位数、静置 60 秒，加 `-Gpu` 同时记录 GPU 共享内存；进程数脚本本来就记。主判据（整棵进程树 `WorkingSetPrivate` 之和）不变，`-Gpu` 只增加记录项。
+- `-viva` 启动保护：在切换为产品默认之前，`-viva` 只允许与 `-bench`、显式 `-db`、显式 `-userdata` 同用，且不能与 `-native` 同用；检查在解析数据目录与初始化数据库**之前**执行（`checkVivaLaunch`，`viva_boot_test.go` 覆盖），因为不带 `-db` 时 `main()` 会按正式安装规则推断出真实数据目录并对它做初始化。
+- 本地构建与冒烟（不入库的基准工具，在 `D:\Project\GuiZhi-bench\tools\`）：`build-viva-ui.ps1` 用与发布相同的构建参数把主包构建到 `D:\Project\GuiZhi-bench\viva-ui\bin\`（不放进任何仓库的 `out` 目录，不覆盖任何 `GuiZhi.exe`）；`smoke-viva-ui.ps1` 用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 启动 `-viva -bench`，确认 READY 后按 PID 结束。
+- 第三方许可：Viva 是 Apache-2.0，许可证原文、NOTICE 与第三方声明按字节收录在 `third-party/viva/`（`.gitattributes` 标 `-text`），根 `NOTICE` 已披露。**切换发布前必须让安装包随包附上这三个文件**（`build-installer.ps1` 目前不处理，属切换清单，见 §9）。
 
 ```powershell
 # 在 apps/desktop-go 下
@@ -189,4 +192,11 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 
 ## 8. 进度记录
 
-- 2026-11-16 阶段 0：建分支 `feat/viva-ui`、打 `mygo-ui-frozen`、merge main（`94b980f0`）、依赖安装；`go.mod` 加 Viva v0.6.4；写本文并固定 §2。
+- 2026-11-16 阶段 0：建分支 `feat/viva-ui`、打 `mygo-ui-frozen`、merge main（`94b980f0`）、依赖安装；写本文并固定 §2；`measure-idle.ps1` 加 `-Gpu`；`go.mod` 加 Viva v0.6.4（钉死标签）；NOTICE 与 `third-party/viva/`；骨架包 `viva`、`viva/app`、`viva/island`（W1 封装，含导航策略与环境变量还原的单元测试）；`-viva` 启动路径与启动保护；冒烟：`-viva -bench` 在一次性目录里 READY、窗口标题正确、用户实例未受影响。
+
+## 9. 切换为产品默认之前的清单（延伸目标，非本阶段）
+
+1. 安装包随包附 `third-party/viva/{LICENSE,NOTICE,THIRD_PARTY_NOTICES.md}`（`build-installer.ps1` 与 NSIS 脚本）。
+2. 决定产品窗口的 `Class`（WebView2 profile 目录名），评估与旧 React 外壳 profile 的关系（旧 profile 里有首次启动要导入的 localStorage 设置）。
+3. 放开 `-viva` 的启动保护，接入单实例锁、托盘、全局快捷键、自动更新与启动参数（`--hidden`、`--updated`、`--force-run`）。
+4. 台账里所有 C 类已裁决，A/B 类逐条复核；真机手册交给用户执行并回填 V-a 与 R-1…R-4。
