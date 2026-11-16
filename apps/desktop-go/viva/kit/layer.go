@@ -22,14 +22,19 @@ import (
 //
 // 层级先后复刻渲染层的 z-index：Select 与 Modal 是 9999，Toast 与 ConfirmDialog 是 99999（ConfirmDialog 的 portal 后插入 DOM，
 // 同级时在 Toast 之上），Tooltip 是 100000。Viva 的 Band 是 uint16，应用自己的浮层用 1…9（Viva 自带控件的层从 10 起，
-// 永远在它们之上；见 ui/layers.go），LayerPaneChrome(1) 与 LayerDrag(2) 留给 Viva 自己的约定，这里不用。
+// 永远在它们之上；见 ui/layers.go），LayerPaneChrome(1) 与 LayerDrag(2) 留给 Viva 自己的约定，这里不用：
+// 3…9 七层已经用满，再要新层得先合并或复用其中一层。
 const (
 	bandModal         ui.Band = 3 // Modal：背景与面板在同一层，面板在背景之后声明
 	bandSelectDismiss ui.Band = 4 // Select 的整窗背景：高于 Modal，下拉才能开在对话框里
 	bandSelectPanel   ui.Band = 5
-	bandToast         ui.Band = 6
-	bandConfirm       ui.Band = 7 // ConfirmDialog：背景与面板在同一层
-	bandTooltip       ui.Band = 8
+	// bandToastUnder 是 Toast 卡片「背后」的垫层：渲染层卡片是 backdrop-blur 的半透明底色，Viva 没有模糊原语（A-007），
+	// 深色下的卡片底色只有 20% 不透明度，要垫一块不透明的页面底色才不会透出背后的文字。垫层必须在所有卡片的阴影之下
+	// （同一层里先画全部形状再画文字，所以不能与卡片同层，否则上一张卡片的阴影会被下一张的垫层盖掉）。
+	bandToastUnder ui.Band = 6
+	bandToast      ui.Band = 7
+	bandConfirm    ui.Band = 8 // ConfirmDialog：背景与面板在同一层
+	bandTooltip    ui.Band = 9
 )
 
 // OverlayLayerMin 是浮层的最低层号：画在这一层及以上的文字属于浮层（对照工具据此区分浮层文字，见台账 A-009）。

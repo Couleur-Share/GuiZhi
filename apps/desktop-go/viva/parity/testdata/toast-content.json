@@ -1,0 +1,9 @@
+{
+  "_comment": "提示对照场景的文案：React 采集器（scripts/parity/scenes/react-scenes.mjs）与 Viva 场景（viva/parity/scenes）共用同一份，避免两边各写一遍而悄悄漂移。",
+  "success": "设置已保存",
+  "info": "已复制到剪贴板",
+  "warning": "部分条目未能导入，请检查文件格式后重试。",
+  "error": "批量更新失败：数据库正忙，请稍后重试。已保留原有内容，没有任何条目被修改。",
+  "undo": "已从列表删除（3 项）",
+  "detail": "SQLITE_BUSY: database is locked\n  at updateItems (items.go:214)\n  at batchUpdate (batch.go:88)\nfailed to update 12 items: C:/Users/someone/AppData/Roaming/GuiZhi/data/knowledge.db: database is locked (5)"
+}
