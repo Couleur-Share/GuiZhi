@@ -35,6 +35,6 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 	}
 	return box.Children(func() {
 		l.Text(c, value, TextSM, WeightNormal, t.Foreground, Ellipsis()).Grow(1).Shrink(1)
-		ui.Icon(c, icons.ChevronDown).Size(chevron, chevron).Color(l.Col(t.MutedForeground))
+		l.Icon(c, icons.ChevronDown, chevron, t.MutedForeground)
 	})
 }

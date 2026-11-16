@@ -22,6 +22,7 @@ func a11yMapDigest() string {
 		fmt.Fprintf(&b, "%s:%s\n", name, strings.Join(keys, ","))
 	}
 	set("reactIgnoredRoles", reactIgnoredRoles)
+	set("reactIgnoredUnnamed", reactIgnoredUnnamed)
 	set("vivaIgnoredRoles", vivaIgnoredRoles)
 	set("popupHasValues", popupHasValues)
 	pairs := make([]string, 0, len(reactRoleMap))

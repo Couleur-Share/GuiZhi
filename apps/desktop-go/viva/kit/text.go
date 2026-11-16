@@ -50,7 +50,12 @@ func Right() TextOpt { return func(b ui.Box) ui.Box { return b.TextEnd() } }
 // 返回的是外层盒子，占的版面恰好是一个行盒（行高）；文字节点在里面按渲染层（Chromium）的基线位置整体平移，
 // 平移用内边距与反向边距，不改变外层盒子的占位。依据与模型见 baseline.go。
 func (l *Look) Text(c ui.C, s string, st TextStyle, weight float32, color tokens.Color, opts ...TextOpt) ui.Box {
-	size, line := l.Rem(st.Size), l.Rem(st.Line)
+	return l.TextPx(c, s, l.Rem(st.Size), l.Rem(st.Line), weight, color, opts...)
+}
+
+// TextPx 与 Text 相同，字号与行高直接给逻辑像素：渲染层里 text-[13px] 这类 px 字面量不随字号档缩放。
+// line 在 Tailwind 里没有显式行高时是继承来的 1.5 倍字号（例如 13px 的行高是 19.5px）。
+func (l *Look) TextPx(c ui.C, s string, size, line, weight float32, color tokens.Color, opts ...TextOpt) ui.Box {
 	dy := BaselineShift(weight, size, line, l.Scale)
 	return ui.Column(c).Children(func() {
 		box := ui.Text(c, s).

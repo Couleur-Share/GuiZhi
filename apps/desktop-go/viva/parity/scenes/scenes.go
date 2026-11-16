@@ -17,6 +17,13 @@ import (
 
 // registry 是全部已登记场景。新增屏幕时在这里加一行，并在 React 采集器里登记同名场景。
 var registry = map[string]parity.Scene{
+	"settings.shell": {
+		ID: "settings.shell",
+		Build: func(look *kit.Look) func(c ui.C) {
+			s := &settingsscreen.Shell{Look: look, Store: settingsscreen.NewMemStore(settings.Default())}
+			return s.Page
+		},
+	},
 	"settings.general": {
 		ID: "settings.general",
 		Build: func(look *kit.Look) func(c ui.C) {

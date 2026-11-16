@@ -183,8 +183,10 @@ type Facts struct {
 	Texts     []Text  `json:"texts"`
 	TextRects []Box   `json:"textRects"`
 	Paints    []Paint `json:"paints"`
-	Fonts     []Font  `json:"fonts,omitempty"`
-	Aria      string  `json:"aria,omitempty"`
+	// Icons 是 Viva 一侧画出的图标的外框（经 kit.Look.IconSink 记录）；React 一侧的图标取自 Paints 里 tag 为 svg 的项，见 reactIcons。
+	Icons []Box  `json:"icons,omitempty"`
+	Fonts []Font `json:"fonts,omitempty"`
+	Aria  string `json:"aria,omitempty"`
 }
 
 // LoadFacts 读事实 JSON；版本不符时明确报错，不静默接受。

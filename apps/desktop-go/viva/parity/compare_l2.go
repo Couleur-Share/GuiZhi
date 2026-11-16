@@ -68,7 +68,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 					rep.L2.TextWidthOK++
 				}
 				if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
-					checkInk(rep, in, th, subject, rr)
+					checkInk(rep, in, th, subject, rr, true)
 				}
 			}
 		}
@@ -80,13 +80,14 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 // 比较「行、列墨迹强度剖面」而不是墨迹外接框：两个引擎的抗锯齿在字形最外一圈强弱不同，外接框会被最浅一圈左右，
 // 而基线整体差一个像素时，剖面的最佳对齐位移一定是 ±1。所以取使剖面平方差最小的位移，上下位移必须不超过 InkMaxDeltaY，
 // 左右不超过 InkMaxDeltaX；另外墨迹总量（强度之和）的比值要落在 [InkMassMin, InkMassMax]，用来发现字重或颜色不对。
-func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box) {
+// 返回量到的墨迹比与位移；两侧都没有墨迹或区域为空时返回 nil。
+func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed bool) *InkMeasure {
 	area := image.Rect(
 		int(math.Floor(rect.X()))-1, int(math.Floor(rect.Y()))-1,
 		int(math.Ceil(rect.Right()))+1, int(math.Ceil(rect.Bottom()))+1,
 	).Intersect(in.ReactImg.Bounds())
 	if area.Empty() {
-		return
+		return nil
 	}
 	rp := inkProfile(in.ReactImg, area)
 	vp := inkProfile(in.VivaImg, area)
@@ -94,16 +95,16 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box) {
 	switch {
 	case rp.mass == 0 && vp.mass == 0:
 		rep.L2.InkOK++
-		return
+		return nil
 	case rp.mass == 0 || vp.mass == 0:
 		rep.add(LayerL2, "ink", subject, "一侧没有墨迹：React 墨迹量 %.0f，Viva 墨迹量 %.0f", rp.mass, vp.mass)
-		return
+		return nil
 	}
 	dy := bestShift(rp.rows, vp.rows)
 	dx := bestShift(rp.cols, vp.cols)
 	// 左边缘在小数像素上的文字：Viva 整像素落位、渲染层子像素定位，水平最多差半个像素，允许最佳位移到 1。
 	allowX := th.Metrics.InkMaxDeltaX
-	if math.Abs(rect.X()-math.Round(rect.X())) > 1e-3 {
+	if fractionalEdgeAllowed && math.Abs(rect.X()-math.Round(rect.X())) > 1e-3 {
 		allowX = th.Metrics.InkMaxDeltaXFractional
 	}
 	ratio := vp.mass / rp.mass
@@ -124,6 +125,15 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box) {
 	default:
 		rep.L2.InkOK++
 	}
+	return &InkMeasure{Subject: subject, Ratio: ratio, DX: dx, DY: dy}
+}
+
+// InkMeasure 是一处墨迹比较量到的数：Viva 与 React 的墨迹总量比，以及最佳对齐位移（正值表示 Viva 偏右、偏下）。
+type InkMeasure struct {
+	Subject string  `json:"subject"`
+	Ratio   float64 `json:"ratio"`
+	DX      int     `json:"dx"`
+	DY      int     `json:"dy"`
 }
 
 func minPositive(cur, v float64) float64 {

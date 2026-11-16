@@ -62,7 +62,21 @@ func Render(s Scene, v Variant, region Region) (*Facts, image.Image, error) {
 	if err := settle(session); err != nil {
 		return nil, nil, err
 	}
+	// 再出一帧专门记录图标外框（画面已稳定，这一帧与上一帧相同）。
+	var icons []Box
+	look.IconSink = func(r gfx.Rect) {
+		// 滚出视口的图标也会经过绘制回调；渲染层的采集只收与区域相交的元素，这里同样只收画面里看得见的图标。
+		if r.X+r.Width <= 0 || r.Y+r.Height <= 0 || r.X >= float32(region.Width) || r.Y >= float32(region.Height) {
+			return
+		}
+		icons = append(icons, Box{float64(r.X), float64(r.Y), float64(r.Width), float64(r.Height)})
+	}
+	if err := session.Frame(); err != nil {
+		return nil, nil, fmt.Errorf("出帧失败：%w", err)
+	}
+	look.IconSink = nil
 	facts := collectViva(session, s.ID, v, region)
+	facts.Icons = icons
 	img, err := session.Image()
 	if err != nil {
 		return nil, nil, fmt.Errorf("取图失败：%w", err)

@@ -24,6 +24,18 @@ var reactIgnoredRoles = map[string]bool{
 	"Section":       true,
 	"LabelText":     true,
 	"Abbr":          true,
+	// 地标：Viva 没有对应的角色（gfx.Role 里没有 banner / complementary / navigation / main），
+	// 它们只是把可访问节点分区，本身没有状态与操作；其中的按钮、标题等照常逐个比较。登记见台账 A-004。
+	"banner":        true,
+	"complementary": true,
+	"navigation":    true,
+	"main":          true,
+}
+
+// reactIgnoredUnnamed 是「无名时不参与结构比较」的 Chromium 角色：没有可访问名的图片是装饰性图标
+// （lucide 的 SVG 在 Chromium 里是无名 image），Viva 的图标不进入可访问树。有名字的图片仍必须逐个决定怎么映射。
+var reactIgnoredUnnamed = map[string]bool{
+	"image": true,
 }
 
 // reactRoleMap 把 Chromium 的 AX 角色换成 Viva 的角色名（gfx.Role.String）。
@@ -137,6 +149,9 @@ func NormalizeReact(f *Facts) (out []Norm, unmapped []string) {
 			if box.W() == 0 || box.H() == 0 {
 				continue
 			}
+		}
+		if reactIgnoredUnnamed[n.Role] && NormText(n.Name) == "" {
+			continue
 		}
 		role, ok := reactRoleMap[n.Role]
 		if !ok {

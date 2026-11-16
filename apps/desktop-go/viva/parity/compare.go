@@ -57,6 +57,12 @@ type L2Result struct {
 	MinInkMass    float64    `json:"minInkMass"`
 	MaxInkMass    float64    `json:"maxInkMass"`
 	InkShifts     []InkShift `json:"inkShifts,omitempty"`
+	// 图标（见 compare_icons.go）：React 的 SVG 数、与 Viva 配上的数、配上的图标外框最大差。
+	Icons        int     `json:"icons"`
+	IconsMatched int     `json:"iconsMatched"`
+	MaxIconDelta float64 `json:"maxIconDelta"`
+	// IconInk 是每枚配上的图标量到的墨迹比与位移，供标定与趋势分析。
+	IconInk []InkMeasure `json:"iconInk,omitempty"`
 }
 
 // Cluster 是一片相连的差异像素（8 邻接）的外框与像素数，用来定位差异落在哪。
@@ -139,6 +145,7 @@ func Compare(in Inputs, th Thresholds) (*Report, *image.RGBA) {
 	}
 	nodePairs, textPairs := compareL1(rep, in)
 	compareL2(rep, in, th, nodePairs, textPairs)
+	compareIcons(rep, in, th)
 	var montage *image.RGBA
 	if !in.FactsOnly {
 		montage = compareL3(rep, in, th)
@@ -167,6 +174,18 @@ func (r *Report) Markdown() string {
 	fmt.Fprintf(&b, "- L2 度量：外框 %d/%d 在阈值内（最大差 %.2fpx，对齐率 %.1f%%）；文字行 %d，宽度合格 %d（最大差 %.2fpx）；墨迹合格 %d/%d（最大位移 ΔX %d、ΔY %d；墨迹量比 %.3f–%.3f）\n",
 		r.L2.BoxWithin, r.L2.BoxPairs, r.L2.MaxBoxDelta, r.L2.AlignmentRate*100, r.L2.TextLines, r.L2.TextWidthOK, r.L2.MaxWidthDelta,
 		r.L2.InkOK, r.L2.InkChecked, r.L2.MaxInkDX, r.L2.MaxInkDY, r.L2.MinInkMass, r.L2.MaxInkMass)
+	if r.L2.Icons > 0 {
+		lo, hi := 0.0, 0.0
+		for i, m := range r.L2.IconInk {
+			if i == 0 || m.Ratio < lo {
+				lo = m.Ratio
+			}
+			if i == 0 || m.Ratio > hi {
+				hi = m.Ratio
+			}
+		}
+		fmt.Fprintf(&b, "- L2 图标：React %d 枚，与 Viva 配上 %d 枚（外框最大差 %.2fpx）；配上的图标墨迹量比 %.3f–%.3f\n", r.L2.Icons, r.L2.IconsMatched, r.L2.MaxIconDelta, lo, hi)
+	}
 	fmt.Fprintf(&b, "- L3 像素：%dx%d，遮罩 %d，比较 %d，差异 %d，比例 %.4f%%（上限 %.4f%%）\n\n",
 		r.L3.Width, r.L3.Height, r.L3.Masked, r.L3.Compared, r.L3.Diff, r.L3.Ratio*100, r.L3.MaxDiffRatio*100)
 	if len(r.L3.Clusters) > 0 {

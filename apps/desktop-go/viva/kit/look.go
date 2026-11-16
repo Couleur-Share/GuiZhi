@@ -43,6 +43,10 @@ type Look struct {
 
 	// Scale 是设备像素与逻辑像素之比（窗口缩放 100% 为 1）；0 按 1。文字基线的取整按设备像素算，需要它。
 	Scale float32
+
+	// IconSink 非空时，Icon 画出的每枚图标都把外框（窗口坐标）报给它：对照工具用它取 Viva 一侧的图标位置。
+	// 正常运行为空。
+	IconSink func(gfx.Rect)
 }
 
 // NewLook 把外观输入装配成 Look。

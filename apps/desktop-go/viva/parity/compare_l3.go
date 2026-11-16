@@ -97,7 +97,7 @@ func diffClusters(diff []bool, w, h, limit int) []Cluster {
 	return all
 }
 
-// textMask 把两侧所有文字行矩形外扩 pad 像素，标成遮罩。
+// textMask 把两侧所有文字行矩形与图标外框外扩 pad 像素，标成遮罩（文字与图标的抗锯齿逐像素不同，改由 L2 按墨迹比较）。
 func textMask(in Inputs, w, h, pad int) []bool {
 	mask := make([]bool, w*h)
 	mark := func(b Box) {
@@ -118,6 +118,12 @@ func textMask(in Inputs, w, h, pad int) []bool {
 		for _, r := range t.Rects {
 			mark(r)
 		}
+	}
+	for _, r := range reactIcons(in.React) {
+		mark(r)
+	}
+	for _, r := range in.Viva.Icons {
+		mark(r)
 	}
 	return mask
 }

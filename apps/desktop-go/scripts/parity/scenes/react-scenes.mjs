@@ -18,7 +18,24 @@ async function openSettingsSection(win, section) {
 /** 设置内容滚动容器：内容壳的直接父元素（没有 testid，用结构选择器）。 */
 const SETTINGS_CONTENT_SCROLLER = 'div:has(> [data-testid="settings-content-shell"])';
 
+/** 设置页外壳（侧栏 + 内容）：SettingsPage 的根元素，即内容滚动容器的父元素。 */
+const SETTINGS_SHELL = 'div:has(> div > [data-testid="settings-content-shell"])';
+
 export const SCENES = {
+  "settings.shell": {
+    module: "settings",
+    region: SETTINGS_SHELL,
+    async enter({ win }) {
+      await openSettingsSection(win, "general");
+    },
+  },
+  // 整窗（顶栏 + rail + 设置页）；不给 region，取整个视口。
+  "app.window.page-settings": {
+    module: "app",
+    async enter({ win }) {
+      await openSettingsSection(win, "general");
+    },
+  },
   "settings.general": {
     module: "settings",
     region: SETTINGS_CONTENT_SCROLLER,
