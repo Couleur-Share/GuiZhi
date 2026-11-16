@@ -44,6 +44,13 @@ func (g Guard) Run(action string, fn func() error) (ok bool) {
 	return true
 }
 
+// Report 报告一次已经捕获的失败：与 Run 失败时相同的错误提示与日志，返回 false 便于直接 return。
+// 给「逐条执行、最后汇总」的批量操作用（对应渲染层 reportOperationError）：单条失败不中断，结束后把各条原因合在一起报一次。
+func (g Guard) Report(action string, err error) bool {
+	g.fail(action, err)
+	return false
+}
+
 // Go 在新的 goroutine 里 Run；done 非 nil 时带着结果回调（在那个 goroutine 里，改界面状态要自己同步）。
 func (g Guard) Go(action string, fn func() error, done func(ok bool)) {
 	go func() {

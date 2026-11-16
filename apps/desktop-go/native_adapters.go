@@ -102,6 +102,76 @@ func (a importsAdapter) OnChange(fn func()) func() {
 	return a.hub.Subscribe(chImportChanged, func(any) { fn() })
 }
 
+// OnTaskChange 把 import:changed 的推送（任务的 JSON 形状，与渲染层收到的相同）解成 ImportTask；
+// 解不出 id 的推送（空载荷、格式不对）直接忽略。
+func (a importsAdapter) OnTaskChange(fn func(services.ImportTask)) func() {
+	return a.hub.Subscribe(chImportChanged, func(payload any) {
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			return
+		}
+		var task services.ImportTask
+		if json.Unmarshal(raw, &task) != nil || task.ID == "" {
+			return
+		}
+		fn(task)
+	})
+}
+
+func (a importsAdapter) QueueState(ctx context.Context) (services.ImportQueueState, error) {
+	return callAs[services.ImportQueueState](ctx, a.b, "import:queueState")
+}
+
+func (a importsAdapter) SetPaused(ctx context.Context, paused bool) (services.ImportQueueState, error) {
+	channel := "import:resume"
+	if paused {
+		channel = "import:pause"
+	}
+	return callAs[services.ImportQueueState](ctx, a.b, channel)
+}
+
+func (a importsAdapter) Cancel(ctx context.Context, id string) error {
+	_, err := a.b.call(ctx, "import:cancel", id)
+	return err
+}
+
+// Retry 的处理器在任务不存在时返回 null：这里翻译成 found=false，由调用方决定怎么提示。
+func (a importsAdapter) Retry(ctx context.Context, id string, opts services.ImportRetryOptions) (bool, error) {
+	args := []any{id}
+	if opts != (services.ImportRetryOptions{}) {
+		args = append(args, opts)
+	}
+	task, err := callAs[*services.ImportTask](ctx, a.b, "import:retry", args...)
+	return task != nil, err
+}
+
+func (a importsAdapter) Remove(ctx context.Context, id string) error {
+	_, err := a.b.call(ctx, "import:remove", id)
+	return err
+}
+
+func (a importsAdapter) PreviewClearTerminal(ctx context.Context, q services.ImportClearQuery) (int, error) {
+	out, err := callAs[struct {
+		Count int `json:"count"`
+	}](ctx, a.b, "import:clearTerminalPreview", q)
+	return out.Count, err
+}
+
+func (a importsAdapter) ClearTerminal(ctx context.Context, q services.ImportClearQuery) (int, error) {
+	out, err := callAs[struct {
+		Count int `json:"count"`
+	}](ctx, a.b, "import:clearTerminal", q)
+	return out.Count, err
+}
+
+func (a importsAdapter) Enqueue(ctx context.Context, inputs []services.EnqueueImportInput) ([]services.ImportTask, error) {
+	return callAs[[]services.ImportTask](ctx, a.b, "import:enqueue", inputs)
+}
+
+func (a importsAdapter) SelectFiles(ctx context.Context) ([]string, error) {
+	return callAs[[]string](ctx, a.b, "dialog:selectImportFiles")
+}
+
 func orStr(s, def string) string {
 	if s == "" {
 		return def

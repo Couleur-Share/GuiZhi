@@ -19,6 +19,17 @@ type Imports struct {
 	gate     chan struct{}
 	queries  []services.ImportQuery
 	onChange func()
+	onTask   func(services.ImportTask)
+
+	// 变更类能力的状态（见 SetQueueState、FailOn 等）。
+	state      services.ImportQueueState
+	failures   map[string]error
+	calls      []string
+	retryOpts  services.ImportRetryOptions
+	enqueued   []services.EnqueueImportInput
+	missing    map[string]bool
+	clearCount int
+	files      []string
 }
 
 var _ services.Imports = (*Imports)(nil)
@@ -92,4 +103,187 @@ func (f *Imports) OnChange(fn func()) func() {
 		f.onChange = nil
 		f.mu.Unlock()
 	}
+}
+
+// OnTaskChange 登记任务变化回调；Emit 触发它。
+func (f *Imports) OnTaskChange(fn func(services.ImportTask)) func() {
+	f.mu.Lock()
+	f.onTask = fn
+	f.mu.Unlock()
+	return func() {
+		f.mu.Lock()
+		f.onTask = nil
+		f.mu.Unlock()
+	}
+}
+
+// Emit 模拟后端推送一次「任务变了」：同时触发 OnTaskChange 与 OnChange 的回调。
+func (f *Imports) Emit(task services.ImportTask) {
+	f.mu.Lock()
+	onTask, onChange := f.onTask, f.onChange
+	f.mu.Unlock()
+	if onTask != nil {
+		onTask(task)
+	}
+	if onChange != nil {
+		onChange()
+	}
+}
+
+// ---- 变更类能力的假实现：记录调用、可注入失败 ----
+
+// SetQueueState 设置 QueueState 与暂停/继续之后返回的调度器状态。
+func (f *Imports) SetQueueState(s services.ImportQueueState) {
+	f.mu.Lock()
+	f.state = s
+	f.mu.Unlock()
+}
+
+// FailOn 让指定操作失败：op 是 state、pause、cancel、retry、remove、preview、clear、enqueue、select 之一，
+// 也可以写成 op:id（只让针对该任务的调用失败，例如 "cancel:t2"）。err 为 nil 取消注入。
+func (f *Imports) FailOn(op string, err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.failures == nil {
+		f.failures = map[string]error{}
+	}
+	if err == nil {
+		delete(f.failures, op)
+		return
+	}
+	f.failures[op] = err
+}
+
+// SetClearCount 设置清理预览与实际清理返回的条数。
+func (f *Imports) SetClearCount(n int) {
+	f.mu.Lock()
+	f.clearCount = n
+	f.mu.Unlock()
+}
+
+// SetFiles 设置文件选择框返回的路径。
+func (f *Imports) SetFiles(paths []string) {
+	f.mu.Lock()
+	f.files = paths
+	f.mu.Unlock()
+}
+
+// SetMissing 让针对这些任务的重试返回「任务已不存在」。
+func (f *Imports) SetMissing(ids ...string) {
+	f.mu.Lock()
+	f.missing = map[string]bool{}
+	for _, id := range ids {
+		f.missing[id] = true
+	}
+	f.mu.Unlock()
+}
+
+// Calls 返回变更类调用的记录，每项形如 "cancel:t1"、"retry:t1"、"pause"、"clear:all"。
+func (f *Imports) Calls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.calls...)
+}
+
+// RetryOptions 返回最近一次重试收到的参数。
+func (f *Imports) RetryOptions() services.ImportRetryOptions {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.retryOpts
+}
+
+// Enqueued 返回迄今入队的全部输入。
+func (f *Imports) Enqueued() []services.EnqueueImportInput {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]services.EnqueueImportInput(nil), f.enqueued...)
+}
+
+// record 记下一次调用并返回应当注入的失败（先查带 id 的键，再查整个操作）。
+func (f *Imports) record(op, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	entry := op
+	if id != "" {
+		entry = op + ":" + id
+	}
+	f.calls = append(f.calls, entry)
+	if err := f.failures[entry]; err != nil {
+		return err
+	}
+	return f.failures[op]
+}
+
+func (f *Imports) QueueState(context.Context) (services.ImportQueueState, error) {
+	if err := f.record("state", ""); err != nil {
+		return services.ImportQueueState{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.state, nil
+}
+
+func (f *Imports) SetPaused(_ context.Context, paused bool) (services.ImportQueueState, error) {
+	op := "resume"
+	if paused {
+		op = "pause"
+	}
+	if err := f.record(op, ""); err != nil {
+		return services.ImportQueueState{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.state.Paused = paused
+	return f.state, nil
+}
+
+func (f *Imports) Cancel(_ context.Context, id string) error { return f.record("cancel", id) }
+
+func (f *Imports) Retry(_ context.Context, id string, opts services.ImportRetryOptions) (bool, error) {
+	if err := f.record("retry", id); err != nil {
+		return false, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.retryOpts = opts
+	return !f.missing[id], nil
+}
+
+func (f *Imports) Remove(_ context.Context, id string) error { return f.record("remove", id) }
+
+func (f *Imports) PreviewClearTerminal(_ context.Context, q services.ImportClearQuery) (int, error) {
+	if err := f.record("preview", q.Scope); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.clearCount, nil
+}
+
+func (f *Imports) ClearTerminal(_ context.Context, q services.ImportClearQuery) (int, error) {
+	if err := f.record("clear", q.Scope); err != nil {
+		return 0, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.clearCount, nil
+}
+
+func (f *Imports) Enqueue(_ context.Context, inputs []services.EnqueueImportInput) ([]services.ImportTask, error) {
+	if err := f.record("enqueue", ""); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.enqueued = append(f.enqueued, inputs...)
+	return nil, nil
+}
+
+func (f *Imports) SelectFiles(context.Context) ([]string, error) {
+	if err := f.record("select", ""); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.files...), nil
 }
