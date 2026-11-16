@@ -14,9 +14,16 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync/atomic"
 
 	vivaapp "guizhi-mygo-shell/viva/app"
+	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/screens/shell"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // vivaWindowClass 是 Viva 窗口的类名。Viva 把 WebView2 的 profile 放在 os.UserCacheDir()\<Class>\WebView2，
@@ -28,6 +35,10 @@ type vivaFlags struct {
 	on     *bool
 	width  *int
 	height *int
+	module *string
+	theme  *string
+	hue    *string
+	font   *string
 }
 
 func declareVivaFlags() vivaFlags {
@@ -35,6 +46,10 @@ func declareVivaFlags() vivaFlags {
 		on:     flag.Bool("viva", false, "Viva 原生界面（feat/viva-ui 开发中）：不加载 WebView 与渲染进程；必须与 -bench、-db、-userdata 同用"),
 		width:  flag.Int("viva-width", 1280, "Viva 窗口宽度（逻辑像素）"),
 		height: flag.Int("viva-height", 800, "Viva 窗口高度（逻辑像素）"),
+		module: flag.String("viva-module", "library", "Viva 界面的起始页：library|inbox|ask|wiki|imports|settings"),
+		theme:  flag.String("viva-theme", "", "覆盖外观的明暗：system|light|dark（只供开发与截图；缺省取设置）"),
+		hue:    flag.String("viva-hue", "", "覆盖外观的主题色：预设 ID（royal-blue、blue、purple、green、orange、teal）或「色相,饱和度」"),
+		font:   flag.String("viva-font", "", "覆盖外观的字号档：small|medium|large"),
 	}
 }
 
@@ -70,6 +85,97 @@ func flagGiven(name string) bool {
 	return given
 }
 
+// searchShortcutLabel 是顶栏搜索框右侧的快捷键提示：读主进程实际生效的「搜索」组合键，
+// 按渲染层 useShortcutLabel 在 Windows 上的规则格式化（CommandOrControl、Control 都显示 Ctrl）；读不到取默认值。
+func searchShortcutLabel(lib *Library) string {
+	combo := defaultShortcutAccelerators["search"]
+	if m, ok := lib.currentShortcuts().(*omap); ok {
+		if v, ok := m.vals["search"].(string); ok && v != "" {
+			combo = v
+		}
+	}
+	return formatShortcutLabel(combo)
+}
+
+// formatShortcutLabel 按渲染层 useShortcutLabel 在 Windows 上的规则显示组合键：CommandOrControl、Control 都写成 Ctrl。
+func formatShortcutLabel(combo string) string {
+	combo = strings.Replace(combo, "CommandOrControl", "Ctrl", 1)
+	return strings.Replace(combo, "Control", "Ctrl", 1)
+}
+
+// startPage 把 -viva-module 换成起始模块与页面；写错时返回带可选值的错误，而不是静默落回默认。
+func (f vivaFlags) startPage() (shell.Module, shell.Page, error) {
+	name := strings.TrimSpace(*f.module)
+	if name == "settings" {
+		return shell.ModuleLibrary, shell.PageSettings, nil
+	}
+	for _, m := range []shell.Module{shell.ModuleLibrary, shell.ModuleInbox, shell.ModuleAsk, shell.ModuleWiki, shell.ModuleImports} {
+		if string(m) == name {
+			return m, shell.PageHome, nil
+		}
+	}
+	return "", shell.PageHome, fmt.Errorf("未知的 -viva-module %q（可选：library|inbox|ask|wiki|imports|settings）", name)
+}
+
+// appearanceOverride 把外观开关做成对 kit.Spec 的覆盖；都没给返回 nil。写错时返回带可选值的错误。
+func (f vivaFlags) appearanceOverride() (func(kit.Spec) kit.Spec, error) {
+	if *f.theme == "" && *f.hue == "" && *f.font == "" {
+		return nil, nil
+	}
+	var (
+		mode     tokens.Mode
+		hue, sat float64
+		setHue   bool
+		font     string
+	)
+	switch tokens.Mode(*f.theme) {
+	case "":
+	case tokens.ModeLight, tokens.ModeDark, tokens.ModeSystem:
+		mode = tokens.Mode(*f.theme)
+	default:
+		return nil, fmt.Errorf("未知的 -viva-theme %q（可选：system|light|dark）", *f.theme)
+	}
+	if v := *f.hue; v != "" {
+		matched := false
+		for _, p := range tokens.HuePresets {
+			if p.ID == v {
+				hue, sat, setHue, matched = p.Hue, p.Saturation, true, true
+			}
+		}
+		if !matched {
+			h, s, ok := strings.Cut(v, ",")
+			hv, errH := strconv.ParseFloat(strings.TrimSpace(h), 64)
+			sv, errS := strconv.ParseFloat(strings.TrimSpace(s), 64)
+			if !ok || errH != nil || errS != nil {
+				return nil, fmt.Errorf("未知的 -viva-hue %q（预设 ID 或「色相,饱和度」）", v)
+			}
+			hue, sat, setHue = hv, sv, true
+		}
+	}
+	if v := *f.font; v != "" {
+		matched := false
+		for _, p := range tokens.FontSizes {
+			matched = matched || p.ID == v
+		}
+		if !matched {
+			return nil, fmt.Errorf("未知的 -viva-font %q（可选：small|medium|large）", v)
+		}
+		font = v
+	}
+	return func(spec kit.Spec) kit.Spec {
+		if mode != "" {
+			spec.Mode = mode
+		}
+		if setHue {
+			spec.Hue, spec.Saturation = hue, sat
+		}
+		if font != "" {
+			spec.FontSize = font
+		}
+		return spec
+	}, nil
+}
+
 // vivaBoot 是 runViva 需要的运行期依赖。
 type vivaBoot struct {
 	flags      vivaFlags
@@ -84,15 +190,36 @@ func runViva(vb vivaBoot) error {
 	if err := vb.flags.checkLaunch(false, vb.bench); err != nil { // main() 已检查过一次；这里再守一次，防止别的调用方绕过
 		return err
 	}
+	module, page, err := vb.flags.startPage()
+	if err != nil {
+		return err
+	}
+	appearance, err := vb.flags.appearanceOverride()
+	if err != nil {
+		return err
+	}
+
+	// 设置与偏好：界面设置在 config/ui-prefs.json，Go 侧设置在 settings 表（见 native_settings.go）。
+	// 自动化实例的 userdata 是一次性目录，不读用户的旧 WebView2 配置，也不会碰真实数据。
+	store := openUIPrefsStore(filepath.Join(vb.lib.paths.ConfigDir(), uiPrefsFileName), log.Printf)
+	nset := newNativeSettings(vb.lib, store, log.Printf)
+	hub := newPushHub()
+	vb.lib.setPush(hub.Dispatch) // 单监听推送 → 订阅者
+	svc := newNativeServices(vb.bridge, hub)
+	svc.Settings, svc.Prefs = nset, store
+
 	var ready atomic.Bool
 	if vb.bench {
 		go announceReady(ready.Load)
 	}
-	err := vivaapp.Run(vivaapp.Options{
+	err = vivaapp.Run(vivaapp.Options{
 		Class: vivaWindowClass, Title: "归知 GuiZhi",
 		Width: *vb.flags.width, Height: *vb.flags.height,
 		MinWidth: minWindowWidth, MinHeight: minWindowHeight,
-		OnReady: func() { ready.Store(true) },
+		OnReady:  func() { ready.Store(true) },
+		Services: svc, Module: module, Page: page,
+		SearchShortcut: searchShortcutLabel(vb.lib),
+		Appearance:     appearance,
 	})
 	if err != nil {
 		return fmt.Errorf("Viva 窗口退出：%w", err)

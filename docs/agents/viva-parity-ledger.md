@@ -8,7 +8,7 @@
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
 | A（平台/Viva 确实做不到） | 6 | A-001…A-006 |
-| B（暂缺，已定里程碑） | 7 | B-001…B-007 |
+| B（暂缺，已定里程碑） | 10 | B-001…B-010 |
 | C（需用户裁决） | 1 | 见 C-001 |
 | 未测（按未通过计） | 5 | 见「未测项」 |
 | 验证缺口（对照工具尚未覆盖，按未验证计） | 3 | 见「验证缺口」 |
@@ -62,8 +62,8 @@
 - 场景/模块：所有整窗场景（`app.window.*`）的真窗口；顶栏最右的三枚窗口按钮。
 - 偏差：渲染层（`TopBar.tsx`）画三枚 `w-11`（2.75rem，随根字号 38.5 / 44 / 49.5px）、`h-full` 的按钮，图标是 lucide 线性图标；Viva 在自绘标题栏里自己画这三枚按钮，宽度固定 46 逻辑像素、高度等于 `Config.TitlebarHeight`，字形是 10 单位见方、线宽 1 的内置图形，且 headless 会话不画它们。
 - 证据：`github.com/vivaui/viva@v0.6.4/internal/platform/win32_frame.go` 第 6 行 `const WindowControlWidth = 46`；`app/window_controls.go` 第 11–14 行（"width in logical pixels of each of the minimize, maximize and close buttons … as tall as Config.TitlebarHeight"）、第 197 行（按钮外框 `size.Width - (3-index)*WindowControlWidth`）、第 241 行（字形居中、边长 `glyph = 10`）；`WindowControlsStyle`（第 63–81 行）只开放前景色、悬停色、按下色、关闭色与四个名字，没有宽度与图标入口；`app/window_controls_viva.go` 第 13 行 `TitlebarInsets() (leading, trailing) = (0, 3*WindowControlWidth)`。
-- 已做的补偿：(1) 真窗口里顶栏右端的留位取「渲染层宽度」与 `3*46px` 的较大者，避免 Viva 的按钮压住「新建」（小字号档「新建」比渲染层左移 19px、中档 2px，大字号档右端多留 15px）；按钮的名字与悬停色、关闭按钮红色（red-500）按渲染层经 `WindowControlsStyle` 配置，**待真窗口接线（阶段 2 的外壳）时落实，尚未接线**；(2) 对照工具与无头测试里用 `shell.Window.OwnControls` 自己画与渲染层一致的三枚按钮，所以整窗场景的 L1–L3 是在「渲染层样式」上比较的，**真窗口里这三枚按钮的形状与宽度与渲染层不同**；(3) 备选路线（未验证）：无边框窗口加自绘三枚按钮，要自己处理拖动区域、最大化吸附与双击标题栏，代价高，待用户裁决是否值得。
-- 状态：开（引擎限制）。阶段末在 `AskQuestion` 里请用户知悉真窗口的差异并决定是否走备选路线。
+- 已做的补偿：(1) 真窗口里顶栏右端的留位取「渲染层宽度」与 `3*46px` 的较大者，避免 Viva 的按钮压住「新建」（小字号档「新建」比渲染层左移 19px、中档 2px，大字号档右端多留 15px）；按钮的名字与悬停色、关闭按钮红色（red-500）按渲染层经 `WindowControlsStyle` 配置，已在真窗口接线（`viva/screens/shell/controls.go` 的 `ControlsStyle`，`viva/app/app.go` 的 `WindowControls`；真窗口截图 `D:\Project\GuiZhi-bench\viva-ui\shots\settings-light.png`，不入库）；(2) 对照工具与无头测试里用 `shell.Window.OwnControls` 自己画与渲染层一致的三枚按钮，所以整窗场景的 L1–L3 是在「渲染层样式」上比较的，**真窗口里这三枚按钮的形状与宽度与渲染层不同**；(3) **没有可行的备选路线**：`app.Window` 没有公开的最小化/最大化方法（公开方法只有 `Close`、`Hide`、`Show`、`SetSize`、`SetFullscreen`、`SetAlwaysOnTop` 与几个只读查询；`SetMinimized`/`SetMaximized` 只在测试驱动 `app.Driver` 上，`app/driver.go` 第 331、363 行），所以「无边框窗口 + 自绘三枚按钮」做不出最小化与最大化。
+- 状态：开（引擎限制）。阶段末在 `AskQuestion` 里请用户知悉真窗口的差异（没有备选路线可裁决，只能接受或放弃自绘标题栏，改用系统标题栏——那样顶栏的位置与高度都要变，偏差更大）。
 
 ### A-006 固定间距文字（等宽）的字格取整
 
@@ -84,6 +84,9 @@
 | B-005 | 图标：`Database`、`DatabaseBackup`（`settings.shell` 数据页导航项） | 这两枚图标的路径含椭圆弧（`A9 3`，rx≠ry）。Viva 的图标编译器 `tools/iconcompile/compile.go` 第 889–892 行 `controlOn` 把椭圆的切线方向写成 `(-tangent·ry·sin, tangent·rx·cos)`，正确应为 `(-tangent·rx·sin, tangent·ry·cos)`，圆弧（rx=ry）不受影响、椭圆弧的控制点错位。后果：16px 图标中心线下缘 14.909px，正确值 14.667px（偏 0.24px）。用到的 139 枚 lucide 图标里只有这两枚含椭圆弧（`<ellipse>` 元素走另一条正确的路径）。 | M0 结束前：生成器 `viva/icons/gen` 在编译前把含椭圆弧的 `d` 展开成正确的三次曲线，并加几何范围单测 |
 | B-006 | 顶栏「更新」按钮（`app.window.*` 的「有可用更新」状态） | 渲染层按钮是 `border-dashed` 虚线边框（border-primary/50）；Viva 目前画实线。Viva 的 `ui.Box.Dashed()` 能画虚线，但 Chromium 的虚线节奏（线段与间隔长度、拐角处理）还没有对照采集，所以还没法逐项核对。 | M1：先加「有更新」的场景变体并采集，再对照调整 |
 | B-007 | 顶栏「新建」旁的创建方式菜单 | 点击箭头按钮弹出 `ContextMenu`（三项：快速采集（带快捷键）、空白笔记、采集文件，各有说明文字）；点击后分别触发快速采集、新建空白条目、选文件并入采集队列后 toast。Viva 目前只有箭头按钮与 `aria-expanded` 状态，菜单本身未实现。 | M0 弹层工具包（菜单）→ M1 窗口外壳；采集与快速采集对话框在 M3 |
+| B-008 | 顶栏动作接线：搜索框、「新建」主按钮、「更新」按钮 | 点击搜索框打开命令面板（`OnOpenPalette`）；点「新建」主按钮发起快速采集（`OnNewCapture`）；「有可用更新」按钮打开更新对话框（`OnUpdate`）。回调已在 `shell.Window` 上留好，但命令面板、采集与更新对话框都在 M3，所以真窗口里这三处点击目前没有反应。 | M3（命令面板、快速采集、更新对话框） |
+| B-009 | 设置：首次读取失败的界面 | 按 AGENTS.md，加载失败要显示 `LoadErrorState`（含重试），不能把默认值当成真实设置渲染。`settingsStore` 已记录首次读取错误（`LoadError()`，有单测），但设置页还没有展示它的组件。 | M0 工具包（`LoadErrorState`）→ 接到设置页 |
+| B-010 | 窗口：改字号档后，Viva 画的窗口按钮条高度 | 渲染层的窗口按钮 `h-full`，随顶栏高度（3rem）在改字号档的瞬间变化；Viva 的 `Config.TitlebarHeight` 只在创建窗口时读取一次（`app/window_controls.go` 第 140–145 行 `newWindowControls` 只算一次 `height`），没有运行时修改的入口，所以改字号档后按钮条高度保持创建时的值，直到重启。尚未尝试「字号档变化时重开窗口」的做法（会闪一下并要保住位置与状态）。 | M0 外壳接线末（阶段 2 结束前）：评估重开窗口方案；不可行则凭证据转 A 类 |
 
 ## C 类：需要用户裁决
 

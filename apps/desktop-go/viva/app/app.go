@@ -1,17 +1,23 @@
 // Package app 是 Viva 原生界面的外壳：负责开窗口并承载页面。
 //
-// 阶段 0 只有骨架（一个空页面，用来验证 -viva 启动路径、READY 握手与空闲内存基线）；
-// 窗口与自绘标题栏、rail、路由、托盘、快捷键、通知、单实例在阶段 2（M0）与阶段 3（M1）补齐。
+// Root 把服务、设置与外观装配成页面（root.go）；Run 打开自绘标题栏的主窗口并阻塞到退出。
+// 托盘、全局快捷键、单实例与通知在阶段 2 的外壳接线里补齐（见 docs/agents/viva-ui-development.md §0）。
 package app
 
 import (
 	"fmt"
-	"sync"
 
 	vapp "github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/screens/shell"
 )
+
+// InterfaceFont 是界面字体族：渲染层的 font-family 里 system-ui 在中文 Windows 上解析成它。
+const InterfaceFont = "Microsoft YaHei UI"
 
 // Options 是外壳的装配参数。
 type Options struct {
@@ -26,6 +32,18 @@ type Options struct {
 	MinWidth, MinHeight int
 	// OnReady 在第一帧声明完成后调用一次（窗口线程）。可为空。
 	OnReady func()
+
+	// Services 是界面依赖的 Go 能力（设置、偏好、导入队列、日志……）；缺省的字段界面按默认值处理。
+	Services services.Services
+	// Module、Page 是起始页：空模块取知识库，Page 为设置页时直接打开设置。
+	Module shell.Module
+	Page   shell.Page
+	// SearchShortcut 是顶栏快捷键提示（读主进程实际生效的组合键）。
+	SearchShortcut string
+	// SystemDark 是启动时系统是否深色；之后由系统外观监听更新。
+	SystemDark bool
+	// Appearance 非空时，在设置里的外观之上再叠加一次（自动化实例用命令行开关覆盖外观）。
+	Appearance func(kit.Spec) kit.Spec
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -33,21 +51,28 @@ func Run(opts Options) error {
 	if opts.Class == "" {
 		return fmt.Errorf("viva/app: Class 不能为空（WebView2 profile 必须用专用名）")
 	}
-	var ready sync.Once
-	theme := ui.LightTheme()
+	vapp.SetInterfaceFontFamily(InterfaceFont)
+	var inv vapp.Invalidator
+	root := NewRoot(opts, inv.Invalidate)
+	defer root.Close()
+	stopAppearance := root.WatchSystemAppearance(inv.Invalidate)
+	defer stopAppearance()
+
 	page := ui.NewPage(ui.PageConfig{
-		Theme: &theme,
-		View: func(ui.C) {
-			if opts.OnReady != nil {
-				ready.Do(opts.OnReady)
-			}
-		},
+		View: root.View, Theme: root.ThemeRef(), Background: root.BackgroundRef(), Invalidator: &inv,
 	})
 	return vapp.RunApplication(func(a *vapp.Application) error {
+		look := root.Look()
 		config := page.Config(vapp.Config{
 			Title: opts.Title, Class: opts.Class,
 			Width: opts.Width, Height: opts.Height,
 			MinWidth: opts.MinWidth, MinHeight: opts.MinHeight,
+			// 自绘标题栏：内容铺满整窗，顶栏就是标题栏；窗口按钮由 Viva 画在右上角（台账 A-005）。
+			// TitlebarHeight 只在创建时生效，之后改字号档不会改变按钮条高度（台账 A-007）。
+			WindowMode:     vapp.WindowCustomTitlebar,
+			TitlebarHeight: look.Rem(3),
+			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },
+			ClearColor:     clearColor(look.Col(look.T.Background)),
 		})
 		var canvas gfx.Canvas
 		if _, err := a.OpenWindow(config, &canvas); err != nil {
@@ -55,4 +80,9 @@ func Run(opts Options) error {
 		}
 		return nil
 	})
+}
+
+// clearColor 把 gfx 颜色换成窗口配置用的颜色类型。
+func clearColor(c gfx.Color) vapp.Color {
+	return vapp.Color{Red: float64(c.Red), Green: float64(c.Green), Blue: float64(c.Blue), Alpha: float64(c.Alpha)}
 }
