@@ -45,6 +45,10 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 			continue
 		}
 		checkWrappedPitch(rep, th, subject, p)
+		overlay := false
+		for _, v := range p.Viva {
+			overlay = overlay || v.Overlay
+		}
 		k := 0
 		for _, v := range p.Viva {
 			for li, vr := range v.Rects {
@@ -68,7 +72,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 					rep.L2.TextWidthOK++
 				}
 				if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
-					checkInk(rep, in, th, subject, rr, true)
+					checkInk(rep, in, th, subject, rr, true, overlay)
 				}
 			}
 		}
@@ -81,7 +85,8 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 // 而基线整体差一个像素时，剖面的最佳对齐位移一定是 ±1。所以取使剖面平方差最小的位移，上下位移必须不超过 InkMaxDeltaY，
 // 左右不超过 InkMaxDeltaX；另外墨迹总量（强度之和）的比值要落在 [InkMassMin, InkMassMax]，用来发现字重或颜色不对。
 // 返回量到的墨迹比与位移；两侧都没有墨迹或区域为空时返回 nil。
-func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed bool) *InkMeasure {
+// overlay 为真表示这行文字画在浮层里：墨迹总量比的问题会带上 Overlay 标记，供已登记的浮层文字偏差（A-009）匹配。
+func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed, overlay bool) *InkMeasure {
 	area := image.Rect(
 		int(math.Floor(rect.X()))-1, int(math.Floor(rect.Y()))-1,
 		int(math.Ceil(rect.Right()))+1, int(math.Ceil(rect.Bottom()))+1,
@@ -122,6 +127,7 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 	case ratio < th.Metrics.InkMassMin || ratio > th.Metrics.InkMassMax:
 		rep.add(LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
 			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)
+		rep.Issues[len(rep.Issues)-1].Overlay = overlay
 	default:
 		rep.L2.InkOK++
 	}

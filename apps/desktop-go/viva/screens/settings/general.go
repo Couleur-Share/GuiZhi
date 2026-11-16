@@ -25,8 +25,8 @@ type General struct {
 	Look  *kit.Look
 	Store Store
 
-	closeOpen    bool // 关闭行为下拉是否展开
-	languageOpen bool // 语言下拉是否展开
+	closeSel    kit.SelectState // 关闭行为下拉
+	languageSel kit.SelectState // 语言下拉
 }
 
 // Page 声明整页：标题加五个分区。
@@ -79,23 +79,25 @@ func (g *General) startup(c ui.C) {
 			// 渲染层仅在 Windows 上显示；归知只面向 Windows，所以恒显示。
 			Label: locales.SettingsCloseAction(), Description: locales.SettingsCloseActionDesc(),
 			Control: func() {
-				current := g.Store.Values().UI.CloseAction
-				g.Look.SelectTrigger(c, locales.SettingsCloseAction(), closeActionLabel(current), g.Look.Rem(10), g.closeOpen)
+				picked, ok := g.Look.Select(c, &g.closeSel, kit.SelectSpec{
+					Label: locales.SettingsCloseAction(), Value: string(g.Store.Values().UI.CloseAction),
+					Options: closeActionOptions(), Width: g.Look.Rem(10), // w-40
+				})
+				if ok {
+					_ = g.Store.Update(func(v *settings.Values) { v.UI.CloseAction = settings.CloseAction(picked) })
+				}
 			},
 		},
 	}
 	g.Look.SettingSection(c, locales.SettingsStartup(), rows)
 }
 
-// closeActionLabel 是关闭行为取值对应的选项文案。
-func closeActionLabel(a settings.CloseAction) string {
-	switch a {
-	case settings.CloseMinimize:
-		return locales.SettingsCloseToTray()
-	case settings.CloseExit:
-		return locales.SettingsCloseApp()
-	default:
-		return locales.SettingsAskEveryTime()
+// closeActionOptions 是关闭行为的选项（渲染层 GeneralSettings 里的 ask / minimize / exit）。
+func closeActionOptions() []kit.SelectOption {
+	return []kit.SelectOption{
+		{Value: string(settings.CloseAsk), Label: locales.SettingsAskEveryTime()},
+		{Value: string(settings.CloseMinimize), Label: locales.SettingsCloseToTray()},
+		{Value: string(settings.CloseExit), Label: locales.SettingsCloseApp()},
 	}
 }
 
@@ -132,18 +134,24 @@ func (g *General) language(c ui.C) {
 		{
 			Label: locales.SettingsLanguage(), Description: locales.SettingsSelectLanguage(),
 			Control: func() {
-				g.Look.SelectTrigger(c, locales.SettingsLanguage(), languageLabel(g.Store.Values().App.Language), g.Look.Rem(10), g.languageOpen)
+				picked, ok := g.Look.Select(c, &g.languageSel, kit.SelectSpec{
+					Label: locales.SettingsLanguage(), Value: string(g.Store.Values().App.Language),
+					Options: languageOptions(), Width: g.Look.Rem(10), // w-40
+				})
+				if ok {
+					_ = g.Store.Update(func(v *settings.Values) { v.App.Language = settings.Language(picked) })
+				}
 			},
 		},
 	})
 }
 
-// languageLabel 是语言取值对应的选项文案：语言名不翻译，两种界面语言下都是各自的本名。
-func languageLabel(lang settings.Language) string {
-	if lang == settings.LangEn {
-		return locales.NativeLanguageNameEn()
+// languageOptions 是语言的选项：语言名不翻译，两种界面语言下都是各自的本名。
+func languageOptions() []kit.SelectOption {
+	return []kit.SelectOption{
+		{Value: string(settings.LangZh), Label: locales.NativeLanguageNameZh()},
+		{Value: string(settings.LangEn), Label: locales.NativeLanguageNameEn()},
 	}
-	return locales.NativeLanguageNameZh()
 }
 
 func (g *General) notifications(c ui.C) {

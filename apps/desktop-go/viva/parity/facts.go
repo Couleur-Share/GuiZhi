@@ -147,6 +147,8 @@ type Text struct {
 	TestID     string    `json:"testId,omitempty"`   // React：最近的 data-testid
 	Painted    []float64 `json:"painted,omitempty"`  // Viva：渲染引擎量出的绘制宽度（每行一个）
 	Baseline   []float64 `json:"baseline,omitempty"` // Viva：基线的 y 坐标（每行一个）
+	Overlay    bool      `json:"overlay,omitempty"`  // Viva：文字画在浮层（下拉面板、对话框、提示）里
+	Hidden     bool      `json:"hidden,omitempty"`   // Viva：被滚动容器或窗口边缘裁得一点不剩，没有画出来（A-010）
 }
 
 // Paint 是一个有绘制的元素（React：背景/边框/圆角/阴影/轮廓/SVG；Viva：图元归并后的同类描述）。

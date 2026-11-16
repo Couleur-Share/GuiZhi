@@ -36,6 +36,7 @@ func TestScenesMatchReactFacts(t *testing.T) {
 		for _, file := range files {
 			sceneID := strings.TrimSuffix(filepath.Base(file), ".facts.json")
 			t.Run(e.Name()+"/"+sceneID, func(t *testing.T) {
+				t.Parallel() // 每次渲染都有自己的外观、页面与无头会话，互不共享状态；并行把总耗时压在 10 秒预算内
 				react, err := parity.LoadFacts(file)
 				if err != nil {
 					t.Fatal(err)
@@ -44,7 +45,7 @@ func TestScenesMatchReactFacts(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				viva, _, err := parity.Render(scene, react.Variant, react.Region)
+				viva, err := parity.RenderFacts(scene, react.Variant, react.Region)
 				if err != nil {
 					t.Fatal(err)
 				}

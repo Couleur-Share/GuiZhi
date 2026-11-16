@@ -1,14 +1,20 @@
 package kit
 
 import (
+	"math"
+
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/icons"
 )
 
+// slotChevron 是触发按钮箭头的旋转动画槽位（同一个控件 ID 上的动画用槽位区分）。
+const slotChevron uint8 = 1
+
 // SelectTrigger 复刻渲染层 Select 的触发按钮：w-full h-10 px-3 rounded-lg bg-muted，文字 text-sm，
-// 右侧 16px 的 ChevronDown（muted-foreground），gap-2。悬停 bg-muted/80；获得焦点或展开时 ring-2 ring-primary/30。
+// 右侧 16px 的 ChevronDown（muted-foreground），gap-2。悬停 bg-muted/80；获得焦点或展开时 ring-2 ring-primary/30；
+// 整体 transition-all duration-quick（背景与环渐变），展开时箭头 rotate-180（transition-transform duration-base）。
 // width 是外层容器宽度（调用方按 Tailwind 的 w-40 等换算成像素）；open 是列表是否展开。
 //
 // 对外的可访问语义是带弹层的下拉触发器（combobox，展开状态与当前值）：渲染层是
@@ -29,12 +35,40 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 		Gap(gap).
 		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Expanded: open, Value: value}).
 		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.8)))).
-		Focused(ui.Look{}.Ring(2, ring))
+		Focused(ui.Look{}.Ring(2, ring)).
+		TransitionWith(l.Motion(DurationQuick, EaseStandard))
 	if open {
 		box = box.Ring(2, ring)
 	}
 	return box.Children(func() {
 		l.Text(c, value, TextSM, WeightNormal, t.Foreground, Ellipsis()).Grow(1).Shrink(1)
-		l.Icon(c, icons.ChevronDown, chevron, t.MutedForeground)
+		l.rotatingChevron(c, id, chevron, open)
+	})
+}
+
+// rotatingChevron 画触发按钮右侧的 ChevronDown：展开时旋转 180°（transition-transform duration-base，标准缓动）。
+// 静止（0° 与 180°）时用精确栅格化的 ChevronDown / ChevronUp——lucide 的 chevron-up 正是 chevron-down 绕中心转半圈，
+// 几何完全相同；只有动画中途才用 Viva 原生的旋转绘制。
+func (l *Look) rotatingChevron(c ui.C, id gfx.ID, size float32, open bool) ui.Box {
+	col := l.Col(l.T.MutedForeground)
+	target := float32(0)
+	if open {
+		target = 1
+	}
+	motion := l.Motion(DurationBase, EaseStandard)
+	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
+		if sink := l.IconSink; sink != nil {
+			sink(d.Rect)
+		}
+		tint := d.Fade(col)
+		turn := d.Canvas.Animate(id, slotChevron, target, motion)
+		switch {
+		case turn <= 0.001:
+			PaintIcon(d.Canvas, icons.ChevronDown, d.Rect, tint)
+		case turn >= 0.999:
+			PaintIcon(d.Canvas, icons.ChevronUp, d.Rect, tint)
+		default:
+			d.Canvas.DrawIconTransformed(icons.ChevronDown, d.Rect, tint, gfx.IconTransform{Rotate: math.Pi * turn})
+		}
 	})
 }

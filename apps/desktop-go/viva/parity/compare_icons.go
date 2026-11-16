@@ -94,7 +94,7 @@ func compareIcons(rep *Report, in Inputs, th Thresholds) {
 			continue
 		}
 		if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
-			if m := checkInk(rep, in, th, subject, p.React, false); m != nil {
+			if m := checkInk(rep, in, th, subject, p.React, false, false); m != nil {
 				rep.L2.IconInk = append(rep.L2.IconInk, *m)
 			}
 		}

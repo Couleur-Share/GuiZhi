@@ -31,7 +31,12 @@ func openRoot(t *testing.T, mutate func(*Options)) *rootFixture {
 	t.Helper()
 	vapp.SetInterfaceFontFamily(InterfaceFont)
 	f := &rootFixture{fake: &servicestest.Settings{}}
-	opts := Options{Services: services.Services{Settings: f.fake}, Page: shell.PageSettings}
+	opts := Options{
+		Services: services.Services{Settings: f.fake}, Page: shell.PageSettings,
+		// 结果不随运行机器的系统「减少动态效果」变化；默认关闭动效，让画面总在终态（动画时钟只在无头会话里手动推进）。
+		OSReduceMotion: func() bool { return false },
+		Appearance:     func(s kit.Spec) kit.Spec { s.Motion = kit.MotionLevelOff; return s },
+	}
 	if mutate != nil {
 		mutate(&opts)
 	}
@@ -62,18 +67,46 @@ func (f *rootFixture) frames(t *testing.T, n int) {
 func TestSpecFromSettings(t *testing.T) {
 	ui := settings.Default().UI
 	ui.ThemeMode, ui.ThemeHue, ui.ThemeSaturation, ui.FontSize = settings.ThemeSystem, 120, 55, settings.FontLarge
-	want := kit.Spec{Mode: tokens.ModeSystem, SystemDark: true, Hue: 120, Saturation: 55, FontSize: "large"}
-	if got := SpecFromSettings(ui, true); got != want {
+	want := kit.Spec{
+		Mode: tokens.ModeSystem, SystemDark: true, Hue: 120, Saturation: 55, FontSize: "large",
+		Motion: kit.MotionLevelStandard,
+	}
+	if got := SpecFromSettings(ui, true, false); got != want {
 		t.Errorf("SpecFromSettings = %+v，期望 %+v", got, want)
 	}
 	// 「跟随系统」才看系统明暗；明确选了浅色时，系统深色不能影响外观。
 	ui.ThemeMode = settings.ThemeLight
-	if kit.NewLook(SpecFromSettings(ui, true)).Dark {
+	if kit.NewLook(SpecFromSettings(ui, true, false)).Dark {
 		t.Error("明确选浅色时，系统深色不应让界面变深")
 	}
 	ui.ThemeMode = settings.ThemeSystem
-	if !kit.NewLook(SpecFromSettings(ui, true)).Dark || kit.NewLook(SpecFromSettings(ui, false)).Dark {
+	if !kit.NewLook(SpecFromSettings(ui, true, false)).Dark || kit.NewLook(SpecFromSettings(ui, false, false)).Dark {
 		t.Error("跟随系统时，界面明暗应与系统一致")
+	}
+}
+
+// 动效偏好与系统「减少动态效果」合并成实际档位（复刻 globals.css 的规则）。
+func TestSpecFromSettingsMotion(t *testing.T) {
+	cases := []struct {
+		pref     settings.MotionPreference
+		osReduce bool
+		want     kit.MotionLevel
+	}{
+		{settings.MotionSystem, false, kit.MotionLevelStandard},
+		{settings.MotionSystem, true, kit.MotionLevelOff},
+		{settings.MotionStandard, false, kit.MotionLevelStandard},
+		{settings.MotionStandard, true, kit.MotionLevelStandard}, // 用户在应用内明确选了标准：无视系统降级
+		{settings.MotionReduced, false, kit.MotionLevelReduced},
+		{settings.MotionReduced, true, kit.MotionLevelOff},
+		{settings.MotionOff, false, kit.MotionLevelOff},
+		{settings.MotionOff, true, kit.MotionLevelOff},
+	}
+	for _, c := range cases {
+		ui := settings.Default().UI
+		ui.MotionPreference = c.pref
+		if got := SpecFromSettings(ui, false, c.osReduce).Motion; got != c.want {
+			t.Errorf("动效偏好 %q、系统减少动态效果=%v：档位 %v，期望 %v", c.pref, c.osReduce, got, c.want)
+		}
 	}
 }
 

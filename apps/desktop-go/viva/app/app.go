@@ -44,6 +44,9 @@ type Options struct {
 	SystemDark bool
 	// Appearance 非空时，在设置里的外观之上再叠加一次（自动化实例用命令行开关覆盖外观）。
 	Appearance func(kit.Spec) kit.Spec
+	// OSReduceMotion 报告系统是否要求减少动态效果，与设置里的动效偏好合并成实际动效档位；缺省读系统（Windows 的「显示动画」开关）。
+	// 无头测试注入固定值，结果才不随运行机器的系统设置变化。
+	OSReduceMotion func() bool
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -68,7 +71,7 @@ func Run(opts Options) error {
 			Width: opts.Width, Height: opts.Height,
 			MinWidth: opts.MinWidth, MinHeight: opts.MinHeight,
 			// 自绘标题栏：内容铺满整窗，顶栏就是标题栏；窗口按钮由 Viva 画在右上角（台账 A-005）。
-			// TitlebarHeight 只在创建时生效，之后改字号档不会改变按钮条高度（台账 A-007）。
+			// TitlebarHeight 只在创建时生效，之后改字号档不会改变按钮条高度（台账 B-010）。
 			WindowMode:     vapp.WindowCustomTitlebar,
 			TitlebarHeight: look.Rem(3),
 			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },

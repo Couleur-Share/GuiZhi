@@ -58,11 +58,19 @@ func NewRoot(opts Options, invalidate func()) *Root {
 
 // currentSpec 是此刻应当使用的外观：设置里的外观，自动化实例再叠加命令行覆盖。
 func (r *Root) currentSpec() kit.Spec {
-	spec := SpecFromSettings(r.store.Values().UI, r.systemDark.Load())
+	spec := SpecFromSettings(r.store.Values().UI, r.systemDark.Load(), r.osReduceMotion())
 	if r.opts.Appearance != nil {
 		spec = r.opts.Appearance(spec)
 	}
 	return spec
+}
+
+// osReduceMotion 是系统是否要求减少动态效果。
+func (r *Root) osReduceMotion() bool {
+	if r.opts.OSReduceMotion != nil {
+		return r.opts.OSReduceMotion()
+	}
+	return vapp.ReduceMotion()
 }
 
 // syncLook 在外观输入变化时重新装配 Look，并让页面读到新主题；c 非空时顺带取窗口缩放。
@@ -79,7 +87,11 @@ func (r *Root) syncLook(c ui.C) {
 		r.win.Look, r.settings.Look = r.look, r.look
 	}
 	if c != nil {
-		r.look.Scale = float32(c.Canvas().PixelScale())
+		canvas := c.Canvas()
+		r.look.Scale = float32(canvas.PixelScale())
+		// 动效关闭档：让 Viva 的过渡与入退场直接到终态（它自己的「减少动态效果」开关就是这个语义）；
+		// 其余档位播放动画，时长由 kit 按档位给出。
+		canvas.SetReduceMotion(r.lookSpec.Motion == kit.MotionLevelOff)
 	}
 }
 

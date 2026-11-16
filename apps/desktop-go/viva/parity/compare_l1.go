@@ -66,6 +66,7 @@ func quote(s string) string { return "「" + s + "」" }
 // 区域裁剪：React 参照只记录区域内可见的文字；一段折行文字可能第一行在区域内、后几行在区域外。
 // 所以匹配时 Viva 的区域外的行也可以用来补全一段文字（拼接要等于 React 的整段文字），但区域外的行
 // 不参与后续的行数、宽度、墨迹比较（textPair.Viva 只留区域内的行），区域外没被消费的行也不算多余。
+// 被滚动容器裁掉、没有画出来的行（Text.Hidden，A-010）同理：不算呈现出来的文字，但可以补全折行的原文。
 func compareTexts(rep *Report, in Inputs) []textPair {
 	region := in.React.Region.Box()
 	var reactTexts []Text
@@ -86,7 +87,7 @@ func compareTexts(rep *Report, in Inputs) []textPair {
 		}
 		visible := false
 		for _, r := range t.Rects {
-			if c := r.Clip(region); c.W() > 0 && c.H() > 0 {
+			if c := r.Clip(region); c.W() > 0 && c.H() > 0 && !t.Hidden {
 				visible = true
 			}
 		}
@@ -97,43 +98,58 @@ func compareTexts(rep *Report, in Inputs) []textPair {
 	}
 	rep.L1.ReactTexts, rep.L1.VivaTexts = len(reactTexts), visibleCount
 
-	var out []textPair
-	vi := 0
-	for _, rt := range reactTexts {
-		// 起点之前区域外的 Viva 行不属于任何 React 文字，直接跳过。
-		for vi < len(vivaTexts) && !vivaTexts[vi].visible {
-			vi++
-		}
-		target := SquashText(rt.Text)
-		if vi >= len(vivaTexts) {
-			rep.add(LayerL1, "missing-text", quote(NormText(rt.Text)), "React 有、Viva 没有")
-			continue
-		}
-		var group []Text
+	// consume 从 from 起累加 Viva 行，直到拼接等于 target；group 只收看得见的行。
+	// 整段都看不见（group 为空）不算命中：React 记录的文字至少有一行在区域内可见。
+	consume := func(from int, target string) (group []Text, end int, ok bool) {
 		acc := ""
-		start := vi
-		for vi < len(vivaTexts) {
-			next := acc + SquashText(vivaTexts[vi].line.Text)
+		for end = from; end < len(vivaTexts); {
+			next := acc + SquashText(vivaTexts[end].line.Text)
 			if !strings.HasPrefix(target, next) {
 				break
 			}
 			acc = next
-			if vivaTexts[vi].visible {
-				group = append(group, vivaTexts[vi].line)
+			if vivaTexts[end].visible {
+				group = append(group, vivaTexts[end].line)
 			}
-			vi++
+			end++
 			if acc == target {
+				return group, end, len(group) > 0
+			}
+		}
+		return nil, end, false
+	}
+
+	var out []textPair
+	vi := 0
+	for _, rt := range reactTexts {
+		target := SquashText(rt.Text)
+		// 当前位置起第一条看得见的 Viva 行。它之前看不见的行有两种可能：不属于任何 React 文字（区域外、
+		// 滚出容器的零散文字），或者是一段折行文字滚出去的开头几行；所以起点从 vi 到 first 逐个试，
+		// 但不能越过看得见的行——跳过一条看得见的行就等于吞掉一处不一致。
+		first := vi
+		for first < len(vivaTexts) && !vivaTexts[first].visible {
+			first++
+		}
+		if first >= len(vivaTexts) {
+			rep.add(LayerL1, "missing-text", quote(NormText(rt.Text)), "React 有、Viva 没有")
+			continue
+		}
+		matched := false
+		for start := vi; start <= first; start++ {
+			if group, end, ok := consume(start, target); ok {
+				out = append(out, textPair{React: rt, Viva: group})
+				vi = end
+				matched = true
 				break
 			}
 		}
-		if acc != target {
-			rep.add(LayerL1, "text", quote(NormText(rt.Text)), "文字不一致：Viva 对应位置是「%s」", NormText(vivaTexts[start].line.Text))
-			if vi == start {
-				vi++ // 不匹配的一条 Viva 文字跳过，免得整个序列错位
-			}
+		if matched {
 			continue
 		}
-		out = append(out, textPair{React: rt, Viva: group})
+		rep.add(LayerL1, "text", quote(NormText(rt.Text)), "文字不一致：Viva 对应位置是「%s」", NormText(vivaTexts[first].line.Text))
+		// 已经吻合了前缀的行算作这一段，剩下的才留给后面的 React 文字；一行都没吻合就跳过这一条，免得序列错位。
+		_, end, _ := consume(first, target)
+		vi = max(first+1, end)
 	}
 	for ; vi < len(vivaTexts); vi++ {
 		if vivaTexts[vi].visible {

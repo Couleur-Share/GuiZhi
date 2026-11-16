@@ -7,7 +7,7 @@
 
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
-| A（平台/Viva 确实做不到） | 6 | A-001…A-006 |
+| A（平台/Viva 确实做不到） | 10 | A-001…A-010 |
 | B（暂缺，已定里程碑） | 10 | B-001…B-010 |
 | C（需用户裁决） | 1 | 见 C-001 |
 | 未测（按未通过计） | 5 | 见「未测项」 |
@@ -72,6 +72,37 @@
 - 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 806–819 行 `MonoCellSize` 的文档（"On a canvas that knows the display scale (SetPixelScale) the width is a whole number of device pixels, rounded to the nearest and at least one"）：字格宽度取整到整设备像素，1× 缩放下 Consolas 10px 的 5.498px 变成 5px；实测 `light-royal-blue-medium-1280x800` 的快捷键提示，渲染层文字宽 60.48px、Viva 55.00px（L2 `text-width` 差 5.48px，墨迹位置差最多一个字格），见 `D:\Project\GuiZhi-bench\parity\viva-m1-t3\*\app.window.page-settings.report.md`（不入库）。
 - 已做的补偿：`kit.MonoAdvance` 按 Consolas 前进量算出渲染层的行宽，把外框与行盒做成渲染层的值（所以外框、右对齐与周围元素位置都对得上，L2 外框检查通过），字形仍按 Viva 的字格画；两条与它相关的 L2 问题（`text-width`、`ink`）在场景里以 `Waiver` 登记，报告里单列。
 - 状态：开（引擎限制；升级 Viva 版本时复测）。
+
+### A-007 遮罩与卡片背后的模糊（backdrop-filter）
+
+- 场景/模块：`Modal` 遮罩（`bg-background/60 backdrop-blur-md`，12px）、`ConfirmDialog` 遮罩（`bg-background/60 backdrop-blur-sm`，4px）、`Toast` 卡片背后（`backdrop-blur-md`）。三者在 `kit` 里随 S4 实现，对话框与 toast 的整窗场景进入对照时在这里补实测数据。
+- 偏差：渲染层把遮罩与卡片背后的页面做高斯模糊；Viva 没有「模糊已画内容」的原语，遮罩下的页面保持清晰。
+- 证据：`github.com/vivaui/viva@v0.6.4/components/dialog.go` 第 353–357 行（"the blur has no canvas primitive … Until a blur exists the scrim is heavier"，Viva 自己的对话框也因此把遮罩加重）；在 `gfx`、`ui`、`app` 公开包按 `blur` 检索，只有阴影的 `Blur` 参数（`gfx.ShadowStyle`），没有对已绘内容的模糊；`internal/platform/windows/backdrop_windows.go` 是整窗系统材质（Mica / 亚克力），作用对象是整个窗口背景，不能限定到窗口内的一块区域。
+- 已做补偿：遮罩色取渲染层的 `bg-background/60`，**不**像 Viva 自带对话框那样加重（保持与渲染层同一不透明度）。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
+
+### A-008 浮层关闭后多画一帧残影
+
+- 场景/模块：用 `kit` 浮层做入场动画的控件：下拉面板（已实现）；`Modal`、`Toast`、`Tooltip`、`ContextMenu`（随 S4 实现）。
+- 偏差：渲染层的下拉面板、`ConfirmDialog`、`ContextMenu` 没有退场动画，关闭即消失；Viva 的入场动画（淡入加缩放）只能通过 `Canvas.BeginPresence` 做，而它的退场是用最后一帧的快照重放（`gfx/presence.go` 第 281–312 行 `leave`），最短也要一帧：按 Esc 之后的第一帧仍然画着面板（只是一张图，不在无障碍树里，也不接收点击），再下一帧起消失。
+- 证据：`viva/kit/select_motion_test.go` 的 `TestSelectLeavesAOneFrameGhost`——Esc 后第一帧面板里的文字仍在、时钟前进 1ms 后消失。已做补偿：入场走完以后把保持动画的时长降到 1ns（`kit/layer.go` 的 `enterPresence`），使残影只有一帧。没有备选路线：不用 Presence 就没有缩放入场（`ui.Box` 只有 `Opacity`，没有缩放，`ui/style.go` 第 214 行），去掉缩放入场是另一处偏差；`Presence` 在 `Duration == 0` 时（`gfx/presence.go` 第 155 行）不创建条目，但入场已创建的条目会在下一帧因「没被画到」而按原时长退场，更糟。
+- 状态：开（引擎限制）。真窗口里残影占几帧没有实测，按虚拟时钟推断为一帧（≈16 ms，60 Hz），归入 G-003。
+
+### A-009 浮层文字的抗锯齿模式
+
+- 场景/模块：所有浮层里的文字：下拉面板、对话框、提示、菜单、toast。
+- 偏差：渲染层的浮层是 `position: fixed` 加圆角裁切的独立合成层，Chromium 在这样的层上用**灰度**抗锯齿；页面本身的文字用 LCD（ClearType）。Viva 的 LCD / 灰度是**整窗**开关，同一帧里不能让浮层单独用灰度，浮层文字是 LCD。LCD 的墨迹总量比灰度偏大，实测 1.15–1.31 倍（随文字颜色、字号与明暗而定，多数变体仍在 `[0.85, 1.15]` 以内）。
+- 证据：裁切放大对比（`D:\Project\GuiZhi-bench\parity\s4-crop-text.png`，不入库）：渲染层的触发器文字与 Viva 一致地带彩边（LCD），渲染层面板里的文字无彩边（灰度）、Viva 面板里的文字带彩边。Viva 源码：`internal/platform/windows/label_picture_windows.go` 第 120 行与 `text_batch_windows.go` 第 235 行 `allowLCD := (renderer.window != 0 && !renderer.usesComposition()) || renderer.color.Alpha >= 1`——由渲染器的窗口清屏色一次决定，标签（`platform.TextLabel`，`internal/platform/contract.go` 第 341 行起）没有按标签关闭 LCD 的字段；公开包里没有这类入口。实测 `app.window.page-settings.select-close-action` 的 T2 36 个变体：墨迹总量比 1.15–1.31（超出 `[0.85, 1.15]`）出现在 11 个变体（浅色与深色都有），位置、字重、颜色、字号全部一致。
+- 已做补偿：对照工具给浮层里的文字行打标记（`Text.Overlay`，层号 ≥ `kit.OverlayLayerMin`），场景用 `Waiver{Overlay: true, Kind: "ink-mass"}` 只放过**浮层文字**的墨迹总量比；位置、字重、颜色、字号照常判定，页面层的同一段文字（如触发器里的「每次询问」）也照常判定。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
+
+### A-010 滚出可视区的内容不进无障碍树
+
+- 场景/模块：所有有滚动容器的屏幕（设置内容区、列表等）。
+- 偏差：Chromium 的可访问树保留滚出滚动容器的节点（辅助技术可以滚动到它们）；Viva 只对看得见的内容出无障碍节点，部分被裁掉的节点其外框也是裁剪之后的。**对屏幕阅读器用户这是真实的差异**：滚出可视区的内容读不到，直到滚到它。
+- 证据：`app.window.page-settings.select-language`（设置内容滚到底）第一次对照报 `[L1/missing-node] switch 「后台任务」：React 有、Viva 没有`，React 一侧该开关外框 y=-2，已滚到顶栏之下；`app/driver.go` 第 1103–1104 行说明 `Snapshot.Texts` 是裁剪之前的、实际画出的在 `Labels`。
+- 已做补偿（口径变更，见「变更记录」）：对照只比「呈现出来的部分」——React 采集器用 `IntersectionObserver` 取每个元素在视口里的可见矩形，滚出的节点、文字与绘制不收，被部分裁掉的节点外框取可见部分（原外框留在 `fullBox`）；Viva 一侧把 `Snapshot.Texts` 里没有出现在 `Labels`（真正画出）的文字行标 `Hidden`：不算呈现出来的文字，但仍可补全一段折行文字的原文（整段文字的拼接要等于渲染层文字节点的全文，与「窗口之外的行」同一处理）。
+- 状态：开（引擎限制）。辅助功能的实际影响在 R-2（讲述人）真机项里一并核对。
 
 ## B 类：暂缺
 
@@ -164,4 +195,7 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 2026-11-16 | **L3 遮罩扩展到图标外框**，并新增 L2 图标检查（配对、外框差、墨迹量比与位移，阈值沿用文字的 `maxDeltaPx`、`inkMassMin/Max`、`inkMaxDeltaX/Y`，`thresholds.json` 与冻结摘要 `5128b953…` 不变） | A-003：图标边缘的抗锯齿无法逐像素一致；先把图标的系统性偏差（墨迹多 17%–53%）修掉（自带栅格化，见 A-003），再把剩余的边缘差异交给 L2 墨迹检查。**这收窄了 L3 的覆盖范围（图标区域不再逐像素比较）**，由 L2 的位置与墨迹量检查补偿 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | 纠正采集口径：React 采集器改为启动参数 `--force-device-scale-factor=1`，宿主缩放 200% 时仅靠 Emulation 钉死会让排版取整带上宿主 DPI；作废此前的小/大字号档参照并重采 | 探针 324 组中 274 组与参数启动不同，见开发文档 §8 | 不需要（让参照与机器缩放无关，不是放宽） |
 | 2026-11-16 | L1 归一化（`a11y_map.go`）：React 的 combobox 节点只有在按钮文字非空时才带 `value` 状态（空值与没有值等价）。守卫摘要不变（摘要只覆盖规则表） | 「创建方式」按钮是无文字的图标按钮，渲染层把空 `value=` 记成状态而 Viva 没有对应的空值，不是放宽带操作的节点 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | **采集与比较口径：只比「呈现出来的部分」**（A-010）。React 采集器改为对每个元素取 `IntersectionObserver` 的可见矩形：被祖先裁得一点不剩的节点、文字行、绘制不收，被部分裁掉的节点外框取可见部分（`fullBox` 备查）；Viva 一侧没有画出的文字行标 `Hidden`（不算呈现出来的文字，仍可补全折行原文）。`thresholds.json` 与冻结摘要不变 | A-010：Chromium 把滚出滚动容器的节点留在可访问树里，Viva 不出。**这收窄了 L1/L2 对「滚出可视区内容」的覆盖**：这类内容的外框与结构只在它未滚走时（别的场景）比较 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | L1 归一化（`render.go` 的 `nodeOf`，不在 `a11y_map.go` 规则表内，守卫摘要不变）：`option`、`tab` 角色的「选中」是固有状态，Viva 一侧未选中时也写 `selected=false`，与渲染层始终写 `aria-selected` 一致 | Viva 的无障碍节点只有 `Selected` 布尔位，没有「可选但未选」与「不可选」的区分，未选中的选项仍是可选的 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | 对照工具新增 `Waiver.Overlay` 与 `Issue.Overlay`、`Text.Overlay`（Viva 文字画在浮层层级时打标记）：A-009 只放过**浮层文字**的墨迹总量比。`Scene.Steps`（场景操作步骤）让整窗场景可以像用户那样滚动、点开下拉后再采集。`thresholds.json` 与冻结摘要不变 | A-009 | 不需要（没有放宽任何阈值；放过范围限定在浮层文字的墨迹总量比，页面层同一段文字照常判定） |
 | 2026-11-16 | 对照工具新增 `Waiver`：已在台账登记（A/B/C 类）的问题仍出现在报告里（单列「已登记的偏差」），但不使场景失败；`thresholds.json` 与冻结摘要不变 | 让「偏差已登记」与「还没处理的问题」在报告里可区分；scenes 包的测试核对每个 Waiver 的台账编号真实存在 | 不需要（没有放宽任何阈值；没有登记就不能豁免） |

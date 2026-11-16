@@ -20,12 +20,18 @@ type Spec struct {
 	Hue, Saturation float64     // 主题色相与饱和度
 	FontSize        string      // tokens.FontSizes 里的档位 ID；未知取默认档
 	Glass           bool        // 壁纸（玻璃）模式
+	// Motion 是动效偏好与系统「减少动态效果」合并后的实际档位（见 ResolveMotion）。
+	// 零值是关闭：所有过渡直接到终态，对照渲染与单测因此不受动画时钟影响；真实窗口由外壳解析后填入。
+	Motion MotionLevel
 }
 
-// DefaultSpec 返回出厂外观：浅色、默认主题色与字号档。
+// DefaultSpec 返回出厂外观：浅色、默认主题色与字号档、标准动效。
 func DefaultSpec() Spec {
 	p := tokens.FindHuePreset(tokens.DefaultHuePreset)
-	return Spec{Mode: tokens.ModeLight, Hue: p.Hue, Saturation: p.Saturation, FontSize: tokens.DefaultFontSize}
+	return Spec{
+		Mode: tokens.ModeLight, Hue: p.Hue, Saturation: p.Saturation, FontSize: tokens.DefaultFontSize,
+		Motion: MotionLevelStandard,
+	}
 }
 
 // Look 是装配好的外观：渲染层语义令牌、由它们派生的 Viva 主题，以及 rem 的像素值。

@@ -5,6 +5,7 @@ import (
 	"image"
 	"math"
 	"strconv"
+	"sync"
 
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
@@ -21,6 +22,9 @@ type Scene struct {
 	// Build 按装配好的外观返回页面函数。场景自带它需要的状态（例如内存里的设置存取），
 	// 每次渲染都应从初始状态开始，保证对照是确定的。
 	Build func(look *kit.Look) func(c ui.C)
+	// Steps 可选：画面首次稳定后、采集前，像用户那样操作界面，把它带到要对照的状态（滚动、点开下拉……）。
+	// 与渲染层场景的 enter 一一对应；做完后会让动画走完、画面再次稳定。
+	Steps func(s *headless.Session) error
 	// Waivers 是这个场景已在台账登记的偏差（见 waiver.go）。
 	Waivers []Waiver
 }
@@ -41,13 +45,27 @@ const interfaceFont = "Microsoft YaHei UI"
 // settleFrames 是渲染到画面稳定的帧数上限；滚动槽、转场等要靠前一帧的版面结果，一帧不够。
 const settleFrames = 12
 
+// fontOnce 保证界面字体族只设置一次：它写的是进程内共享的文字引擎，字体族又是常量，
+// 反复设置没有意义，还会让并行跑的渲染互相踩。
+var fontOnce sync.Once
+
 // Render 用 Viva 把场景在变体下渲染成 region 大小的无头画布（缩放 1:1），返回同形的事实与图片。
 func Render(s Scene, v Variant, region Region) (*Facts, image.Image, error) {
+	return render(s, v, region, true)
+}
+
+// RenderFacts 与 Render 相同，但不光栅化成图片：单元测试只比较 L1/L2 事实，软件光栅化一整帧是出帧之外最大的开销。
+func RenderFacts(s Scene, v Variant, region Region) (*Facts, error) {
+	facts, _, err := render(s, v, region, false)
+	return facts, err
+}
+
+func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Image, error) {
 	vw, _, err := v.Size()
 	if err != nil {
 		return nil, nil, err
 	}
-	app.SetInterfaceFontFamily(interfaceFont)
+	fontOnce.Do(func() { app.SetInterfaceFontFamily(interfaceFont) })
 	look := kit.NewLook(v.Spec())
 	look.Viewport = float32(vw)
 	look.Scale = 1
@@ -64,6 +82,18 @@ func Render(s Scene, v Variant, region Region) (*Facts, image.Image, error) {
 	if err := settle(session); err != nil {
 		return nil, nil, err
 	}
+	if s.Steps != nil {
+		if err := s.Steps(session); err != nil {
+			return nil, nil, fmt.Errorf("场景 %s 的操作步骤失败：%w", s.ID, err)
+		}
+		// 动画走完（虚拟时钟推进到没有转场为止），再等画面稳定。
+		if err := session.Rest(); err != nil {
+			return nil, nil, fmt.Errorf("等待动画结束失败：%w", err)
+		}
+		if err := settle(session); err != nil {
+			return nil, nil, err
+		}
+	}
 	// 再出一帧专门记录图标外框（画面已稳定，这一帧与上一帧相同）。
 	var icons []Box
 	look.IconSink = func(r gfx.Rect) {
@@ -79,6 +109,9 @@ func Render(s Scene, v Variant, region Region) (*Facts, image.Image, error) {
 	look.IconSink = nil
 	facts := collectViva(session, s.ID, v, region)
 	facts.Icons = icons
+	if !wantImage {
+		return facts, nil, nil
+	}
 	img, err := session.Image()
 	if err != nil {
 		return nil, nil, fmt.Errorf("取图失败：%w", err)
@@ -145,6 +178,10 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 			Color:    cssColor(t.Style.Color),
 			Painted:  []float64{painted},
 			Baseline: []float64{baseline},
+			Overlay:  t.Layer >= kit.OverlayLayerMin,
+			// Snapshot.Texts 是裁剪之前画过的所有文字；滚出滚动容器的文字不在 Labels（真正画出来的）里。
+			// 标成 Hidden：比较时它不算「呈现出来的文字」，但仍可补全一段折行文字的原文（口径见台账 A-010）。
+			Hidden: !isDrawn(snap.Labels, t),
 		})
 		f.TextRects = append(f.TextRects, f.Texts[len(f.Texts)-1].Rects...)
 	}
@@ -168,6 +205,18 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 	return f
 }
 
+// isDrawn 报告 text 是否真的被画出来了：labels 里有同样内容、位置相差不超过 1 个逻辑像素
+// （绘制时位置会取整）的一行。被裁剪得一点不剩的文字不会成为 label。
+func isDrawn(labels []app.Label, text gfx.Text) bool {
+	for _, l := range labels {
+		if l.Value == text.Value &&
+			math.Abs(float64(l.Bounds.X-text.Bounds.X)) <= 1 && math.Abs(float64(l.Bounds.Y-text.Bounds.Y)) <= 1 {
+			return true
+		}
+	}
+	return false
+}
+
 // nodeOf 把 Viva 的可访问节点写成与 React 同形的 Node，状态用字符串（"true"/"false"），与 Node.Prop 的口径一致。
 func nodeOf(n app.AccessNode) Node {
 	props := map[string]any{"focusable": strconv.FormatBool(n.Focusable)}
@@ -178,7 +227,12 @@ func nodeOf(n app.AccessNode) Node {
 	if n.Expandable {
 		props["expanded"] = strconv.FormatBool(n.Expanded)
 	}
-	if n.Selected {
+	switch {
+	case n.Role == gfx.RoleOption || n.Role == gfx.RoleTab:
+		// 选项与页签的「选中」是固有状态：渲染层始终写 aria-selected（true/false），
+		// Viva 的无障碍节点同样始终带这个状态位，所以这两种角色未选中也写 "false"。
+		props["selected"] = strconv.FormatBool(n.Selected)
+	case n.Selected:
 		props["selected"] = "true"
 	}
 	if n.Disabled {

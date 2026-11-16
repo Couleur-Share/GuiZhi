@@ -52,6 +52,9 @@ type Surface struct {
 	BorderW float32 // 逻辑像素；0 表示没有边框
 	Radius  float32
 	Shadow  tokens.Shadow
+	// Shadows 是多层阴影（CSS box-shadow 列表：第一层在最上，所以从最后一层画起）；与 Shadow 二选一。
+	// Tailwind 默认的 shadow-lg、shadow-2xl 等都是多层或带负扩散的阴影，见 shadows.go。
+	Shadows []tokens.Shadow
 	// Clip 非零时，只画落在它里面的部分（逻辑像素，按设备像素吸附）。
 	// 用来画只有一侧有圆角的盒子（rounded-l-lg）：按整个盒子画圆角矩形，再裁到这一侧。
 	Clip gfx.Rect
@@ -67,6 +70,12 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	if s.Clip.Width > 0 && s.Clip.Height > 0 {
 		d.Canvas.Clip(SnapRect(s.Clip, d.Canvas.PixelScale()))
 		defer d.Canvas.Unclip()
+	}
+	for i := len(s.Shadows) - 1; i >= 0; i-- {
+		if sh := s.Shadows[i]; !sh.IsZero() {
+			style, color := ShadowStyle(sh)
+			d.Canvas.Shadow(outer, s.Radius, style, d.Fade(color))
+		}
 	}
 	if !s.Shadow.IsZero() {
 		style, color := ShadowStyle(s.Shadow)

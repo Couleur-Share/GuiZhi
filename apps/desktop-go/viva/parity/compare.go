@@ -21,6 +21,8 @@ type Issue struct {
 	Kind    string `json:"kind"`
 	Subject string `json:"subject"`
 	Message string `json:"message"`
+	// Overlay 表示问题出在浮层里的文字上（Viva 把它画在浮层层级）；已登记的浮层文字偏差据此匹配。
+	Overlay bool `json:"overlay,omitempty"`
 }
 
 // L1Result 汇总结构比较。

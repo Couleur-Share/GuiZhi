@@ -15,6 +15,25 @@ async function openSettingsSection(win, section) {
   await win.getByTestId("settings-content-shell").waitFor({ state: "visible" });
 }
 
+/**
+ * 打开设置页「应用设置」里的下拉：先收起可能残留的浮层，点触发器，等 listbox 出现，再把指针挪到左上角——
+ * 触发器与选项的悬停态不能混进画面（Viva 侧的无头会话没有指针）。
+ * name 是触发器的可访问名（aria-label，简体中文界面）。
+ * scrollEnd 为真时先把设置内容滚到底：语言下拉在窗口底部，不滚就被视口边缘截住（Viva 侧同样先滚到底）。
+ */
+async function openSettingsSelect(win, name, { scrollEnd = false } = {}) {
+  await openSettingsSection(win, "general");
+  await win.keyboard.press("Escape");
+  if (scrollEnd) {
+    await win.locator(SETTINGS_CONTENT_SCROLLER).evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }
+  await win.getByRole("button", { name, exact: true }).click();
+  await win.getByRole("listbox", { name, exact: true }).waitFor({ state: "visible" });
+  await win.mouse.move(2, 2);
+}
+
 /** 设置内容滚动容器：内容壳的直接父元素（没有 testid，用结构选择器）。 */
 const SETTINGS_CONTENT_SCROLLER = 'div:has(> [data-testid="settings-content-shell"])';
 
@@ -34,6 +53,19 @@ export const SCENES = {
     module: "app",
     async enter({ win }) {
       await openSettingsSection(win, "general");
+    },
+  },
+  // 整窗 + 下拉面板展开（面板是 portal 到 body 的 fixed 元素，只能在整窗里对照）。
+  "app.window.page-settings.select-close-action": {
+    module: "app",
+    async enter({ win }) {
+      await openSettingsSelect(win, "关闭窗口行为");
+    },
+  },
+  "app.window.page-settings.select-language": {
+    module: "app",
+    async enter({ win }) {
+      await openSettingsSelect(win, "语言", { scrollEnd: true });
     },
   },
   "settings.general": {

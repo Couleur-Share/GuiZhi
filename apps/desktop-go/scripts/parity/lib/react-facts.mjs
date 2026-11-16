@@ -30,11 +30,40 @@ export const STYLE_PROPS = [
 
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
+/**
+ * 页内工具：对一批元素取「在视口里看得见的部分」（IntersectionObserver 的 intersectionRect）。
+ * 浏览器按包含块链裁掉祖先 overflow、fixed 与变换之后给出结果，所以滚出滚动容器、被裁掉的内容得到零面积。
+ * 没有元素（null）的位置返回 null。
+ *
+ * 为什么要这个：渲染层把滚出可视区的节点仍留在 DOM 与可访问树里，Viva 只对看得见的内容出无障碍节点与文字
+ * （台账 A-010）。对照只比「呈现出来」的部分，两边都按看得见的内容采，才是同口径。
+ */
+const VISIBLE_RECTS_SRC = `const visibleRects = (targets) => new Promise((resolve) => {
+  const out = new Array(targets.length).fill(null);
+  const index = new Map();
+  targets.forEach((t, i) => {
+    if (!t) return;
+    if (!index.has(t)) index.set(t, []);
+    index.get(t).push(i);
+  });
+  if (index.size === 0) { resolve(out); return; }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const r = e.intersectionRect;
+      for (const i of index.get(e.target) ?? []) out[i] = [Math.round(r.x * 1000) / 1000, Math.round(r.y * 1000) / 1000, Math.round(r.width * 1000) / 1000, Math.round(r.height * 1000) / 1000];
+    }
+    io.disconnect();
+    resolve(out);
+  }, { threshold: 0 });
+  for (const t of index.keys()) io.observe(t);
+});`;
+
 /** 在页内对一批节点（Element 或 Text）取外框与样式；通过 Runtime.callFunctionOn 的多个参数传入。 */
-const MEASURE_FN = `function (...nodes) {
+const MEASURE_FN = `async function (...nodes) {
   const PROPS = ${JSON.stringify(STYLE_PROPS)};
   const round = (n) => Math.round(n * 1000) / 1000;
-  return nodes.map((n) => {
+  ${VISIBLE_RECTS_SRC}
+  const measured = nodes.map((n) => {
     if (n.nodeType === 3) {
       const range = document.createRange();
       range.selectNodeContents(n);
@@ -55,6 +84,10 @@ const MEASURE_FN = `function (...nodes) {
       style,
     };
   });
+  // 文字节点取父元素的可见部分；非元素、非文字的节点没有。
+  const visible = await visibleRects(nodes.map((n) => (n.nodeType === 1 ? n : n.nodeType === 3 ? n.parentElement : null)));
+  measured.forEach((m, i) => { if (visible[i]) m.vis = visible[i]; });
+  return measured;
 }`;
 
 /**
@@ -66,8 +99,10 @@ const MEASURE_FN = `function (...nodes) {
  * 位置的算法与普通文字一致：行盒在内容盒里垂直居中，内容区（高 = 取整的 ascent + descent）在行盒里
  * 上方留 floor((行高 − (A+D)) / 2)；宽度取 canvas 按同一字体量出的排版宽度（两者共用 Chromium 的字体匹配与整形）。
  */
-const TEXTS_EXPR = `(() => {
+const TEXTS_EXPR = `(async () => {
+  ${VISIBLE_RECTS_SRC}
   const out = [];
+  const owners = []; // 与 out 一一对应的所属元素，用来按可见部分裁掉滚出可视区的文字
   const round = (n) => Math.round(n * 1000) / 1000;
   const measure = document.createElement("canvas").getContext("2d");
   const skipTypes = new Set(["password", "hidden", "checkbox", "radio", "file", "range", "color", "button", "submit", "reset", "image"]);
@@ -112,7 +147,7 @@ const TEXTS_EXPR = `(() => {
   while ((node = walker.nextNode())) {
     if (node.nodeType === 1) {
       const field = fieldText(node);
-      if (field) out.push(field);
+      if (field) { out.push(field); owners.push(node); }
       continue;
     }
     if (!node.data.trim()) continue;
@@ -139,16 +174,29 @@ const TEXTS_EXPR = `(() => {
       tag: el.localName,
       testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
     });
+    owners.push(el);
   }
-  return out;
+  // 只留与所属元素「看得见的部分」相交的行片段：滚出滚动容器的文字不算呈现出来的文字。
+  const visible = await visibleRects(owners);
+  const kept = [];
+  out.forEach((t, i) => {
+    const v = visible[i];
+    if (v) {
+      t.rects = t.rects.filter(([x, y, w, h]) => x < v[0] + v[2] && x + w > v[0] && y < v[1] + v[3] && y + h > v[1]);
+    }
+    if (t.rects.length > 0) kept.push(t);
+  });
+  return kept;
 })()`;
 
 /**
  * 有绘制的元素（schema 2）：背景色/背景图、边框、圆角、阴影、轮廓，以及 SVG 图标（颜色取 currentColor）。
  * 按文档顺序（即默认的绘制先后）输出，外框是未裁剪的边框盒。比较端用它给 L3 的差异定位到具体元素与令牌。
  */
-const PAINTS_EXPR = `(() => {
+const PAINTS_EXPR = `(async () => {
+  ${VISIBLE_RECTS_SRC}
   const out = [];
+  const owners = [];
   const round = (n) => Math.round(n * 1000) / 1000;
   const clear = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
   let order = 0;
@@ -183,8 +231,11 @@ const PAINTS_EXPR = `(() => {
       overflow: cs.overflowX + " " + cs.overflowY,
       color: svg ? cs.color : undefined,
     });
+    owners.push(el);
   }
-  return out;
+  // 被祖先裁得一点不剩的元素不算绘制出来的（可见部分零面积）。
+  const visible = await visibleRects(owners);
+  return out.filter((p, i) => !visible[i] || (visible[i][2] > 0 && visible[i][3] > 0));
 })()`;
 
 const FONT_KEYS_EXPR = `(() => {
@@ -287,6 +338,7 @@ async function measureNodes(cdp, backendIds) {
       functionDeclaration: MEASURE_FN,
       arguments: args,
       returnByValue: true,
+      awaitPromise: true,
       objectGroup: "parity",
     });
     if (exceptionDetails) throw new Error(`页内测量失败：${exceptionDetails.exception?.description ?? exceptionDetails.text}`);
@@ -340,6 +392,13 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
     const m = measuredByIndex.get(i);
     const box = m?.box ?? null;
     if (box && !intersects(box, region)) return;
+    // 被祖先裁得一点不剩（滚出滚动容器等）的节点不收：口径见 VISIBLE_RECTS_SRC。零面积的外框不受影响。
+    if (box && box[2] > 0 && box[3] > 0 && m.vis && !(m.vis[2] > 0 && m.vis[3] > 0)) return;
+    // 被祖先裁掉一部分的节点：Viva 报告的外框是裁剪之后的，所以比较口径取可见部分；原外框留在 fullBox 里备查。
+    const clipped = m?.k === "e" && box && m.vis && box[2] > 0 && box[3] > 0 &&
+      (Math.abs(m.vis[0] - box[0]) > 0.01 || Math.abs(m.vis[1] - box[1]) > 0.01 ||
+       Math.abs(m.vis[2] - box[2]) > 0.01 || Math.abs(m.vis[3] - box[3]) > 0.01);
+    const visibleBox = clipped ? m.vis : box;
     indexMap.set(i, nodes.length);
     nodes.push({
       role: n.role,
@@ -347,8 +406,9 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
       ...(n.description !== undefined ? { description: n.description } : {}),
       ...(n.value !== undefined ? { value: n.value } : {}),
       props: n.props,
-      // 位置换算到区域坐标系；尺寸不变
-      box: box ? [r3(box[0] - region.x), r3(box[1] - region.y), box[2], box[3]] : null,
+      // 位置换算到区域坐标系；未被裁剪时尺寸不变
+      box: visibleBox ? [r3(visibleBox[0] - region.x), r3(visibleBox[1] - region.y), visibleBox[2], visibleBox[3]] : null,
+      ...(clipped ? { fullBox: [r3(box[0] - region.x), r3(box[1] - region.y), box[2], box[3]] } : {}),
       kind: m?.k ?? null,
       ...(m?.tag ? { tag: m.tag } : {}),
       ...(m?.testId ? { testId: m.testId } : {}),
@@ -371,11 +431,11 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
 
   // 文字：保留与区域相交的行片段，坐标换算到区域坐标系；整段文字都在区域外的丢弃。
   const rel = (b) => [r3(b[0] - region.x), r3(b[1] - region.y), b[2], b[3]];
-  const texts = (await cdp.send("Runtime.evaluate", { expression: TEXTS_EXPR, returnByValue: true })).result.value
+  const texts = (await cdp.send("Runtime.evaluate", { expression: TEXTS_EXPR, returnByValue: true, awaitPromise: true })).result.value
     .map((t) => ({ ...t, rects: t.rects.filter((b) => intersects(b, region)).map(rel) }))
     .filter((t) => t.rects.length > 0);
   const textRects = texts.flatMap((t) => t.rects);
-  const paints = (await cdp.send("Runtime.evaluate", { expression: PAINTS_EXPR, returnByValue: true })).result.value
+  const paints = (await cdp.send("Runtime.evaluate", { expression: PAINTS_EXPR, returnByValue: true, awaitPromise: true })).result.value
     .filter((p) => intersects(p.box, region))
     .map((p) => ({ ...p, box: rel(p.box) }));
   const fonts = await platformFonts(cdp);

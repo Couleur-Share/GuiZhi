@@ -17,6 +17,8 @@ type Waiver struct {
 	Kind  string
 	// Subject 非空时，只放过 Issue.Subject 里含有这段文字的问题（例如某一行文字、某一枚图标）。
 	Subject string
+	// Overlay 为真时，只放过出在浮层文字上的问题（Issue.Overlay）：同一段文字在页面层里出的问题照常判定。
+	Overlay bool
 	// Note 说明偏差的内容与范围，写进报告，供阅读报告的人不必翻台账。
 	Note string
 }
@@ -34,6 +36,9 @@ func (w Waiver) matches(is Issue) bool {
 		return false
 	}
 	if w.Kind != "" && w.Kind != is.Kind {
+		return false
+	}
+	if w.Overlay && !is.Overlay {
 		return false
 	}
 	return w.Subject == "" || strings.Contains(is.Subject, w.Subject)
