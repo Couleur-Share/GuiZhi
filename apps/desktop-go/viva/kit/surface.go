@@ -73,13 +73,11 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	}
 	for i := len(s.Shadows) - 1; i >= 0; i-- {
 		if sh := s.Shadows[i]; !sh.IsZero() {
-			style, color := ShadowStyle(sh)
-			d.Canvas.Shadow(outer, s.Radius, style, d.Fade(color))
+			l.paintShadow(d, outer, s.Radius, sh)
 		}
 	}
 	if !s.Shadow.IsZero() {
-		style, color := ShadowStyle(s.Shadow)
-		d.Canvas.Shadow(outer, s.Radius, style, d.Fade(color))
+		l.paintShadow(d, outer, s.Radius, s.Shadow)
 	}
 	if s.Bg.A > 0 {
 		d.Canvas.Rounded(outer, s.Radius, d.Fade(l.Col(s.Bg)))
