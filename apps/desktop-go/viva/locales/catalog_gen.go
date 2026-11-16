@@ -15163,6 +15163,14 @@ func NativeLanguageNameEn() string {
 	return "English"
 }
 
+// NativeSettingsSaveAction 是 native.settings.saveAction：保存设置
+func NativeSettingsSaveAction() string {
+	if useEn() {
+		return "Save settings"
+	}
+	return "保存设置"
+}
+
 // NativeShellNotMigrated 是 native.shell.notMigrated：「{{module}}」还没有迁移到原生界面
 func NativeShellNotMigrated(module any) string {
 	if useEn() {

@@ -51,6 +51,8 @@ const compactBreakpoint = 640
 type Shell struct {
 	Look  *kit.Look
 	Store Store
+	// Guard 是设置写入失败的通道（错误提示 + 日志），交给各分区页；零值时失败不弹提示。
+	Guard kit.Guard
 	// Active 是当前分区；空表示应用设置（打开设置页时的默认分区）。
 	Active SectionID
 	// OnBack 是点「返回」时的回调（回到知识库等模块页）。
@@ -83,7 +85,7 @@ func (s *Shell) content(c ui.C) {
 		if s.general == nil {
 			s.general = &General{}
 		}
-		s.general.Look, s.general.Store = l, s.Store
+		s.general.Look, s.general.Store, s.general.Guard = l, s.Store, s.Guard
 		s.general.Page(c)
 	default:
 		title := ""

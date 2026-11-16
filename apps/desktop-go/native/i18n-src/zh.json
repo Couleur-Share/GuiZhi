@@ -8,6 +8,9 @@
       "zh": "简体中文",
       "en": "English"
     },
+    "settings": {
+      "saveAction": "保存设置"
+    },
     "shell": {
       "notMigrated": "「{{module}}」还没有迁移到原生界面",
       "notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。"

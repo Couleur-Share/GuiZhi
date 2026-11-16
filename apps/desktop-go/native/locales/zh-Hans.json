@@ -3732,6 +3732,7 @@
   "native_island_webview2Missing": "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。",
   "native_languageName_zh": "简体中文",
   "native_languageName_en": "English",
+  "native_settings_saveAction": "保存设置",
   "native_shell_notMigrated": "「{module}」还没有迁移到原生界面",
   "@native_shell_notMigrated": {
     "placeholders": {

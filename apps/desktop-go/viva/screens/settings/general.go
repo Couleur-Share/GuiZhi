@@ -24,6 +24,8 @@ type Store interface {
 type General struct {
 	Look  *kit.Look
 	Store Store
+	// Guard 接住写入失败：弹出带原因的错误提示并记日志（B-002）；零值时失败只会静默回到原值。
+	Guard kit.Guard
 
 	closeSel    kit.SelectState // 关闭行为下拉
 	languageSel kit.SelectState // 语言下拉
@@ -47,14 +49,20 @@ func (g *General) Page(c ui.C) {
 	g.backgroundDialog(c)
 }
 
-// toggle 是绑定到设置布尔字段的开关：点击后把新值交给 Store；写入失败时设置不变，界面保持原状。
+// save 把一次修改交给 Store，返回是否写入成功（runGuardedMutation 的语义）：
+// 失败时设置保持原值、界面随之回到原状，同时弹出带原因的错误提示并记日志，用户再点一次即是重试。
+func (g *General) save(mutate func(*settings.Values)) bool {
+	return g.Guard.Run(locales.NativeSettingsSaveAction(), func() error { return g.Store.Update(mutate) })
+}
+
+// toggle 是绑定到设置布尔字段的开关：点击后把新值交给 Store；写入失败时设置不变，界面保持原状并提示。
 func (g *General) toggle(c ui.C, label string, get func(settings.Values) bool, set func(*settings.Values, bool)) func() {
 	return func() {
 		on := get(g.Store.Values())
 		sw := g.Look.Switch(c, &on, label)
 		if sw.Clicked() {
 			next := on
-			_ = g.Store.Update(func(v *settings.Values) { set(v, next) })
+			g.save(func(v *settings.Values) { set(v, next) })
 		}
 	}
 }
@@ -73,7 +81,7 @@ func (g *General) backgroundTasks(c ui.C) func() {
 			g.backgroundAsk = true
 			return
 		}
-		_ = g.Store.Update(func(v *settings.Values) { v.App.BackgroundTasksEnabled = false })
+		g.save(func(v *settings.Values) { v.App.BackgroundTasksEnabled = false })
 	}
 }
 
@@ -89,7 +97,8 @@ func (g *General) backgroundDialog(c ui.C) {
 	}) {
 	case kit.ConfirmAccepted:
 		g.backgroundAsk = false
-		_ = g.Store.Update(func(v *settings.Values) {
+		// 写入失败时对话框照常关闭，开关仍是关的（值取自设置），错误提示说明原因，用户可以再打开一次重试
+		g.save(func(v *settings.Values) {
 			v.App.BackgroundTasksEnabled = true
 			v.App.LaunchAtStartup = true
 			v.App.MinimizeOnLaunch = true
@@ -127,7 +136,7 @@ func (g *General) startup(c ui.C) {
 					Options: closeActionOptions(), Width: g.Look.Rem(10), // w-40
 				})
 				if ok {
-					_ = g.Store.Update(func(v *settings.Values) { v.UI.CloseAction = settings.CloseAction(picked) })
+					g.save(func(v *settings.Values) { v.UI.CloseAction = settings.CloseAction(picked) })
 				}
 			},
 		},
@@ -182,7 +191,7 @@ func (g *General) language(c ui.C) {
 					Options: languageOptions(), Width: g.Look.Rem(10), // w-40
 				})
 				if ok {
-					_ = g.Store.Update(func(v *settings.Values) { v.App.Language = settings.Language(picked) })
+					g.save(func(v *settings.Values) { v.App.Language = settings.Language(picked) })
 				}
 			},
 		},

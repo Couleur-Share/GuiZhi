@@ -19822,6 +19822,16 @@ func (msgs Messages) NativeLanguageNameEn() string {
 	return Catalog.Format(msgs.locale, "native_languageName_en", nil)
 }
 
+// NativeSettingsSaveAction says "保存设置"
+// in the language the app shows.
+func NativeSettingsSaveAction() string { return In(i18n.Locale()).NativeSettingsSaveAction() }
+
+// NativeSettingsSaveAction says "保存设置"
+// in the language of msgs.
+func (msgs Messages) NativeSettingsSaveAction() string {
+	return Catalog.Format(msgs.locale, "native_settings_saveAction", nil)
+}
+
 // NativeShellNotMigrated says "「{module}」还没有迁移到原生界面"
 // in the language the app shows.
 func NativeShellNotMigrated(module any) string {

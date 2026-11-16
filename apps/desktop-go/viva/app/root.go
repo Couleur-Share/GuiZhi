@@ -25,6 +25,10 @@ type Root struct {
 	win      *shell.Window
 	settings *settingsscreen.Shell
 
+	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
+	notifier *kit.Notifier
+	guard    kit.Guard
+
 	look     *kit.Look
 	lookSpec kit.Spec
 	theme    gfx.Theme // ui.Page 读它的当前值
@@ -38,9 +42,12 @@ type Root struct {
 func NewRoot(opts Options, invalidate func()) *Root {
 	r := &Root{opts: opts}
 	r.store = newSettingsStore(opts.Services.Settings, invalidate)
-	r.settings = &settingsscreen.Shell{Store: r.store}
+	r.notifier = kit.NewNotifier(invalidate)
+	r.guard = kit.Guard{Notify: r.notifier, Log: opts.Services.Log}
+	r.settings = &settingsscreen.Shell{Store: r.store, Guard: r.guard}
 	r.win = &shell.Window{
 		Settings:       r.settings,
+		Notifier:       r.notifier,
 		SearchShortcut: opts.SearchShortcut,
 		OnModule: func(m shell.Module) {
 			r.win.Module, r.win.Page = m, shell.PageHome
@@ -102,6 +109,10 @@ func (r *Root) Look() *kit.Look { return r.look }
 func (r *Root) ThemeRef() *gfx.Theme        { return &r.theme }
 func (r *Root) BackgroundRef() *gfx.Color   { return &r.bg }
 func (r *Root) Services() services.Services { return r.opts.Services }
+
+// Notifier 是窗口的提示通道；Guard 是变更类操作的失败通道。任意 goroutine 可用。
+func (r *Root) Notifier() *kit.Notifier { return r.notifier }
+func (r *Root) Guard() kit.Guard        { return r.guard }
 
 // View 声明整个窗口内容。
 func (r *Root) View(c ui.C) {

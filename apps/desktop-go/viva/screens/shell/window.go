@@ -39,6 +39,9 @@ type Window struct {
 	// Settings 是设置页；Page 为 PageSettings 时显示。
 	Settings *settingsscreen.Shell
 
+	// Notifier 是窗口的提示通道（渲染层的 Toast）；nil 时不画提示。提示宿主是覆盖层，在整个页面声明完之后才声明。
+	Notifier *kit.Notifier
+
 	Page   Page
 	Module Module
 
@@ -131,6 +134,7 @@ func (w *Window) View(c ui.C) {
 			ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() { w.content(c) })
 		})
 	})
+	l.Toasts(c, w.Notifier)
 }
 
 // content 是顶栏下面的区域：设置页，或当前模块的工作区。

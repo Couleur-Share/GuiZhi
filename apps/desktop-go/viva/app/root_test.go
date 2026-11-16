@@ -14,6 +14,7 @@ import (
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/native/settings"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/screens/shell"
 	"guizhi-mygo-shell/viva/tokens"
 )
@@ -140,6 +141,57 @@ func TestRootToggleWritesThroughService(t *testing.T) {
 	node, ok := f.session.AccessByRole(gfx.RoleSwitch, "显示行号")
 	if !ok || !node.Checked {
 		t.Errorf("界面上的「显示行号」开关没有跟着变成开：%+v（找到=%v）", node, ok)
+	}
+}
+
+// 设置写入失败（B-002）：开关回到原状、弹出带原因的错误提示（原文折叠在「查看详情」里）、记一条日志；
+// 提示留到手动关闭，故障排除后再点一次就是重试，成功写入。
+func TestRootSettingsWriteFailureShowsToastAndRetries(t *testing.T) {
+	log := &servicestest.Logger{}
+	f := openRoot(t, func(o *Options) { o.Services.Log = log })
+	f.fake.FailWith(errors.New("磁盘已满"))
+	if err := f.session.ClickLabel("显示行号"); err != nil {
+		t.Fatal(err)
+	}
+	f.frames(t, 3)
+	if node, ok := f.session.AccessByRole(gfx.RoleSwitch, "显示行号"); !ok || node.Checked {
+		t.Errorf("写入失败后开关应回到原状（关）：%+v 找到=%v", node, ok)
+	}
+	if f.root.Notifier().Len() != 1 {
+		t.Fatalf("写入失败应弹出 1 条错误提示，实际 %d 条", f.root.Notifier().Len())
+	}
+	title := locales.CommonOperationFailed(locales.NativeSettingsSaveAction())
+	if !f.session.HasText(title) {
+		t.Errorf("错误提示的标题应是 %q", title)
+	}
+	if f.session.HasText("磁盘已满") {
+		t.Error("原因折叠在「查看详情」里，不应直接铺开")
+	}
+	if err := f.session.ClickLabel(locales.CommonViewDetail()); err != nil {
+		t.Fatalf("没有「查看详情」：%v", err)
+	}
+	f.frames(t, 3)
+	if !f.session.HasText("磁盘已满") {
+		t.Error("展开后应能读到原因")
+	}
+	entries := log.Entries()
+	if len(entries) != 1 || entries[0].Scope != "native" || entries[0].Action != locales.NativeSettingsSaveAction() || entries[0].Message != "磁盘已满" {
+		t.Errorf("日志不对：%+v", entries)
+	}
+
+	f.fake.FailWith(nil)
+	if err := f.session.ClickLabel("显示行号"); err != nil {
+		t.Fatal(err)
+	}
+	f.frames(t, 3)
+	if node, ok := f.session.AccessByRole(gfx.RoleSwitch, "显示行号"); !ok || !node.Checked {
+		t.Errorf("重试成功后开关应打开：%+v 找到=%v", node, ok)
+	}
+	if got := f.fake.Updates(); got != 1 {
+		t.Errorf("重试成功只应落盘 1 次，实际 %d", got)
+	}
+	if f.root.Notifier().Len() != 1 {
+		t.Error("错误提示留到用户手动关闭，重试成功不应把它撤掉")
 	}
 }
 

@@ -1895,6 +1895,7 @@
   "native_island_webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working.",
   "native_languageName_zh": "简体中文",
   "native_languageName_en": "English",
+  "native_settings_saveAction": "Save settings",
   "native_shell_notMigrated": "\"{module}\" has not been moved to the native UI yet",
   "native_shell_notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone."
 }
