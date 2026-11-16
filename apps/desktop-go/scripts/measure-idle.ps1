@@ -28,6 +28,9 @@
 .PARAMETER ExtraArgs    附加到命令行的参数（原生版的专用参数放这里）
 .PARAMETER ReadyPattern 标准输出中表示「已出首屏」的正则，默认 ^READY
 .PARAMETER OutJson      结果 JSON 路径；默认写到 <TEMP>\guizhi-idle\<Label>.json
+.PARAMETER Gpu          同时记录进程树的 GPU 进程内存（性能计数器 GPU Process Memory：专用 / 共享 / 已提交）。
+                        集显上显存就是系统内存，私有工作集不含它；两边（React 的 WebView2 GPU 进程与原生进程）
+                        都开这个开关，才能排除「内存搬进显存」的假象。
 
 .EXAMPLE
   pwsh -NoProfile -File apps/desktop-go/scripts/measure-idle.ps1 `
@@ -57,6 +60,7 @@ param(
   [string]$WebViewArgs = '--disable-features=CalculateNativeWinOcclusion',
   [switch]$SkipHidden,
   [switch]$KeepDir,
+  [switch]$Gpu,
   [string]$OutJson = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -116,11 +120,22 @@ function Get-Sample([int]$Root) {
   $procs = $perf | ForEach-Object {
     [pscustomobject]@{ Name = $_.Name; Pid = [int]$_.IDProcess; PrivateWsMB = [math]::Round($_.WorkingSetPrivate / 1MB, 1); PrivateBytesMB = [math]::Round($_.PrivateBytes / 1MB, 1); Cpu = [int]$_.PercentProcessorTime }
   }
+  $gpuInfo = $null
+  if ($Gpu) {
+    $mine = Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUProcessMemory -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -match '^pid_(\d+)_' -and ($ids -contains [int]$Matches[1]) }
+    $gpuInfo = [pscustomobject]@{
+      DedicatedMB = [math]::Round((($mine | Measure-Object DedicatedUsage -Sum).Sum) / 1MB, 1)
+      SharedMB    = [math]::Round((($mine | Measure-Object SharedUsage -Sum).Sum) / 1MB, 1)
+      CommittedMB = [math]::Round((($mine | Measure-Object TotalCommitted -Sum).Sum) / 1MB, 1)
+    }
+  }
   [pscustomobject]@{
     Procs          = @($procs).Count
     PrivateWsMB    = [math]::Round((($procs | Measure-Object PrivateWsMB -Sum).Sum), 1)
     PrivateBytesMB = [math]::Round((($procs | Measure-Object PrivateBytesMB -Sum).Sum), 1)
     CpuPct         = ($procs | Measure-Object Cpu -Sum).Sum
+    Gpu            = $gpuInfo
     Detail         = @($procs | Sort-Object PrivateWsMB -Descending)
   }
 }
@@ -143,6 +158,7 @@ function Measure-State([int]$Root, [string]$Name) {
   }
   $mid = ($samples | Sort-Object PrivateWsMB)[[math]::Floor(($samples.Count - 1) / 2)]
   Write-Host ("    {0,-7} {1,7:N1} MB  进程 {2}  CPU {3}%  (样本 {4})" -f $Name, $mid.PrivateWsMB, $mid.Procs, $mid.CpuPct, (($samples | ForEach-Object { $_.PrivateWsMB }) -join '/'))
+  if ($mid.Gpu) { Write-Host ("            GPU 专用 {0:N1} MB  共享 {1:N1} MB  已提交 {2:N1} MB" -f $mid.Gpu.DedicatedMB, $mid.Gpu.SharedMB, $mid.Gpu.CommittedMB) }
   return $mid
 }
 
@@ -235,11 +251,21 @@ $summary = [ordered]@{
   visibleProcs    = Get-Median ($results | ForEach-Object { $_.visible.Procs })
   visibleCpuPct   = Get-Median ($results | ForEach-Object { $_.visible.CpuPct })
 }
+if ($Gpu) {
+  $summary['visibleGpuSharedMB'] = Get-Median ($results | ForEach-Object { $_.visible.Gpu.SharedMB })
+  $summary['visibleGpuDedicatedMB'] = Get-Median ($results | ForEach-Object { $_.visible.Gpu.DedicatedMB })
+  $summary['visibleGpuCommittedMB'] = Get-Median ($results | ForEach-Object { $_.visible.Gpu.CommittedMB })
+}
 if (-not $SkipHidden) {
   $summary['hiddenMedianMB'] = Get-Median ($results | ForEach-Object { $_.hidden.PrivateWsMB })
   $summary['hiddenMinMB'] = ($results | ForEach-Object { $_.hidden.PrivateWsMB } | Measure-Object -Minimum).Minimum
   $summary['hiddenMaxMB'] = ($results | ForEach-Object { $_.hidden.PrivateWsMB } | Measure-Object -Maximum).Maximum
   $summary['hiddenProcs'] = Get-Median ($results | ForEach-Object { $_.hidden.Procs })
+  if ($Gpu) {
+    $summary['hiddenGpuSharedMB'] = Get-Median ($results | ForEach-Object { $_.hidden.Gpu.SharedMB })
+    $summary['hiddenGpuDedicatedMB'] = Get-Median ($results | ForEach-Object { $_.hidden.Gpu.DedicatedMB })
+    $summary['hiddenGpuCommittedMB'] = Get-Median ($results | ForEach-Object { $_.hidden.Gpu.CommittedMB })
+  }
 }
 $out = [pscustomobject]@{
   label    = $Label
