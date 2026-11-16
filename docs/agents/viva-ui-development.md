@@ -10,7 +10,7 @@
 | --- | --- |
 | 分支与基线 | `feat/viva-ui` 从 `feat/native-ui` `3f31fb53` 拉出（本地标签 `mygo-ui-frozen` 指向该提交），已 merge main（`94b980f0`，只带入评估文档补记，渲染层无变化）；Viva 固定 `v0.6.4`；`golang.org/x/text` 因 Viva 依赖由 0.43.0 升到 0.44.0 |
 | 阶段 0 准备 | 骨架已就位（见 §8）；剩余：生成器输出端改普通 Go（随阶段 2 的主题/i18n/图标一并做，见 §6） |
-| 阶段 1 对等基础设施 | 进行中：① 盘点清单已完成（[分母](viva-parity-inventory.md)：616 个基础场景、90 个对话框/弹层、344 条交互、1891 个文案键、998 条 React 用例；脚本与守卫测试已就位）；② React 采集器已建成（`scripts/parity/collect-react.mjs`，已在 `settings.general`/`settings.appearance` 上验证稳定）；③ Viva 采集路径实验、④ 比较工具、⑤ 在 `settings.general` 上校准阈值：未开始 |
+| 阶段 1 对等基础设施 | 已建成并校准：盘点、React 采集器（设备缩放钉死为 1）、Viva 采集器与比较工具（L1–L3）、阈值冻结（2026-11-16）、`settings.general` 在 T3 全矩阵 108/108 通过，采集稳定性 108/108。**未完成**：L2 的令牌/绘制比较、L4 行为测试、真窗口截图路径实验（见 §8 末条与台账 B 类） |
 | 阶段 2 M0 外壳与工具包层 | 未开始 |
 | 阶段 3 M1 + 检查点 1 | 未开始 |
 | V-a 中文输入法真机 | **未测，按未通过计**（用户决定推迟到整体迁移完成之后） |
@@ -85,14 +85,18 @@
 
 阈值只存在于 `apps/desktop-go/viva/parity/thresholds.json`（入库）。字段与含义：
 
-| 字段 | 初值 | 说明 |
-| --- | --- | --- |
-| `metrics.maxDeltaPx` | `1.0` | L2 外框位置/尺寸差上限；**固定，不参与校准** |
-| `metrics.wrappedTextHeightPx` | 待校准 | 文字换行决定高度的文本框的高度差上限 |
-| `pixel.tolerance` | `12/255` | L3 逐通道容差 |
-| `pixel.maskPad` | `1` | 文字遮罩外扩像素 |
-| `pixel.maxDiffRatio` | `0.01` | L3 差异比例上限 |
-| `stability.factor` | `0.5` | 采集稳定性：两次采集的差异必须小于对应阈值的这个倍数；**固定** |
+| 字段 | 初值 | 冻结值（2026-11-16） | 说明 |
+| --- | --- | --- | --- |
+| `metrics.maxDeltaPx` | `1.0` | `1.0` | L2 外框位置/尺寸差上限；**固定，不参与校准** |
+| `metrics.wrappedTextPitchPx` | 待校准 | `0.1` | 折行文字相邻两行行距（行盒顶之差）的差上限；实测 0.00 |
+| `metrics.inkMaxDeltaX` | `1` | `0` | 同一行文字墨迹剖面最佳对齐的水平位移上限（整像素） |
+| `metrics.inkMaxDeltaXFractional` | — | `1` | 只对左边缘落在小数像素上的文字放宽水平位移：Viva 整像素落位、渲染层子像素定位（台账 A-001） |
+| `metrics.inkMaxDeltaY` | `0` | `0` | 垂直位移上限；**固定为 0**（基线差一个像素就是缺陷） |
+| `metrics.inkMassMin / inkMassMax` | `0.8 / 1.25` | `0.85 / 1.15` | 墨迹总量比（Viva / React）范围，用来发现字重、颜色、字号不对；实测 0.905–1.042 |
+| `pixel.tolerance` | `12/255` | `12` | L3 逐通道容差 |
+| `pixel.maskPad` | `1` | `1` | 文字遮罩外扩像素 |
+| `pixel.maxDiffRatio` | `0.01` | `0.0025` | L3 差异比例上限；实测 108 个变体最大 0.0715%、中位 0.0175% |
+| `stability.factor` | `0.5` | `0.5` | 采集稳定性：两次采集的差异必须小于对应阈值的这个倍数；**固定** |
 
 **校准**只做一次，在第一个屏幕 `settings.general` 上：用与 React 逐项一致的实现测出在该屏幕上"实现正确时"稳定可达的噪声水平，据此写出 `pixel.*` 与 `metrics.wrappedTextHeightPx` 的最终值，连同 `frozenAt`（ISO 日期）与对其余字段求得的 SHA-256 一起写进 `thresholds.json`；`viva/parity/thresholds_test.go` 断言该哈希。此后改动 `thresholds.json` 必然让测试红，必须同时改测试——这样放宽在代码评审里一定可见，并且须先有用户同意。校准结果比初值更严可以直接采用；比初值更松（例如 `pixel.maxDiffRatio` > 0.01）按 C 类上报，等用户裁决再冻结。
 
@@ -176,9 +180,9 @@ apps/desktop-go/scripts/parity/            React 侧事实采集器（Node + Pla
 ## 7. 验证与度量
 
 - 隔离：不碰用户正在运行的归知（安装版）、不碰 `%APPDATA%\GuiZhi` 与 `%LOCALAPPDATA%\GuiZhi\WebView2`；每个被测进程拿一次性 `LOCALAPPDATA`/`APPDATA` 与 userData，库只用副本；只按 PID 结束自己拉起的进程。
-- React 侧采集：`scripts/parity/collect-react.mjs`，基于 `pnpm shot` 的隔离构建与屏幕外窗口（`-bench`，保留屏幕外 + `showInactive`，不改成隐藏窗口），经 CDP 连 WebView2，视口用 `Emulation.setDeviceMetricsOverride` 钉死（设备像素比 1）。
-- Viva 侧采集：`headless.Session`；截图路径以阶段 1 的实验结论为准（记在 §8）。
-- 比较与报告：`go run ./viva/parity/cmd/vivaparity`，输出每场景 L1–L4 结果表与 react/viva/diff 三图到 `D:\Project\GuiZhi-bench\parity\`；L1/L2 的事实比较同时是 `go test ./viva/parity/...` 里的快速测试（对入库的 React 事实 JSON）。
+- React 侧采集：`scripts/parity/collect-react.mjs`，基于 `pnpm shot` 的隔离构建与屏幕外窗口（`-bench`，保留屏幕外 + `showInactive`，不改成隐藏窗口），经 CDP 连 WebView2，视口用 `Emulation.setDeviceMetricsOverride` 钉死（设备像素比 1；**并且启动参数带 `--force-device-scale-factor=1`**，原因见 §8 的 2026-11-16 条）。
+- Viva 侧采集：`headless.Session`（`Access`/`Snapshot`/`Image`），区域尺寸取 React 事实里的区域；截图路径的结论见 §8。
+- 比较与报告：`go run ./viva/cmd/vivaparity`，输出每场景 L1–L4 结果表与 react/viva/diff 三图到 `D:\Project\GuiZhi-bench\parity\`；L1/L2 的事实比较同时是 `go test ./viva/parity/...` 里的快速测试（对入库的 React 事实 JSON）。
 - 内存读数：`measure-idle.ps1`，两态各 5 次中位数、静置 60 秒，加 `-Gpu` 同时记录 GPU 共享内存；进程数脚本本来就记。主判据（整棵进程树 `WorkingSetPrivate` 之和）不变，`-Gpu` 只增加记录项。
 - `-viva` 启动保护：在切换为产品默认之前，`-viva` 只允许与 `-bench`、显式 `-db`、显式 `-userdata` 同用，且不能与 `-native` 同用；检查在解析数据目录与初始化数据库**之前**执行（`checkVivaLaunch`，`viva_boot_test.go` 覆盖），因为不带 `-db` 时 `main()` 会按正式安装规则推断出真实数据目录并对它做初始化。
 - 本地构建与冒烟（不入库的基准工具，在 `D:\Project\GuiZhi-bench\tools\`）：`build-viva-ui.ps1` 用与发布相同的构建参数把主包构建到 `D:\Project\GuiZhi-bench\viva-ui\bin\`（不放进任何仓库的 `out` 目录，不覆盖任何 `GuiZhi.exe`）；`smoke-viva-ui.ps1` 用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 启动 `-viva -bench`，确认 READY 后按 PID 结束。
@@ -195,6 +199,13 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - 2026-11-16 阶段 0：建分支 `feat/viva-ui`、打 `mygo-ui-frozen`、merge main（`94b980f0`）、依赖安装；写本文并固定 §2；`measure-idle.ps1` 加 `-Gpu`；`go.mod` 加 Viva v0.6.4（钉死标签）；NOTICE 与 `third-party/viva/`；骨架包 `viva`、`viva/app`、`viva/island`（W1 封装，含导航策略与环境变量还原的单元测试）；`-viva` 启动路径与启动保护；冒烟：`-viva -bench` 在一次性目录里 READY、窗口标题正确、用户实例未受影响。
 - 2026-11-16 阶段 1 · 盘点（本条之后的采集器、比较与校准另记）：9 个并行子任务逐屏读源码写出分片（`docs/agents/viva-parity-inventory/`），再由 `scripts/parity/inventory-{stats,i18n,tests}.mjs` 机械统计并写回 [viva-parity-inventory.md](viva-parity-inventory.md)；`scripts/tests/parity-inventory.test.mjs` 守住 ID 唯一性与分母表不过期（并入 `test:validation`）。统计过程中核实到的事实：(a) React 用例实为 998 条而不是约 650，其中 514 条属于与界面无关的 `db`/`shared`/`core`/`services`，界面相关约 484 条、渲染 DOM 的 213 条；(b) zh/en 各 1891 个键完全对齐，且每个键都被渲染层引用，没有只存在于代码里的默认文案；(c) 但有 443 处 CJK 字符串字面量与 14 处 JSX 直写文本不经 `t()`，「不改文案」要求它们同样原样携带；(d) 基础场景 616 个，乘以 §2.1 的展开矩阵 108 得 66528 个完整场景——T3 的机时待采集器建成后实测，规模若不可行按 C 类上报；(e) 21 处 `(?)` 留给运行时采集核实。
 - 2026-11-16 阶段 1 · React 采集器：`scripts/parity/build-react-ref.mjs` 在隔离快照里构建一份常驻的 React 参照（`D:\Project\GuiZhi-bench\react-ref\`，按源码指纹判定是否过期；首次 37.9 s）；`collect-react.mjs` 用 `-dist -userdata -db -bench` 拉起它（一次性 userData 与 WebView2 目录、`--remote-debugging-port=0`，Playwright `connectOverCDP`），对「场景 × 变体」采集 PNG、可访问性树（`Accessibility.getFullAXTree` 展平，去掉没有 DOM 的 `InlineTextBox`）、元素外框、计算样式、文字行外框与平台字体（`CSS.getPlatformFontsForNode`）。核实到的事实：(a) 本机宿主缩放 200%，WebView 默认设备像素比是 2：Playwright `page.screenshot` 得到 2560×1600，`DOMSnapshot` 外框是设备像素。所以统一用 `Emulation.setDeviceMetricsOverride(deviceScaleFactor: 1)` 钉死视口与像素比，截图走 CDP `Page.captureScreenshot`（`clip.scale = 1`），外框在页内用 `getBoundingClientRect`（CSS 像素）量；(b) 稳定性（§2.4）：`settings.general`/`settings.appearance` × T0 两个变体，同一会话连采两次与跨会话再采一次，PNG、事实 JSON、ARIA 快照共 12 个文件逐字节相同，采集噪声为 0；(c) 平台字体：`ui-sans-serif, system-ui, …` 在本机解析为 `Microsoft YaHei UI`（400）与 `Microsoft YaHei UI Semibold`（500/600），等宽落到 `Consolas`，Viva 侧须用同一族；(d) 耗时：会话启动约 10 s，每次采集约 0.5 s，T0（2 场景 × 2 变体）合计 3.7 s。
+
+- 2026-11-16 阶段 1 · 更正与重要发现（设备缩放）：上一条里「用 `Emulation.setDeviceMetricsOverride(deviceScaleFactor: 1)` 钉死像素比」**不够**。本机宿主缩放 200% 时，Emulation 只改了视口与截图的缩放，Chromium 的**排版取整仍按 2× 物理像素**：字体 ascent/descent 与半行距都量化到 0.5 CSS 像素，参照里的文字基线因此带上宿主 DPI 的印记，换一台 100% 缩放的机器会采到不同的基线。证据：隔离探针（`scripts/parity/tools/probe-text-metrics.mjs`，324 组字号×字重×行高）在无参数与带 `--force-device-scale-factor=1` 两种启动下，274 组至少有一项（内容区顶、内容区高、基线）不同（基线 178 组、内容区顶 164 组、内容区高 126 组）；无参数时 212 组的内容区顶或高是半像素值，带参数时 324 组全部是整数。例：12.25px Semibold、行高 17.5，无参数得内容区顶 0.5、高 16.5、基线 13.5，带参数得 0、16、13（`window.devicePixelRatio` 无参数为 2、带参数为 1；探针输出 `D:\Project\GuiZhi-bench\parity\probe-metrics-{noflag,dsf1}.json`，不入库）。**处置**：`react-session.mjs` 默认给 WebView2 加 `--force-device-scale-factor=1`，并在读不到原始 DPR=1 时直接中止；采集器在事实里写 `capture.forcedDsf`，`parity.Compare` 拒绝没有该标记的陈旧参照。此前基于旧参照做的小/大字号档基线结论作废（当时看到的「小数字号取整规则未知」就是这个污染）。
+- 2026-11-16 阶段 1 · 文字基线模型（钉在 Chromium 实测上）：设备缩放为 1 时，Chromium 一行文字的基线到行盒顶的距离 = `floor((L − (A+D)) / 2) + A`，A = round(ascent·s)、D = round(descent·s)（四舍五入），L 是行高，字体面按字重取 YaHei UI / Semibold / Bold；**对探针 324 组（9 个字号含 10.5/12.25/13.5/15.75/20.25 等小数字号、4 个字重、9 个行高含 17.5/22.5/24.5/31.5）全部吻合**，已作为夹具 `viva/kit/testdata/chrome-text-probe.json` 与 `TestChromeBaselineMatchesProbe` 入库。Viva 一侧：界面字体的行把基线放在纹理第 `floor(H/2 + 0.378·s)` 行，且文字盒的顶边与左边带小数时按**四舍五入（半个像素向上）落到整设备像素**（`TestVivaLabelRoundsHalfUp` 守卫）。kit 的 `Text` 用整数平移补偿两者之差；行盒顶带小数（行高 17.5 之类）时两边对顶边都是四舍五入，整数平移不改变各自的进位，所以小数布局下补偿同样成立。
+- 2026-11-16 阶段 1 · 表面像素吸附：Chromium 把背景与边框画在吸附后的矩形上（起点与终点各自四舍五入）；Viva 对**带圆角**的矩形取「起点四舍五入 + 尺寸四舍五入」，小数布局下下边缘与右边缘会差 1 个设备像素（示例（按规则推演）：起点 356.75、高 111.5 时 Chromium 取 357～468，Viva 取 357～469，卡片底边与右边多出一行/一列）。根字号 14px 与 18px 两档到处是小数布局，所以带背景、边框、圆角或阴影的表面一律由 `kit.Surface` / `PaintSurface` 按 Chromium 规则自己吸附并画出（背景铺满边框盒，边框是其上的环），不用 `Box.Background/Border/Radius`；开关的轨道与圆形旋钮同理（旋钮直径、top 随根字号缩放，小字号档为 17.5px）。修复前后在 T3 的 108 个变体上 L3 差异比例的最大值 0.4044% → 0.0715%、中位 0.1173% → 0.0175%（运行日志 `viva-t3-run5`/`run6`）。
+- 2026-11-16 阶段 1 · Viva 采集与比较工具：`viva/parity`（事实 schema 2、a11y 归一化、L1 序列对齐与状态、L2 外框/文字行数/宽度/折行行距/墨迹剖面位移与墨迹量比、L3 带文字遮罩的像素比较与差异片定位、三联图）与 `viva/cmd/vivaparity`（`-scene`、`-variant` 子串过滤、`-stability`）。Viva 一侧用 `headless.Session`（`Access`/`Snapshot`/`Image`）出事实与图片，区域尺寸取 React 事实里的区域，窗口宽度经 `Look.Viewport` 传入以触发正确的 Tailwind 断点；折行文字用 `ui.Wrap` 路线（`kit.Wrapped()`），开关用 `Shrink(0)` 对应渲染层的 `flex-shrink-0`；区域裁剪：React 只记录区域内可见的文字，所以折行文字的区域外行只用来补全文字拼接，不参与行数、宽度、墨迹比较。**截图路径结论**：全部场景用 headless `Session.Image()`——它与 `Snapshot` 同源，已能把 L3 压到 ≤0.0715%，且不需要窗口；与真窗口（屏幕外 + `showInactive`）截图的对比留到阶段 2 有了真窗口之后做（台账 B-006）。
+- 2026-11-16 阶段 1 · 校准与冻结：`settings.general` 在 T3（6 色相 × 3 字号档 × 3 视口 × 明暗 = 108）上 **108/108 通过**：L1 可访问树逐节点相等；L2 共 1344 对外框全部在容差内、最大差 0.00px，2364 行文字的绘制宽度最大差 0.0142px，墨迹垂直位移 0；水平位移 1 像素出现在 60 行文字上（54 个变体，仅「每次询问」与「简体中文」两处下拉框取值，仅出现在小/大字号档，左边缘为小数像素，台账 A-001）；墨迹量比 0.9053–1.0424；L3 差异比例最小 0.0100%、中位 0.0175%、最大 0.0715%，残留是圆角与图标边缘的抗锯齿（簇尺寸 1×1 到 15×15 像素，单簇最多 25 个差异像素，台账 A-003）。**采集稳定性**：同一会话连采两次 108/108 完全相同（外框、文字、绘制、字体取证逐字一致，像素差异 0）；两次独立启动（跨会话）108/108 稳定，像素差异最大 1。据此冻结阈值（见 §2.3，均比初值更严，不属于放宽），`thresholds_test.go` 守 SHA-256，`a11y_map_test.go` 守归一化规则摘要。入库的是 5 个变体的压缩事实 JSON（约 420 KB，`viva/parity/testdata/react/`，由 `scripts/parity/export-testdata.mjs` 导出），`go test ./viva/parity/scenes` 用它们做 L1+L2，不启动 WebView2。
+- 2026-11-16 阶段 1 · 还没做的（诚实记录）：(1) L2 的**令牌/绘制比较**（React `paints[]` 与 Viva 图元、`:root` 语义令牌与 `tokens.For` 逐项对拍）未实现，目前颜色/边框/阴影只由 L3 兜底；(2) **L4 行为**只有雏形：`settings.general` 的「打开后台任务要先弹确认对话框」「写入失败要 toast 并可重试」「下拉弹层」在 Viva 页里尚未实现（台账 B-001…B-003），需要阶段 2 的对话框、toast、下拉弹层先落地；(3) 悬停/聚焦/按下与动效状态没有采集（`settings.general` 之外的状态场景要等对应工具包控件）；(4) 真窗口截图路径实验（台账 B-006）。
 
 ## 9. 切换为产品默认之前的清单（延伸目标，非本阶段）
 

@@ -7,10 +7,11 @@
 
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
-| A（平台/Viva 确实做不到） | 0 | |
-| B（暂缺，已定里程碑） | 0 | |
+| A（平台/Viva 确实做不到） | 3 | A-001…A-003 |
+| B（暂缺，已定里程碑） | 4 | B-001…B-004 |
 | C（需用户裁决） | 1 | 见 C-001 |
 | 未测（按未通过计） | 5 | 见「未测项」 |
+| 验证缺口（对照工具尚未覆盖，按未验证计） | 3 | 见「验证缺口」 |
 
 ## 条目格式
 
@@ -24,11 +25,35 @@
 
 ## A 类：Viva 或平台确实做不到
 
-（暂无。）
+### A-001 文字水平方向没有子像素定位
+
+- 场景/模块：所有左边缘落在小数像素上的文字。`settings.general` 上出现在两处下拉框取值（「每次询问」「简体中文」），只在小/大字号档（根字号 14/18px 让布局出现 .5 像素）；T3 的 108 个变体中 54 个、共 60 行文字。
+- 偏差：渲染层（Chromium）把文字画在小数 x 上，竖笔画可以跨两列；Viva 把文字纹理整张放在整设备像素上，同一行文字最多差半个像素，整像素最佳对齐位移为 1。
+- 证据：(1) Viva 源码自述：`github.com/vivaui/viva@v0.6.4/internal/platform/label_pixels.go` 第 4–10 行，「A label texture holds one texel per device pixel, so drawing it anywhere but on a whole device pixel makes the sampler blend neighbouring texels … Rounding the layout position moves the text by at most half a device pixel」，`DevicePosition` 为 `floor((logical+origin)*scale + 0.5)`；`kit/snap_test.go` 的 `TestVivaLabelRoundsHalfUp` 在 x、y 两轴上钉住这条规则。(2) 实测：`light-royal-blue-small-1280x800` 里「每次询问」两边外框一致（x=833.5、行基线一致），最后一个字「问」的右竖笔画，渲染层占两列（浓度 3,3），Viva 居中占三列（1,4,1），正好差半个像素（逐列墨迹，`D:\Project\GuiZhi-bench\parity\react|viva\light-royal-blue-small-1280x800\`，不入库）。(3) 已做的补偿：垂直方向由 `kit.Text` 整数平移补齐（基线 324/324 吻合，墨迹垂直位移 0）；水平方向 Viva 没有可调的参数，只能放宽——`metrics.inkMaxDeltaXFractional = 1`，且**只对左边缘为小数像素的文字**放宽，其余文字水平位移仍必须为 0。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
+
+### A-002 文字光栅化的浓淡与抗锯齿细节
+
+- 场景/模块：所有文字。
+- 偏差：字形位置与行盒一致（外框差 0.00px，墨迹垂直位移 0），但同一行文字的墨迹总量 Viva / React 在 0.9053–1.0424（T3 的 108 个变体、2364 行文字）；逐像素的抗锯齿灰度不同。L3 的文字区域被遮罩（`pixel.maskPad = 1`），文字外观由墨迹量比（范围 `[0.85, 1.15]`）与位置兜底，不由像素差兜底。
+- 证据：Viva 在 Windows 上经 Direct2D 出字，并跟随用户的 ClearType 设置（渲染模式、像素几何、级别、伽马、增强对比度；`internal/platform/windows/direct_windows.go` 第 16–18 行），透明目标上改用灰度（`backdrop_windows.go` 第 100–101 行）；渲染层是 Chromium 自己的 Skia 出字路径，两边的伽马与对比度处理不同。在 v0.6.4 源码的公开包（`gfx`、`ui`、`app`，不含测试）里按 `cleartype|gamma|grayscale|subpixel` 检索，没有覆盖这些参数的入口。墨迹量比的逐变体数据在 `D:\Project\GuiZhi-bench\parity\viva\*\settings.general.report.json`（不入库）。headless `Session.Image` 实际使用哪种抗锯齿模式尚未核实（见 G-003）。
+- 状态：开（引擎限制）。真窗口截图路径（G-003）有了之后复测 LCD 与灰度两种模式的差异。
+
+### A-003 圆角与图标边缘的抗锯齿
+
+- 场景/模块：`settings.general` 的开关胶囊圆角、下拉框箭头图标、开关旋钮。
+- 偏差：圆角与图标边缘的抗锯齿像素不逐像素相同。T3 的 108 个变体共 15167 个差异像素，占比最小 0.0100%、中位 0.0175%、最大 0.0715%（冻结阈值 0.25%）；差异集中成簇（簇尺寸 1×1 到 15×15，单簇最多 25 个像素）。例：`dark-blue-large-1280x800` 的 8 个簇里，4 个 21 像素的簇是开启状态的「自动保存」开关胶囊的四个圆角，2 个 2×2 簇在「关闭窗口行为」下拉框的箭头图标上，另 2 个单像素簇在开关旋钮附近（簇坐标对照 React 外框得出，`report.json` 不入库）。
+- 证据：Viva 的圆角由自带光栅化器绘制，`Canvas.Rounded`/`RoundedOutline` 没有抗锯齿选项。已做的补偿：边缘位置按 Chromium 规则吸附（`kit.SnapRect`/`PaintSurface`），使整体边界对齐（修复前最大 0.4044%，修复后 0.0715%）；剩下的是边缘灰度的差异。
+- 状态：开（引擎限制）。
 
 ## B 类：暂缺
 
-（暂无。）
+| ID | 场景/模块 | 缺什么（React 的行为） | 里程碑 |
+| --- | --- | --- | --- |
+| B-001 | `settings.general`：后台任务开关 | 打开「后台任务」先弹 `ConfirmDialog`（标题「启用系统后台运行」），确认后才写入；关闭立即写入。Viva 页目前直接写入。 | M0 对话框工具包 → M1 设置页 |
+| B-002 | `settings.general`：写入失败 | 失败时 `showToast` 带可复制的 `detail` 并可重试；Viva 页目前吞掉 `Store.Update` 的错误。 | M0 toast → M1 设置页 |
+| B-003 | `settings.general`：下拉框 | 点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）；Viva 页只有静态触发器。 | M0 下拉弹层 → M1 设置页 |
+| B-004 | `settings.general`：悬停、聚焦、按下、禁用状态与过渡动效 | 各控件的状态样式与时长（`motion` 四种模式）；Viva 页只有静止状态。 | M0 控件状态 → L4 测试 |
 
 ## C 类：需要用户裁决
 
@@ -47,12 +72,21 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 
 | 候选 | 预期类别 | 在哪个阶段实测 |
 | --- | --- | --- |
-| 文字抗锯齿（Chromium ClearType/灰度 vs Viva DirectWrite 纹理） | A | 阶段 1（截图路径实验与阈值校准） |
 | 壁纸模式的磨砂玻璃（`backdrop-filter`） | C | 阶段 2（主题令牌、壁纸） |
 | 滚动条与惯性滚动 | A | 阶段 3 |
 | 系统文件对话框、系统菜单的外观 | A | 阶段 2（对话框） |
 | 窗口圆角与阴影（自绘标题栏下） | A | 阶段 2（窗口与自绘标题栏） |
 | 浏览器级跨块选择与页内查找 | A | 阶段 4 以后（阅读岛之外的界面） |
+
+## 验证缺口（对照工具尚未覆盖，按未验证计）
+
+这不是偏差，而是「现有通过结论没覆盖到的东西」：最终报告里要写成未验证，不得写成通过。
+
+| ID | 缺口 | 影响 | 计划 |
+| --- | --- | --- | --- |
+| G-001 | L2 的令牌与绘制比较未实现：React `paints[]` 与 Viva 图元、`:root` 语义令牌与 `tokens.For` 逐项对拍 | 颜色、边框、阴影目前只由 L3 兜底（容忍度 12/255 的逐通道差） | 阶段 2 的 M0 令牌落地时补，并先在 `settings.general` 上跑通 |
+| G-002 | L4 行为测试只有雏形 | 点击、键盘、对话框、toast、下拉弹层的行为未逐项比较 | 随 B-001…B-004 在 M0/M1 补齐 |
+| G-003 | 真窗口（屏幕外 + `showInactive`）截图与 headless `Session.Image` 的差异未比较 | headless 路径下 LCD 抗锯齿不会出现；窗口合成与缩放路径未对照 | 阶段 2 有了真窗口之后做，结论写进开发文档 §8 |
 
 ## 未测项（按未通过计）
 
@@ -84,3 +118,5 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 日期 | 变更 | 依据 | 用户同意 |
 | --- | --- | --- | --- |
 | 2026-11-16 | 固定 §2 的 L1–L4 定义与 §2.3 初值 | 本分支立项 | 是（立项时的指令） |
+| 2026-11-16 | 校准并冻结 `thresholds.json`：`pixel.maxDiffRatio` 0.01 → 0.0025，`inkMaxDeltaX` 1 → 0，墨迹量比范围 [0.8, 1.25] → [0.85, 1.15]，其余不变；`metrics.wrappedTextHeightPx`（待校准）由更严的 `wrappedTextPitchPx = 0.1`（折行相邻行距之差）取代，文字框高度本身仍受固定的 `maxDeltaPx = 1.0` 约束；`inkMaxDeltaXFractional = 1` 只对小数左边缘文字放宽，等于初始的 `inkMaxDeltaX` | `settings.general` T3 108/108 的实测分布，见开发文档 §8；全部不比初值松 | 不需要（只收紧，未放宽；放宽才需要） |
+| 2026-11-16 | 纠正采集口径：React 采集器改为启动参数 `--force-device-scale-factor=1`，宿主缩放 200% 时仅靠 Emulation 钉死会让排版取整带上宿主 DPI；作废此前的小/大字号档参照并重采 | 探针 324 组中 274 组与参数启动不同，见开发文档 §8 | 不需要（让参照与机器缩放无关，不是放宽） |
