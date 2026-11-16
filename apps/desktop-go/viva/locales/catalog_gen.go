@@ -15147,6 +15147,22 @@ func NativeIslandWebview2Missing() string {
 	return "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
 }
 
+// NativeLanguageNameZh 是 native.languageName.zh：简体中文
+func NativeLanguageNameZh() string {
+	if useEn() {
+		return "简体中文"
+	}
+	return "简体中文"
+}
+
+// NativeLanguageNameEn 是 native.languageName.en：English
+func NativeLanguageNameEn() string {
+	if useEn() {
+		return "English"
+	}
+	return "English"
+}
+
 // NativeShellNotMigrated 是 native.shell.notMigrated：「{{module}}」还没有迁移到原生界面
 func NativeShellNotMigrated(module any) string {
 	if useEn() {

@@ -1,0 +1,40 @@
+package kit
+
+import (
+	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/viva/icons"
+)
+
+// SelectTrigger 复刻渲染层 Select 的触发按钮：w-full h-10 px-3 rounded-lg bg-muted，文字 text-sm，
+// 右侧 16px 的 ChevronDown（muted-foreground），gap-2。悬停 bg-muted/80；获得焦点或展开时 ring-2 ring-primary/30。
+// width 是外层容器宽度（调用方按 Tailwind 的 w-40 等换算成像素）；open 是列表是否展开。
+//
+// 对外的可访问语义是带弹层的下拉触发器（combobox，展开状态与当前值）：渲染层是
+// button[aria-haspopup=listbox][aria-expanded]，L1 的角色映射把两者归为同一类。
+func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bool) ui.Box {
+	t := l.T
+	id := ui.ID(c)
+	ring := l.Col(t.Primary.WithAlpha(0.3))
+	pad := l.Rem(0.75)
+	chevron := l.Rem(1)
+	gap := l.Rem(0.5)
+	box := ui.Row(c).
+		Size(width, l.Rem(2.5)).
+		Radius(l.Rem(0.75)).
+		Background(l.Col(t.Muted)).
+		Items(ui.Center).
+		PadX(pad).
+		Gap(gap).
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Expanded: open, Value: value}).
+		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.8)))).
+		Focused(ui.Look{}.Ring(2, ring))
+	if open {
+		box = box.Ring(2, ring)
+	}
+	return box.Children(func() {
+		l.Text(c, value, TextSM, WeightNormal, t.Foreground, Ellipsis()).Grow(1).Shrink(1)
+		ui.Icon(c, icons.ChevronDown).Size(chevron, chevron).Color(l.Col(t.MutedForeground))
+	})
+}

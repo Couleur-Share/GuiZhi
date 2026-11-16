@@ -1,0 +1,125 @@
+package kit
+
+import (
+	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/viva/tokens"
+)
+
+// ViewportWidth 是 Tailwind 响应式断点所依据的窗口内容宽度（逻辑像素）。外壳里就是窗口宽度；
+// 阶段 1 把单个屏幕的区域当校准载体时，区域比窗口窄，由 Look.Viewport 显式给出窗口宽度。
+func (l *Look) ViewportWidth(c ui.C) float32 {
+	if l.Viewport > 0 {
+		return l.Viewport
+	}
+	return c.Bounds().Width
+}
+
+// SettingsContent 是设置页的内容区：SettingsPage 里的滚动容器（px-3 py-5，sm:px-6 xl:px-8 2xl:px-10，
+// app-wallpaper-section 底色）、内容壳（max-w-[1024px] xl:max-w-[1152px] 2xl:max-w-[1280px]）与 h1 标题。
+// 断点按窗口宽度判定（640 / 1280 / 1536），与区域宽度无关。
+func (l *Look) SettingsContent(c ui.C, title string, body func()) {
+	vw := l.ViewportWidth(c)
+	px, maxWidth := l.Rem(0.75), float32(1024)
+	switch {
+	case vw >= 1536:
+		px, maxWidth = l.Rem(2.5), 1280
+	case vw >= 1280:
+		px, maxWidth = l.Rem(2), 1152
+	case vw >= 640:
+		px = l.Rem(1.5)
+	}
+	py := l.Rem(1.25)
+	l.ScrollArea(c, [4]float32{py, px, py, px}, func() {
+		ui.Column(c).FillWidth().MaxWidth(maxWidth).Children(func() {
+			l.Heading(c, 1, title, TextLG, WeightSemibold, l.T.Foreground).MarginBottom(l.Rem(1))
+			body()
+		})
+	}).FillWidth().Grow(1).Background(l.Col(l.T.UiSectionBg))
+}
+
+// SettingSections 把若干分区竖排（渲染层的 space-y-6）。
+func (l *Look) SettingSections(c ui.C, body func()) {
+	ui.Column(c).FillWidth().Gap(l.Rem(1.5)).Children(body)
+}
+
+// SettingRow 是 SettingSection 里的一项：左侧标签与说明，右侧控件。
+type SettingRow struct {
+	Label, Description string
+	Control            func()
+}
+
+// SettingSection 是设置分区：h3 标题（text-sm font-medium muted）加 app-settings-card 卡片，
+// 卡片里是 SettingItem 行，除最后一行外都有 border-b border-border/70。
+func (l *Look) SettingSection(c ui.C, title string, rows []SettingRow) {
+	ui.Column(c).FillWidth().Gap(l.Rem(0.75)).Children(func() {
+		l.Heading(c, 3, title, TextSM, WeightMedium, l.T.MutedForeground)
+		l.SettingsCard(c, func() {
+			for i, row := range rows {
+				l.SettingItem(c.Key(row.Label), row, i == len(rows)-1)
+			}
+		})
+	})
+}
+
+// SettingsCard 复刻 .app-settings-card：令牌背景、1px 令牌边框、1rem 圆角与令牌阴影。
+// 阴影要画在卡片背景之下，所以外面套一层只画阴影的容器。
+func (l *Look) SettingsCard(c ui.C, body func()) {
+	t := l.T
+	radius := l.Rem(1)
+	ui.Column(c).FillWidth().Draw(func(d *ui.DrawContext) {
+		l.paintShadow(d, t.SettingsCardShadow, radius)
+	}).Children(func() {
+		ui.Column(c).FillWidth().
+			Background(l.Col(t.SettingsCardBg)).
+			Border(1, l.Col(t.SettingsCardBorder)).
+			Radius(radius).
+			Children(body)
+	})
+}
+
+// paintShadow 在 d.Rect 之外画令牌阴影；零值阴影什么也不画。
+func (l *Look) paintShadow(d *ui.DrawContext, s tokens.Shadow, radius float32) {
+	if s.IsZero() {
+		return
+	}
+	style, color := ShadowStyle(s)
+	d.Canvas.Shadow(d.Rect, radius, style, d.Fade(color))
+}
+
+// SettingItem 复刻渲染层的 SettingItem：flex items-center justify-between gap-4 px-4 py-3，
+// 非末行带 border-b border-border/70，悬停 bg-muted/20。左侧标签 text-sm font-medium，
+// 说明 text-xs muted mt-0.5；左侧可收缩（min-w-0），右侧控件不收缩。
+func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
+	t := l.T
+	pad := [4]float32{l.Space(3), l.Space(4), l.Space(3), l.Space(4)} // py-3 px-4
+	if !last {
+		pad[2]++ // border-b 占 1px，画在行盒的最底部
+	}
+	box := ui.Row(c).FillWidth().
+		Items(ui.Center).
+		Justify(ui.Between).
+		Gap(l.Space(4)).
+		PadSides(pad[0], pad[1], pad[2], pad[3]).
+		HitWith(ui.ID(c), "", gfx.HitOptions{SkipFocus: true}).
+		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.2)))).
+		DrawOver(func(d *ui.DrawContext) {
+			if last {
+				return
+			}
+			line := gfx.Rect{X: d.Rect.X, Y: d.Rect.Y + d.Rect.Height - 1, Width: d.Rect.Width, Height: 1}
+			d.Canvas.Fill(line, d.Fade(l.Col(t.Border.WithAlpha(0.7))))
+		})
+	box.Children(func() {
+		ui.Column(c).Shrink(1).Children(func() {
+			l.Text(c, row.Label, TextSM, WeightMedium, t.Foreground)
+			if row.Description != "" {
+				l.Text(c, row.Description, TextXS, WeightNormal, t.MutedForeground).MarginTop(l.Space(0.5))
+			}
+		})
+		if row.Control != nil {
+			row.Control()
+		}
+	})
+}

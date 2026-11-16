@@ -7,15 +7,21 @@
 // lucide-react 的位置：LUCIDE_REACT_DIR 环境变量，否则 apps/desktop/node_modules/lucide-react（需要 pnpm install）。
 // 产物入库，所以普通的 go build / go test 不依赖 node_modules；渲染层新增图标后重新运行本脚本。
 // MyGo 的 ui.Icon 直接吃 Lucide 的 SVG（描边色取文字色），不需要改写。
+//
+// 另有 Viva 目标：同一份 SVG 经 viva/icons/gen（Viva 自带的 iconcompile）编译成 gfx.Icon 的 Go 值，
+// 写到 viva/icons/icons_gen.go（普通 Go，运行期没有 SVG 解析）。
 
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
 const RENDERER = path.join(REPO_ROOT, "apps/desktop/src/renderer");
+const GO_ROOT = path.join(REPO_ROOT, "apps/desktop-go");
 const OUT_FILE = path.join(REPO_ROOT, "apps/desktop-go/native/kit/icons/icons_gen.go");
+const OUT_FILE_VIVA = path.join(REPO_ROOT, "apps/desktop-go/viva/icons/icons_gen.go");
 
 /** 只是类型、不是图标的导出。 */
 const NOT_ICONS = new Set(["LucideIcon", "LucideProps", "Icon", "icons", "createLucideIcon", "IconNode"]);
@@ -139,7 +145,22 @@ export function render() {
   for (const n of names) lines.push(`\t${n}: \`${icons.get(n)}\`,`);
   lines.push("}");
   lines.push("");
-  return { text: gofmt(lines.join("\n")), count: names.length };
+  return { text: gofmt(lines.join("\n")), count: names.length, icons };
+}
+
+/** Viva 目标：把各图标的 SVG 写进临时目录，交给 viva/icons/gen 编译，返回生成的 Go 源码。 */
+export function renderViva(icons) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "guizhi-viva-icons-"));
+  try {
+    for (const [name, svg] of icons) fs.writeFileSync(path.join(dir, `${name}.svg`), svg);
+    return execFileSync("go", ["run", "./viva/icons/gen", "-pkg", "icons", dir], {
+      cwd: GO_ROOT,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /** 产物必须已是 gofmt 格式（CI 有 gofmt 检查，常量块的列对齐靠它）。 */
@@ -148,20 +169,29 @@ function gofmt(src) {
 }
 
 export function main(argv) {
-  const { text, count } = render();
+  const { text, count, icons } = render();
+  const vivaText = renderViva(icons);
   // Windows 检出（core.autocrlf=true）的工作区文件是 CRLF，比较前统一成 LF，否则 --check 永远报过期
-  const prev = fs.existsSync(OUT_FILE) ? fs.readFileSync(OUT_FILE, "utf8").replace(/\r\n/g, "\n") : null;
+  const read = (file) => (fs.existsSync(file) ? fs.readFileSync(file, "utf8").replace(/\r\n/g, "\n") : null);
+  const targets = [
+    [OUT_FILE, text],
+    [OUT_FILE_VIVA, vivaText],
+  ];
   if (argv.includes("--check")) {
-    if (prev === text) {
-      console.log(`图标清单与渲染层一致（${count} 个）`);
-      return 0;
+    let stale = 0;
+    for (const [file, want] of targets) {
+      if (read(file) === want) continue;
+      stale += 1;
+      console.error(`过期：${path.relative(REPO_ROOT, file)}（请运行 node apps/desktop-go/scripts/gen-native-icons.mjs 并提交）`);
     }
-    console.error(`过期：${path.relative(REPO_ROOT, OUT_FILE)}（请运行 node apps/desktop-go/scripts/gen-native-icons.mjs 并提交）`);
-    return 1;
+    if (stale === 0) console.log(`图标清单与渲染层一致（${count} 个）`);
+    return stale === 0 ? 0 : 1;
   }
-  fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
-  fs.writeFileSync(OUT_FILE, text);
-  console.log(`写入 ${path.relative(REPO_ROOT, OUT_FILE)}（${count} 个图标）`);
+  for (const [file, content] of targets) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+    console.log(`写入 ${path.relative(REPO_ROOT, file)}（${count} 个图标）`);
+  }
   return 0;
 }
 

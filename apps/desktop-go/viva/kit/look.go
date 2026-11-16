@@ -37,6 +37,12 @@ type Look struct {
 	Dark   bool
 	Glass  bool
 	RootPx float32 // 根字号（字号档对应的像素）：Tailwind 的 1rem
+
+	// Viewport 是响应式断点依据的窗口宽度（逻辑像素）；0 表示取页面自身宽度（外壳里两者相同）。
+	Viewport float32
+
+	// Scale 是设备像素与逻辑像素之比（窗口缩放 100% 为 1）；0 按 1。文字基线的取整按设备像素算，需要它。
+	Scale float32
 }
 
 // NewLook 把外观输入装配成 Look。

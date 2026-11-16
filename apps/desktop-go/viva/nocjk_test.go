@@ -134,6 +134,12 @@ var a, b = "こんにちは", "안녕"`, 2},
 	}
 }
 
+// devToolDirs 是开发期工具目录：输出给开发者看（命令行帮助、对照报告），不是用户界面，不受界面文案规则约束。
+var devToolDirs = map[string]bool{
+	"icons/gen": true, // SVG → gfx.Icon 的生成器命令
+	"parity":    true, // 渲染层对照工具与报告
+}
+
 // TestNoCJKLiteralsInVivaUI 扫描 viva/ 下全部手写的非测试 Go 文件。
 func TestNoCJKLiteralsInVivaUI(t *testing.T) {
 	scanned := 0
@@ -143,6 +149,9 @@ func TestNoCJKLiteralsInVivaUI(t *testing.T) {
 			return err
 		}
 		name := d.Name()
+		if d.IsDir() && devToolDirs[filepath.ToSlash(path)] {
+			return filepath.SkipDir
+		}
 		if d.IsDir() || !strings.HasSuffix(name, ".go") ||
 			strings.HasSuffix(name, "_test.go") || strings.HasSuffix(name, "_gen.go") {
 			return nil

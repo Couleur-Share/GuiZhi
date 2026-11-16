@@ -19802,6 +19802,26 @@ func (msgs Messages) NativeIslandWebview2Missing() string {
 	return Catalog.Format(msgs.locale, "native_island_webview2Missing", nil)
 }
 
+// NativeLanguageNameZh says "简体中文"
+// in the language the app shows.
+func NativeLanguageNameZh() string { return In(i18n.Locale()).NativeLanguageNameZh() }
+
+// NativeLanguageNameZh says "简体中文"
+// in the language of msgs.
+func (msgs Messages) NativeLanguageNameZh() string {
+	return Catalog.Format(msgs.locale, "native_languageName_zh", nil)
+}
+
+// NativeLanguageNameEn says "English"
+// in the language the app shows.
+func NativeLanguageNameEn() string { return In(i18n.Locale()).NativeLanguageNameEn() }
+
+// NativeLanguageNameEn says "English"
+// in the language of msgs.
+func (msgs Messages) NativeLanguageNameEn() string {
+	return Catalog.Format(msgs.locale, "native_languageName_en", nil)
+}
+
 // NativeShellNotMigrated says "「{module}」还没有迁移到原生界面"
 // in the language the app shows.
 func NativeShellNotMigrated(module any) string {
