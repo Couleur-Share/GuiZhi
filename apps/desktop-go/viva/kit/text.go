@@ -35,6 +35,10 @@ type TextOpt func(ui.Box) ui.Box
 // Ellipsis 让放不下的文字以省略号收尾（CSS truncate）。
 func Ellipsis() TextOpt { return func(b ui.Box) ui.Box { return b.Ellipsis() } }
 
+// Wrapped 让文字按可用宽度折行（CSS 默认的 white-space: normal），高度随行数增长；
+// Text 默认是单行（不折行），渲染层里会折行的段落（设置项说明、对话框正文）要加这个选项。
+func Wrapped() TextOpt { return func(b ui.Box) ui.Box { return b.MaxLines(0) } }
+
 // Centered 让文字在行内居中（text-center）。
 func Centered() TextOpt { return func(b ui.Box) ui.Box { return b.TextCenter() } }
 

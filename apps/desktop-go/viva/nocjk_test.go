@@ -138,6 +138,7 @@ var a, b = "こんにちは", "안녕"`, 2},
 var devToolDirs = map[string]bool{
 	"icons/gen": true, // SVG → gfx.Icon 的生成器命令
 	"parity":    true, // 渲染层对照工具与报告
+	"cmd":       true, // 开发期命令行（vivaparity 等）
 }
 
 // TestNoCJKLiteralsInVivaUI 扫描 viva/ 下全部手写的非测试 Go 文件。

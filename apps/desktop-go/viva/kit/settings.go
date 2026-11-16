@@ -3,8 +3,6 @@ package kit
 import (
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
-
-	"guizhi-mygo-shell/viva/tokens"
 )
 
 // ViewportWidth 是 Tailwind 响应式断点所依据的窗口内容宽度（逻辑像素）。外壳里就是窗口宽度；
@@ -64,28 +62,13 @@ func (l *Look) SettingSection(c ui.C, title string, rows []SettingRow) {
 }
 
 // SettingsCard 复刻 .app-settings-card：令牌背景、1px 令牌边框、1rem 圆角与令牌阴影。
-// 阴影要画在卡片背景之下，所以外面套一层只画阴影的容器。
+// 表面由 PaintSurface 按 Chromium 的像素吸附规则画出，子元素在 1px 边框之内。
 func (l *Look) SettingsCard(c ui.C, body func()) {
 	t := l.T
-	radius := l.Rem(1)
-	ui.Column(c).FillWidth().Draw(func(d *ui.DrawContext) {
-		l.paintShadow(d, t.SettingsCardShadow, radius)
-	}).Children(func() {
-		ui.Column(c).FillWidth().
-			Background(l.Col(t.SettingsCardBg)).
-			Border(1, l.Col(t.SettingsCardBorder)).
-			Radius(radius).
-			Children(body)
-	})
-}
-
-// paintShadow 在 d.Rect 之外画令牌阴影；零值阴影什么也不画。
-func (l *Look) paintShadow(d *ui.DrawContext, s tokens.Shadow, radius float32) {
-	if s.IsZero() {
-		return
-	}
-	style, color := ShadowStyle(s)
-	d.Canvas.Shadow(d.Rect, radius, style, d.Fade(color))
+	surface := Surface{Bg: t.SettingsCardBg, Border: t.SettingsCardBorder, BorderW: 1, Radius: l.Rem(1), Shadow: t.SettingsCardShadow}
+	ui.Column(c).FillWidth().Pad(1).Draw(func(d *ui.DrawContext) {
+		l.PaintSurface(d, surface)
+	}).Children(body)
 }
 
 // SettingItem 复刻渲染层的 SettingItem：flex items-center justify-between gap-4 px-4 py-3，
@@ -115,7 +98,7 @@ func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
 		ui.Column(c).Shrink(1).Children(func() {
 			l.Text(c, row.Label, TextSM, WeightMedium, t.Foreground)
 			if row.Description != "" {
-				l.Text(c, row.Description, TextXS, WeightNormal, t.MutedForeground).MarginTop(l.Space(0.5))
+				l.Text(c, row.Description, TextXS, WeightNormal, t.MutedForeground, Wrapped()).MarginTop(l.Space(0.5))
 			}
 		})
 		if row.Control != nil {

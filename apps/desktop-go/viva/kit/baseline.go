@@ -4,23 +4,27 @@ import "math"
 
 // 文字基线对齐
 //
-// 同一行文字在渲染层（Chromium）与 Viva 里的基线位置不同，差一到两个设备像素，且随字号、字重、行高变化：
+// 同一行文字在渲染层（Chromium）与 Viva 里的基线位置不同，差零到两个设备像素，且随字号、字重、行高变化：
 //
-//   - Chromium：行盒顶到基线的距离 = round((L − (A+D)) / 2 + A)。A、D 是该字体面的 ascent、descent 按字号取整
-//     （A = round(ascent·s)，D = round(descent·s)），L 是行高。字体面取自 font-weight：400 是 Microsoft YaHei UI，
-//     500 与 600 是 Microsoft YaHei UI Semibold，700 是 Microsoft YaHei UI Bold。
+//   - Chromium（LayoutNG，设备缩放 1）：行盒顶到基线的距离 = floor((L − (A+D)) / 2) + A。
+//     A、D 是该字体面的 ascent、descent 按字号取整（A = round(ascent·s)，D = round(descent·s)，四舍五入），
+//     L 是行高；floor 来自 FontHeight::AddLeading 的 half_leading.Floor()。字体面取自 font-weight：
+//     400 是 Microsoft YaHei UI，500 与 600 是 Microsoft YaHei UI Semibold，700 是 Microsoft YaHei UI Bold。
+//     这个模型对 2026-11-16 在 React 参照里用隔离探针量出的 324 组（9 个字号 × 4 个字重 × 9 个行高，含小数字号与小数行高）
+//     (内容区高度、内容区顶、基线) 全部吻合。
 //   - Viva：界面字体的行不论字体，一律把基线放在纹理第 floor(H/2 + 0.378·s) 行（H 是纹理高，见
-//     internal/textmetrics.LabelBaseline）。
+//     internal/textmetrics.LabelBaseline）；纹理的顶边按「四舍五入到整设备像素」落位（2026-11-16 在 0/0.25/0.5/0.75/1.0 的
+//     小数顶边上实测：.25 向下取整，.5 与 .75 向上进位，见 frac_spike 的结论记录在 viva-ui-development.md §8）。
 //
 // 两者之差是一个整数设备像素。Text 用顶部内边距与底部负边距把文字整体平移这个差值，节点占的版面高度不变，
-// 所以平移对周围布局无影响。依据：2026-11-16 在 settings.general 上，h1（18px/600/行高 28）、label（14px/500/20）、
-// 描述（12px/400/16）三处实测 Viva 比 React 高 1px，combobox 里的值（14px/400/20）为 0px，与此模型预测一致；
-// 守卫测试 baseline_test.go 用无头渲染核对 Viva 一侧的常数。
+// 所以平移对周围布局无影响。行盒顶带小数（行高 17.5、24.5 这类）时，两边对顶边都是「四舍五入」，
+// 整数平移不改变各自的进位，差值仍是同一个整数。守卫测试 baseline_test.go 用无头渲染核对 Viva 一侧的常数。
 //
-// 已知边界：模型假定行盒顶落在整设备像素上。行盒顶带小数时 Chromium 与 Viva 的取整方式不同，
-// 可能差 1 个设备像素；这类场景由 L2 的基线比较暴露，登记在台账里。
+// 为什么必须是设备缩放 1 的参照：若 Chromium 实际按 200% 缩放排版（本机显示缩放 200% 且没有钉死设备缩放时就是如此），
+// A、D、半行距都量化到 0.5 CSS 像素，同一字号的基线与上面的模型相差半像素。参照采集器已用
+// --force-device-scale-factor=1 钉死，compare 会拒绝没有 forcedDsf 标记的陈旧参照。
 
-// viviBaselineBelowCenter 是 internal/textmetrics.BaselineBelowCenter（Viva v0.6.4），内部包不能导入，抄在这里。
+// vivaBaselineBelowCenter 是 internal/textmetrics.BaselineBelowCenter（Viva v0.6.4），内部包不能导入，抄在这里。
 const vivaBaselineBelowCenter = 0.378
 
 // face 是一个字体面的垂直度量：OS/2 的 winAscent、winDescent，单位 em。
@@ -48,12 +52,12 @@ func faceOfWeight(weight float32) face {
 
 func roundHalfUp(v float64) float64 { return math.Floor(v + 0.5) }
 
-// ChromeBaselineRow 是渲染层一行文字的基线到行盒顶的距离（设备像素）。
+// ChromeBaselineRow 是渲染层一行文字的基线到行盒顶的距离（设备像素，整数）。
 func ChromeBaselineRow(weight float32, sizeDev, lineDev float64) int {
 	f := faceOfWeight(weight)
 	a := roundHalfUp(f.ascent * sizeDev)
 	d := roundHalfUp(f.descent * sizeDev)
-	return int(roundHalfUp((lineDev-(a+d))/2 + a))
+	return int(math.Floor((lineDev-(a+d))/2) + a)
 }
 
 // VivaBaselineRow 是 Viva 把一行文字的基线放在高 rows 行的纹理里的第几行。

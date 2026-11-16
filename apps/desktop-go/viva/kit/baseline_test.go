@@ -1,7 +1,9 @@
 package kit
 
 import (
+	"encoding/json"
 	"image"
+	"os"
 	"testing"
 
 	"github.com/vivaui/viva/app"
@@ -10,8 +12,59 @@ import (
 	"github.com/vivaui/viva/ui"
 )
 
-// TestBaselineShiftKnownCases 钉住三处在渲染层实测过的案例（Microsoft YaHei UI，设备像素 1:1）：
-// 模型预测与 2026-11-16 在 settings.general 上量到的 Viva 与 React 墨迹差一致。
+// TestChromeBaselineMatchesProbe 把 ChromeBaselineRow 钉在 Chromium 的实测上：testdata/chrome-text-probe.json 是
+// scripts/parity/tools/probe-text-metrics.mjs 在设备缩放钉死为 1 的 React 参照里量出的样本（含小数字号与小数行高），
+// 每一组的「基线到行盒顶」必须等于模型值。Chromium 或字体变了，重新生成夹具后这里会先红。
+func TestChromeBaselineMatchesProbe(t *testing.T) {
+	raw, err := os.ReadFile("testdata/chrome-text-probe.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Samples []struct {
+			Size, Line, Baseline float64
+			Weight               int
+		} `json:"samples"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Samples) < 300 {
+		t.Fatalf("夹具样本只有 %d 组，期望覆盖完整矩阵", len(doc.Samples))
+	}
+	bad := 0
+	for _, s := range doc.Samples {
+		if got := ChromeBaselineRow(vivaWeightOfCSS(t, s.Weight), s.Size, s.Line); float64(got) != s.Baseline {
+			bad++
+			if bad <= 8 {
+				t.Errorf("字号 %v 字重 %v 行高 %v：模型基线 %d，Chromium %v", s.Size, s.Weight, s.Line, got, s.Baseline)
+			}
+		}
+	}
+	if bad > 0 {
+		t.Errorf("共 %d/%d 组样本与模型不符", bad, len(doc.Samples))
+	}
+}
+
+// vivaWeightOfCSS 把夹具里的 CSS 字重换成 Viva 的字重刻度（theme.go：Regular 0、Medium 0.15、Semibold 0.23、Bold 0.40）。
+func vivaWeightOfCSS(t *testing.T, css int) float32 {
+	t.Helper()
+	switch css {
+	case 400:
+		return WeightNormal
+	case 500:
+		return WeightMedium
+	case 600:
+		return WeightSemibold
+	case 700:
+		return WeightBold
+	}
+	t.Fatalf("夹具里有未映射的 CSS 字重 %d", css)
+	return 0
+}
+
+// TestBaselineShiftKnownCases 钉住几处代表性案例的平移量（Microsoft YaHei UI，设备像素 1:1）。
+// 期望值由模型两端的公式手算，并由 settings.general 的 React/Viva 墨迹对照在 2026-11-16 复核（设备缩放钉死为 1 的参照）。
 func TestBaselineShiftKnownCases(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -20,9 +73,12 @@ func TestBaselineShiftKnownCases(t *testing.T) {
 		wantShiftDev float32
 	}{
 		{"h1 18px/600/行高 28", WeightSemibold, 18, 28, 1},
-		{"label 14px/500/行高 20", WeightMedium, 14, 20, 1},
-		{"描述 12px/400/行高 16", WeightNormal, 12, 16, 1},
+		{"label 14px/500/行高 20", WeightMedium, 14, 20, 0},
+		{"描述 12px/400/行高 16", WeightNormal, 12, 16, 0},
 		{"select 值 14px/400/行高 20", WeightNormal, 14, 20, 0},
+		{"小字号 label 12.25px/500/行高 17.5（根字号 14px）", WeightMedium, 12.25, 17.5, 0},
+		{"小字号描述 10.5px/400/行高 14", WeightNormal, 10.5, 14, 1},
+		{"小字号 h1 15.75px/600/行高 24.5", WeightSemibold, 15.75, 24.5, 0},
 	}
 	for _, c := range cases {
 		if got := BaselineShift(c.weight, c.size, c.line, 1); got != c.wantShiftDev {

@@ -35,15 +35,16 @@ func (l *Look) Switch(c ui.C, on *bool, label string) ui.Box {
 	if checked {
 		left = 22
 	}
+	track := Surface{Bg: fill, Border: border, BorderW: 2, Radius: height / 2}
 	return ui.SwitchBase(c, on, label).
 		Size(width, height).
+		Shrink(0). // 渲染层是 flex-shrink-0：窄行里让说明文字让位，开关保持原宽
 		HitOutset(0, 0, 0, 0).
-		Radius(height/2).
-		Background(l.Col(fill)).
-		Border(2, l.Col(border)).
 		Draw(func(d *ui.DrawContext) {
-			// 旋钮相对按钮的内边距盒（边框之内）定位：border-2 + top / left
+			// 轨道与旋钮都按 Chromium 的规则吸附到设备像素（见 surface.go）；
+			// 旋钮相对按钮的内边距盒（边框之内）定位：border-2 + top / left，直径与 top 随根字号缩放。
+			l.PaintSurface(d, track)
 			bounds := gfx.Rect{X: d.Rect.X + 2 + left, Y: d.Rect.Y + 2 + top, Width: diameter, Height: diameter}
-			d.Canvas.Rounded(bounds, diameter/2, d.Fade(l.Col(knob)))
+			d.Canvas.Rounded(SnapRect(bounds, d.Canvas.PixelScale()), diameter/2, d.Fade(l.Col(knob)))
 		})
 }
