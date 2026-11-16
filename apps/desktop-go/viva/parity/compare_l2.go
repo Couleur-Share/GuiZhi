@@ -40,11 +40,12 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 		for _, v := range p.Viva {
 			lines += len(v.Rects)
 		}
-		if len(p.React.Rects) != lines {
-			rep.add(LayerL2, "text-lines", subject, "行数不一致：React %d，Viva %d", len(p.React.Rects), lines)
+		reactRows := rowRects(p.React.Rects)
+		if len(reactRows) != lines {
+			rep.add(LayerL2, "text-lines", subject, "行数不一致：React %d，Viva %d", len(reactRows), lines)
 			continue
 		}
-		checkWrappedPitch(rep, th, subject, p)
+		checkWrappedPitch(rep, th, subject, reactRows, p)
 		overlay := false
 		for _, v := range p.Viva {
 			overlay = overlay || v.Overlay
@@ -52,7 +53,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 		k := 0
 		for _, v := range p.Viva {
 			for li, vr := range v.Rects {
-				rr := p.React.Rects[k]
+				rr := reactRows[k]
 				k++
 				rep.L2.TextLines++
 				painted := vr.W()
@@ -60,7 +61,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 					painted = v.Painted[li]
 				}
 				// 末行以外的折行行宽取不到「不含尾随空白」的口径，只比末行与单行文字的宽度。
-				if len(p.React.Rects) == 1 || k == len(p.React.Rects) {
+				if len(reactRows) == 1 || k == len(reactRows) {
 					dw := math.Abs(rr.W() - painted)
 					rep.L2.MaxWidthDelta = math.Max(rep.L2.MaxWidthDelta, dw)
 					if dw <= maxDelta+1e-9 {
@@ -264,18 +265,36 @@ func fmtBox(b Box) string {
 	return fmt.Sprintf("[%.2f %.2f %.2f %.2f]", b[0], b[1], b[2], b[3])
 }
 
+// rowRects 把 React 一段文字的片段矩形并成「行」。Range 的矩形是行内盒的片段：预排版文字（white-space: pre-wrap）
+// 的行首缩进空白、折行处挂在行尾的空格，都会单独成一块，同一行于是有两三块。行数与行宽要按整行比较：
+// y 相差不到 0.5px 的相邻片段属于同一行，并成它们的并集；不同行的片段、没有片段的文字不受影响。
+func rowRects(rects []Box) []Box {
+	rows := make([]Box, 0, len(rects))
+	for _, r := range rects {
+		if n := len(rows); n > 0 && math.Abs(rows[n-1].Y()-r.Y()) < 0.5 {
+			last := rows[n-1]
+			left, top := math.Min(last.X(), r.X()), math.Min(last.Y(), r.Y())
+			right, bottom := math.Max(last.Right(), r.Right()), math.Max(last.Bottom(), r.Bottom())
+			rows[n-1] = Box{left, top, right - left, bottom - top}
+			continue
+		}
+		rows = append(rows, r)
+	}
+	return rows
+}
+
 // checkWrappedPitch 比较折行文字相邻两行的行距：React 取各行 Range 矩形的 y 之差，Viva 取各行文字盒的 y 之差，
 // 两者都等于行高。行距不对说明行高或折行方式不对，单看行数和宽度发现不了。
-func checkWrappedPitch(rep *Report, th Thresholds, subject string, p textPair) {
+func checkWrappedPitch(rep *Report, th Thresholds, subject string, reactRows []Box, p textPair) {
 	var vivaRects []Box
 	for _, v := range p.Viva {
 		vivaRects = append(vivaRects, v.Rects...)
 	}
-	if len(p.React.Rects) < 2 || len(p.React.Rects) != len(vivaRects) {
+	if len(reactRows) < 2 || len(reactRows) != len(vivaRects) {
 		return
 	}
 	for i := 1; i < len(vivaRects); i++ {
-		pr := p.React.Rects[i].Y() - p.React.Rects[i-1].Y()
+		pr := reactRows[i].Y() - reactRows[i-1].Y()
 		pv := vivaRects[i].Y() - vivaRects[i-1].Y()
 		if d := math.Abs(pr - pv); d > th.Metrics.WrappedTextPitchPx+1e-9 {
 			rep.add(LayerL2, "wrapped-pitch", subject, "第 %d 行与上一行的行距差 %.2fpx（上限 %.2f）：React %.2f，Viva %.2f", i+1, d, th.Metrics.WrappedTextPitchPx, pr, pv)
