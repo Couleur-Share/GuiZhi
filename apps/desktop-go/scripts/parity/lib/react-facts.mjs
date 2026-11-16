@@ -1,5 +1,5 @@
 /**
- * React 侧事实采集：对当前页面取一份「可比较的事实」（schema 1）。
+ * React 侧事实采集：对当前页面取一份「可比较的事实」（schema 2：在 schema 1 之上增加 texts 与 paints）。
  *
  * 事实来源（都经 CDP，口径是 CSS 像素、设备像素比 1，见 react-state.mjs 顶部说明）：
  *   - 可访问树：Accessibility.getFullAXTree（Chromium 自己算的角色与可访问名，是 L1 的机器比较来源）；
@@ -57,8 +57,13 @@ const MEASURE_FN = `function (...nodes) {
   });
 }`;
 
-const TEXT_RECTS_EXPR = `(() => {
+/**
+ * 文字节点（schema 2）：原文、每个行片段的矩形（Range 的内容区矩形，高 = ascent+descent）、字体键、
+ * 字号/字重/行高的计算值（行高 normal 时为 null）、颜色。比较端用它核对文字的宽度、行盒与基线。
+ */
+const TEXTS_EXPR = `(() => {
   const out = [];
+  const round = (n) => Math.round(n * 1000) / 1000;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
@@ -69,9 +74,67 @@ const TEXT_RECTS_EXPR = `(() => {
     if (cs.display === "none" || cs.visibility === "hidden") continue;
     const range = document.createRange();
     range.selectNodeContents(node);
+    const rects = [];
     for (const b of range.getClientRects()) {
-      if (b.width > 0 && b.height > 0) out.push([Math.round(b.x * 1000) / 1000, Math.round(b.y * 1000) / 1000, Math.round(b.width * 1000) / 1000, Math.round(b.height * 1000) / 1000]);
+      if (b.width > 0 && b.height > 0) rects.push([round(b.x), round(b.y), round(b.width), round(b.height)]);
     }
+    if (rects.length === 0) continue;
+    const lh = parseFloat(cs.lineHeight);
+    out.push({
+      text: node.data,
+      rects,
+      font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),
+      size: parseFloat(cs.fontSize),
+      weight: Number(cs.fontWeight),
+      lineHeight: Number.isFinite(lh) ? lh : null,
+      color: cs.color,
+      tag: el.localName,
+      testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
+    });
+  }
+  return out;
+})()`;
+
+/**
+ * 有绘制的元素（schema 2）：背景色/背景图、边框、圆角、阴影、轮廓，以及 SVG 图标（颜色取 currentColor）。
+ * 按文档顺序（即默认的绘制先后）输出，外框是未裁剪的边框盒。比较端用它给 L3 的差异定位到具体元素与令牌。
+ */
+const PAINTS_EXPR = `(() => {
+  const out = [];
+  const round = (n) => Math.round(n * 1000) / 1000;
+  const clear = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
+  let order = 0;
+  for (const el of document.body.querySelectorAll("*")) {
+    order += 1;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") continue;
+    const b = el.getBoundingClientRect();
+    if (b.width <= 0 || b.height <= 0) continue;
+    const sides = ["top", "right", "bottom", "left"];
+    const border = sides.map((s) => ({
+      w: parseFloat(cs.getPropertyValue("border-" + s + "-width")),
+      style: cs.getPropertyValue("border-" + s + "-style"),
+      color: cs.getPropertyValue("border-" + s + "-color"),
+    }));
+    const hasBorder = border.some((x) => x.w > 0 && x.style !== "none" && !clear(x.color));
+    const bg = clear(cs.backgroundColor) ? null : cs.backgroundColor;
+    const bgImage = cs.backgroundImage === "none" ? null : cs.backgroundImage;
+    const shadow = cs.boxShadow === "none" ? null : cs.boxShadow;
+    const outline = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0 ? { w: parseFloat(cs.outlineWidth), color: cs.outlineColor, offset: parseFloat(cs.outlineOffset) } : null;
+    const svg = el instanceof SVGSVGElement;
+    if (!(bg || bgImage || hasBorder || shadow || outline || svg)) continue;
+    out.push({
+      order,
+      tag: el.localName,
+      testId: el.getAttribute("data-testid"),
+      box: [round(b.x), round(b.y), round(b.width), round(b.height)],
+      bg, bgImage, shadow, outline,
+      border: hasBorder ? border : null,
+      radius: ["top-left", "top-right", "bottom-right", "bottom-left"].map((c) => cs.getPropertyValue("border-" + c + "-radius")),
+      opacity: Number(cs.opacity),
+      overflow: cs.overflowX + " " + cs.overflowY,
+      color: svg ? cs.color : undefined,
+    });
   }
   return out;
 })()`;
@@ -258,21 +321,29 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
     delete n.parentOrig;
   }
 
-  const textRects = (await cdp.send("Runtime.evaluate", { expression: TEXT_RECTS_EXPR, returnByValue: true })).result.value
-    .filter((b) => intersects(b, region))
-    .map((b) => [r3(b[0] - region.x), r3(b[1] - region.y), b[2], b[3]]);
+  // 文字：保留与区域相交的行片段，坐标换算到区域坐标系；整段文字都在区域外的丢弃。
+  const rel = (b) => [r3(b[0] - region.x), r3(b[1] - region.y), b[2], b[3]];
+  const texts = (await cdp.send("Runtime.evaluate", { expression: TEXTS_EXPR, returnByValue: true })).result.value
+    .map((t) => ({ ...t, rects: t.rects.filter((b) => intersects(b, region)).map(rel) }))
+    .filter((t) => t.rects.length > 0);
+  const textRects = texts.flatMap((t) => t.rects);
+  const paints = (await cdp.send("Runtime.evaluate", { expression: PAINTS_EXPR, returnByValue: true })).result.value
+    .filter((p) => intersects(p.box, region))
+    .map((p) => ({ ...p, box: rel(p.box) }));
   const fonts = await platformFonts(cdp);
   const aria = await page.locator(regionSelector ?? "body").ariaSnapshot();
   const chromium = (await cdp.send("Browser.getVersion")).product;
 
   return {
-    schema: 1,
+    schema: 2,
     scene,
     variant,
     region: { x: region.x, y: region.y, width: region.width, height: region.height, selector: region.selector },
-    capture: { dpr: 1, chromium },
+    capture: { dpr: 1, forcedDsf: true, chromium },
     nodes,
+    texts,
     textRects,
+    paints,
     fonts,
     aria,
   };

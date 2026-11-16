@@ -16,6 +16,10 @@ import os from "node:os";
 import path from "node:path";
 import { chromium } from "playwright";
 
+// 真正把 Chromium 的设备缩放钉在 1：只靠 Emulation.setDeviceMetricsOverride 不够——本机显示缩放 200% 时，
+// 排版仍按 2× 物理像素取整（行高半行距、字体上下伸展量都量化到 0.5 CSS 像素），参照就会带上宿主 DPI 的印记，
+// 换一台 100% 缩放的机器采集会得到不同的文字基线。实测对比见 viva-ui-development.md §8。
+const FORCE_DSF_ARG = "--force-device-scale-factor=1";
 const READY_TEST_ID = "topbar-search";
 const START_TIMEOUT_MS = 90_000;
 const READY_TIMEOUT_MS = 30_000;
@@ -38,10 +42,11 @@ async function readDevToolsPort(userDataDir, isExited, deadline) {
 
 /**
  * 打开一次会话。
- * @param {{executable:string, dist:string, dataDb?:string|null, env?:object}} options
+ * @param {{executable:string, dist:string, dataDb?:string|null, env?:object, browserArgs?:string}} options
+ * browserArgs：追加给 WebView2 的浏览器参数（空格分隔），在 --remote-debugging-port=0 之后。
  * @returns 会话：page、cdp、userDataDir，以及 reload()、close()。
  */
-export async function openReactSession({ executable, dist, dataDb = null, env = process.env }) {
+export async function openReactSession({ executable, dist, dataDb = null, env = process.env, browserArgs = FORCE_DSF_ARG }) {
   const userDataDir = fs.mkdtempSync(path.join(fs.realpathSync.native(os.tmpdir()), "guizhi-parity-react-"));
   const dbFile = path.join(userDataDir, "data", "knowledge.db");
   fs.mkdirSync(path.dirname(dbFile), { recursive: true });
@@ -60,7 +65,7 @@ export async function openReactSession({ executable, dist, dataDb = null, env = 
     env: {
       ...env,
       WEBVIEW2_USER_DATA_FOLDER: path.join(userDataDir, "webview2"),
-      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: "--remote-debugging-port=0",
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=0 ${browserArgs}`.trim(),
     },
   });
   child.stdout.on("data", (d) => { output += d; });
@@ -97,10 +102,16 @@ export async function openReactSession({ executable, dist, dataDb = null, env = 
     if (!page) throw new Error("已连接调试端口，但没有找到页面");
     await page.waitForLoadState("domcontentloaded");
     await page.getByTestId(READY_TEST_ID).waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
+    // 不经 Emulation 读一次原始 DPR：不是 1 说明强制参数没生效，此时采到的参照带宿主 DPI 印记，必须中止。
+    const rawDpr = await page.evaluate(() => window.devicePixelRatio);
+    if (rawDpr !== 1) {
+      throw new Error(`React 参照的原始 devicePixelRatio=${rawDpr}，期望 1（--force-device-scale-factor 未生效）；参照会带上宿主显示缩放的印记，已中止`);
+    }
     const cdp = await context.newCDPSession(page);
     return {
       page,
       cdp,
+      rawDpr,
       userDataDir,
       pid: child.pid,
       /** reload 后等回到就绪状态。 */
