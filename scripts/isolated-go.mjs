@@ -19,7 +19,7 @@ import { createDesktopSnapshot } from "./desktop-validation-snapshot.mjs";
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 
 /** 副本里只需要 Go 壳构建用得到的文件；testdata 与 verify 体积大且与截图无关。 */
-const GO_SOURCE_PATHS = [
+export const GO_SOURCE_PATHS = [
   "apps/desktop-go",
   ":(exclude)apps/desktop-go/testdata",
   ":(exclude)apps/desktop-go/verify",
@@ -95,7 +95,7 @@ function run(command, args, { cwd, env, logFile }) {
  * 在副本里构建；返回 { exe, dist }，失败时抛出带日志尾部的错误。
  * renderer=false 只构建 Go 壳与 SQLite 原生库（原生界面用：不加载渲染进程，不需要 vite 与 node_modules）。
  */
-async function buildInSnapshot(snapshot, env, { renderer = true } = {}) {
+export async function buildInSnapshot(snapshot, env, { renderer = true } = {}) {
   const root = snapshot.root;
   const goRoot = path.join(root, "apps/desktop-go");
   const logFile = path.join(root, "build.log");
