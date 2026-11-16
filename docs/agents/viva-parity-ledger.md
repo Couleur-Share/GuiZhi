@@ -8,10 +8,10 @@
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
 | A（平台/Viva 确实做不到） | 10 | A-001…A-010 |
-| B（暂缺，已定里程碑） | 8 | B-002、B-004…B-010（B-001、B-003 已于 2026-11-16 关闭，见「已关闭条目」） |
-| C（需用户裁决） | 1 | 见 C-001 |
+| B（暂缺，已定里程碑） | 7 | B-004…B-010（B-001、B-002、B-003 已于 2026-11-16 关闭，见「已关闭条目」） |
+| C（需用户裁决） | 2 | 见 C-001（通知）、C-002（非输入控件文字不可选） |
 | 未测（按未通过计） | 5 | 见「未测项」 |
-| 验证缺口（对照工具尚未覆盖，按未验证计） | 4 | 见「验证缺口」 |
+| 验证缺口（对照工具尚未覆盖，按未验证计） | 5 | 见「验证缺口」（G-005 为 Toast 背后有内容的情形，2026-11-16 新增） |
 
 ## 条目格式
 
@@ -75,12 +75,13 @@
 
 ### A-007 遮罩与卡片背后的模糊（backdrop-filter）
 
-- 场景/模块：`Modal` 遮罩（`bg-background/60 backdrop-blur-md`，12px）、`ConfirmDialog` 遮罩（`bg-background/60 backdrop-blur-sm`，4px）、`Toast` 卡片背后（`backdrop-blur-md`）。`ConfirmDialog` 已落地并对照（`app.window.page-settings.dlg-background-tasks`）；`Modal` 与 `Toast` 随 S4 后续实现，进入对照时在这里补数据。
+- 场景/模块：`Modal` 遮罩（`bg-background/60 backdrop-blur-md`，12px）、`ConfirmDialog` 遮罩（`bg-background/60 backdrop-blur-sm`，4px）、`Toast` 卡片背后（`backdrop-blur-md`）。`ConfirmDialog` 与 `Toast` 已落地并对照（`app.window.page-settings.dlg-background-tasks`、`ui.toast.*`）；`Modal` 随 S4 后续实现，进入对照时在这里补数据。
 - 偏差：渲染层把遮罩与卡片背后的页面做高斯模糊；Viva 没有「模糊已画内容」的原语，遮罩下的页面保持清晰。这是用户看得见的真实差异：背后的文字在渲染层里是一团糊，在 Viva 窗口里仍清晰可读。
 - 证据：`github.com/vivaui/viva@v0.6.4/components/dialog.go` 第 353–357 行（"the blur has no canvas primitive … Until a blur exists the scrim is heavier"，Viva 自己的对话框也因此把遮罩加重）；在 `gfx`、`ui`、`app` 公开包按 `blur` 检索，只有阴影的 `Blur` 参数（`gfx.ShadowStyle`），没有对已绘内容的模糊；`internal/platform/windows/backdrop_windows.go` 是整窗系统材质（Mica / 亚克力），作用对象是整个窗口背景，不能限定到窗口内的一块区域。**偏差量**（`app.window.page-settings.dlg-background-tasks`，`royal-blue` × 中字号 × 1280x800）：把模拟的模糊半径调成近似零（σ = 0.3，等于 Viva 不模糊）时 L3 差异像素比 4.36%（浅色）与 4.96%（深色），冻结上限 0.25%，约 17–20 倍。
 - 已做补偿：遮罩色取渲染层的 `bg-background/60`，**不**像 Viva 自带对话框那样加重（保持与渲染层同一不透明度）。
 - 对照口径（口径变更，见「变更记录」）：模态场景在 `Scene.Backdrop` 里登记模糊，对照工具在 Viva 一侧精确模拟渲染层的合成，让遮罩色、面板与面板阴影、背景位置仍被逐像素检查，而不是整块放过。(1) L3：同一场景再渲染一次「对话框打开之前」的页面（`BackdropSpec.BaseSteps`），叠上遮罩色（背景令牌 × 0.6）得到 Viva 里遮罩背后的清晰背景 Sharp，按 σ 做高斯模糊（sRGB 逐通道、边缘镜像延拓）得到 Blurred；面板之外 Viva 原图相对 Sharp 的逐通道比值（上限 1）就是面板阴影的衰减，预测图 = Blurred × 衰减，与 React 图按**不变的阈值**逐像素比较；面板之内原样比较（不被模糊）；面板之外的文字与图标遮罩去掉（背景已模糊），面板之内的遮罩不变。(2) L2：有遮罩的场景里，页面层文字与不完全落在面板里的图标不比墨迹（计入 `InkBlurred`，报告单列一行）——这些文字在无遮罩的 `app.window.page-settings` 场景里仍按 L2 完整比较；面板自己的文字与图标照常比较（浮层文字的墨迹总量比由 A-009 登记）。
 - 验证结果：`dlg-background-tasks` 在 T2（36 个变体）、T1（4 个变体，含 800x600 与 1920x1080）与 5 个入库样本变体全部通过，L3 差异比例最大 0.0134%（上限 0.25%）。半径分辨力实测（T0，浅色 / 深色）：σ = 0.3 → 4.36% / 4.96%（不通过）；σ = 2 → 0.44% / 0.34%（不通过）；σ = 4 → 0.0010% / 0.0000%（通过）；σ = 5 → 0.0006% / 0.0001%（通过）；σ = 8 → 0.90% / 1.06%（不通过）。所以 L3 能检出 ≥ 2px 的半径偏差，分辨不了 ±1px（见 G-004）。
+- **Toast 的部分**（`ui.toast.*` 八个场景：success、info、warning、error、error-detail、detail-expanded、action、container）：渲染层的卡片是半透明底色加 `backdrop-blur-md`，深色下底色只有 20% 不透明度。Viva 没有模糊，若直接叠半透明色，背后的页面文字会透出来；做法是先在卡片位置垫一块**不透明的页面底色**（`kit/toast_view.go` 的 `paintToastSurface`，独立层号 `bandToastUnder`，在所有卡片阴影之下），再叠半透明底色。对照时 React 一侧把 `#root` 设为 `visibility:hidden`（提示容器是 portal 到 `body` 的 fixed 元素，不受影响），提示背后是纯页面底色，此时垫层与模糊在像素上等价，所以场景能逐像素比较；**背后有图文内容的真实情形不在对照范围内**（G-005），那时渲染层是一团模糊，Viva 是平整的底色，是用户看得见的真实差异。验证结果：T0 16/16、T1 32/32、T2 288/288（8 场景 × 36 变体），另抽 2 个变体 16/16；L3 差异比例最大 0.1001%（上限 0.25%）；入库样本 5 个变体 × 8 场景。浅色下的投影一度超限（0.36%–0.47%），根因与模糊无关，是投影模型的差异，见开发文档 §5.1「Viva 阴影模型」。
 - 状态：开（引擎限制；升级 Viva 版本时复测）。
 
 ### A-008 浮层关闭后多画一帧残影
@@ -110,7 +111,6 @@
 
 | ID | 场景/模块 | 缺什么（React 的行为） | 里程碑 |
 | --- | --- | --- | --- |
-| B-002 | `settings.general`：写入失败 | 失败时 `showToast` 带可复制的 `detail` 并可重试；Viva 页目前吞掉 `Store.Update` 的错误。 | M0 toast → M1 设置页 |
 | B-004 | `settings.general`：悬停、聚焦、按下、禁用状态与过渡动效 | 各控件的状态样式与时长（`motion` 四种模式）；Viva 页只有静止状态。 | M0 控件状态 → L4 测试 |
 | B-005 | 图标：`Database`、`DatabaseBackup`（`settings.shell` 数据页导航项） | 这两枚图标的路径含椭圆弧（`A9 3`，rx≠ry）。Viva 的图标编译器 `tools/iconcompile/compile.go` 第 889–892 行 `controlOn` 把椭圆的切线方向写成 `(-tangent·ry·sin, tangent·rx·cos)`，正确应为 `(-tangent·rx·sin, tangent·ry·cos)`，圆弧（rx=ry）不受影响、椭圆弧的控制点错位。后果：16px 图标中心线下缘 14.909px，正确值 14.667px（偏 0.24px）。用到的 139 枚 lucide 图标里只有这两枚含椭圆弧（`<ellipse>` 元素走另一条正确的路径）。 | M0 结束前：生成器 `viva/icons/gen` 在编译前把含椭圆弧的 `d` 展开成正确的三次曲线，并加几何范围单测 |
 | B-006 | 顶栏「更新」按钮（`app.window.*` 的「有可用更新」状态） | 渲染层按钮是 `border-dashed` 虚线边框（border-primary/50）；Viva 目前画实线。Viva 的 `ui.Box.Dashed()` 能画虚线，但 Chromium 的虚线节奏（线段与间隔长度、拐角处理）还没有对照采集，所以还没法逐项核对。 | M1：先加「有更新」的场景变体并采集，再对照调整 |
@@ -126,6 +126,7 @@
 | ID | 原缺口 | 关闭日期 | 证据 |
 | --- | --- | --- | --- |
 | B-001 | `settings.general`：后台任务开关——打开「后台任务」先弹 `ConfirmDialog`（标题「启用系统后台运行」），确认后才写入；关闭立即写入。 | 2026-11-16 | `kit.ConfirmDialog`（`viva/kit/confirm.go`）与设置页接线（`viva/screens/settings/general.go` 的 `backgroundTasks`、`backgroundDialog`）。对照：场景 `app.window.page-settings.dlg-background-tasks` 在 T2（36）、T1（4）与 5 个入库样本变体全部通过，L3 比例最大 0.0134%（口径见 A-007）。L4：`viva/kit/confirm_test.go`（取消按钮初始焦点、Enter 确认、Esc 与点遮罩关闭、加载中不可关闭、焦点陷阱与归还、入场动画时长与曲线、四种动效偏好）与 `viva/screens/settings/general_test.go`（先确认再写入、取消 / Esc / 点遮罩只关闭、确认一次写入四项、关闭不需确认、普通开关即写即翻）。写入失败的提示归 B-002。 |
+| B-002 | `settings.general`：写入失败——失败时用 `showToast` 带可复制的 `detail` 并可重试；原先 Viva 页吞掉 `Store.Update` 的错误。 | 2026-11-16 | `kit.Notifier`、`kit.Toasts`、`kit.Guard`（`viva/kit/toast.go`、`toast_view.go`、`guard.go`）与接线：`viva/app/root.go` 创建 Notifier 与 Guard（日志取服务日志）、`viva/screens/settings/general.go` 的全部写入改走 `g.save`（`Guard.Run`）、`viva/screens/shell/window.go` 在窗口根上挂 `Toasts`。对照：`ui.toast.*` 八个场景 T2 288/288、T1 32/32、T0 16/16（口径与偏差见 A-007）。L4：`viva/kit/toast_test.go`（自动消失时长、挤出规则、任意 goroutine 投递、操作与关闭、详情展开与复制、剪贴板失败、进退场动效、Guard）、`viva/app/root_test.go` 的 `TestRootSettingsWriteFailureShowsToastAndRetries`（写入失败 → 开关回退、一条 error toast 标题含「保存设置」、详情默认折叠且可展开复制、日志一条、重试成功）。补充：React 侧并没有这条通道——`GeneralSettings.tsx` 里没有任何错误处理，开关乐观地改本地状态，同步到主进程失败只有 `console.warn`（`stores/settings.store.ts` 第 58 行）；这里按验收标准第 6 条（AGENTS.md「用户操作失败必须可理解、可重试」）补全了用户可见的通道，登记在「有意的增强」一节，不是复刻。 |
 | B-003 | `settings.general`：下拉框——点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）。 | 2026-11-16 | `kit.Select` 与弹层（`viva/kit/select_popup.go`），提交 `fa87d599`。对照：场景 `app.window.page-settings.select-close-action`、`…select-language`（T2 各 36 个变体通过，浮层文字的墨迹总量比按 A-009 登记，一帧残影见 A-008）。L4：`viva/kit/select_popup_test.go`、`select_motion_test.go`。 |
 
 ## C 类：需要用户裁决
@@ -138,6 +139,15 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 - 偏差：Viva 在 Windows 上的通知经「shell notification icon」发出（托盘气泡），并要求窗口正在运行；React 外壳的通知是系统 Toast。
 - 证据：Viva 文档 `system-integrations`（研究副本 `D:\Project\GuiZhi-bench\viva-research\docs__system-integrations.md` 第 24 行，`Notification` 一行的 Windows 列写 "shell notification icon; running window required"）。阶段 2 实测后补充截图与行为差异。
 - 状态：开，待阶段 2 末与其他 C 类一并裁决。
+
+### C-002 非输入控件里的文字不能用鼠标选中
+
+- 场景/模块：除文本输入框之外的全部界面文字——设置项标题与说明、toast 的错误详情、列表条目标题、对话框正文、状态文字等。阅读视图与 Wiki 图在 WebView 岛里，不受影响。
+- 偏差：渲染层是网页，文字默认可以拖选、双击选词、Ctrl+C 复制（没有 `select-none` 的地方）；Viva 的 `ui.Text` 与组件库的文字标签没有选择能力，只有输入类控件里的文字可选。用户看得见的真实差异：拖不选 toast 里的错误详情、设置项说明等。
+- 证据：在 `github.com/vivaui/viva@v0.6.4` 的 `ui`、`gfx`、`app`、`components` 包按 `selectable`（不区分大小写）检索，没有文字标签选择的入口，命中的只是列表项 / 表格行 / 菜单项的「可选中」语义（`components/single_select.go`、`components/dropdown_menu.go`、`internal/componentdemo/table.go`）与无障碍状态常量（`internal/platform/linux/atspi_model.go`）；`ui/text_value.go` 里的 caret / selection 属于输入框。组件库的 `Input`、`Textarea`、`CodeEditor` 带 `ReadOnly`（`components/textarea.go` 等），所以「把需要复制的文字放进只读文本框」是可行的候选路线，**尚未试做**（所以不登记为 A 类）。
+- 选项与代价（阶段末用 `AskQuestion` 裁决）：(1) 接受——除已有的「复制」按钮外其余文字不可选，零成本；(2) 只对「错误详情、日志、路径」这类需要复制的文字改用只读文本框——中等成本：外观与折行要重新对拍（现在 toast 详情的折行与 Chromium 逐行一致），只读文本框不涉及输入法，V-a 风险面基本不扩大；(3) 全部文字都用只读文本框——不可行（性能与外观代价过大）。
+- 已做补偿：toast 详情带「复制」按钮（与渲染层同样存在，含「已复制」2 秒反馈）。
+- 状态：开，待阶段末与 C-001 一并裁决；裁决前 M0/M1 按选项 (1) 实施。
 
 ## 候选（尚未成立，需实测才能登记）
 
@@ -158,6 +168,15 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 位置 | 内容 | 为什么不可达 |
 | --- | --- | --- |
 | `SidebarRail.tsx` 采集项 | 采集忙碌时的琥珀色呼吸圆点 | 它只在「没有角标」时出现，而忙碌条件（进行中数 > 0）恰好就是有角标的条件 |
+| `components/ui/UnsavedChangesDialog.tsx` | 「有未保存的更改」对话框 | 在 `apps/desktop/src` 里按 `UnsavedChanges` 检索，只有它自己的定义与 `components/ui/index.ts` 的导出，没有任何组件渲染它；2026-11-16 核对 |
+
+## 有意的增强（验收标准第 6 条要求，不属于复刻偏差）
+
+用户给的模块验收标准第 6 条要求 Viva 界面遵守 AGENTS.md 的错误处理约定，而渲染层的部分写入路径本身没有做到。这里逐条登记 Viva 比渲染层多做的部分，使「不做改进」的原则不被悄悄突破；阶段末与 C 类一并告知用户。
+
+| 位置 | 渲染层的行为 | Viva 的行为 | 依据与证据 |
+| --- | --- | --- | --- |
+| `settings.general` 所有写入 | 开关乐观地改本地状态，同步到主进程失败只有 `console.warn`（`stores/settings.store.ts` 第 58 行），界面与已保存的值可能不一致且用户毫不知情 | 写入失败时开关回退到已保存的值、弹出 error toast（标题含「保存设置」，详情默认折叠、可展开并复制）、写一条脱敏日志；重试成功后 toast 保留供用户关闭 | AGENTS.md「用户操作失败必须可理解、可重试」「store 变更使用 `runGuardedMutation`」；`viva/app/root_test.go` 的 `TestRootSettingsWriteFailureShowsToastAndRetries` |
 
 ## 验证缺口（对照工具尚未覆盖，按未验证计）
 
@@ -166,9 +185,10 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | ID | 缺口 | 影响 | 计划 |
 | --- | --- | --- | --- |
 | G-001 | L2 的令牌与绘制比较未实现：React `paints[]` 与 Viva 图元、`:root` 语义令牌与 `tokens.For` 逐项对拍 | 颜色、边框、阴影目前只由 L3 兜底（容忍度 12/255 的逐通道差） | 阶段 2 的 M0 令牌落地时补，并先在 `settings.general` 上跑通 |
-| G-002 | L4 行为测试只有雏形 | 点击、键盘、对话框、toast、下拉弹层的行为未逐项比较 | 随 B-001…B-004 在 M0/M1 补齐 |
+| G-002 | L4 行为测试还不是对渲染层用例的逐条对应：`ConfirmDialog`、`Select`、`Toast`/`Guard`、设置页写入都有 Viva 无头测试，但期望值取自阅读渲染层源码（时长、曲线、挤出规则等），没有逐条映射盘点清单里 React 的 vitest 用例，也没有对 React 的真实动画逐帧采样（采集器只取稳定后的静止帧） | 行为与动效的结论是「按源码常量断言」而不是「与 React 实测对拍」；悬停、聚焦、按下、禁用状态与过渡动效（B-004）尚未覆盖 | 每个模块收尾时按盘点清单的用例列表对一遍，缺的补测；动效逐帧对拍的可行性在 M1 评估 |
 | G-003 | 真窗口（屏幕外 + `showInactive`）截图与 headless `Session.Image` 的差异未比较 | headless 路径下 LCD 抗锯齿不会出现；窗口合成与缩放路径未对照 | 阶段 2 有了真窗口之后做，结论写进开发文档 §8 |
 | G-004 | 遮罩模糊半径只能由类名保证，不能由像素独立验证：L3 对模糊标准差的分辨力约 ±1px（`ConfirmDialog` 的 σ=4 与 σ=5 都通过，见 A-007） | `ConfirmDialog` 的 4px 取自 `backdrop-blur-sm`、`Modal` 的 12px 取自 `backdrop-blur-md`（Tailwind 默认值），如果渲染层改了类名而对照场景的 σ 没跟着改，L3 不一定报警 | `Modal` 落地后在 σ=12 下复测分辨力；半径来源靠代码审阅 |
+| G-005 | Toast 背后有图文内容的情形没有对照：采集时 React 一侧把 `#root` 设为不可见，提示背后只有纯页面底色（`scripts/parity/lib/react-toast.mjs`） | 渲染层卡片 `backdrop-blur-md` 会把背后的内容糊成一团，Viva 是不透明的平整底色（A-007），这个差异在真实使用里看得见，但没有任何场景量化它 | 取决于 Viva 是否有模糊原语（升级版本时复测）；在此之前只能由 A-007 登记，不能写成「Toast 逐像素一致」，而是「背后为纯色时逐像素一致」 |
 
 ## 未测项（按未通过计）
 
@@ -212,3 +232,5 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 2026-11-16 | L1 归一化（`a11y_map.go` 的 `reactRoleMap`）：`alertdialog`、`dialog` 映射成 `group`；`testdata/a11y_map.sha256` 由 `8cf00a9e…` 更新为 `420f64c7…`。名称、外框、里面的按钮与标题照常逐个比较，只是角色名不比较 | A-004：Viva 的 `gfx.Role` 没有 dialog / alertdialog，无法表达；不是为让场景通过而放宽 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | **L1 新增检查：可访问描述**（`Norm.Description`，`compare_l1.go` 的 `description` 类问题）：对齐上的节点，React 的 `description` 与 Viva 的 `AccessNode.Description` 必须相等；React 一侧与名称相同的描述（`title` 属性的副产物）归一化为没有。入库样本与已通过的场景重跑无新增问题 | 对话框的说明文字是 `aria-describedby` 的内容，此前 L1 不比较描述，等于这条信息没有人看；这是**收紧**（新增比较），归一化规则只处理 `title` 重复名称这一种已知情形 | 不需要（只收紧，未放宽） |
 | 2026-11-16 | **模态场景的遮罩口径（`Scene.Backdrop`，A-007）**：面板之外的 L3 与「模拟渲染层合成的预测图」比较（页面再渲染一次 → 叠遮罩色 → 按 σ 高斯模糊 → 乘以由 Viva 原图推出的面板阴影衰减），面板之内原样比较，阈值不变；面板之外的文字与图标 L3 遮罩去掉；L2 对页面层文字与不完全落在面板里的图标不比墨迹（计入 `InkBlurred`，报告单列）。没有登记 `Backdrop` 的场景不受影响，`thresholds.json` 与冻结摘要 `5128b953…` 不变。**收窄**：遮罩背后页面文字的 L2 墨迹不再比较（这些文字在无遮罩的场景里完整比较）；**未覆盖**：模糊半径本身由类名保证（G-004）。面板阴影所在的一圈也在逐像素比较之内（试验过「遮掉面板外一圈」的做法，已弃用） | A-007：Viva 没有模糊原语，直接比较必然失败（模拟的 σ 取 0.3 时 L3 差异 4.4%–5.0%）；预测图方法在 σ=2 与 σ=8 下都能检出偏差（0.34%–1.06% > 0.25%），说明它不是什么都放过 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | **L2 文字行数与折行行距按「整行」比较**（`compare_l2.go` 的 `rowRects`）：React 一侧用 `Range.getClientRects` 取文字外框，预排版文字（`white-space: pre-wrap`）的行首缩进空白与折行处挂在行尾的空格会各自成一块，同一行有 2–3 个矩形；比较前把 y 相差不到 0.5px 的相邻片段并成它们的并集。`thresholds.json` 与冻结摘要不变；已通过的场景重跑结果不变；`compare_l2_rows_test.go` 守卫 | `ui.toast.detail-expanded` 的 `text-lines` 报 React 9 行、Viva 6 行，原因是片段被当成行，不是排版差异；折行文字相邻行距的比较（`wrappedTextPitchPx`）同样基于整行 | 不需要（澄清比较对象，没有放宽任何阈值：并行之后行数与行宽仍按 `maxDeltaPx` 逐行比较） |
+| 2026-11-16 | 新增 Toast 对照场景的采集口径（`scripts/parity/lib/react-toast.mjs`）：沿 React fiber 找到渲染层 `ToastProvider` 的 context 值，调用它自己的 `showToast`/`showUndoToast`（不改渲染层一行代码，「渲染层改动登记」仍为空）；弹出时把自动消失的定时器换成空操作后立即还原，采集期间提示不会自己消失；`#root` 设为 `visibility:hidden`，提示背后是纯页面底色。`overlayInkWaiver`（A-009）与等宽字格的 `toastMonoWaivers`（A-006）只放过各自登记的项目 | A-007、G-005：背后有内容时 Viva 没有对应的模糊，所以只在纯色背景下逐像素对照 | 不需要（没有放宽任何阈值；**未覆盖**的部分登记为 G-005） |
