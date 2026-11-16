@@ -299,6 +299,16 @@ test("tailwind: native/kit/tailwind.go 的色阶与 tailwindcss/colors 逐项一
   for (const [, name, hex] of entries) assert.equal(hex.toLowerCase(), tailwindHex(colors, name), name);
 });
 
+test("tailwind: viva/tokens/palette.go 的色阶与 tailwindcss/colors 逐项一致", async () => {
+  const src = await read("apps/desktop-go/viva/tokens/palette.go");
+  const block = src.match(/var tailwindPalette = map\[string\]string\{([\s\S]*?)\n\}/);
+  assert.ok(block, "找不到 tailwindPalette 的定义，写法变了就同步改这条测试");
+  const entries = [...block[1].matchAll(/"([a-z]+-\d+)":\s*"(#[0-9a-fA-F]{6})"/g)];
+  assert.ok(entries.length >= 25, `只解析出 ${entries.length} 项，解析规则可能失效`);
+  const colors = tailwindColors();
+  for (const [, name, hex] of entries) assert.equal(hex.toLowerCase(), tailwindHex(colors, name), name);
+});
+
 test("tailwind: 品牌图标生成器的 TAILWIND 表与 tailwindcss/colors 一致", async () => {
   const { TAILWIND } = await scripts("gen-native-brand-icons.mjs");
   const colors = tailwindColors();

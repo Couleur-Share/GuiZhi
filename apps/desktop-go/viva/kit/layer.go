@@ -35,30 +35,41 @@ const (
 // OverlayLayerMin 是浮层的最低层号：画在这一层及以上的文字属于浮层（对照工具据此区分浮层文字，见台账 A-009）。
 const OverlayLayerMin = uint16(bandModal)
 
+// dismissSpec 描述整窗的背景层。
+type dismissSpec struct {
+	Band ui.Band
+	// Scrim 非空：先把整窗填成这个颜色（模态对话框的遮罩，bg-background/60）。
+	Scrim *tokens.Color
+	// PassPress 为真：点背景的这一下关闭浮层，并在浮层消失后交给下面的控件（非模态弹层的行为，Select 的「点外面关闭」）；
+	// 为假：这一下只关闭，不再往下传（模态：背后的页面够不着）。
+	PassPress bool
+	// Keep 非空：这块区域（触发器）里的点击只关闭、不往下传——否则「点触发器收起」会被传给触发器再展开一次。
+	Keep *gfx.Rect
+	// NoEscape 为真：Esc 不关闭（确认对话框加载中：渲染层的键盘处理整个跳过）。点背景仍然关闭。
+	NoEscape bool
+}
+
 // dismissLayer 声明整窗的背景层并返回这一帧是否被要求关闭（点了背景，或按了 Esc）。
-//
-//	scrim 非空：先把整窗填成这个颜色（模态对话框的遮罩，bg-background/60）。
-//	passPress 为真：点背景的这一下关闭浮层，并在浮层消失后交给下面的控件（非模态弹层的行为，Select 的「点外面关闭」）；
-//	               为假：这一下只关闭，不再往下传（模态：背后的页面够不着）。
-//	keep 非空：这块区域（触发器）里的点击只关闭、不往下传——否则「点触发器收起」会被传给触发器再展开一次。
-func (l *Look) dismissLayer(c ui.C, band ui.Band, scrim *tokens.Color, passPress bool, keep *gfx.Rect) bool {
+func (l *Look) dismissLayer(c ui.C, s dismissSpec) bool {
 	id := ui.ID(c)
-	layer := ui.Overlay(c, ui.OverlaySpec{Band: band, Bounds: c.Bounds()}).
+	layer := ui.Overlay(c, ui.OverlaySpec{Band: s.Band, Bounds: c.Bounds()}).
 		HitWith(id, "", gfx.HitOptions{
 			Role: gfx.RoleButton, SkipFocus: true, Backdrop: true,
-			PassPrimary: passPress, PassSecondary: passPress,
+			PassPrimary: s.PassPress, PassSecondary: s.PassPress,
 		}).
 		Draw(func(d *ui.DrawContext) {
-			if scrim != nil {
-				d.Canvas.Fill(d.Rect, d.Fade(l.Col(*scrim)))
+			if s.Scrim != nil {
+				d.Canvas.Fill(d.Rect, d.Fade(l.Col(*s.Scrim)))
 			}
-			if keep != nil && keep.Width > 0 && keep.Height > 0 {
-				d.Canvas.HitWithOptions(id, *keep, "", gfx.HitOptions{
-					Role: gfx.RoleButton, SkipFocus: true, Backdrop: true, PassSecondary: passPress,
+			if s.Keep != nil && s.Keep.Width > 0 && s.Keep.Height > 0 {
+				d.Canvas.HitWithOptions(id, *s.Keep, "", gfx.HitOptions{
+					Role: gfx.RoleButton, SkipFocus: true, Backdrop: true, PassSecondary: s.PassPress,
 				})
 			}
 			// Esc 作用于最后一个声明的目标：多个浮层同时存在时，最上面（最后声明）的先关。
-			d.Canvas.SetEscapeTarget(id)
+			if !s.NoEscape {
+				d.Canvas.SetEscapeTarget(id)
+			}
 		})
 	return layer.Clicked()
 }

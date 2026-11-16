@@ -27,9 +27,12 @@ type General struct {
 
 	closeSel    kit.SelectState // 关闭行为下拉
 	languageSel kit.SelectState // 语言下拉
+
+	backgroundAsk     bool             // 「后台任务」确认对话框是否打开（渲染层的 confirmBackground）
+	backgroundConfirm kit.ConfirmState // 该对话框的界面状态
 }
 
-// Page 声明整页：标题加五个分区。
+// Page 声明整页：标题加五个分区，再加「后台任务」确认对话框（浮层，不占版面）。
 func (g *General) Page(c ui.C) {
 	l := g.Look
 	l.SettingsContent(c, locales.SettingsGeneral(), func() {
@@ -41,6 +44,7 @@ func (g *General) Page(c ui.C) {
 			g.notifications(c)
 		})
 	})
+	g.backgroundDialog(c)
 }
 
 // toggle 是绑定到设置布尔字段的开关：点击后把新值交给 Store；写入失败时设置不变，界面保持原状。
@@ -55,13 +59,52 @@ func (g *General) toggle(c ui.C, label string, get func(settings.Values) bool, s
 	}
 }
 
+// backgroundTasks 是「后台任务」开关。关→开先弹确认（它会同时改开机启动、隐藏启动与关闭行为），开→关直接写入；
+// 开关本身由设置值决定：点开之后在确认之前它仍然是关的（渲染层的受控开关）。
+func (g *General) backgroundTasks(c ui.C) func() {
+	label := locales.SettingsBackgroundTasks()
+	return func() {
+		on := g.Store.Values().App.BackgroundTasksEnabled
+		sw := g.Look.Switch(c, &on, label)
+		if !sw.Clicked() {
+			return
+		}
+		if on {
+			g.backgroundAsk = true
+			return
+		}
+		_ = g.Store.Update(func(v *settings.Values) { v.App.BackgroundTasksEnabled = false })
+	}
+}
+
+// backgroundDialog 是「启用系统后台运行」确认对话框。确认后一次写入四项：后台任务、开机启动、隐藏启动、关闭按钮最小化到托盘
+// （渲染层 setBackgroundTasksEnabled(true) 的产品承诺：之后用户仍可分别修改这些偏好）。
+func (g *General) backgroundDialog(c ui.C) {
+	switch g.Look.ConfirmDialog(c, &g.backgroundConfirm, kit.ConfirmSpec{
+		Open:        g.backgroundAsk,
+		Title:       locales.SettingsBackgroundTasksConfirmTitle(),
+		Message:     locales.SettingsBackgroundTasksConfirmMessage(),
+		ConfirmText: locales.CommonEnable(),
+		CancelText:  locales.CommonCancel(),
+	}) {
+	case kit.ConfirmAccepted:
+		g.backgroundAsk = false
+		_ = g.Store.Update(func(v *settings.Values) {
+			v.App.BackgroundTasksEnabled = true
+			v.App.LaunchAtStartup = true
+			v.App.MinimizeOnLaunch = true
+			v.UI.CloseAction = settings.CloseMinimize
+		})
+	case kit.ConfirmDismissed:
+		g.backgroundAsk = false
+	}
+}
+
 func (g *General) startup(c ui.C) {
 	rows := []kit.SettingRow{
 		{
 			Label: locales.SettingsBackgroundTasks(), Description: locales.SettingsBackgroundTasksDesc(),
-			Control: g.toggle(c, locales.SettingsBackgroundTasks(),
-				func(v settings.Values) bool { return v.App.BackgroundTasksEnabled },
-				func(v *settings.Values, on bool) { v.App.BackgroundTasksEnabled = on }),
+			Control: g.backgroundTasks(c),
 		},
 		{
 			Label: locales.SettingsLaunchAtStartup(), Description: locales.SettingsLaunchAtStartupDesc(),

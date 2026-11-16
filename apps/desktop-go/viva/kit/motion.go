@@ -57,7 +57,13 @@ const (
 	DurationBase                        // 180 ms：对话框入场、提示入场
 	DurationSmooth                      // 280 ms
 	DurationSlow                        // 420 ms
+	// DurationDefault 是 Tailwind 自带的 transition 时长（150 ms）：`transition-colors`、`transition-opacity` 等不带 duration-* 的类用它。
+	// 它不是 --motion-duration-* 变量，所以「减弱」档不缩放它（globals.css 只改变量），只有「关闭」档把它压成 0。
+	DurationDefault
 )
+
+// tailwindDefaultDuration 是 DurationDefault 的时长。
+const tailwindDefaultDuration = 150 * time.Millisecond
 
 // LoadingDelay 是加载指示器延迟登场的时长。本地 SQLite 走一趟通常几十毫秒就回来，
 // 立刻画转圈再抹掉，这一下闪现本身就是闪烁；低于它人眼注意不到等待。
@@ -66,7 +72,13 @@ const LoadingDelay = 250 * time.Millisecond
 
 // Duration 返回档位在当前动效档下的时长；关闭档返回 0。
 func (m MotionLevel) Duration(n DurationName) time.Duration {
-	if m == MotionLevelOff || n < 0 || int(n) >= len(tokens.MotionStandardMs) {
+	if m == MotionLevelOff || n < 0 {
+		return 0
+	}
+	if n == DurationDefault {
+		return tailwindDefaultDuration
+	}
+	if int(n) >= len(tokens.MotionStandardMs) {
 		return 0
 	}
 	return time.Duration(tokens.DurationMs(int(n), m == MotionLevelReduced)) * time.Millisecond

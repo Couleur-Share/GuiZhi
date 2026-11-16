@@ -77,8 +77,8 @@ func (l *Look) TextPx(c ui.C, s string, size, line, weight float32, color tokens
 }
 
 // Heading 与 Text 相同，但在可访问树里是 level 级标题（渲染层的 h1、h3）。外框就是外层盒子（行盒）。
-func (l *Look) Heading(c ui.C, level uint8, s string, st TextStyle, weight float32, color tokens.Color) ui.Box {
-	return l.Text(c, s, st, weight, color).Draw(func(d *ui.DrawContext) {
+func (l *Look) Heading(c ui.C, level uint8, s string, st TextStyle, weight float32, color tokens.Color, opts ...TextOpt) ui.Box {
+	return l.Text(c, s, st, weight, color, opts...).Draw(func(d *ui.DrawContext) {
 		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleHeading, s, gfx.HitOptions{Level: level})
 	})
 }

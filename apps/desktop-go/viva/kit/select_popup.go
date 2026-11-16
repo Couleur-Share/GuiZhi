@@ -110,7 +110,7 @@ func (l *Look) selectPanel(c ui.C, st *SelectState, spec SelectSpec) (picked str
 	}
 	rect := selectPanelRect(st.anchor, bounds.Width, bounds.Height, contentH, minWidth, spec.AlignEnd)
 
-	if l.dismissLayer(c, bandSelectDismiss, nil, true, &st.anchor) {
+	if l.dismissLayer(c, dismissSpec{Band: bandSelectDismiss, PassPress: true, Keep: &st.anchor}) {
 		st.Open = false
 		return "", false
 	}
