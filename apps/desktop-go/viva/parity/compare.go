@@ -45,20 +45,22 @@ type InkShift struct {
 
 // L2Result 汇总度量比较。
 type L2Result struct {
-	BoxPairs      int        `json:"boxPairs"`
-	BoxWithin     int        `json:"boxWithin"`
-	MaxBoxDelta   float64    `json:"maxBoxDelta"`
-	AlignmentRate float64    `json:"alignmentRate"` // 已对齐节点数 / React 节点数
-	TextLines     int        `json:"textLines"`
-	TextWidthOK   int        `json:"textWidthOK"`
-	MaxWidthDelta float64    `json:"maxWidthDelta"`
-	InkChecked    int        `json:"inkChecked"`
-	InkOK         int        `json:"inkOK"`
-	MaxInkDX      int        `json:"maxInkDX"`
-	MaxInkDY      int        `json:"maxInkDY"`
-	MinInkMass    float64    `json:"minInkMass"`
-	MaxInkMass    float64    `json:"maxInkMass"`
-	InkShifts     []InkShift `json:"inkShifts,omitempty"`
+	BoxPairs      int     `json:"boxPairs"`
+	BoxWithin     int     `json:"boxWithin"`
+	MaxBoxDelta   float64 `json:"maxBoxDelta"`
+	AlignmentRate float64 `json:"alignmentRate"` // 已对齐节点数 / React 节点数
+	TextLines     int     `json:"textLines"`
+	TextWidthOK   int     `json:"textWidthOK"`
+	MaxWidthDelta float64 `json:"maxWidthDelta"`
+	InkChecked    int     `json:"inkChecked"`
+	InkOK         int     `json:"inkOK"`
+	// InkBlurred 是因遮罩背后模糊而没有比较墨迹的文字行与图标数（台账 A-007）。
+	InkBlurred int        `json:"inkBlurred,omitempty"`
+	MaxInkDX   int        `json:"maxInkDX"`
+	MaxInkDY   int        `json:"maxInkDY"`
+	MinInkMass float64    `json:"minInkMass"`
+	MaxInkMass float64    `json:"maxInkMass"`
+	InkShifts  []InkShift `json:"inkShifts,omitempty"`
 	// 图标（见 compare_icons.go）：React 的 SVG 数、与 Viva 配上的数、配上的图标外框最大差。
 	Icons        int     `json:"icons"`
 	IconsMatched int     `json:"iconsMatched"`
@@ -128,6 +130,9 @@ type Inputs struct {
 	FactsOnly bool
 	// Waivers 是场景登记的已知偏差；覆盖到的问题进 Report.Waived，不使场景失败。
 	Waivers []Waiver
+	// Backdrop 非空：场景里有被遮罩背后模糊的区域（台账 A-007），L2 墨迹对这些区域的文字与图标不比较（改由 L3 模糊后比较），
+	// L3 对这些区域改比「Viva 图模糊后」。nil 表示没有遮罩。
+	Backdrop *Backdrop
 }
 
 // Compare 做 L1–L3 比较，返回报告与差异图（react | viva | diff 三联图）。
@@ -181,6 +186,9 @@ func (r *Report) Markdown() string {
 	fmt.Fprintf(&b, "- L2 度量：外框 %d/%d 在阈值内（最大差 %.2fpx，对齐率 %.1f%%）；文字行 %d，宽度合格 %d（最大差 %.2fpx）；墨迹合格 %d/%d（最大位移 ΔX %d、ΔY %d；墨迹量比 %.3f–%.3f）\n",
 		r.L2.BoxWithin, r.L2.BoxPairs, r.L2.MaxBoxDelta, r.L2.AlignmentRate*100, r.L2.TextLines, r.L2.TextWidthOK, r.L2.MaxWidthDelta,
 		r.L2.InkOK, r.L2.InkChecked, r.L2.MaxInkDX, r.L2.MaxInkDY, r.L2.MinInkMass, r.L2.MaxInkMass)
+	if r.L2.InkBlurred > 0 {
+		fmt.Fprintf(&b, "- L2 墨迹：%d 行文字与图标在遮罩背后被模糊，不比较墨迹（台账 A-007），改由 L3 在 Viva 图模糊后比较\n", r.L2.InkBlurred)
+	}
 	if r.L2.Icons > 0 {
 		lo, hi := 0.0, 0.0
 		for i, m := range r.L2.IconInk {

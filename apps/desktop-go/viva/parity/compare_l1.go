@@ -47,6 +47,10 @@ func compareL1(rep *Report, in Inputs) ([]nodePair, []textPair) {
 			rep.add(LayerL1, "state", describe(rn), "状态不一致：React「%s」，Viva「%s」", rn.StateString(), vn.StateString())
 			continue
 		}
+		if rn.Description != vn.Description {
+			rep.add(LayerL1, "description", describe(rn), "可访问描述不一致：React「%s」，Viva「%s」", rn.Description, vn.Description)
+			continue
+		}
 		matched = append(matched, nodePair{React: rn, Viva: vn})
 	}
 	rep.L1.NodesMatched = len(matched)

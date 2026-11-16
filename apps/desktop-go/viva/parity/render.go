@@ -27,6 +27,8 @@ type Scene struct {
 	Steps func(s *headless.Session) error
 	// Waivers 是这个场景已在台账登记的偏差（见 waiver.go）。
 	Waivers []Waiver
+	// Backdrop 非空：场景里有被遮罩背后模糊的区域（模态对话框，台账 A-007），对照时按它模拟模糊（见 backdrop.go）。
+	Backdrop *BackdropSpec
 }
 
 // Spec 把变体换成外观装配的输入。
@@ -242,7 +244,7 @@ func nodeOf(n app.AccessNode) Node {
 		props["level"] = float64(n.Level)
 	}
 	return Node{
-		Role: n.Role.String(), Name: n.Label, Value: n.Value, Props: props,
+		Role: n.Role.String(), Name: n.Label, Value: n.Value, Description: n.Description, Props: props,
 		Box:    []float64{float64(n.Bounds.X), float64(n.Bounds.Y), float64(n.Bounds.Width), float64(n.Bounds.Height)},
 		Parent: -1,
 	}

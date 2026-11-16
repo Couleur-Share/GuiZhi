@@ -62,6 +62,10 @@ var reactRoleMap = map[string]string{
 	"grid":      "grid",
 	"gridcell":  "gridcell",
 	"group":     "group",
+	// 对话框：Viva 的 gfx.Role 没有 dialog / alertdialog（台账 A-004 的同一条限制），按带名字的分组比较：
+	// 名称（aria-labelledby / aria-label）、位置、里面的按钮与标题照常逐个比较。
+	"alertdialog": "group",
+	"dialog":      "group",
 }
 
 // vivaIgnoredRoles 是 Viva 一侧不算可访问节点的角色：未声明角色的区域。
@@ -113,12 +117,15 @@ func SquashText(s string) string {
 
 // Norm 是归一化后的可访问节点：比较的最小单位。
 type Norm struct {
-	Role   string
-	Name   string
-	States map[string]string // 参与比较的状态，键见 roleStates，值统一成字符串
-	Box    Box
-	HasBox bool
-	Source int // 在原事实 Nodes 里的序号
+	Role string
+	Name string
+	// Description 是可访问描述（aria-describedby 指向的文字，如对话框的说明）。React 一侧与名称相同的描述是
+	// title 属性的副产物（Chromium 在名称来自 aria-label 时把 title 报成描述），不带额外信息，归一化时视为没有。
+	Description string
+	States      map[string]string // 参与比较的状态，键见 roleStates，值统一成字符串
+	Box         Box
+	HasBox      bool
+	Source      int // 在原事实 Nodes 里的序号
 }
 
 // Key 是对齐用的键：角色加名称。
@@ -192,7 +199,11 @@ func NormalizeReact(f *Facts) (out []Norm, unmapped []string) {
 		if v, has := n.Prop("disabled"); has && v == "true" {
 			states["disabled"] = "true"
 		}
-		out = append(out, Norm{Role: role, Name: name, States: states, Box: box, HasBox: hasBox, Source: i})
+		desc := NormText(n.Description)
+		if desc == name {
+			desc = ""
+		}
+		out = append(out, Norm{Role: role, Name: name, Description: desc, States: states, Box: box, HasBox: hasBox, Source: i})
 	}
 	return out, unmapped
 }
@@ -246,7 +257,7 @@ func NormalizeViva(f *Facts) []Norm {
 		if v, has := n.Prop("disabled"); has && v == "true" {
 			states["disabled"] = "true"
 		}
-		out = append(out, Norm{Role: n.Role, Name: name, States: states, Box: box, HasBox: hasBox, Source: i})
+		out = append(out, Norm{Role: n.Role, Name: name, Description: NormText(n.Description), States: states, Box: box, HasBox: hasBox, Source: i})
 	}
 	return out
 }

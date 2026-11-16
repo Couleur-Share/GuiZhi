@@ -8,10 +8,10 @@
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
 | A（平台/Viva 确实做不到） | 10 | A-001…A-010 |
-| B（暂缺，已定里程碑） | 10 | B-001…B-010 |
+| B（暂缺，已定里程碑） | 8 | B-002、B-004…B-010（B-001、B-003 已于 2026-11-16 关闭，见「已关闭条目」） |
 | C（需用户裁决） | 1 | 见 C-001 |
 | 未测（按未通过计） | 5 | 见「未测项」 |
-| 验证缺口（对照工具尚未覆盖，按未验证计） | 3 | 见「验证缺口」 |
+| 验证缺口（对照工具尚未覆盖，按未验证计） | 4 | 见「验证缺口」 |
 
 ## 条目格式
 
@@ -51,10 +51,10 @@
 
 ### A-004 可访问树里没有地标角色与图标图片角色
 
-- 场景/模块：所有整窗与外壳场景（`app.window.*`、`settings.shell`）：React 的 `<aside>`（complementary）、`<header>`（banner）、`<nav>`（navigation）、`<main>`，以及 lucide 图标 SVG 在 Chromium 里的无名 `image` 节点。
-- 偏差：Chromium 的可访问树里有这些节点；Viva 没有对应的角色，图标也不进可访问树。
-- 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 330–361 行的 `Role` 枚举只有 Button、Link、Checkbox、Radio、Tab、MenuItem、Combobox、Switch、TextField、Slider、Terminal、Group、Menu、Menubar、ListBox、Option、Grid、GridCell、Heading、Status、Separator 二十一种，没有 banner / complementary / navigation / main / image；`Canvas.Container` 只接受这些角色。
-- 已做的补偿：L1 归一化（`viva/parity/a11y_map.go`）把这四种地标放进 `reactIgnoredRoles`，无名 `image` 放进新增的 `reactIgnoredUnnamed`；它们里面的按钮、标题、输入框、开关等**照常逐个比较**（角色、名称、状态、外框）。没有放宽任何带操作或状态的节点；带名字的 `image` 仍必须逐个决定怎么映射。
+- 场景/模块：所有整窗与外壳场景（`app.window.*`、`settings.shell`）：React 的 `<aside>`（complementary）、`<header>`（banner）、`<nav>`（navigation）、`<main>`，以及 lucide 图标 SVG 在 Chromium 里的无名 `image` 节点；所有对话框场景：`role="alertdialog"` / `role="dialog"`（`ConfirmDialog`、`Modal`、`UnsavedChangesDialog` 等）。
+- 偏差：Chromium 的可访问树里有这些节点；Viva 没有对应的角色，图标也不进可访问树；对话框在 Viva 里只能是带名字与描述的 `group`，屏幕阅读器不会把它读成「对话框」。
+- 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 330–361 行的 `Role` 枚举只有 Button、Link、Checkbox、Radio、Tab、MenuItem、Combobox、Switch、TextField、Slider、Terminal、Group、Menu、Menubar、ListBox、Option、Grid、GridCell、Heading、Status、Separator 二十一种，没有 banner / complementary / navigation / main / image / dialog / alertdialog；`Canvas.Container` 只接受这些角色。
+- 已做的补偿：L1 归一化（`viva/parity/a11y_map.go`）把这四种地标放进 `reactIgnoredRoles`，无名 `image` 放进新增的 `reactIgnoredUnnamed`；它们里面的按钮、标题、输入框、开关等**照常逐个比较**（角色、名称、状态、外框）。没有放宽任何带操作或状态的节点；带名字的 `image` 仍必须逐个决定怎么映射。对话框：`alertdialog`、`dialog` 映射成 `group`（`reactRoleMap`），名称、描述（`Description`）、外框、里面的标题与按钮照常逐个比较，只是角色名不比较；`kit.ConfirmDialog` 把说明文字放进面板 `group` 的 `Description`，对应渲染层的 `aria-describedby`。
 - 状态：开（引擎限制）。守卫摘要随之更新，见「变更记录」。阶段末在 `AskQuestion` 里请用户知悉这条对 L1 口径的扩展。
 
 ### A-005 窗口最小化/最大化/关闭按钮的外观与宽度
@@ -75,10 +75,12 @@
 
 ### A-007 遮罩与卡片背后的模糊（backdrop-filter）
 
-- 场景/模块：`Modal` 遮罩（`bg-background/60 backdrop-blur-md`，12px）、`ConfirmDialog` 遮罩（`bg-background/60 backdrop-blur-sm`，4px）、`Toast` 卡片背后（`backdrop-blur-md`）。三者在 `kit` 里随 S4 实现，对话框与 toast 的整窗场景进入对照时在这里补实测数据。
-- 偏差：渲染层把遮罩与卡片背后的页面做高斯模糊；Viva 没有「模糊已画内容」的原语，遮罩下的页面保持清晰。
-- 证据：`github.com/vivaui/viva@v0.6.4/components/dialog.go` 第 353–357 行（"the blur has no canvas primitive … Until a blur exists the scrim is heavier"，Viva 自己的对话框也因此把遮罩加重）；在 `gfx`、`ui`、`app` 公开包按 `blur` 检索，只有阴影的 `Blur` 参数（`gfx.ShadowStyle`），没有对已绘内容的模糊；`internal/platform/windows/backdrop_windows.go` 是整窗系统材质（Mica / 亚克力），作用对象是整个窗口背景，不能限定到窗口内的一块区域。
+- 场景/模块：`Modal` 遮罩（`bg-background/60 backdrop-blur-md`，12px）、`ConfirmDialog` 遮罩（`bg-background/60 backdrop-blur-sm`，4px）、`Toast` 卡片背后（`backdrop-blur-md`）。`ConfirmDialog` 已落地并对照（`app.window.page-settings.dlg-background-tasks`）；`Modal` 与 `Toast` 随 S4 后续实现，进入对照时在这里补数据。
+- 偏差：渲染层把遮罩与卡片背后的页面做高斯模糊；Viva 没有「模糊已画内容」的原语，遮罩下的页面保持清晰。这是用户看得见的真实差异：背后的文字在渲染层里是一团糊，在 Viva 窗口里仍清晰可读。
+- 证据：`github.com/vivaui/viva@v0.6.4/components/dialog.go` 第 353–357 行（"the blur has no canvas primitive … Until a blur exists the scrim is heavier"，Viva 自己的对话框也因此把遮罩加重）；在 `gfx`、`ui`、`app` 公开包按 `blur` 检索，只有阴影的 `Blur` 参数（`gfx.ShadowStyle`），没有对已绘内容的模糊；`internal/platform/windows/backdrop_windows.go` 是整窗系统材质（Mica / 亚克力），作用对象是整个窗口背景，不能限定到窗口内的一块区域。**偏差量**（`app.window.page-settings.dlg-background-tasks`，`royal-blue` × 中字号 × 1280x800）：把模拟的模糊半径调成近似零（σ = 0.3，等于 Viva 不模糊）时 L3 差异像素比 4.36%（浅色）与 4.96%（深色），冻结上限 0.25%，约 17–20 倍。
 - 已做补偿：遮罩色取渲染层的 `bg-background/60`，**不**像 Viva 自带对话框那样加重（保持与渲染层同一不透明度）。
+- 对照口径（口径变更，见「变更记录」）：模态场景在 `Scene.Backdrop` 里登记模糊，对照工具在 Viva 一侧精确模拟渲染层的合成，让遮罩色、面板与面板阴影、背景位置仍被逐像素检查，而不是整块放过。(1) L3：同一场景再渲染一次「对话框打开之前」的页面（`BackdropSpec.BaseSteps`），叠上遮罩色（背景令牌 × 0.6）得到 Viva 里遮罩背后的清晰背景 Sharp，按 σ 做高斯模糊（sRGB 逐通道、边缘镜像延拓）得到 Blurred；面板之外 Viva 原图相对 Sharp 的逐通道比值（上限 1）就是面板阴影的衰减，预测图 = Blurred × 衰减，与 React 图按**不变的阈值**逐像素比较；面板之内原样比较（不被模糊）；面板之外的文字与图标遮罩去掉（背景已模糊），面板之内的遮罩不变。(2) L2：有遮罩的场景里，页面层文字与不完全落在面板里的图标不比墨迹（计入 `InkBlurred`，报告单列一行）——这些文字在无遮罩的 `app.window.page-settings` 场景里仍按 L2 完整比较；面板自己的文字与图标照常比较（浮层文字的墨迹总量比由 A-009 登记）。
+- 验证结果：`dlg-background-tasks` 在 T2（36 个变体）、T1（4 个变体，含 800x600 与 1920x1080）与 5 个入库样本变体全部通过，L3 差异比例最大 0.0134%（上限 0.25%）。半径分辨力实测（T0，浅色 / 深色）：σ = 0.3 → 4.36% / 4.96%（不通过）；σ = 2 → 0.44% / 0.34%（不通过）；σ = 4 → 0.0010% / 0.0000%（通过）；σ = 5 → 0.0006% / 0.0001%（通过）；σ = 8 → 0.90% / 1.06%（不通过）。所以 L3 能检出 ≥ 2px 的半径偏差，分辨不了 ±1px（见 G-004）。
 - 状态：开（引擎限制；升级 Viva 版本时复测）。
 
 ### A-008 浮层关闭后多画一帧残影
@@ -108,9 +110,7 @@
 
 | ID | 场景/模块 | 缺什么（React 的行为） | 里程碑 |
 | --- | --- | --- | --- |
-| B-001 | `settings.general`：后台任务开关 | 打开「后台任务」先弹 `ConfirmDialog`（标题「启用系统后台运行」），确认后才写入；关闭立即写入。Viva 页目前直接写入。 | M0 对话框工具包 → M1 设置页 |
 | B-002 | `settings.general`：写入失败 | 失败时 `showToast` 带可复制的 `detail` 并可重试；Viva 页目前吞掉 `Store.Update` 的错误。 | M0 toast → M1 设置页 |
-| B-003 | `settings.general`：下拉框 | 点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）；Viva 页只有静态触发器。 | M0 下拉弹层 → M1 设置页 |
 | B-004 | `settings.general`：悬停、聚焦、按下、禁用状态与过渡动效 | 各控件的状态样式与时长（`motion` 四种模式）；Viva 页只有静止状态。 | M0 控件状态 → L4 测试 |
 | B-005 | 图标：`Database`、`DatabaseBackup`（`settings.shell` 数据页导航项） | 这两枚图标的路径含椭圆弧（`A9 3`，rx≠ry）。Viva 的图标编译器 `tools/iconcompile/compile.go` 第 889–892 行 `controlOn` 把椭圆的切线方向写成 `(-tangent·ry·sin, tangent·rx·cos)`，正确应为 `(-tangent·rx·sin, tangent·ry·cos)`，圆弧（rx=ry）不受影响、椭圆弧的控制点错位。后果：16px 图标中心线下缘 14.909px，正确值 14.667px（偏 0.24px）。用到的 139 枚 lucide 图标里只有这两枚含椭圆弧（`<ellipse>` 元素走另一条正确的路径）。 | M0 结束前：生成器 `viva/icons/gen` 在编译前把含椭圆弧的 `d` 展开成正确的三次曲线，并加几何范围单测 |
 | B-006 | 顶栏「更新」按钮（`app.window.*` 的「有可用更新」状态） | 渲染层按钮是 `border-dashed` 虚线边框（border-primary/50）；Viva 目前画实线。Viva 的 `ui.Box.Dashed()` 能画虚线，但 Chromium 的虚线节奏（线段与间隔长度、拐角处理）还没有对照采集，所以还没法逐项核对。 | M1：先加「有更新」的场景变体并采集，再对照调整 |
@@ -118,6 +118,15 @@
 | B-008 | 顶栏动作接线：搜索框、「新建」主按钮、「更新」按钮 | 点击搜索框打开命令面板（`OnOpenPalette`）；点「新建」主按钮发起快速采集（`OnNewCapture`）；「有可用更新」按钮打开更新对话框（`OnUpdate`）。回调已在 `shell.Window` 上留好，但命令面板、采集与更新对话框都在 M3，所以真窗口里这三处点击目前没有反应。 | M3（命令面板、快速采集、更新对话框） |
 | B-009 | 设置：首次读取失败的界面 | 按 AGENTS.md，加载失败要显示 `LoadErrorState`（含重试），不能把默认值当成真实设置渲染。`settingsStore` 已记录首次读取错误（`LoadError()`，有单测），但设置页还没有展示它的组件。 | M0 工具包（`LoadErrorState`）→ 接到设置页 |
 | B-010 | 窗口：改字号档后，Viva 画的窗口按钮条高度 | 渲染层的窗口按钮 `h-full`，随顶栏高度（3rem）在改字号档的瞬间变化；Viva 的 `Config.TitlebarHeight` 只在创建窗口时读取一次（`app/window_controls.go` 第 140–145 行 `newWindowControls` 只算一次 `height`），没有运行时修改的入口，所以改字号档后按钮条高度保持创建时的值，直到重启。尚未尝试「字号档变化时重开窗口」的做法（会闪一下并要保住位置与状态）。 | M0 外壳接线末（阶段 2 结束前）：评估重开窗口方案；不可行则凭证据转 A 类 |
+
+### 已关闭条目
+
+关闭必须附证据（场景与测试）；条目原文保留在这里，便于追溯。
+
+| ID | 原缺口 | 关闭日期 | 证据 |
+| --- | --- | --- | --- |
+| B-001 | `settings.general`：后台任务开关——打开「后台任务」先弹 `ConfirmDialog`（标题「启用系统后台运行」），确认后才写入；关闭立即写入。 | 2026-11-16 | `kit.ConfirmDialog`（`viva/kit/confirm.go`）与设置页接线（`viva/screens/settings/general.go` 的 `backgroundTasks`、`backgroundDialog`）。对照：场景 `app.window.page-settings.dlg-background-tasks` 在 T2（36）、T1（4）与 5 个入库样本变体全部通过，L3 比例最大 0.0134%（口径见 A-007）。L4：`viva/kit/confirm_test.go`（取消按钮初始焦点、Enter 确认、Esc 与点遮罩关闭、加载中不可关闭、焦点陷阱与归还、入场动画时长与曲线、四种动效偏好）与 `viva/screens/settings/general_test.go`（先确认再写入、取消 / Esc / 点遮罩只关闭、确认一次写入四项、关闭不需确认、普通开关即写即翻）。写入失败的提示归 B-002。 |
+| B-003 | `settings.general`：下拉框——点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）。 | 2026-11-16 | `kit.Select` 与弹层（`viva/kit/select_popup.go`），提交 `fa87d599`。对照：场景 `app.window.page-settings.select-close-action`、`…select-language`（T2 各 36 个变体通过，浮层文字的墨迹总量比按 A-009 登记，一帧残影见 A-008）。L4：`viva/kit/select_popup_test.go`、`select_motion_test.go`。 |
 
 ## C 类：需要用户裁决
 
@@ -159,6 +168,7 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | G-001 | L2 的令牌与绘制比较未实现：React `paints[]` 与 Viva 图元、`:root` 语义令牌与 `tokens.For` 逐项对拍 | 颜色、边框、阴影目前只由 L3 兜底（容忍度 12/255 的逐通道差） | 阶段 2 的 M0 令牌落地时补，并先在 `settings.general` 上跑通 |
 | G-002 | L4 行为测试只有雏形 | 点击、键盘、对话框、toast、下拉弹层的行为未逐项比较 | 随 B-001…B-004 在 M0/M1 补齐 |
 | G-003 | 真窗口（屏幕外 + `showInactive`）截图与 headless `Session.Image` 的差异未比较 | headless 路径下 LCD 抗锯齿不会出现；窗口合成与缩放路径未对照 | 阶段 2 有了真窗口之后做，结论写进开发文档 §8 |
+| G-004 | 遮罩模糊半径只能由类名保证，不能由像素独立验证：L3 对模糊标准差的分辨力约 ±1px（`ConfirmDialog` 的 σ=4 与 σ=5 都通过，见 A-007） | `ConfirmDialog` 的 4px 取自 `backdrop-blur-sm`、`Modal` 的 12px 取自 `backdrop-blur-md`（Tailwind 默认值），如果渲染层改了类名而对照场景的 σ 没跟着改，L3 不一定报警 | `Modal` 落地后在 σ=12 下复测分辨力；半径来源靠代码审阅 |
 
 ## 未测项（按未通过计）
 
@@ -199,3 +209,6 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 2026-11-16 | L1 归一化（`render.go` 的 `nodeOf`，不在 `a11y_map.go` 规则表内，守卫摘要不变）：`option`、`tab` 角色的「选中」是固有状态，Viva 一侧未选中时也写 `selected=false`，与渲染层始终写 `aria-selected` 一致 | Viva 的无障碍节点只有 `Selected` 布尔位，没有「可选但未选」与「不可选」的区分，未选中的选项仍是可选的 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | 对照工具新增 `Waiver.Overlay` 与 `Issue.Overlay`、`Text.Overlay`（Viva 文字画在浮层层级时打标记）：A-009 只放过**浮层文字**的墨迹总量比。`Scene.Steps`（场景操作步骤）让整窗场景可以像用户那样滚动、点开下拉后再采集。`thresholds.json` 与冻结摘要不变 | A-009 | 不需要（没有放宽任何阈值；放过范围限定在浮层文字的墨迹总量比，页面层同一段文字照常判定） |
 | 2026-11-16 | 对照工具新增 `Waiver`：已在台账登记（A/B/C 类）的问题仍出现在报告里（单列「已登记的偏差」），但不使场景失败；`thresholds.json` 与冻结摘要不变 | 让「偏差已登记」与「还没处理的问题」在报告里可区分；scenes 包的测试核对每个 Waiver 的台账编号真实存在 | 不需要（没有放宽任何阈值；没有登记就不能豁免） |
+| 2026-11-16 | L1 归一化（`a11y_map.go` 的 `reactRoleMap`）：`alertdialog`、`dialog` 映射成 `group`；`testdata/a11y_map.sha256` 由 `8cf00a9e…` 更新为 `420f64c7…`。名称、外框、里面的按钮与标题照常逐个比较，只是角色名不比较 | A-004：Viva 的 `gfx.Role` 没有 dialog / alertdialog，无法表达；不是为让场景通过而放宽 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | **L1 新增检查：可访问描述**（`Norm.Description`，`compare_l1.go` 的 `description` 类问题）：对齐上的节点，React 的 `description` 与 Viva 的 `AccessNode.Description` 必须相等；React 一侧与名称相同的描述（`title` 属性的副产物）归一化为没有。入库样本与已通过的场景重跑无新增问题 | 对话框的说明文字是 `aria-describedby` 的内容，此前 L1 不比较描述，等于这条信息没有人看；这是**收紧**（新增比较），归一化规则只处理 `title` 重复名称这一种已知情形 | 不需要（只收紧，未放宽） |
+| 2026-11-16 | **模态场景的遮罩口径（`Scene.Backdrop`，A-007）**：面板之外的 L3 与「模拟渲染层合成的预测图」比较（页面再渲染一次 → 叠遮罩色 → 按 σ 高斯模糊 → 乘以由 Viva 原图推出的面板阴影衰减），面板之内原样比较，阈值不变；面板之外的文字与图标 L3 遮罩去掉；L2 对页面层文字与不完全落在面板里的图标不比墨迹（计入 `InkBlurred`，报告单列）。没有登记 `Backdrop` 的场景不受影响，`thresholds.json` 与冻结摘要 `5128b953…` 不变。**收窄**：遮罩背后页面文字的 L2 墨迹不再比较（这些文字在无遮罩的场景里完整比较）；**未覆盖**：模糊半径本身由类名保证（G-004）。面板阴影所在的一圈也在逐像素比较之内（试验过「遮掉面板外一圈」的做法，已弃用） | A-007：Viva 没有模糊原语，直接比较必然失败（模拟的 σ 取 0.3 时 L3 差异 4.4%–5.0%）；预测图方法在 σ=2 与 σ=8 下都能检出偏差（0.34%–1.06% > 0.25%），说明它不是什么都放过 | 待阶段末告知（口径变更，按 C 类告知处理） |

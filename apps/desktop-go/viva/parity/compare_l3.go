@@ -25,6 +25,12 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 	}
 	w, h := rb.Dx(), rb.Dy()
 	mask := textMask(in, w, h, th.Pixel.MaskPad)
+	viva := in.VivaImg
+	if in.Backdrop != nil {
+		// 遮罩背后被模糊（台账 A-007）：面板外换成按渲染层合成方式预测的图（模糊的背景叠上面板阴影），不遮文字与图标。
+		viva = backdropComposite(in.VivaImg, in.Backdrop, mask, w, h)
+		vb = viva.Bounds()
+	}
 	diff := make([]bool, w*h)
 	tol := th.Pixel.Tolerance
 	for y := 0; y < h; y++ {
@@ -36,7 +42,7 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 			}
 			rep.L3.Compared++
 			a := rgba8(in.ReactImg, rb.Min.X+x, rb.Min.Y+y)
-			b := rgba8(in.VivaImg, vb.Min.X+x, vb.Min.Y+y)
+			b := rgba8(viva, vb.Min.X+x, vb.Min.Y+y)
 			if rgbDistance(a, b) > tol {
 				diff[i] = true
 				rep.L3.Diff++
@@ -50,7 +56,7 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 	if rep.L3.Ratio > th.Pixel.MaxDiffRatio {
 		rep.add(LayerL3, "pixel", rep.Scene, "差异像素 %d / %d = %.4f%%，上限 %.4f%%", rep.L3.Diff, rep.L3.Compared, rep.L3.Ratio*100, th.Pixel.MaxDiffRatio*100)
 	}
-	return montage(in.ReactImg, in.VivaImg, mask, diff, w, h)
+	return montage(in.ReactImg, viva, mask, diff, w, h)
 }
 
 // diffClusters 把差异像素按 8 邻接分片，返回像素最多的 limit 片。

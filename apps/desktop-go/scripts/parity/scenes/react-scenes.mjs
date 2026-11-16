@@ -10,6 +10,8 @@
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
 async function openSettingsSection(win, section) {
+  // 上一个场景可能留下了模态对话框（遮罩会拦住后面的点击）：Esc 先把它与残留的浮层收起。
+  await win.keyboard.press("Escape");
   await win.getByTestId("rail-settings").click();
   await win.getByTestId(`settings-nav-${section}`).click();
   await win.getByTestId("settings-content-shell").waitFor({ state: "visible" });
@@ -32,6 +34,16 @@ async function openSettingsSelect(win, name, { scrollEnd = false } = {}) {
   await win.getByRole("button", { name, exact: true }).click();
   await win.getByRole("listbox", { name, exact: true }).waitFor({ state: "visible" });
   await win.mouse.move(2, 2);
+}
+
+/**
+ * 打开设置页「应用设置」里的「后台任务」确认对话框：把开关从关打开，等对话框出现。
+ * 对话框不确认也不取消：场景停在它打开的状态；下一个场景的 openSettingsSection 先按 Esc 把它关掉。
+ */
+async function openBackgroundTasksDialog(win) {
+  await openSettingsSection(win, "general");
+  await win.getByRole("switch", { name: "后台任务", exact: true }).click();
+  await win.getByRole("alertdialog").waitFor({ state: "visible" });
 }
 
 /** 设置内容滚动容器：内容壳的直接父元素（没有 testid，用结构选择器）。 */
@@ -66,6 +78,13 @@ export const SCENES = {
     module: "app",
     async enter({ win }) {
       await openSettingsSelect(win, "语言", { scrollEnd: true });
+    },
+  },
+  // 整窗 + 「后台任务」确认对话框（模态：遮罩盖住整窗，面板居中）。
+  "app.window.page-settings.dlg-background-tasks": {
+    module: "app",
+    async enter({ win }) {
+      await openBackgroundTasksDialog(win);
     },
   },
   "settings.general": {

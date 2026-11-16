@@ -39,6 +39,18 @@ var overlayInkWaiver = parity.Waiver{
 	Note: "浮层文字：渲染层灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（位置、字重、颜色、字号均一致）",
 }
 
+// confirmBackdrop 是 ConfirmDialog 的遮罩（bg-background/60 加 backdrop-blur-sm，4px）：遮罩之上是名为 name 的对话框面板（台账 A-007）。
+// 对话框由 Scene.Steps 点开，打开之前的页面不需要任何操作（BaseSteps 为空）。
+func confirmBackdrop(name string) *parity.BackdropSpec {
+	return &parity.BackdropSpec{Sigma: 4, ScrimAlpha: 0.6, PanelRole: "group", PanelName: name}
+}
+
+// withBackdrop 给场景登记遮罩背后的模糊。
+func withBackdrop(s parity.Scene, b *parity.BackdropSpec) parity.Scene {
+	s.Backdrop = b
+	return s
+}
+
 // pageSettings 是整窗（顶栏 + rail + 设置页）的场景；steps 非空时在首次稳定后按它操作界面。
 func pageSettings(id string, steps func(s *headless.Session) error, waivers ...parity.Waiver) parity.Scene {
 	return parity.Scene{
@@ -74,6 +86,15 @@ func openSelect(name string, scrollEnd bool) func(s *headless.Session) error {
 	}
 }
 
+// openBackgroundTasksDialog 是「把设置页的『后台任务』开关从关打开，弹出确认对话框并把指针移开」，
+// 与渲染层的 openBackgroundTasksDialog 对应。
+func openBackgroundTasksDialog(s *headless.Session) error {
+	if err := parity.ClickRole(s, gfx.RoleSwitch, "后台任务"); err != nil {
+		return err
+	}
+	return parity.ParkPointer(s)
+}
+
 // registry 是全部已登记场景。新增屏幕时在这里加一行，并在 React 采集器里登记同名场景。
 var registry = map[string]parity.Scene{
 	"app.window.page-settings": pageSettings("app.window.page-settings", nil),
@@ -81,6 +102,9 @@ var registry = map[string]parity.Scene{
 		openSelect("关闭窗口行为", false), overlayInkWaiver),
 	"app.window.page-settings.select-language": pageSettings("app.window.page-settings.select-language",
 		openSelect("语言", true), overlayInkWaiver),
+	"app.window.page-settings.dlg-background-tasks": withBackdrop(
+		pageSettings("app.window.page-settings.dlg-background-tasks", openBackgroundTasksDialog, overlayInkWaiver),
+		confirmBackdrop("启用系统后台运行")),
 	"settings.shell": {
 		ID: "settings.shell",
 		Build: func(look *kit.Look) func(c ui.C) {

@@ -72,7 +72,13 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 					rep.L2.TextWidthOK++
 				}
 				if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
-					checkInk(rep, in, th, subject, rr, true, overlay)
+					if in.Backdrop != nil && !overlay {
+						// 有遮罩的场景里，页面层文字都在遮罩背后：被模糊，或（窄窗口里）整个被面板盖住，墨迹处是面板自己的内容，
+						// 都不比墨迹（台账 A-007）；面板自己的文字（overlay）照常比。
+						rep.L2.InkBlurred++
+					} else {
+						checkInk(rep, in, th, subject, rr, true, overlay)
+					}
 				}
 			}
 		}
@@ -87,6 +93,11 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 // 返回量到的墨迹比与位移；两侧都没有墨迹或区域为空时返回 nil。
 // overlay 为真表示这行文字画在浮层里：墨迹总量比的问题会带上 Overlay 标记，供已登记的浮层文字偏差（A-009）匹配。
 func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed, overlay bool) *InkMeasure {
+	// 遮罩背后被模糊的文字与图标没法比墨迹（React 是糊的、Viva 是清晰的）：改由 L3 在 Viva 图模糊后比较（backdrop.go，台账 A-007）。
+	if !overlay && in.Backdrop.Blurs(rect) {
+		rep.L2.InkBlurred++
+		return nil
+	}
 	area := image.Rect(
 		int(math.Floor(rect.X()))-1, int(math.Floor(rect.Y()))-1,
 		int(math.Ceil(rect.Right()))+1, int(math.Ceil(rect.Bottom()))+1,

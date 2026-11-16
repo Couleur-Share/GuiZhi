@@ -49,7 +49,11 @@ func TestScenesMatchReactFacts(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				rep, _ := parity.Compare(parity.Inputs{React: react, Viva: viva, FactsOnly: true, Waivers: scene.Waivers}, th)
+				backdrop, err := scene.Backdrop.Resolve(scene, viva, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				rep, _ := parity.Compare(parity.Inputs{React: react, Viva: viva, FactsOnly: true, Waivers: scene.Waivers, Backdrop: backdrop}, th)
 				if !rep.Pass {
 					for _, is := range rep.Issues {
 						t.Errorf("[%s/%s] %s：%s", is.Layer, is.Kind, is.Subject, is.Message)
