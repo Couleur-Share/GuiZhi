@@ -175,6 +175,9 @@ type Text struct {
 	Baseline   []float64 `json:"baseline,omitempty"` // Viva：基线的 y 坐标（每行一个）
 	Overlay    bool      `json:"overlay,omitempty"`  // Viva：文字画在浮层（下拉面板、对话框、提示）里
 	Hidden     bool      `json:"hidden,omitempty"`   // Viva：被滚动容器或窗口边缘裁得一点不剩，没有画出来（A-010）
+	// Clip 是 React 一侧：文字被祖先的 overflow 裁掉一部分时，所属元素看得见的区域 [x y w h]（没被裁就没有）。
+	// 量墨迹只取这一块：裁剪线之外是页脚、边线之类别的图形，不是这行文字的墨迹。
+	Clip []float64 `json:"clip,omitempty"`
 }
 
 // Paint 是一个有绘制的元素（React：背景/边框/圆角/阴影/轮廓/SVG；Viva：图元归并后的同类描述）。
@@ -191,6 +194,9 @@ type Paint struct {
 	// Invisible 只对 SVG 图标记：自身或某个祖先的 opacity 为 0（悬停才显现的控件），整体看不见。
 	Invisible bool   `json:"invisible,omitempty"`
 	Color     string `json:"color,omitempty"`
+	// Clip 只对 SVG 图标记：图标被祖先的 overflow 裁掉一部分时看得见的区域 [x y w h]（没被裁就没有），
+	// 口径同 Text.Clip：量图标墨迹时只取这一块。
+	Clip []float64 `json:"clip,omitempty"`
 }
 
 // Font 是一个字体键对应的平台字体取证（React：CSS.getPlatformFontsForNode）。

@@ -31,6 +31,9 @@ type Scene struct {
 	// 状态存在场景值上就会串线；Prepare 每次渲染新建自己的一份，步骤闭包拿的是自己那份。
 	// Build 仍须可用（模糊背景的「对话框打开之前」渲染只走 Build，见 BackdropSpec.BaseSteps）。
 	Prepare func(look *kit.Look) (view func(c ui.C), steps func(s *headless.Session) error)
+	// Spec 可选：场景自己的外观，输入是变体的外观。渲染层场景在操作中会改变主题（选「自定义」会按十六进制重新取色相与饱和度），
+	// 对照的是改变之后的画面，所以这类场景用它把变体的外观换成改变之后的样子。
+	Spec func(base kit.Spec) kit.Spec
 	// Waivers 是这个场景已在台账登记的偏差（见 waiver.go）。
 	Waivers []Waiver
 	// Backdrop 非空：场景里有被遮罩背后模糊的区域（模态对话框，台账 A-007），对照时按它模拟模糊（见 backdrop.go）。
@@ -74,7 +77,11 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 		return nil, nil, err
 	}
 	fontOnce.Do(func() { app.SetInterfaceFontFamily(interfaceFont) })
-	look := kit.NewLook(v.Spec())
+	spec := v.Spec()
+	if s.Spec != nil {
+		spec = s.Spec(spec)
+	}
+	look := kit.NewLook(spec)
 	look.Viewport = float32(vw)
 	look.Scale = 1
 	background := look.Col(look.T.Background)
@@ -188,9 +195,25 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		f.Nodes = append(f.Nodes, nodeOf(n))
 	}
 	for i, t := range snap.Texts {
+		if t.Style.Color.Alpha < kit.VisibleInkAlpha {
+			// 透明的文字看不见，不是「呈现出来的文字」：kit.Input 画大写叠层时把输入框自己的字设成透明，
+			// 看得见的是叠层画的那一份（React 一侧采集的也是 text-transform 之后的字）。
+			continue
+		}
 		painted := float64(t.Bounds.Width)
 		if i < len(snap.TextWidths) && snap.TextWidths[i] > 0 {
 			painted = float64(snap.TextWidths[i])
+		} else if t.Style.Mono && t.CellWidth > 0 {
+			// 固定间距文字 Viva 不量宽度（按字格排）：宽度是字格数乘字格宽。输入框里的文字，文字盒是整个内容区，
+			// 比文字本身宽，必须按字格算，否则「绘制宽度」成了输入框的宽度。
+			cells := 0
+			for _, r := range t.Value {
+				cells++
+				if kit.IsWideRune(r) {
+					cells++
+				}
+			}
+			painted = math.Min(painted, float64(cells)*float64(t.CellWidth))
 		}
 		// 文字被裁剪矩形截掉的右半段不算「呈现出来」：React 一侧同样只记看得见的部分（输入框的内容盒、
 		// 溢出隐藏的祖先），两边都按可见宽度比较；否则一段被裁掉的占位文字会让遮罩与墨迹区域越出输入框。

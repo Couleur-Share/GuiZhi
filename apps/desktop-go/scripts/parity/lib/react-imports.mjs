@@ -42,10 +42,12 @@ function pageInit({ fixture, configKey }) {
 
   const isActive = (t) => t.status === "pending" || t.status === "processing";
   const isMobile = (t) => (t.origin ?? "desktop") === "mobile";
+  // overrides：按任务 id 覆盖夹具里的字段（任务详情场景要的「刷新来源」「手机端的接收时间」这类夹具里没有的状态）。
+  const overrides = config.overrides || {};
   const tasks = (config.mode === "empty" ? [] : fixture.tasks).map((t) => ({
     receivedAt: null, stage: null, error: null, warning: null, itemType: null, resultItemId: null,
     duplicateItemId: null, collectionId: null, refreshOfItemId: null, tagNames: [], stageStats: null,
-    captureStrategy: "standard", commentLimit: 0, ...t,
+    captureStrategy: "standard", commentLimit: 0, ...t, ...(overrides[t.id] || {}),
   }));
 
   /** 服务端的来源与关键字筛选（import_list.go taskSearch）。 */
@@ -157,7 +159,8 @@ async function reloadClean(session) {
 
 /**
  * 进入采集页：写配置 → reload（让替换赶在渲染层启动之前）→ 点 rail「采集」。
- * options：{ mode: "data"|"empty"|"loading"|"error", errorMessage, paused, hasMore }。
+ * options：{ mode: "data"|"empty"|"loading"|"error", errorMessage, paused, hasMore, overrides }；
+ * overrides 是按任务 id 覆盖夹具字段的表（{ "task-completed": { refreshOfItemId: "item-005" } }）。
  */
 export async function enterImports(session, options = {}) {
   await ensureRegistered(session);

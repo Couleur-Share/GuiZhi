@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/headless"
@@ -23,6 +24,9 @@ type importsOptions struct {
 	mode    string // data | empty | loading | error
 	paused  bool
 	hasMore bool
+	// overrides 在夹具任务上补字段（按任务 id）：对应 React 采集器 enterImports 的 overrides，
+	// 用来造夹具里没有的状态（来源刷新待确认、手机端的接收时间）。
+	overrides map[string]func(*services.ImportTask)
 }
 
 // fakeImports 是采集队列的夹具实现：按服务端口径（import_list.go）从固定任务集里筛选，
@@ -32,12 +36,18 @@ type fakeImports struct {
 	err   string
 	conc  int
 	tasks []services.ImportTask
+	items map[string]services.ImportItemFacts // 任务详情读的条目事实（夹具的 items）
 }
 
 func newFakeImports(fix parity.ImportsFixture, opt importsOptions) *fakeImports {
-	f := &fakeImports{opt: opt, err: fix.LoadError, conc: fix.Queue.Concurrency}
+	f := &fakeImports{opt: opt, err: fix.LoadError, conc: fix.Queue.Concurrency, items: fix.Items}
 	if opt.mode != "empty" {
-		f.tasks = fix.Tasks
+		f.tasks = append([]services.ImportTask(nil), fix.Tasks...) // 补字段不能改到夹具本身（它被并行渲染共用）
+		for i := range f.tasks {
+			if patch := opt.overrides[f.tasks[i].ID]; patch != nil {
+				patch(&f.tasks[i])
+			}
+		}
 	}
 	return f
 }
@@ -186,12 +196,50 @@ func (f *fakeImports) Enqueue(context.Context, []services.EnqueueImportInput) ([
 }
 func (f *fakeImports) SelectFiles(context.Context) ([]string, error) { return nil, nil }
 
+func (f *fakeImports) ItemFacts(_ context.Context, id string) (services.ImportItemFacts, bool, error) {
+	facts, ok := f.items[id]
+	return facts, ok, nil
+}
+
 // letterSpacingWaivers 登记 A-013：二级侧栏小标题「任务概览」用了 tracking-wide（0.025em），Viva 的文字没有字距，
 // 文字盒宽度按「字符数 × 字距」补齐（位置对得上），字形本身的绘制宽度窄 字符数 × 字距（12px 时 4 × 0.3 = 1.2px）。
 var letterSpacingWaivers = []parity.Waiver{{
 	Ledger: "A-013", Layer: parity.LayerL2, Kind: "text-width", Subject: "任务概览",
 	Note: "tracking-wide 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.025em（盒宽已补齐，后面的元素位置一致）",
 }}
+
+// modalTitleWaivers 登记 A-013 在模态页眉标题上的延伸：Modal 的标题是 text-xl font-bold tracking-tight（-0.025em），
+// Viva 的文字没有字距，每个字符都比渲染层宽 0.025em（小、中、大字号档的 text-xl 是 17.5、20、22.5px，即 0.4375、0.5、0.5625px），
+// 一行标题的绘制宽度因此宽 字符数 × 这个字距，墨迹整体被拉宽、位置上偏出最多一半的宽度差。
+// 标题不在别的文字之前（页眉里它独占一行，右边是页眉操作），所以没有后续元素被带偏，不需要像小标题那样补盒宽。
+// 宽度差框在 [字符数×0.4375−0.6, 字符数×0.5625+0.6]：落在这个范围外的偏差（含同一段文字出现在遮罩背后任务行里的偏差）照常判定；
+// 墨迹位移的上限是宽度差的一半再加 1 像素（相关峰的取整）。
+//
+// 标题放不下（truncate）时，渲染层按带字距的字宽截断，比 Viva 按自然字宽截断多放约每 20 个字符 1 个字符：
+// 两边都是同一段标题的前缀加「…」，只是 Viva 的短几个字。这类「截断点不同」单独成类（L1 的 ellipsis-cut），
+// 只放过浮层里、以标题开头的那一条；截断后的那一行不再配对，也就不比它的宽度与墨迹（截断点不同，宽度本来就不同）。
+func modalTitleWaivers(title string) []parity.Waiver {
+	n := float64(utf8.RuneCountInString(title))
+	head := []rune(title)
+	if len(head) > 10 {
+		head = head[:10]
+	}
+	return []parity.Waiver{
+		{
+			Ledger: "A-013", Layer: parity.LayerL1, Kind: "ellipsis-cut", Subject: string(head), Overlay: true,
+			Note: "tracking-tight 的字距：Viva 没有字距，按自然字宽截断，标题可见前缀比渲染层短几个字符",
+		},
+		{
+			Ledger: "A-013", Layer: parity.LayerL2, Kind: "text-width", Subject: title,
+			MinDelta: max(n*0.4375-0.6, 0.01), MaxDelta: n*0.5625 + 0.6,
+			Note: "tracking-tight 的字距：Viva 没有字距，标题绘制宽度宽 字符数 × 0.025em",
+		},
+		{
+			Ledger: "A-013", Layer: parity.LayerL2, Kind: "ink", Subject: title, MaxDelta: n*0.5625/2 + 1,
+			Note: "同上：标题被拉宽，墨迹整体位移最多宽度差的一半",
+		},
+	}
+}
 
 // kerningWaivers 登记 A-014：空队列引导的来源提示里「B站 / YouTube / 抖音」含字偶对（Yo、Tu），Viva 不做字偶距，
 // 整行宽 2.25px；提示块在居中的行里，同行其余提示块的图标随之偏半个宽度差（≤ 1.2px，大字号档 ≤ 1.3px），
@@ -213,6 +261,27 @@ var kerningWaivers = []parity.Waiver{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: "网页文章", MaxDelta: 2,
 		Note: "同上：该文字在含字偶对那段文字的左侧，整行居中，位置偏 Δ/2（大字号档 1.27px）再加半像素取整，墨迹最佳位移 2 像素",
 	},
+}
+
+// detailKerningWaivers 登记 A-014 在任务详情弹窗里的几处：平台名「YouTube」含字偶对（Yo、Tu，12px 时共 −2.25px）、
+// 网址里长串的拉丁字母（原始地址、来源链接）与带「HTTP 403」的失败说明含字偶对，Viva 不做字偶距，整行宽度比渲染层多出字偶对的总和
+// （网址 ≤ 1.3px，大字号档放宽到 2px），墨迹剖面的最佳对齐位移被推到 1–2 像素。偏差按大小设了上限，更大的偏差照常判定。
+var detailKerningWaivers = []parity.Waiver{
+	{
+		Ledger: "A-014", Layer: parity.LayerL2, Kind: "text-width", Subject: "YouTube", MaxDelta: 2.6,
+		Note: "字偶距：Yo、Tu 字偶对共 −2.25px（12px 时；大字号档 13.5px 时 −2.53px），Viva 不做字偶距，整行宽 2.26px（大字号档 2.54px）",
+	},
+	{
+		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: "YouTube", MaxDelta: 2,
+		Note: "同上：整行宽度差 2.26px 累积成墨迹剖面的最佳对齐位移 2 像素",
+	},
+	{
+		Ledger: "A-014", Layer: parity.LayerL2, Kind: "text-width", Subject: "https://", MaxDelta: 2,
+		Note: "字偶距：网址里长串的拉丁字母含字偶对，Viva 不做字偶距，整行宽出 1.3px 左右（大字号档放宽到 2px）",
+	},
+	kerningInkWaiver("https://"),
+	kerningInkWaiver("文字稿生成失败"),
+	kerningInkWaiver("网络或站点暂时不可达"), // 含「www.zhihu.com」，整行宽 0.65px
 }
 
 // tinyIconWaivers 登记 A-003 在小图标上的延伸：小字号档（根字号 14px）下「重复内容」标签里 8.75px 的 Copy 图标，
@@ -255,6 +324,8 @@ type importsEnv struct {
 	store *importsscreen.Store
 	ctx   context.Context
 	fix   parity.ImportsFixture
+	// screen 是这次渲染里的采集界面：步骤用它直接打开任务详情（对应 React 采集器对行上「任务详情」钮派发 click）。
+	screen *importsscreen.Screen
 	// compact 表示视口处于紧凑布局（≤ 1179.98px）：二级侧栏默认收起，要先点顶栏的「展开」才点得到里面的按钮。
 	compact bool
 }
@@ -291,6 +362,7 @@ func importsScene(id string, opt importsOptions, steps importsSteps, waivers ...
 			Loc:    time.FixedZone("Asia/Shanghai", 8*3600),
 			Locale: kit.ParseDateLocale(fix.Locale),
 		}
+		env.screen = screen
 		w := &shellscreen.Window{
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleImports,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F",
@@ -451,6 +523,36 @@ func hoverTooltip(move func(*headless.Session, *importsEnv) error) importsSteps 
 	}
 }
 
+// openDetail 对应渲染层采集器的 openImportDetail：打开 taskID 这条任务的详情弹窗，再把指针停到窗口左上角（落在遮罩上）。
+// React 一侧是对那一行的「任务详情」钮派发 click（行内动作条默认不接收指针），Viva 一侧直接调界面的入口：两者的结果是同一个状态，
+// 列表背景都不受影响（没有悬停、没有焦点）。
+func openDetail(taskID string) importsSteps {
+	return func(s *headless.Session, e *importsEnv) error {
+		e.screen.OpenDetail(taskID)
+		if err := s.Rest(); err != nil { // 弹窗的入场过渡走完
+			return err
+		}
+		return parity.ParkPointer(s)
+	}
+}
+
+// detailTitle 是任务详情弹窗的标题（显示名，没有显示名取原始地址），遮罩之上那块面板的可访问名。
+func detailTitle(taskID string) string {
+	fix, err := parity.LoadImportsFixture()
+	if err != nil {
+		panic(err) // 夹具是编译进来的常量，解码失败是程序错误
+	}
+	for _, t := range fix.Tasks {
+		if t.ID == taskID {
+			if t.DisplayName != "" {
+				return t.DisplayName
+			}
+			return t.SourceInput
+		}
+	}
+	panic("夹具里没有任务 " + taskID)
+}
+
 func init() {
 	registry["app.window.imports"] = importsScene("app.window.imports", importsOptions{mode: "data"}, nil,
 		append(tinyIconWaivers, kerningInkWaiver("yt-dlp"))...)
@@ -499,4 +601,31 @@ func init() {
 	registry["app.window.imports.clear-confirm"] = withBackdrop(
 		importsScene("app.window.imports.clear-confirm", data, clickButton("清理当前筛选"), withOverlayInk(dataWaivers)...),
 		confirmBackdrop("清理采集任务历史"))
+
+	// 任务详情弹窗（台账 B-014）：整窗 + 模态，遮罩背后的页面模糊（A-007，Modal 的 backdrop-blur-md 是 12），浮层文字的墨迹总量偏大（A-009）。
+	// 各状态取夹具里对应的任务；夹具里没有的状态（来源刷新待确认、手机端的接收时间）用 overrides 在 completed / video-done 上补字段，
+	// 与 React 一侧 `react-scenes.mjs` 的同名场景一一对应。
+	detail := func(suffix, taskID string, opt importsOptions) {
+		id := "app.window.imports.dlg-detail-" + suffix
+		waivers := append(withOverlayInk(dataWaivers), modalTitleWaivers(detailTitle(taskID))...)
+		waivers = append(waivers, detailKerningWaivers...)
+		registry[id] = withBackdrop(
+			importsScene(id, opt, openDetail(taskID), waivers...),
+			modalBackdrop(detailTitle(taskID)))
+	}
+	detail("completed", "task-completed", data)
+	detail("video", "task-video-done", data)
+	detail("warning", "task-warning", data)
+	detail("failed", "task-failed", data)
+	detail("processing", "task-processing", data)
+	detail("duplicate", "task-duplicate", data)
+	detail("canceled", "task-canceled", data)
+	detail("long", "task-long", data)
+	detail("auth", "task-auth", data)
+	detail("refresh", "task-completed", importsOptions{mode: "data", overrides: map[string]func(*services.ImportTask){
+		"task-completed": func(t *services.ImportTask) { t.RefreshOfItemID = "item-005" },
+	}})
+	detail("mobile", "task-video-done", importsOptions{mode: "data", overrides: map[string]func(*services.ImportTask){
+		"task-video-done": func(t *services.ImportTask) { t.ReceivedAt = 1794790795000 },
+	}})
 }

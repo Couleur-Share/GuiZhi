@@ -22,6 +22,13 @@ type Waiver struct {
 	// MaxDelta 大于 0 时，只放过偏差大小（Issue.Delta，像素）不超过它的问题；没有记大小的问题不放过。
 	// 用于「某个已登记的原因造成的次像素位移」：原因本身（如字距差）放过，同一处更大的偏差仍要判定。
 	MaxDelta float64
+	// MinDelta 大于 0 时，只放过偏差大小不小于它的问题：与 MaxDelta 一起把已登记的原因框在「它应当造成的大小」里。
+	// 例如字距差必然使一行文字宽 字符数 × 字距，比这小得多的偏差是别的问题；同一段文字出现在别处（遮罩背后的任务行）
+	// 时，那里的偏差也不会因为文字相同而被放过。
+	MinDelta float64
+	// Dir 非零时，只放过方向相同的墨迹总量问题（Issue.Dir：+1 Viva 偏多，-1 Viva 偏少）：
+	// 灰度抗锯齿使 Viva 偏多（A-009），小字号拉丁笔画使 Viva 偏少（A-016），两类原因不能互相冒名。
+	Dir int8
 	// Note 说明偏差的内容与范围，写进报告，供阅读报告的人不必翻台账。
 	Note string
 }
@@ -45,6 +52,12 @@ func (w Waiver) matches(is Issue) bool {
 		return false
 	}
 	if w.MaxDelta > 0 && (is.Delta <= 0 || is.Delta > w.MaxDelta+1e-9) {
+		return false
+	}
+	if w.MinDelta > 0 && (is.Delta <= 0 || is.Delta < w.MinDelta-1e-9) {
+		return false
+	}
+	if w.Dir != 0 && w.Dir != is.Dir {
 		return false
 	}
 	return w.Subject == "" || strings.Contains(is.Subject, w.Subject)

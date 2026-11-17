@@ -69,8 +69,11 @@ var reactRoleMap = map[string]string{
 	"alertdialog": "group",
 	"dialog":      "group",
 	// 悬停提示：Viva 的 gfx.Role 没有 tooltip（Box.Tooltip 只设命中区的 Hint，不产生节点），气泡用带名字的分组表达：
-	// 名称（气泡文字）、位置与大小照常逐个比较（台账 A-017，与 A-004 同一条限制）。
+	// 名称（气泡文字）、位置与大小照常逐个比较（台账 A-004 的同一条限制）。
 	"tooltip": "group",
+	// 应用区域（role="application"，取色器的饱和度/明度面板）：Viva 的 gfx.Role 没有 application，
+	// 同一条限制（台账 A-004），按带名字的分组比较：名称（含「可用方向键微调」的操作提示）、位置与大小照常逐个比较。
+	"application": "group",
 }
 
 // vivaIgnoredRoles 是 Viva 一侧不算可访问节点的角色：未声明角色的区域。

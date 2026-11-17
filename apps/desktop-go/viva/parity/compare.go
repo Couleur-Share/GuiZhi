@@ -25,6 +25,9 @@ type Issue struct {
 	Overlay bool `json:"overlay,omitempty"`
 	// Delta 是偏差的大小（像素），只有外框、文字宽度、图标外框与墨迹位移这几类度量问题带；其余为 0。
 	Delta float64 `json:"delta,omitempty"`
+	// Dir 是墨迹总量问题的方向：+1 表示 Viva 的墨迹比 React 多，-1 表示少；其余问题为 0。
+	// 已登记的偏差有方向（灰度抗锯齿使 Viva 偏多，小字号笔画使 Viva 偏少），据此分开匹配（Waiver.Dir）。
+	Dir int8 `json:"dir,omitempty"`
 }
 
 // L1Result 汇总结构比较。
@@ -36,6 +39,8 @@ type L1Result struct {
 	VivaTexts    int      `json:"vivaTexts"`
 	TextsMatched int      `json:"textsMatched"`
 	Unmapped     []string `json:"unmapped,omitempty"`
+	// Inert 是按台账 A-015 补回 Viva 一侧的节点数：模态让背后的节点退出可访问树，比对前按「对话框打开之前」的渲染补回。
+	Inert int `json:"inertNodes,omitempty"`
 }
 
 // InkShift 记录一行文字墨迹相对 React 的整像素位移（只记非零的，供排查；是否超限由阈值另行判定）。
@@ -59,12 +64,14 @@ type L2Result struct {
 	// InkBlurred 是因遮罩背后模糊而没有比较墨迹的文字行与图标数（台账 A-007）。
 	InkBlurred int `json:"inkBlurred,omitempty"`
 	// InkOccluded 是因墨迹区域被浮层里的文字或图标侵入而没有比较墨迹的页面文字行与图标数（台账 A-009，见 compare_occlusion.go）。
-	InkOccluded int        `json:"inkOccluded,omitempty"`
-	MaxInkDX    int        `json:"maxInkDX"`
-	MaxInkDY    int        `json:"maxInkDY"`
-	MinInkMass  float64    `json:"minInkMass"`
-	MaxInkMass  float64    `json:"maxInkMass"`
-	InkShifts   []InkShift `json:"inkShifts,omitempty"`
+	InkOccluded int `json:"inkOccluded,omitempty"`
+	// InkClipped 是因大半落在截图区域之外而没有比较墨迹的文字行数（区域里只剩几行像素，墨迹总量比不可靠；位置与宽度照常比）。
+	InkClipped int        `json:"inkClipped,omitempty"`
+	MaxInkDX   int        `json:"maxInkDX"`
+	MaxInkDY   int        `json:"maxInkDY"`
+	MinInkMass float64    `json:"minInkMass"`
+	MaxInkMass float64    `json:"maxInkMass"`
+	InkShifts  []InkShift `json:"inkShifts,omitempty"`
 	// 图标（见 compare_icons.go）：React 的 SVG 数、与 Viva 配上的数、配上的图标外框最大差。
 	Icons        int     `json:"icons"`
 	IconsMatched int     `json:"iconsMatched"`
@@ -167,6 +174,11 @@ func Compare(in Inputs, th Thresholds) (*Report, *image.RGBA) {
 	if !in.React.Capture.ForcedDSF {
 		rep.add(LayerL1, "stale-reference", rep.Scene, "React 参照没有 forcedDsf 标记：它在未钉死设备缩放的采集器下生成，文字基线可能带宿主 DPI 印记，请重新采集")
 	}
+	if in.Backdrop != nil && len(in.Backdrop.Inert) > 0 {
+		// 模态让背后的节点惰性化（台账 A-015）：把它们按「对话框打开之前」的渲染补回 Viva 一侧，背景照常逐节点比对。
+		in.Viva = withInertNodes(in.Viva, in.Backdrop.Inert)
+		rep.L1.Inert = len(in.Backdrop.Inert)
+	}
 	nodePairs, textPairs := compareL1(rep, in)
 	compareL2(rep, in, th, nodePairs, textPairs)
 	compareIcons(rep, in, th)
@@ -196,6 +208,9 @@ func (r *Report) Markdown() string {
 	b.WriteString("\n\n")
 	fmt.Fprintf(&b, "- L1 结构：可访问节点 React %d / Viva %d，对齐 %d；文字 React %d / Viva %d，对齐 %d；未映射角色 %v\n",
 		r.L1.ReactNodes, r.L1.VivaNodes, r.L1.NodesMatched, r.L1.ReactTexts, r.L1.VivaTexts, r.L1.TextsMatched, r.L1.Unmapped)
+	if r.L1.Inert > 0 {
+		fmt.Fprintf(&b, "- L1 惰性背景：Viva 的模态让背后 %d 个节点退出可访问树（台账 A-015），上面的 Viva 节点数已含按「对话框打开之前」的渲染补回的这些节点\n", r.L1.Inert)
+	}
 	fmt.Fprintf(&b, "- L2 度量：外框 %d/%d 在阈值内（最大差 %.2fpx，对齐率 %.1f%%）；文字行 %d，宽度合格 %d（最大差 %.2fpx）；墨迹合格 %d/%d（最大位移 ΔX %d、ΔY %d；墨迹量比 %.3f–%.3f）\n",
 		r.L2.BoxWithin, r.L2.BoxPairs, r.L2.MaxBoxDelta, r.L2.AlignmentRate*100, r.L2.TextLines, r.L2.TextWidthOK, r.L2.MaxWidthDelta,
 		r.L2.InkOK, r.L2.InkChecked, r.L2.MaxInkDX, r.L2.MaxInkDY, r.L2.MinInkMass, r.L2.MaxInkMass)
@@ -204,6 +219,9 @@ func (r *Report) Markdown() string {
 	}
 	if r.L2.InkOccluded > 0 {
 		fmt.Fprintf(&b, "- L2 墨迹：%d 行文字与图标的墨迹区域被浮层里的文字或图标侵入，不比较墨迹（台账 A-009）；位置与宽度照常比\n", r.L2.InkOccluded)
+	}
+	if r.L2.InkClipped > 0 {
+		fmt.Fprintf(&b, "- L2 墨迹：%d 行文字有大半在截图区域之外（被窗口边缘裁掉），不比较墨迹；位置与宽度照常比\n", r.L2.InkClipped)
 	}
 	if r.L2.Icons > 0 {
 		lo, hi := 0.0, 0.0

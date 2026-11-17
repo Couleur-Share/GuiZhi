@@ -46,6 +46,20 @@ func invisibleReactIcons(f *Facts) map[Box]bool {
 	return hidden
 }
 
+// reactIconClips 返回被祖先裁掉一部分的 React 图标看得见的区域（采集时记在 Paint.Clip），按图标外框索引。
+func reactIconClips(f *Facts) map[Box][]float64 {
+	var out map[Box][]float64
+	for _, p := range f.Paints {
+		if p.Tag == "svg" && len(p.Clip) == 4 {
+			if out == nil {
+				out = map[Box][]float64{}
+			}
+			out[p.Box] = p.Clip
+		}
+	}
+	return out
+}
+
 // maskedIcons 返回 L3 要遮掉的图标外框：两侧的图标，去掉 React 一侧看不见的图标和与之配对的 Viva 图标。
 func maskedIcons(in Inputs) []Box {
 	react := reactIcons(in.React)
@@ -126,7 +140,8 @@ func compareIcons(rep *Report, in Inputs, th Thresholds) {
 	react := reactIcons(in.React)
 	rep.L2.Icons = len(react)
 	hidden := invisibleReactIcons(in.React)
-	overlayInk := overlayInkRects(in.Viva)
+	clips := reactIconClips(in.React)
+	overlayInk, panels := overlayInkRects(in.Viva), overlayPanelRects(in.React)
 	pairs, missing, extra := pairIcons(react, in.Viva.Icons)
 	for _, b := range missing {
 		rep.add(LayerL2, "icon-missing", "图标 "+fmtBox(b), "React 有这枚图标，Viva 没有画（或画在别处，中心距离超过 %.0fpx）", maxIconPairDistance)
@@ -155,11 +170,13 @@ func compareIcons(rep *Report, in Inputs, th Thresholds) {
 				rep.L2.InkBlurred++
 				continue
 			}
-			if !overlay && occludedByOverlayInk(p.React, overlayInk) {
-				rep.L2.InkOccluded++ // 图标被浮层里的文字或图标盖住一部分：区域里是浮层自己的墨迹，同页面文字的规则（compare_occlusion.go）
+			if !overlay && occludedByOverlayInk(p.React, overlayInk, panels) {
+				rep.L2.InkOccluded++ // 图标被浮层里的文字、图标或浮层面板盖住一部分：区域里是浮层自己的内容，同页面文字的规则（compare_occlusion.go）
 				continue
 			}
-			if m := checkInk(rep, in, th, subject, p.React, false, overlay); m != nil {
+			// 左边缘在小数像素上的图标与文字同一规则：渲染层按子像素栅格化，Viva 整像素落位，
+			// 小数部分恰在 .5 附近时（React 438.48、Viva 438.50）最佳位移会差一个像素（2026-11-17，settings.appearance.custom 的主题图标）。
+			if m := checkInk(rep, in, th, subject, p.React, true, overlay, clips[p.React]); m != nil {
 				rep.L2.IconInk = append(rep.L2.IconInk, *m)
 			}
 		}

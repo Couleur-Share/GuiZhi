@@ -37,11 +37,37 @@ func TestOccludedByOverlayInk(t *testing.T) {
 		{"垂直方向离开", Box{110, 130, 20, 10}, false},
 	}
 	for _, c := range cases {
-		if got := occludedByOverlayInk(c.rect, overlay); got != c.want {
+		if got := occludedByOverlayInk(c.rect, overlay, nil); got != c.want {
 			t.Errorf("%s：occludedByOverlayInk(%v) = %v，期望 %v", c.name, c.rect, got, c.want)
 		}
 	}
-	if occludedByOverlayInk(Box{110, 102, 20, 10}, nil) {
+	if occludedByOverlayInk(Box{110, 102, 20, 10}, nil, nil) {
 		t.Error("没有浮层墨迹时不应判为被遮挡")
+	}
+}
+
+// 浮层面板（取色器弹层、下拉面板、对话框、气泡）压在页面文字上：文字没有墨迹可比，与浮层墨迹同一规则。
+func TestOverlayPanelRectsAndOcclusion(t *testing.T) {
+	facts := &Facts{Nodes: []Node{
+		{Role: "button", Name: "自定义", Box: []float64{10, 10, 40, 36}},
+		{Role: "dialog", Name: "自定义", Box: []float64{854, 454, 232, 230}},
+		{Role: "listbox", Name: "语言", Box: []float64{100, 100, 180, 118}},
+		{Role: "dialog", Name: "未渲染", Box: nil},
+	}}
+	panels := overlayPanelRects(facts)
+	if len(panels) != 2 || panels[0] != (Box{854, 454, 232, 230}) || panels[1] != (Box{100, 100, 180, 118}) {
+		t.Fatalf("应只取有外框的面板角色（对话框、下拉面板）：%v", panels)
+	}
+	if overlayPanelRects(nil) != nil {
+		t.Fatal("没有事实时应返回空")
+	}
+	if !occludedByOverlayInk(Box{1055, 415.75, 24.5, 16}, nil, []Box{{877, 401, 232, 218.5}}) {
+		t.Error("整个盖在面板底下的文字应判为被遮挡")
+	}
+	if !occludedByOverlayInk(Box{1100, 500, 30, 16}, nil, []Box{{877, 401, 232, 218.5}}) {
+		t.Error("只盖住一部分（压在面板边缘）的文字应判为被遮挡")
+	}
+	if occludedByOverlayInk(Box{700, 415.75, 24.5, 16}, nil, []Box{{877, 401, 232, 218.5}}) {
+		t.Error("在面板之外的文字不应判为被遮挡")
 	}
 }

@@ -23,6 +23,32 @@ async function openSettingsSection(win, section) {
   await win.getByTestId("settings-content-shell").waitFor({ state: "visible" });
 }
 
+/** 把设置内容滚到底（与 Viva 侧的 parity.ScrollDown 对应）。 */
+async function scrollSettingsToEnd(win) {
+  await win.locator(SETTINGS_CONTENT_SCROLLER).evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+}
+
+/** 打开「显示设置」并点色带里的「自定义」：面板展开后把指针挪到左上角。主题色按自定义的十六进制重新取色。 */
+async function openCustomColor(win) {
+  await openSettingsSection(win, "appearance");
+  await win.getByRole("button", { name: "自定义", exact: true }).first().click();
+  await win.getByPlaceholder("#3b82f6", { exact: true }).waitFor({ state: "visible" });
+  await win.mouse.move(2, 2);
+}
+
+/**
+ * 打开「显示设置」，选「自定义」展开面板，再点面板里的取色器触发钮：弹层（role=dialog，portal 到 body 的 fixed 面板）出现后
+ * 把指针挪到左上角。触发钮与色带里的预设同名，是第二个名为「自定义」的按钮。
+ */
+async function openCustomPicker(win) {
+  await openCustomColor(win);
+  await win.getByRole("button", { name: "自定义", exact: true }).nth(1).click();
+  await win.getByRole("dialog", { name: "自定义", exact: true }).waitFor({ state: "visible" });
+  await win.mouse.move(2, 2);
+}
+
 /**
  * 打开设置页「应用设置」里的下拉：先收起可能残留的浮层，点触发器，等 listbox 出现，再把指针挪到左上角——
  * 触发器与选项的悬停态不能混进画面（Viva 侧的无头会话没有指针）。
@@ -254,6 +280,23 @@ async function lowestVisibleRowName(win) {
   return best;
 }
 
+/**
+ * 打开任务详情弹窗（B-014）：在列表里找标题（以及状态徽标文字）匹配的那一行，直接对它的「任务详情」钮派发 click。
+ * 行内动作条默认是 pointer-events-none（行悬停才可点），派发事件不依赖悬停；弹窗出现后把指针挪到左上角。
+ */
+function openImportDetail(title, { status } = {}) {
+  return async (win) => {
+    let row = win.locator('[class*="group/row"]').filter({ hasText: title });
+    if (status) row = row.filter({ hasText: status });
+    await row.first().getByRole("button", { name: "任务详情", exact: true }).dispatchEvent("click");
+    await win.getByRole("dialog").waitFor({ state: "visible" });
+    await win.mouse.move(2, 2);
+  };
+}
+
+/** 夹具里各任务的标题（与 Viva 场景用同一份数据）。 */
+const importTitle = (id) => IMPORTS_FIXTURE.tasks.find((t) => t.id === id).displayName;
+
 /** 点「清理当前筛选」，等确认框出现。 */
 async function openClearConfirm(win) {
   await win.getByRole("button", { name: "清理当前筛选", exact: true }).click();
@@ -329,6 +372,25 @@ export const SCENES = {
   "app.window.imports.load-more": importsScene({ hasMore: true }, scrollImportsToEnd),
   "app.window.imports.row-hover": importsScene({}, hoverImportsRow("本地优先软件的七个理想"), { keepPointer: true }),
   "app.window.imports.clear-confirm": importsScene({}, openClearConfirm),
+  // 任务详情弹窗（台账 B-014）：整窗 + 模态。各状态取夹具里对应的任务；夹具里没有的状态（刷新来源待确认、手机端的接收时间）
+  // 用 overrides 在 completed / video-done 上补字段。
+  "app.window.imports.dlg-detail-completed": importsScene({}, openImportDetail(importTitle("task-completed"), { status: "已完成" })),
+  "app.window.imports.dlg-detail-video": importsScene({}, openImportDetail(importTitle("task-video-done"))),
+  "app.window.imports.dlg-detail-warning": importsScene({}, openImportDetail(importTitle("task-warning"))),
+  "app.window.imports.dlg-detail-failed": importsScene({}, openImportDetail(importTitle("task-failed"))),
+  "app.window.imports.dlg-detail-processing": importsScene({}, openImportDetail(importTitle("task-processing"))),
+  "app.window.imports.dlg-detail-duplicate": importsScene({}, openImportDetail(importTitle("task-duplicate"), { status: "重复内容" })),
+  "app.window.imports.dlg-detail-canceled": importsScene({}, openImportDetail(importTitle("task-canceled"))),
+  "app.window.imports.dlg-detail-long": importsScene({}, openImportDetail(importTitle("task-long"))),
+  "app.window.imports.dlg-detail-auth": importsScene({}, openImportDetail(importTitle("task-auth"))),
+  "app.window.imports.dlg-detail-refresh": importsScene(
+    { overrides: { "task-completed": { refreshOfItemId: "item-005" } } },
+    openImportDetail(importTitle("task-completed"), { status: "已完成" }),
+  ),
+  "app.window.imports.dlg-detail-mobile": importsScene(
+    { overrides: { "task-video-done": { receivedAt: 1794790795000 } } },
+    openImportDetail(importTitle("task-video-done")),
+  ),
   // 悬停提示（TooltipLayer）：整窗 + 气泡。宿主取自采集队列页——顶栏图标钮（单行短提示）、筛选到失败后第一条的任务标题
   // （长地址折成两行，气泡在下方）、最靠下的任务标题（翻到上方）。
   "ui.tooltip.below": importsScene({}, hoverTooltip(topBarToggle), { keepPointer: true }),
@@ -350,6 +412,43 @@ export const SCENES = {
     region: SETTINGS_CONTENT_SCROLLER,
     async enter({ win }) {
       await openSettingsSection(win, "appearance");
+    },
+  },
+  // 显示设置滚到内容底（背景图分区）：与应用设置的语言下拉同样先把设置内容滚到底。
+  "settings.appearance.bottom": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    async enter({ win }) {
+      await openSettingsSection(win, "appearance");
+      await scrollSettingsToEnd(win);
+    },
+  },
+  // 选「自定义」：主题色换成自定义的十六进制（默认 #3b82f6），面板展开。整个界面随之按它重新取色，
+  // 所以场景标 changesTheme：采集后把变体的外观恢复回来，免得影响同一变体里后面的场景。
+  "settings.appearance.custom": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    changesTheme: true,
+    async enter({ win }) {
+      await openCustomColor(win);
+    },
+  },
+  // 自定义面板展开后滚到内容底：面板把下面的分区顶下去，底部的背景图分区位置随之变化。
+  "settings.appearance.custom-bottom": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    changesTheme: true,
+    async enter({ win }) {
+      await openCustomColor(win);
+      await scrollSettingsToEnd(win);
+    },
+  },
+  // 整窗 + 取色器弹层（弹层压在 rail 与页面之上，只能在整窗里对照）；主题按自定义色重新取色。
+  "app.window.page-settings.custom-picker": {
+    module: "app",
+    changesTheme: true,
+    async enter({ win }) {
+      await openCustomPicker(win);
     },
   },
 };

@@ -50,7 +50,7 @@ function parseArgs(argv) {
 }
 
 /** 采集一个场景一次，写文件，返回摘要。 */
-async function captureScene(session, sceneId, variant, outDir, suffix) {
+async function captureScene(session, sceneId, variant, outDir, suffix, matrix) {
   const scene = getScene(sceneId);
   const { page } = session;
   try {
@@ -72,7 +72,10 @@ async function captureScene(session, sceneId, variant, outDir, suffix) {
     return { scene: sceneId, nodes: facts.nodes.length, textRects: facts.textRects.length, region: facts.region, png: `${base}.png` };
   } finally {
     // 场景可以登记 leave 来收拾自己留下的东西（提示场景收走提示并恢复页面）；采集失败时也要收，否则下一个场景从脏状态开始。
-    await scene.leave?.({ win: page, session });
+    await scene.leave?.({ win: page, session, variant });
+    // 场景在操作中改了主题（选「自定义」会按十六进制重新取色相与饱和度）：同一变体里后面的场景要从变体的外观出发，
+    // 所以把变体重新应用一遍（主题模式、主题色预设、字号、视口都回到变体的取值）。
+    if (scene.changesTheme) await applyVariant(session, variant, matrix);
   }
 }
 
@@ -98,7 +101,7 @@ async function main() {
       for (const sceneId of scenes) {
         for (let r = 1; r <= args.repeat; r += 1) {
           const t0 = Date.now();
-          const summary = await captureScene(session, sceneId, variant, dir, args.repeat > 1 ? `.r${r}` : "");
+          const summary = await captureScene(session, sceneId, variant, dir, args.repeat > 1 ? `.r${r}` : "", matrix);
           count += 1;
           console.log(`  ${sceneId}${args.repeat > 1 ? ` #${r}` : ""}：${summary.nodes} 个节点，${summary.textRects} 个文字行，区域 ${summary.region.width}x${summary.region.height}，${Date.now() - t0}ms`);
         }

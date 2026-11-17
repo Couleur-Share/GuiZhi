@@ -52,6 +52,10 @@ type Backdrop struct {
 	Panel Box
 	// Sharp 是 Viva 里遮罩背后的清晰背景（页面叠上遮罩色），Blurred 是它按 Sigma 模糊的结果；只在带图片的比较里有值。
 	Sharp, Blurred *image.RGBA
+	// Inert 是「对话框打开之前」的页面里、对话框打开后不在 Viva 可访问树里的节点（台账 A-015）：Viva 的模态
+	// （Canvas.TrapFocus）把背后的一切从可访问树里拿掉，渲染层的 aria-modal 不拿（Playwright 的 ARIA 快照仍列出背景）。
+	// 对照 L1 时把它们按原顺序补回 Viva 一侧的节点里，背景就仍与 React 逐节点比对（位置、名称、状态），而不是整体豁免。
+	Inert []Node
 }
 
 // Resolve 在 Viva 事实里找到面板，得到本次比较用的 Backdrop；withImage 为真时再渲染一次对话框打开之前的页面，算出清晰与模糊的背景。
@@ -74,15 +78,22 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 	if !found {
 		return nil, fmt.Errorf("Viva 事实里没有 %s「%s」，无法确定遮罩之上的面板", s.PanelRole, s.PanelName)
 	}
-	if !withImage {
-		return b, nil
-	}
 	base := scene
 	base.Steps, base.Prepare, base.Backdrop = s.BaseSteps, nil, nil
-	_, page, err := Render(base, viva.Variant, viva.Region)
+	if !withImage {
+		// 只比事实：不光栅化，但仍要渲染一次对话框打开之前的页面，找出被模态拿出可访问树的节点。
+		baseFacts, err := RenderFacts(base, viva.Variant, viva.Region)
+		if err != nil {
+			return nil, fmt.Errorf("渲染对话框打开之前的页面失败：%w", err)
+		}
+		b.Inert = inertNodes(baseFacts.Nodes, viva.Nodes)
+		return b, nil
+	}
+	baseFacts, page, err := Render(base, viva.Variant, viva.Region)
 	if err != nil {
 		return nil, fmt.Errorf("渲染对话框打开之前的页面失败：%w", err)
 	}
+	b.Inert = inertNodes(baseFacts.Nodes, viva.Nodes)
 	look := kit.NewLook(viva.Variant.Spec())
 	b.Sharp = scrimOver(page, look.T.Background.R, look.T.Background.G, look.T.Background.B, float64(s.ScrimAlpha))
 	b.Blurred = gaussianBlur(b.Sharp, s.Sigma)

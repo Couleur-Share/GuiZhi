@@ -34,7 +34,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 	}
 
 	// 文字：行数、绘制宽度、墨迹外接框。
-	overlayInk := overlayInkRects(in.Viva)
+	overlayInk, panels := overlayInkRects(in.Viva), overlayPanelRects(in.React)
 	for _, p := range texts {
 		subject := quote(NormText(p.React.Text))
 		lines := 0
@@ -78,16 +78,33 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 						// 有遮罩的场景里，页面层文字都在遮罩背后：被模糊，或（窄窗口里）整个被面板盖住，墨迹处是面板自己的内容，
 						// 都不比墨迹（台账 A-007）；面板自己的文字（overlay）照常比。
 						rep.L2.InkBlurred++
-					} else if !overlay && occludedByOverlayInk(rr, overlayInk) {
-						// 页面文字被浮层里的文字或图标盖住一部分：量墨迹的区域里是浮层自己的字形，不是这行文字的墨迹（见 compare_occlusion.go）。
+					} else if !overlay && occludedByOverlayInk(rr, overlayInk, panels) {
+						// 页面文字被浮层里的文字、图标或浮层面板盖住一部分：量墨迹的区域里是浮层自己的内容，不是这行文字的墨迹（见 compare_occlusion.go）。
 						rep.L2.InkOccluded++
+					} else if mostlyOutside(rr, in.ReactImg.Bounds()) {
+						// 文字有大半在截图区域之外：区域里只剩字形的几行像素，墨迹总量比被边缘处半个像素的抗锯齿差异左右，
+						// 量不出字重、颜色或字号是否对（位置与宽度照常比）。
+						rep.L2.InkClipped++
 					} else {
-						checkInk(rep, in, th, subject, rr, true, overlay)
+						checkInk(rep, in, th, subject, rr, true, overlay, p.React.Clip)
 					}
 				}
 			}
 		}
 	}
+}
+
+// mostlyOutside 报告 rect 是否有一半以上落在截图区域 bounds 之外（被窗口边缘裁掉）。
+func mostlyOutside(rect Box, bounds image.Rectangle) bool {
+	if rect.W() <= 0 || rect.H() <= 0 {
+		return false
+	}
+	w := math.Min(rect.Right(), float64(bounds.Max.X)) - math.Max(rect.X(), float64(bounds.Min.X))
+	h := math.Min(rect.Bottom(), float64(bounds.Max.Y)) - math.Max(rect.Y(), float64(bounds.Min.Y))
+	if w <= 0 || h <= 0 {
+		return true
+	}
+	return w*h < 0.5*rect.W()*rect.H()
 }
 
 // checkInk 比较同一行文字在两张图里的墨迹：区域取 React 的文字行矩形外扩 1 像素。
@@ -97,7 +114,9 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 // 左右不超过 InkMaxDeltaX；另外墨迹总量（强度之和）的比值要落在 [InkMassMin, InkMassMax]，用来发现字重或颜色不对。
 // 返回量到的墨迹比与位移；两侧都没有墨迹或区域为空时返回 nil。
 // overlay 为真表示这行文字画在浮层里：墨迹总量比的问题会带上 Overlay 标记，供已登记的浮层文字偏差（A-009）匹配。
-func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed, overlay bool) *InkMeasure {
+// clip 是文字被祖先裁掉一部分时看得见的区域（Text.Clip）：区域只取这一块，且向内取整（压在裁剪线上的半个像素行不算），
+// 免得裁剪线之外的页脚、边线进了墨迹剖面；没被裁的文字传 nil。
+func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, fractionalEdgeAllowed, overlay bool, clip []float64) *InkMeasure {
 	// 遮罩背后被模糊的文字与图标没法比墨迹（React 是糊的、Viva 是清晰的）：改由 L3 在 Viva 图模糊后比较（backdrop.go，台账 A-007）。
 	if !overlay && in.Backdrop.Blurs(rect) {
 		rep.L2.InkBlurred++
@@ -107,6 +126,12 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 		int(math.Floor(rect.X()))-1, int(math.Floor(rect.Y()))-1,
 		int(math.Ceil(rect.Right()))+1, int(math.Ceil(rect.Bottom()))+1,
 	).Intersect(in.ReactImg.Bounds())
+	if len(clip) == 4 {
+		area = area.Intersect(image.Rect(
+			int(math.Ceil(clip[0])), int(math.Ceil(clip[1])),
+			int(math.Floor(clip[0]+clip[2])), int(math.Floor(clip[1]+clip[3])),
+		))
+	}
 	if area.Empty() {
 		return nil
 	}
@@ -144,6 +169,10 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 		rep.addDelta(math.Abs(ratio-1), LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
 			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)
 		rep.Issues[len(rep.Issues)-1].Overlay = overlay
+		rep.Issues[len(rep.Issues)-1].Dir = 1
+		if ratio < 1 {
+			rep.Issues[len(rep.Issues)-1].Dir = -1
+		}
 	default:
 		rep.L2.InkOK++
 	}
@@ -193,14 +222,22 @@ func bestShift(a, b []float64) int {
 	best, bestCost := 0, math.Inf(1)
 	for s := -span; s <= span; s++ {
 		cost := 0.0
+		overlap := 0
 		for i := range a {
 			j := i + s
 			var bv float64
 			if j >= 0 && j < len(b) {
 				bv = b[j]
+				overlap++
 			}
 			d := a[i] - bv
 			cost += d * d
+		}
+		// 位移后两条剖面重叠不足一半：代价量的是「被挤出去多少」而不是对齐程度，这样的位移不参选
+		// （被祖先裁成几行薄片的图标，±4 的窗口会把整条剖面推出范围，误报成 4 像素的错位）。
+		// 文字行与整枚图标的剖面有十几行，±4 时重叠都在一半以上，不受影响。
+		if 2*overlap < len(a) {
+			continue
 		}
 		if cost < bestCost-1e-6 || (math.Abs(cost-bestCost) <= 1e-6 && abs(s) < abs(best)) {
 			best, bestCost = s, cost

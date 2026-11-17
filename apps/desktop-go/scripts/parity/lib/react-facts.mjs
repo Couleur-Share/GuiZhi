@@ -110,7 +110,9 @@ const TEXTS_EXPR = `(async () => {
     if (el.localName !== "input" || skipTypes.has(el.type)) return null;
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden") return null;
-    const text = el.value || el.getAttribute("placeholder") || "";
+    // 采「看得见的文字」：text-transform（取色器的十六进制框是 uppercase）改变的是画出来的字，不是 value。
+    const raw = el.value || el.getAttribute("placeholder") || "";
+    const text = cs.textTransform === "uppercase" ? raw.toUpperCase() : cs.textTransform === "lowercase" ? raw.toLowerCase() : raw;
     if (!text) return null;
     const b = el.getBoundingClientRect();
     if (b.width <= 0 || b.height <= 0) return null;
@@ -218,6 +220,10 @@ const TEXTS_EXPR = `(async () => {
     const v = visible[i];
     if (v) {
       t.rects = t.rects.filter(([x, y, w, h]) => x < v[0] + v[2] && x + w > v[0] && y < v[1] + v[3] && y + h > v[1]);
+      // 文字被祖先的 overflow 裁掉一部分（滚动区域的底边压住按钮文字之类）：记下看得见的区域，
+      // 比较端量墨迹时只取这一块，免得把裁剪线以外的别的图形（页脚、边线）当成文字的墨迹。
+      const cut = t.rects.some(([x, y, w, h]) => x < v[0] - 0.5 || y < v[1] - 0.5 || x + w > v[0] + v[2] + 0.5 || y + h > v[1] + v[3] + 0.5);
+      if (cut) t.clip = v;
     }
     if (t.rects.length > 0) kept.push(t);
   });
@@ -281,7 +287,19 @@ const PAINTS_EXPR = `(async () => {
   }
   // 被祖先裁得一点不剩的元素不算绘制出来的（可见部分零面积）。
   const visible = await visibleRects(owners);
-  return out.filter((p, i) => !visible[i] || (visible[i][2] > 0 && visible[i][3] > 0));
+  const kept = [];
+  out.forEach((p, i) => {
+    const v = visible[i];
+    if (v && !(v[2] > 0 && v[3] > 0)) return;
+    // SVG 图标被祖先的 overflow 裁掉一部分（滚动区域的底边只留下按钮图标的一条薄片）：记下看得见的区域，
+    // 比较端量图标墨迹时只取这一块，免得把裁剪线以外的页脚、边线当成图标的墨迹（同文字的 clip，见 TEXTS_EXPR）。
+    if (v && p.tag === "svg") {
+      const [x, y, w, h] = p.box;
+      if (x < v[0] - 0.5 || y < v[1] - 0.5 || x + w > v[0] + v[2] + 0.5 || y + h > v[1] + v[3] + 0.5) p.clip = v;
+    }
+    kept.push(p);
+  });
+  return kept;
 })()`;
 
 const FONT_KEYS_EXPR = `(() => {
@@ -478,12 +496,12 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
   // 文字：保留与区域相交的行片段，坐标换算到区域坐标系；整段文字都在区域外的丢弃。
   const rel = (b) => [r3(b[0] - region.x), r3(b[1] - region.y), b[2], b[3]];
   const texts = (await cdp.send("Runtime.evaluate", { expression: TEXTS_EXPR, returnByValue: true, awaitPromise: true })).result.value
-    .map((t) => ({ ...t, rects: t.rects.filter((b) => intersects(b, region)).map(rel) }))
+    .map((t) => ({ ...t, rects: t.rects.filter((b) => intersects(b, region)).map(rel), ...(t.clip ? { clip: rel(t.clip) } : {}) }))
     .filter((t) => t.rects.length > 0);
   const textRects = texts.flatMap((t) => t.rects);
   const paints = (await cdp.send("Runtime.evaluate", { expression: PAINTS_EXPR, returnByValue: true, awaitPromise: true })).result.value
     .filter((p) => intersects(p.box, region))
-    .map((p) => ({ ...p, box: rel(p.box) }));
+    .map((p) => ({ ...p, box: rel(p.box), ...(p.clip ? { clip: rel(p.clip) } : {}) }));
   const fonts = await platformFonts(cdp);
   const aria = await page.locator(regionSelector ?? "body").ariaSnapshot();
   const chromium = (await cdp.send("Browser.getVersion")).product;

@@ -65,6 +65,17 @@ func describe(n Norm) string {
 
 func quote(s string) string { return "「" + s + "」" }
 
+// isEllipsisCut 报告 react 与 viva 是不是同一段文字的两种省略号截断：两边都以「…」收尾，
+// 去掉省略号后其中一个是另一个的前缀（截在不同的字上），且不完全相同。
+func isEllipsisCut(react, viva string) bool {
+	const ellipsis = "…"
+	if !strings.HasSuffix(react, ellipsis) || !strings.HasSuffix(viva, ellipsis) {
+		return false
+	}
+	a, b := strings.TrimSuffix(react, ellipsis), strings.TrimSuffix(viva, ellipsis)
+	return a != b && a != "" && b != "" && (strings.HasPrefix(a, b) || strings.HasPrefix(b, a))
+}
+
 // compareTexts 比较文字序列。折行时 Viva 把一段文字拆成多行多个条目，所以按「去掉空白后的拼接」逐段消费。
 //
 // 区域裁剪：React 参照只记录区域内可见的文字；一段折行文字可能第一行在区域内、后几行在区域外。
@@ -150,7 +161,14 @@ func compareTexts(rep *Report, in Inputs) []textPair {
 		if matched {
 			continue
 		}
-		rep.add(LayerL1, "text", quote(NormText(rt.Text)), "文字不一致：Viva 对应位置是「%s」", NormText(vivaTexts[first].line.Text))
+		vivaText := NormText(vivaTexts[first].line.Text)
+		if isEllipsisCut(NormText(rt.Text), vivaText) {
+			// 同一段文字被省略号截断、只是截在不同的字上：单独成类，便于登记（如字距使可见前缀长短不一，A-013）。
+			rep.add(LayerL1, "ellipsis-cut", quote(NormText(rt.Text)), "省略号截断点不同：React 看得见的是「%s」，Viva 是「%s」", NormText(rt.Text), vivaText)
+		} else {
+			rep.add(LayerL1, "text", quote(NormText(rt.Text)), "文字不一致：Viva 对应位置是「%s」", vivaText)
+		}
+		rep.Issues[len(rep.Issues)-1].Overlay = vivaTexts[first].line.Overlay
 		// 已经吻合了前缀的行算作这一段，剩下的才留给后面的 React 文字；一行都没吻合就跳过这一条，免得序列错位。
 		_, end, _ := consume(first, target)
 		vi = max(first+1, end)
