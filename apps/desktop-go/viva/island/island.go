@@ -12,6 +12,10 @@
 //   - Ephemeral：cookie、存储与缓存只在内存，关闭即丢。
 //   - BridgeMainFrameOnly：内嵌框架拿不到 window.viva。
 //   - Navigate 只放行自有 scheme 与 about:blank/srcdoc；NewWindow、Download 不设（即全部拒绝）。
+//     局限：被拒绝的 GET 导航，请求仍会发出（headers.go 与台账 A-018），所以它不是出站控制。
+//   - 每个响应带内容安全策略与 Permissions-Policy（headers.go）：关掉出站网络、内嵌框架与权限提示。
+//   - 每开一个岛，WebView2 都在用户数据目录里留一个 WV2Profile_viva-ephemeral-* 目录且从不删除：
+//     Open 之前先清掉没人用的旧目录（profiles.go，R5）；需先用 SetProfileClass 登记窗口 Class。
 //   - OnMessage 没有来源信息：页面里任何框架（含内嵌的第三方内容）都可能发消息，
 //     调用方必须把收到的文本当作不可信输入校验。
 package island
@@ -35,6 +39,8 @@ type Config struct {
 	Entry string
 	// Serve 按路径提供资源（路径不含主机名与查询串）；ok=false 即 404。
 	Serve func(path string) (mime string, data []byte, ok bool)
+	// CSP 是每个响应带的内容安全策略；空取 DefaultCSP（脚本只许自有 scheme 的文件）。
+	CSP string
 	// OnMessage 收到页面 window.viva.postMessage(text) 的文本。无来源信息，按不可信输入处理。
 	OnMessage func(text string)
 	// OnLoad 报告导航进度（主框架 WebLoadFinished 后页面才可用）。
@@ -65,7 +71,7 @@ func webViewConfig(cfg Config) (app.WebViewConfig, error) {
 	}
 	return app.WebViewConfig{
 		URL:    fmt.Sprintf("%s://%s/%s", scheme, entryHost, entry),
-		Scheme: &app.WebScheme{Name: scheme, Serve: cfg.Serve},
+		Scheme: newScheme(scheme, cfg.CSP, cfg.Serve),
 		// 独立的代理环境（W1）：direct = 绕过系统代理。岛不碰网络，这里的目的是拿到自己的环境与浏览器进程。
 		Proxy:               app.WebProxyDirect,
 		Ephemeral:           true,
@@ -94,12 +100,15 @@ func Open(host *app.WebHost, cfg Config) (*Island, error) {
 	}
 	openMu.Lock()
 	defer openMu.Unlock()
+	// R5：Viva 的临时 profile 目录关岛后不会被删，开新岛之前先清掉没人用的旧目录（profiles.go）。
+	sweepStaleProfiles()
 	restore := appendBrowserArgs(componentUpdateOff)
 	defer restore()
 	view, err := host.Open(wc)
 	if err != nil {
 		return nil, fmt.Errorf("island: 打开页面失败：%w", err)
 	}
+	openCount.Add(1)
 	return &Island{view: view}, nil
 }
 
@@ -111,5 +120,8 @@ func (i *Island) Close() {
 	if i == nil {
 		return
 	}
-	i.once.Do(func() { i.view.Close() })
+	i.once.Do(func() {
+		i.view.Close()
+		openCount.Add(-1)
+	})
 }

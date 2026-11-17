@@ -13,6 +13,7 @@ import (
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/island"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
@@ -65,6 +66,11 @@ func Run(opts Options) error {
 		return fmt.Errorf("viva/app: Class 不能为空（WebView2 profile 必须用专用名）")
 	}
 	vapp.SetInterfaceFontFamily(InterfaceFont)
+	// 岛的临时 profile 目录清理（R5）：登记窗口 Class，清理失败写日志（动作名是诊断用的英文标识，不是界面文案）。
+	island.SetProfileClass(opts.Class)
+	if log := opts.Services.Log; log != nil {
+		island.SetFailureHook(func(err error) { log.AppError("native", "island", err.Error()) })
+	}
 	var inv vapp.Invalidator
 	root := NewRoot(opts, inv.Invalidate)
 	defer root.Close()
