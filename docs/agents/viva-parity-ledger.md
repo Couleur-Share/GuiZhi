@@ -7,7 +7,7 @@
 
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
-| A（平台/Viva 确实做不到） | 17 | A-001…A-017（A-017 为全局快捷键只认一小组按键，2026-11-17 新增） |
+| A（平台/Viva 确实做不到） | 18 | A-001…A-018（A-017 为全局快捷键只认一小组按键，A-018 为岛里被拒绝的 GET 导航请求仍会发出，2026-11-17 新增） |
 | B（暂缺，已定里程碑） | 18 | B-004、B-006、B-008、B-010、B-013、B-015…B-027（B-001、B-002、B-003 于 2026-11-16 关闭，B-005、B-007、B-009、B-011、B-012、B-014 于 2026-11-17 关闭，见「已关闭条目」） |
 | C（需用户裁决） | 1 | 见 C-002（非输入控件文字不可选）；C-001（通知）于 2026-11-17 撤销，前提不成立 |
 | 未测（按未通过计） | 8 | 见「未测项」：V-a、R-1…R-7（R-5 托盘、R-6 全局快捷键、R-7 登录项于 2026-11-17 新增） |
@@ -173,6 +173,15 @@
 - 证据：`github.com/vivaui/viva@v0.6.4/app/global_shortcut.go` 第 18–37 行 `normalizeGlobalShortcut`（修饰键必选、主键白名单，其余 `unsupported global shortcut key`）；`app/global_shortcut_windows.go` 第 26–43 行把主键映射到虚拟键码，也只覆盖这几类。外壳侧：`viva_shortcuts.go` 的 `parseGlobalAccelerator`（把 Electron 风格的加速键字符串翻成 Viva 的修饰键与主键，主键不合格时返回失败并留日志），单元测试 `viva_shell_test.go` 的 `TestParseGlobalAccelerator`。
 - 已做的补偿：无。Viva 的公开包里没有别的注册入口（Win32 的 `RegisterHotKey` 封装在 `internal/platform/windows`，不对外）；绕开它、自己再起一条消息循环去注册会引入第二套线程模型，收益只是标点与导航键，没有试做。
 - 状态：开（引擎限制；升级 Viva 版本时复测）。真机注册与触发属于未测项 R-6。
+
+### A-018 岛里被拒绝的 GET 导航，请求仍会发到目标服务器
+
+- 场景/模块：`viva/island` 的所有岛（阅读视图、Wiki 图谱、mermaid、媒体播放，M2 起使用）；计划 §4.7「岛的安全」。这是对 Viva 源码注释的反证：`internal/platform/windows/web_windows.go` 第 378–379 行写「A refused navigation is cancelled, so the foreign document is never fetched」。
+- 偏差：`Config.Navigate` 对主框架与内嵌框架的 GET 导航返回 false 之后，页面确实没有被替换（`location.href`、`<meta http-equiv=refresh>`、点击链接、`file:`、`data:` 全部「stayed」），但**请求已经到达目标服务器**。回环服务（本机 127.0.0.1，岛里的页面把它当外部网站）收到了 `GET /nav-http`、`/meta`、`/link`（主框架）与 `/iframe`（内嵌框架），请求头是浏览器自己发起的导航：`Sec-Fetch-Mode: navigate`、`Sec-Fetch-Dest: document`（内嵌框架是 `iframe`）、`Sec-Fetch-Site: cross-site`、`Upgrade-Insecure-Requests: 1`。POST 表单（`/form`）被拒绝后没有请求。所以「导航被拒绝」不是出站控制：页面可以通过 URL 把信息送给任意服务器。
+- 证据：`viva/cmd/islandprobe`（`go run ./viva/cmd/islandprobe -probe security`），运行 `D:\Project\GuiZhi-bench\test-logs\island-probe-sec2.json`（加固前，`serverHitDetails` 里是每个请求的方法与请求头）、`island-probe-sec3.json`（bare / inline / prod 三组；三组里 `/nav-http`、`/meta`、`/link` 各 1 次命中，`deniedNavigations` 同时记着这些地址被 `Navigate` 拒绝），WebView2 运行时 157.0.4341.46，Viva v0.6.4。不入库。没有用第二台机器或别的运行时版本复现，所以不知道这是运行时版本相关还是一贯行为。
+- 已做的补偿：(1) 岛的响应头里内容安全策略 `frame-src about:` 与 `form-action 'none'` 挡住内嵌框架与表单——探针里 inline / prod 两组的 `/iframe` 不再命中、表单无请求；`connect-src`、`img-src`、`script-src`、`style-src` 挡住所有子资源请求（bare 组 12 个路径全部命中，inline / prod 只剩上面三条主框架导航）。(2) `script-src 'self'` 不允许内联脚本与 eval，页面里的内容自己发不起 `location.href`。(3) 响应头带 `Referrer-Policy: no-referrer`，导航请求不带来源。
+- 内容安全策略管不到的残余：`<meta http-equiv=refresh>`、被点击的 `<a>`、岛的自有脚本（阅读外壳）自己触发的导航。所以**岛里的内容必须先清理**：去掉脚本、meta refresh、内嵌框架（这是应用侧职责，M2 阅读视图落地时用单元测试守住），链接点击由阅读外壳拦截并交给系统浏览器打开，而不是让它在岛里导航。不能指望 `Navigate`。
+- 状态：开（引擎限制；升级 Viva 或 WebView2 运行时版本时复测）。M2 阅读视图的内容清理与链接拦截是这条的验收项。
 
 ## B 类：暂缺
 

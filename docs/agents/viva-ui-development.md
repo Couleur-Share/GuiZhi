@@ -11,8 +11,8 @@
 | 分支与基线 | `feat/viva-ui` 从 `feat/native-ui` `3f31fb53` 拉出（本地标签 `mygo-ui-frozen` 指向该提交），已 merge main（`94b980f0`，只带入评估文档补记，渲染层无变化）；Viva 固定 `v0.6.4`；`golang.org/x/text` 因 Viva 依赖由 0.43.0 升到 0.44.0 |
 | 阶段 0 准备 | 已完成：骨架、依赖、W1 岛封装，生成器输出端也已是普通 Go（`viva/locales`、`viva/icons`、`viva/tokens`，见 §6） |
 | 阶段 1 对等基础设施 | 已建成并校准：盘点、React 采集器（设备缩放钉死为 1）、Viva 采集器与比较工具（L1–L3）、阈值冻结（2026-11-16）、`settings.general` 在 T3 全矩阵 108/108 通过，采集稳定性 108/108。L4 行为测试随各模块的无头测试落地；**仍未完成**：L2 的令牌/绘制比较（G-001）、真窗口截图路径实验（G-003），见台账 G 类 |
-| 阶段 2 M0 外壳与工具包层 | **大部分完成，余项见下**。已完成：窗口外壳与自绘标题栏、主题与 i18n 与图标生成（输出端已是普通 Go）、`Select`、`ConfirmDialog`、`Modal`（σ=12）、`Toast`/`Notifier`/`Guard`、`LoadErrorState`、`Tooltip` 与悬停下划线、取色器与分段等控件、文字输入封装与守卫（`viva/inputguard_test.go`）；台账 B-001、B-002、B-003、B-005、B-009、B-011、B-012 已关闭。**余项**：`ContextMenu`（B-007）、控件状态与动效（B-004）、B-006 / B-010 / B-021 的评估、托盘与隐藏销毁岛、全局快捷键、单实例、通知气泡（C-001）、§4.7 三项核实、R5 配置目录清理。S4 成本已超出估算 2 倍，用户已选择「继续」（2026-11-16），按 §8.1 的重估推进 |
-| 阶段 3 M1 + 检查点 1 | **进行中**。已完成：整窗外壳（rail、顶栏、窗格宽度）、采集页（队列、任务行、批量与清理、任务详情弹窗，B-014 关闭）、设置的应用设置与显示设置；全量 T2 回归 r1 共 47 个场景 × 36 个变体 1692/1692 通过（2026-11-17）。**检查点 1 尚未正式测量**：早期冒烟（一次采样，非官方）visible 98.1 MB、hidden 98.1 MB，阈值 153.8 / 151.7 MB（见 §8 末条）；正式读数在 M0 余项做完后按 §7 的口径测 |
+| 阶段 2 M0 外壳与工具包层 | **主体完成，余项登记在台账**。已完成：窗口外壳与自绘标题栏、主题与 i18n 与图标生成（输出端已是普通 Go）、`Select`、`ConfirmDialog`、`Modal`（σ=12）、`Toast`/`Notifier`/`Guard`、`LoadErrorState`、`Tooltip` 与悬停下划线、`ContextMenu`、`CloseDialog`、`Checkbox`、取色器与分段等控件、文字输入封装与守卫（`viva/inputguard_test.go`）；**外壳接线**（`-viva-shell`，默认关闭）：托盘与隐藏时销毁岛、全局快捷键、单实例、关闭行为，真窗口冒烟 S0–S4 共 35 项 0 失败、变异检查 46/46 被杀（§8.2）；**岛加固**（响应头）与**计划 §4.7 三项核实**（§8.3）。台账 B-001…B-003、B-005、B-007、B-009、B-011、B-012、B-014 已关闭。**余项**：控件状态与动效（B-004）、B-006 / B-010 / B-021 的评估、B-017 的收起情形、B-024 / B-026 / B-027（登录项、局部快捷键、窗口记忆，切换为产品默认时一并做）。S4 成本超出估算 2 倍，用户已选择「继续」（2026-11-16）；**S7 的用量已到重估的 2 倍线（§8.1），余项不再静默推进，等用户裁决** |
+| 阶段 3 M1 + 检查点 1 | **M1 完成，检查点 1 已测并通过**：整窗外壳（rail、顶栏、窗格宽度）、采集页（队列、任务行、批量与清理、任务详情弹窗）、设置的应用设置与显示设置；全量 T2 回归 r3 共 54 个场景 × 36 个变体 = 1944/1944 通过（2026-11-17）。**检查点 1 正式读数**（构建 `c5ace179`，模块 `imports`，`-viva-shell`，库副本 13.4 MB，`measure-idle.ps1` 两态各 5 次中位数、静置 60 s）：visible **107.7 MB**（阈值 153.8，余量 46.1，占基线 31.5%）、hidden **101.8 MB**（阈值 151.7，余量 49.9，占基线 30.2%）；进程数 1，空闲 CPU 0%，GPU 共享内存中位 58.0 MB（两态相同）；逐次读数见 §8 末条。**这个读数只覆盖 M1 的范围**：知识库、问答、Wiki、收件箱、阅读岛、采集浏览器等还没迁移，内存会随之增长；检查点 2（≤55%）与最终线（≤60%）未测。 |
 | V-a 中文输入法真机 | **未测，按未通过计**（用户决定推迟到整体迁移完成之后） |
 
 **新会话如何接着做**：先读本文 §0、§8（进度记录末尾几条）与台账；再 `git log --oneline -20` 看最近提交；看 `docs/agents/viva-parity-inventory.md` 顶部的分母表确认哪些模块完成。每个模块一个独立提交序列，提交只在本地，用 `git commit -F <UTF-8 LF 文件>`。
@@ -159,7 +159,7 @@ apps/desktop-go/scripts/parity/            React 侧事实采集器（Node + Pla
 ## 4. 统一封装与守卫
 
 - **文本输入**：`viva/kit.Input`（单行，含大写叠层、占位符与基线对齐）是目前唯一的封装；多行与编辑器封装在 M2/M3 需要时同样放进 `viva/kit`。`viva/kit` 是**唯一**允许使用 `ui.TextField`、`ui.TextArea`、`ui.Combobox`、`components.CodeEditor`、`components.Textarea`、`components.Input` 一类输入控件的包；`viva/inputguard_test.go`（Go AST 扫描，禁用的标识符前缀写在该文件里，另有对 `kit/input.go` 的金丝雀：Viva 改名后守卫不会悄悄失效）对 `viva/kit` 之外的非测试文件判失败。允许的例外只有 `ui.Field`（状态类型，不是控件）。目的：V-a 真机若失败，整体替换封装的实现而不改业务界面。
-- **岛（W1）**：`viva/island` 固定使用 `Proxy` 非空的独立环境（`app.WebProxyDirect`）；`Open` 期间设置并还原 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`（`--disable-component-update`，进程级互斥，失败路径也还原）；`Ephemeral`、`BridgeMainFrameOnly`；`Navigate` 只放行自有 scheme（主机必须是 `doc`）与 `about:blank`/`about:srcdoc`（按解析后的 URL 判断，不用子串匹配），`NewWindow`/`Download` 不设即全部拒绝。这些默认值由 `viva/island` 的单元测试固化。`OnMessage` 没有来源信息，调用方必须把收到的文本当作不可信输入。关岛后清理 `WV2Profile_viva-ephemeral-*` 残留目录（R5）与整体安全结论在阶段 2 的 §4.7 核实里实现并记录。
+- **岛（W1）**：`viva/island` 固定使用 `Proxy` 非空的独立环境（`app.WebProxyDirect`）；`Open` 期间设置并还原 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`（`--disable-component-update`，进程级互斥，失败路径也还原）；`Ephemeral`、`BridgeMainFrameOnly`；`Navigate` 只放行自有 scheme（主机必须是 `doc`）与 `about:blank`/`about:srcdoc`（按解析后的 URL 判断，不用子串匹配），`NewWindow`/`Download` 不设即全部拒绝。这些默认值由 `viva/island` 的单元测试固化。`OnMessage` 没有来源信息，调用方必须把收到的文本当作不可信输入。每个自有 scheme 响应都带内容安全策略、`Permissions-Policy`、`Referrer-Policy` 与 `nosniff`（`headers.go`）；Viva 在关岛后不删的 `WV2Profile_viva-ephemeral-*` 临时目录，由 `profiles.go` 在下一次开岛前清理（R5，需先 `SetProfileClass`）；`Navigate` 拒绝的 GET 导航请求仍会发出（台账 A-018），它不是出站控制。整体安全结论与证据见 §8.3。
 - **不引入**：原生 select、color picker、`alert`/`confirm`/`prompt`；复用 `components/ui` 对应的 Viva 件与现有语义令牌。
 
 ## 5. 外观桥、字号与动效（继承自 MyGo 路线、按 Viva 重做）
@@ -230,23 +230,121 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - 2026-11-17 阶段 2/3 · 收尾与全量回归（提交 `33fdc36c`、`0729fafb`、`18b48a80`、`0503e260`）：B-009（设置首次读取失败 → `LoadErrorState` 与后台重试，`LoadReporter` 可选接口）与 B-005（`viva/icons/gen/arcs.go` 在编译前把椭圆弧展开成三次曲线，绕开 Viva 图标编译器的 rx/ry 对调；`icons_gen.go` 只有 `Database`、`DatabaseBackup` 变化）关闭，证据见台账；`gen:native` 串入 Viva 品牌图标生成器（CI 在 gen 之前已装好 Go）。**全量 T2 回归 r1**：9 份 React 参照目录共 47 个场景 × 36 个变体 = 1692 个变体全部通过（汇总 `D:\Project\GuiZhi-bench\parity\logs-reg-r1-summary.txt`，阈值摘要 `5128b9532a96` 未变）。**测试耗时**：`go test ./viva/... -count=1 -p 1`（逐包串行）各包最长 3.7 s（`viva/kit`），含链接共 15.4 s；全量并行（含 `native/...`）时各包会被互相拖慢到 10–40 s，不是单包成本。全量并行运行还暴露一条陈旧断言（`imports` 刷新对照卡仍在找整段「120 字」，而 Viva 为对齐渲染层已把数字与单位分开画），已改，不改实现。**早期内存冒烟（不是检查点读数）**：`measure-idle.ps1 -Runs 1 -SettleSeconds 60 -Gpu`、`-viva-module imports`、库副本 13.4 MB：visible 98.1 MB、hidden 98.1 MB（进程 1），GPU 共享 58.0 MB；检查点 1 阈值是 153.8 / 151.7 MB。一次采样，只判量级——托盘、菜单、关闭对话框与内容还会增加；官方读数仍按 §7 的口径。台账现为 A=16、B=14、C=2、G=5、未测 5。
 - 2026-11-17 阶段 2 · 外壳接线（S7，未发版；`-viva-shell` 默认关闭）：**工具包**：`kit.ContextMenu`（顶栏「新建」旁的创建方式菜单，B-007 关闭）、`kit.Checkbox` 与 `kit.CloseDialog`（渲染层 `CloseDialog`：关闭应用时的「最小化到托盘 / 退出」二选一加「记住我的选择」）；对照新增场景 `app.window.page-settings.{new-menu,new-menu-key}` 与 `…dlg-close{,-checked,-key,-hover-exit,-hover-minimize}`，采集器新增 `proxyOf`（`react-facts.mjs`：渲染层的复选框是 `sr-only` 的原生控件，把它的可访问节点对到旁边画出来的方框上）与 `Scene.Prepare`（场景构造完、采集之前对页面做准备，如先点开菜单）。**外壳**：`viva/app/shell.go` 定义 `Shell` 接口（`Attach`、`OnCloseRequest`、关闭对话框结果）、`Host`（显示 / 隐藏 / 关闭 / 退出 / 托盘图标 / 推命令 / `RunOnUI`）与 `Command`；`root_shell.go` 管外壳任务队列（`DrainShell` 挂在 Viva 的 `OnWake` 上，窗口隐藏时 Viva 也会在重绘之前叫醒它，所以托盘的建与销毁不会卡在隐藏的窗口里）、关闭对话框与命令分发；`island.Group` 登记所有开着的岛，`Host.Hide` 先 `closeIslands` 再收窗口（WebView 子进程只在可见时存在，对应 V-c 的结论）。main 包只做适配、不复制策略：`viva_shell.go`（`vivaShell`/`vivaHost`/`vivaInstance` 接到与 React 路径共用的 `appLifecycle`，`lifecycleWindow`/`trayPort` 两个接口与 `quitHook` 是为这次复用抽出来的）、`viva_tray.go`（托盘经 Viva 的 `AddStatusItem`，菜单文案随语言与显示状态变）、`viva_shortcuts.go`（全局快捷键，仅非自动化实例注册，Viva 的键集合见台账 A-017）。单实例用 Viva 的 `app/singleinstance`（命名管道，传递依赖 `github.com/Microsoft/go-winio v0.6.4`，MIT 许可证原文收在 `third-party/go-winio/LICENSE`、`NOTICE` 已披露），**按数据目录加锁且在数据库初始化之前判断**——第二个实例连库都不碰。`-viva-shell` 之外的实例（截图、对照、基准）的行为不变，由冒烟 S0 钉住。**验证**：main 包 `viva_shell_test.go` 24 个用例（生命周期策略、托盘装卸顺序、单实例交接、快捷键解析与注册、命令翻译），`viva/app/root_shell_test.go` 10 个用例，`island.Group` 用例；**变异检查**（故意把实现改坏看测试能否发现，脚本在 `D:\Project\GuiZhi-bench\tools\`）：main 包适配 13/13 被杀、`viva/island` + `viva/app` + `viva/kit` 的外壳相关代码 33/33 被杀、0 个幸存（第一轮写弱了一个 `Group.Forget` 的用例——假的 `Close` 是幂等的，掩盖了 `Forget` 空操作，补了「登记数」断言后才被杀）；真窗口冒烟 S0–S4 见 §8.2；**全量 T2 回归 r3**：11 份 React 参照目录共 54 个场景 × 36 个变体 = 1944 个变体全部通过（汇总 `D:\Project\GuiZhi-bench\parity\logs-reg-r3-summary.txt`，阈值摘要 `5128b9532a96` 未变，用时约 15 分钟；相对 r1（47 个场景、1692 个变体）新增的是 `new-menu*` 与 `dlg-close*` 共 7 个场景 252 个变体）。**台账**：C-001（通知）撤销——渲染层路径与 Viva 路径都没有系统通知的产生方，前提不成立（检索证据写在条目里）；新增 A-017（全局快捷键键集）、B-026（局部快捷键）、B-027（窗口位置记忆）、G-007、未测 R-5 托盘 / R-6 全局快捷键 / R-7 登录项；B-024（登录项）刻意不接，理由与 B-027 相同：现有 Viva 实例都是 `-bench` 自动化实例，接上会让基准运行改写用户真实的开机启动项与窗口记忆。**S7 尚未做**：§4.7 三项核实、控件状态与动效（B-004）、B-006 / B-010 / B-021 的评估、B-017 的收起情形、R5 配置目录清理。
 
+- 2026-11-17 阶段 3 · 检查点 1 读数、岛加固与 §4.7 核实（S7/S8 收尾）：**检查点 1 正式读数**（构建 `c5ace179`，模块 `imports`，`-viva-shell`，库副本 13.4 MB，`measure-idle.ps1` 两态各 5 次、静置 60 s、窗口摆放 peek）：visible 逐次 100.5 / 111.0 / 111.7 / 101.9 / 107.7 MB，中位 **107.7 MB**（阈值 153.8，余量 46.1，占基线 341.8 的 31.5%）；hidden 逐次 100.5 / 98.7 / 111.6 / 101.8 / 113.5 MB，中位 **101.8 MB**（阈值 151.7，余量 49.9，占基线 337.1 的 30.2%）；进程数各 1，空闲 CPU 0%，GPU 专用 0、共享中位 58.0 MB（hidden 同为 58.0）、已提交中位 62.9 MB；测量开始时可用内存约 4.0 GB；5 次读数的最大最小差约 11–15 MB（visible 100.5–111.7，hidden 98.7–113.5），原因没有查。若按计划里记录的默认遮挡行为下的 React 参照（295 / 265 MB）这个更严的口径，60% 线 177.0 / 159.0、45% 线 132.8 / 119.3，读数仍低于全部这些线（45% 线的余量 25.1 / 17.5 MB）。日志 `D:\Project\GuiZhi-bench\test-logs\measure-cp1-r1.txt`。**这个读数只覆盖 M1 的范围**，库、问答、Wiki、收件箱、阅读岛、采集浏览器还没迁移。**§4.7 三项核实**见 §8.3：采集隐藏 WebView 有条件通过、岛的安全有条件通过（加固前权限提示一项不通过，已修）、长文阅读通过（仍走岛）。**岛加固**：自有 scheme 的每个响应带 CSP、`Permissions-Policy`、`Referrer-Policy`、`nosniff`；新增台账 A-018（被拒绝的 GET 导航请求仍会发出）。**R5**：Viva 的临时 profile 目录关岛后不删，已在开岛前清理（`viva/island/profiles.go`，规则变异 11/11 被杀；纠正了我早先「R5 无残留」的错误说法，见 §8.3）。台账现为 A=18、B=18、C=1、G=7、未测 8。
+
 ### 8.1 成本估算与实际（以「工作段」为单位）
 
 「工作段」指一次连续的执行（一个上下文窗口）。**S1–S3（阶段 0、阶段 1、真窗口启动）开工前没有登记估算，事后不倒推补写，只记状态；S4 起的估算是规划时的数，直到 2026-11-16 本段才写进文档**（这是流程上的缺口：「模块成本 > 估算 2 倍」这条停止条件需要有登记过的估算才能判定）。
 
 | 步骤 | 内容 | 估算 | 已用 | 状态 |
 | --- | --- | --- | --- | --- |
-| S4 | M0 工具包层：浮层地基、`Select`、`ConfirmDialog`、`Toast`/`Notifier`/`Guard`、`Modal`、`LoadErrorState`、`Tooltip`、`ContextMenu`、控件状态与动效（B-001…B-004、B-007、B-009；`UnsavedChangesDialog` 渲染层无使用方，已从范围中移除） | 1–1.5 段 | 约 7 段（段数是对话上下文窗口的粗略计数，不是计时） | **超支，已获用户同意继续**：Select、ConfirmDialog、`Toast`/`Notifier`/`Guard`（含阴影模型修正）、`Modal`、`LoadErrorState`、`Tooltip` 与悬停下划线完成；**`ContextMenu`（B-007）与控件状态（B-004）仍未做**，并入 S7 |
+| S4 | M0 工具包层：浮层地基、`Select`、`ConfirmDialog`、`Toast`/`Notifier`/`Guard`、`Modal`、`LoadErrorState`、`Tooltip`、`ContextMenu`、控件状态与动效（B-001…B-004、B-007、B-009；`UnsavedChangesDialog` 渲染层无使用方，已从范围中移除） | 1–1.5 段 | 约 7 段（段数是对话上下文窗口的粗略计数，不是计时） | **超支，已获用户同意继续**：Select、ConfirmDialog、`Toast`/`Notifier`/`Guard`（含阴影模型修正）、`Modal`、`LoadErrorState`、`Tooltip` 与悬停下划线完成；`ContextMenu`（B-007）已在 S7 完成；**控件状态与动效（B-004）仍未做** |
 | S5 | M1 导入队列（状态、行、批量栏、空/错/加载、更多、6 个对话框、30 个交互） | 2–3 段（重估 4–6 段） | S5 与 S6 合计约 4 段 | **完成**：队列页 12 个场景与详情弹窗 11 个场景 T2 全部通过；真窗口里 B-015、B-016 的接线属 M3 |
 | S6 | `settings.appearance`（含 `ColorPicker` 移植） | 1–1.5 段（重估 2–3 段） | 同上 | **完成**：5 个场景 T2 180/180；B-019…B-022 登记，B-020 的背景图适配器在 M3 前接 |
-| S7 | M0 外壳余项：`ContextMenu`（B-007）、控件状态（B-004）、托盘与隐藏销毁岛、全局快捷键、单实例、通知气泡（C-001）、§4.7 三项核实、B-006 / B-010 / B-021 评估、R5 清理（输入守卫 AST 测试、生成器输出端改普通 Go、B-005 已做完） | 约 1 段（重估 2 段） | — | 进行中 |
-| S8 | 检查点 1 读数（`measure-idle.ps1` 两态各 5 次中位数、静置 60 s、GPU 共享与进程数） | 约 0.5 段 | — | 未开始 |
+| S7 | M0 外壳余项：`ContextMenu`（B-007）、托盘与隐藏时销毁岛、全局快捷键、单实例、关闭行为、§4.7 三项核实与岛加固；原计划里的 B-004、B-006、B-010、B-021、B-017 收起情形、R5 清理也挂在这一步 | 约 1 段（重估 2 段） | 约 4 段（粗略计数，含检查点 1 的测量与 §4.7 的探针） | **到达重估的 2 倍线（4 段）**。已完成：`ContextMenu`、外壳接线与冒烟 S0–S4（35 项）、变异检查 46/46、§4.7 三项、岛加固、R5 清理（岛用临时配置，正常退出后无残留目录，见 §8.3）。**未做**：B-004、B-006、B-010、B-021、B-017。再往下做会越过「模块成本 > 估算 2 倍」的停止条件，所以停下来请用户裁决，不静默继续 |
+| S8 | 检查点 1 读数（`measure-idle.ps1` 两态各 5 次中位数、静置 60 s、GPU 共享与进程数） | 约 0.5 段 | 约 0.5 段 | **完成**：visible 107.7 MB、hidden 101.8 MB，均低于 45% 线（153.8 / 151.7），见 §0 与 §8 末条 |
 
 **超支的归因**（事实，不是辩解）：(1) 「完美复刻」的验证成本被低估——一个对话框场景要先在渲染层采集、再在 Viva 侧对照 L1–L3，遇到遮罩模糊时还要为对照工具新增合成口径（`backdrop.go`、负向检验、台账与阈值登记），这一项约占本段的一半；(2) Viva 的 `c.Key` 语义、`Box.Shortcut` 作用域、`Presence` 退场等行为要靠试错摸清，每一项都有专门的回归测试，但摸清的代价计在工具包里；(3) 对照工具是一次性投入，已经复用于 `Modal`（σ=12）与后续所有模态，估计后续每个对话框的验证成本低于第一个。**重估的依据**：S4 已用 4 段 ÷ 估算 1–1.5 段 ≈ 2.7–4 倍，而且 S4 还没做完；S5–S8 的重估是在原估算上乘约 2 倍（没有全额乘 3–4 倍，因为对照工具与浮层地基已建成），这个倍率是判断而不是测量，要在 S5 第一段结束时用实际耗时复核。检查点 1 之前剩余约 10.5–14.5 段（S4 余 2–3、S5 4–6、S6 2–3、S7 2、S8 0.5）。
+
+### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
+
+真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。
+
+| 场景 | 内容 | 检查数 |
+| --- | --- | --- |
+| S0 | 不带 `-viva-shell`：一次关闭请求直接退出、退出码 0、没有外壳日志（截图、对照、基准实例的行为不变） | 5 |
+| S1 | `ask`（默认）：第一次关闭被接管并弹关闭对话框（窗口仍可见，附真窗口截图 `viva-ui\shots\shell-close-dialog.png`），对话框开着时再关则放行退出 | 8 |
+| S2 | `exit`：一次关闭即退出；退出后单实例锁已释放，同数据目录可再启动 | 4 |
+| S3 | 单实例：同数据目录的第二个实例把参数交给第一个后立即退出、不往下初始化（不碰数据库）；不同数据目录互不干扰 | 6 |
+| S4 | `minimize`：关闭请求隐藏窗口并保持运行（主窗口还在、没销毁）；第二个实例把窗口带回前台；再关又隐藏、再带回 | 12 |
+
+结果：2026-11-17、构建 `c5ace179`，共 35 项检查、失败 0 项（日志 `D:\Project\GuiZhi-bench\test-logs\smoke-viva-shell-cp1.txt`）。
+
+**没有覆盖**（均记在台账「未测」）：托盘图标的点击与右键菜单（R-5）、全局快捷键真的触发（R-6）、登录项（R-7；B-024 刻意没接）。托盘图标本身无法在脚本里枚举，只核对「已创建」日志。S4 结束时进程只能被结束，托盘区会留下幽灵图标，鼠标划过后消失，不是产品缺陷。
+
+**变异检查**（故意把实现改坏，看测试能不能发现；脚本在同一目录）：`mutate-s7-shell.ps1` 改 main 包适配，13 处变异全部被杀；`mutate-viva-core.ps1` 改 `viva/island`、`viva/app`、`viva/kit` 里外壳相关代码，33 处变异全部被杀，0 个幸存。第一轮写弱了一个 `Group.Forget` 的用例（假的 `Close` 幂等，掩盖了 `Forget` 空操作），补了「登记数」断言后才被杀。
+
+### 8.3 计划 §4.7 三项核实与岛加固（2026-11-17）
+
+**怎么测的**：探针 `viva/cmd/islandprobe`（入库；`-probe security|msgsize|reading|throttle|markdown|ephemeral`，逗号分隔）起真的 Viva 窗口与真的 WebView2 页面，页面里的脚本把结果经 `postMessage` 交给 Go，Go 写成 JSON。请求是否真的出了岛，由 Go 一侧的回环 HTTP 服务（127.0.0.1，页面把它当外部网站）的命中记录判定，不信页面自己的说法。运行脚本 `D:\Project\GuiZhi-bench\tools\run-island-probe.ps1`：每次运行用一次性的 `LOCALAPPDATA`/`APPDATA`/`TEMP`（不碰真实数据目录与用户实例）；窗口监视脚本 `watch-windows.ps1` 只记探针自己进程树的顶层窗口（类名、标题、位置），不截屏。环境：WebView2 运行时 157.0.4341.46、Viva v0.6.4、Windows 11、宿主缩放 200%；页面里 `requestAnimationFrame` 约 165 帧/秒（据此推断显示器刷新率约 165 Hz）。结果文件在 `D:\Project\GuiZhi-bench\test-logs\island-probe-*.json`（不入库）。
+
+| 项 | 结论 | 一句话依据 |
+| --- | --- | --- |
+| 采集用的隐藏 WebView | **有条件通过** | 没摆进窗口的页面可以跑脚本并回传结果（单条 64 MB 通过）；计时器默认被压到约 1 Hz，在它自己的环境创建时带上三个后台限速开关后恢复到 600/600 个 tick；隐藏时 `requestAnimationFrame` 不运行。条件见下 |
+| 岛的安全 | **有条件通过**；加固前的「权限提示」一项**不通过**，已用响应头修好并复测 | 不带响应头时页面能向任意地址发出 9 类子资源与框架请求（另有 3 种导航），并能让 WebView2 弹出权限气泡；默认响应头之后子资源请求 0 命中、权限查询为 denied、没有弹窗。残余风险是 GET 导航请求仍会发出（台账 A-018） |
+| 长文阅读 | **通过**：阅读视图仍走岛；原生 `markdown` 组件只作备选 | 岛里 50 KB / 200 KB 文章逐帧滚动 p95 6.2 ms、没有超过 20 ms 的帧；原生组件记录 ≤ 1.5 ms、光栅化加回读 p95 约 11 ms，但没有页内查找，#184 未复现 |
+
+#### 采集用的隐藏 WebView
+
+每个场景计时 30 秒，页面里每 50 ms 一个 `setInterval` 加 `requestAnimationFrame` 计数（`island-probe-thr2.json`）：
+
+| 场景 | 50 ms 定时器 tick（理想 600） | rAF 帧数 | 最长间隔 | 页面可见性 |
+| --- | --- | --- | --- | --- |
+| 摆进可见窗口（基线） | 600 | 4951 | 56 ms | visible |
+| 开了岛但没摆进窗口（Viva 视为隐藏） | **31** | 1 | **1011 ms** | hidden |
+| 窗口收起（`SW_HIDE`，等价收托盘），岛仍摆着 | 600 | 4953 | 56 ms | visible（从未变 hidden） |
+| 没摆进窗口 + 三个后台限速开关 | 600 | 1 | 64 ms | hidden |
+| 窗口收起 + 三个开关 | 600 | 4952 | 55 ms | visible |
+
+三个开关是 `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`，与 MyGo 的 `ThrottlingOff` 同一引擎、同一效果；W1 的 `appendBrowserArgs` 机制（只在 `Open` 期间设环境变量）可以原样复用。读数的含义：
+
+- 没摆进窗口的页面被当成隐藏页：计时器降到约 1 Hz（31/601），`requestAnimationFrame` 停了（只有 1 帧）；开关恢复计时器，**不恢复 rAF**（隐藏页没有渲染帧）。
+- **收起窗口不会让页面变成隐藏**：页面一直是 visible，计时器与 rAF 照常全速（4953 帧/30 s）。所以托盘态必须先销毁岛（S7 的 `Group.CloseAll` 已做），否则隐藏窗口里的 WebView2 仍在以显示刷新率渲染。
+- `Eval` 没有返回值，结果走页面里的 `postMessage` 回传；消息体积探针：页面→Go 与 Go→页面单条 64 MB（67,108,864 个字符）都通过，耗时分别 1.1 s 与 2.4 s（`island-probe-sec1.json`；`island-probe-r5b.json` 复测 0.9 s / 2.2 s），上限没有测到。
+
+条件：(1) 采集页要有**自己的环境**并在该环境第一次创建时带上三个开关（开关属于浏览器进程，环境已存在就不会再生效）；岛的环境带 `--disable-component-update`，采集访问真实网页，需要保留组件更新，所以两者不能共用环境。需要一个采集专用的开页入口（M3，`island.Open` 不做这件事）。(2) 隐藏页没有 rAF：依赖渲染的页面（懒加载图片、`IntersectionObserver`、靠动画帧推进的单页应用）可能不前进，会不会影响真实站点的采集**没有测**；备选是把页面摆进窗口再移到屏幕外或 1×1（也没有测）。(3) 每个独立环境多一组 WebView2 浏览器进程（计划 §10 测得空页底价约 120 MB、7 个进程），只在采集期间存在。**没有测**：真实采集流程（登录桥、`NewWindow` 接管弹窗、下载、持久 profile 与 cookie）。
+
+#### 岛的安全
+
+「加固前」是岛不带任何响应头的状态（探针里的 `bare` 组，自己复刻了旧的开页配置）；「加固后」是岛现在的默认状态（`prod` 组：默认响应头、脚本外链；`inline` 组用 `Config.CSP` 放行内联脚本、其余全关：出站与权限的结果与 `prod` 一致，自有资源的正向对照被它更严的策略挡住，不计）。数据：`island-probe-sec3.json`，窗口监视 `island-probe-sec3-windows.log`。
+
+| 问题 | 加固前 | 加固后 |
+| --- | --- | --- |
+| 页面能摸到 Go 的入口 | `window.viva`（`postMessage`/`onmessage`/`deliver`）与标准的 `chrome.webview.postMessage`，都只送到 `OnMessage`，没有来源；没有宿主对象 | 同左 |
+| 内嵌框架能否给 Go 发消息 | `chrome.webview` 在 srcdoc 与 sandbox 框架里存在，但框架发的消息没有到达 `OnMessage`（Go 只收到主框架的 ready 与 done）；框架里 `window.viva` 为 undefined | 内联脚本的框架在 CSP 下不执行 |
+| 出站网络 | 12 个路径全部命中回环服务：fetch 两种、XHR、`sendBeacon`、图片、样式、脚本、WebSocket 握手、内嵌框架，外加 3 个导航 | 子资源 0 命中；只剩 3 个主框架导航命中（A-018） |
+| 导航 | 页面不被替换（http、`file:`、`data:`、meta refresh、链接点击、表单均停在原页），但 GET 请求已发出 | 同左；内嵌框架与表单被 CSP 挡在发请求之前 |
+| 弹窗 | `window.open` 返回 null | 同左 |
+| 下载 | 触发后没有文件产生 | 同左 |
+| 权限提示 | 定位请求一直挂起（超时，code 3），窗口监视看到一个 336×198 的可见 Chromium 弹窗（`Chrome_WidgetWin_1`，在 +6.8 s 出现、岛关闭时才消失）；摄像头、定位的状态查询是 prompt | 查询为 denied，定位请求立刻失败（code 1）；`inline` 与 `prod` 阶段全程没有可见弹窗；通知查询仍是 prompt，但 `requestPermission()` 直接返回 denied |
+| 剪贴板读取 | 失败（文档没有焦点）；有焦点时没测 | 同左，策略里另有 `clipboard-read=()` |
+| 页面自己的资源还能用吗（正向对照） | — | 自有 scheme 的 fetch、图片、`data:`、`blob:`、内联样式属性都通过 |
+| 隔离 | Ephemeral：第一个岛写入 localStorage 与 IndexedDB，第二个岛读不到（`island-probe-sec1.json` 的 `ephemeral`） | 同左（没有在加固后复测） |
+
+处置：`viva/island/headers.go`（默认内容安全策略 `DefaultCSP`、`Permissions-Policy`、`Referrer-Policy: no-referrer`、`X-Content-Type-Options: nosniff`，每个自有 scheme 响应含 404 都带；`Config.CSP` 可覆盖策略）与 `island_test.go` 里的 5 个用例（头齐全、每次新建不共享、可覆盖、策略各指令封闭、权限特性列表）固化。**不通过的那一项**（权限气泡）是探针在加固前的配置里发现的，不是加固后的缺陷。
+
+**应用侧的义务**（台账 A-018 的验收项，M2 阅读视图落地时用单元测试守住）：岛里的内容必须先清理——去掉脚本、`<meta http-equiv=refresh>`、内嵌框架、`<base>`；链接点击由阅读外壳拦截并交给系统浏览器，而不是让它在岛里导航；`OnMessage` 收到的文本一律当不可信输入，并自己限制单条大小（Viva 不限制，64 MB 也能收到）。
+
+#### 长文阅读
+
+| 路径 | 读数 |
+| --- | --- |
+| 岛（WebView2；页面里用 rAF 逐帧程序化滚动 6 s） | 50 KB（482 个 DOM 节点，页高 19,482 px）与 200 KB（2040 个节点，77,041 px）的文章：帧间隔 p50 6.1 ms、p95 6.2 ms、p99 7.0 / 6.3 ms、最大 12.8 / 6.5 ms，超过 20 ms 的帧 0 个（受限于 rAF 的 165 Hz 节奏）。数据 `island-probe-sec1.json`，**加固之前测的**；响应头不改变渲染路径，没有在加固后复测 |
+| 原生 `markdown` 组件（无头：记录一帧 + `Session.Image` 光栅化并回读） | 50 KB（文档高 16,191 px）与 200 KB（62,279 px）：记录 ≤ 1.5 ms；光栅化加回读 warm p50 6.5 ms、p95 11.3 ms、最大 13.4 ms（冷启动 p95 11.9 ms）；首次布局 39.8 ms / 12.1 ms（含预热）；滚轮步进总耗时 p95 11.1 ms；全选复制 40,317 / 154,673 个字符，不到 1 ms；Go 堆增量 1.6–1.7 MB；**没有页内查找**（`findInPage`：组件无此能力） |
+| #184（文本整形缓存在每帧超过 512 个不同行时崩塌） | **未复现**：不裁剪、整篇一次绘制（2000 多行）：首帧 103 ms（50 KB）/ 387 ms（200 KB，填缓存），之后每帧 4–6 ms / 7–13 ms，没有逐帧变慢（`island-probe-md2.json` 的 `unclippedRenderMs`） |
+
+结论仍是阅读走岛：原生组件的帧时间没问题，但它不是 CommonMark 实现、不解释 HTML、没有页内查找，采集来的网页正文含 HTML。**没有测**：文章里的图片（探针文章含标题、列表、引用、代码块、表格，没有图片）；跨块的指针拖选（只测了全选复制与按点取偏移）；真实滚轮与触摸输入（岛的读数是脚本逐帧滚动）；原生组件在真窗口里的呈现耗时（无头读数含回读，是上界）；输入法与讲述人。
+
+#### R5：岛的临时 profile 目录（已修）
+
+每开一个 Ephemeral 岛，WebView2 都在 `<缓存目录>\<窗口 Class>\WebView2\<代理槽>\EBWebView` 下留一个 `WV2Profile_viva-ephemeral-<进程号>-<序号>` 目录（约 0.8 MB、109 个文件），关岛与进程退出后都不删。**我早先在对话里说过「R5 在正常退出路径上没有残留」，那是看错了地方**（只查了 `TEMP`，目录实际在 `LOCALAPPDATA`），不要引用。实测修复前：开 1/3/5 个岛留下 1/3/5 个目录（`bare1`、`sec3`、`thr1`、`thr2`）。
+
+`viva/island/profiles.go`：每次 `Open` 之前扫一遍（同步，毫秒级），规则——创建者进程已退出的删；创建者是本进程且没有岛开着的删；活着的别的进程的、名字不严格符合 `WV2Profile_viva-ephemeral-<正整数>-<正整数>` 的、不在 `<代理槽>\EBWebView` 直接子级的、同名的普通文件一概不碰。删不掉（浏览器进程还占着文件）的汇总成一条日志、下次 `Open` 重试。`viva/app.Run` 登记窗口 Class 并把失败写日志。验证：单元测试 9 个（含真实进程存活判断与「占着文件时删不掉」的汇报与重试）、规则变异 11/11 被杀；真窗口：开 5 个岛后剩 2 个目录（最后两个，前面的在后一次开岛时已删；`island-probe-r5a.json`），同一隔离目录再起一个进程，上个进程留下的 2 个在它第一次开岛时被删、只剩它自己的 1 个（`island-probe-r5b.json`）。残余：进程退出后总会剩下最后一两个目录，由下一次启动的第一次开岛清掉；从不开岛的会话不清理。
+
+#### 这份证据不能证明什么
+
+- 一台机器、一个 WebView2 运行时版本（157.0.4341.46）、Viva v0.6.4；A-018 是否随版本变化不知道。
+- 探针里的「敌意页面」是我写的，覆盖常见的出站与越权手法，不是对 Chromium 的穷举。**没测**：WebRTC（`RTCPeerConnection`，历史上不受 CSP 约束）、`EventSource`、`<link rel=preconnect|dns-prefetch|prefetch>`、`@font-face` 外链、`<video>`/`<audio>`/`<object>`/`<embed>` 的外链、Service Worker。当前姿态下这些要先能执行脚本才可达，而脚本只允许自有 scheme 的文件（`script-src 'self'`），内容又要先清理，但这是推理，不是实测。
+- 权限只测了定位与摄像头的状态查询、定位请求与通知请求；麦克风、MIDI、有焦点时的剪贴板读取等没有逐项请求。
+- 没有拿真实的、采集来的恶意 HTML 测，只有合成脚本；也没有测第二台机器、不同缩放或不同显示器刷新率。
+- 采集只测了计时器与渲染节流、消息通道体积，没有跑真实采集流程。
+- R5 的崩溃路径用「上一个进程正常退出后的下一次启动」间接覆盖（留下的目录状态相同），没有真的强杀进程。
 
 ## 9. 切换为产品默认之前的清单（延伸目标，非本阶段）
 
 1. 安装包随包附 `third-party/viva/{LICENSE,NOTICE,THIRD_PARTY_NOTICES.md}`（`build-installer.ps1` 与 NSIS 脚本）。
 2. 决定产品窗口的 `Class`（WebView2 profile 目录名），评估与旧 React 外壳 profile 的关系（旧 profile 里有首次启动要导入的 localStorage 设置）。
-3. 放开 `-viva` 的启动保护，接入单实例锁、托盘、全局快捷键、自动更新与启动参数（`--hidden`、`--updated`、`--force-run`）。
-4. 台账里所有 C 类已裁决，A/B 类逐条复核；真机手册交给用户执行并回填 V-a 与 R-1…R-4。
+3. 放开 `-viva` 的启动保护，把 `-viva-shell` 的外壳接线（托盘、全局快捷键、单实例，已做）变成产品默认，并补齐：自动更新与启动参数（`--hidden`、`--updated`、`--force-run`）、登录项与启动即隐藏（B-024）、局部快捷键（B-026）、窗口位置与大小的记忆（B-027）；这三项刻意没在自动化实例上接，要在非自动化实例上接并补真机验证。
+4. 台账里所有 C 类已裁决，A/B 类逐条复核；真机手册交给用户执行并回填 V-a 与 R-1…R-7（R-5 托盘点击与菜单、R-6 全局快捷键触发、R-7 登录项）。
+5. 安装包随包附 `third-party/go-winio/LICENSE`（单实例的传递依赖，MIT，`NOTICE` 已披露），与第 1 条同一份随附清单。
+6. 岛（§8.3）：M2 的阅读视图要先做内容清理（去掉脚本、meta refresh、内嵌框架、`<base>`）并拦截链接点击，这是台账 A-018 的验收项；岛页面的脚本必须外链（默认策略 `script-src 'self'` 不允许内联）；`OnMessage` 收到的文本自己限制单条大小；M3 的采集需要专用的开页入口（独立环境、在环境创建时带三个后台限速开关），`island.Open` 不做这件事。
