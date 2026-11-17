@@ -59,13 +59,18 @@ var reactRoleMap = map[string]string{
 	"option":    "option",
 	"separator": "separator",
 	"status":    "status",
-	"grid":      "grid",
-	"gridcell":  "gridcell",
-	"group":     "group",
+	// alert：Viva 的 gfx.Role 没有 alert，用「status + 立即播报」表达同一件事（台账 A-012）。
+	"alert":    "status",
+	"grid":     "grid",
+	"gridcell": "gridcell",
+	"group":    "group",
 	// 对话框：Viva 的 gfx.Role 没有 dialog / alertdialog（台账 A-004 的同一条限制），按带名字的分组比较：
 	// 名称（aria-labelledby / aria-label）、位置、里面的按钮与标题照常逐个比较。
 	"alertdialog": "group",
 	"dialog":      "group",
+	// 悬停提示：Viva 的 gfx.Role 没有 tooltip（Box.Tooltip 只设命中区的 Hint，不产生节点），气泡用带名字的分组表达：
+	// 名称（气泡文字）、位置与大小照常逐个比较（台账 A-017，与 A-004 同一条限制）。
+	"tooltip": "group",
 }
 
 // vivaIgnoredRoles 是 Viva 一侧不算可访问节点的角色：未声明角色的区域。
@@ -89,6 +94,8 @@ var roleStates = map[string][]string{
 	"menuitem":  {},
 	"slider":    {"value"},
 	"textfield": {"value"},
+	// 分隔条（ColumnResizer）是可聚焦的 separator，当前宽度与上下限在 aria-valuenow / valuemin / valuemax 里。
+	"separator": {"value", "valuemin", "valuemax"},
 }
 
 // NormText 做名称与文字的归一化：NFC，所有 Unicode 空白折成一个空格，去掉首尾空白。
@@ -134,7 +141,7 @@ func (n Norm) Key() string { return n.Role + "\x00" + n.Name }
 // StateString 把状态排成稳定的字符串，便于比较与打印。
 func (n Norm) StateString() string {
 	var parts []string
-	for _, k := range []string{"checked", "expanded", "selected", "level", "value", "disabled"} {
+	for _, k := range []string{"checked", "expanded", "selected", "pressed", "level", "value", "valuemin", "valuemax", "disabled"} {
 		if v, ok := n.States[k]; ok {
 			parts = append(parts, k+"="+v)
 		}
@@ -199,6 +206,13 @@ func NormalizeReact(f *Facts) (out []Norm, unmapped []string) {
 		if v, has := n.Prop("disabled"); has && v == "true" {
 			states["disabled"] = "true"
 		}
+		// 切换钮（aria-pressed）：只比较「按下」。aria-pressed="false" 与没有这个属性，在 Viva 一侧无法区分
+		// （HitOptions 只有 Selected 一个布尔），所以「未按下」不参与比较；登记见台账 A-011。
+		if role == "button" {
+			if v, has := n.Prop("pressed"); has && (v == "true" || v == "mixed") {
+				states["pressed"] = "true"
+			}
+		}
 		desc := NormText(n.Description)
 		if desc == name {
 			desc = ""
@@ -232,7 +246,8 @@ func NormalizeViva(f *Facts) []Norm {
 			continue
 		}
 		name := NormText(n.Name)
-		if focusable, has := n.Prop("focusable"); name == "" && (!has || focusable != "true") {
+		// 无名的 status 是 alert 区域（见 reactRoleMap），名字本来就是空的，不能当行级命中区丢掉。
+		if focusable, has := n.Prop("focusable"); name == "" && n.Role != "status" && (!has || focusable != "true") {
 			continue
 		}
 		box, hasBox := n.BoxOK()
@@ -243,6 +258,12 @@ func NormalizeViva(f *Facts) []Norm {
 			}
 		}
 		states := map[string]string{}
+		if n.Role == "button" {
+			// 与 NormalizeReact 对应：Viva 的 Selected 就是切换钮的「按下」。
+			if v, has := n.Prop("selected"); has && v == "true" {
+				states["pressed"] = "true"
+			}
+		}
 		for _, key := range roleStates[n.Role] {
 			if key == "value" {
 				if v := NormText(n.Value); v != "" {

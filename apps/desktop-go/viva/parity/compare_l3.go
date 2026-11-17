@@ -125,10 +125,7 @@ func textMask(in Inputs, w, h, pad int) []bool {
 			mark(r)
 		}
 	}
-	for _, r := range reactIcons(in.React) {
-		mark(r)
-	}
-	for _, r := range in.Viva.Icons {
+	for _, r := range maskedIcons(in) {
 		mark(r)
 	}
 	return mask

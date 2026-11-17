@@ -7,9 +7,11 @@
  *
  * 渲染层只允许加 data-testid / aria 属性（见台账「渲染层改动登记」）；能用现有角色与名称定位的，不去改渲染层。
  * `leave(ctx)`：可选，场景采集完后调用，把场景留下的东西收掉（提示场景用它收走提示、恢复页面）。
+ * `keepPointer`：可选，悬停态场景（行悬停）为真：采集器不挪走指针、不清焦点，也不校验悬停残留；默认一律挪走并校验。
  */
 import fs from "node:fs";
 import path from "node:path";
+import { IMPORTS_FIXTURE, enterImports, leaveImports } from "../lib/react-imports.mjs";
 import { resetToasts, showToasts } from "../lib/react-toast.mjs";
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
@@ -73,6 +75,192 @@ function toastScene(specs, { expandDetail = false } = {}) {
   };
 }
 
+/**
+ * 采集队列场景：进入时装夹具并 reload，可选再做一段交互（steps）；离开时清夹具并 reload。
+ * 整窗对照，不给 region。
+ */
+function importsScene(options, steps, { keepPointer = false } = {}) {
+  return {
+    module: "imports",
+    keepPointer,
+    async enter({ win, session }) {
+      await enterImports(session, options);
+      if (steps) await steps(win, session);
+    },
+    async leave({ session }) {
+      await leaveImports(session);
+    },
+  };
+}
+
+// 采集页的操作步骤。每一步都以「指针停在窗口左上角（没有悬停）」收尾（行悬停场景除外），
+// Viva 一侧（viva/parity/scenes/imports.go）做同样的操作，最终画面才可比。
+
+/** 搜索框填成没有匹配的词，列表按它筛选后让输入框失焦：画面上是词在框里、没有焦点环与光标。 */
+async function searchNoMatch(win) {
+  const box = win.getByPlaceholder("搜索标题或链接");
+  await box.fill(IMPORTS_FIXTURE.noMatchQuery);
+  await win.getByText("当前筛选下没有任务", { exact: true }).waitFor({ state: "visible" });
+  await box.evaluate((el) => el.blur());
+  await win.mouse.move(2, 2);
+}
+
+/** 依次点第 indexes 行的选择钮（行首的类型图标）。第一次选择后批量条出现、列表下移，locator 每次重新定位。 */
+function selectImportRows(...indexes) {
+  return async (win) => {
+    const boxes = win.getByRole("button", { name: "选择", exact: true });
+    for (const i of indexes) await boxes.nth(i).click();
+    await win.mouse.move(2, 2);
+  };
+}
+
+/**
+ * 紧凑布局（视口 ≤ 1179.98px，useCompactLayout）下二级侧栏默认收起，里面的按钮被 rail 盖住点不到：
+ * 先点顶栏的「展开」让它以浮层打开（浮层打开后一直留着，直到点遮罩或按 Esc，筛选之后也不自动收起）。
+ */
+async function openCompactSidebar(win) {
+  const compact = await win.evaluate(() => window.matchMedia("(max-width: 1179.98px)").matches);
+  if (!compact) return;
+  await win.getByRole("button", { name: "展开", exact: true }).click();
+  await win.waitForTimeout(400); // 浮层的入场过渡（duration-smooth 280ms）
+}
+
+/** 点一个按钮（侧栏的状态筛选、来源筛选等），等列表按新筛选重取一轮。 */
+function clickImportsButton(name, { group } = {}) {
+  return async (win) => {
+    // 来源筛选在工作区工具条里（带 group），不在二级侧栏；只有侧栏里的按钮才需要先展开浮层——浮层还会盖住工作区。
+    if (!group) await openCompactSidebar(win);
+    const scope = group ? win.getByRole("group", { name: group, exact: true }) : win;
+    await scope.getByRole("button", { name, exact: true }).click();
+    await win.waitForTimeout(300);
+    await win.mouse.move(2, 2);
+  };
+}
+
+/** 把任务列表滚到底（「加载更早的任务」钮所在的滚动容器）。 */
+async function scrollImportsToEnd(win) {
+  await win.getByRole("button", { name: "加载更早的任务", exact: true }).evaluate((el) => {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      if (p.scrollHeight > p.clientHeight && /(auto|scroll)/.test(getComputedStyle(p).overflowY)) {
+        p.scrollTop = p.scrollHeight;
+        return;
+      }
+    }
+  });
+  await win.mouse.move(2, 2);
+}
+
+/**
+ * 把指针停在标题为 title 的那一行的左内边距处（距行左上角 6px、20px）：行进入悬停态（底色、前导勾选框、右上的动作条），
+ * 但指针不落在任何带 title 提示的元素上——气泡（TooltipLayer，台账 B-011）是另一个场景要对照的状态。
+ */
+function hoverImportsRow(title) {
+  return async (win) => {
+    const row = win
+      .getByRole("button", { name: title, exact: true })
+      .first()
+      .locator("xpath=ancestor::*[contains(@class,'group/row')][1]");
+    const box = await row.boundingBox();
+    await win.mouse.move(box.x + 6, box.y + 20);
+  };
+}
+
+/**
+ * 悬停提示（TooltipLayer，台账 B-011）：把指针停在 pick 选中的元素中心，等 320ms 延迟后气泡出现并走完入场过渡。
+ * pick(win) 返回宿主的 locator；采集器的 keepPointer 保持指针不动（移开会收起气泡）。
+ */
+function hoverTooltip(pick) {
+  return async (win) => {
+    const host = await pick(win);
+    const box = await host.boundingBox();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await win.mouse.move(x, y);
+    try {
+      await win.locator('[role="tooltip"]').waitFor({ state: "visible", timeout: 5000 });
+    } catch (error) {
+      // 没出气泡多半是指针没落在宿主上：把落点与宿主的现状写进错误，免得再盲猜
+      const info = await win.evaluate(([px, py]) => {
+        const el = document.elementFromPoint(px, py);
+        return { tag: el?.tagName, cls: String(el?.className ?? "").slice(0, 80), title: el?.getAttribute("title"), innerHeight: window.innerHeight };
+      }, [x, y]);
+      throw new Error(`悬停提示没有出现：指针 (${x}, ${y})，宿主外框 ${JSON.stringify(box)}，落点 ${JSON.stringify(info)}；${error.message.split("\n")[0]}`);
+    }
+    await win.waitForTimeout(400); // 入场过渡（duration-quick）走完
+  };
+}
+
+/** 顶栏的侧栏开关：宽屏是「收起」，紧凑布局是「展开」；两个文案都带 title。 */
+const topBarToggle = (win) => win.locator('button[title="收起"], button[title="展开"]').first();
+
+/** 第一个可打开成果的任务标题（标题按钮，title 是原始地址；行是已完成的「本地优先软件的七个理想」）。 */
+const openableTitle = (win) => win.getByRole("button", { name: "本地优先软件的七个理想", exact: true }).first();
+
+/**
+ * 把指针停在名字匹配 name 的第一个按钮的中心，等颜色过渡（transition-colors 150ms）走完。
+ * 用于没有 title 提示的按钮（耗时摘要）：悬停后只有颜色与下划线变化。
+ */
+function hoverImportsButton(name) {
+  return async (win) => {
+    const box = await win.getByRole("button", { name }).first().boundingBox();
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await win.waitForTimeout(400);
+  };
+}
+
+/**
+ * 筛选到「失败」后列表里的第一个带 title 的任务标题（显示名顶掉了原始地址）：失败任务里排第一的是知乎那条，
+ * 原始地址 57 个字符，比气泡的 max-w-xs 长，折成两行；它在列表最上方，下方放得下，气泡落在它下面。
+ * 任务行的时间列也有长提示（「入队 …｜更新 …」），但行一悬停，左右两个动作钮（含删除）就把它整个盖住（钮间缝隙 1.75px、
+ * 两端各不到 1px），鼠标几乎碰不到，所以不拿它当宿主。
+ */
+const firstNamedRowTitle = (win) => win.locator('[class*="group/row"] :is(p, button).truncate[title]').first();
+
+/** 点筛选「失败 N」之后悬停在 pick 选中的元素上；两步合成一个场景步骤。 */
+function filterThenHoverTooltip(filterName, pick) {
+  const filter = clickImportsButton(filterName);
+  const hover = hoverTooltip(pick);
+  return async (win) => {
+    await filter(win);
+    await hover(win);
+  };
+}
+
+/**
+ * 视口里完整可见、且指针真的落得到的最靠下的一个任务标题（带 title 的那种：显示名顶掉了原始地址）：
+ * 它下方放不下气泡时，提示翻到它上方。取标题而不是时间列，因为行一悬停右上角的动作条就盖在时间列上，指针落不到它；
+ * 标题在行的左侧，动作条够不着。
+ * 「落得到」指中心点的最上层元素是它自己或它的后代——被滚动容器裁掉的那半截行在视口坐标里看得见，指针却落在别处。
+ */
+async function lowestVisibleRowName(win) {
+  const labels = win.locator('[class*="group/row"] :is(p, button).truncate[title]');
+  const count = await labels.count();
+  const innerHeight = await win.evaluate(() => window.innerHeight);
+  let best = null;
+  let bestBottom = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const box = await labels.nth(i).boundingBox();
+    if (!box || box.y + box.height > innerHeight - 2 || box.y + box.height <= bestBottom) continue;
+    const reachable = await labels.nth(i).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!hit && el.contains(hit);
+    });
+    if (!reachable) continue;
+    best = labels.nth(i);
+    bestBottom = box.y + box.height;
+  }
+  if (!best) throw new Error("视口里没有完整可见、指针落得到的任务标题");
+  return best;
+}
+
+/** 点「清理当前筛选」，等确认框出现。 */
+async function openClearConfirm(win) {
+  await win.getByRole("button", { name: "清理当前筛选", exact: true }).click();
+  await win.getByRole("alertdialog").waitFor({ state: "visible" });
+  await win.mouse.move(2, 2);
+}
+
 /** 设置内容滚动容器：内容壳的直接父元素（没有 testid，用结构选择器）。 */
 const SETTINGS_CONTENT_SCROLLER = 'div:has(> [data-testid="settings-content-shell"])';
 
@@ -128,6 +316,28 @@ export const SCENES = {
     { message: TOAST_TEXT.success, type: "success" },
     { message: TOAST_TEXT.undo, undo: true },
   ]),
+  // 采集队列整窗（顶栏 + rail + 二级侧栏 + 任务列表）：夹具与时间见 lib/react-imports.mjs。
+  "app.window.imports": importsScene({}),
+  "app.window.imports.loading": importsScene({ mode: "loading" }),
+  "app.window.imports.error": importsScene({ mode: "error", errorMessage: IMPORTS_FIXTURE.loadError }),
+  "app.window.imports.empty": importsScene({ mode: "empty" }),
+  "app.window.imports.filtered-empty": importsScene({}, searchNoMatch),
+  "app.window.imports.selection": importsScene({}, selectImportRows(1, 3)),
+  "app.window.imports.filter-failed": importsScene({}, clickImportsButton("失败 3")),
+  "app.window.imports.origin-mobile": importsScene({}, clickImportsButton("手机端", { group: "提交来源" })),
+  "app.window.imports.paused": importsScene({ paused: true }),
+  "app.window.imports.load-more": importsScene({ hasMore: true }, scrollImportsToEnd),
+  "app.window.imports.row-hover": importsScene({}, hoverImportsRow("本地优先软件的七个理想"), { keepPointer: true }),
+  "app.window.imports.clear-confirm": importsScene({}, openClearConfirm),
+  // 悬停提示（TooltipLayer）：整窗 + 气泡。宿主取自采集队列页——顶栏图标钮（单行短提示）、筛选到失败后第一条的任务标题
+  // （长地址折成两行，气泡在下方）、最靠下的任务标题（翻到上方）。
+  "ui.tooltip.below": importsScene({}, hoverTooltip(topBarToggle), { keepPointer: true }),
+  "ui.tooltip.wrap": importsScene({}, filterThenHoverTooltip("失败 3", firstNamedRowTitle), { keepPointer: true }),
+  "ui.tooltip.flip": importsScene({}, hoverTooltip(lowestVisibleRowName), { keepPointer: true }),
+  // 悬停下划线（台账 B-012）：可打开成果的任务标题（hover:text-primary hover:underline，同时出标题的提示气泡），
+  // 与行上的耗时摘要（hover:text-foreground hover:underline，11px，没有提示）。
+  "app.window.imports.title-hover": importsScene({}, hoverTooltip(openableTitle), { keepPointer: true }),
+  "app.window.imports.summary-hover": importsScene({}, hoverImportsButton(/^共 \d/), { keepPointer: true }),
   "settings.general": {
     module: "settings",
     region: SETTINGS_CONTENT_SCROLLER,

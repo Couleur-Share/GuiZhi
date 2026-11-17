@@ -3,6 +3,7 @@ package parity
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 )
 
@@ -18,6 +19,53 @@ func reactIcons(f *Facts) []Box {
 	for _, p := range f.Paints {
 		if p.Tag == "svg" {
 			out = append(out, p.Box)
+		}
+	}
+	return out
+}
+
+// invisibleReactIcons 返回 React 一侧「看不见」的图标外框：自身或祖先 opacity 为 0（悬停才显现的行内工具条等），
+// 采集时标了 Paint.Invisible。同一个外框上只要还有一枚看得见的图标，就不算看不见。
+// 看不见的图标没有自己的墨迹：外框与数量照常比较，但不比墨迹，L3 也不遮罩它们——底下的内容（常是别的文字、背景）仍要如实比。
+func invisibleReactIcons(f *Facts) map[Box]bool {
+	hidden := map[Box]bool{}
+	visible := map[Box]bool{}
+	for _, p := range f.Paints {
+		if p.Tag != "svg" {
+			continue
+		}
+		if p.Invisible {
+			hidden[p.Box] = true
+		} else {
+			visible[p.Box] = true
+		}
+	}
+	for b := range visible {
+		delete(hidden, b)
+	}
+	return hidden
+}
+
+// maskedIcons 返回 L3 要遮掉的图标外框：两侧的图标，去掉 React 一侧看不见的图标和与之配对的 Viva 图标。
+func maskedIcons(in Inputs) []Box {
+	react := reactIcons(in.React)
+	hidden := invisibleReactIcons(in.React)
+	pairs, _, _ := pairIcons(react, in.Viva.Icons)
+	pairedHidden := map[Box]bool{}
+	for _, p := range pairs {
+		if hidden[p.React] {
+			pairedHidden[p.Viva] = true
+		}
+	}
+	var out []Box
+	for _, b := range react {
+		if !hidden[b] {
+			out = append(out, b)
+		}
+	}
+	for _, b := range in.Viva.Icons {
+		if !pairedHidden[b] {
+			out = append(out, b)
 		}
 	}
 	return out
@@ -77,6 +125,8 @@ func pairIcons(react, viva []Box) (pairs []iconPair, missing, extra []Box) {
 func compareIcons(rep *Report, in Inputs, th Thresholds) {
 	react := reactIcons(in.React)
 	rep.L2.Icons = len(react)
+	hidden := invisibleReactIcons(in.React)
+	overlayInk := overlayInkRects(in.Viva)
 	pairs, missing, extra := pairIcons(react, in.Viva.Icons)
 	for _, b := range missing {
 		rep.add(LayerL2, "icon-missing", "图标 "+fmtBox(b), "React 有这枚图标，Viva 没有画（或画在别处，中心距离超过 %.0fpx）", maxIconPairDistance)
@@ -90,11 +140,26 @@ func compareIcons(rep *Report, in Inputs, th Thresholds) {
 		d := boxDelta(p.React, p.Viva)
 		rep.L2.MaxIconDelta = math.Max(rep.L2.MaxIconDelta, d)
 		if d > th.Metrics.MaxDeltaPx+1e-9 {
-			rep.add(LayerL2, "icon-box", subject, "外框差 %.2fpx（上限 %.2f）：React %s，Viva %s", d, th.Metrics.MaxDeltaPx, fmtBox(p.React), fmtBox(p.Viva))
+			rep.addDelta(d, LayerL2, "icon-box", subject, "外框差 %.2fpx（上限 %.2f）：React %s，Viva %s", d, th.Metrics.MaxDeltaPx, fmtBox(p.React), fmtBox(p.Viva))
+			continue
+		}
+		if hidden[p.React] {
+			rep.L2.IconsInvisible++ // 看不见的图标没有墨迹可比：外框已比过，见 invisibleReactIcons
 			continue
 		}
 		if !in.FactsOnly && in.ReactImg != nil && in.VivaImg != nil {
-			if m := checkInk(rep, in, th, subject, p.React, false, false); m != nil {
+			overlay := slices.Contains(in.Viva.OverlayIcons, p.Viva)
+			if in.Backdrop != nil && !overlay {
+				// 与页面层文字同一规则（compareText）：有遮罩的场景里页面层的图标在遮罩背后，被模糊，或整个被面板盖住，
+				// 量墨迹的区域里是面板自己的内容，不比墨迹（台账 A-007）；面板自己的图标（overlay）照常比。
+				rep.L2.InkBlurred++
+				continue
+			}
+			if !overlay && occludedByOverlayInk(p.React, overlayInk) {
+				rep.L2.InkOccluded++ // 图标被浮层里的文字或图标盖住一部分：区域里是浮层自己的墨迹，同页面文字的规则（compare_occlusion.go）
+				continue
+			}
+			if m := checkInk(rep, in, th, subject, p.React, false, overlay); m != nil {
 				rep.L2.IconInk = append(rep.L2.IconInk, *m)
 			}
 		}

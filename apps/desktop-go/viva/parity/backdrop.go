@@ -78,7 +78,7 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 		return b, nil
 	}
 	base := scene
-	base.Steps, base.Backdrop = s.BaseSteps, nil
+	base.Steps, base.Prepare, base.Backdrop = s.BaseSteps, nil, nil
 	_, page, err := Render(base, viva.Variant, viva.Region)
 	if err != nil {
 		return nil, fmt.Errorf("渲染对话框打开之前的页面失败：%w", err)

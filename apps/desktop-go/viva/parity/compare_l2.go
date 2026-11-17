@@ -22,7 +22,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 			rep.L2.BoxWithin++
 			continue
 		}
-		rep.add(LayerL2, "box", describe(p.React), "外框差 %.2fpx（上限 %.2f）：React %s，Viva %s", d, maxDelta, fmtBox(p.React.Box), fmtBox(p.Viva.Box))
+		rep.addDelta(d, LayerL2, "box", describe(p.React), "外框差 %.2fpx（上限 %.2f）：React %s，Viva %s", d, maxDelta, fmtBox(p.React.Box), fmtBox(p.Viva.Box))
 	}
 	if rep.L1.ReactNodes > 0 {
 		rep.L2.AlignmentRate = float64(rep.L1.NodesMatched) / float64(rep.L1.ReactNodes)
@@ -34,6 +34,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 	}
 
 	// 文字：行数、绘制宽度、墨迹外接框。
+	overlayInk := overlayInkRects(in.Viva)
 	for _, p := range texts {
 		subject := quote(NormText(p.React.Text))
 		lines := 0
@@ -67,7 +68,7 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 					if dw <= maxDelta+1e-9 {
 						rep.L2.TextWidthOK++
 					} else {
-						rep.add(LayerL2, "text-width", subject, "绘制宽度差 %.2fpx（上限 %.2f）：React %.2f，Viva %.2f", dw, maxDelta, rr.W(), painted)
+						rep.addDelta(dw, LayerL2, "text-width", subject, "绘制宽度差 %.2fpx（上限 %.2f）：React %.2f，Viva %.2f", dw, maxDelta, rr.W(), painted)
 					}
 				} else {
 					rep.L2.TextWidthOK++
@@ -77,6 +78,9 @@ func compareL2(rep *Report, in Inputs, th Thresholds, nodes []nodePair, texts []
 						// 有遮罩的场景里，页面层文字都在遮罩背后：被模糊，或（窄窗口里）整个被面板盖住，墨迹处是面板自己的内容，
 						// 都不比墨迹（台账 A-007）；面板自己的文字（overlay）照常比。
 						rep.L2.InkBlurred++
+					} else if !overlay && occludedByOverlayInk(rr, overlayInk) {
+						// 页面文字被浮层里的文字或图标盖住一部分：量墨迹的区域里是浮层自己的字形，不是这行文字的墨迹（见 compare_occlusion.go）。
+						rep.L2.InkOccluded++
 					} else {
 						checkInk(rep, in, th, subject, rr, true, overlay)
 					}
@@ -134,10 +138,10 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 	rep.L2.MaxInkMass = math.Max(rep.L2.MaxInkMass, ratio)
 	switch {
 	case abs(dx) > allowX || abs(dy) > th.Metrics.InkMaxDeltaY:
-		rep.add(LayerL2, "ink", subject, "墨迹错位：水平 %+d、垂直 %+d 像素（上限 %d、%d；正值表示 Viva 相对 React 偏右、偏下）",
+		rep.addDelta(float64(max(abs(dx), abs(dy))), LayerL2, "ink", subject, "墨迹错位：水平 %+d、垂直 %+d 像素（上限 %d、%d；正值表示 Viva 相对 React 偏右、偏下）",
 			dx, dy, allowX, th.Metrics.InkMaxDeltaY)
 	case ratio < th.Metrics.InkMassMin || ratio > th.Metrics.InkMassMax:
-		rep.add(LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
+		rep.addDelta(math.Abs(ratio-1), LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
 			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)
 		rep.Issues[len(rep.Issues)-1].Overlay = overlay
 	default:

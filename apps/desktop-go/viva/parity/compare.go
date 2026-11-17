@@ -23,6 +23,8 @@ type Issue struct {
 	Message string `json:"message"`
 	// Overlay 表示问题出在浮层里的文字上（Viva 把它画在浮层层级）；已登记的浮层文字偏差据此匹配。
 	Overlay bool `json:"overlay,omitempty"`
+	// Delta 是偏差的大小（像素），只有外框、文字宽度、图标外框与墨迹位移这几类度量问题带；其余为 0。
+	Delta float64 `json:"delta,omitempty"`
 }
 
 // L1Result 汇总结构比较。
@@ -55,16 +57,20 @@ type L2Result struct {
 	InkChecked    int     `json:"inkChecked"`
 	InkOK         int     `json:"inkOK"`
 	// InkBlurred 是因遮罩背后模糊而没有比较墨迹的文字行与图标数（台账 A-007）。
-	InkBlurred int        `json:"inkBlurred,omitempty"`
-	MaxInkDX   int        `json:"maxInkDX"`
-	MaxInkDY   int        `json:"maxInkDY"`
-	MinInkMass float64    `json:"minInkMass"`
-	MaxInkMass float64    `json:"maxInkMass"`
-	InkShifts  []InkShift `json:"inkShifts,omitempty"`
+	InkBlurred int `json:"inkBlurred,omitempty"`
+	// InkOccluded 是因墨迹区域被浮层里的文字或图标侵入而没有比较墨迹的页面文字行与图标数（台账 A-009，见 compare_occlusion.go）。
+	InkOccluded int        `json:"inkOccluded,omitempty"`
+	MaxInkDX    int        `json:"maxInkDX"`
+	MaxInkDY    int        `json:"maxInkDY"`
+	MinInkMass  float64    `json:"minInkMass"`
+	MaxInkMass  float64    `json:"maxInkMass"`
+	InkShifts   []InkShift `json:"inkShifts,omitempty"`
 	// 图标（见 compare_icons.go）：React 的 SVG 数、与 Viva 配上的数、配上的图标外框最大差。
 	Icons        int     `json:"icons"`
 	IconsMatched int     `json:"iconsMatched"`
 	MaxIconDelta float64 `json:"maxIconDelta"`
+	// IconsInvisible 是配上了、但 React 一侧看不见（祖先 opacity 为 0）因而没有比墨迹的图标数。
+	IconsInvisible int `json:"iconsInvisible,omitempty"`
 	// IconInk 是每枚配上的图标量到的墨迹比与位移，供标定与趋势分析。
 	IconInk []InkMeasure `json:"iconInk,omitempty"`
 }
@@ -108,6 +114,13 @@ type Report struct {
 
 func (r *Report) add(layer Layer, kind, subject, format string, args ...any) {
 	r.Issues = append(r.Issues, Issue{Layer: layer, Kind: kind, Subject: subject, Message: fmt.Sprintf(format, args...)})
+}
+
+// addDelta 与 add 相同，另记下偏差的大小（像素）：已登记的偏差可以按大小设上限（Waiver.MaxDelta），
+// 这样「某个原因造成的次像素位移」只放过次像素的，同一处更大的偏差照常判定。
+func (r *Report) addDelta(delta float64, layer Layer, kind, subject, format string, args ...any) {
+	r.add(layer, kind, subject, format, args...)
+	r.Issues[len(r.Issues)-1].Delta = delta
 }
 
 // Failed 返回某一层上的问题数。
@@ -189,6 +202,9 @@ func (r *Report) Markdown() string {
 	if r.L2.InkBlurred > 0 {
 		fmt.Fprintf(&b, "- L2 墨迹：%d 行文字与图标在遮罩背后被模糊，不比较墨迹（台账 A-007），改由 L3 在 Viva 图模糊后比较\n", r.L2.InkBlurred)
 	}
+	if r.L2.InkOccluded > 0 {
+		fmt.Fprintf(&b, "- L2 墨迹：%d 行文字与图标的墨迹区域被浮层里的文字或图标侵入，不比较墨迹（台账 A-009）；位置与宽度照常比\n", r.L2.InkOccluded)
+	}
 	if r.L2.Icons > 0 {
 		lo, hi := 0.0, 0.0
 		for i, m := range r.L2.IconInk {
@@ -200,6 +216,9 @@ func (r *Report) Markdown() string {
 			}
 		}
 		fmt.Fprintf(&b, "- L2 图标：React %d 枚，与 Viva 配上 %d 枚（外框最大差 %.2fpx）；配上的图标墨迹量比 %.3f–%.3f\n", r.L2.Icons, r.L2.IconsMatched, r.L2.MaxIconDelta, lo, hi)
+		if r.L2.IconsInvisible > 0 {
+			fmt.Fprintf(&b, "- L2 图标：其中 %d 枚在 React 一侧看不见（祖先 opacity 为 0，悬停才显现），只比外框、不比墨迹，L3 也不遮罩\n", r.L2.IconsInvisible)
+		}
 	}
 	fmt.Fprintf(&b, "- L3 像素：%dx%d，遮罩 %d，比较 %d，差异 %d，比例 %.4f%%（上限 %.4f%%）\n\n",
 		r.L3.Width, r.L3.Height, r.L3.Masked, r.L3.Compared, r.L3.Diff, r.L3.Ratio*100, r.L3.MaxDiffRatio*100)

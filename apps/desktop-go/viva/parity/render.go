@@ -5,6 +5,7 @@ import (
 	"image"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/vivaui/viva/app"
@@ -25,6 +26,11 @@ type Scene struct {
 	// Steps 可选：画面首次稳定后、采集前，像用户那样操作界面，把它带到要对照的状态（滚动、点开下拉……）。
 	// 与渲染层场景的 enter 一一对应；做完后会让动画走完、画面再次稳定。
 	Steps func(s *headless.Session) error
+	// Prepare 可选：一次渲染的页面与操作步骤由它一起装配，非空时替代 Build 与 Steps。
+	// 操作步骤要用到装配页面时新建的状态（Store 之类）时用它：同一个 Scene 值会被并行渲染多次（单元测试里每个样本一次），
+	// 状态存在场景值上就会串线；Prepare 每次渲染新建自己的一份，步骤闭包拿的是自己那份。
+	// Build 仍须可用（模糊背景的「对话框打开之前」渲染只走 Build，见 BackdropSpec.BaseSteps）。
+	Prepare func(look *kit.Look) (view func(c ui.C), steps func(s *headless.Session) error)
 	// Waivers 是这个场景已在台账登记的偏差（见 waiver.go）。
 	Waivers []Waiver
 	// Backdrop 非空：场景里有被遮罩背后模糊的区域（模态对话框，台账 A-007），对照时按它模拟模糊（见 backdrop.go）。
@@ -72,7 +78,14 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 	look.Viewport = float32(vw)
 	look.Scale = 1
 	background := look.Col(look.T.Background)
-	page := ui.NewPage(ui.PageConfig{View: s.Build(look), Theme: &look.Theme, Background: &background})
+	var view func(c ui.C)
+	steps := s.Steps
+	if s.Prepare != nil {
+		view, steps = s.Prepare(look)
+	} else {
+		view = s.Build(look)
+	}
+	page := ui.NewPage(ui.PageConfig{View: view, Theme: &look.Theme, Background: &background})
 	var canvas gfx.Canvas
 	session, err := headless.Open(
 		page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height}),
@@ -84,8 +97,8 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 	if err := settle(session); err != nil {
 		return nil, nil, err
 	}
-	if s.Steps != nil {
-		if err := s.Steps(session); err != nil {
+	if steps != nil {
+		if err := steps(session); err != nil {
 			return nil, nil, fmt.Errorf("场景 %s 的操作步骤失败：%w", s.ID, err)
 		}
 		// 动画走完（虚拟时钟推进到没有转场为止），再等画面稳定。
@@ -97,20 +110,26 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 		}
 	}
 	// 再出一帧专门记录图标外框（画面已稳定，这一帧与上一帧相同）。
-	var icons []Box
-	look.IconSink = func(r gfx.Rect) {
-		// 滚出视口的图标也会经过绘制回调；渲染层的采集只收与区域相交的元素，这里同样只收画面里看得见的图标。
+	var icons, overlayIcons []Box
+	look.IconSink = func(ic kit.IconDraw) {
+		// 滚出视口的图标也会经过绘制回调；渲染层的采集只收与区域相交的元素，这里同样只收画面里看得见的图标
+		// （被滚动区域等祖先裁掉的，kit 在报告之前已经滤掉了）。
+		r := ic.Rect
 		if r.X+r.Width <= 0 || r.Y+r.Height <= 0 || r.X >= float32(region.Width) || r.Y >= float32(region.Height) {
 			return
 		}
-		icons = append(icons, Box{float64(r.X), float64(r.Y), float64(r.Width), float64(r.Height)})
+		box := Box{float64(r.X), float64(r.Y), float64(r.Width), float64(r.Height)}
+		icons = append(icons, box)
+		if ic.Overlay {
+			overlayIcons = append(overlayIcons, box)
+		}
 	}
 	if err := session.Frame(); err != nil {
 		return nil, nil, fmt.Errorf("出帧失败：%w", err)
 	}
 	look.IconSink = nil
 	facts := collectViva(session, s.ID, v, region)
-	facts.Icons = icons
+	facts.Icons, facts.OverlayIcons = icons, overlayIcons
 	if !wantImage {
 		return facts, nil, nil
 	}
@@ -143,16 +162,19 @@ func settle(session *headless.Session) error {
 	return fmt.Errorf("画面在 %d 帧内没有稳定", settleFrames)
 }
 
+// layoutDigest 把当前画面的文字与图元外框、颜色串成一个摘要，供 settle 判断画面是否停住。
+// 用 strings.Builder 线性拼接：采集队列页有几千个图元，逐个 s += 会让整个测试集多花近一半时间（O(n²) 的内存拷贝）。
 func layoutDigest(session *headless.Session) string {
 	snap := session.Snapshot()
-	s := fmt.Sprintf("%d|%d|", len(snap.Primitives), len(snap.Texts))
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d|%d|", len(snap.Primitives), len(snap.Texts))
 	for _, t := range snap.Texts {
-		s += fmt.Sprintf("%v;", t.Bounds)
+		fmt.Fprintf(&b, "%v;", t.Bounds)
 	}
 	for _, p := range snap.Primitives {
-		s += fmt.Sprintf("%v%v;", p.Bounds, p.Color)
+		fmt.Fprintf(&b, "%v%v;", p.Bounds, p.Color)
 	}
-	return s
+	return b.String()
 }
 
 // collectViva 把无头会话当前的画面整理成事实：可访问节点、文字、绘制图元。
@@ -169,6 +191,13 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		painted := float64(t.Bounds.Width)
 		if i < len(snap.TextWidths) && snap.TextWidths[i] > 0 {
 			painted = float64(snap.TextWidths[i])
+		}
+		// 文字被裁剪矩形截掉的右半段不算「呈现出来」：React 一侧同样只记看得见的部分（输入框的内容盒、
+		// 溢出隐藏的祖先），两边都按可见宽度比较；否则一段被裁掉的占位文字会让遮罩与墨迹区域越出输入框。
+		if t.HasClip {
+			if right := float64(t.ClipOf.X + t.ClipOf.Width); float64(t.Bounds.X)+painted > right {
+				painted = math.Max(right-float64(t.Bounds.X), 0)
+			}
 		}
 		rows := int(math.Ceil(float64(t.Bounds.Height) - 1e-6))
 		baseline := float64(t.Bounds.Y) + float64(kit.VivaBaselineRow(rows, float64(t.Style.Size)))
@@ -243,8 +272,15 @@ func nodeOf(n app.AccessNode) Node {
 	if n.Level > 0 {
 		props["level"] = float64(n.Level)
 	}
+	value := n.Value
+	if n.Range.Set {
+		// 滑块、分隔条的数值：与渲染层的 aria-valuenow / valuemin / valuemax 对应。
+		value = strconv.FormatFloat(n.Range.Now, 'f', -1, 64)
+		props["valuemin"] = strconv.FormatFloat(n.Range.Min, 'f', -1, 64)
+		props["valuemax"] = strconv.FormatFloat(n.Range.Max, 'f', -1, 64)
+	}
 	return Node{
-		Role: n.Role.String(), Name: n.Label, Value: n.Value, Description: n.Description, Props: props,
+		Role: n.Role.String(), Name: n.Label, Value: value, Description: n.Description, Props: props,
 		Box:    []float64{float64(n.Bounds.X), float64(n.Bounds.Y), float64(n.Bounds.Width), float64(n.Bounds.Height)},
 		Parent: -1,
 	}

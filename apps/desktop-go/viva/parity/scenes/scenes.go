@@ -40,6 +40,11 @@ var overlayInkWaiver = parity.Waiver{
 	Note: "浮层文字：渲染层灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（位置、字重、颜色、字号均一致）",
 }
 
+// withOverlayInk 在 waivers 之外再加上 overlayInkWaiver，返回新切片（不改动 waivers 的底层数组：它被多个场景共用）。
+func withOverlayInk(waivers []parity.Waiver) []parity.Waiver {
+	return append(append([]parity.Waiver{}, waivers...), overlayInkWaiver)
+}
+
 // confirmBackdrop 是 ConfirmDialog 的遮罩（bg-background/60 加 backdrop-blur-sm，4px）：遮罩之上是名为 name 的对话框面板（台账 A-007）。
 // 对话框由 Scene.Steps 点开，打开之前的页面不需要任何操作（BaseSteps 为空）。
 func confirmBackdrop(name string) *parity.BackdropSpec {

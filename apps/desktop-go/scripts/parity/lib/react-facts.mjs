@@ -142,6 +142,38 @@ const TEXTS_EXPR = `(async () => {
       testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
     };
   };
+  // text-overflow: ellipsis 截断：DOM 文本仍是全文，浏览器画出的是「放得下的前缀 + …」。
+  // 采集的是「看得见的文字」（Viva 的 Ellipsis 同样只留可见部分），所以按 Chromium 的规则复算截断点：
+  // 取最长的前缀，使「前缀宽度 + 省略号宽度」不超过内容盒宽度。只处理单行、文字节点直接位于截断元素之下的常见写法
+  // （truncate 类）；其余写法不复算，对照时文字不一致会直接报出来，不会悄悄放过。
+  const ellipsize = (node, el, cs, rects) => {
+    if (cs.textOverflow !== "ellipsis" || cs.overflowX === "visible") return null;
+    if (el.scrollWidth <= el.clientWidth) return null;
+    // 单行才复算（折行的文字没有省略号）；截断的那一行 Chromium 会给出一个以上的矩形片段，同一 y。
+    if (rects.some((r) => r[1] !== rects[0][1])) return null;
+    const px = (name) => parseFloat(cs.getPropertyValue(name)) || 0;
+    const avail = el.clientWidth - px("padding-left") - px("padding-right");
+    measure.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(" ");
+    const ellipsisWidth = measure.measureText("…").width;
+    const text = node.data;
+    const probe = document.createRange();
+    const widthOf = (k) => {
+      probe.setStart(node, 0);
+      probe.setEnd(node, k);
+      return probe.getBoundingClientRect().width;
+    };
+    let lo = 0;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (widthOf(mid) + ellipsisWidth <= avail + 1e-6) lo = mid;
+      else hi = mid - 1;
+    }
+    const code = text.charCodeAt(lo - 1);
+    if (lo > 0 && code >= 0xd800 && code <= 0xdbff) lo -= 1; // 不把代理对劈开
+    const [x, y, , h] = rects[0];
+    return { shown: text.slice(0, lo) + "…", rect: [x, y, round(widthOf(lo) + ellipsisWidth), h] };
+  };
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   let node;
   while ((node = walker.nextNode())) {
@@ -163,9 +195,12 @@ const TEXTS_EXPR = `(async () => {
     }
     if (rects.length === 0) continue;
     const lh = parseFloat(cs.lineHeight);
+    const cut = ellipsize(node, el, cs, rects);
     out.push({
-      text: node.data,
-      rects,
+      // 被省略号截断时，text 是看得见的「前缀 + …」，full 才是 DOM 原文；rects 取截断后的宽度。
+      text: cut ? cut.shown : node.data,
+      ...(cut ? { full: node.data } : {}),
+      rects: cut ? [cut.rect] : rects,
       font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),
       size: parseFloat(cs.fontSize),
       weight: Number(cs.fontWeight),
@@ -199,6 +234,16 @@ const PAINTS_EXPR = `(async () => {
   const owners = [];
   const round = (n) => Math.round(n * 1000) / 1000;
   const clear = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
+  // 有效不透明度：自身与全部祖先 opacity 的乘积。opacity-0 的容器里（悬停才显现的行内工具条）的图标自己的 opacity 仍是 1，
+  // 但整体看不见；采集时记 invisible，比较端据此不比这类图标的墨迹、也不遮罩它们底下的内容。
+  const effectiveOpacity = (node) => {
+    let o = 1;
+    for (let e = node; e && e !== document.documentElement; e = e.parentElement) {
+      o *= Number(getComputedStyle(e).opacity);
+      if (o < 0.001) return 0;
+    }
+    return o;
+  };
   let order = 0;
   for (const el of document.body.querySelectorAll("*")) {
     order += 1;
@@ -228,6 +273,7 @@ const PAINTS_EXPR = `(async () => {
       border: hasBorder ? border : null,
       radius: ["top-left", "top-right", "bottom-right", "bottom-left"].map((c) => cs.getPropertyValue("border-" + c + "-radius")),
       opacity: Number(cs.opacity),
+      ...(svg && effectiveOpacity(el) === 0 ? { invisible: true } : {}),
       overflow: cs.overflowX + " " + cs.overflowY,
       color: svg ? cs.color : undefined,
     });

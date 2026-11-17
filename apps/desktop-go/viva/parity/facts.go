@@ -105,6 +105,29 @@ type Node struct {
 	Depth       int            `json:"depth"`
 }
 
+// UnmarshalJSON 兼容两种 value：文本框、下拉的值是字符串，滑块与分隔条的 aria-valuenow 是数字
+// （React 采集器把它原样写进 value）。数字按最短写法转成字符串，与 Viva 一侧 Range.Now 的写法一致。
+func (n *Node) UnmarshalJSON(data []byte) error {
+	type Alias Node // 导出名：encoding/json 不能给未导出类型的内嵌指针赋值
+	aux := struct {
+		*Alias
+		Value json.RawMessage `json:"value"`
+	}{Alias: (*Alias)(n)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	raw := strings.TrimSpace(string(aux.Value))
+	switch {
+	case raw == "" || raw == "null":
+		n.Value = ""
+	case strings.HasPrefix(raw, `"`):
+		return json.Unmarshal(aux.Value, &n.Value)
+	default:
+		n.Value = raw
+	}
+	return nil
+}
+
 // BoxOK 返回外框；没有外框时 ok 为 false。
 func (n Node) BoxOK() (Box, bool) {
 	if len(n.Box) != 4 {
@@ -136,7 +159,10 @@ func (n Node) Prop(key string) (string, bool) {
 // React 侧的矩形是 Range 的内容区矩形（高 = ascent + descent）；Viva 侧的矩形是文字盒（行盒），
 // 两者的差异由比较端按各自语义处理，见 compare_text.go。
 type Text struct {
+	// Text 是看得见的文字。React 侧遇到 text-overflow: ellipsis 的截断时是「放得下的前缀 + …」（采集器按 Chromium 的规则复算），
+	// 原文在 Full 里；其余情况与 DOM 文本相同。
 	Text       string    `json:"text"`
+	Full       string    `json:"full,omitempty"`
 	Rects      []Box     `json:"rects"`
 	Font       string    `json:"font,omitempty"`
 	Size       float64   `json:"size"`
@@ -162,7 +188,9 @@ type Paint struct {
 	Shadow  string   `json:"shadow,omitempty"`
 	Radius  []string `json:"radius,omitempty"`
 	Opacity float64  `json:"opacity"`
-	Color   string   `json:"color,omitempty"`
+	// Invisible 只对 SVG 图标记：自身或某个祖先的 opacity 为 0（悬停才显现的控件），整体看不见。
+	Invisible bool   `json:"invisible,omitempty"`
+	Color     string `json:"color,omitempty"`
 }
 
 // Font 是一个字体键对应的平台字体取证（React：CSS.getPlatformFontsForNode）。
@@ -186,9 +214,11 @@ type Facts struct {
 	TextRects []Box   `json:"textRects"`
 	Paints    []Paint `json:"paints"`
 	// Icons 是 Viva 一侧画出的图标的外框（经 kit.Look.IconSink 记录）；React 一侧的图标取自 Paints 里 tag 为 svg 的项，见 reactIcons。
-	Icons []Box  `json:"icons,omitempty"`
-	Fonts []Font `json:"fonts,omitempty"`
-	Aria  string `json:"aria,omitempty"`
+	Icons []Box `json:"icons,omitempty"`
+	// OverlayIcons 是 Icons 里画在浮层层级（对话框、下拉面板）的那部分；遮罩场景里页面层的图标在遮罩背后，不比墨迹（见 compareIcons）。
+	OverlayIcons []Box  `json:"overlayIcons,omitempty"`
+	Fonts        []Font `json:"fonts,omitempty"`
+	Aria         string `json:"aria,omitempty"`
 }
 
 // LoadFacts 读事实 JSON；版本不符时明确报错，不静默接受。

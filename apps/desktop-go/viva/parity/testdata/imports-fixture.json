@@ -1,0 +1,223 @@
+{
+  "now": 1794801600000,
+  "timezone": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "loadError": "无法读取采集任务：database is locked（SQLITE_BUSY）",
+  "noMatchQuery": "没有这个关键字",
+  "queue": { "paused": false, "runningCount": 2, "pendingCount": 1, "concurrency": 2 },
+  "tasks": [
+    {
+      "id": "task-processing",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.bilibili.com/video/BV1GJ411x7h7",
+      "displayName": "【教程】三十分钟学会本地优先的软件设计",
+      "status": "processing",
+      "stage": "transcribing",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "video-metadata", "ms": 3200 },
+        { "stage": "video-audio", "ms": 41000 }
+      ],
+      "createdAt": 1794800870000,
+      "updatedAt": 1794801580000
+    },
+    {
+      "id": "task-stalled",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "displayName": "Local-first software: you own your data, in spite of the cloud",
+      "status": "processing",
+      "stage": "summarizing",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "video-metadata", "ms": 2100 },
+        { "stage": "transcribing", "ms": 418000 },
+        { "stage": "formatting", "ms": 96000 }
+      ],
+      "createdAt": 1794800040000,
+      "updatedAt": 1794801415000
+    },
+    {
+      "id": "task-pending",
+      "origin": "desktop",
+      "sourceKind": "file",
+      "sourceInput": "D:\\资料\\2026-Q4\\季度复盘与明年规划.pdf",
+      "displayName": "季度复盘与明年规划.pdf",
+      "status": "pending",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "createdAt": 1794801330000,
+      "updatedAt": 1794801330000
+    },
+    {
+      "id": "task-completed",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://example.com/blog/local-first-notes",
+      "displayName": "本地优先软件的七个理想",
+      "status": "completed",
+      "itemType": "webpage",
+      "resultItemId": "item-001",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "fetching", "ms": 1840 },
+        { "stage": "extracting", "ms": 920 },
+        { "stage": "saving", "ms": 310 }
+      ],
+      "createdAt": 1794799500000,
+      "updatedAt": 1794799552000
+    },
+    {
+      "id": "task-video-done",
+      "origin": "mobile",
+      "sourceKind": "url",
+      "sourceInput": "https://www.bilibili.com/video/BV1xx411c7mD",
+      "displayName": "一口气看完 Go 1.27 新特性",
+      "status": "completed",
+      "itemType": "video",
+      "resultItemId": "item-002",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "video-metadata", "ms": 2400 },
+        { "stage": "video-audio", "ms": 58000 },
+        { "stage": "transcoding", "ms": 9300 },
+        { "stage": "transcribing", "ms": 312000 },
+        { "stage": "formatting", "ms": 44000 },
+        { "stage": "summarizing", "ms": 21000 }
+      ],
+      "createdAt": 1794790800000,
+      "updatedAt": 1794791460000
+    },
+    {
+      "id": "task-warning",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+      "displayName": "Me at the zoo",
+      "status": "completed",
+      "warning": "文字稿生成失败：下载音频失败（HTTP 403）",
+      "itemType": "video",
+      "resultItemId": "item-003",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "video-metadata", "ms": 1500 },
+        { "stage": "video-audio", "ms": 6200 }
+      ],
+      "createdAt": 1794700000000,
+      "updatedAt": 1794700090000
+    },
+    {
+      "id": "task-duplicate",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://example.com/blog/local-first-notes",
+      "displayName": "本地优先软件的七个理想",
+      "status": "duplicate",
+      "itemType": "webpage",
+      "duplicateItemId": "item-001",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "createdAt": 1794699000000,
+      "updatedAt": 1794699004000
+    },
+    {
+      "id": "task-failed",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.zhihu.com/question/123456789/answer/987654321",
+      "displayName": "如何评价「本地优先」这一软件设计理念？",
+      "status": "failed",
+      "error": "[network] 抓取失败：连接 www.zhihu.com 超时（已重试 3 次），请检查网络或代理设置后重试",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [{ "stage": "fetching", "ms": 30000 }],
+      "createdAt": 1794698000000,
+      "updatedAt": 1794698031000
+    },
+    {
+      "id": "task-canceled",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://example.com/very/long/path/that/keeps/going/and/going/article.html?utm_source=newsletter&utm_medium=email",
+      "displayName": "https://example.com/very/long/path/that/keeps/going/and/going/article.html?utm_source=newsletter&utm_medium=email",
+      "status": "canceled",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "createdAt": 1794697000000,
+      "updatedAt": 1794697012000
+    },
+    {
+      "id": "task-text",
+      "origin": "desktop",
+      "sourceKind": "text",
+      "sourceInput": "今天读到的一段话：知识库的价值不在存储，而在回忆。",
+      "displayName": "今天读到的一段话",
+      "status": "completed",
+      "itemType": "note",
+      "resultItemId": "item-004",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [{ "stage": "saving", "ms": 120 }],
+      "createdAt": 1794696000000,
+      "updatedAt": 1794696001000
+    },
+    {
+      "id": "task-tool-missing",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.bilibili.com/video/BV1Zs4y1k7Wp",
+      "displayName": "BV1Zs4y1k7Wp",
+      "status": "failed",
+      "error": "yt-dlp 尚未安装，无法解析视频；请先在设置中安装采集工具",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "createdAt": 1794695000000,
+      "updatedAt": 1794695003000
+    },
+    {
+      "id": "task-auth",
+      "origin": "desktop",
+      "sourceKind": "url",
+      "sourceInput": "https://www.xiaohongshu.com/explore/65f1c2d3000000001a02b3c4",
+      "displayName": "周末咖啡探店｜这家的手冲值得专程去",
+      "status": "failed",
+      "error": "[guest_denied] 游客态无法查看这条笔记",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "createdAt": 1794694000000,
+      "updatedAt": 1794694006000
+    },
+    {
+      "id": "task-long",
+      "origin": "desktop",
+      "sourceKind": "file",
+      "sourceInput": "D:\\Users\\g2014\\Documents\\非常非常长的文件夹名称用来测试路径截断的行为\\第二级目录\\第三级目录\\年度报告（终稿）-2026-最终版-再次修改-请勿删除.docx",
+      "displayName": "年度报告（终稿）-2026-最终版-再次修改-请勿删除-这个文件名真的非常非常长一直长到一行放不下为止.docx",
+      "status": "completed",
+      "itemType": "document",
+      "resultItemId": "item-005",
+      "captureStrategy": "standard",
+      "commentLimit": 0,
+      "stageStats": [
+        { "stage": "extracting", "ms": 5400 },
+        { "stage": "saving", "ms": 260 }
+      ],
+      "createdAt": 1794600000000,
+      "updatedAt": 1794600009000
+    }
+  ],
+  "items": {
+    "item-001": { "id": "item-001", "title": "本地优先软件的七个理想", "bodyLength": 1286, "transcriptLength": 0, "assetCount": 0, "tags": ["本地优先","软件设计","CRDT"] },
+    "item-002": { "id": "item-002", "title": "一口气看完 Go 1.27 新特性", "bodyLength": 842, "transcriptLength": 5120, "assetCount": 3, "tags": ["Go","视频"] },
+    "item-003": { "id": "item-003", "title": "Me at the zoo", "bodyLength": 96, "transcriptLength": 48, "assetCount": 0, "tags": [] },
+    "item-004": { "id": "item-004", "title": "今天读到的一段话", "bodyLength": 58, "transcriptLength": 0, "assetCount": 0, "tags": ["摘录"] },
+    "item-005": { "id": "item-005", "title": "年度报告（终稿）-2026-最终版-再次修改-请勿删除", "bodyLength": 20480, "transcriptLength": 0, "assetCount": 0, "tags": ["报告","年度","归档","财务","复盘"] }
+  }
+}

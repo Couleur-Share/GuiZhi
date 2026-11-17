@@ -19,6 +19,9 @@ type Waiver struct {
 	Subject string
 	// Overlay 为真时，只放过出在浮层文字上的问题（Issue.Overlay）：同一段文字在页面层里出的问题照常判定。
 	Overlay bool
+	// MaxDelta 大于 0 时，只放过偏差大小（Issue.Delta，像素）不超过它的问题；没有记大小的问题不放过。
+	// 用于「某个已登记的原因造成的次像素位移」：原因本身（如字距差）放过，同一处更大的偏差仍要判定。
+	MaxDelta float64
 	// Note 说明偏差的内容与范围，写进报告，供阅读报告的人不必翻台账。
 	Note string
 }
@@ -39,6 +42,9 @@ func (w Waiver) matches(is Issue) bool {
 		return false
 	}
 	if w.Overlay && !is.Overlay {
+		return false
+	}
+	if w.MaxDelta > 0 && (is.Delta <= 0 || is.Delta > w.MaxDelta+1e-9) {
 		return false
 	}
 	return w.Subject == "" || strings.Contains(is.Subject, w.Subject)
