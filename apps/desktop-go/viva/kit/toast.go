@@ -193,6 +193,15 @@ func (n *Notifier) copyText(text string) error {
 	return app.SetClipboardText(text)
 }
 
+// CopyText 把文字写进剪贴板，供各屏的「复制」类动作使用；与「复制详情」走同一条路径，
+// 测试里换掉 Clipboard 就不碰系统剪贴板。n 为空（没有提示条宿主的测试与对照）时直接写系统剪贴板。任意 goroutine 可调用。
+func (n *Notifier) CopyText(text string) error {
+	if n == nil {
+		return app.SetClipboardText(text)
+	}
+	return n.copyText(text)
+}
+
 // advance 推进到帧时间 now：领走排队的操作，处理到点的自动消失、卸载与「已复制」，
 // 返回下一个需要重绘的时刻与它是否存在（供宿主 RequestFrameIn）。只在窗口线程调用。
 func (n *Notifier) advance(now time.Duration) (next time.Duration, ok bool) {

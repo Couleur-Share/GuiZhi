@@ -55,6 +55,11 @@ func Ellipsis() TextOpt { return TextOpt{box: func(b ui.Box) ui.Box { return b.E
 // Text 默认是单行（不折行），渲染层里会折行的段落（设置项说明、对话框正文）要加这个选项。
 func Wrapped() TextOpt { return TextOpt{box: func(b ui.Box) ui.Box { return b.MaxLines(0) }} }
 
+// LineClamp 让文字至多排 n 行，放不下时最后一行以省略号收尾（Tailwind 的 line-clamp-N）。n 不大于 1 时等同 Ellipsis。
+func LineClamp(n int) TextOpt {
+	return TextOpt{box: func(b ui.Box) ui.Box { return b.MaxLines(n) }}
+}
+
 // Centered 让文字在行内居中（text-center）。
 func Centered() TextOpt {
 	return TextOpt{box: func(b ui.Box) ui.Box { return b.TextCenter() }, align: alignCenter}

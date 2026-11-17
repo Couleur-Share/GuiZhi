@@ -28,6 +28,9 @@ func monoRuneAdvance(r rune, size float32) float32 {
 	return size * consolasAdvance
 }
 
+// IsWideRune 报告 r 是否占两个字格（汉字、假名、谚文、全角标点等）：对照工具据此算固定间距文字的字格数。
+func IsWideRune(r rune) bool { return isWideRune(r) }
+
 // isWideRune 报告 r 是否占一个全角字格（汉字、假名、谚文、全角标点等）。
 func isWideRune(r rune) bool {
 	switch {

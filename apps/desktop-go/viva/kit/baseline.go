@@ -118,6 +118,25 @@ func InputPad(weight, size, height, scale float32) (top, bottom float32) {
 	return top, height - line - top
 }
 
+// InlineFlexExtra 是「在一行文字的行盒里放一个行内弹性盒（图标加文字，items-center）」比一行文字多出的高度，单位逻辑像素。
+//
+// 渲染层里 <span class="inline-flex items-center"> 的基线取第一项（图标）的下沿：图标没有基线，由它的边框盒下沿合成，
+// 而图标在弹性盒里居中，下沿离盒顶 B = (H − icon)/2 + icon（H 是弹性盒高，取文字行高与图标的较大者）。
+// 行盒按基线对齐，父行的文字基线离行盒顶 sb（ChromeBaselineRow）：B 比 sb 大，弹性盒顶部就探出行盒顶 B − sb，
+// 行盒整体向上长出这一截（内容落在行盒的上部，下面留空）；B 不比 sb 大时不长。
+//
+// size、line 是父行文字的字号与行高，icon 是图标边长，都是逻辑像素；weight 与 scale 同 BaselineShift。
+// 2026-11-17 在中号字（根字号 16）的任务详情弹窗里与渲染层实测吻合：12px 图标（提交来源）多 2px、14px 图标（副标题）多 3px。
+func InlineFlexExtra(weight float32, size, line, icon, scale float32) float32 {
+	if scale <= 0 {
+		scale = 1
+	}
+	h := max(line, icon)
+	b := (h-icon)/2 + icon
+	sb := float32(ChromeBaselineRow(weight, float64(size)*float64(scale), float64(line)*float64(scale))) / scale
+	return max(0, b-sb)
+}
+
 // BaselineShift 返回把 Viva 的文字基线移到渲染层基线所需的平移，单位逻辑像素（设备像素差除以缩放）。
 // 正值向下。size、line 是逻辑像素，scale 是设备像素与逻辑像素之比（缩放 100% 时为 1）。
 func BaselineShift(weight float32, size, line, scale float32) float32 {

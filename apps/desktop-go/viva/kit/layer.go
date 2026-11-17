@@ -52,6 +52,9 @@ type dismissSpec struct {
 	Keep *gfx.Rect
 	// NoEscape 为真：Esc 不关闭（确认对话框加载中：渲染层的键盘处理整个跳过）。点背景仍然关闭。
 	NoEscape bool
+	// ByKeyboard 非空：关闭这一帧是由键盘（Esc）引起时写入 true，点背景引起时写入 false。
+	// 取色器据此决定要不要把焦点还给触发按钮（渲染层只在 Esc 时 triggerRef.focus()）。
+	ByKeyboard *bool
 }
 
 // fadePresence 让一个浮层淡入淡出：入场用 enter，入场播完之后换成 exit，撤掉时按它回放（Modal 的遮罩）。
@@ -85,7 +88,11 @@ func (l *Look) dismissLayer(c ui.C, s dismissSpec) bool {
 				d.Canvas.SetEscapeTarget(id)
 			}
 		})
-	return layer.Clicked()
+	clicked := layer.Clicked()
+	if clicked && s.ByKeyboard != nil {
+		*s.ByKeyboard = c.Canvas().ClickedByKey(id)
+	}
+	return clicked
 }
 
 // floatingPanel 声明面板层里的一个矩形：r 是页面坐标里的位置与大小。

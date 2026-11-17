@@ -51,13 +51,19 @@ type SettingRow struct {
 // SettingSection 是设置分区：h3 标题（text-sm font-medium muted）加 app-settings-card 卡片，
 // 卡片里是 SettingItem 行，除最后一行外都有 border-b border-border/70。
 func (l *Look) SettingSection(c ui.C, title string, rows []SettingRow) {
+	l.SettingSectionBody(c, title, func() {
+		for i, row := range rows {
+			l.SettingItem(c.Key(row.Label), row, i == len(rows)-1)
+		}
+	})
+}
+
+// SettingSectionBody 是内容自定的设置分区：h3 标题加 app-settings-card 卡片，卡片里放 body 声明的任意内容
+// （渲染层的 SettingSection 带任意 children：显示设置里的按钮网格、色带、滑块都在这里面）。
+func (l *Look) SettingSectionBody(c ui.C, title string, body func()) {
 	ui.Column(c).FillWidth().Gap(l.Rem(0.75)).Children(func() {
 		l.Heading(c, 3, title, TextSM, WeightMedium, l.T.MutedForeground)
-		l.SettingsCard(c, func() {
-			for i, row := range rows {
-				l.SettingItem(c.Key(row.Label), row, i == len(rows)-1)
-			}
-		})
+		l.SettingsCard(c, body)
 	})
 }
 

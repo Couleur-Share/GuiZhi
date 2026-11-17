@@ -19,4 +19,55 @@ var (
 	Shadow2XL = []tokens.Shadow{
 		{X: 0, Y: 25, Blur: 50, Spread: -12, Color: black25},
 	}
+	// ShadowBase 是 Tailwind 的 shadow（无后缀）：悬停时的轻投影。
+	ShadowBase = []tokens.Shadow{
+		{X: 0, Y: 1, Blur: 3, Spread: 0, Color: black10},
+		{X: 0, Y: 1, Blur: 2, Spread: -1, Color: black10},
+	}
 )
+
+// ShadowLGOf 是带颜色的 shadow-lg（Tailwind 的 shadow-lg shadow-primary/20）：几何同 ShadowLG，每层颜色换成 color。
+func ShadowLGOf(color tokens.Color) []tokens.Shadow {
+	out := make([]tokens.Shadow, len(ShadowLG))
+	for i, s := range ShadowLG {
+		s.Color = color
+		out[i] = s
+	}
+	return out
+}
+
+// MixShadows 在两组阴影之间按进度 p 插值（CSS 对 box-shadow 列表的过渡：逐层插值，较短的一边用零几何的透明层补齐，
+// 颜色在预乘 alpha 里插值）。两端为空时返回空。
+func MixShadows(from, to []tokens.Shadow, p float32) []tokens.Shadow {
+	switch {
+	case p <= 0:
+		return from
+	case p >= 1:
+		return to
+	}
+	n := max(len(from), len(to))
+	out := make([]tokens.Shadow, 0, n)
+	for i := 0; i < n; i++ {
+		a, b := paddedShadow(from, to, i), paddedShadow(to, from, i)
+		out = append(out, tokens.Shadow{
+			X:      a.X + (b.X-a.X)*p,
+			Y:      a.Y + (b.Y-a.Y)*p,
+			Blur:   a.Blur + (b.Blur-a.Blur)*p,
+			Spread: a.Spread + (b.Spread-a.Spread)*p,
+			Color:  MixToken(a.Color, b.Color, p),
+		})
+	}
+	return out
+}
+
+// paddedShadow 取 list 的第 i 层；没有这一层时，用 other 对应层的颜色（透明）加零几何补齐。
+func paddedShadow(list, other []tokens.Shadow, i int) tokens.Shadow {
+	if i < len(list) {
+		return list[i]
+	}
+	pad := tokens.Shadow{}
+	if i < len(other) {
+		pad.Color = other[i].Color.WithAlpha(0)
+	}
+	return pad
+}

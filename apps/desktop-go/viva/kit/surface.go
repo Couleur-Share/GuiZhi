@@ -97,3 +97,15 @@ func (l *Look) PaintRing(d *ui.DrawContext, width float32, color tokens.Color, r
 	ring := gfx.Rect{X: outer.X - width, Y: outer.Y - width, Width: outer.Width + 2*width, Height: outer.Height + 2*width}
 	d.Canvas.Rounded(ring, radius+width, d.Fade(l.Col(color)))
 }
+
+// PaintRingBand 在 d.Rect 外画一圈空心环：与 PaintRing 画出的外形相同，但中间是空的。
+// box-shadow 的环只出现在边框盒的外侧，PaintRing 画的是实心圆盘、靠随后画的不透明背景盖住内部；
+// 背景透明或半透明的控件（取色器的触发钮、带透明度的聚焦环）改用这个，环里才不会透出环的颜色。
+func (l *Look) PaintRingBand(d *ui.DrawContext, width float32, color tokens.Color, radius float32) {
+	outer := SnapRect(d.Rect, d.Canvas.PixelScale())
+	if outer.Width <= 0 || outer.Height <= 0 || color.A <= 0 {
+		return
+	}
+	ring := gfx.Rect{X: outer.X - width, Y: outer.Y - width, Width: outer.Width + 2*width, Height: outer.Height + 2*width}
+	d.Canvas.RoundedOutline(ring, radius+width, width, d.Fade(l.Col(color)))
+}
