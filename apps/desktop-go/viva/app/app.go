@@ -55,6 +55,8 @@ type Options struct {
 	// OSReduceMotion 报告系统是否要求减少动态效果，与设置里的动效偏好合并成实际动效档位；缺省读系统（Windows 的「显示动画」开关）。
 	// 无头测试注入固定值，结果才不随运行机器的系统设置变化。
 	OSReduceMotion func() bool
+	// Shell 是外壳接线（关闭策略、托盘、界面命令；见 shell.go）：nil 表示没有（截图、对照与无头测试：关窗口就是关闭）。
+	Shell Shell
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -85,9 +87,24 @@ func Run(opts Options) error {
 			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },
 			ClearColor:     clearColor(look.Col(look.T.Background)),
 		})
+		// 外壳任务在 OnWake 里排空：窗口隐藏（收在托盘）时 Viva 仍会在重绘之前调用它，托盘的创建与销毁不会卡在隐藏的窗口里。
+		prevWake := config.OnWake
+		config.OnWake = func() {
+			if prevWake != nil {
+				prevWake()
+			}
+			root.DrainShell()
+		}
+		// 关闭请求交给外壳决定（没有外壳时不拦）。
+		config.OnCloseRequest = closeGate(opts.Shell)
 		var canvas gfx.Canvas
-		if _, err := a.OpenWindow(config, &canvas); err != nil {
+		win, err := a.OpenWindow(config, &canvas)
+		if err != nil {
 			return fmt.Errorf("viva/app: 打开窗口失败：%w", err)
+		}
+		if opts.Shell != nil {
+			// 事件循环线程：外壳在这里建托盘（AddStatusItem 只能在这条线程上调用）。
+			opts.Shell.Attach(&Host{app: a, win: win, root: root})
 		}
 		return nil
 	})

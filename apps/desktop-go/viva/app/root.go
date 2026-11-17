@@ -47,11 +47,14 @@ type Root struct {
 
 	systemDark atomic.Bool // 系统当前是否深色（由系统外观监听更新）
 	ready      sync.Once
+
+	shellState // 外壳接线：跨线程任务、关闭对话框、网页岛（root_shell.go）
 }
 
 // NewRoot 装配根。invalidate 在设置被别处改动后调用，请求重绘（可为空）。
 func NewRoot(opts Options, invalidate func()) *Root {
 	r := &Root{opts: opts}
+	r.invalidate = invalidate
 	parent := opts.Context
 	if parent == nil {
 		parent = context.Background()
@@ -62,13 +65,15 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.guard = kit.Guard{Notify: r.notifier, Log: opts.Services.Log}
 	r.settings = &settingsscreen.Shell{Store: r.store, Guard: r.guard}
 	r.win = &shell.Window{
-		Settings:       r.settings,
-		Notifier:       r.notifier,
-		SearchShortcut: opts.SearchShortcut,
+		Settings:        r.settings,
+		Notifier:        r.notifier,
+		SearchShortcut:  opts.SearchShortcut,
+		CaptureShortcut: opts.CaptureShortcut,
 		OnModule: func(m shell.Module) {
 			r.win.Module, r.win.Page = m, shell.PageHome
 		},
-		OnSettings: func() { r.win.Page = shell.PageSettings },
+		OnSettings:    func() { r.win.Page = shell.PageSettings },
+		OnCloseDialog: r.onCloseDialog,
 	}
 	if opts.Module != "" {
 		r.win.Module = opts.Module
@@ -175,6 +180,7 @@ func (r *Root) Guard() kit.Guard        { return r.guard }
 // View 声明整个窗口内容。
 func (r *Root) View(c ui.C) {
 	r.syncLook(c)
+	r.DrainShell()
 	r.started.Do(r.startBackground)
 	if r.importsStore != nil {
 		r.win.ActiveImports = r.importsStore.View().ActiveCount
@@ -201,6 +207,7 @@ func (r *Root) WatchSystemAppearance(invalidate func()) (stop func()) {
 
 // Close 释放订阅、取消后台请求。采集队列里还在撤销窗口内的移除先提交，关窗口不会把「已删除」的行带回来。
 func (r *Root) Close() {
+	r.closeIslands()
 	if r.importsStore != nil {
 		r.importsStore.FlushRemovals()
 	}

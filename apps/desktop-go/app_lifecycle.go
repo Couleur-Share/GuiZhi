@@ -210,13 +210,7 @@ func (a *appLifecycle) register(b *Bridge) {
 			logAppErrorf("app", "设置关闭行为", "app:setCloseAction requires action to be 'ask', 'minimize', or 'exit'")
 			return
 		}
-		a.mu.Lock()
-		a.closeAction = action
-		isWin := a.isWindows
-		a.mu.Unlock()
-		if action == "minimize" && isWin {
-			a.createTray()
-		}
+		a.setCloseAction(action)
 	}
 	b.sends["app:setDebugMode"] = func(args []json.RawMessage) {
 		enabled := jsTruthy(firstArg(args, 0))
@@ -251,26 +245,7 @@ func (a *appLifecycle) register(b *Bridge) {
 			a.clearPending()
 			return
 		}
-		a.mu.Lock()
-		a.pendingCloseAction = false
-		if jsTruthy(data["remember"]) {
-			a.closeAction = action
-		}
-		if action == "exit" {
-			a.quitting = true
-		}
-		win := a.win
-		a.mu.Unlock()
-		if action == "minimize" {
-			if win != nil {
-				win.Hide()
-			}
-			a.createTray()
-			return
-		}
-		if win != nil {
-			win.Close()
-		}
+		a.closeDialogResult(action, jsTruthy(data["remember"]))
 	}
 	b.sends["window:closeDialogCancel"] = func([]json.RawMessage) { a.clearPending() }
 }
@@ -279,6 +254,61 @@ func (a *appLifecycle) clearPending() {
 	a.mu.Lock()
 	a.pendingCloseAction = false
 	a.mu.Unlock()
+}
+
+// setCloseAction 对应 app:setCloseAction 通过校验后的处理：记下关闭行为；Windows 上选了「最小化」就先建好托盘。
+// action 必须是 ask / minimize / exit（IPC 入口负责校验并记日志）。
+func (a *appLifecycle) setCloseAction(action string) {
+	a.mu.Lock()
+	a.closeAction = action
+	isWin := a.isWindows
+	a.mu.Unlock()
+	if action == "minimize" && isWin {
+		a.createTray()
+	}
+}
+
+// closeDialogResult 对应 window:closeDialogResult 通过校验后的处理（React 与 Viva 的关闭对话框共用）：
+// 复位等待标记；勾了「记住我的选择」就记下动作；退出走窗口关闭路径，最小化则隐藏窗口并建托盘。
+// action 必须是 minimize 或 exit。
+func (a *appLifecycle) closeDialogResult(action string, remember bool) {
+	a.mu.Lock()
+	a.pendingCloseAction = false
+	if remember {
+		a.closeAction = action
+	}
+	if action == "exit" {
+		a.quitting = true
+	}
+	win := a.win
+	a.mu.Unlock()
+	if action == "minimize" {
+		if win != nil {
+			win.Hide()
+		}
+		a.createTray()
+		return
+	}
+	if win != nil {
+		win.Close()
+	}
+}
+
+// runTrayAction 执行托盘菜单项的动作（tray-controller.ts 的菜单点击）：与托盘的具体实现无关，React 与 Viva 共用。
+// action 取 buildTrayMenuItems 给出的值；未知的动作忽略。
+func (a *appLifecycle) runTrayAction(action string) {
+	switch action {
+	case "toggle":
+		a.toggleWindow()
+	case "quit":
+		a.trayQuit()
+	case "cmd:item:new":
+		a.dispatchAppCommand(map[string]any{"type": "item:new"})
+	case "cmd:settings:open":
+		a.dispatchAppCommand(map[string]any{"type": "settings:open"})
+	case "cmd:updater:open":
+		a.dispatchAppCommand(map[string]any{"type": "updater:open"})
+	}
 }
 
 // ── 设置读取（settings-readers.ts / language-setting.ts）──

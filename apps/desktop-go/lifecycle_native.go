@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -17,6 +18,28 @@ import (
 //
 //go:embed assets/tray-icon.png
 var trayIconPNG []byte
+
+// quitHook 是 Viva 路径的退出函数（窗口建好后由外壳登记）；为空表示用 mygo 的 App.Quit。
+var quitHook atomic.Pointer[func()]
+
+// setQuitHook 登记（或用 nil 撤销）退出函数。
+func setQuitHook(fn func()) {
+	if fn == nil {
+		quitHook.Store(nil)
+		return
+	}
+	quitHook.Store(&fn)
+}
+
+// quitApp 退出应用。更新器安装后重启、「重启应用」都经它：React 路径是 mygo 的 App.Quit，
+// Viva 路径没有 mygo 的事件循环，要结束的是 Viva 的循环（viva_shell.go 登记）。
+func quitApp() {
+	if fn := quitHook.Load(); fn != nil {
+		(*fn)()
+		return
+	}
+	mygo.App.Quit()
+}
 
 // mygoHost 把 *mygo.Window 适配成 lifecycleWindow。
 type mygoHost struct{ win *mygo.Window }
@@ -74,20 +97,7 @@ func (t *mygoTray) menu() *mygo.Menu {
 	return mygo.NewMenu(items)
 }
 
-func (t *mygoTray) run(action string) {
-	switch action {
-	case "toggle":
-		t.a.toggleWindow()
-	case "quit":
-		t.a.trayQuit()
-	case "cmd:item:new":
-		t.a.dispatchAppCommand(map[string]any{"type": "item:new"})
-	case "cmd:settings:open":
-		t.a.dispatchAppCommand(map[string]any{"type": "settings:open"})
-	case "cmd:updater:open":
-		t.a.dispatchAppCommand(map[string]any{"type": "updater:open"})
-	}
-}
+func (t *mygoTray) run(action string) { t.a.runTrayAction(action) }
 
 func (t *mygoTray) Create() {
 	t.mu.Lock()

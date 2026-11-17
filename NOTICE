@@ -61,3 +61,17 @@ v0.6.4. Viva's full license text, its NOTICE and its third-party notices
 go-toml, golang.org/x/text) are kept verbatim under third-party/viva/
 (LICENSE, NOTICE, THIRD_PARTY_NOTICES.md); a release installer must ship
 these three files.
+
+  go-winio — Windows API bindings for Go (named pipes and friends)
+  Copyright (c) 2015 Microsoft
+  https://github.com/microsoft/go-winio
+  Licensed under the MIT License
+
+原生界面的单实例检测使用 Viva 的 app/singleinstance 包，该包经由 go-winio v0.6.4
+使用 Windows 命名管道；MIT 许可证原文按原样收录在 third-party/go-winio/LICENSE，
+发布安装包时必须随包附上该文件。
+
+The native UI's single-instance guard uses Viva's app/singleinstance package,
+which talks over Windows named pipes through go-winio v0.6.4; the MIT license
+text is kept verbatim in third-party/go-winio/LICENSE, and a release installer
+must ship that file.

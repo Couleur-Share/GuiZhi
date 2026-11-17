@@ -152,7 +152,8 @@ func main() {
 
 	waitForRelaunchParent()
 	automation := *shot != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
-	if !automation && !mygo.App.RequestSingleInstanceLock() {
+	// Viva 路径不用 mygo 的单实例锁（它按应用名全局生效，会把参数转给用户正在运行的归知）：-viva-shell 用自己的、按数据目录隔离的锁。
+	if !automation && !vf.enabled() && !mygo.App.RequestSingleInstanceLock() {
 		return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
 	}
 
@@ -160,6 +161,18 @@ func main() {
 	ud := *userData
 	if ud == "" {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
+	}
+	var vivaInst *vivaInstance
+	if vf.enabled() && vf.shellEnabled() { // 在碰数据库之前抢锁：后来者不该去争数据库租约
+		inst, primary, err := claimVivaInstance(ud, os.Args[1:])
+		if err != nil {
+			log.Printf("[viva-shell] 单实例锁不可用，按无锁继续：%v", err)
+		}
+		if !primary {
+			return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
+		}
+		vivaInst = inst
+		defer vivaInst.Close()
 	}
 	// 自动化实例（截图/对拍/基准）绝不能共用真实安装的 WebView2 配置（%LOCALAPPDATA%\GuiZhi\WebView2）：
 	// 渲染进程的 localStorage（设置、网络代理、语言等）存在那里，测试写进去会让真实安装“首次导入旧设置”失效、
@@ -270,7 +283,7 @@ func main() {
 			cmd.Env = append(os.Environ(), relaunchParentEnv+"="+strconv.Itoa(os.Getpid()))
 			_ = cmd.Start()
 		}
-		mygo.App.Quit()
+		quitApp()
 	}
 	lib.jobs = newBackgroundJobRuntime(lib, func(job map[string]any) { lib.pushMain(chBackgroundJobAvail, job) })
 	lib.register(b)
@@ -303,7 +316,7 @@ func main() {
 	lib.registerConfigTransfer(b)
 	lib.registerLegacyMigration(b)
 	lib.registerDataPath(b)
-	lib.registerUpdater(b, packagedBuild == "true", mygo.App.Quit)
+	lib.registerUpdater(b, packagedBuild == "true", quitApp) // 登记时就取函数值，退出时再按当前路径（mygo / Viva）分派
 	lc := newAppLifecycle(runtime.GOOS == "windows")
 	lc.setLoginItem = setLoginItemNative
 	lc.register(b)
@@ -337,7 +350,7 @@ func main() {
 		return
 	}
 	if vf.enabled() { // Viva 原生界面：同样共用到此为止的初始化，之后不建 WebView、不绑定 Bridge
-		err = runViva(vivaBoot{flags: vf, lib: lib, bridge: b, automation: automation, bench: *bench})
+		err = runViva(vivaBoot{flags: vf, lib: lib, bridge: b, lc: lc, instance: vivaInst, automation: automation, bench: *bench})
 		shutdownLibrary(lib, shutdownDB)
 		if err != nil {
 			log.Fatal(err)

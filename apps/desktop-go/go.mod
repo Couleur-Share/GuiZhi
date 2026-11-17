@@ -24,6 +24,7 @@ require (
 
 require (
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
+	github.com/Microsoft/go-winio v0.6.4 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/dlclark/regexp2/v2 v2.11.0 // indirect

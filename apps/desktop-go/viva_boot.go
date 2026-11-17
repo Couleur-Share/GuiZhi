@@ -9,6 +9,9 @@ package main
 //
 // 切换到产品默认之前，-viva 只允许与 -bench 同用，且必须显式给 -db 与 -userdata：
 // 它还不是完整的产品界面，不应在真实数据目录上运行（见 docs/agents/viva-ui-development.md §7）。
+//
+// -viva-shell 接上外壳生命周期（viva_shell.go）：关闭行为、托盘、按数据目录隔离的单实例。不带它时窗口一关就是退出，
+// 截图、对照与基准实例都是这样。系统级快捷键与登录项只在真实实例（非自动化）里接，切换为产品默认时一并启用。
 
 import (
 	"errors"
@@ -33,6 +36,7 @@ const vivaWindowClass = "guizhi-viva"
 // vivaFlags 是 -viva 的命令行开关；必须在 flag.Parse 之前声明。
 type vivaFlags struct {
 	on     *bool
+	shell  *bool
 	width  *int
 	height *int
 	module *string
@@ -44,6 +48,7 @@ type vivaFlags struct {
 func declareVivaFlags() vivaFlags {
 	return vivaFlags{
 		on:     flag.Bool("viva", false, "Viva 原生界面（feat/viva-ui 开发中）：不加载 WebView 与渲染进程；必须与 -bench、-db、-userdata 同用"),
+		shell:  flag.Bool("viva-shell", false, "Viva 外壳生命周期（关闭行为、托盘、按数据目录隔离的单实例）：验证外壳用；系统级快捷键与登录项不接（自动化实例不抢用户的组合键）"),
 		width:  flag.Int("viva-width", 1280, "Viva 窗口宽度（逻辑像素）"),
 		height: flag.Int("viva-height", 800, "Viva 窗口高度（逻辑像素）"),
 		module: flag.String("viva-module", "library", "Viva 界面的起始页：library|inbox|ask|wiki|imports|settings"),
@@ -55,6 +60,9 @@ func declareVivaFlags() vivaFlags {
 
 // enabled 报告是否以 Viva 原生界面启动。
 func (f vivaFlags) enabled() bool { return f.on != nil && *f.on }
+
+// shellEnabled 报告是否接外壳生命周期（-viva-shell）：不接时窗口一关就是退出，没有托盘与单实例（截图、对照、基准实例）。
+func (f vivaFlags) shellEnabled() bool { return f.shell != nil && *f.shell }
 
 // checkLaunch 检查 -viva 的启动条件。它必须在解析数据目录、初始化数据库之前调用：
 // 不带 -db 时 main() 会按正式安装的规则推断出真实的数据目录并对它做初始化（租约、迁移、升级前备份），
@@ -184,8 +192,10 @@ type vivaBoot struct {
 	flags      vivaFlags
 	lib        *Library
 	bridge     *Bridge
-	automation bool // 截图/基准实例：不占单实例锁、不建托盘、不抢系统快捷键
-	bench      bool // 基准实例：首屏声明后在标准输出打印 READY，之后一直运行直到被终止
+	lc         *appLifecycle // 生命周期策略（main 里已登记 IPC）；外壳接线用
+	instance   *vivaInstance // 单实例锁（-viva-shell；可为空）
+	automation bool          // 截图/基准实例：不占 mygo 的单实例锁、不抢系统快捷键
+	bench      bool          // 基准实例：首屏声明后在标准输出打印 READY，之后一直运行直到被终止
 }
 
 // runViva 打开 Viva 窗口并阻塞到退出。
@@ -215,6 +225,13 @@ func runViva(vb vivaBoot) error {
 	if vb.bench {
 		go announceReady(ready.Load)
 	}
+	// 外壳生命周期只在 -viva-shell 时接：没有外壳时窗口一关就是退出（截图、对照、基准实例不能被关闭对话框拦住）。
+	var shellHook vivaapp.Shell
+	var vs *vivaShell
+	if vb.flags.shellEnabled() {
+		vs = &vivaShell{lc: vb.lc, lib: vb.lib, hub: hub, settings: nset, systemShortcuts: !vb.automation, instance: vb.instance}
+		shellHook = vs
+	}
 	err = vivaapp.Run(vivaapp.Options{
 		Class: vivaWindowClass, Title: "归知 GuiZhi",
 		Width: *vb.flags.width, Height: *vb.flags.height,
@@ -227,7 +244,11 @@ func runViva(vb vivaBoot) error {
 		AppVersion:      appVersion,
 		Platform:        nodePlatform(),
 		Appearance:      appearance,
+		Shell:           shellHook,
 	})
+	if vs != nil {
+		vs.Shutdown() // 事件循环已停：摘托盘图标、撤销快捷键与订阅、释放单实例锁
+	}
 	if err != nil {
 		return fmt.Errorf("Viva 窗口退出：%w", err)
 	}
