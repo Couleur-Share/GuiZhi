@@ -50,9 +50,23 @@ type Look struct {
 	// Scale 是设备像素与逻辑像素之比（窗口缩放 100% 为 1）；0 按 1。文字基线的取整按设备像素算，需要它。
 	Scale float32
 
-	// IconSink 非空时，Icon 画出的每枚图标都把外框（窗口坐标）报给它：对照工具用它取 Viva 一侧的图标位置。
-	// 正常运行为空。
-	IconSink func(gfx.Rect)
+	// IconSink 非空时，Icon 画出的每枚看得见的图标都把外框（窗口坐标）与所在层级报给它：对照工具用它取 Viva 一侧的图标位置。
+	// 被祖先裁剪整个裁掉的图标不报（见 reportIcon）。正常运行为空。
+	IconSink func(IconDraw)
+
+	// modalScope 是最近一次打开的 Modal 的焦点作用域（Modal 每帧在声明时写入，关闭时撤销）：
+	// Modal 把焦点与指针限制在自己的作用域里，渲染层里高于它的浮层（Toast）借用它才仍能被点到（见 pushModalScope）。
+	modalScope gfx.ID
+
+	// tips 是窗口根上的提示层状态（Tooltips 每帧写入）：宿主在悬停或聚焦期间不再有可访问描述（见 HintDescription）。
+	tips *TooltipState
+}
+
+// IconDraw 是 IconSink 收到的一次图标绘制：外框（窗口坐标），以及它是否画在浮层层级里（对话框、下拉面板、提示）。
+// 浮层图标与页面层图标在遮罩场景里的对照口径不同（页面层的在遮罩背后，被模糊或被面板盖住），与文字的 Overlay 标记同理。
+type IconDraw struct {
+	Rect    gfx.Rect
+	Overlay bool
 }
 
 // NewLook 把外观输入装配成 Look。

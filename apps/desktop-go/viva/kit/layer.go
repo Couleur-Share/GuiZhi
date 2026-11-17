@@ -54,6 +54,15 @@ type dismissSpec struct {
 	NoEscape bool
 }
 
+// fadePresence 让一个浮层淡入淡出：入场用 enter，入场播完之后换成 exit，撤掉时按它回放（Modal 的遮罩）。
+func fadePresence(canvas *gfx.Canvas, id gfx.ID, enter, exit gfx.Motion, pivot gfx.Point) {
+	motion := exit
+	if _, playing := canvas.PlayOnce(id, 0, true, enter.Duration); playing {
+		motion = enter
+	}
+	canvas.BeginPresence(id, 0, gfx.Presence{Motion: motion, Fade: true}, pivot)
+}
+
 // dismissLayer 声明整窗的背景层并返回这一帧是否被要求关闭（点了背景，或按了 Esc）。
 func (l *Look) dismissLayer(c ui.C, s dismissSpec) bool {
 	id := ui.ID(c)

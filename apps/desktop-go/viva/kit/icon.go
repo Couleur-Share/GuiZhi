@@ -16,11 +16,69 @@ import (
 func (l *Look) Icon(c ui.C, ic gfx.Icon, size float32, color tokens.Color) ui.Box {
 	col := l.Col(color)
 	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
-		if sink := l.IconSink; sink != nil {
-			sink(d.Rect)
-		}
+		mark := l.markIcon(d)
 		PaintIcon(d.Canvas, ic, d.Rect, d.Fade(col))
+		l.reportIcon(d, mark)
 	})
+}
+
+// iconMark 记下画图标之前各类图元的数量：对照工具（IconSink）据此找出这枚图标新画出的图元，读出它们带的裁剪矩形。
+type iconMark struct{ rects, triangles, images int }
+
+// markIcon 在画图标之前调用；IconSink 为空（正常运行）时什么也不做。
+func (l *Look) markIcon(d *ui.DrawContext) iconMark {
+	if l.IconSink == nil {
+		return iconMark{}
+	}
+	return iconMark{len(d.Canvas.Rectangles()), len(d.Canvas.Triangles()), len(d.Canvas.Images())}
+}
+
+// reportIcon 在图标画完之后把外框报给 IconSink；被祖先裁剪（滚动区域、overflow-hidden）整个裁掉的图标不报。
+//
+// 渲染层的采集只收「可见部分非空」的元素（react-facts.mjs 的 visibleRects），Viva 的绘制回调对滚出滚动区域的图标照常触发，
+// 所以要看这枚图标刚画出的图元带的裁剪矩形：悬浮层（下拉弹层）自带视口裁剪、不继承滚动祖先的裁剪，
+// 图元记下的才是真正生效的那一个。
+//
+// 全透明的图标（悬停才显现的动作条）一个图元也不画，没有图元可读，只能退而取 Canvas.Clips 里全部裁剪的交集。
+// 这个退路的局限：悬浮层里恰好有透明图标、且它落在滚动祖先的可视区之外时会被误判成裁掉（目前没有这种界面；
+// 出现时 React 一侧会报「图标缺失」，对照不会悄悄放过）。
+func (l *Look) reportIcon(d *ui.DrawContext, m iconMark) {
+	sink := l.IconSink
+	if sink == nil {
+		return
+	}
+	canvas := d.Canvas
+	var clip gfx.Rect
+	var clipped, drawn bool
+	var layer uint16
+	switch {
+	case len(canvas.Rectangles()) > m.rects:
+		r := canvas.Rectangles()[m.rects]
+		clip, clipped, drawn, layer = r.ClipOf, r.HasClip, true, r.Layer
+	case len(canvas.Triangles()) > m.triangles:
+		t := canvas.Triangles()[m.triangles]
+		clip, clipped, drawn, layer = t.ClipOf, t.HasClip, true, t.Layer
+	case len(canvas.Images()) > m.images:
+		im := canvas.Images()[m.images]
+		clip, clipped, drawn, layer = im.ClipOf, im.HasClip, true, im.Layer
+	}
+	if drawn {
+		if clipped && !rectsOverlap(clip, d.Rect) {
+			return
+		}
+	} else {
+		for _, c := range canvas.Clips() {
+			if !rectsOverlap(c.Bounds, d.Rect) {
+				return
+			}
+		}
+	}
+	sink(IconDraw{Rect: d.Rect, Overlay: layer >= OverlayLayerMin})
+}
+
+// rectsOverlap 报告两个矩形是否有面积相交（只挨着边不算）。
+func rectsOverlap(a, b gfx.Rect) bool {
+	return a.X < b.X+b.Width && b.X < a.X+a.Width && a.Y < b.Y+b.Height && b.Y < a.Y+a.Height
 }
 
 // iconSnapEpsilon 是吸附到整设备像素时给「刚好半个像素」的位置留的容差。渲染层的位置是 1/64 像素的定点数（精确的 .5），

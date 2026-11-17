@@ -19,23 +19,24 @@ import (
 	"github.com/vivaui/viva/tools/iconcompile"
 )
 
-const license = "Lucide icons (https://lucide.dev), ISC License; compiled from the lucide-react package the renderer imports."
+const defaultLicense = "Lucide icons (https://lucide.dev), ISC License; compiled from the lucide-react package the renderer imports."
 
 func main() {
 	out := flag.String("o", "-", "输出文件；- 表示标准输出")
 	pkg := flag.String("pkg", "icons", "生成文件的包名")
+	license := flag.String("license", defaultLicense, "写进生成文件头部的版权说明（可多行）")
 	flag.Parse()
 	if flag.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "用法：gen [-o 文件] [-pkg 包名] <SVG 目录>")
+		fmt.Fprintln(os.Stderr, "用法：gen [-o 文件] [-pkg 包名] [-license 说明] <SVG 目录>")
 		os.Exit(2)
 	}
-	if err := run(flag.Arg(0), *out, *pkg); err != nil {
+	if err := run(flag.Arg(0), *out, *pkg, *license); err != nil {
 		fmt.Fprintln(os.Stderr, "viva/icons/gen:", err)
 		os.Exit(1)
 	}
 }
 
-func run(dir, out, pkg string) error {
+func run(dir, out, pkg, license string) error {
 	files, err := filepath.Glob(filepath.Join(dir, "*.svg"))
 	if err != nil {
 		return err

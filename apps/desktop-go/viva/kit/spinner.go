@@ -23,16 +23,16 @@ func (l *Look) Spinner(c ui.C, size float32, color tokens.Color) ui.Box {
 	col := l.Col(color)
 	animated := l.Spec.Motion.Animated()
 	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
-		if sink := l.IconSink; sink != nil {
-			sink(d.Rect)
-		}
+		mark := l.markIcon(d)
 		tint := d.Fade(col)
 		if !animated || !d.Canvas.HasClock() {
 			PaintIcon(d.Canvas, icons.LoaderCircle, d.Rect, tint)
+			l.reportIcon(d, mark)
 			return
 		}
 		turns := float64(d.Canvas.Now()%spinPeriod) / float64(spinPeriod)
 		d.Canvas.DrawIconTransformed(icons.LoaderCircle, d.Rect, tint, gfx.IconTransform{Rotate: float32(2 * math.Pi * turns)})
+		l.reportIcon(d, mark)
 		d.Canvas.RequestFrame()
 	})
 }

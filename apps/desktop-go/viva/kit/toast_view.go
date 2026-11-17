@@ -78,8 +78,12 @@ func (l *Look) Toasts(c ui.C, n *Notifier) {
 	}
 	width := l.toastStackWidth(canvas, n.toasts)
 	// 容器：fixed bottom-6 right-6 z-[99999] flex flex-col gap-3；宽度是最宽那张卡片的宽度，卡片都撑满它
+	// 卡片的命中区借用打开着的 Modal 的作用域（渲染层里提示在窗口之上，窗口打开时照样能点关闭钮与复制）。
+	var popScope func()
 	host := ui.Overlay(c.Key("toasts"), ui.OverlaySpec{Band: bandToast, Bounds: c.Bounds()}).
-		Justify(ui.End).Items(ui.End).Pad(l.Space(6))
+		Justify(ui.End).Items(ui.End).Pad(l.Space(6)).
+		Draw(func(d *ui.DrawContext) { popScope = l.pushModalScope(d.Canvas) }).
+		DrawOver(func(d *ui.DrawContext) { popScope() })
 	host.Children(func() {
 		ui.Column(c.Key("stack")).Width(width).Gap(l.Space(3)).Children(func() {
 			for _, t := range n.toasts {
@@ -328,9 +332,7 @@ func (l *Look) toastToggle(c ui.C, t *toast) {
 func (l *Look) toastChevron(c ui.C, size, turn float32, color tokens.Color) ui.Box {
 	col := l.Col(color)
 	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
-		if sink := l.IconSink; sink != nil {
-			sink(d.Rect)
-		}
+		mark := l.markIcon(d)
 		tint := d.Fade(col)
 		switch {
 		case turn <= 0.001:
@@ -340,6 +342,7 @@ func (l *Look) toastChevron(c ui.C, size, turn float32, color tokens.Color) ui.B
 		default:
 			d.Canvas.DrawIconTransformed(icons.ChevronRight, d.Rect, tint, gfx.IconTransform{Rotate: math.Pi / 2 * turn})
 		}
+		l.reportIcon(d, mark)
 	})
 }
 

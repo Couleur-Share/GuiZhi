@@ -57,9 +57,7 @@ func (l *Look) rotatingChevron(c ui.C, id gfx.ID, size float32, open bool) ui.Bo
 	}
 	motion := l.Motion(DurationBase, EaseStandard)
 	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
-		if sink := l.IconSink; sink != nil {
-			sink(d.Rect)
-		}
+		mark := l.markIcon(d)
 		tint := d.Fade(col)
 		turn := d.Canvas.Animate(id, slotChevron, target, motion)
 		switch {
@@ -70,5 +68,6 @@ func (l *Look) rotatingChevron(c ui.C, id gfx.ID, size float32, open bool) ui.Bo
 		default:
 			d.Canvas.DrawIconTransformed(icons.ChevronDown, d.Rect, tint, gfx.IconTransform{Rotate: math.Pi * turn})
 		}
+		l.reportIcon(d, mark)
 	})
 }

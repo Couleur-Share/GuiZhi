@@ -51,6 +51,9 @@ func ResolveMotion(pref string, osReduce bool) MotionLevel {
 // DurationName 是动效时长的档位名，对应 --motion-duration-*（Tailwind 的 duration-instant 等）。
 type DurationName int
 
+// DurationNone 表示没有过渡：渲染层的控件没写 transition-*，状态直接切换。
+const DurationNone DurationName = -1
+
 const (
 	DurationInstant DurationName = iota // 80 ms：悬停变色
 	DurationQuick                       // 120 ms：下拉、退场

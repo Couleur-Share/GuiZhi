@@ -81,7 +81,7 @@ func WrapMono(text string, width, size float32) []string {
 			out = append(out, hard)
 			continue
 		}
-		out = append(out, wrapMonoLine(hard, width, size)...)
+		out = append(out, wrapLine(hard, width, monoMeasure(size))...)
 	}
 	return out
 }
@@ -106,8 +106,32 @@ func expandTabs(s string) string {
 	return b.String()
 }
 
-func wrapMonoLine(line string, width, size float32) []string {
-	units := splitMonoUnits(line, size)
+// measureFn 量一段文字（不含换行）排出来的宽度。等宽文字按字格累加（monoMeasure），比例字体交给画布的文字度量。
+type measureFn func(string) float32
+
+// monoMeasure 是 font-mono 文字（字号 size）的度量。
+func monoMeasure(size float32) measureFn {
+	return func(s string) float32 { return MonoWidth(s, size) }
+}
+
+// WrapText 与 WrapMono 的规则相同，但用 measure 量宽度：比例字体的文字（提示气泡）按 Chromium 的断行机会折行。
+// 比例字体的整行宽度不是逐字符前进量之和（字偶距等，台账 A-014），这里对每个断行单元整体量宽，单元之间累加。
+func WrapText(text string, width float32, measure func(string) float32) []string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+	var out []string
+	for _, hard := range strings.Split(text, "\n") {
+		if width <= 0 {
+			out = append(out, hard)
+			continue
+		}
+		out = append(out, wrapLine(hard, width, measure)...)
+	}
+	return out
+}
+
+func wrapLine(line string, width float32, measure measureFn) []string {
+	units := splitUnits(line, measure)
 	if len(units) == 0 {
 		return []string{""}
 	}
@@ -133,11 +157,11 @@ func wrapMonoLine(line string, width, size float32) []string {
 			i--
 		default:
 			// 空行也放不下：在任意字符处断开（break-word），余下的当作新的一段重新排
-			head, rest := splitToFit(u.text, width, size)
+			head, rest := splitToFit(u.text, width, measure)
 			cur.WriteString(head)
 			flush()
 			if rest != "" {
-				units[i] = newMonoUnit(rest, size)
+				units[i] = newUnit(rest, measure)
 				i--
 			}
 		}
@@ -149,10 +173,10 @@ func wrapMonoLine(line string, width, size float32) []string {
 }
 
 // splitToFit 取 s 开头尽量多、宽度不超过 width 的字符（至少一个）。
-func splitToFit(s string, width, size float32) (head, rest string) {
+func splitToFit(s string, width float32, measure measureFn) (head, rest string) {
 	var w float32
 	for i, r := range s {
-		adv := monoRuneAdvance(r, size)
+		adv := measure(string(r))
 		if w+adv > width+1e-3 && i > 0 {
 			return s[:i], s[i:]
 		}
@@ -161,13 +185,13 @@ func splitToFit(s string, width, size float32) (head, rest string) {
 	return s, ""
 }
 
-func newMonoUnit(text string, size float32) monoUnit {
+func newUnit(text string, measure measureFn) monoUnit {
 	trimmed := strings.TrimRight(text, " ")
-	return monoUnit{text: text, solid: MonoWidth(trimmed, size), full: MonoWidth(text, size)}
+	return monoUnit{text: text, solid: measure(trimmed), full: measure(text)}
 }
 
-// splitMonoUnits 按断行机会把一行切成若干段；每段是「词 + 它后面的空格」，行首的缩进并入第一个词。
-func splitMonoUnits(line string, size float32) []monoUnit {
+// splitUnits 按断行机会把一行切成若干段；每段是「词 + 它后面的空格」，行首的缩进并入第一个词。
+func splitUnits(line string, measure measureFn) []monoUnit {
 	runes := []rune(line)
 	var (
 		units []monoUnit
@@ -175,7 +199,7 @@ func splitMonoUnits(line string, size float32) []monoUnit {
 	)
 	emit := func(end int) {
 		if end > start {
-			units = append(units, newMonoUnit(string(runes[start:end]), size))
+			units = append(units, newUnit(string(runes[start:end]), measure))
 			start = end
 		}
 	}
