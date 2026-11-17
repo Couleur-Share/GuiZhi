@@ -425,7 +425,8 @@ func TestDetailRefreshPairNeedsBothSides(t *testing.T) {
 	r := openedDetail(t, refreshed, withFacts(original, copyFacts))
 	for _, want := range []string{
 		locales.ImportsRefreshComparison(), locales.ImportsRefreshComparisonHint(),
-		locales.ImportsRefreshOriginal(), locales.ImportsRefreshNew(), "旧版", "120 字", "340 字",
+		// 渲染层的字数是 {n} {单位}：数字与单位是两个文本节点（对照 dlg-detail-refresh 的 L1 已逐节点核对），所以分开找。
+		locales.ImportsRefreshOriginal(), locales.ImportsRefreshNew(), "旧版", "120", "340", locales.LibraryWordUnit(),
 	} {
 		if !r.hasText(want) {
 			t.Errorf("对照卡缺少文字 %q；画面上有 %q", want, r.session.Texts())
