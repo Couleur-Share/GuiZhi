@@ -7,8 +7,8 @@
 
 | 类别 | 条数 | 说明 |
 | --- | --- | --- |
-| A（平台/Viva 确实做不到） | 10 | A-001…A-010 |
-| B（暂缺，已定里程碑） | 7 | B-004…B-010（B-001、B-002、B-003 已于 2026-11-16 关闭，见「已关闭条目」） |
+| A（平台/Viva 确实做不到） | 14 | A-001…A-014 |
+| B（暂缺，已定里程碑） | 13 | B-004…B-010、B-013…B-018（B-001、B-002、B-003 于 2026-11-16 关闭，B-011、B-012 于 2026-11-17 关闭，见「已关闭条目」） |
 | C（需用户裁决） | 2 | 见 C-001（通知）、C-002（非输入控件文字不可选） |
 | 未测（按未通过计） | 5 | 见「未测项」 |
 | 验证缺口（对照工具尚未覆盖，按未验证计） | 5 | 见「验证缺口」（G-005 为 Toast 背后有内容的情形，2026-11-16 新增） |
@@ -47,6 +47,7 @@
   - 图标：渲染层（Chromium/Skia）对每个 SVG 元素各自抗锯齿后再合成：相邻元素在连接处各合成一次半透明色（`foreground/80` 之类）而加深——实测 `Database` 图标的连接处像素暗度 164–171，单层笔画的上限是 156（`light-blue-medium-1280x800`）；`gfx.Icon` 编译后元素边界已丢失，Viva 一侧按整枚图标的并集着色，复现不了。其余边缘灰度差推测来自 Skia 的有限级数采样（未在 Skia 源码上核实），Viva 一侧是自己的精确面积覆盖。图标逐像素差：`settings.shell` 的 10 枚导航图标在不遮罩时每枚最大通道差 18–103、超过容差 12 的像素 4–80 个（`light-blue-medium-1280x800`，实验记录在开发文档 §8）。
 - 证据（图标）：先用 Viva 自带的绘制路径，`settings.shell` 的 108 个变体里有 864 次图标墨迹总量比超出 `[0.85, 1.15]`，全是 Viva 偏多、介于 1.173 与 1.526 之间（**多 17%–53%**），原因有二，都在 Viva 源码里：(1) `gfx/icon.go` 第 505–510 行与第 575–585 行，笔画「向上取整到半个设备像素」，16px 图标的 1.333px 笔画画成 1.5px（+12.5%）；(2) 半透明笔画走 `gfx/path.go` 第 653–692 行的单轮廓三角剖分，`internal/raster/shapes.go` 第 189–290 行的栅格器只对「三角形自己带羽化标记的边」做半像素渐变，剖分出的内部三角形 `EdgeMask=0`、覆盖度恒为 1：隔离实验里同一条竖线，不透明色两列各 170/255（2/3，正确），透明度 0.8 时两列各 204/255（满覆盖），即 1.333px 的线被画成接近 2px。**已做的补偿**：`kit.Icon`/`kit.PaintIcon`（`viva/kit/iconraster.go`）自己栅格化——图标缩放到设备像素、路径拉平、按扫描线求「到路径的距离 ≤ 半线宽」的带（圆头圆角正是 lucide 的笔画样式）对每个像素的精确面积覆盖度（水平方向精确，竖直方向 1/32），缓存后一像素一矩形经 `Canvas.Fill` 画出；单元测试用解析可算的图形（线宽、圆盘面积、圆环面积、平移不变性、对称）钉住。多色与填充图标仍走 Viva 原生路径。**结果**：`settings.shell` T3 108 个变体 1248 枚图标，墨迹总量比 Viva / React 为 0.904–1.044（均值 0.980），墨迹位移全为 0。
 - 对照口径（口径变更，见「变更记录」）：图标外框进入 L3 遮罩（与文字同样处理，`maskPad = 1`）；L2 新增图标检查——React 的每个 SVG 外框必须在 Viva 里配上一枚（中心距 ≤ 3px，一对一，缺与多都是问题）、外框差 ≤ `maxDeltaPx`（1px）、墨迹量比落在 `[0.85, 1.15]` 且位移为 0（沿用文字阈值，`thresholds.json` 未改）。
+- 小图标的延伸（采集页，2026-11-16）：小字号档（根字号 14px）下「重复内容」徽标里的 `Copy` 图标只有 8.75px、笔画 0.73px，墨迹总量比 Viva / React 为 1.144–1.153，超出 `[0.85, 1.15]` 上限；校准范围（12px 以上的图标）是 0.904–1.044。方向与成因同上（Skia 的采样量化对细笔画更敏感，Viva 是精确面积覆盖），只是笔画越细偏差越大。**登记范围**：`Waiver{Kind: "ink-mass", Subject: 外框为 8.75×8.75 的图标, MaxDelta: 0.16}`——只放过这个尺寸的图标、且墨迹总量比偏离不超过 0.16（实测最大 0.153）；其余尺寸或更大的偏差照常判定。证据：`D:\Project\GuiZhi-bench\parity\viva-imp\light-royal-blue-small-1280x800\app.window.imports.report.md`（不入库）。
 - 状态：开（引擎限制：Skia 的采样量化与逐元素合成无法复现，图标边缘不逐像素相同）。
 
 ### A-004 可访问树里没有地标角色与图标图片角色
@@ -54,7 +55,7 @@
 - 场景/模块：所有整窗与外壳场景（`app.window.*`、`settings.shell`）：React 的 `<aside>`（complementary）、`<header>`（banner）、`<nav>`（navigation）、`<main>`，以及 lucide 图标 SVG 在 Chromium 里的无名 `image` 节点；所有对话框场景：`role="alertdialog"` / `role="dialog"`（`ConfirmDialog`、`Modal`、`UnsavedChangesDialog` 等）。
 - 偏差：Chromium 的可访问树里有这些节点；Viva 没有对应的角色，图标也不进可访问树；对话框在 Viva 里只能是带名字与描述的 `group`，屏幕阅读器不会把它读成「对话框」。
 - 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 330–361 行的 `Role` 枚举只有 Button、Link、Checkbox、Radio、Tab、MenuItem、Combobox、Switch、TextField、Slider、Terminal、Group、Menu、Menubar、ListBox、Option、Grid、GridCell、Heading、Status、Separator 二十一种，没有 banner / complementary / navigation / main / image / dialog / alertdialog；`Canvas.Container` 只接受这些角色。
-- 已做的补偿：L1 归一化（`viva/parity/a11y_map.go`）把这四种地标放进 `reactIgnoredRoles`，无名 `image` 放进新增的 `reactIgnoredUnnamed`；它们里面的按钮、标题、输入框、开关等**照常逐个比较**（角色、名称、状态、外框）。没有放宽任何带操作或状态的节点；带名字的 `image` 仍必须逐个决定怎么映射。对话框：`alertdialog`、`dialog` 映射成 `group`（`reactRoleMap`），名称、描述（`Description`）、外框、里面的标题与按钮照常逐个比较，只是角色名不比较；`kit.ConfirmDialog` 把说明文字放进面板 `group` 的 `Description`，对应渲染层的 `aria-describedby`。
+- 已做的补偿：L1 归一化（`viva/parity/a11y_map.go`）把这四种地标放进 `reactIgnoredRoles`，无名 `image` 放进新增的 `reactIgnoredUnnamed`；它们里面的按钮、标题、输入框、开关等**照常逐个比较**（角色、名称、状态、外框）。没有放宽任何带操作或状态的节点；带名字的 `image` 仍必须逐个决定怎么映射。对话框：`alertdialog`、`dialog` 映射成 `group`（`reactRoleMap`），名称、描述（`Description`）、外框、里面的标题与按钮照常逐个比较，只是角色名不比较；`kit.ConfirmDialog` 把说明文字放进面板 `group` 的 `Description`，对应渲染层的 `aria-describedby`。悬停提示（`TooltipLayer` 的气泡，`role="tooltip"`）同理映射成 `group`（`reactRoleMap` 的 `"tooltip": "group"`，2026-11-17）：气泡文字作为它的名称照常比较，角色名不比较。
 - 状态：开（引擎限制）。守卫摘要随之更新，见「变更记录」。阶段末在 `AskQuestion` 里请用户知悉这条对 L1 口径的扩展。
 
 ### A-005 窗口最小化/最大化/关闭按钮的外观与宽度
@@ -97,6 +98,7 @@
 - 偏差：渲染层的浮层是 `position: fixed` 加圆角裁切的独立合成层，Chromium 在这样的层上用**灰度**抗锯齿；页面本身的文字用 LCD（ClearType）。Viva 的 LCD / 灰度是**整窗**开关，同一帧里不能让浮层单独用灰度，浮层文字是 LCD。LCD 的墨迹总量比灰度偏大，实测 1.15–1.31 倍（随文字颜色、字号与明暗而定，多数变体仍在 `[0.85, 1.15]` 以内）。
 - 证据：裁切放大对比（`D:\Project\GuiZhi-bench\parity\s4-crop-text.png`，不入库）：渲染层的触发器文字与 Viva 一致地带彩边（LCD），渲染层面板里的文字无彩边（灰度）、Viva 面板里的文字带彩边。Viva 源码：`internal/platform/windows/label_picture_windows.go` 第 120 行与 `text_batch_windows.go` 第 235 行 `allowLCD := (renderer.window != 0 && !renderer.usesComposition()) || renderer.color.Alpha >= 1`——由渲染器的窗口清屏色一次决定，标签（`platform.TextLabel`，`internal/platform/contract.go` 第 341 行起）没有按标签关闭 LCD 的字段；公开包里没有这类入口。实测 `app.window.page-settings.select-close-action` 的 T2 36 个变体：墨迹总量比 1.15–1.31（超出 `[0.85, 1.15]`）出现在 11 个变体（浅色与深色都有），位置、字重、颜色、字号全部一致。
 - 已做补偿：对照工具给浮层里的文字行打标记（`Text.Overlay`，层号 ≥ `kit.OverlayLayerMin`），场景用 `Waiver{Overlay: true, Kind: "ink-mass"}` 只放过**浮层文字**的墨迹总量比；位置、字重、颜色、字号照常判定，页面层的同一段文字（如触发器里的「每次询问」）也照常判定。
+- 悬停提示的延伸（采集页，2026-11-17）：`TooltipLayer` 的气泡是 `position: fixed` 的浮层，文字同样是灰度抗锯齿；实测气泡里文字的墨迹总量比 Viva / React 为 1.315–1.339（浅色），登记方式同上（`overlayInkWaiver`，`ui.tooltip.*` 与 `title-hover` 场景都带）。**比较规则补充**（`viva/parity/compare_occlusion.go`）：气泡盖在页面文字上时（例如悬停标题时气泡压住下一行的「网页」「共 0:03」），量墨迹的区域里混进了气泡自己的字形，那一行页面文字的墨迹总量比因此偏到 0.70–1.25，不是页面文字本身的偏差。规则：页面层文字或图标的墨迹比较区域（外框外扩 1 像素）与浮层里的文字或图标外框重叠时，**不比这一行的墨迹**（报告里单独计数：`inkOccluded`，以 `light-royal-blue-medium` 为例，`title-hover` 里 4 行、`wrap`/`flip` 里 2 行）；它的位置、宽度、外框仍照常比，没有浮层时同一行的墨迹由别的场景比较。没有改任何阈值（阈值摘要 `5128b9532a96` 不变）；单测 `compare_occlusion_test.go`。
 - 状态：开（引擎限制；升级 Viva 版本时复测）。
 
 ### A-010 滚出可视区的内容不进无障碍树
@@ -106,6 +108,40 @@
 - 证据：`app.window.page-settings.select-language`（设置内容滚到底）第一次对照报 `[L1/missing-node] switch 「后台任务」：React 有、Viva 没有`，React 一侧该开关外框 y=-2，已滚到顶栏之下；`app/driver.go` 第 1103–1104 行说明 `Snapshot.Texts` 是裁剪之前的、实际画出的在 `Labels`。
 - 已做补偿（口径变更，见「变更记录」）：对照只比「呈现出来的部分」——React 采集器用 `IntersectionObserver` 取每个元素在视口里的可见矩形，滚出的节点、文字与绘制不收，被部分裁掉的节点外框取可见部分（原外框留在 `fullBox`）；Viva 一侧把 `Snapshot.Texts` 里没有出现在 `Labels`（真正画出）的文字行标 `Hidden`：不算呈现出来的文字，但仍可补全一段折行文字的原文（整段文字的拼接要等于渲染层文字节点的全文，与「窗口之外的行」同一处理）。
 - 状态：开（引擎限制）。辅助功能的实际影响在 R-2（讲述人）真机项里一并核对。
+
+### A-011 切换钮的「未按下」与「没有 aria-pressed」不可区分
+
+- 场景/模块：采集页（`app.window.imports*`）二级侧栏的状态筛选行（`aria-pressed`）、页头「提交来源」切换钮、暂停/继续队列；今后所有 toggle 按钮。
+- 偏差：Chromium 的可访问树里 `aria-pressed="false"` 的切换钮与没有这个属性的普通按钮是两种状态；Viva 的 `HitOptions` 只有 `Selected` 一个布尔位，未按下的切换钮在可访问树里与普通按钮无法区分。用户看得见的差异：辅助技术读不出「未按下」。
+- 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 441–520 行的 `HitOptions` 字段（Checked、Mixed、Selected、Expanded、Expandable……）没有 pressed；`app/accessnodes.go` 第 11–51 行的 `AccessNode` 同样没有。
+- 已做补偿：按下态写成 `Selected: true`，L1 归一化（`a11y_map.go`）把 Viva 的 Button + Selected 与 React 的 `aria-pressed="true"` 对上；「未按下」不参与比较（React 的 `pressed=false` 与无属性都视为未按下）。**没有放宽带操作的节点**：按下态仍逐个比较。
+- 状态：开（引擎限制）。
+
+### A-012 没有 alert 角色
+
+- 场景/模块：`LoadErrorState`（列表读取失败，渲染层 `role="alert"`）；今后其余 `role="alert"` 区域。
+- 偏差：Chromium 的 `alert` 是带直播属性的区域（出现即播报）；Viva 的 `gfx.Role` 没有 alert（与 A-004 是同一份枚举）。
+- 证据：`github.com/vivaui/viva@v0.6.4/gfx/canvas.go` 第 330–361 行的 `Role` 枚举；直播属性有 `gfx.LiveAssertive`（同文件第 395–403 行）。
+- 已做补偿：`kit.LoadErrorState` 声明 `Status` 角色加 `Live: LiveAssertive` 的容器，L1 把 React 的 `alert` 映射为 `status`（`reactRoleMap`），无名的 `status` 不再被当作行级悬停区丢弃（`NormalizeViva`）；容器里的图标、标题、原因、重试钮照常逐个比较。
+- 状态：开（引擎限制）。
+
+### A-013 文字没有字距（letter-spacing）
+
+- 场景/模块：用了 Tailwind `tracking-*` 的文字：采集页二级侧栏的「任务概览」小标题（`tracking-wide` = 0.025em）；今后其余带字距的文字。
+- 偏差：Chromium 把 `letter-spacing` 加在每个字符之后（含最后一个）；Viva 的 `gfx.TextStyle` 只有 Size / Weight / Italic / Color / Mono / MonoFace / Direction，没有字距。「任务概览」12px、每字 0.3px、四个字：React 绘制宽 49.20px，Viva 48.00px（`app.window.imports` 的 L2 `text-width` 差 1.20px）。
+- 证据：`gfx.TextStyle` 字段清单（`github.com/vivaui/viva@v0.6.4/gfx`）；`D:\Project\GuiZhi-bench\parity\viva-imp\light-royal-blue-medium-1280x800\app.window.imports.report.md`（不入库）。
+- 已做补偿：`kit.TextTracked` 按自然字宽排字，把文字盒的宽度加上「字符数 × 字距」，后面的元素（本例是右侧的分隔线）落在渲染层的位置；字形本身依次比渲染层靠左，最多差 (字符数 − 1) × 字距（本例 0.9px）。`text-width` 以 `Waiver` 登记，只放过这一段文字、这一类问题。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
+
+### A-014 文字没有字偶距（kerning）
+
+- 场景/模块：含拉丁字母字偶对（如 `Yo`、`Tu`）的文字：采集空队列引导里的「B站 / YouTube / 抖音」；用户数据里的英文标题同样受影响（宽度差随字偶对数量累积，一般在 1–3px）。
+- 偏差：Chromium 默认启用字偶距；Viva 不做。12px 的「B站 / YouTube / 抖音」React 绘制宽 116.75px，Viva 119.00px，差 2.25px；该行居中，同一行里其余提示块与图标的位置随之偏 1.12px，个别图标恰好落在半像素的取整边界上，墨迹整体差 1 像素。
+- 证据：`github.com/vivaui/viva@v0.6.4/internal/textmetrics/textmetrics.go` 第 12–14 行（"Widths are exact sums of integer advances scaled by the size: no kerning, no shaping, no hinting"）；在 React 参照里用 `canvas.measureText` 量同一段文字：关闭字偶距 118.998px，与 Viva 的 118.998px 逐位相同，开启 116.736px（DOM 实测 116.75px）；`YouTube` 单词 48.75px（开）对 51.01px（关）、`Yo` 13.73 对 14.87、`Tu` 13.15 对 14.27（脚本 `D:\Project\GuiZhi-bench\tools\measure-text.mjs`，不入库）。
+- 已做补偿：无——没有可行路线：`TextStyle` 没有字偶距参数；把文字逐对拆开定位会把一段文字拆成多个文本节点，破坏 L1 的文字序列与可访问名。对照里该文字的 `text-width`、受其位置牵连的图标外框（≤ 1.5px）与图标墨迹位移（≤ 1px）以 `Waiver` 登记，只放过这几类、且对后两类按偏差大小设了上限（`Waiver.MaxDelta`），同一处更大的偏差照常判定。
+- 实测量级与登记范围（采集页 T3，2026-11-16）：差异只来自整行宽度差累积出的次像素位移，没有出现结构性偏差。(1) 空队列引导里「B站 / YouTube / 抖音」整行宽度差 2.25px，其所在的行居中，左侧「网页文章」的位置偏 Δ/2——1280 宽下 1.12px，大字号档（根字号 18px）Δ 增至 2.53px、位移 1.26px，加半像素取整后墨迹最佳位移为 2 像素，登记为 `ink` 上限 2（`MaxDelta: 2`，仅限「网页文章」）；(2) 数据场景里 yt-dlp 提示行（0.68px 的宽度差）墨迹最佳位移 1 像素，登记为 `ink` 上限 1（仅限含 yt-dlp 的那一行）。所有登记都带 `MaxDelta`：同一处位移更大时照常判定。
+- 悬停提示里的长网址（采集页，2026-11-17）：气泡里的网址没有空格，渲染层与 Viva 都在行满处按字符折行；Chromium 做字偶距，整行比 Viva 窄。「https://www.zhihu.com/question/123456789/answer/987654321」（57 字符）在 `max-w-xs`（320px）减去内边距后的 302px 内：渲染层第一行放得下前 47 个字符，宽 301.625px；Viva 同样 47 个字符宽 302.332px（逐字相加与整串宽度相同，没有字偶距），正好越过 302px，最后一个字符「r」折到下一行。结果两边折行点差一个字符：第二行宽度差 4.57px（渲染层 68.47px，Viva 73.04px），整段墨迹随之偏一个字符。外框、行数、气泡位置都一致——气泡宽度由「不折行时最宽的逻辑行」（`kit.tooltipMaxContent`）而不是折行后的行宽决定，折行点不影响外框。**登记范围**：`tooltipBreakWaivers`（`viva/parity/scenes/imports.go`）：`Waiver{Kind: "text-width" 或 "ink", Subject: 含 "zhihu.com" 的那段网址, MaxDelta: 8}`，只放过这一段文字、且偏差不超过一个拉丁字符的宽度；`ui.tooltip.wrap` 与 `ui.tooltip.flip` 带上它。
+- 状态：开（引擎限制；升级 Viva 版本时复测）。
 
 ## B 类：暂缺
 
@@ -118,6 +154,12 @@
 | B-008 | 顶栏动作接线：搜索框、「新建」主按钮、「更新」按钮 | 点击搜索框打开命令面板（`OnOpenPalette`）；点「新建」主按钮发起快速采集（`OnNewCapture`）；「有可用更新」按钮打开更新对话框（`OnUpdate`）。回调已在 `shell.Window` 上留好，但命令面板、采集与更新对话框都在 M3，所以真窗口里这三处点击目前没有反应。 | M3（命令面板、快速采集、更新对话框） |
 | B-009 | 设置：首次读取失败的界面 | 按 AGENTS.md，加载失败要显示 `LoadErrorState`（含重试），不能把默认值当成真实设置渲染。`settingsStore` 已记录首次读取错误（`LoadError()`，有单测），但设置页还没有展示它的组件。 | M0 工具包（`LoadErrorState`）→ 接到设置页 |
 | B-010 | 窗口：改字号档后，Viva 画的窗口按钮条高度 | 渲染层的窗口按钮 `h-full`，随顶栏高度（3rem）在改字号档的瞬间变化；Viva 的 `Config.TitlebarHeight` 只在创建窗口时读取一次（`app/window_controls.go` 第 140–145 行 `newWindowControls` 只算一次 `height`），没有运行时修改的入口，所以改字号档后按钮条高度保持创建时的值，直到重启。尚未尝试「字号档变化时重开窗口」的做法（会闪一下并要保住位置与状态）。 | M0 外壳接线末（阶段 2 结束前）：评估重开窗口方案；不可行则凭证据转 A 类 |
+| B-013 | 采集页：「采集文档站」整页（`DocumentSitePanel`） | 点页头「采集文档站」切到整页的文档站采集界面（地址、扫描、选择、入队）；Viva 现在显示「尚未迁移」占位并提供返回。 | M3（采集模块） |
+| B-014 | 采集页：任务详情弹窗（`ImportTaskDetailModal`：阶段耗时、错误原文、操作） | 点「查看成果」「耗时摘要」「详情」打开；Viva 只记下任务 id（`Screen.detailTaskID`），弹窗未做。 | `Modal` 工具包落地后（M0）接上，M1 收尾前完成 |
+| B-015 | 采集页：登录后重试（`RetryAuthenticated`） | 失败任务的「登录后重试」「打开平台登录」依赖浏览器登录窗口与桥接；回调 `Hooks.RetryAuthenticated` 已留好，尚未接线；`Hooks.WebSolverEnabled`（网页验证自动求解 FlareSolverr 是否开启，决定行内重试按钮写「网页验证」还是「自动验证并采集」）依赖设置 → 网络页的 FlareSolverr 开关，同样尚未接线，外壳目前按「未开启」处理。 | M3（采集模块的登录桥接） |
+| B-016 | 采集页：跳到其他模块的两个入口（`Hooks.QuickCapture`、`Hooks.OpenItem`） | 二级侧栏的「快速采集」按钮要打开快速采集对话框；任务行的「查看成果」与可打开成果时的标题要切到知识库并选中条目。两个回调已在 `imports.Hooks` 上留好，`viva/app/root.go` 目前只接了 `CaptureShortcut` 与 `OpenSettingsSection`，所以真窗口里这几处点击没有反应（按钮自身的可访问性、外观与悬停已对照）。 | M3（快速采集对话框）与 M2（知识库选中条目）接线 |
+| B-017 | 悬停提示（`kit.Tooltips`）：键盘、滚动与窗口失焦时收起 | 渲染层 `TooltipLayer` 在 pointerdown、keydown、滚动、窗口失焦时都会收起气泡（`dismiss()`）。Viva 已做：按下收起并在指针离开前不再提示、换宿主重新计时、键盘聚焦也出提示（`FocusVisible`）、宿主外框变了（被滚走）重新计时；**没接**：按键时收起、滚动中收起（目前靠外框变化重新计时间接覆盖）、窗口失焦时收起。这三个状态没有对照场景，按未验证计。 | M2 前补：按键与失焦收起（在窗口根上监听）；补 L4 测试后转已关闭 |
+| B-018 | 来源平台识别在 Go 里有两份实现 | 渲染层 `packages/shared/utils/{video,forum,source}-platforms.ts` 的判定，外壳 main 包 `source_platforms.go` 已移植一份（由 `make-golden.mts` 基准对拍）；main 包不能被界面层引用，原生界面（任务详情的平台图标与名称）又在 `native/services/source_platform.go` 里移植了一份，`source_platform_test.go` 与外壳侧用同一批输入。两处必须一起改。 | M4 收尾（React 渲染层退役时）：把判定收敛到界面与外壳都能引用的包里，删除外壳侧的重复，对拍基准改指新位置 |
 
 ### 已关闭条目
 
@@ -128,6 +170,8 @@
 | B-001 | `settings.general`：后台任务开关——打开「后台任务」先弹 `ConfirmDialog`（标题「启用系统后台运行」），确认后才写入；关闭立即写入。 | 2026-11-16 | `kit.ConfirmDialog`（`viva/kit/confirm.go`）与设置页接线（`viva/screens/settings/general.go` 的 `backgroundTasks`、`backgroundDialog`）。对照：场景 `app.window.page-settings.dlg-background-tasks` 在 T2（36）、T1（4）与 5 个入库样本变体全部通过，L3 比例最大 0.0134%（口径见 A-007）。L4：`viva/kit/confirm_test.go`（取消按钮初始焦点、Enter 确认、Esc 与点遮罩关闭、加载中不可关闭、焦点陷阱与归还、入场动画时长与曲线、四种动效偏好）与 `viva/screens/settings/general_test.go`（先确认再写入、取消 / Esc / 点遮罩只关闭、确认一次写入四项、关闭不需确认、普通开关即写即翻）。写入失败的提示归 B-002。 |
 | B-002 | `settings.general`：写入失败——失败时用 `showToast` 带可复制的 `detail` 并可重试；原先 Viva 页吞掉 `Store.Update` 的错误。 | 2026-11-16 | `kit.Notifier`、`kit.Toasts`、`kit.Guard`（`viva/kit/toast.go`、`toast_view.go`、`guard.go`）与接线：`viva/app/root.go` 创建 Notifier 与 Guard（日志取服务日志）、`viva/screens/settings/general.go` 的全部写入改走 `g.save`（`Guard.Run`）、`viva/screens/shell/window.go` 在窗口根上挂 `Toasts`。对照：`ui.toast.*` 八个场景 T2 288/288、T1 32/32、T0 16/16（口径与偏差见 A-007）。L4：`viva/kit/toast_test.go`（自动消失时长、挤出规则、任意 goroutine 投递、操作与关闭、详情展开与复制、剪贴板失败、进退场动效、Guard）、`viva/app/root_test.go` 的 `TestRootSettingsWriteFailureShowsToastAndRetries`（写入失败 → 开关回退、一条 error toast 标题含「保存设置」、详情默认折叠且可展开复制、日志一条、重试成功）。补充：React 侧并没有这条通道——`GeneralSettings.tsx` 里没有任何错误处理，开关乐观地改本地状态，同步到主进程失败只有 `console.warn`（`stores/settings.store.ts` 第 58 行）；这里按验收标准第 6 条（AGENTS.md「用户操作失败必须可理解、可重试」）补全了用户可见的通道，登记在「有意的增强」一节，不是复刻。 |
 | B-003 | `settings.general`：下拉框——点击「关闭窗口行为」「语言」弹出选项列表（键盘与指针操作、选中后关闭）。 | 2026-11-16 | `kit.Select` 与弹层（`viva/kit/select_popup.go`），提交 `fa87d599`。对照：场景 `app.window.page-settings.select-close-action`、`…select-language`（T2 各 36 个变体通过，浮层文字的墨迹总量比按 A-009 登记，一帧残影见 A-008）。L4：`viva/kit/select_popup_test.go`、`select_motion_test.go`。 |
+| B-011 | 采集页：时间标签、按钮等带 `title` 的悬停提示（渲染层 `TooltipLayer` 把 `[title]` 换成自绘气泡：悬停约 320 ms 出现，样式与位置统一）。 | 2026-11-17 | `kit.Tooltips` / `kit.HintGroup` / `kit.HintDescription`（`viva/kit/tooltip.go`），宿主声明提示文字即可（`gfx.HitOptions.Hint`），采集页的顶栏开关、来源分组、任务标题与行内按钮已接。对照（T2，36 个变体全部通过）：`ui.tooltip.below`（顶栏图标钮，单行气泡在宿主下方）、`ui.tooltip.wrap`（筛选到失败后第一条的任务标题，57 字符的原始地址折成两行）、`ui.tooltip.flip`（最靠下的任务标题，下方放不下，翻到上方）；偏差已登记：A-009（气泡文字的墨迹总量与页面文字被气泡侵入的墨迹）、A-014（长网址的折行点差一个字符）、A-004（`role="tooltip"` 映射成 `group`）。L4（`viva/kit/tooltip_test.go`）：320 ms 延迟、气泡在宿主下方 8px、夹回窗口 8px 内、下方放不下翻到上方、`w-max max-w-xs` 的宽度（取不折行时最宽的逻辑行，折行不缩窄气泡）、按下后不再提示直到指针离开、容器提示（`closest("[title]")`）对里面的按钮生效、宿主在被提示期间没有可访问描述（React 在悬停与聚焦一开始就把 `title` 摘下）、`white-space: pre-line` 的换行。未接的收起情形见 B-017。时间列（`入队 …｜更新 …`）也带长提示，但行一悬停左右两个动作钮把它整个盖住（钮间缝隙 1.75px），鼠标几乎碰不到，不作对照宿主（`react-scenes.mjs` 里写明）。 |
+| B-012 | 采集页：悬停下划线（任务标题、耗时摘要的 `hover:underline`）。Viva 的文字没有下划线样式（`TextStyle` 无此字段，只有输入法与制表符用到下划线）。 | 2026-11-17 | 自己画：`kit.Underline`（`viva/kit/text.go` 的 `paintUnderline`）在文字盒的 `Draw` 钩子里填一条线，几何取自 React 实测——粗 1 设备像素（11–18px、字重 400），行号 = 行盒顶取整 + 基线行（`ChromeBaselineRow`）+ 1，横向正好是文字宽度（右端小数像素处带半透明），颜色 = 当前文字色，悬停立即出现（无过渡）。实测脚本 `scripts/parity/tools/probe-underline.mjs`（8 个字号 × 4 个小数偏移的栅格位置），L4 `viva/kit/text_underline_test.go` 把这 32 格逐一对上。接线：`viva/screens/imports/row.go` 的 `rowTitle`（可打开成果的标题，同时变主色）与 `stageSummary`（耗时摘要，11px，两段文字共用悬停态）。对照（T2，36 个变体全部通过）：`app.window.imports.title-hover`（同时出标题的提示气泡）与 `app.window.imports.summary-hover`；目视核对放大截图，下划线行与长度与 React 一致。React 参照采集关掉了所有过渡（`SETTLE_CSS`），对照比的是悬停稳定后的画面；150ms 的颜色过渡由 L4 的悬停进度用例覆盖，下划线本身不过渡。**未验证**：标题被截断（带省略号）时悬停的下划线（`kit.Underline` 取「整段文字的宽度与盒宽的较小值」，被截断时就是盒宽；Chromium 的线只盖到省略号末尾，两者可能差不到一个字符的宽度，没有对照场景）。 |
 
 ## C 类：需要用户裁决
 
@@ -234,3 +278,10 @@ C 类不阻塞：继续做不依赖它的部分，阶段末汇总，用 `AskQues
 | 2026-11-16 | **模态场景的遮罩口径（`Scene.Backdrop`，A-007）**：面板之外的 L3 与「模拟渲染层合成的预测图」比较（页面再渲染一次 → 叠遮罩色 → 按 σ 高斯模糊 → 乘以由 Viva 原图推出的面板阴影衰减），面板之内原样比较，阈值不变；面板之外的文字与图标 L3 遮罩去掉；L2 对页面层文字与不完全落在面板里的图标不比墨迹（计入 `InkBlurred`，报告单列）。没有登记 `Backdrop` 的场景不受影响，`thresholds.json` 与冻结摘要 `5128b953…` 不变。**收窄**：遮罩背后页面文字的 L2 墨迹不再比较（这些文字在无遮罩的场景里完整比较）；**未覆盖**：模糊半径本身由类名保证（G-004）。面板阴影所在的一圈也在逐像素比较之内（试验过「遮掉面板外一圈」的做法，已弃用） | A-007：Viva 没有模糊原语，直接比较必然失败（模拟的 σ 取 0.3 时 L3 差异 4.4%–5.0%）；预测图方法在 σ=2 与 σ=8 下都能检出偏差（0.34%–1.06% > 0.25%），说明它不是什么都放过 | 待阶段末告知（口径变更，按 C 类告知处理） |
 | 2026-11-16 | **L2 文字行数与折行行距按「整行」比较**（`compare_l2.go` 的 `rowRects`）：React 一侧用 `Range.getClientRects` 取文字外框，预排版文字（`white-space: pre-wrap`）的行首缩进空白与折行处挂在行尾的空格会各自成一块，同一行有 2–3 个矩形；比较前把 y 相差不到 0.5px 的相邻片段并成它们的并集。`thresholds.json` 与冻结摘要不变；已通过的场景重跑结果不变；`compare_l2_rows_test.go` 守卫 | `ui.toast.detail-expanded` 的 `text-lines` 报 React 9 行、Viva 6 行，原因是片段被当成行，不是排版差异；折行文字相邻行距的比较（`wrappedTextPitchPx`）同样基于整行 | 不需要（澄清比较对象，没有放宽任何阈值：并行之后行数与行宽仍按 `maxDeltaPx` 逐行比较） |
 | 2026-11-16 | 新增 Toast 对照场景的采集口径（`scripts/parity/lib/react-toast.mjs`）：沿 React fiber 找到渲染层 `ToastProvider` 的 context 值，调用它自己的 `showToast`/`showUndoToast`（不改渲染层一行代码，「渲染层改动登记」仍为空）；弹出时把自动消失的定时器换成空操作后立即还原，采集期间提示不会自己消失；`#root` 设为 `visibility:hidden`，提示背后是纯页面底色。`overlayInkWaiver`（A-009）与等宽字格的 `toastMonoWaivers`（A-006）只放过各自登记的项目 | A-007、G-005：背后有内容时 Viva 没有对应的模糊，所以只在纯色背景下逐像素对照 | 不需要（没有放宽任何阈值；**未覆盖**的部分登记为 G-005） |
+| 2026-11-16 | L1 归一化（`a11y_map.go`）：(1) React 的 `alert` 映射为 `status`（A-012）；(2) 切换钮只比较「按下」，未按下与无 `aria-pressed` 不可区分（A-011）；(3) 无名的 `status` 不再按行级悬停区丢弃；(4) **新增更严的检查**：`separator`（列分隔条）比较 `aria-valuenow`/`valuemin`/`valuemax`（Viva 经 `HitOptions.Range` 表达）。`testdata/a11y_map.sha256` 由 `420f64c7…` 更新为 `63b12ccf…`。(1)–(3) 不放宽带操作的节点：按下态、名称、外框照常逐个比较 | A-011、A-012：Viva 的 `HitOptions` 没有 pressed、`gfx.Role` 没有 alert，无法表达；(4) 是补上此前没有的覆盖 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-16 | 对照工具：(1) React 采集器对 `text-overflow: ellipsis` 且确实被截断的单行文字，按 Chromium 的规则复算看得见的「前缀 + …」（最长的前缀使「前缀宽度 + 省略号宽度」不超过内容盒宽度），`texts[].text` 记看得见的文字、`full` 记 DOM 原文，`rects` 取截断后的宽度；复算结果与 Viva 的截断一致（`https://example.com/…utm_…`）；(2) 事实 JSON 的节点 `value` 兼容数字（`aria-valuenow`）；(3) `Issue.Delta` 记度量问题的偏差大小，`Waiver.MaxDelta` 据此给已登记偏差设上限（A-014）。`thresholds.json` 与冻结摘要不变 | 此前采集器记 DOM 原文，被省略号截断的文字与 Viva 画出的文字必然不一致，是采集口径与「只比呈现出来的部分」（A-010）不统一；(3) 让同一原因造成的次像素位移被放过时，更大的偏差仍照常判定 | 不需要（没有放宽任何阈值；放过范围限定在已登记原因的次像素位移） |
+| 2026-11-16 | 对照工具（采集页 T2/T3 暴露）：(1) React 采集器给 SVG 记「有效不透明度为 0」（`paints[].invisible`：自身与祖先不透明度之积 < 0.001），典型是 `opacity-0 group-hover/row:opacity-100` 的行内动作条；L2 对这类图标仍比较外框（位置与大小必须一致），但不比较墨迹（画面上并不存在），L3 也不再为它们遮罩，报告里单列「不可见图标」个数；(2) Viva 一侧的文字宽度按 `gfx.Text.ClipOf` 裁到裁剪框右缘，与渲染层输入框里被截断的占位文字一致（此前取自然宽度，800×600 下报 84.00 对 53.88）；(3) 墨迹总量比问题记偏差大小（`|比值 − 1|`），供 `Waiver.MaxDelta` 使用。`thresholds.json`（`5128b9532a96`）与 `a11y_map.sha256` 不变 | (1) 不可见元素的墨迹是噪声，遮罩它们反而白白遮掉一块本可比较的像素；(2) 这是采集口径与「只比呈现出来的部分」（A-010）不统一；(3) 同 A-003 与 A-014 的登记需要大小上限 | 不需要（没有放宽任何阈值；未检查的只有画面上并不存在的墨迹，外框检查保留） |
+| 2026-11-17 | L1 归一化（`a11y_map.go` 的 `reactRoleMap`）：悬停提示气泡的 `tooltip` 映射成 `group`；`testdata/a11y_map.sha256` 由 `63b12ccf…` 更新为 `014d41b0…`。气泡文字（名称）、外框照常逐个比较，只是角色名不比较 | A-004：Viva 的 `gfx.Role` 没有 tooltip，无法表达；不是为让场景通过而放宽 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-17 | **L2 墨迹比较规则：页面层文字与图标的墨迹区域被浮层里的文字或图标侵入时不比这一行的墨迹**（`compare_occlusion.go`；报告 `inkOccluded` 单列计数）。位置、宽度、外框照常比；`thresholds.json`（`5128b9532a96`）不变，单测 `compare_occlusion_test.go`。悬停提示的气泡盖在页面文字上时，区域里量到的是气泡自己的字形（A-009 的灰度抗锯齿使它与 React 的墨迹总量偏 1.3 倍），页面文字被误报成墨迹总量偏到 0.70–1.25 | A-009：不是页面文字的偏差；不拿 `Waiver` 逐文字放过（按受气泡压住的文字列名既脆弱又会随字号与布局变化），而是把「量不出」写成规则。**这收窄了 L2 的覆盖范围**：被浮层压住的那几行的墨迹，只在没有浮层的场景里比较 | 待阶段末告知（口径变更，按 C 类告知处理） |
+| 2026-11-17 | **React 参照的复核规则**：长会话里（一次采集 100 多次、同一个 Electron 进程）偶发栅格抖动，实测 108 次采集里 1 次：采集页侧栏「进行中」旋转图标（14px，外框 x=87.5，小数像素位置）整体偏 1 像素，其余像素与外框完全不变（`app.window.imports.summary-hover` × `light-purple-small`，79 个像素、最大通道差 168）；同一 (场景, 变体) 在新会话里重采 5 次结果逐位一致（4 次三场景序列 + 1 次单场景），且与 Viva 一致；基础场景 `app.window.imports` 在同一变体上单场景采集 8 次，像素也逐位相同。规则：比对只在这类「仅一枚小数位置图标位移」的失败上触发复核——在新会话重采同一 (变体, 场景)，以多数一致者为准；被替换的原采集留档，不删（本次留在 `D:\Project\GuiZhi-bench\parity\react-tip-outliers`）。不改任何阈值，没有放宽图标墨迹的位移上限（仍为 0） | 抖动出在 React 参照一侧（Viva 与另外 5 次 React 采集一致），不是 Viva 的偏差；用容差吸收它会放宽图标检查，用「重采」只是确认参照本身没有被抖动污染。只对失败触发复核有偏向通过的风险，所以限定在上述特征（位移限单枚图标、其余像素逐位相同）并留档 | 待阶段末告知（采集口径，按 C 类告知处理） |
+| 2026-11-17 | 对照工具与采集：(1) React 场景新增 `app.window.imports.title-hover`、`summary-hover`（悬停下划线，B-012），`ui.tooltip.wrap` 改取「筛选到失败后第一条的任务标题」作宿主（原定的时间列被动作钮整个盖住，鼠标几乎碰不到）；(2) Viva 步骤新增 `MoveOverRolePrefix`，`MoveOverHint` 复用 `firstHint`，`SourceInputOf` 取夹具任务的原始地址；(3) `settle` 的 `layoutDigest` 改用 `strings.Builder`（原先 `s +=` 逐个拼接是平方级的内存拷贝，`go test ./viva/parity/scenes` 由 25.9s 降到 2.7s）。`thresholds.json` 与冻结摘要不变 | 场景与耗时的工程修正，没有改任何比较规则 | 不需要 |
