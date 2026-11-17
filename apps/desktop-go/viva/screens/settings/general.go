@@ -52,7 +52,12 @@ func (g *General) Page(c ui.C) {
 // save 把一次修改交给 Store，返回是否写入成功（runGuardedMutation 的语义）：
 // 失败时设置保持原值、界面随之回到原状，同时弹出带原因的错误提示并记日志，用户再点一次即是重试。
 func (g *General) save(mutate func(*settings.Values)) bool {
-	return g.Guard.Run(locales.NativeSettingsSaveAction(), func() error { return g.Store.Update(mutate) })
+	return save(g.Guard, g.Store, mutate)
+}
+
+// save 是各设置页共用的写入入口（runGuardedMutation 的对应物）：失败时设置保持原值并弹出带原因的错误提示。
+func save(guard kit.Guard, store Store, mutate func(*settings.Values)) bool {
+	return guard.Run(locales.NativeSettingsSaveAction(), func() error { return store.Update(mutate) })
 }
 
 // toggle 是绑定到设置布尔字段的开关：点击后把新值交给 Store；写入失败时设置不变，界面保持原状并提示。

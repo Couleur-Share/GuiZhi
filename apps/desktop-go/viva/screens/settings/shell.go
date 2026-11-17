@@ -58,7 +58,12 @@ type Shell struct {
 	// OnBack 是点「返回」时的回调（回到知识库等模块页）。
 	OnBack func()
 
-	general *General
+	// PickBackground 与 Wake 交给「显示设置」页的背景图分区（见 Appearance 同名字段）。
+	PickBackground func() (fileName string, err error)
+	Wake           func()
+
+	general    *General
+	appearance *Appearance
 }
 
 // section 返回当前分区。
@@ -87,6 +92,13 @@ func (s *Shell) content(c ui.C) {
 		}
 		s.general.Look, s.general.Store, s.general.Guard = l, s.Store, s.Guard
 		s.general.Page(c)
+	case SectionAppearance:
+		if s.appearance == nil {
+			s.appearance = &Appearance{}
+		}
+		a := s.appearance
+		a.Look, a.Store, a.Guard, a.PickBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.Wake
+		a.Page(c)
 	default:
 		title := ""
 		for _, m := range sectionMenu {
