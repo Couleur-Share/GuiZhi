@@ -9,6 +9,7 @@
       "en": "English"
     },
     "settings": {
+      "loadAction": "读取设置",
       "saveAction": "保存设置"
     },
     "shell": {

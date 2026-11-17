@@ -20,6 +20,16 @@ type Store interface {
 	Update(mutate func(*settings.Values)) error
 }
 
+// LoadReporter 是 Store 的可选能力：报告首次读取设置的失败，并允许重新读取（台账 B-009）。
+// 读取失败时 Values 只是默认值，不能当成真实设置渲染——外壳据此显示加载失败与重试，而不是一页看似正常的默认开关。
+// 没有实现它的 Store（测试里的内存实现）视为从不失败。
+type LoadReporter interface {
+	// LoadError 返回首次读取的错误；读取成功后为 nil。
+	LoadError() error
+	// Reload 重新读取；失败时 LoadError 随之更新。
+	Reload() error
+}
+
 // General 是「应用设置」页（渲染层 GeneralSettings）。
 type General struct {
 	Look  *kit.Look

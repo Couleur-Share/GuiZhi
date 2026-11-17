@@ -19822,6 +19822,16 @@ func (msgs Messages) NativeLanguageNameEn() string {
 	return Catalog.Format(msgs.locale, "native_languageName_en", nil)
 }
 
+// NativeSettingsLoadAction says "读取设置"
+// in the language the app shows.
+func NativeSettingsLoadAction() string { return In(i18n.Locale()).NativeSettingsLoadAction() }
+
+// NativeSettingsLoadAction says "读取设置"
+// in the language of msgs.
+func (msgs Messages) NativeSettingsLoadAction() string {
+	return Catalog.Format(msgs.locale, "native_settings_loadAction", nil)
+}
+
 // NativeSettingsSaveAction says "保存设置"
 // in the language the app shows.
 func NativeSettingsSaveAction() string { return In(i18n.Locale()).NativeSettingsSaveAction() }

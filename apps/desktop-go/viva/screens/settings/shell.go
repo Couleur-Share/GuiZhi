@@ -85,6 +85,9 @@ func (s *Shell) Page(c ui.C) {
 // content 是右侧内容区：按分区分派；还没迁移的分区如实说明，而不是一个看起来能用的空页。
 func (s *Shell) content(c ui.C) {
 	l := s.Look
+	if s.loadFailed(c) {
+		return
+	}
 	switch s.section() {
 	case SectionGeneral:
 		if s.general == nil {
@@ -100,17 +103,43 @@ func (s *Shell) content(c ui.C) {
 		a.Look, a.Store, a.Guard, a.PickBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.Wake
 		a.Page(c)
 	default:
-		title := ""
-		for _, m := range sectionMenu {
-			if m.id == s.section() {
-				title = m.label()
-			}
-		}
+		title := s.sectionTitle()
 		l.SettingsContent(c, title, func() {
 			l.Text(c, locales.NativeShellNotMigrated(title), kit.TextSM, kit.WeightMedium, l.T.Foreground)
 			l.Text(c, locales.NativeShellNotMigratedHint(), kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped()).MarginTop(l.Space(2))
 		})
 	}
+}
+
+// sectionTitle 是当前分区在侧栏里的名字（内容区的 h1 标题）。
+func (s *Shell) sectionTitle() string {
+	for _, m := range sectionMenu {
+		if m.id == s.section() {
+			return m.label()
+		}
+	}
+	return ""
+}
+
+// loadFailed 在设置首次读取失败时把内容区画成「读取失败」加重试，返回是否画了（台账 B-009）。
+// 失败时 Store 里只有默认值：不能把它们当成真实设置渲染，否则用户会对着一页看似正常的默认开关做修改。
+// 渲染层的设置页没有这个状态（设置存在渲染进程本地），这是 AGENTS.md「加载失败用 LoadErrorState」要求下的有意增强，
+// 登记在台账「有意的增强」。重试在后台读取，失败走 Guard（日志与带原因的错误提示）。
+func (s *Shell) loadFailed(c ui.C) bool {
+	lr, ok := s.Store.(LoadReporter)
+	if !ok {
+		return false
+	}
+	err := lr.LoadError()
+	if err == nil {
+		return false
+	}
+	s.Look.SettingsContent(c, s.sectionTitle(), func() {
+		if s.Look.LoadErrorState(c, err.Error()) {
+			s.Guard.Go(locales.NativeSettingsLoadAction(), lr.Reload, nil)
+		}
+	})
+	return true
 }
 
 // nav 是左侧栏：w-56（窄窗口 w-14）、面板底色、右侧 1px 面板边框；上面是「返回」，下面是分区菜单。

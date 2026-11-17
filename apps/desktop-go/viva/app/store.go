@@ -58,6 +58,26 @@ func (s *settingsStore) LoadError() error {
 	return s.loadErr
 }
 
+// Reload 重新读取设置（加载失败界面的「重试」）：成功后缓存换成真实值并清除错误、请求重绘；
+// 失败时保留错误（原因随之更新），界面继续停在加载失败状态。服务为 nil 时没有可读的东西，视为成功。
+func (s *settingsStore) Reload() error {
+	if s.svc == nil {
+		return nil
+	}
+	v, err := s.svc.Snapshot()
+	s.mu.Lock()
+	if err != nil {
+		s.loadErr = err
+	} else {
+		s.cur, s.loadErr = v, nil
+	}
+	s.mu.Unlock()
+	if err == nil && s.invalidate != nil {
+		s.invalidate()
+	}
+	return err
+}
+
 // Update 应用一次修改：经服务落盘，成功后更新缓存；失败时设置保持不变并返回错误。
 func (s *settingsStore) Update(mutate func(*settings.Values)) error {
 	if s.svc == nil {

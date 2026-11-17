@@ -15163,6 +15163,14 @@ func NativeLanguageNameEn() string {
 	return "English"
 }
 
+// NativeSettingsLoadAction 是 native.settings.loadAction：读取设置
+func NativeSettingsLoadAction() string {
+	if useEn() {
+		return "Load settings"
+	}
+	return "读取设置"
+}
+
 // NativeSettingsSaveAction 是 native.settings.saveAction：保存设置
 func NativeSettingsSaveAction() string {
 	if useEn() {

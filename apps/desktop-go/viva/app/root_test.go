@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	vapp "github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
@@ -336,6 +337,124 @@ func TestSettingsStoreWithoutService(t *testing.T) {
 	}
 	if !store.Values().UI.ShowLineNumbers {
 		t.Error("没有服务时应只在内存里读写")
+	}
+}
+
+// flakySettings 的 Snapshot 在 failing 为真时失败：演练「首次读取失败 → 重试」。
+type flakySettings struct {
+	servicestest.Settings
+	failing atomic.Bool
+	reads   atomic.Int32
+}
+
+func (f *flakySettings) Snapshot() (settings.Values, error) {
+	f.reads.Add(1)
+	if f.failing.Load() {
+		return settings.Values{}, errors.New("config 目录不可读")
+	}
+	return f.Settings.Snapshot()
+}
+
+// waitFrames 一边出帧一边等条件成立（后台读取在别的 goroutine 里完成），最多 2 秒。
+func (f *rootFixture) waitFrames(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		f.frames(t, 1)
+		if cond() {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("等待超时：%s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// 设置首次读取失败（B-009）：内容区显示「读取失败」加原因与重试，不渲染默认设置；
+// 重试失败时弹出带原因的错误提示并记日志、仍停在失败状态；重试成功后换成真实的设置页并请求重绘。
+func TestRootSettingsLoadFailureShowsErrorStateAndRetries(t *testing.T) {
+	svc := &flakySettings{}
+	svc.failing.Store(true)
+	log := &servicestest.Logger{}
+	f := openRoot(t, func(o *Options) { o.Services.Settings, o.Services.Log = svc, log })
+
+	if !f.session.HasText(locales.CommonLoadFailed()) || !f.session.HasText("config 目录不可读") {
+		t.Fatal("读取失败时应显示「读取失败」与原因")
+	}
+	if _, ok := f.session.AccessByRole(gfx.RoleSwitch, "自动保存"); ok {
+		t.Fatal("读取失败时不能把默认设置当成真实设置渲染出来")
+	}
+	if _, ok := f.session.AccessByRole(gfx.RoleButton, locales.CommonRetry()); !ok {
+		t.Fatal("读取失败时应有「重试」按钮")
+	}
+	if !f.session.HasText(locales.SettingsGeneral()) {
+		t.Error("读取失败时内容区仍应保留当前分区的标题")
+	}
+
+	// 重试仍失败：错误提示（标题是「读取设置失败」）、日志、仍是失败状态。
+	reads := svc.reads.Load()
+	if err := f.session.ClickLabel(locales.CommonRetry()); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFrames(t, "重试后的错误提示", func() bool { return f.root.Notifier().Len() == 1 })
+	if svc.reads.Load() != reads+1 {
+		t.Errorf("点一次重试应只重新读取一次，实际 %d 次", svc.reads.Load()-reads)
+	}
+	if !f.session.HasText(locales.CommonOperationFailed(locales.NativeSettingsLoadAction())) {
+		t.Errorf("错误提示的标题应是 %q", locales.CommonOperationFailed(locales.NativeSettingsLoadAction()))
+	}
+	entries := log.Entries()
+	if len(entries) != 1 || entries[0].Action != locales.NativeSettingsLoadAction() || entries[0].Message != "config 目录不可读" {
+		t.Errorf("日志不对：%+v", entries)
+	}
+	if !f.session.HasText(locales.CommonLoadFailed()) {
+		t.Error("重试失败后仍应停在读取失败状态")
+	}
+
+	// 故障排除后重试：换成真实的设置页。
+	svc.failing.Store(false)
+	redraws := f.redraws.Load()
+	if err := f.session.ClickLabel(locales.CommonRetry()); err != nil {
+		t.Fatal(err)
+	}
+	f.waitFrames(t, "设置页出现", func() bool {
+		_, ok := f.session.AccessByRole(gfx.RoleSwitch, "自动保存")
+		return ok
+	})
+	if f.session.HasText(locales.CommonLoadFailed()) {
+		t.Error("重试成功后不应再显示读取失败")
+	}
+	if f.redraws.Load() == redraws {
+		t.Error("重试成功后应请求重绘")
+	}
+}
+
+// Reload：服务恢复后缓存换成真实值并清除错误；仍失败时错误随原因更新；没有服务时视为成功。
+func TestSettingsStoreReload(t *testing.T) {
+	svc := &flakySettings{}
+	svc.failing.Store(true)
+	redraws := 0
+	store := newSettingsStore(svc, func() { redraws++ })
+	defer store.Close()
+	if store.LoadError() == nil {
+		t.Fatal("前提不成立：首次读取应失败")
+	}
+	if err := store.Reload(); err == nil || store.LoadError() == nil {
+		t.Fatalf("仍失败时 Reload 应返回错误并保留 LoadError：%v / %v", err, store.LoadError())
+	}
+	if redraws != 0 {
+		t.Errorf("失败的重试不应请求重绘，实际 %d 次", redraws)
+	}
+	svc.failing.Store(false)
+	if err := store.Reload(); err != nil {
+		t.Fatalf("服务恢复后 Reload 应成功：%v", err)
+	}
+	if store.LoadError() != nil || redraws != 1 {
+		t.Errorf("成功后应清除错误并请求一次重绘：LoadError=%v 重绘=%d", store.LoadError(), redraws)
+	}
+	if err := newSettingsStore(nil, nil).Reload(); err != nil {
+		t.Errorf("没有服务时 Reload 应视为成功：%v", err)
 	}
 }
 
