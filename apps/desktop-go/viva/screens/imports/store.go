@@ -777,6 +777,11 @@ func (s *Store) PreviewClearTerminal(ctx context.Context, q services.ImportClear
 	return s.svc.PreviewClearTerminal(ctx, q)
 }
 
+// ItemFacts 读一个知识条目的事实（任务详情的成果卡与来源刷新对照用）；是只读查询，失败原样返回，由调用方决定提不提示。
+func (s *Store) ItemFacts(ctx context.Context, id string) (services.ImportItemFacts, bool, error) {
+	return s.svc.ItemFacts(ctx, id)
+}
+
 // ClearTerminal 删除清理范围内的终态任务；失败时弹出错误提示并返回 0。
 func (s *Store) ClearTerminal(ctx context.Context, q services.ImportClearQuery) int {
 	count := 0

@@ -6,6 +6,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
+	"guizhi-mygo-shell/native/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
 
@@ -76,6 +77,33 @@ func TestRootMountsImportsModule(t *testing.T) {
 	svc.Emit(importTask("t3", "关闭之后的推送"))
 	if hasTask(f.root, "t3") {
 		t.Error("关闭后仍在接收采集队列的推送")
+	}
+}
+
+// 采集模块的外壳回调：网页验证自动求解是否开启每次现读设置（别处改了，下一次调用就跟上）；
+// 应用版本与平台来自启动选项，复制诊断信息时写进环境行。
+func TestRootImportsHooksReadSettingsAndOptions(t *testing.T) {
+	svc := &servicestest.Imports{}
+	svc.Set(services.ImportPage{}, nil)
+	f := openRoot(t, func(o *Options) {
+		o.Services.Imports = svc
+		o.Page, o.Module = shell.PageHome, shell.ModuleImports
+		o.AppVersion, o.Platform = "0.28.7", "win32"
+	})
+	hooks := f.root.imports.Hooks
+
+	if hooks.WebSolverEnabled() {
+		t.Error("默认设置里自动求解应是关闭的")
+	}
+	if _, err := f.fake.Update(func(v *settings.Values) { v.App.FlareSolverr.Enabled = true }); err != nil {
+		t.Fatal(err)
+	}
+	if !hooks.WebSolverEnabled() {
+		t.Error("别处开启自动求解后，下一次调用就应读到")
+	}
+
+	if version, platform := hooks.AppInfo(); version != "0.28.7" || platform != "win32" {
+		t.Errorf("应用信息应取自启动选项，得 %q %q", version, platform)
 	}
 }
 

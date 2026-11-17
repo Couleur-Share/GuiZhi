@@ -43,6 +43,9 @@ type Options struct {
 	SearchShortcut string
 	// CaptureShortcut 是「新建条目」快捷键的显示文案（采集空队列引导里的提示用）。
 	CaptureShortcut string
+	// AppVersion 与 Platform 是应用版本与运行平台（process.platform 的写法，如 win32）：任务详情的「复制诊断信息」写进环境行。
+	// 空串表示取不到，诊断文本就少这一行。
+	AppVersion, Platform string
 	// Context 是应用生命周期：取消后各模块的后台请求随之停止。空表示 context.Background()。
 	Context context.Context
 	// SystemDark 是启动时系统是否深色；之后由系统外观监听更新。

@@ -91,6 +91,10 @@ func (r *Root) mountImports(invalidate func()) {
 		Store: r.importsStore, Ctx: r.ctx, Guard: r.guard,
 		Hooks: importsscreen.Hooks{
 			CaptureShortcut: func() string { return r.opts.CaptureShortcut },
+			// 行内与详情里的网页验证重试按钮写「自动验证并采集」还是「验证并自动采集」，取决于设置里 FlareSolverr 是否开启；
+			// 每一帧现读（设置在别处改了，下一帧就跟上）。
+			WebSolverEnabled: func() bool { return r.store.Values().App.FlareSolverr.Enabled },
+			AppInfo:          func() (string, string) { return r.opts.AppVersion, r.opts.Platform },
 			OpenSettingsSection: func(section string) {
 				r.settings.Active = settingsscreen.SectionID(section)
 				r.win.Page = shell.PageSettings

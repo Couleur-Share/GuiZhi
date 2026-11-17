@@ -224,6 +224,8 @@ func runViva(vb vivaBoot) error {
 		SearchShortcut: searchShortcutLabel(vb.lib),
 		// 采集空队列引导的提示文案取「新建」快捷键当前的组合键；取消应用生命周期时各模块的后台请求随之停止。
 		CaptureShortcut: shortcutLabel(vb.lib, "newItem"),
+		AppVersion:      appVersion,
+		Platform:        nodePlatform(),
 		Appearance:      appearance,
 	})
 	if err != nil {

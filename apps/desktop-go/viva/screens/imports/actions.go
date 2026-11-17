@@ -59,9 +59,7 @@ func (s *Screen) rowActions(task services.ImportTask) []rowAction {
 				s.openDetail(task.ID)
 				return
 			}
-			if s.Hooks.RetryAuthenticated != nil {
-				s.Hooks.RetryAuthenticated(task, platform)
-			}
+			s.retryAuthenticated(task, platform, false)
 		}})
 	}
 	add(rowAction{key: "detail", label: locales.ImportsTaskDetail(), icon: icons.Info, run: func() { s.openDetail(task.ID) }})

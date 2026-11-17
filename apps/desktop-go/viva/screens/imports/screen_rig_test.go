@@ -42,16 +42,32 @@ type rig struct {
 	quickOpened int      // Hooks.QuickCapture 的调用次数
 	solver      bool     // Hooks.WebSolverEnabled 的返回值
 	authRetried []string // Hooks.RetryAuthenticated 收到的「任务 id:平台」
+	authOK      bool     // Hooks.RetryAuthenticated 的返回值：是否已发起登录态重试
+
+	asked     []string // Hooks.AskAboutItem 收到的草稿
+	nodeErr   error    // Hooks.VerifyNodeseek 的返回值
+	nodeCalls []string // 「verify:任务 id」「cancel」，按调用顺序
+
+	nowMs   int64    // 界面看到的「现在」（毫秒）；测试可以推进它来模拟时间流逝
+	copied  []string // 写进剪贴板的文字，按顺序
+	clipErr error    // 非空时写剪贴板失败
 }
 
 // newRig 在 1280×800、缩放 1 的无头会话里打开采集工作区，页面由 page 给出；mutate 在首帧之前调整界面。
 func newRig(t *testing.T, page services.ImportPage, mutate ...func(*rig)) *rig {
 	t.Helper()
 	rigFontOnce.Do(func() { app.SetInterfaceFontFamily("Microsoft YaHei UI") })
-	r := &rig{t: t, svc: &servicestest.Imports{}, clock: newManualClock(), log: &recLog{}}
+	r := &rig{t: t, svc: &servicestest.Imports{}, clock: newManualClock(), log: &recLog{}, nowMs: testNow}
 	r.svc.Set(page, nil)
 	r.svc.SetQueueState(services.ImportQueueState{Concurrency: 2})
 	r.notifier = kit.NewNotifier(nil)
+	r.notifier.Clipboard = func(text string) error { // 测试不碰系统剪贴板
+		if r.clipErr != nil {
+			return r.clipErr
+		}
+		r.copied = append(r.copied, text)
+		return nil
+	}
 
 	spec := kit.DefaultSpec()
 	spec.Motion = kit.MotionLevelOff // 动效直接到终态，断言不受动画时钟影响
@@ -71,11 +87,22 @@ func newRig(t *testing.T, page services.ImportPage, mutate ...func(*rig)) *rig {
 			CaptureShortcut:     func() string { return "Ctrl+N" },
 			OpenSettingsSection: func(section string) { r.sections = append(r.sections, section) },
 			WebSolverEnabled:    func() bool { return r.solver },
-			RetryAuthenticated: func(task services.ImportTask, platform string) {
+			RetryAuthenticated: func(task services.ImportTask, platform string) bool {
 				r.authRetried = append(r.authRetried, task.ID+":"+platform)
+				return r.authOK
+			},
+			AskAboutItem: func(draft string) { r.asked = append(r.asked, draft) },
+			AppInfo:      func() (string, string) { return "0.28.7", "win32" },
+			VerifyNodeseek: func(_ context.Context, task services.ImportTask) error {
+				r.nodeCalls = append(r.nodeCalls, "verify:"+task.ID)
+				return r.nodeErr
+			},
+			CancelNodeseek: func() error {
+				r.nodeCalls = append(r.nodeCalls, "cancel")
+				return nil
 			},
 		},
-		Now:    func() time.Time { return time.UnixMilli(testNow) },
+		Now:    func() time.Time { return time.UnixMilli(r.nowMs) },
 		Loc:    time.FixedZone("Asia/Shanghai", 8*3600),
 		Locale: kit.ParseDateLocale("zh-CN"),
 	}
@@ -214,6 +241,16 @@ func (r *rig) typeText(text string) {
 	r.frames(3)
 }
 
+// scrollBy 在 (x, y) 处滚动 dy 个逻辑像素（正值向下，模拟触控板的精确滚动），再出几帧。
+// 内容超出的部分在无障碍树里不可见（被裁剪），要点到它得先滚过去。
+func (r *rig) scrollBy(x, y, dy float32) {
+	r.t.Helper()
+	if err := r.session.Scroll(gfx.ScrollEvent{X: x, Y: y, DeltaY: dy, Precise: true}); err != nil {
+		r.t.Fatalf("滚动失败：%v", err)
+	}
+	r.frames(3)
+}
+
 // calls 是服务收到的变更类调用（"retry:t1"、"pause"、"clear:all" 等）；读队列状态的 "state" 是每次刷新都会发生的后台读取，不算。
 func (r *rig) calls() []string {
 	var out []string
@@ -238,6 +275,47 @@ func (r *rig) countText(text string) int {
 
 // allText 是画面上全部文字按绘制顺序连起来的结果：折行的长句用它整句比对。
 func (r *rig) allText() string { return strings.Join(r.session.Texts(), "") }
+
+// textCenter 是第 n 个（从 0 起，按绘制顺序）内容恰好等于 text 的文字的中心。
+func (r *rig) textCenter(text string, n int) (x, y float32, ok bool) {
+	seen := 0
+	for _, got := range r.session.Snapshot().Texts {
+		if got.Value != text {
+			continue
+		}
+		if seen == n {
+			return got.Bounds.X + got.Bounds.Width/2, got.Bounds.Y + got.Bounds.Height/2, true
+		}
+		seen++
+	}
+	return 0, 0, false
+}
+
+// hoverText 把指针移到第 n 个等于 text 的文字上，再出几帧让悬停落定。
+func (r *rig) hoverText(text string, n int) {
+	r.t.Helper()
+	x, y, ok := r.textCenter(text, n)
+	if !ok {
+		r.t.Fatalf("画面上没有第 %d 个文字 %q；画面上有 %q", n, text, r.session.Texts())
+	}
+	if err := r.session.Move(x, y); err != nil {
+		r.t.Fatalf("移动指针失败：%v", err)
+	}
+	r.frames(3)
+}
+
+// clickText 点击第 n 个等于 text 的文字的中心。
+func (r *rig) clickText(text string, n int) {
+	r.t.Helper()
+	x, y, ok := r.textCenter(text, n)
+	if !ok {
+		r.t.Fatalf("画面上没有第 %d 个文字 %q；画面上有 %q", n, text, r.session.Texts())
+	}
+	r.clickAt(x, y)
+}
+
+// toasts 是此刻提示条里全部消息（含详情之外的标题）；用画面上的文字判断更接近用户所见，这里只给「有没有」的快速查询。
+func (r *rig) toastShown(message string) bool { return r.hasText(message) }
 
 // ---- 夹具 ----
 

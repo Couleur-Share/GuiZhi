@@ -228,7 +228,7 @@ func (s *Screen) rowMeta(c ui.C, task services.ImportTask, now int64) {
 		if task.Status == services.ImportStatusCompleted && task.ResultItemID != "" {
 			s.viewResultButton(c, task)
 		}
-		s.originLabel(c, task)
+		s.originLabel(c, task, t.MutedForeground)
 		if host, ok := ResolveTaskHost(task); ok {
 			l.Text(c.Key("host"), host, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Ellipsis()).Shrink(1).MinWidth(0)
 		}
@@ -313,17 +313,17 @@ func (s *Screen) viewResultButton(c ui.C, task services.ImportTask) {
 	}
 }
 
-// originLabel 是提交来源：inline-flex shrink-0 items-center gap-1，图标 h-3 w-3，文字继承 text-xs。
-func (s *Screen) originLabel(c ui.C, task services.ImportTask) {
+// originLabel 是提交来源：inline-flex shrink-0 items-center gap-1，图标 h-3 w-3，文字继承 text-xs，图标与文字同色（currentColor）。
+// 行里是次要色，详情弹窗的字段值里是正文色。
+func (s *Screen) originLabel(c ui.C, task services.ImportTask, color tokens.Color) {
 	l := s.Look
-	t := l.T
 	icon, label := icons.Monitor, locales.ImportsOriginDesktopLabel()
 	if task.Origin == OriginMobile {
 		icon, label = icons.Smartphone, locales.ImportsOriginMobileLabel()
 	}
 	ui.Row(c.Key("origin")).Shrink(0).Items(ui.Center).Gap(l.Space(1)).Children(func() {
-		l.Icon(c.Key("icon"), icon, l.Rem(0.75), t.MutedForeground)
-		l.Text(c.Key("label"), label, kit.TextXS, kit.WeightNormal, t.MutedForeground)
+		l.Icon(c.Key("icon"), icon, l.Rem(0.75), color)
+		l.Text(c.Key("label"), label, kit.TextXS, kit.WeightNormal, color)
 	})
 }
 
@@ -387,6 +387,3 @@ func (s *Screen) stageSummary(c ui.C, task services.ImportTask) {
 		s.openDetail(task.ID)
 	}
 }
-
-// openDetail 打开任务详情弹窗（弹窗本身尚未迁移，见台账 B-014；先记下 id，弹窗接上后无需改动调用方）。
-func (s *Screen) openDetail(id string) { s.detailTaskID = id }

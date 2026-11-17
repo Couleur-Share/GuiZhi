@@ -24,41 +24,52 @@ const StallThresholdMs int64 = 90_000
 // 只显示「抓取中」用户无法判断是在推进还是卡死了；这里刻意不给「第 N 步 / 共 M 步」（实际步数取决于运行时条件）。
 // 未知阶段与空阶段回落到「抓取中」，与渲染层 getStageLabel 一致。
 func StageLabel(stage string) string {
-	switch stage {
-	case "web-preparing":
-		return locales.ImportsStageWebPreparing()
-	case "web-verifying":
-		return locales.ImportsStageWebVerifying()
-	case "extracting":
-		return locales.ImportsStageExtracting()
-	case "saving":
-		return locales.ImportsStageSaving()
-	case "video-metadata":
-		return locales.ImportsStageVideoMetadata()
-	case "video-captions":
-		return locales.ImportsStageVideoCaptions()
-	case "video-audio":
-		return locales.ImportsStageVideoAudio()
-	case "transcoding":
-		return locales.ImportsStageTranscoding()
-	case "transcribing":
-		return locales.ImportsStageTranscribing()
-	case "formatting":
-		return locales.ImportsStageFormatting()
-	case "summarizing":
-		return locales.ImportsStageSummarizing()
-	case "image-download":
-		return locales.ImportsStageImageDownload()
-	case "image-ocr":
-		return locales.ImportsStageImageOcr()
-	case "forum-replies":
-		return locales.ImportsStageForumReplies()
-	case "browser-capture":
-		return locales.ImportsStageBrowserCapture()
-	case "comments":
-		return locales.ImportsStageComments()
+	if label, ok := knownStageLabel(stage); ok {
+		return label
 	}
 	return locales.ImportsStageFetching()
+}
+
+// knownStageLabel 取登记过的阶段的文案（渲染层 STAGE_LABELS）；没登记的阶段 ok 为假。
+// 诊断文本对未登记的阶段写阶段名原文，而不是回落到「抓取中」（那会把一个陌生阶段说成别的阶段）。
+func knownStageLabel(stage string) (label string, ok bool) {
+	switch stage {
+	case "fetching":
+		return locales.ImportsStageFetching(), true
+	case "web-preparing":
+		return locales.ImportsStageWebPreparing(), true
+	case "web-verifying":
+		return locales.ImportsStageWebVerifying(), true
+	case "extracting":
+		return locales.ImportsStageExtracting(), true
+	case "saving":
+		return locales.ImportsStageSaving(), true
+	case "video-metadata":
+		return locales.ImportsStageVideoMetadata(), true
+	case "video-captions":
+		return locales.ImportsStageVideoCaptions(), true
+	case "video-audio":
+		return locales.ImportsStageVideoAudio(), true
+	case "transcoding":
+		return locales.ImportsStageTranscoding(), true
+	case "transcribing":
+		return locales.ImportsStageTranscribing(), true
+	case "formatting":
+		return locales.ImportsStageFormatting(), true
+	case "summarizing":
+		return locales.ImportsStageSummarizing(), true
+	case "image-download":
+		return locales.ImportsStageImageDownload(), true
+	case "image-ocr":
+		return locales.ImportsStageImageOcr(), true
+	case "forum-replies":
+		return locales.ImportsStageForumReplies(), true
+	case "browser-capture":
+		return locales.ImportsStageBrowserCapture(), true
+	case "comments":
+		return locales.ImportsStageComments(), true
+	}
+	return "", false
 }
 
 // StatusLabel 取状态文案（详情弹窗与诊断文本用；行内徽标按状态自己挑样式）。

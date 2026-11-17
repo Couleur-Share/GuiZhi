@@ -25,7 +25,20 @@ type Hooks struct {
 	// WebSolverEnabled 报告网页验证自动求解（FlareSolverr）是否开启：开启时重试按钮写「自动验证并采集」。
 	WebSolverEnabled func() bool
 	// RetryAuthenticated 用内置登录窗口的登录态重试一个任务（渲染层 retryAuthenticated：查平台状态、必要时登录、再带登录态重试）。
-	RetryAuthenticated func(task services.ImportTask, platform string)
+	// 在后台调用，可以阻塞（等用户登录）；返回登录态重试是否已发起（详情弹窗据此关闭），失败由钩子自己带详情提示（「登录态重试未开始」）。
+	RetryAuthenticated func(task services.ImportTask, platform string) bool
+	// AskAboutItem 围绕新入库的内容开始提问（渲染层 askAboutItem）：新建会话（不污染刚浏览的历史会话）、
+	// 把 draft 预填进输入框（只预填不发送）、切到问答。
+	AskAboutItem func(draft string)
+	// AppInfo 返回应用版本与运行平台（复制诊断信息用）；取不到的返回空串，诊断文本就少一行环境信息。
+	AppInfo func() (version, platform string)
+	// CaptureBrowser 返回登录态采集用的浏览器（名称加版本，诊断信息用）；没有信息返回空串。
+	CaptureBrowser func(platform string) string
+	// VerifyNodeseek 打开 NodeSeek 的验证窗口，等用户通过验证后返回（渲染层 platformCapture.login("nodeseek", …)）。
+	// 在后台调用，会阻塞；取消或窗口被关闭时返回错误。随后由界面带登录态重试任务。
+	VerifyNodeseek func(ctx context.Context, task services.ImportTask) error
+	// CancelNodeseek 取消正在等待的 NodeSeek 验证（渲染层 platformCapture.cancelLogin("nodeseek")）。
+	CancelNodeseek func() error
 }
 
 // Screen 是「采集」模块的界面（渲染层 components/imports/*）：二级侧栏里的筛选，工作区里的任务队列。
@@ -54,12 +67,13 @@ type Screen struct {
 	mounted      bool
 	documents    bool   // 工作区显示「采集文档站」而不是任务队列（渲染层 ImportsWorkspace 的 view）
 	detailTaskID string // 详情弹窗打开的任务 id；空表示没开
+	detail       detailState
 	clear        *clearConfirm
 	confirm      kit.ConfirmState
 	rowHover     kit.HoverGroups
 	loading      kit.Delayed
 
-	mu           sync.Mutex    // 保护 pendingClear：它由后台预览写入，界面线程在帧首取走
+	mu           sync.Mutex    // 保护 pendingClear 与 detail 里由后台写入的字段：界面线程在帧首取走或读出
 	pendingClear *clearConfirm // 预览完成、等界面线程打开的确认框
 }
 
