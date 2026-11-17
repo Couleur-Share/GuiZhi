@@ -136,4 +136,7 @@ type Imports interface {
 	Enqueue(ctx context.Context, inputs []EnqueueImportInput) ([]ImportTask, error)
 	// SelectFiles 弹出系统文件选择框（dialog:selectImportFiles）；取消返回空列表。
 	SelectFiles(ctx context.Context) ([]string, error)
+	// ItemFacts 读一个知识条目的事实（knowledge:get 之后只取标题与几个数字）：任务详情的成果卡与来源刷新对照用。
+	// 条目不存在返回 found=false；读取失败返回携带原因的 error（详情弹窗不因此出错，只记日志）。
+	ItemFacts(ctx context.Context, id string) (facts ImportItemFacts, found bool, err error)
 }

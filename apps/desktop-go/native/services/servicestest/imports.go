@@ -30,6 +30,11 @@ type Imports struct {
 	missing    map[string]bool
 	clearCount int
 	files      []string
+
+	// 条目事实（ItemFacts）是只读查询，不进 calls，免得干扰对变更类调用的断言。
+	itemFacts    map[string]services.ImportItemFacts
+	itemFactsErr error
+	factsLoaded  []string
 }
 
 var _ services.Imports = (*Imports)(nil)
@@ -286,4 +291,39 @@ func (f *Imports) SelectFiles(context.Context) ([]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.files...), nil
+}
+
+// SetItemFacts 设置 ItemFacts 能读到的条目（整体替换）；没登记的条目算「不存在」。
+func (f *Imports) SetItemFacts(items ...services.ImportItemFacts) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.itemFacts = make(map[string]services.ImportItemFacts, len(items))
+	for _, item := range items {
+		f.itemFacts[item.ID] = item
+	}
+}
+
+// SetItemFactsError 让之后的 ItemFacts 失败；err 为 nil 取消注入。
+func (f *Imports) SetItemFactsError(err error) {
+	f.mu.Lock()
+	f.itemFactsErr = err
+	f.mu.Unlock()
+}
+
+// ItemFactsLoaded 返回 ItemFacts 收到的条目 id，按调用顺序。
+func (f *Imports) ItemFactsLoaded() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.factsLoaded...)
+}
+
+func (f *Imports) ItemFacts(_ context.Context, id string) (services.ImportItemFacts, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.factsLoaded = append(f.factsLoaded, id)
+	if f.itemFactsErr != nil {
+		return services.ImportItemFacts{}, false, f.itemFactsErr
+	}
+	facts, ok := f.itemFacts[id]
+	return facts, ok, nil
 }

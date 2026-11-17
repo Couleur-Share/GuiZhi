@@ -43,8 +43,9 @@ func TestBridgeCallErrors(t *testing.T) {
 	}
 }
 
-// 用真实库与真实处理器验证 DTO 与 import:list 输出的对应关系：字段改名或类型变化时这里先红。
-func TestImportsAdapterAgainstRealHandler(t *testing.T) {
+// openAdapterTestDB 在临时用户数据目录里建一个真实的库（含迁移）并打开；测试结束时自动关闭。
+func openAdapterTestDB(t *testing.T) (context.Context, Paths, *sqlite.DB) {
+	t.Helper()
 	ctx := context.Background()
 	paths := Paths{UserData: t.TempDir()}
 	if err := os.MkdirAll(paths.DataDir(), 0o755); err != nil {
@@ -54,12 +55,54 @@ func TestImportsAdapterAgainstRealHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lease.release()
+	t.Cleanup(lease.release)
 	db, err := sqlite.Open(ctx, paths.DatabasePath(), sqlite.OpenOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { db.Close() })
+	return ctx, paths, db
+}
+
+// 条目事实经真实的 knowledge:create / knowledge:get 往返：字数是渲染层 `content.trim().length` 的口径（UTF-16 码元），
+// 媒体个数按文件名去重，标签取名称；不存在的条目是 found=false 而不是错误。
+func TestImportsAdapterItemFactsAgainstRealHandler(t *testing.T) {
+	ctx, paths, db := openAdapterTestDB(t)
+	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}, db: db}
+	l := &Library{db: db, dbPath: paths.DatabasePath(), paths: paths}
+	l.registerWrite(b)
+	svc := newNativeServices(b, newPushHub()).Imports
+
+	// 正文两端的空白不算；😀 在 UTF-16 里占两个码元；同名媒体引用只算一个。
+	content := "\n  正文😀 local-image://a.png local-video://b.mp4 local-image://a.png  \n"
+	created, err := callAs[struct {
+		ID string `json:"id"`
+	}](ctx, b, "knowledge:create", map[string]any{
+		"title": "AI 中转站调研", "content": content, "transcript": "文字稿", "tagNames": []string{"b", "a"},
+	})
+	if err != nil || created.ID == "" {
+		t.Fatalf("创建条目失败：%+v %v", created, err)
+	}
+
+	facts, found, err := svc.ItemFacts(ctx, created.ID)
+	if err != nil || !found {
+		t.Fatalf("应读到刚创建的条目：found=%v err=%v", found, err)
+	}
+	want := services.ImportItemFacts{ID: created.ID, Title: "AI 中转站调研", BodyLength: 64, TranscriptLength: 3, AssetCount: 2, Tags: []string{"a", "b"}}
+	if facts.ID != want.ID || facts.Title != want.Title || facts.BodyLength != want.BodyLength ||
+		facts.TranscriptLength != want.TranscriptLength || facts.AssetCount != want.AssetCount || strings.Join(facts.Tags, ",") != "a,b" {
+		t.Fatalf("条目事实不对：\n got  %+v\n want %+v", facts, want)
+	}
+
+	missing, found, err := svc.ItemFacts(ctx, "no-such-item")
+	if err != nil || found || missing.ID != "" {
+		t.Fatalf("不存在的条目应是 found=false 且没有错误：%+v found=%v err=%v", missing, found, err)
+	}
+}
+
+// 用真实库与真实处理器验证 DTO 与 import:list 输出的对应关系：字段改名或类型变化时这里先红。
+func TestImportsAdapterAgainstRealHandler(t *testing.T) {
+	ctx, paths, db := openAdapterTestDB(t)
 
 	insert := func(id, kind, input, name, status string, stage, errMsg, warn any, created int64) {
 		t.Helper()

@@ -172,6 +172,28 @@ func (a importsAdapter) SelectFiles(ctx context.Context) ([]string, error) {
 	return callAs[[]string](ctx, a.b, "dialog:selectImportFiles")
 }
 
+// ItemFacts 经 knowledge:get（与渲染层 window.api.knowledge.get 同一个处理器）读条目，只取成果卡与来源刷新对照用的标题与数字；
+// 处理器在条目不存在时返回 null，这里翻译成 found=false。整篇正文只在这里过一遍，不进界面。
+func (a importsAdapter) ItemFacts(ctx context.Context, id string) (services.ImportItemFacts, bool, error) {
+	item, err := callAs[*struct {
+		ID         string `json:"id"`
+		Title      string `json:"title"`
+		Content    string `json:"content"`
+		Transcript string `json:"transcript"`
+		Tags       []struct {
+			Name string `json:"name"`
+		} `json:"tags"`
+	}](ctx, a.b, "knowledge:get", id)
+	if err != nil || item == nil {
+		return services.ImportItemFacts{}, false, err
+	}
+	tags := make([]string, len(item.Tags))
+	for i, tag := range item.Tags {
+		tags[i] = tag.Name
+	}
+	return services.ComputeImportItemFacts(item.ID, item.Title, item.Content, item.Transcript, tags), true, nil
+}
+
 func orStr(s, def string) string {
 	if s == "" {
 		return def
