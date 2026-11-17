@@ -52,6 +52,11 @@ func run(dir, out, pkg, license string) error {
 			return err
 		}
 		name := strings.TrimSuffix(filepath.Base(file), ".svg")
+		// Viva 的编译器把半径不等的椭圆弧的控制点算错了（台账 B-005），编译前先改写成三次曲线；没有椭圆弧时原样不动。
+		source, err = expandEllipticalArcs(source)
+		if err != nil {
+			return fmt.Errorf("展开 %s 的椭圆弧：%w", name, err)
+		}
 		icon, err := iconcompile.Compile(name, source)
 		if err != nil {
 			return fmt.Errorf("编译 %s：%w", name, err)
