@@ -387,3 +387,15 @@ func NeedsWebVerification(task services.ImportTask) bool {
 			verificationTitle.MatchString(task.DisplayName) ||
 			captchaRequiredError.MatchString(task.Error))
 }
+
+// SummarizeStages 求各阶段的总耗时与最慢的那个阶段（渲染层 summarizeStages）。stats 不能为空。
+func SummarizeStages(stats []services.ImportStageStat) (totalMs int64, slowest services.ImportStageStat) {
+	slowest = stats[0]
+	for _, entry := range stats {
+		totalMs += entry.Ms
+		if entry.Ms > slowest.Ms {
+			slowest = entry
+		}
+	}
+	return totalMs, slowest
+}

@@ -5,6 +5,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	vapp "github.com/vivaui/viva/app"
@@ -40,6 +41,10 @@ type Options struct {
 	Page   shell.Page
 	// SearchShortcut 是顶栏快捷键提示（读主进程实际生效的组合键）。
 	SearchShortcut string
+	// CaptureShortcut 是「新建条目」快捷键的显示文案（采集空队列引导里的提示用）。
+	CaptureShortcut string
+	// Context 是应用生命周期：取消后各模块的后台请求随之停止。空表示 context.Background()。
+	Context context.Context
 	// SystemDark 是启动时系统是否深色；之后由系统外观监听更新。
 	SystemDark bool
 	// Appearance 非空时，在设置里的外观之上再叠加一次（自动化实例用命令行开关覆盖外观）。

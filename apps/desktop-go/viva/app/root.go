@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -10,6 +11,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
+	importsscreen "guizhi-mygo-shell/viva/screens/imports"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
@@ -24,6 +26,15 @@ type Root struct {
 	store    *settingsStore
 	win      *shell.Window
 	settings *settingsscreen.Shell
+
+	// 采集模块：队列状态在窗口生命周期内常驻（rail 角标在别的模块里也要实时），界面只在进入该模块时才画。
+	// Services.Imports 为空（装配不全的自动化实例）时两者都是 nil，rail 与工作区按「尚未迁移」处理。
+	imports      *importsscreen.Screen
+	importsStore *importsscreen.Store
+	started      sync.Once
+	ctx          context.Context
+	cancel       context.CancelFunc
+	stopImports  func()
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -41,6 +52,11 @@ type Root struct {
 // NewRoot 装配根。invalidate 在设置被别处改动后调用，请求重绘（可为空）。
 func NewRoot(opts Options, invalidate func()) *Root {
 	r := &Root{opts: opts}
+	parent := opts.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+	r.ctx, r.cancel = context.WithCancel(parent)
 	r.store = newSettingsStore(opts.Services.Settings, invalidate)
 	r.notifier = kit.NewNotifier(invalidate)
 	r.guard = kit.Guard{Notify: r.notifier, Log: opts.Services.Log}
@@ -59,8 +75,43 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	}
 	r.win.Page = opts.Page
 	r.systemDark.Store(opts.SystemDark)
+	r.mountImports(invalidate)
 	r.syncLook(nil)
 	return r
+}
+
+// mountImports 装配采集模块（渲染层 components/imports）：Store 持有队列状态，Screen 是界面。
+func (r *Root) mountImports(invalidate func()) {
+	svc := r.opts.Services.Imports
+	if svc == nil {
+		return
+	}
+	r.importsStore = importsscreen.NewStore(svc, r.guard, invalidate)
+	r.imports = &importsscreen.Screen{
+		Store: r.importsStore, Ctx: r.ctx, Guard: r.guard,
+		Hooks: importsscreen.Hooks{
+			CaptureShortcut: func() string { return r.opts.CaptureShortcut },
+			OpenSettingsSection: func(section string) {
+				r.settings.Active = settingsscreen.SectionID(section)
+				r.win.Page = shell.PageSettings
+				if invalidate != nil {
+					invalidate()
+				}
+			},
+		},
+	}
+	r.win.Modules = map[shell.Module]shell.ModuleView{
+		shell.ModuleImports: {Panel: r.imports.Panel, Workspace: r.imports.Workspace},
+	}
+}
+
+// startBackground 在第一帧启动常驻的后台工作：采集队列的推送订阅与首次读取（rail 角标要在任何模块里都准）。
+func (r *Root) startBackground() {
+	if r.importsStore == nil {
+		return
+	}
+	r.stopImports = r.importsStore.Subscribe(r.ctx)
+	r.importsStore.Spawn(func() { r.importsStore.Fetch(r.ctx) })
 }
 
 // currentSpec 是此刻应当使用的外观：设置里的外观，自动化实例再叠加命令行覆盖。
@@ -92,6 +143,9 @@ func (r *Root) syncLook(c ui.C) {
 		r.theme = r.look.Theme
 		r.bg = r.look.Col(r.look.T.Background)
 		r.win.Look, r.settings.Look = r.look, r.look
+		if r.imports != nil {
+			r.imports.Look = r.look
+		}
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -117,6 +171,10 @@ func (r *Root) Guard() kit.Guard        { return r.guard }
 // View 声明整个窗口内容。
 func (r *Root) View(c ui.C) {
 	r.syncLook(c)
+	r.started.Do(r.startBackground)
+	if r.importsStore != nil {
+		r.win.ActiveImports = r.importsStore.View().ActiveCount
+	}
 	r.win.View(c)
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)
@@ -137,5 +195,14 @@ func (r *Root) WatchSystemAppearance(invalidate func()) (stop func()) {
 	})
 }
 
-// Close 释放订阅。
-func (r *Root) Close() { r.store.Close() }
+// Close 释放订阅、取消后台请求。采集队列里还在撤销窗口内的移除先提交，关窗口不会把「已删除」的行带回来。
+func (r *Root) Close() {
+	if r.importsStore != nil {
+		r.importsStore.FlushRemovals()
+	}
+	if r.stopImports != nil {
+		r.stopImports()
+	}
+	r.cancel()
+	r.store.Close()
+}

@@ -39,8 +39,17 @@ type Window struct {
 	// Settings 是设置页；Page 为 PageSettings 时显示。
 	Settings *settingsscreen.Shell
 
+	// Modules 是各模块的二级侧栏面板与工作区。没有登记的模块在工作区显示「尚未迁移」的占位。
+	Modules map[Module]ModuleView
+
+	// PanelResizer 是二级侧栏宽度的拖拽状态：Width 由装配代码用已保存的宽度初始化。
+	PanelResizer kit.ColumnResizerState
+
 	// Notifier 是窗口的提示通道（渲染层的 Toast）；nil 时不画提示。提示宿主是覆盖层，在整个页面声明完之后才声明。
 	Notifier *kit.Notifier
+
+	// tips 是悬停提示层（渲染层的 TooltipLayer）：声明了 Hint 的命中区悬停或聚焦 320 ms 后出气泡，在最上层。
+	tips kit.TooltipState
 
 	Page   Page
 	Module Module
@@ -73,12 +82,14 @@ type Window struct {
 	OnSettings      func()
 	OnBack          func()
 	OnToggleSidebar func()
-	OnUpdate        func()
-	OnNewCapture    func()
-	OnOpenPalette   func()
-	OnMinimize      func()
-	OnMaximize      func()
-	OnClose         func()
+	// OnPanelWidth 在二级侧栏宽度定下来（拖动结束、按键、双击）之后调用，用来保存。
+	OnPanelWidth  func(width float32)
+	OnUpdate      func()
+	OnNewCapture  func()
+	OnOpenPalette func()
+	OnMinimize    func()
+	OnMaximize    func()
+	OnClose       func()
 
 	// search 是顶栏搜索框（知识库模块下可输入）。
 	search  ui.Field // 知识库模块的搜索框
@@ -131,15 +142,22 @@ func (w *Window) View(c ui.C) {
 		w.rail(c)
 		ui.Column(c).Grow(1).FillHeight().MinWidth(0).Children(func() {
 			w.topBar(c)
-			ui.Column(c).Grow(1).FillWidth().MinHeight(0).Children(func() { w.content(c) })
+			w.body(c)
 		})
 	})
 	l.Toasts(c, w.Notifier)
+	l.Tooltips(c, &w.tips)
 }
 
-// content 是顶栏下面的区域：设置页，或当前模块的工作区。
+// content 是顶栏下面、侧栏右边的区域：设置页，或当前模块的工作区。
 func (w *Window) content(c ui.C) {
 	l := w.Look
+	if w.Page == PageHome {
+		if view, ok := w.Modules[w.module()]; ok && view.Workspace != nil {
+			view.Workspace(c)
+			return
+		}
+	}
 	if w.Page == PageSettings {
 		s := w.Settings
 		if s == nil {

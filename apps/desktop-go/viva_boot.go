@@ -87,10 +87,13 @@ func flagGiven(name string) bool {
 
 // searchShortcutLabel 是顶栏搜索框右侧的快捷键提示：读主进程实际生效的「搜索」组合键，
 // 按渲染层 useShortcutLabel 在 Windows 上的规则格式化（CommandOrControl、Control 都显示 Ctrl）；读不到取默认值。
-func searchShortcutLabel(lib *Library) string {
-	combo := defaultShortcutAccelerators["search"]
+func searchShortcutLabel(lib *Library) string { return shortcutLabel(lib, "search") }
+
+// shortcutLabel 是某个快捷键动作（showApp、newItem、search、settings）当前生效组合键的显示文案。
+func shortcutLabel(lib *Library, action string) string {
+	combo := defaultShortcutAccelerators[action]
 	if m, ok := lib.currentShortcuts().(*omap); ok {
-		if v, ok := m.vals["search"].(string); ok && v != "" {
+		if v, ok := m.vals[action].(string); ok && v != "" {
 			combo = v
 		}
 	}
@@ -219,7 +222,9 @@ func runViva(vb vivaBoot) error {
 		OnReady:  func() { ready.Store(true) },
 		Services: svc, Module: module, Page: page,
 		SearchShortcut: searchShortcutLabel(vb.lib),
-		Appearance:     appearance,
+		// 采集空队列引导的提示文案取「新建」快捷键当前的组合键；取消应用生命周期时各模块的后台请求随之停止。
+		CaptureShortcut: shortcutLabel(vb.lib, "newItem"),
+		Appearance:      appearance,
 	})
 	if err != nil {
 		return fmt.Errorf("Viva 窗口退出：%w", err)

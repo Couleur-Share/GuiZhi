@@ -60,7 +60,7 @@ func (w *Window) iconButton(c ui.C, icon gfx.Icon, size float32, label string, r
 	t := l.T
 	id := ui.ID(c)
 	box := ui.Row(c).Size(l.Rem(2), l.Rem(2)).Shrink(0).Items(ui.Center).Justify(ui.Center).
-		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton}).Tooltip(label)
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Hint: label})
 	fg := t.MutedForeground
 	surface := kit.Surface{Radius: radius}
 	if box.State().Hovered {
@@ -102,9 +102,11 @@ func (w *Window) searchBox(c ui.C, wide bool) {
 				right = l.Rem(8)
 				field = &w.search
 			}
+			// Placeholder 取与 Viva 自带占位符相同的 MutedForeground，只为走 kit.Input 的叠画路径：占位符放不下时与 Chromium
+			// 一样在内容框边缘硬裁剪；Viva 自带的占位符会改成「前缀 + …」的省略（大字号、窄窗口下 800×600 会比渲染层少显示「命令」二字）。
 			input := l.Input(c, field, placeholder, placeholder, kit.InputSpec{
 				Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground,
-				Height: height, Left: l.Rem(2.25) + 1, Right: right,
+				Height: height, Left: l.Rem(2.25) + 1, Right: right, Placeholder: t.MutedForeground,
 			}).Absolute().Inset(0)
 			if !library {
 				// 只读入口：点击、聚焦、按键都打开命令面板（渲染层 readOnly + onFocus/onClick/onKeyDown），输入框自己不收字。
@@ -135,7 +137,7 @@ func (w *Window) shortcutChip(c ui.C, height float32) {
 	ui.Row(c.Key("chip")).Absolute().Right(l.Space(2)).Top(0).Height(height).Items(ui.Center).Children(func() {
 		id := ui.ID(c)
 		box := ui.Row(c).Items(ui.Center).PadSides(l.Space(0.5)+1, l.Space(1.5)+1, l.Space(0.5)+1, l.Space(1.5)+1).
-			HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton}).Tooltip(label)
+			HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Hint: label})
 		fg := t.MutedForeground
 		bg := t.Background.WithAlpha(0.6)
 		if box.State().Hovered {
@@ -251,7 +253,7 @@ func (w *Window) newItemButton(c ui.C, wide bool) {
 		cc := c.Key("caret")
 		caretID := ui.ID(cc)
 		caret := ui.Row(cc).Width(l.Rem(1.5)).Items(ui.Center).Justify(ui.Center).
-			HitWith(caretID, caretLabel, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Expanded: w.createMenuOpen}).Tooltip(caretLabel)
+			HitWith(caretID, caretLabel, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Expanded: w.createMenuOpen, Hint: caretLabel})
 		caretHover = caret.State().Hovered
 		caret.Draw(func(d *ui.DrawContext) { caretRect = d.Rect }).Children(func() {
 			l.Icon(c, icons.ChevronDown, l.Rem(0.875), t.PrimaryForeground).Shrink(0)
