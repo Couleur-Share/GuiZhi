@@ -64,17 +64,20 @@ func withBackdrop(s parity.Scene, b *parity.BackdropSpec) parity.Scene {
 	return s
 }
 
+// settingsWindow 是整窗（顶栏 + rail + 设置页）的初始状态：每次渲染都新建，状态不跨渲染共享。
+func settingsWindow(look *kit.Look) *shellscreen.Window {
+	return &shellscreen.Window{
+		Look: look, Page: shellscreen.PageSettings, OwnControls: true,
+		SearchShortcut: "Alt+Shift+F", CaptureShortcut: "Alt+Shift+N",
+		Settings: &settingsscreen.Shell{Look: look, Store: settingsscreen.NewMemStore(settings.Default())},
+	}
+}
+
 // pageSettings 是整窗（顶栏 + rail + 设置页）的场景；steps 非空时在首次稳定后按它操作界面。
 func pageSettings(id string, steps func(s *headless.Session) error, waivers ...parity.Waiver) parity.Scene {
 	return parity.Scene{
-		ID: id,
-		Build: func(look *kit.Look) func(c ui.C) {
-			w := &shellscreen.Window{
-				Look: look, Page: shellscreen.PageSettings, OwnControls: true, SearchShortcut: "Alt+Shift+F",
-				Settings: &settingsscreen.Shell{Look: look, Store: settingsscreen.NewMemStore(settings.Default())},
-			}
-			return w.View
-		},
+		ID:      id,
+		Build:   func(look *kit.Look) func(c ui.C) { return settingsWindow(look).View },
 		Steps:   steps,
 		Waivers: append(append([]parity.Waiver{}, pageSettingsWaivers...), waivers...),
 	}
@@ -115,6 +118,73 @@ func openSelect(name string, scrollEnd bool) func(s *headless.Session) error {
 		}
 		return parity.ParkPointer(s)
 	}
+}
+
+// openNewMenu 是「点顶栏『创建方式』箭头展开菜单并把指针移开」，与渲染层的 openNewMenu 对应
+// （渲染层采集器随后保留焦点：菜单打开时第一项自动聚焦，那是用户看到的自然状态）。
+func openNewMenu(s *headless.Session) error {
+	if err := parity.ClickRole(s, gfx.RoleCombobox, "创建方式"); err != nil {
+		return err
+	}
+	return parity.ParkPointer(s)
+}
+
+// openNewMenuKeyboard 是「展开菜单后按一次 ↓」，与渲染层的 openNewMenuKeyboard 对应。
+func openNewMenuKeyboard(s *headless.Session) error {
+	if err := openNewMenu(s); err != nil {
+		return err
+	}
+	return s.Keys("down")
+}
+
+// closeDialogScene 是设置页上弹着「关闭应用」对话框的整窗场景：渲染层的触发是主进程推 window:showCloseDialog（采集器直接走那条推送路径），
+// Viva 一侧由外壳置 Window.CloseDialogOpen。对话框是步骤里才打开的（Prepare：状态每次渲染新建），所以「打开之前」的页面
+// （模糊背景的预测，台账 A-007）仍走 Build——一个没有对话框的设置页。after 可选：对话框出现之后再做的操作（勾选、悬停、Tab）。
+func closeDialogScene(id string, after func(s *headless.Session) error) parity.Scene {
+	return withBackdrop(parity.Scene{
+		ID:    id,
+		Build: func(look *kit.Look) func(c ui.C) { return settingsWindow(look).View },
+		Prepare: func(look *kit.Look) (func(c ui.C), func(s *headless.Session) error) {
+			w := settingsWindow(look)
+			return w.View, func(s *headless.Session) error {
+				w.CloseDialogOpen = true
+				// 出两帧（对话框要先被声明、再有版面与命中区），再让入场动画走完：后面的操作要用到它们。
+				for range 2 {
+					if err := s.Frame(); err != nil {
+						return err
+					}
+				}
+				if err := s.Rest(); err != nil {
+					return err
+				}
+				if after == nil {
+					return nil
+				}
+				return after(s)
+			}
+		},
+		Waivers: append(append([]parity.Waiver{}, pageSettingsWaivers...), overlayInkWaiver),
+	}, modalBackdrop("关闭应用"))
+}
+
+// clickCheckboxLabel 是「点名为 name 的复选框右边的文字」：对应渲染层采集器点 label 的文字（label 的 onClick 翻转，不取键盘焦点）。
+// 复选框节点是 16px 的方框，文字在它右边 8px 之后。
+func clickCheckboxLabel(name string) func(s *headless.Session) error {
+	return func(s *headless.Session) error {
+		node, ok := s.AccessByRole(gfx.RoleCheckbox, name)
+		if !ok {
+			return fmt.Errorf("找不到复选框「%s」", name)
+		}
+		if err := s.Click(node.Bounds.X+node.Bounds.Width+16, node.Bounds.Y+node.Bounds.Height/2); err != nil {
+			return err
+		}
+		return parity.ParkPointer(s)
+	}
+}
+
+// hoverButton 是「把指针停在名为 name 的按钮中心」，对应渲染层采集器的 hover（场景用 keepPointer 保留悬停）。
+func hoverButton(name string) func(s *headless.Session) error {
+	return func(s *headless.Session) error { return parity.MoveOverRolePrefix(s, gfx.RoleButton, name) }
 }
 
 // openBackgroundTasksDialog 是「把设置页的『后台任务』开关从关打开，弹出确认对话框并把指针移开」，
@@ -186,10 +256,24 @@ var registry = map[string]parity.Scene{
 		openSelect("关闭窗口行为", false), overlayInkWaiver),
 	"app.window.page-settings.select-language": pageSettings("app.window.page-settings.select-language",
 		openSelect("语言", true), overlayInkWaiver),
+	// 顶栏「新建」旁的创建方式菜单（B-007）：点箭头，菜单出现、第一项程序聚焦（不画环）；-key 再按一次 ↓，第二项带键盘聚焦环。
+	"app.window.page-settings.new-menu": pageSettings("app.window.page-settings.new-menu",
+		openNewMenu, overlayInkWaiver),
+	"app.window.page-settings.new-menu-key": pageSettings("app.window.page-settings.new-menu-key",
+		openNewMenuKeyboard, overlayInkWaiver),
 	"app.window.page-settings.dlg-background-tasks": withBackdrop(
 		pageSettings("app.window.page-settings.dlg-background-tasks", openBackgroundTasksDialog, overlayInkWaiver),
 		confirmBackdrop("启用系统后台运行")),
-	"settings.shell": {
+	// 关闭应用对话框（S7，渲染层 CloseDialog）：整窗 + 模态，遮罩背后的页面模糊（A-007，backdrop-blur-md 是 12），浮层文字的墨迹总量偏大（A-009）。
+	// 默认态；勾上「记住我的选择」（点文字）；悬停两枚选项；键盘 Tab 一次（焦点落到页眉关闭钮，带聚焦环）。
+	"app.window.page-settings.dlg-close":         closeDialogScene("app.window.page-settings.dlg-close", nil),
+	"app.window.page-settings.dlg-close-checked": closeDialogScene("app.window.page-settings.dlg-close-checked", clickCheckboxLabel("记住我的选择")),
+	"app.window.page-settings.dlg-close-hover-minimize": closeDialogScene("app.window.page-settings.dlg-close-hover-minimize",
+		hoverButton("最小化到托盘")),
+	"app.window.page-settings.dlg-close-hover-exit": closeDialogScene("app.window.page-settings.dlg-close-hover-exit",
+		hoverButton("退出应用")),
+	"app.window.page-settings.dlg-close-key": closeDialogScene("app.window.page-settings.dlg-close-key",
+		func(s *headless.Session) error { return s.Keys("tab") }), "settings.shell": {
 		ID: "settings.shell",
 		Build: func(look *kit.Look) func(c ui.C) {
 			s := &settingsscreen.Shell{Look: look, Store: settingsscreen.NewMemStore(settings.Default())}

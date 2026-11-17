@@ -60,7 +60,7 @@ async function captureScene(session, sceneId, variant, outDir, suffix, matrix) {
       // 悬停态场景：指针就停在场景自己放的位置（行悬停、按钮悬停），不挪走也不清焦点；其余场景一律挪走并校验没有残留悬停。
       await settle(page, { quietMs: 80 });
     } else {
-      const hovering = await parkPointer(session);
+      const hovering = await parkPointer(session, { keepFocus: scene.keepFocus === true });
       if (hovering !== 0) throw new Error(`场景 ${sceneId}：采集前仍有 ${hovering} 个元素处于悬停态，状态不干净`);
     }
     const facts = await collectFacts(session, { regionSelector: scene.region ?? null, scene: sceneId, variant });

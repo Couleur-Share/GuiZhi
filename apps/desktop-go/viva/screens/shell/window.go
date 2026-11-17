@@ -7,6 +7,7 @@
 package shell
 
 import (
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/kit"
@@ -70,6 +71,9 @@ type Window struct {
 	// SearchShortcut 是顶栏快捷键提示（读主进程实际生效的组合键，例如 "Alt+Shift+F"）。
 	SearchShortcut string
 
+	// CaptureShortcut 是「新建条目」快捷键的显示文案（创建方式菜单里「快速采集」右侧的提示，例如 "Alt+Shift+N"）；空则不显示。
+	CaptureShortcut string
+
 	// OwnControls 为真时顶栏自己画最小化/最大化/关闭按钮。真窗口里这三个按钮由 Viva 画在窗口右上角，
 	// 顶栏只留出位置；对照工具与无头测试没有真窗口，需要自己画才能与渲染层逐项比较（台账 A-005）。
 	OwnControls bool
@@ -90,13 +94,28 @@ type Window struct {
 	OnMinimize    func()
 	OnMaximize    func()
 	OnClose       func()
+	// OnNewBlankNote 与 OnImportFiles 是创建方式菜单的「空白笔记」与「采集文件」（新建空白条目；选文件入采集队列）。
+	OnNewBlankNote func()
+	OnImportFiles  func()
+
+	// CloseDialogOpen 为真时显示「关闭应用」对话框（渲染层 CloseDialog：设置为「每次询问」时点关闭钮，主进程推 window:showCloseDialog）。
+	// OnCloseDialog 收用户的选择（最小化、退出、只关对话框），由外壳转给生命周期策略并把 CloseDialogOpen 置假。
+	CloseDialogOpen bool
+	OnCloseDialog   func(kit.CloseDialogResult)
 
 	// search 是顶栏搜索框（知识库模块下可输入）。
 	search  ui.Field // 知识库模块的搜索框
 	trigger ui.Field // 其余模块的只读入口（始终为空，点击与按键打开命令面板）
 
-	// createMenuOpen 是「新建」旁边的创建方式菜单是否展开。
+	// createMenuOpen 是「新建」旁边的创建方式菜单是否展开；createMenu 是菜单自己的状态，
+	// createMenuAt 是打开那一刻算出的菜单左上角（渲染层只在点击时取一次锚点，之后布局变了菜单也不跟随），
+	// caretRect 是箭头按钮上一帧的外框（点它只收起菜单；打开时据此算锚点）。
 	createMenuOpen bool
+	createMenu     kit.MenuState
+	createMenuAt   gfx.Point
+	caretRect      gfx.Rect
+
+	closeDialog kit.CloseDialogState
 }
 
 // module 返回当前模块；没设置时是知识库（渲染层 appModule 的默认值）。
@@ -145,8 +164,26 @@ func (w *Window) View(c ui.C) {
 			w.body(c)
 		})
 	})
+	w.newMenu(c)
+	w.closeDialogView(c)
 	l.Toasts(c, w.Notifier)
 	l.Tooltips(c, &w.tips)
+}
+
+// closeDialogView 声明「关闭应用」对话框；用户有了选择就交给 OnCloseDialog（由它决定是否关上，渲染层的 onClose 同理）。
+func (w *Window) closeDialogView(c ui.C) {
+	res := w.Look.CloseDialog(c.Key("close-dialog"), &w.closeDialog, kit.CloseDialogSpec{
+		Open:  w.CloseDialogOpen,
+		Title: locales.CloseDialogTitle(), Message: locales.CloseDialogMessage(),
+		MinimizeText: locales.CloseDialogMinimizeToTray(), ExitText: locales.CloseDialogExitApp(),
+		RememberText: locales.CloseDialogRememberChoice(), CloseLabel: locales.CommonClose(),
+	})
+	if res.Choice != kit.CloseDialogNone {
+		w.CloseDialogOpen = false
+		if w.OnCloseDialog != nil {
+			w.OnCloseDialog(res)
+		}
+	}
 }
 
 // content 是顶栏下面、侧栏右边的区域：设置页，或当前模块的工作区。

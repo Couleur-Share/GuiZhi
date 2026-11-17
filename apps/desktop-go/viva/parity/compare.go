@@ -82,13 +82,15 @@ type L2Result struct {
 	IconInk []InkMeasure `json:"iconInk,omitempty"`
 }
 
-// Cluster 是一片相连的差异像素（8 邻接）的外框与像素数，用来定位差异落在哪。
+// Cluster 是一片相连的差异像素（8 邻接）的外框、像素数与最大通道差，用来定位差异落在哪、判断是抗锯齿噪声还是实打实的错位。
 type Cluster struct {
 	X      int `json:"x"`
 	Y      int `json:"y"`
 	Width  int `json:"w"`
 	Height int `json:"h"`
 	Pixels int `json:"pixels"`
+	// MaxDelta 是片内像素的最大通道差（0–255）。圆角与图标边缘的抗锯齿差通常只有几十，整条线、整块底色的差是上百。
+	MaxDelta int `json:"maxDelta"`
 }
 
 // L3Result 汇总像素比较。
@@ -102,6 +104,9 @@ type L3Result struct {
 	MaxDiffRatio float64 `json:"maxDiffRatio"`
 	// Clusters 是像素最多的几片差异（至多 8 片），按像素数降序。
 	Clusters []Cluster `json:"clusters,omitempty"`
+	// Strongest 是最大通道差最高的几片差异（至多 8 片，先按最大通道差、再按像素数降序）：小而强的差（一条分隔线的底色、
+	// 一圈聚焦环）在整窗比例里几乎不占分量，Clusters 里排不上，靠这一份才看得见。
+	Strongest []Cluster `json:"strongest,omitempty"`
 }
 
 // Report 是一个场景在一个变体下的对照结果。
@@ -247,6 +252,16 @@ func (r *Report) Markdown() string {
 				b.WriteString("；")
 			}
 			fmt.Fprintf(&b, "(%d,%d %d×%d，%d)", c.X, c.Y, c.Width, c.Height, c.Pixels)
+		}
+		b.WriteString("\n\n")
+	}
+	if len(r.L3.Strongest) > 0 {
+		b.WriteString("L3 差得最狠的差异片（区域内坐标 x,y 宽×高，像素数，最大通道差）：")
+		for i, c := range r.L3.Strongest[:min(len(r.L3.Strongest), 5)] {
+			if i > 0 {
+				b.WriteString("；")
+			}
+			fmt.Fprintf(&b, "(%d,%d %d×%d，%d，%d)", c.X, c.Y, c.Width, c.Height, c.Pixels, c.MaxDelta)
 		}
 		b.WriteString("\n\n")
 	}

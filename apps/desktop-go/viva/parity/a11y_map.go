@@ -82,6 +82,11 @@ var vivaIgnoredRoles = map[string]bool{
 	"":       true,
 }
 
+// vivaKeepUnnamed 是 Viva 一侧「没有可访问名也参与比较」的角色（其余无名且不可聚焦的节点是行级悬停命中区，被忽略）：
+// 无名的 status 是 alert 区域（见 reactRoleMap）；无名的 menu 是菜单容器（渲染层的 role="menu" 没有 aria-label，
+// 创建方式菜单就是这样）。名字本来就是空的，不能当行级命中区丢掉。
+var vivaKeepUnnamed = map[string]bool{"status": true, "menu": true}
+
 // popupHasValues 是 aria-haspopup 的取值里让 button 变成「下拉触发器（combobox）」的那些。
 var popupHasValues = map[string]bool{"listbox": true, "menu": true, "true": true, "dialog": false}
 
@@ -249,8 +254,8 @@ func NormalizeViva(f *Facts) []Norm {
 			continue
 		}
 		name := NormText(n.Name)
-		// 无名的 status 是 alert 区域（见 reactRoleMap），名字本来就是空的，不能当行级命中区丢掉。
-		if focusable, has := n.Prop("focusable"); name == "" && n.Role != "status" && (!has || focusable != "true") {
+		// 无名的 status（alert 区域）与 menu（菜单容器）名字本来就是空的，不能当行级命中区丢掉（vivaKeepUnnamed）。
+		if focusable, has := n.Prop("focusable"); name == "" && !vivaKeepUnnamed[n.Role] && (!has || focusable != "true") {
 			continue
 		}
 		box, hasBox := n.BoxOK()

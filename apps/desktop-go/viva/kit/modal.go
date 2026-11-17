@@ -280,15 +280,19 @@ func (l *Look) modalTitle(c ui.C, title string) ui.Box {
 	return l.Heading(c, 2, title, TextXL, WeightBold, l.T.Foreground, Ellipsis()).FillWidth()
 }
 
-// modalClose 是关闭钮：p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent，图标 w-5 h-5，transition duration-base。
-func (l *Look) modalClose(c ui.C, label string) bool {
+// modalClose 是 Modal 页眉的关闭钮：p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent，图标 w-5 h-5，transition duration-base。
+func (l *Look) modalClose(c ui.C, label string) bool { return l.closeButton(c, label, DurationBase) }
+
+// closeButton 是对话框页眉右端的关闭钮；dur 是悬停过渡的档位（Modal 写 transition duration-base，CloseDialog 只写 transition-colors，
+// 用 Tailwind 的默认 150 ms）。
+func (l *Look) closeButton(c ui.C, label string, dur DurationName) bool {
 	t := l.T
 	id := ui.ID(c)
 	size := l.Rem(2.25) // p-2（8px）+ 20px 图标 + p-2
 	box := ui.Row(c).Size(size, size).Shrink(0).Items(ui.Center).Justify(ui.Center).
 		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 	hovered := box.State().Hovered
-	p := l.hoverTo(c.Canvas(), id, 0, hovered, DurationBase)
+	p := l.hoverTo(c.Canvas(), id, 0, hovered, dur)
 	fg := MixToken(t.MutedForeground, t.Foreground, p)
 	box = box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {

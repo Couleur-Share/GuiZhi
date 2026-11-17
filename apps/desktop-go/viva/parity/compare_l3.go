@@ -32,6 +32,7 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 		vb = viva.Bounds()
 	}
 	diff := make([]bool, w*h)
+	dist := make([]uint8, w*h)
 	tol := th.Pixel.Tolerance
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
@@ -43,8 +44,9 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 			rep.L3.Compared++
 			a := rgba8(in.ReactImg, rb.Min.X+x, rb.Min.Y+y)
 			b := rgba8(viva, vb.Min.X+x, vb.Min.Y+y)
-			if rgbDistance(a, b) > tol {
+			if d := rgbDistance(a, b); d > tol {
 				diff[i] = true
+				dist[i] = uint8(min(d, 255))
 				rep.L3.Diff++
 			}
 		}
@@ -52,15 +54,16 @@ func compareL3(rep *Report, in Inputs, th Thresholds) *image.RGBA {
 	if rep.L3.Compared > 0 {
 		rep.L3.Ratio = float64(rep.L3.Diff) / float64(rep.L3.Compared)
 	}
-	rep.L3.Clusters = diffClusters(diff, w, h, 8)
+	clusters := diffClusters(diff, dist, w, h)
+	rep.L3.Clusters, rep.L3.Strongest = topClusters(clusters, 8)
 	if rep.L3.Ratio > th.Pixel.MaxDiffRatio {
 		rep.add(LayerL3, "pixel", rep.Scene, "差异像素 %d / %d = %.4f%%，上限 %.4f%%", rep.L3.Diff, rep.L3.Compared, rep.L3.Ratio*100, th.Pixel.MaxDiffRatio*100)
 	}
 	return montage(in.ReactImg, viva, mask, diff, w, h)
 }
 
-// diffClusters 把差异像素按 8 邻接分片，返回像素最多的 limit 片。
-func diffClusters(diff []bool, w, h, limit int) []Cluster {
+// diffClusters 把差异像素按 8 邻接分片，返回全部片（未排序）；dist 是每个像素的最大通道差。
+func diffClusters(diff []bool, dist []uint8, w, h int) []Cluster {
 	seen := make([]bool, len(diff))
 	var all []Cluster
 	var stack []int
@@ -77,6 +80,7 @@ func diffClusters(diff []bool, w, h, limit int) []Cluster {
 			stack = stack[:len(stack)-1]
 			x, y := i%w, i/w
 			c.Pixels++
+			c.MaxDelta = max(c.MaxDelta, int(dist[i]))
 			c.X, c.Y = min(c.X, x), min(c.Y, y)
 			x1, y1 = max(x1, x), max(y1, y)
 			for dy := -1; dy <= 1; dy++ {
@@ -96,11 +100,27 @@ func diffClusters(diff []bool, w, h, limit int) []Cluster {
 		c.Width, c.Height = x1-c.X+1, y1-c.Y+1
 		all = append(all, c)
 	}
-	sort.Slice(all, func(a, b int) bool { return all[a].Pixels > all[b].Pixels })
-	if len(all) > limit {
-		all = all[:limit]
-	}
 	return all
+}
+
+// topClusters 取像素最多的 limit 片与最大通道差最高的 limit 片（各自降序；同差按像素数）。
+func topClusters(all []Cluster, limit int) (byPixels, byDelta []Cluster) {
+	byPixels = append([]Cluster(nil), all...)
+	sort.SliceStable(byPixels, func(a, b int) bool { return byPixels[a].Pixels > byPixels[b].Pixels })
+	byDelta = append([]Cluster(nil), all...)
+	sort.SliceStable(byDelta, func(a, b int) bool {
+		if byDelta[a].MaxDelta != byDelta[b].MaxDelta {
+			return byDelta[a].MaxDelta > byDelta[b].MaxDelta
+		}
+		return byDelta[a].Pixels > byDelta[b].Pixels
+	})
+	if len(byPixels) > limit {
+		byPixels = byPixels[:limit]
+	}
+	if len(byDelta) > limit {
+		byDelta = byDelta[:limit]
+	}
+	return byPixels, byDelta
 }
 
 // textMask 把两侧所有文字行矩形与图标外框外扩 pad 像素，标成遮罩（文字与图标的抗锯齿逐像素不同，改由 L2 按墨迹比较）。

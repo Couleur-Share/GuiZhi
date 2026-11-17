@@ -19863,3 +19863,25 @@ func NativeShellNotMigratedHint() string { return In(i18n.Locale()).NativeShellN
 func (msgs Messages) NativeShellNotMigratedHint() string {
 	return Catalog.Format(msgs.locale, "native_shell_notMigratedHint", nil)
 }
+
+// NativeShellCommandAction says "处理窗口命令"
+// in the language the app shows.
+func NativeShellCommandAction() string { return In(i18n.Locale()).NativeShellCommandAction() }
+
+// NativeShellCommandAction says "处理窗口命令"
+// in the language of msgs.
+func (msgs Messages) NativeShellCommandAction() string {
+	return Catalog.Format(msgs.locale, "native_shell_commandAction", nil)
+}
+
+// NativeShellCommandNotMigrated says "命令「{command}」对应的界面还没有迁移到原生界面（台账 B-008）"
+// in the language the app shows.
+func NativeShellCommandNotMigrated(command any) string {
+	return In(i18n.Locale()).NativeShellCommandNotMigrated(command)
+}
+
+// NativeShellCommandNotMigrated says "命令「{command}」对应的界面还没有迁移到原生界面（台账 B-008）"
+// in the language of msgs.
+func (msgs Messages) NativeShellCommandNotMigrated(command any) string {
+	return Catalog.Format(msgs.locale, "native_shell_commandNotMigrated", map[string]any{"command": command})
+}

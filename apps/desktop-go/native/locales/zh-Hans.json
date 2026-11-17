@@ -3742,5 +3742,14 @@
       }
     }
   },
-  "native_shell_notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。"
+  "native_shell_notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。",
+  "native_shell_commandAction": "处理窗口命令",
+  "native_shell_commandNotMigrated": "命令「{command}」对应的界面还没有迁移到原生界面（台账 B-008）",
+  "@native_shell_commandNotMigrated": {
+    "placeholders": {
+      "command": {
+        "type": "Object"
+      }
+    }
+  }
 }

@@ -126,10 +126,13 @@ export async function settle(page, { quietMs = 200, timeoutMs = 8000 } = {}) {
  * 把鼠标挪到视口外并清掉焦点，避免悬停/焦点样式混进「正常」态场景。
  * 返回仍处于 :hover 的元素数量（除 html/body 外应为 0）。
  */
-export async function parkPointer(session) {
+export async function parkPointer(session, { keepFocus = false } = {}) {
   const { page, cdp } = session;
   await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: -1, y: -1 });
-  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  // keepFocus：场景的自然状态里焦点就在某个控件上（菜单打开后第一项自动聚焦），清掉它就不是用户看到的画面。
+  if (!keepFocus) {
+    await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  }
   await settle(page, { quietMs: 80 });
   return page.evaluate(() => [...document.querySelectorAll(":hover")].filter((el) => el !== document.documentElement && el !== document.body).length);
 }

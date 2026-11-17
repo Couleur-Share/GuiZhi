@@ -24,6 +24,7 @@ func a11yMapDigest() string {
 	set("reactIgnoredRoles", reactIgnoredRoles)
 	set("reactIgnoredUnnamed", reactIgnoredUnnamed)
 	set("vivaIgnoredRoles", vivaIgnoredRoles)
+	set("vivaKeepUnnamed", vivaKeepUnnamed)
 	set("popupHasValues", popupHasValues)
 	pairs := make([]string, 0, len(reactRoleMap))
 	for k, v := range reactRoleMap {

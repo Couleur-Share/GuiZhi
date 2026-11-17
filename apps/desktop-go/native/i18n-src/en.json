@@ -14,7 +14,9 @@
     },
     "shell": {
       "notMigrated": "\"{{module}}\" has not been moved to the native UI yet",
-      "notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone."
+      "notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone.",
+      "commandAction": "Handle window command",
+      "commandNotMigrated": "The screen behind command \"{{command}}\" has not been moved to the native UI yet (ledger B-008)"
     }
   }
 }

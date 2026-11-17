@@ -206,7 +206,9 @@ func (w *Window) updateButton(c ui.C, wide bool) {
 }
 
 // newItemButton 是「新建」拆分按钮：主按钮（Plus 与文字，sm 以上才有文字）、1px 分隔线、下拉箭头按钮。
-// 两半各自悬停变 bg-primary/90；主按钮只有左侧圆角，箭头按钮只有右侧圆角（按整个按钮画圆角矩形再裁到各自一侧）。
+// 两半各自悬停变 bg-primary/90；主按钮只有左侧圆角，箭头按钮只有右侧圆角。
+// 两半各画各的底，中间 1px 分隔线下面是页面底色（渲染层的两个按钮各自有 bg-primary，分隔线 bg-primary-foreground/25
+// 直接叠在页面上，浅色下是纯白）。
 func (w *Window) newItemButton(c ui.C, wide bool) {
 	l := w.Look
 	t := l.T
@@ -214,29 +216,32 @@ func (w *Window) newItemButton(c ui.C, wide bool) {
 	newLabel := locales.HeaderNew()
 	caretLabel := locales.HeaderCreateMenu()
 	var mainHover, caretHover bool
-	var mainRect, caretRect gfx.Rect
-	group := ui.Row(c).Height(l.Rem(2)).Shrink(0).Items(ui.Stretch)
-	group.Draw(func(d *ui.DrawContext) {
-		radius := l.Rem(0.5)
-		whole := kit.Surface{Radius: radius}
-		bgFor := func(hover bool) tokens.Color {
-			if hover {
-				return t.Primary.WithAlpha(0.9)
-			}
-			return t.Primary
+	radius := l.Rem(0.5)
+	bgFor := func(hover bool) tokens.Color {
+		if hover {
+			return t.Primary.WithAlpha(0.9)
 		}
-		whole.Bg, whole.Clip = bgFor(mainHover), mainRect
-		l.PaintSurface(d, whole)
-		whole.Bg, whole.Clip = bgFor(caretHover), caretRect
-		l.PaintSurface(d, whole)
-	}).Children(func() {
+		return t.Primary
+	}
+	// paintHalf 把圆角矩形的另一侧挪到裁剪区之外：side 为 -1 时只留左半（左侧圆角），为 1 时只留右半。
+	paintHalf := func(d *ui.DrawContext, bg tokens.Color, side int) {
+		shifted := *d
+		shifted.Rect = d.Rect
+		shifted.Rect.Width += radius
+		if side > 0 {
+			shifted.Rect.X -= radius
+		}
+		l.PaintSurface(&shifted, kit.Surface{Bg: bg, Radius: radius, Clip: d.Rect})
+	}
+	group := ui.Row(c).Height(l.Rem(2)).Shrink(0).Items(ui.Stretch)
+	group.Children(func() {
 		// 主按钮：pl-2.5 pr-2 gap-1.5 text-sm font-medium text-primary-foreground。
 		mc := c.Key("main")
 		id := ui.ID(mc)
 		main := ui.Row(mc).Items(ui.Center).Gap(l.Space(1.5)).PadSides(0, l.Space(2), 0, l.Space(2.5)).
 			HitWith(id, newLabel, gfx.HitOptions{Role: gfx.RoleButton})
 		mainHover = main.State().Hovered
-		main.Draw(func(d *ui.DrawContext) { mainRect = d.Rect }).Children(func() {
+		main.Draw(func(d *ui.DrawContext) { paintHalf(d, bgFor(mainHover), -1) }).Children(func() {
 			l.Icon(c, icons.Plus, l.Rem(1), t.PrimaryForeground).Shrink(0)
 			if wide {
 				l.Text(c, newLabel, kit.TextSM, kit.WeightMedium, t.PrimaryForeground)
@@ -255,13 +260,40 @@ func (w *Window) newItemButton(c ui.C, wide bool) {
 		caret := ui.Row(cc).Width(l.Rem(1.5)).Items(ui.Center).Justify(ui.Center).
 			HitWith(caretID, caretLabel, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Expanded: w.createMenuOpen, Hint: caretLabel})
 		caretHover = caret.State().Hovered
-		caret.Draw(func(d *ui.DrawContext) { caretRect = d.Rect }).Children(func() {
-			l.Icon(c, icons.ChevronDown, l.Rem(0.875), t.PrimaryForeground).Shrink(0)
+		caret.Draw(func(d *ui.DrawContext) {
+			w.caretRect = d.Rect
+			paintHalf(d, bgFor(caretHover), 1)
+		}).Children(func() {
+			// 展开时箭头转 180°（transition-transform，没有写 duration-*：Tailwind 默认 150 ms）。
+			l.RotatingChevron(c, caretID, l.Rem(0.875), w.createMenuOpen, t.PrimaryForeground, kit.DurationDefault).Shrink(0)
 		})
-		if caret.Clicked() {
-			w.createMenuOpen = !w.createMenuOpen
+		// 展开时点箭头由菜单的背景层接走（Keep）：只收起、不再传到这里，所以这里只会在收起状态下收到点击。
+		if caret.Clicked() && !w.createMenuOpen {
+			w.createMenuOpen = true
+			// 渲染层在点击时取一次锚点：按钮右缘 − 224、下缘 + 4（逻辑像素字面量，不随字号档缩放）。
+			w.createMenuAt = gfx.Point{X: w.caretRect.Right() - 224, Y: w.caretRect.Bottom() + 4}
 		}
 	})
+}
+
+// newMenu 声明创建方式菜单（渲染层 NewItemButton 的 ContextMenu）：三项，点箭头展开。
+// 它是浮层，要在整个页面声明完之后才声明（见 View）。
+func (w *Window) newMenu(c ui.C) {
+	l := w.Look
+	keep := w.caretRect
+	items := []kit.MenuItem{
+		{Label: locales.CaptureTitle(), Description: locales.HeaderNewCaptureDesc(), Icon: icons.Sparkles,
+			Shortcut: w.CaptureShortcut, OnSelect: w.OnNewCapture},
+		{Label: locales.CaptureBlankNote(), Description: locales.HeaderNewBlankNoteDesc(), Icon: icons.StickyNote,
+			OnSelect: w.OnNewBlankNote},
+		{Label: locales.HeaderNewImportFiles(), Description: locales.HeaderNewImportFilesDesc(), Icon: icons.FileUp,
+			OnSelect: w.OnImportFiles},
+	}
+	if l.ContextMenu(c, &w.createMenu, kit.MenuSpec{
+		Open: w.createMenuOpen, X: w.createMenuAt.X, Y: w.createMenuAt.Y, Items: items, Keep: &keep,
+	}) {
+		w.createMenuOpen = false
+	}
 }
 
 // windowControls 画最小化、最大化与关闭三个按钮（渲染层 WindowControls：ml-1，每个 w-11，h-12 满高）。

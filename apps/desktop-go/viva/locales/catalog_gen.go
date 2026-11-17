@@ -15194,3 +15194,19 @@ func NativeShellNotMigratedHint() string {
 	}
 	return "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。"
 }
+
+// NativeShellCommandAction 是 native.shell.commandAction：处理窗口命令
+func NativeShellCommandAction() string {
+	if useEn() {
+		return "Handle window command"
+	}
+	return "处理窗口命令"
+}
+
+// NativeShellCommandNotMigrated 是 native.shell.commandNotMigrated：命令「{{command}}」对应的界面还没有迁移到原生界面（台账 B-008）
+func NativeShellCommandNotMigrated(command any) string {
+	if useEn() {
+		return "The screen behind command \"" + fmtArg(command) + "\" has not been moved to the native UI yet (ledger B-008)"
+	}
+	return "命令「" + fmtArg(command) + "」对应的界面还没有迁移到原生界面（台账 B-008）"
+}

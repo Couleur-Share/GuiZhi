@@ -7,6 +7,7 @@ import (
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/icons"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // slotChevron 是触发按钮箭头的旋转动画槽位（同一个控件 ID 上的动画用槽位区分）。
@@ -42,20 +43,21 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 	}
 	return box.Children(func() {
 		l.Text(c, value, TextSM, WeightNormal, t.Foreground, Ellipsis()).Grow(1).Shrink(1)
-		l.rotatingChevron(c, id, chevron, open)
+		l.RotatingChevron(c, id, chevron, open, l.T.MutedForeground, DurationBase)
 	})
 }
 
-// rotatingChevron 画触发按钮右侧的 ChevronDown：展开时旋转 180°（transition-transform duration-base，标准缓动）。
+// RotatingChevron 画触发按钮右侧的 ChevronDown：展开时旋转 180°（transition-transform，标准缓动，时长 dur：
+// Select 是 duration-base，顶栏「新建」的箭头没有写 duration-*，用 Tailwind 默认的 150 ms）。
 // 静止（0° 与 180°）时用精确栅格化的 ChevronDown / ChevronUp——lucide 的 chevron-up 正是 chevron-down 绕中心转半圈，
 // 几何完全相同；只有动画中途才用 Viva 原生的旋转绘制。
-func (l *Look) rotatingChevron(c ui.C, id gfx.ID, size float32, open bool) ui.Box {
-	col := l.Col(l.T.MutedForeground)
+func (l *Look) RotatingChevron(c ui.C, id gfx.ID, size float32, open bool, color tokens.Color, dur DurationName) ui.Box {
+	col := l.Col(color)
 	target := float32(0)
 	if open {
 		target = 1
 	}
-	motion := l.Motion(DurationBase, EaseStandard)
+	motion := l.Motion(dur, EaseStandard)
 	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
 		mark := l.markIcon(d)
 		tint := d.Fade(col)

@@ -8,6 +8,7 @@
  * 渲染层只允许加 data-testid / aria 属性（见台账「渲染层改动登记」）；能用现有角色与名称定位的，不去改渲染层。
  * `leave(ctx)`：可选，场景采集完后调用，把场景留下的东西收掉（提示场景用它收走提示、恢复页面）。
  * `keepPointer`：可选，悬停态场景（行悬停）为真：采集器不挪走指针、不清焦点，也不校验悬停残留；默认一律挪走并校验。
+ * `keepFocus`：可选，为真时采集器照常挪走指针并校验没有悬停残留，但不清焦点（菜单打开后第一项自动聚焦，那是用户看到的自然状态）。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -76,6 +77,66 @@ async function openBackgroundTasksDialog(win) {
   await openSettingsSection(win, "general");
   await win.getByRole("switch", { name: "后台任务", exact: true }).click();
   await win.getByRole("alertdialog").waitFor({ state: "visible" });
+}
+
+/**
+ * 打开顶栏「新建」旁的创建方式菜单（台账 B-007）：点箭头按钮，等菜单出现，再把指针挪到左上角。
+ * 菜单打开时第一项自动聚焦（渲染层 ContextMenu 的 useEffect），场景用 keepFocus 保留这个状态。
+ */
+async function openNewMenu(win) {
+  await openSettingsSection(win, "general");
+  await win.keyboard.press("Escape");
+  await win.getByRole("button", { name: "创建方式", exact: true }).click();
+  await win.getByRole("menu").waitFor({ state: "visible" });
+  await win.mouse.move(2, 2);
+}
+
+/** 菜单打开后按一次 ↓：焦点从第一项挪到第二项，键盘模态下 :focus-visible 成立，出现全局的聚焦环。 */
+async function openNewMenuKeyboard(win) {
+  await openNewMenu(win);
+  await win.keyboard.press("ArrowDown");
+  await win.mouse.move(2, 2);
+}
+
+/**
+ * 打开「关闭应用」对话框（CloseDialog，Windows 点关闭钮且设置为「每次询问」时由主进程推 window:showCloseDialog）。
+ * 采集器没有真实的主进程，直接走 Go 推送到页面的同一条路径：MyGo 运行时的 `__mygo.receive` 收到 "ipc" 事件，
+ * shim 再按频道分发给渲染层注册的监听器——驱动的是渲染层自己的 App 状态与 CloseDialog，不改渲染层一行代码。
+ */
+async function openCloseDialog(win) {
+  await openSettingsSection(win, "general");
+  await win.keyboard.press("Escape");
+  await win.evaluate(() => {
+    window.__mygo.receive({ t: "event", n: "ipc", p: { channel: "window:showCloseDialog", args: [] } });
+  });
+  await win.getByRole("alertdialog").waitFor({ state: "visible" });
+}
+
+/** 关闭对话框里点一下「记住我的选择」的文字：label 的 onClick 翻转，不取键盘焦点。 */
+async function openCloseDialogChecked(win) {
+  await openCloseDialog(win);
+  await win.getByText("记住我的选择", { exact: true }).click();
+  await win.mouse.move(2, 2);
+}
+
+/**
+ * 把指针停在关闭对话框里名为 name 的选项按钮中心（悬停态：场景用 keepPointer 保留）。
+ * 采集器的 keepPointer 路径不清焦点，而对话框容器是程序聚焦的（dialog.focus()），Chromium 会给它画默认的 :focus-visible 外框
+ * （黑色细线，视觉上是对话框外圈）；其余场景的采集器都会 blur 掉它，所以这里照样 blur：悬停保持，焦点清掉（台账 A-017）。
+ */
+function hoverCloseOption(name) {
+  return async (win) => {
+    await openCloseDialog(win);
+    await win.getByRole("button", { name, exact: true }).hover();
+    await win.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); });
+  };
+}
+
+/** 关闭对话框打开后按一次 Tab：焦点从对话框容器落到页眉关闭钮，键盘模态下出聚焦环（场景用 keepFocus 保留）。 */
+async function openCloseDialogKeyboard(win) {
+  await openCloseDialog(win);
+  await win.keyboard.press("Tab");
+  await win.mouse.move(2, 2);
 }
 
 /** 提示场景的文案：与 Viva 场景共用同一份 JSON（viva/parity/testdata/toast-content.json）。 */
@@ -343,6 +404,57 @@ export const SCENES = {
     module: "app",
     async enter({ win }) {
       await openBackgroundTasksDialog(win);
+    },
+  },
+  // 整窗 + 「关闭应用」对话框（模态：遮罩盖住整窗，面板居中；打开时对话框容器自己取焦点，采集前清掉）。
+  "app.window.page-settings.dlg-close": {
+    module: "app",
+    async enter({ win }) {
+      await openCloseDialog(win);
+    },
+  },
+  // 同上，勾上「记住我的选择」；悬停两枚选项（边框与图标块随悬停变色）；Tab 一次（页眉关闭钮带聚焦环）。
+  "app.window.page-settings.dlg-close-checked": {
+    module: "app",
+    async enter({ win }) {
+      await openCloseDialogChecked(win);
+    },
+  },
+  "app.window.page-settings.dlg-close-hover-minimize": {
+    module: "app",
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverCloseOption("最小化到托盘")(win);
+    },
+  },
+  "app.window.page-settings.dlg-close-hover-exit": {
+    module: "app",
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverCloseOption("退出应用")(win);
+    },
+  },
+  "app.window.page-settings.dlg-close-key": {
+    module: "app",
+    keepFocus: true,
+    async enter({ win }) {
+      await openCloseDialogKeyboard(win);
+    },
+  },
+  // 整窗 + 顶栏「新建」旁的创建方式菜单（portal 到 body 的 fixed 菜单；第一项自动聚焦）。
+  "app.window.page-settings.new-menu": {
+    module: "app",
+    keepFocus: true,
+    async enter({ win }) {
+      await openNewMenu(win);
+    },
+  },
+  // 同上，再按一次 ↓：第二项带键盘聚焦环。
+  "app.window.page-settings.new-menu-key": {
+    module: "app",
+    keepFocus: true,
+    async enter({ win }) {
+      await openNewMenuKeyboard(win);
     },
   },
   // 提示（Toast）：整窗，页面内容隐去，只留右下角的提示（见 lib/react-toast.mjs）。

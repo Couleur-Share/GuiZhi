@@ -63,6 +63,15 @@ const MEASURE_FN = `async function (...nodes) {
   const PROPS = ${JSON.stringify(STYLE_PROPS)};
   const round = (n) => Math.round(n * 1000) / 1000;
   ${VISIBLE_RECTS_SRC}
+  // 视觉隐藏（sr-only，外框不超过 1px）的原生勾选/单选框，由同一容器里 aria-hidden 的兄弟元素代画（Checkbox.tsx：input.sr-only 加 span[aria-hidden]）。
+  // 它在可访问树里是一个正常的 checkbox / radio，但视觉上就是那个方框；Viva 的复选框节点也是方框本身。
+  // 所以外框与可见部分都取代画元素的，不然这个节点会被「可见部分为零」的规则整个丢掉，L1 就会报 Viva 多了一个节点。
+  const proxyOf = (n) => {
+    if (n.nodeType !== 1 || n.localName !== "input" || (n.type !== "checkbox" && n.type !== "radio")) return null;
+    const r = n.getBoundingClientRect();
+    if (r.width > 1 || r.height > 1) return null;
+    return n.parentElement?.querySelector(":scope > [aria-hidden='true']") ?? null;
+  };
   const measured = nodes.map((n) => {
     if (n.nodeType === 3) {
       const range = document.createRange();
@@ -71,7 +80,8 @@ const MEASURE_FN = `async function (...nodes) {
       return { k: "t", box: [round(b.x), round(b.y), round(b.width), round(b.height)], text: n.data };
     }
     if (n.nodeType !== 1) return { k: "o" };
-    const b = n.getBoundingClientRect();
+    const proxy = proxyOf(n);
+    const b = (proxy ?? n).getBoundingClientRect();
     const cs = getComputedStyle(n);
     const style = {};
     for (const p of PROPS) style[p] = cs.getPropertyValue(p);
@@ -80,12 +90,13 @@ const MEASURE_FN = `async function (...nodes) {
       tag: n.localName,
       testId: n.getAttribute("data-testid"),
       box: [round(b.x), round(b.y), round(b.width), round(b.height)],
+      ...(proxy ? { proxy: proxy.localName } : {}),
       scroll: [n.scrollLeft, n.scrollTop, n.scrollWidth, n.scrollHeight],
       style,
     };
   });
   // 文字节点取父元素的可见部分；非元素、非文字的节点没有。
-  const visible = await visibleRects(nodes.map((n) => (n.nodeType === 1 ? n : n.nodeType === 3 ? n.parentElement : null)));
+  const visible = await visibleRects(nodes.map((n) => (n.nodeType === 1 ? (proxyOf(n) ?? n) : n.nodeType === 3 ? n.parentElement : null)));
   measured.forEach((m, i) => { if (visible[i]) m.vis = visible[i]; });
   return measured;
 }`;
@@ -476,6 +487,7 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
       kind: m?.k ?? null,
       ...(m?.tag ? { tag: m.tag } : {}),
       ...(m?.testId ? { testId: m.testId } : {}),
+      ...(m?.proxy ? { proxy: m.proxy } : {}),
       ...(m?.k === "e" ? { style: m.style, scroll: m.scroll } : {}),
       ...(m?.k === "t" ? { text: m.text } : {}),
       parentOrig: n.parent,
