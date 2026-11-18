@@ -102,19 +102,27 @@ func PaintIcon(canvas *gfx.Canvas, ic gfx.Icon, bounds gfx.Rect, tint gfx.Color)
 		canvas.DrawIcon(ic, bounds, tint)
 		return
 	}
-	scale := float64(canvas.PixelScale())
-	side := math.Min(float64(bounds.Width), float64(bounds.Height))
-	sideDev := side * scale
-	if sideDev <= 0 {
+	origin, sideDev, n, ok := iconPlacement(canvas, bounds)
+	if !ok {
 		return
 	}
-	// 盒子 = bounds 里居中的 side×side 正方形（图标盒子通常恰好是 bounds）。
+	paintCoverage(canvas, iconCoverageSide(ic, sideDev, n, 0, 0), n, origin, canvas.PixelScale(), tint)
+}
+
+// iconPlacement 求图标在 bounds 里的落笔位置：原点（逻辑坐标，已吸附到最近的整设备像素）、边长（设备像素，可带小数）与掩码边长。
+// 盒子 = bounds 里居中的 side×side 正方形（图标盒子通常恰好是 bounds）；边长为零时 ok 为 false。
+func iconPlacement(canvas *gfx.Canvas, bounds gfx.Rect) (origin gfx.Point, sideDev float64, n int, ok bool) {
+	scale := float64(canvas.PixelScale())
+	side := math.Min(float64(bounds.Width), float64(bounds.Height))
+	sideDev = side * scale
+	if sideDev <= 0 {
+		return gfx.Point{}, 0, 0, false
+	}
 	x0 := (float64(bounds.X) + (float64(bounds.Width)-side)/2) * scale
 	y0 := (float64(bounds.Y) + (float64(bounds.Height)-side)/2) * scale
-	origin := gfx.Point{
+	origin = gfx.Point{
 		X: float32(math.Floor(x0+0.5+iconSnapEpsilon) / scale),
 		Y: float32(math.Floor(y0+0.5+iconSnapEpsilon) / scale),
 	}
-	n := int(math.Ceil(sideDev - 1e-6))
-	paintCoverage(canvas, iconCoverageSide(ic, sideDev, n, 0, 0), n, origin, float32(scale), tint)
+	return origin, sideDev, int(math.Ceil(sideDev - 1e-6)), true
 }
