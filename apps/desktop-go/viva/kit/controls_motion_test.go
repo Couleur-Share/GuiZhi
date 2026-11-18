@@ -499,7 +499,7 @@ func TestSegmentFocusRing(t *testing.T) {
 // 悬停上移后命中区跟着上移 2px：指针停在原位置下沿内侧 1px 时，上移后指针落在新位置之外。
 // 渲染层（Chromium）在命中区变动后会补发一次假的鼠标移动，悬停因此每帧来回切换——实测 600 ms 内 100 次翻转
 // （scripts/parity/tools/probe-lift-edge.mjs，读数在 probes/lift-edge.json）。Viva 只在指针事件时重算悬停：
-// 指针不动就不闪，每次真的移动才切换一次。这是已登记的偏差（台账 C-003，偏向更稳定的一侧），测试把现状钉住。
+// 指针不动就不闪，每次真的移动才切换一次。这是已登记的偏差（台账 A-022，用户裁决接受，偏向更稳定的一侧），测试把现状钉住。
 func TestSegmentLiftEdgeTogglesOnlyOnPointerMoves(t *testing.T) {
 	sel := 0
 	h := segmentPage(t, still(), &sel)
