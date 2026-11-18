@@ -44,7 +44,7 @@ func openPage(t *testing.T, spec Spec, width, height int, view func(l *Look, c u
 	})
 	var canvas gfx.Canvas
 	// OnKey 与窗口里一样接上 Tab 可达（reach.go）。
-	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height, OnKey: look.TabKey})
+	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height, OnKey: look.OnKey})
 	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)

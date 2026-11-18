@@ -69,6 +69,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 		Notifier:        r.notifier,
 		SearchShortcut:  opts.SearchShortcut,
 		CaptureShortcut: opts.CaptureShortcut,
+		WindowActive:    ownProcessForeground,
 		OnModule: func(m shell.Module) {
 			r.win.Module, r.win.Page = m, shell.PageHome
 		},
@@ -177,13 +178,13 @@ func (r *Root) Services() services.Services { return r.opts.Services }
 func (r *Root) Notifier() *kit.Notifier { return r.notifier }
 func (r *Root) Guard() kit.Guard        { return r.guard }
 
-// OnKey 是窗口按键的前置钩子：目前只做 Tab 可达（滚动区里的焦点跟随与滚入视野，见 kit.Look.TabKey）。
+// OnKey 是窗口按键的前置钩子：收起悬停提示（B-017）与 Tab 可达（滚动区里滚入视野，B-030），见 kit.Look.OnKey。
 // 窗口线程调用；Look 还没装配好（第一次绘制之前）时不插手。
 func (r *Root) OnKey(e gfx.KeyEvent) gfx.EventResult {
 	if r.look == nil {
 		return gfx.EventResult{}
 	}
-	return r.look.TabKey(e)
+	return r.look.OnKey(e)
 }
 
 // View 声明整个窗口内容。

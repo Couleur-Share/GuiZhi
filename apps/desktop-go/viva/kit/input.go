@@ -68,6 +68,9 @@ func (l *Look) Input(c ui.C, f *ui.Field, label, placeholder string, spec InputS
 		Weight(spec.Weight).
 		Color(l.Col(ink))
 	l.noteStop(box)
+	if box.Changed() && l.tips != nil {
+		l.tips.noteKey() // 文字被编辑了：键没有经过 OnKey（文字系统直接收了），补记一次按键以收起悬停提示（台账 B-017）
+	}
 	if spec.Mono {
 		box = box.Mono()
 	}

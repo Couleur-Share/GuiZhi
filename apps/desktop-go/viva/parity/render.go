@@ -101,7 +101,7 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 	page := ui.NewPage(ui.PageConfig{View: view, Theme: &look.Theme, Background: &background})
 	var canvas gfx.Canvas
 	session, err := headless.Open(
-		page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height, OnKey: look.TabKey}),
+		page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height, OnKey: look.OnKey}),
 		&canvas, headless.Options{Scale: 1})
 	if err != nil {
 		return nil, nil, fmt.Errorf("打开无头会话失败：%w", err)

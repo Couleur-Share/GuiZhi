@@ -12,8 +12,12 @@ import (
 // 悬停提示（渲染层 components/ui/TooltipLayer.tsx，台账 B-011）
 //
 // 渲染层的 TooltipLayer 接管所有带 title 的元素：指针悬停（或键盘聚焦）到一个带 title 的元素上 320 ms 后，
-// 在它下方 8px 处出一个自绘气泡（居中、夹回视口 8px 以内、下方放不下就翻到上方）；移开、按下、滚动、失焦都会收起；
+// 在它下方 8px 处出一个自绘气泡（居中、夹回视口 8px 以内、下方放不下就翻到上方）；移开、按下、按键、滚动、窗口失焦都会收起；
 // 点击过的元素在指针离开之前不再提示（点击后按钮拿到焦点，不能让气泡盖在这一下点开的菜单上）。
+//
+// 收起（渲染层的 dismiss()）之后宿主就被忘掉了，要等一个「新事件」才会再排期：指针进入别的元素（pointerover）、
+// 键盘焦点换了（focusin）。所以按键、滚动、失焦收起之后，指针还停在原处、焦点还在原处时不会重新出气泡。
+// 这里用 hushHover / hushFocus 记下收起那一刻的悬停与焦点，指针或焦点一换就解除。
 //
 // Viva 自带的 Box.Tooltip 是即时出现、自带样式与箭头，与渲染层的延迟、外观、位置都对不上，所以这里自己画：
 // 宿主只需在命中区上声明提示文字（gfx.HitOptions.Hint，也是它的可访问描述），由窗口根上的提示层统一出气泡。
@@ -27,6 +31,10 @@ const (
 
 	tooltipMargin float32 = 8 // 气泡与视口边缘的最小留白（VIEWPORT_MARGIN）
 	tooltipGap    float32 = 8 // 气泡与宿主的间距（TRIGGER_GAP）
+
+	// activePoll 是有气泡显示（或排期）时探测窗口是否仍在前台的间隔。Viva 没有窗口失活的回调
+	//（OnActivate 只在变成活动窗口时触发），渲染层的 window blur 监听只能靠轮询近似：失焦之后至多晚这么久才收起。
+	activePoll = 250 * time.Millisecond
 )
 
 // tooltipHost 是一个提示宿主的身份：带提示的命中区自己的 ID；由容器提供提示时（容器没有 ID）按它的外框与文字认。
@@ -44,6 +52,34 @@ type TooltipState struct {
 	text       string        // 气泡文字（宿主的 Hint）
 	suppressed gfx.ID        // 被按下过的宿主：指针离开它之前不再提示
 	shown      bool          // 气泡是否应当显示
+
+	// Active 报告窗口是否是前台窗口（渲染层 window blur 的对应物，见 activePoll）；nil 表示不探测（无头测试与对照场景）。
+	// 只在有气泡显示或排期时调用。
+	Active func() bool
+
+	keyed      bool   // 有按键到达（Look.OnKey 经 noteKey 置位）：传感器下一次运行时收起
+	hushHover  gfx.ID // 收起时指针所在的命中区：指针进入别的命中区之前不再提示
+	hushFocus  gfx.ID // 收起时的键盘焦点：焦点换了之前不再提示
+	lastFocus  gfx.ID // 上一次传感器运行时的键盘焦点：按键先于焦点移动，收起要记下「按键之前」的焦点
+	wasActive  bool   // 上一次探测时窗口在前台
+	waitActive bool   // 失焦收起之后在等窗口回到前台（回来时键盘焦点的控件像 focusin 那样重新排期）
+}
+
+// noteKey 记下一次按键（渲染层 TooltipLayer 的 keydown 监听）：有气泡显示或排期时返回真，调用方要补一次重绘，
+// 让传感器收起它；没有就什么也不做。
+func (st *TooltipState) noteKey() bool {
+	if !st.shown && st.host == (tooltipHost{}) {
+		return false
+	}
+	st.keyed = true
+	return true
+}
+
+// armPoll 在有气泡显示、排期或在等窗口回到前台时安排下一次探测。
+func (st *TooltipState) armPoll(canvas *gfx.Canvas) {
+	if st.Active != nil && (st.shown || st.host != (tooltipHost{}) || st.waitActive) {
+		canvas.RequestFrameIn(activePoll)
+	}
 }
 
 // hide 收起气泡并忘掉当前宿主。
@@ -102,9 +138,60 @@ func hintedHit(canvas *gfx.Canvas, id gfx.ID) (tooltipHost, bool) {
 	return tooltipHost{}, false
 }
 
-// update 是传感器：每一帧绘制时按指针与键盘焦点所在的命中区推进状态。
-func (st *TooltipState) update(canvas *gfx.Canvas) {
+// update 是传感器：每一帧绘制时按指针与键盘焦点所在的命中区推进状态。scrolled 是这次绘制里有没有滚动区滚动过。
+func (st *TooltipState) update(canvas *gfx.Canvas, scrolled bool) {
 	now := canvas.Now()
+	hovered, focused := canvas.Hovered(), canvas.FocusVisible()
+	before := st.lastFocus
+	st.lastFocus = focused
+	defer st.armPoll(canvas)
+
+	// 窗口失焦（window blur）：有气泡显示或排期时才探测，从前台变成不在前台的那一刻收起。
+	// 只在「变化」时收起：窗口不在前台时指针悬停到别的宿主，渲染层照样出提示（pointerover 不看窗口焦点）。
+	if st.Active != nil && (st.shown || st.host != (tooltipHost{}) || st.waitActive) {
+		active := st.Active()
+		pending := st.shown || st.host != (tooltipHost{})
+		switch {
+		case st.waitActive && active:
+			st.waitActive, st.hushFocus = false, gfx.ID{} // 回到前台：键盘焦点的控件重新排期（focusin）
+		case st.wasActive && !active && pending:
+			st.hide(canvas)
+			st.hushHover, st.hushFocus, st.waitActive = hovered, focused, true
+			st.wasActive = false
+			return
+		}
+		st.wasActive = active
+	}
+
+	// 按键（keydown，捕获阶段，任何键都算）：收起；指针没动、键盘焦点没换之前不再提示。
+	// Tab 把焦点移走时，新焦点与 hushFocus（按键之前的焦点）不同，照常排期。
+	if st.keyed {
+		st.keyed = false
+		st.hide(canvas)
+		st.hushHover, st.hushFocus = hovered, before
+		return
+	}
+
+	// 滚动（scroll，捕获阶段，任何滚动区都算）：收起。滚动期间内容在指针下面换来换去，不解除、也不重新记录——
+	// 渲染层要等滚动停下、指针底下的元素确实换了（pointerover）才再排期。
+	if scrolled {
+		st.hide(canvas)
+		if st.hushHover.IsZero() {
+			st.hushHover = hovered
+		}
+		if st.hushFocus.IsZero() {
+			st.hushFocus = focused
+		}
+		return
+	}
+
+	// 新事件：指针进入了别的命中区（pointerover）、键盘焦点换了（focusin），解除对应来源的「不再提示」。
+	if hovered != st.hushHover {
+		st.hushHover = gfx.ID{}
+	}
+	if focused != st.hushFocus {
+		st.hushFocus = gfx.ID{}
+	}
 
 	// 按下：宿主在指针离开之前不再提示（pointerdown → pressedRef），并立即收起。
 	if pressed := canvas.Pressed(); !pressed.IsZero() {
@@ -112,7 +199,6 @@ func (st *TooltipState) update(canvas *gfx.Canvas) {
 		st.hide(canvas)
 		return
 	}
-	hovered := canvas.Hovered()
 	if !st.suppressed.IsZero() {
 		if hovered == st.suppressed {
 			st.hide(canvas)
@@ -122,9 +208,16 @@ func (st *TooltipState) update(canvas *gfx.Canvas) {
 	}
 
 	// 宿主：指针所在的带提示的命中区（或包着它的带提示的容器）；没有就看键盘聚焦的那个（focusin 同样排期）。
+	// 收起之后还没有新事件的那一路（hushHover / hushFocus）不当宿主。
+	if hovered == st.hushHover {
+		hovered = gfx.ID{}
+	}
+	if focused == st.hushFocus {
+		focused = gfx.ID{}
+	}
 	host, ok := hintedHit(canvas, hovered)
 	if !ok {
-		host, ok = hintedHit(canvas, canvas.FocusVisible())
+		host, ok = hintedHit(canvas, focused)
 	}
 	if !ok {
 		st.hide(canvas)
@@ -136,6 +229,9 @@ func (st *TooltipState) update(canvas *gfx.Canvas) {
 		// 宿主一换，描述也跟着变（HintDescription）：无论气泡显没显示，都要有一帧把新的描述声明出去。
 		canvas.RequestFrame()
 		st.host, st.since, st.shown = host, now, false
+		if st.Active != nil {
+			st.wasActive = st.Active() // 窗口此刻不在前台时，气泡照常出（渲染层不看窗口焦点），之后才有「失焦」可言
+		}
 	}
 	st.anchor, st.text = host.bounds, host.text
 
@@ -212,7 +308,7 @@ func (l *Look) Tooltips(c ui.C, st *TooltipState) {
 	l.tips = st
 	bounds := c.Bounds()
 	ui.Overlay(c.Key("tooltip-sensor"), ui.OverlaySpec{Band: bandTooltip, Bounds: bounds}).
-		Draw(func(d *ui.DrawContext) { st.update(d.Canvas) })
+		Draw(func(d *ui.DrawContext) { st.update(d.Canvas, l.takeScrolled()) })
 	if st.shown {
 		l.tooltipBubble(c.Key("tooltip-bubble"), st, bounds)
 	}

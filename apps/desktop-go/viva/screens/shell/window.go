@@ -49,6 +49,10 @@ type Window struct {
 	// Notifier 是窗口的提示通道（渲染层的 Toast）；nil 时不画提示。提示宿主是覆盖层，在整个页面声明完之后才声明。
 	Notifier *kit.Notifier
 
+	// WindowActive 报告窗口是否在前台（渲染层 window blur 的对应物，悬停提示据此在失焦时收起）；nil 不探测。
+	// 只在有气泡显示或排期时调用，见 kit.TooltipState.Active。
+	WindowActive func() bool
+
 	// tips 是悬停提示层（渲染层的 TooltipLayer）：声明了 Hint 的命中区悬停或聚焦 320 ms 后出气泡，在最上层。
 	tips kit.TooltipState
 
@@ -167,6 +171,7 @@ func (w *Window) View(c ui.C) {
 	w.newMenu(c)
 	w.closeDialogView(c)
 	l.Toasts(c, w.Notifier)
+	w.tips.Active = w.WindowActive
 	l.Tooltips(c, &w.tips)
 }
 

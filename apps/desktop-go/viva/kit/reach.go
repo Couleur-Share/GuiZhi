@@ -43,6 +43,10 @@ type reachSet struct {
 	areas  map[*ui.ScrollState]*reachArea // 以滚动状态指针为键；没被最近两次绘制声明的在 BeginPaint 里清掉
 	stack  []*reachArea                   // 声明期间的嵌套滚动区，栈顶接收停靠点
 	latest *reachArea                     // 最近一次有停靠点持有键盘焦点的区域
+
+	// scrolled 为真表示本次绘制里有滚动区的偏移与上一次绘制不同（滚轮、滑块拖动、程序滚动都算）：
+	// 渲染层的 scroll 捕获监听据此收起悬停提示（台账 B-017）。提示层的传感器在同一次绘制的最后读走它。
+	scrolled bool
 }
 
 // reachArea 是一个滚动区的停靠点登记与上一次绘制的快照。
@@ -62,6 +66,9 @@ type reachArea struct {
 	refocus int        // 焦点已被清掉时：滚动之后、续走 Tab 之前要先把焦点还给的出发点，没有为 -1
 	trapped bool       // 快照时有模态焦点陷阱：停靠点都在陷阱之外，不插手
 
+	last float32 // 上一次绘制时的滚动偏移，与本次比较得出「滚动过」
+	seen bool    // last 是否有效（区域第一次出现时没有「上一次」）
+
 	// windowed 为真表示区里有窗口化的行列（RowWindow）：只声明视窗里的行，停靠点登记不完整，这个区不插手。
 	windowed bool
 }
@@ -70,6 +77,7 @@ type reachArea struct {
 func (l *Look) BeginPaint() {
 	s := &l.reach
 	s.paint++
+	s.scrolled = false
 	for key, a := range s.areas {
 		if a.paint+1 < s.paint {
 			delete(s.areas, key)
@@ -143,6 +151,10 @@ func (a *reachArea) reveal(r gfx.Rect, scale float32) (to float32, moved bool) {
 // settleReach 在滚动区画完（DrawOver）时取快照，并处理两件待办：
 // 上一次按键滚动之后等着聚焦的停靠点（已经在视野里了就请求焦点），以及键盘落在半露停靠点上的跟随滚动。
 func (l *Look) settleReach(d *ui.DrawContext, a *reachArea) {
+	if off := a.state.Offset; a.seen && math.Abs(float64(off-a.last)) > 0.01 {
+		l.reach.scrolled = true
+	}
+	a.seen, a.last = true, a.state.Offset
 	if a.windowed {
 		a.snap, a.focused, a.anchor, a.want, a.refocus = a.snap[:0], -1, -1, -1, -1
 		clear(a.boxes)
@@ -192,6 +204,13 @@ func (l *Look) settleReach(d *ui.DrawContext, a *reachArea) {
 	}
 	clear(a.boxes)
 	a.boxes = a.boxes[:0]
+}
+
+// takeScrolled 读走并清掉「本次绘制里有滚动区滚动过」的标记（提示层的传感器用，见 TooltipState.update）。
+func (l *Look) takeScrolled() bool {
+	s := l.reach.scrolled
+	l.reach.scrolled = false
+	return s
 }
 
 // scalePx 是设备像素与逻辑像素之比，未设置按 1。
