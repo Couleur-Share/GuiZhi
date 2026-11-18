@@ -19,6 +19,10 @@ var (
 	Shadow2XL = []tokens.Shadow{
 		{X: 0, Y: 25, Blur: 50, Spread: -12, Color: black25},
 	}
+	// ShadowSM 是 shadow-sm：选中的页签、分段控件的轻投影。
+	ShadowSM = []tokens.Shadow{
+		{X: 0, Y: 1, Blur: 2, Spread: 0, Color: tokens.RGBA(0, 0, 0, 0.05)},
+	}
 	// ShadowBase 是 Tailwind 的 shadow（无后缀）：悬停时的轻投影。
 	ShadowBase = []tokens.Shadow{
 		{X: 0, Y: 1, Blur: 3, Spread: 0, Color: black10},
