@@ -28,9 +28,15 @@ func openAppearance(t *testing.T, store sscreen.Store) (*rig, *sscreen.Appearanc
 // openAppearanceWith 同上，打开之前让调用方先改一改页面（接日志、选图函数等）。
 func openAppearanceWith(t *testing.T, store sscreen.Store, tweak func(a *sscreen.Appearance)) (*rig, *sscreen.Appearance) {
 	t.Helper()
+	return openAppearanceMotion(t, store, kit.MotionLevelOff, tweak)
+}
+
+// openAppearanceMotion 同上，动效档由调用方指定（测过渡与入场时用标准档，时钟只在 Advance 时前进）。
+func openAppearanceMotion(t *testing.T, store sscreen.Store, level kit.MotionLevel, tweak func(a *sscreen.Appearance)) (*rig, *sscreen.Appearance) {
+	t.Helper()
 	fontOnce.Do(func() { app.SetInterfaceFontFamily("Microsoft YaHei UI") })
 	spec := kit.DefaultSpec()
-	spec.Motion = kit.MotionLevelOff
+	spec.Motion = level
 	look := kit.NewLook(spec)
 	look.Scale = 1
 	look.Viewport = 1280
@@ -41,7 +47,7 @@ func openAppearanceWith(t *testing.T, store sscreen.Store, tweak func(a *sscreen
 	bg := look.Col(look.T.Background)
 	page := ui.NewPage(ui.PageConfig{
 		View: func(c ui.C) {
-			c.Canvas().SetReduceMotion(true)
+			c.Canvas().SetReduceMotion(level == kit.MotionLevelOff)
 			a.Page(c)
 		},
 		Theme: &look.Theme, Background: &bg,

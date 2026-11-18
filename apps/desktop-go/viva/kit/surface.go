@@ -101,11 +101,29 @@ func (l *Look) PaintRing(d *ui.DrawContext, width float32, color tokens.Color, r
 // PaintRingBand 在 d.Rect 外画一圈空心环：与 PaintRing 画出的外形相同，但中间是空的。
 // box-shadow 的环只出现在边框盒的外侧，PaintRing 画的是实心圆盘、靠随后画的不透明背景盖住内部；
 // 背景透明或半透明的控件（取色器的触发钮、带透明度的聚焦环）改用这个，环里才不会透出环的颜色。
+//
+// 宽度可以不是整数设备像素（环在过渡中从 0 长到 2px）：Chromium 的 box-shadow 对 spread 做抗锯齿，最外一圈像素只按覆盖率上色。
+// Viva 的 RoundedOutline 遇到小数几何会把整圈取整成偏内一像素、留下缝，所以拆成两圈：整数像素的一圈，
+// 加外面一圈 1 设备像素宽、不透明度乘以小数部分的细环（覆盖率）。
 func (l *Look) PaintRingBand(d *ui.DrawContext, width float32, color tokens.Color, radius float32) {
-	outer := SnapRect(d.Rect, d.Canvas.PixelScale())
-	if outer.Width <= 0 || outer.Height <= 0 || color.A <= 0 {
+	scale := d.Canvas.PixelScale()
+	outer := SnapRect(d.Rect, scale)
+	if outer.Width <= 0 || outer.Height <= 0 || color.A <= 0 || width <= 0 {
 		return
 	}
-	ring := gfx.Rect{X: outer.X - width, Y: outer.Y - width, Width: outer.Width + 2*width, Height: outer.Height + 2*width}
-	d.Canvas.RoundedOutline(ring, radius+width, width, d.Fade(l.Col(color)))
+	px := 1 / scale
+	whole := float32(math.Floor(float64(width/px)+1e-4)) * px
+	frac := (width - whole) / px
+	band := func(w float32, c tokens.Color) {
+		ring := gfx.Rect{X: outer.X - w, Y: outer.Y - w, Width: outer.Width + 2*w, Height: outer.Height + 2*w}
+		d.Canvas.RoundedOutline(ring, radius+w, w, d.Fade(l.Col(c)))
+	}
+	if whole > 0 {
+		band(whole, color)
+	}
+	if frac > 0.01 {
+		// 外圈只有 px 宽：以 whole+px 为外沿、px 为厚度。
+		ring := gfx.Rect{X: outer.X - whole - px, Y: outer.Y - whole - px, Width: outer.Width + 2*(whole+px), Height: outer.Height + 2*(whole+px)}
+		d.Canvas.RoundedOutline(ring, radius+whole+px, px, d.Fade(l.Col(Fade(color, frac))))
+	}
 }

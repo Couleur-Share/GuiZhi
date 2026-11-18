@@ -108,6 +108,11 @@ func (l *Look) floatingPanel(c ui.C, band ui.Band, r gfx.Rect) ui.Box {
 // 退场时按撤掉前最后一帧的快照回放；所以入场播完之后把 Motion 的时长改成最短的 1ns，
 // 撤掉面板时退场立即结束（只多回放一帧，台账 A-008）。
 func enterPresence(canvas *gfx.Canvas, id gfx.ID, slot uint8, motion gfx.Motion, scale float32, pivot gfx.Point) {
+	enterShape(canvas, id, slot, motion, gfx.Presence{Fade: true, Scale: scale}, pivot)
+}
+
+// enterShape 是 enterPresence 的一般形：shape 给出入场的形状（淡入、缩放、滑入），时长与曲线取 motion。
+func enterShape(canvas *gfx.Canvas, id gfx.ID, slot uint8, motion gfx.Motion, shape gfx.Presence, pivot gfx.Point) {
 	if motion.Duration <= 0 {
 		canvas.BeginPresence(id, slot, gfx.Presence{}, pivot)
 		return
@@ -115,7 +120,19 @@ func enterPresence(canvas *gfx.Canvas, id gfx.ID, slot uint8, motion gfx.Motion,
 	if _, playing := canvas.PlayOnce(id, slot, true, motion.Duration); !playing {
 		motion.Duration = time.Nanosecond
 	}
-	canvas.BeginPresence(id, slot, gfx.Presence{Motion: motion, Fade: true, Scale: scale}, pivot)
+	shape.Motion = motion
+	canvas.BeginPresence(id, slot, shape, pivot)
+}
+
+// EnterSlide 给页面里的一块内容加入场过渡：渲染层的 nimate-in fade-in slide-in-from-bottom-N，
+// 即淡入的同时从下方 fromY 处滑回原位（tailwindcss-animate 的 enter 关键帧：版面不动，只是视觉变换，命中区随绘制一起挪）。
+// 内容第一次被绘制时播放；按 box 的 Draw 钩子画 draw，并在 DrawOver 里收尾。没有退场：内容撤掉即消失。
+// id 须唯一且在内容存在期间稳定；motion 通常是 l.Motion(DurationBase, EaseDefault)（animation-timing-function 默认 ease）。
+func (l *Look) EnterSlide(box ui.Box, id gfx.ID, fromY float32, motion gfx.Motion, draw func(d *ui.DrawContext)) ui.Box {
+	return box.Draw(func(d *ui.DrawContext) {
+		enterShape(d.Canvas, id, 0, motion, gfx.Presence{Fade: true, SlideIn: gfx.Point{Y: fromY}}, center(d.Rect))
+		draw(d)
+	}).DrawOver(func(d *ui.DrawContext) { d.Canvas.EndPresence() })
 }
 
 // center 是矩形的中心点。

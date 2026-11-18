@@ -87,7 +87,7 @@ func Run(opts Options) error {
 			Width: opts.Width, Height: opts.Height,
 			MinWidth: opts.MinWidth, MinHeight: opts.MinHeight,
 			// 自绘标题栏：内容铺满整窗，顶栏就是标题栏；窗口按钮由 Viva 画在右上角（台账 A-005）。
-			// TitlebarHeight 只在创建时生效，之后改字号档不会改变按钮条高度（台账 B-010）。
+			// TitlebarHeight 只在创建时生效，之后改字号档不会改变按钮条高度（台账 A-020）。
 			WindowMode:     vapp.WindowCustomTitlebar,
 			TitlebarHeight: look.Rem(3),
 			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },

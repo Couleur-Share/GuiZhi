@@ -93,6 +93,8 @@ func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
 		PadSides(pad[0], pad[1], pad[2], pad[3]).
 		HitWith(ui.ID(c), "", gfx.HitOptions{SkipFocus: true}).
 		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.2)))).
+		// transition-colors：Tailwind 默认时长 150 ms、标准曲线（不随「减弱」档缩放，台账 B-004）。
+		TransitionWith(l.Motion(DurationDefault, EaseStandard)).
 		DrawOver(func(d *ui.DrawContext) {
 			if last {
 				return

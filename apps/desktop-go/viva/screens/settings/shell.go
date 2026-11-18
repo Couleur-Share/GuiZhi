@@ -215,7 +215,7 @@ func (s *Shell) navItem(c ui.C, wide bool, m menuEntry) bool {
 		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: active})
 	hovered := box.State().Hovered
 	color := t.Foreground.WithAlpha(0.8)
-	surface := kit.Surface{Radius: l.Rem(0.5)}
+	surface := kit.Surface{Radius: l.Rem(0.75)} // rounded-lg：本应用的 lg 是 --radius（0.75rem）
 	switch {
 	case active:
 		color = t.PrimaryForeground

@@ -63,10 +63,18 @@ const (
 	// DurationDefault 是 Tailwind 自带的 transition 时长（150 ms）：`transition-colors`、`transition-opacity` 等不带 duration-* 的类用它。
 	// 它不是 --motion-duration-* 变量，所以「减弱」档不缩放它（globals.css 只改变量），只有「关闭」档把它压成 0。
 	DurationDefault
+	// DurationSurface 是 globals.css 里 `.app-settings-card`、`.app-settings-subtle`、`.app-settings-input` 自己写的过渡时长
+	// （`background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease`，写死的毫秒数）。
+	// 与 DurationDefault 一样不是 --motion-duration-* 变量，「减弱」档不缩放它，只有「关闭」档把它压成 0；
+	// 曲线是 CSS 关键字 ease（EaseDefault），不是标准曲线。它会盖掉同一元素上 Tailwind 的 transition-all / duration-*（实测，台账 B-004）。
+	DurationSurface
 )
 
-// tailwindDefaultDuration 是 DurationDefault 的时长。
-const tailwindDefaultDuration = 150 * time.Millisecond
+// tailwindDefaultDuration 是 DurationDefault 的时长；surfaceTransitionDuration 是 DurationSurface 的时长。
+const (
+	tailwindDefaultDuration   = 150 * time.Millisecond
+	surfaceTransitionDuration = 160 * time.Millisecond
+)
 
 // LoadingDelay 是加载指示器延迟登场的时长。本地 SQLite 走一趟通常几十毫秒就回来，
 // 立刻画转圈再抹掉，这一下闪现本身就是闪烁；低于它人眼注意不到等待。
@@ -78,8 +86,11 @@ func (m MotionLevel) Duration(n DurationName) time.Duration {
 	if m == MotionLevelOff || n < 0 {
 		return 0
 	}
-	if n == DurationDefault {
+	switch n {
+	case DurationDefault:
 		return tailwindDefaultDuration
+	case DurationSurface:
+		return surfaceTransitionDuration
 	}
 	if int(n) >= len(tokens.MotionStandardMs) {
 		return 0
