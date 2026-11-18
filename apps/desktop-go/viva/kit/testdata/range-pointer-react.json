@@ -1,0 +1,2326 @@
+{
+  "variant": "light-royal-blue-medium-1280x800",
+  "widths": [
+    400,
+    313,
+    200
+  ],
+  "sliders": [
+    {
+      "min": "0",
+      "max": "100",
+      "step": "1",
+      "id": ":r14:",
+      "runs": [
+        {
+          "width": 400,
+          "boxWidth": 400,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "0"
+            },
+            {
+              "dx": 14,
+              "value": "2"
+            },
+            {
+              "dx": 21,
+              "value": "4"
+            },
+            {
+              "dx": 50,
+              "value": "11"
+            },
+            {
+              "dx": 100,
+              "value": "24"
+            },
+            {
+              "dx": 200,
+              "value": "50"
+            },
+            {
+              "dx": 300,
+              "value": "76"
+            },
+            {
+              "dx": 379,
+              "value": "96"
+            },
+            {
+              "dx": 386,
+              "value": "98"
+            },
+            {
+              "dx": 392,
+              "value": "100"
+            },
+            {
+              "dx": 393,
+              "value": "100"
+            },
+            {
+              "dx": 394,
+              "value": "100"
+            },
+            {
+              "dx": 397,
+              "value": "100"
+            },
+            {
+              "dx": 399,
+              "value": "100"
+            },
+            {
+              "dx": 400,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "6"
+            },
+            {
+              "to": 100,
+              "value": "24"
+            },
+            {
+              "to": 200,
+              "value": "50"
+            },
+            {
+              "to": 370,
+              "value": "94"
+            },
+            {
+              "to": 393,
+              "value": "100"
+            },
+            {
+              "to": 440,
+              "value": "100"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "27"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": {
+            "dxs": [
+              -9,
+              -8,
+              -7.75,
+              -7.5,
+              -7.25,
+              -7,
+              -6.75,
+              -6.5,
+              -6,
+              -5,
+              -3,
+              -2,
+              2,
+              3,
+              5,
+              6,
+              6.5,
+              6.75,
+              7,
+              7.25,
+              7.5,
+              7.75,
+              8,
+              9
+            ],
+            "dys": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ],
+            "mid": "50",
+            "boxX": 366,
+            "boxY": 723.75,
+            "inside": [
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ]
+            ]
+          },
+          "dragHover": {
+            "overThumb": true,
+            "draggedOutside": true,
+            "afterUp": false,
+            "away": false
+          },
+          "keys": [
+            {
+              "key": "ArrowRight",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "ArrowLeft",
+              "from": "49",
+              "start": "50"
+            },
+            {
+              "key": "ArrowUp",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "ArrowDown",
+              "from": "49",
+              "start": "50"
+            },
+            {
+              "key": "PageUp",
+              "from": "60",
+              "start": "50"
+            },
+            {
+              "key": "PageDown",
+              "from": "40",
+              "start": "50"
+            },
+            {
+              "key": "Home",
+              "from": "0",
+              "start": "50"
+            },
+            {
+              "key": "End",
+              "from": "100",
+              "start": "50"
+            },
+            {
+              "key": "Shift+ArrowRight",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "Shift+ArrowLeft",
+              "from": "49",
+              "start": "50"
+            },
+            {
+              "key": "Control+ArrowRight",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "Control+Shift+ArrowRight",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "Shift+Home",
+              "from": "0",
+              "start": "50"
+            },
+            {
+              "key": "Shift+End",
+              "from": "100",
+              "start": "50"
+            },
+            {
+              "key": "Control+PageUp",
+              "from": "60",
+              "start": "50"
+            },
+            {
+              "key": "Shift+PageDown",
+              "from": "40",
+              "start": "50"
+            },
+            {
+              "key": "Alt+ArrowRight",
+              "from": "51",
+              "start": "50"
+            },
+            {
+              "key": "ArrowLeft",
+              "from": "0",
+              "start": "0"
+            },
+            {
+              "key": "ArrowRight",
+              "from": "100",
+              "start": "100"
+            },
+            {
+              "key": "PageUp",
+              "from": "100",
+              "start": "99"
+            },
+            {
+              "key": "PageDown",
+              "from": "0",
+              "start": "1"
+            }
+          ],
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "2"
+          }
+        },
+        {
+          "width": 313,
+          "boxWidth": 313,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "0"
+            },
+            {
+              "dx": 14,
+              "value": "2"
+            },
+            {
+              "dx": 21,
+              "value": "5"
+            },
+            {
+              "dx": 50,
+              "value": "14"
+            },
+            {
+              "dx": 78.25,
+              "value": "24"
+            },
+            {
+              "dx": 156.5,
+              "value": "50"
+            },
+            {
+              "dx": 234.75,
+              "value": "76"
+            },
+            {
+              "dx": 292,
+              "value": "95"
+            },
+            {
+              "dx": 299,
+              "value": "98"
+            },
+            {
+              "dx": 305,
+              "value": "100"
+            },
+            {
+              "dx": 306,
+              "value": "100"
+            },
+            {
+              "dx": 307,
+              "value": "100"
+            },
+            {
+              "dx": 310,
+              "value": "100"
+            },
+            {
+              "dx": 312,
+              "value": "100"
+            },
+            {
+              "dx": 313,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "8"
+            },
+            {
+              "to": 100,
+              "value": "31"
+            },
+            {
+              "to": 156.5,
+              "value": "50"
+            },
+            {
+              "to": 283,
+              "value": "92"
+            },
+            {
+              "to": 306,
+              "value": "100"
+            },
+            {
+              "to": 353,
+              "value": "100"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "35"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": null,
+          "dragHover": null,
+          "keys": null,
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "2"
+          }
+        },
+        {
+          "width": 200,
+          "boxWidth": 200,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "1"
+            },
+            {
+              "dx": 14,
+              "value": "4"
+            },
+            {
+              "dx": 21,
+              "value": "8"
+            },
+            {
+              "dx": 50,
+              "value": "23"
+            },
+            {
+              "dx": 50,
+              "value": "23"
+            },
+            {
+              "dx": 100,
+              "value": "50"
+            },
+            {
+              "dx": 150,
+              "value": "77"
+            },
+            {
+              "dx": 179,
+              "value": "92"
+            },
+            {
+              "dx": 186,
+              "value": "96"
+            },
+            {
+              "dx": 192,
+              "value": "99"
+            },
+            {
+              "dx": 193,
+              "value": "100"
+            },
+            {
+              "dx": 194,
+              "value": "100"
+            },
+            {
+              "dx": 197,
+              "value": "100"
+            },
+            {
+              "dx": 199,
+              "value": "100"
+            },
+            {
+              "dx": 200,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "12"
+            },
+            {
+              "to": 100,
+              "value": "50"
+            },
+            {
+              "to": 100,
+              "value": "50"
+            },
+            {
+              "to": 170,
+              "value": "88"
+            },
+            {
+              "to": 193,
+              "value": "100"
+            },
+            {
+              "to": 240,
+              "value": "100"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "56"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": null,
+          "dragHover": null,
+          "keys": null,
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "4"
+          }
+        }
+      ]
+    },
+    {
+      "min": "0",
+      "max": "50",
+      "step": "0.5",
+      "id": ":r15:",
+      "runs": [
+        {
+          "width": 400,
+          "boxWidth": 400,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "0"
+            },
+            {
+              "dx": 14,
+              "value": "1"
+            },
+            {
+              "dx": 21,
+              "value": "2"
+            },
+            {
+              "dx": 50,
+              "value": "5.5"
+            },
+            {
+              "dx": 100,
+              "value": "12"
+            },
+            {
+              "dx": 200,
+              "value": "25"
+            },
+            {
+              "dx": 300,
+              "value": "38"
+            },
+            {
+              "dx": 379,
+              "value": "48"
+            },
+            {
+              "dx": 386,
+              "value": "49"
+            },
+            {
+              "dx": 392,
+              "value": "50"
+            },
+            {
+              "dx": 393,
+              "value": "50"
+            },
+            {
+              "dx": 394,
+              "value": "50"
+            },
+            {
+              "dx": 397,
+              "value": "50"
+            },
+            {
+              "dx": 399,
+              "value": "50"
+            },
+            {
+              "dx": 400,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "3"
+            },
+            {
+              "to": 100,
+              "value": "12"
+            },
+            {
+              "to": 200,
+              "value": "25"
+            },
+            {
+              "to": 370,
+              "value": "47"
+            },
+            {
+              "to": 393,
+              "value": "50"
+            },
+            {
+              "to": 440,
+              "value": "50"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "13.5"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": {
+            "dxs": [
+              -9,
+              -8,
+              -7.75,
+              -7.5,
+              -7.25,
+              -7,
+              -6.75,
+              -6.5,
+              -6,
+              -5,
+              -3,
+              -2,
+              2,
+              3,
+              5,
+              6,
+              6.5,
+              6.75,
+              7,
+              7.25,
+              7.5,
+              7.75,
+              8,
+              9
+            ],
+            "dys": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20
+            ],
+            "mid": "25",
+            "boxX": 796,
+            "boxY": 723.75,
+            "inside": [
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+              ],
+              [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ]
+            ]
+          },
+          "dragHover": {
+            "overThumb": true,
+            "draggedOutside": true,
+            "afterUp": false,
+            "away": false
+          },
+          "keys": [
+            {
+              "key": "ArrowRight",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "ArrowLeft",
+              "from": "24.5",
+              "start": "25"
+            },
+            {
+              "key": "ArrowUp",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "ArrowDown",
+              "from": "24.5",
+              "start": "25"
+            },
+            {
+              "key": "PageUp",
+              "from": "30",
+              "start": "25"
+            },
+            {
+              "key": "PageDown",
+              "from": "20",
+              "start": "25"
+            },
+            {
+              "key": "Home",
+              "from": "0",
+              "start": "25"
+            },
+            {
+              "key": "End",
+              "from": "50",
+              "start": "25"
+            },
+            {
+              "key": "Shift+ArrowRight",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "Shift+ArrowLeft",
+              "from": "24.5",
+              "start": "25"
+            },
+            {
+              "key": "Control+ArrowRight",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "Control+Shift+ArrowRight",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "Shift+Home",
+              "from": "0",
+              "start": "25"
+            },
+            {
+              "key": "Shift+End",
+              "from": "50",
+              "start": "25"
+            },
+            {
+              "key": "Control+PageUp",
+              "from": "30",
+              "start": "25"
+            },
+            {
+              "key": "Shift+PageDown",
+              "from": "20",
+              "start": "25"
+            },
+            {
+              "key": "Alt+ArrowRight",
+              "from": "25.5",
+              "start": "25"
+            },
+            {
+              "key": "ArrowLeft",
+              "from": "0",
+              "start": "0"
+            },
+            {
+              "key": "ArrowRight",
+              "from": "50",
+              "start": "50"
+            },
+            {
+              "key": "PageUp",
+              "from": "50",
+              "start": "49"
+            },
+            {
+              "key": "PageDown",
+              "from": "0",
+              "start": "1"
+            }
+          ],
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "1"
+          }
+        },
+        {
+          "width": 313,
+          "boxWidth": 313,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "0"
+            },
+            {
+              "dx": 14,
+              "value": "1"
+            },
+            {
+              "dx": 21,
+              "value": "2.5"
+            },
+            {
+              "dx": 50,
+              "value": "7"
+            },
+            {
+              "dx": 78.25,
+              "value": "12"
+            },
+            {
+              "dx": 156.5,
+              "value": "25"
+            },
+            {
+              "dx": 234.75,
+              "value": "38"
+            },
+            {
+              "dx": 292,
+              "value": "47.5"
+            },
+            {
+              "dx": 299,
+              "value": "49"
+            },
+            {
+              "dx": 305,
+              "value": "50"
+            },
+            {
+              "dx": 306,
+              "value": "50"
+            },
+            {
+              "dx": 307,
+              "value": "50"
+            },
+            {
+              "dx": 310,
+              "value": "50"
+            },
+            {
+              "dx": 312,
+              "value": "50"
+            },
+            {
+              "dx": 313,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "4"
+            },
+            {
+              "to": 100,
+              "value": "15.5"
+            },
+            {
+              "to": 156.5,
+              "value": "25"
+            },
+            {
+              "to": 283,
+              "value": "46"
+            },
+            {
+              "to": 306,
+              "value": "50"
+            },
+            {
+              "to": 353,
+              "value": "50"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "17.5"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": null,
+          "dragHover": null,
+          "keys": null,
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "1"
+          }
+        },
+        {
+          "width": 200,
+          "boxWidth": 200,
+          "clicks": [
+            {
+              "dx": 0,
+              "value": "0"
+            },
+            {
+              "dx": 1,
+              "value": "0"
+            },
+            {
+              "dx": 3,
+              "value": "0"
+            },
+            {
+              "dx": 6,
+              "value": "0"
+            },
+            {
+              "dx": 7,
+              "value": "0"
+            },
+            {
+              "dx": 8,
+              "value": "0.5"
+            },
+            {
+              "dx": 14,
+              "value": "2"
+            },
+            {
+              "dx": 21,
+              "value": "4"
+            },
+            {
+              "dx": 50,
+              "value": "11.5"
+            },
+            {
+              "dx": 50,
+              "value": "11.5"
+            },
+            {
+              "dx": 100,
+              "value": "25"
+            },
+            {
+              "dx": 150,
+              "value": "38.5"
+            },
+            {
+              "dx": 179,
+              "value": "46"
+            },
+            {
+              "dx": 186,
+              "value": "48"
+            },
+            {
+              "dx": 192,
+              "value": "49.5"
+            },
+            {
+              "dx": 193,
+              "value": "50"
+            },
+            {
+              "dx": 194,
+              "value": "50"
+            },
+            {
+              "dx": 197,
+              "value": "50"
+            },
+            {
+              "dx": 199,
+              "value": "50"
+            },
+            {
+              "dx": 200,
+              "value": "0"
+            }
+          ],
+          "drags": [
+            {
+              "to": 30,
+              "value": "6"
+            },
+            {
+              "to": 100,
+              "value": "25"
+            },
+            {
+              "to": 100,
+              "value": "25"
+            },
+            {
+              "to": 170,
+              "value": "44"
+            },
+            {
+              "to": 193,
+              "value": "50"
+            },
+            {
+              "to": 240,
+              "value": "50"
+            },
+            {
+              "to": -40,
+              "value": "0"
+            }
+          ],
+          "grab": {
+            "downAt": 12,
+            "moveTo": 112,
+            "value": "28"
+          },
+          "thumbPress": [
+            {
+              "at": 8,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 10,
+              "afterDown": "0",
+              "afterUp": "0"
+            },
+            {
+              "at": 13,
+              "afterDown": "0",
+              "afterUp": "0"
+            }
+          ],
+          "thumbHit": null,
+          "dragHover": null,
+          "keys": null,
+          "nudge": {
+            "downAt": 13,
+            "moveTo": 14,
+            "value": "2"
+          }
+        }
+      ]
+    }
+  ]
+}

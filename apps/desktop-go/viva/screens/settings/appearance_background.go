@@ -152,7 +152,7 @@ func (a *Appearance) sliderBlock(c ui.C, key string, icon gfx.Icon, label string
 // syncSlider 把设置里的值灌进滑块，只在设置变了（第一帧、别处改了、写入失败后退回）时才灌：
 // 键盘改值发生在两次声明之间，滑块要到下一次声明才报告「变了」，每帧无条件覆盖会在报告之前把这次修改冲掉。
 // seen 是上次灌进去的设置值。
-func syncSlider(state *ui.SliderState, seen *float64, value float64) {
+func syncSlider(state *kit.RangeState, seen *float64, value float64) {
 	if *seen != value {
 		state.Value, *seen = float32(value), value
 	}

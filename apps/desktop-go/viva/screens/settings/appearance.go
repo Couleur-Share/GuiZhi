@@ -32,8 +32,8 @@ type Appearance struct {
 	picking     bool           // 正在选图（渲染层 isPickingBackground）：按钮禁用，防重入
 	pickMu      sync.Mutex     // 保护 pickResult
 	pickResult  *pickOutcome   // 后台选图的结果，由下一帧取走
-	opacity     ui.SliderState // 背景可见度滑块
-	blur        ui.SliderState // 虚化强度滑块
+	opacity     kit.RangeState // 背景可见度滑块
+	blur        kit.RangeState // 虚化强度滑块
 	opacitySeen float64        // 上次灌进可见度滑块的设置值（百分比），见 syncSlider
 	blurSeen    float64        // 上次灌进虚化滑块的设置值
 	hexField    ui.Field
