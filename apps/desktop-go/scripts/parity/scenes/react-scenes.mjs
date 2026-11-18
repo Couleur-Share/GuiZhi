@@ -22,6 +22,10 @@ async function openSettingsSection(win, section) {
   await win.getByTestId("rail-settings").click();
   await win.getByTestId(`settings-nav-${section}`).click();
   await win.getByTestId("settings-content-shell").waitFor({ state: "visible" });
+  // 同一分区再次进入时滚动容器不会重建：上一个场景（滚到底的那些）留下的滚动位置要复位，场景才与顺序无关。
+  await win.locator(SETTINGS_CONTENT_SCROLLER).evaluate((el) => {
+    el.scrollTop = 0;
+  });
 }
 
 /** 把设置内容滚到底（与 Viva 侧的 parity.ScrollDown 对应）。 */
@@ -29,6 +33,18 @@ async function scrollSettingsToEnd(win) {
   await win.locator(SETTINGS_CONTENT_SCROLLER).evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
+}
+
+/**
+ * 把设置内容滚到「locator 的上沿离内容区上沿 offset 像素」（到末端就停）。Viva 侧（scrollToControl）按同样的距离滚，
+ * 两边落在同一个滚动位置：目标不在可见区里时 Viva 看不到它，没法用「滚到底」让目标在所有视口里都看得见（800x600 里它在底部之上很远）。
+ */
+async function scrollSettingsTo(win, locator, offset = 120) {
+  const area = win.locator(SETTINGS_CONTENT_SCROLLER);
+  const [a, b] = await Promise.all([area.boundingBox(), locator.boundingBox()]);
+  await area.evaluate((el, dy) => {
+    el.scrollTop += dy;
+  }, b.y - a.y - offset);
 }
 
 /** 打开「显示设置」并点色带里的「自定义」：面板展开后把指针挪到左上角。主题色按自定义的十六进制重新取色。 */
@@ -112,6 +128,26 @@ async function openCloseDialog(win) {
   await win.getByRole("alertdialog").waitFor({ state: "visible" });
 }
 
+/** 「有新版本」场景里推送的版本号（Viva 场景用同一个值）。 */
+export const UPDATE_VERSION = "1.2.3";
+
+/**
+ * 顶栏出现「有新版本」按钮（B-006）：主进程推 updater:status = available 时，App 把状态存下来，
+ * 顶栏在新建按钮之前多出虚线边框的更新按钮与一条竖分隔线。
+ * 走与 openCloseDialog 同一条路径（Go 推给页面的 ipc 事件），驱动渲染层自己的 App 状态，不改渲染层一行代码。
+ */
+async function showUpdateButton(win) {
+  await openSettingsSection(win, "general");
+  await win.evaluate((version) => {
+    window.__mygo.receive({ t: "event", n: "ipc", p: { channel: "updater:status", args: [{ status: "available", info: { version } }] } });
+  }, UPDATE_VERSION);
+  const button = win.getByRole("button", { name: "发现新版本", exact: true });
+  await button.waitFor({ state: "visible" });
+  // 自动检查更新的回包（not-available）会把状态清掉：等一小会儿再确认按钮还在，免得采到一半消失。
+  await win.waitForTimeout(400);
+  await button.waitFor({ state: "visible", timeout: 1000 });
+}
+
 /** 关闭对话框里点一下「记住我的选择」的文字：label 的 onClick 翻转，不取键盘焦点。 */
 async function openCloseDialogChecked(win) {
   await openCloseDialog(win);
@@ -122,7 +158,7 @@ async function openCloseDialogChecked(win) {
 /**
  * 把指针停在关闭对话框里名为 name 的选项按钮中心（悬停态：场景用 keepPointer 保留）。
  * 采集器的 keepPointer 路径不清焦点，而对话框容器是程序聚焦的（dialog.focus()），Chromium 会给它画默认的 :focus-visible 外框
- * （黑色细线，视觉上是对话框外圈）；其余场景的采集器都会 blur 掉它，所以这里照样 blur：悬停保持，焦点清掉（台账 A-017）。
+ * （黑色细线，视觉上是对话框外圈）；其余场景的采集器都会 blur 掉它，所以这里照样 blur：悬停保持，焦点清掉（台账 G-007）。
  */
 function hoverCloseOption(name) {
   return async (win) => {
@@ -371,6 +407,63 @@ const SETTINGS_CONTENT_SCROLLER = 'div:has(> [data-testid="settings-content-shel
 /** 设置页外壳（侧栏 + 内容）：SettingsPage 的根元素，即内容滚动容器的父元素。 */
 const SETTINGS_SHELL = 'div:has(> div > [data-testid="settings-content-shell"])';
 
+// ---- 控件状态场景（台账 B-004）：悬停、键盘聚焦 ----
+// 采集器默认把指针挪走、把焦点清掉；这些场景带 keepPointer / keepFocus 保留自己要的状态。
+// 过渡在采集时被 SETTLE_CSS 压成瞬时（见 collect-react.mjs），拿到的是终态；过渡本身由 Go 的 L4 测试按渲染层读数核对。
+
+/** 应用设置页：把指针停在「后台任务」那一行的左上内边距处（SettingItem 的 hover:bg-muted/20，不碰行内的任何控件）。 */
+async function hoverBackgroundTasksRow(win) {
+  await openSettingsSection(win, "general");
+  const row = win.getByText("后台任务", { exact: true }).first().locator("xpath=ancestor::div[contains(@class,'justify-between')][1]");
+  const box = await row.boundingBox();
+  await win.mouse.move(box.x + 8, box.y + 6);
+}
+
+/**
+ * 键盘聚焦：先按一次 Tab 让页面进入键盘模态，再程序聚焦 locate(win) 取到的控件（此时 :focus-visible 成立），最后把指针挪走。
+ * scrollTo 为真时聚焦之后再把控件滚到离内容区上沿 120px 处（Viva 侧同样先走 Tab 聚焦、再按位置滚轮：焦点留在原控件上，滚动位置才与这里一致）。
+ */
+function focusByKeyboard(section, locate, { scrollTo = false } = {}) {
+  return async (win) => {
+    await openSettingsSection(win, section);
+    await win.keyboard.press("Tab");
+    await locate(win).focus();
+    if (scrollTo) await scrollSettingsTo(win, locate(win));
+    await win.mouse.move(2, 2);
+  };
+}
+
+/** 把指针停在 locator 的中心（悬停态）。 */
+async function hoverCenter(win, locator) {
+  const box = await locator.boundingBox();
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/** 应用设置页的下拉触发器（可访问名是 aria-label）。 */
+const closeActionSelect = (win) => win.getByRole("button", { name: "关闭窗口行为", exact: true });
+/** 显示设置页背景图片区的主按钮（没有背景图时叫「选择图片」）。 */
+const pickImageButton = (win) => win.getByRole("button", { name: "选择图片", exact: true });
+/** 自定义主题色面板里的取色器触发钮：与色带里的预设同名，是第二个名为「自定义」的按钮。 */
+const pickerTrigger = (win) => win.getByRole("button", { name: "自定义", exact: true }).nth(1);
+
+/** 显示设置页：把指针停在 locate(win) 取到的控件中心（悬停态）。 */
+function hoverInAppearance(locate) {
+  return async (win) => {
+    await openSettingsSection(win, "appearance");
+    const box = await locate(win).boundingBox();
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  };
+}
+
+/** 主题模式分段里没被选中的「跟随系统」（变体的主题模式永远是浅色或深色，它从不选中）；页面里另有一枚同名的动效偏好按钮，取第一枚。 */
+const unselectedSegment = (win) => win.getByRole("button", { name: "跟随系统", exact: true }).first();
+/** 内容区里第一枚被选中的按钮：主题模式分段里选中的那一枚（在色带与字号之上）。限定在内容滚动区里：侧栏的当前分区项同样带 aria-pressed，在 DOM 里还更靠前。 */
+const selectedSegment = (win) => win.locator(SETTINGS_CONTENT_SCROLLER).locator('button[aria-pressed="true"]').first();
+/** 色带里选中的那枚预设色板（40×40 的圆形按钮）。 */
+const selectedSwatch = (win) => win.locator(SETTINGS_CONTENT_SCROLLER).locator('button.rounded-full.h-10.w-10[aria-pressed="true"]').first();
+/** 色带最后的「自定义」入口：没选自定义时它从不选中。 */
+const customSwatch = (win) => win.getByRole("button", { name: "自定义", exact: true }).first();
+
 export const SCENES = {
   "settings.shell": {
     module: "settings",
@@ -447,6 +540,13 @@ export const SCENES = {
     keepFocus: true,
     async enter({ win }) {
       await openNewMenu(win);
+    },
+  },
+  // 整窗 + 顶栏的「有新版本」按钮（虚线边框 border-primary/50、bg-primary/10）与右侧竖分隔线。
+  "app.window.page-settings.update-available": {
+    module: "app",
+    async enter({ win }) {
+      await showUpdateButton(win);
     },
   },
   // 同上，再按一次 ↓：第二项带键盘聚焦环。
@@ -553,6 +653,161 @@ export const SCENES = {
     async enter({ win }) {
       await openCustomColor(win);
       await scrollSettingsToEnd(win);
+    },
+  },
+  // 控件状态（B-004）：行悬停、开关键盘聚焦、分段按钮（未选中 / 选中）悬停与键盘聚焦、色板（未选中 / 选中）悬停与键盘聚焦。
+  "settings.general.row-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverBackgroundTasksRow(win);
+    },
+  },
+  "settings.general.switch-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("general", (w) => w.getByRole("switch", { name: "自动保存", exact: true }))(win);
+    },
+  },
+  "settings.appearance.segment-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverInAppearance(unselectedSegment)(win);
+    },
+  },
+  "settings.appearance.segment-hover-selected": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverInAppearance(selectedSegment)(win);
+    },
+  },
+  "settings.appearance.segment-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("appearance", unselectedSegment)(win);
+    },
+  },
+  "settings.appearance.segment-focus-selected": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("appearance", selectedSegment)(win);
+    },
+  },
+  "settings.appearance.swatch-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await hoverInAppearance(customSwatch)(win);
+    },
+  },
+  "settings.appearance.swatch-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("appearance", customSwatch)(win);
+    },
+  },
+  "settings.appearance.swatch-focus-selected": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("appearance", selectedSwatch)(win);
+    },
+  },
+  // 控件状态（B-004，续）：下拉触发器、背景图主按钮、取色器触发钮的悬停与键盘聚焦，分段按钮的按下。
+  "settings.general.select-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await openSettingsSection(win, "general");
+      await hoverCenter(win, closeActionSelect(win));
+    },
+  },
+  "settings.general.select-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("general", closeActionSelect)(win);
+    },
+  },
+  "settings.appearance.pick-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await openSettingsSection(win, "appearance");
+      await scrollSettingsTo(win, pickImageButton(win));
+      await hoverCenter(win, pickImageButton(win));
+    },
+  },
+  "settings.appearance.pick-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await focusByKeyboard("appearance", pickImageButton, { scrollTo: true })(win);
+    },
+  },
+  "settings.appearance.segment-pressed": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await openSettingsSection(win, "appearance");
+      await hoverCenter(win, unselectedSegment(win));
+      await win.mouse.down();
+    },
+    // 按着的鼠标移出按钮再松开：不触发点击，页面状态不变。
+    async leave({ win }) {
+      await win.mouse.move(2, 2);
+      await win.mouse.up();
+    },
+  },
+  "settings.appearance.custom-trigger-hover": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepPointer: true,
+    async enter({ win }) {
+      await openCustomColor(win);
+      await hoverCenter(win, pickerTrigger(win));
+    },
+  },
+  "settings.appearance.custom-trigger-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await openCustomColor(win);
+      await win.keyboard.press("Tab");
+      await pickerTrigger(win).focus();
+      await win.mouse.move(2, 2);
+    },
+  },
+  // 十六进制色值框聚焦：全局 input:focus-visible 的 ring-2 ring-primary/50（文本框任何方式聚焦都匹配 :focus-visible）。
+  "settings.appearance.hex-focus": {
+    module: "settings",
+    region: SETTINGS_CONTENT_SCROLLER,
+    keepFocus: true,
+    async enter({ win }) {
+      await openCustomColor(win);
+      await win.getByPlaceholder("#3b82f6", { exact: true }).focus();
+      await win.mouse.move(2, 2);
     },
   },
   // 整窗 + 取色器弹层（弹层压在 rail 与页面之上，只能在整窗里对照）；主题按自定义色重新取色。

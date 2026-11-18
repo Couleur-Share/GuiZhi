@@ -122,6 +122,32 @@ func MoveOverRolePrefix(s *headless.Session, role gfx.Role, prefix string) error
 	return fmt.Errorf("找不到可访问名以「%s」开头的 %s", prefix, role)
 }
 
+// MoveOverRoleNth 把指针移到第 n 个（从 0 起，按可访问树的顺序）角色与可访问名都匹配的控件的中心：
+// 对应渲染层采集器里 getByRole(...).nth(n) 取外框后 mouse.move(外框中心)。
+func MoveOverRoleNth(s *headless.Session, role gfx.Role, name string, n int) error {
+	seen := 0
+	for _, node := range s.Access() {
+		if node.Role != role || node.Label != name {
+			continue
+		}
+		if seen == n {
+			return s.Move(node.Bounds.X+node.Bounds.Width/2, node.Bounds.Y+node.Bounds.Height/2)
+		}
+		seen++
+	}
+	return fmt.Errorf("找不到第 %d 个 %s「%s」（只有 %d 个）", n, role, name, seen)
+}
+
+// PressRole 在第一个角色与可访问名都匹配的控件的中心按下鼠标并不松开（按下态）：
+// 对应渲染层采集器里 mouse.move(外框中心) 加 mouse.down()。
+func PressRole(s *headless.Session, role gfx.Role, name string) error {
+	node, ok := s.AccessByRole(role, name)
+	if !ok {
+		return fmt.Errorf("找不到 %s「%s」", role, name)
+	}
+	return s.Press(node.Bounds.X+node.Bounds.Width/2, node.Bounds.Y+node.Bounds.Height/2)
+}
+
 // firstHint 是「提示文字以任一前缀开头」的第一个宿主：最靠上，同一高度取最靠左。
 func firstHint(s *headless.Session, prefixes []string) (gfx.Hit, error) {
 	hits := hintHits(s, prefixes)
