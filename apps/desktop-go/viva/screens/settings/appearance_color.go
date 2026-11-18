@@ -26,8 +26,10 @@ func (a *Appearance) themeColor(c ui.C) {
 					l.Text(c, name, kit.TextXS, kit.WeightNormal, t.MutedForeground)
 				}
 			})
-			// 单行色带：均匀分布，px-2 py-2 给选中环留出安全边距。
-			ui.Row(c).FillWidth().Items(ui.Center).Pad(l.Space(2)).Children(func() {
+			// 单行色带：均匀分布，px-2 py-2 给选中环留出安全边距。格子按 Chromium 的 LayoutUnit 规则分宽并居中（kit.EqualCells，台账 B-025），
+			// 否则恰好落在半个像素上的色板（大字号档的第四枚）会比渲染层差 1 像素。
+			a.swatchRow.Center = true
+			kit.EqualCellsBox(c, &a.swatchRow).Pad(l.Space(2)).Children(func() {
 				for _, p := range tokens.HuePresets {
 					a.swatch(c, p.ID, kit.SwatchSpec{
 						Name: presetName(p.ID), Fill: tokens.HSL(p.Hue, p.Saturation, 55),
@@ -54,13 +56,12 @@ func (a *Appearance) colorName(cur settings.UI) string {
 	return presetName(cur.ThemeColor)
 }
 
-// swatch 是色带里的一格（flex-1 flex justify-center min-w-0）：色板居中。
+// swatch 是色带里的一格（渲染层 flex-1 flex justify-center min-w-0，里面一枚 flex-shrink-0 的色板）：
+// 格子由 swatchRow 这个 EqualCells 版面摆放，所以色板直接作它的孩子，居中由版面做。
 func (a *Appearance) swatch(c ui.C, key string, spec kit.SwatchSpec, onClick func()) {
-	ui.Row(c.Key(key)).Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).Children(func() {
-		if a.Look.Swatch(c, spec).Clicked() {
-			onClick()
-		}
-	})
+	if a.Look.Swatch(c.Key(key), spec).Clicked() {
+		onClick()
+	}
 }
 
 // selectPreset 选一个预设主题色（渲染层 setThemeColor(id)）：色相与饱和度取预设的。

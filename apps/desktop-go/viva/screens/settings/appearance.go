@@ -39,6 +39,7 @@ type Appearance struct {
 	hexField    ui.Field
 	picker      kit.ColorPickerState // 自定义颜色的十六进制文本框
 	sideBySide  bool                 // 两个滑块是否并排（md 断点以上），每帧由背景图分区算出
+	swatchRow   kit.EqualCells       // 主题色带的版面（跨帧保留；Center 在 themeColor 里每帧置位）
 }
 
 // pickOutcome 是后台选图的结果。

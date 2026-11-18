@@ -2,6 +2,7 @@ package settings_test
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"sync"
 	"testing"
@@ -644,5 +645,37 @@ func TestSlidersWriteClampedValuesFromTheKeyboard(t *testing.T) {
 	r.keys("end")
 	if got := store.Values().UI.BackgroundImageBlur; got != 50 {
 		t.Errorf("End 应到 50，得到 %v", got)
+	}
+}
+
+// 主题色带的格子按 Chromium 的 LayoutUnit 规则摆放（kit.EqualCells，台账 B-025）：七枚色板的左缘都落在 1/64 像素的格点上。
+// Viva 之前的做法（每格 Grow 加居中，float32 精确运算）得到的是 802 ÷ 7 = 114.5714… 这样落不到格点上的循环小数，
+// 大字号档第四枚的左缘是精确的 442.5，渲染层是 442.484375，整枚色板差 1 个设备像素。
+func TestSwatchRowSitsOnTheLayoutUnitGrid(t *testing.T) {
+	r, _ := openAppearance(t, sscreen.NewMemStore(nsettings.Default()))
+	names := []string{
+		locales.SettingsColorRoyalBlue(), locales.SettingsColorBlue(), locales.SettingsColorPurple(), locales.SettingsColorGreen(),
+		locales.SettingsColorOrange(), locales.SettingsColorTeal(), locales.SettingsCustomColor(),
+	}
+	var lefts []float32
+	for _, name := range names {
+		nodes := r.named(gfx.RoleButton, name)
+		if len(nodes) != 1 {
+			t.Fatalf("色板「%s」应当恰有 1 个，得到 %d", name, len(nodes))
+		}
+		x := float64(nodes[0].Bounds.X) * 64
+		if math.Abs(x-math.Round(x)) > 1e-3 {
+			t.Errorf("色板「%s」的左缘 %v 不在 1/64 像素的格点上", name, nodes[0].Bounds.X)
+		}
+		lefts = append(lefts, nodes[0].Bounds.X)
+	}
+	// 七格相邻色板的间距只会是两个相邻的单位值（格宽四舍五入的结果），不会更散
+	lo, hi := float32(math.MaxFloat32), float32(0)
+	for i := 1; i < len(lefts); i++ {
+		d := lefts[i] - lefts[i-1]
+		lo, hi = min(lo, d), max(hi, d)
+	}
+	if hi-lo > 2.0/64+1e-6 {
+		t.Errorf("相邻色板的间距在 %v 到 %v 之间，散得超过两个 1/64 单位", lo, hi)
 	}
 }
