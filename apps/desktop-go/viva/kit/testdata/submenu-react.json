@@ -1,0 +1,1709 @@
+{
+ "note": "由 scripts/parity/tools/probe-submenu.mjs 生成：React 参照里侧栏标签行菜单（重命名 / 颜色〔子菜单 10 色〕/ 删除标签）的子菜单事实。",
+ "tag": "Alpha",
+ "cases": [
+  {
+   "id": "mid-small",
+   "font": "small",
+   "anchor": [
+    150,
+    300
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    150,
+    300,
+    160,
+    93
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      151,
+      304.5,
+      158,
+      28
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      151,
+      332.5,
+      158,
+      28
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      151,
+      360.5,
+      158,
+      28
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": false,
+    "wrapper": [
+     305.5,
+     328.5,
+     227,
+     324
+    ],
+    "panel": [
+     312.5,
+     328.5,
+     220,
+     324
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       313.5,
+       333,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       313.5,
+       364.5,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       313.5,
+       396,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       313.5,
+       427.5,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       313.5,
+       459,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       313.5,
+       490.5,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       313.5,
+       522,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       313.5,
+       553.5,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       313.5,
+       585,
+       218,
+       31.5
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       313.5,
+       616.5,
+       218,
+       31.5
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "mid-medium",
+   "font": "medium",
+   "anchor": [
+    150,
+    300
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    150,
+    300,
+    160,
+    106
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      151,
+      305,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      151,
+      337,
+      158,
+      32
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      151,
+      369,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": false,
+    "wrapper": [
+     305,
+     333,
+     228,
+     370
+    ],
+    "panel": [
+     313,
+     333,
+     220,
+     370
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       314,
+       338,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       314,
+       374,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       314,
+       410,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       314,
+       446,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       314,
+       482,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       314,
+       518,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       314,
+       554,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       314,
+       590,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       314,
+       626,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       314,
+       662,
+       218,
+       36
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "mid-large",
+   "font": "large",
+   "anchor": [
+    150,
+    300
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    150,
+    300,
+    160,
+    119
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      151,
+      305.5,
+      158,
+      36
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      151,
+      341.5,
+      158,
+      36
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      151,
+      377.5,
+      158,
+      36
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": false,
+    "wrapper": [
+     304.5,
+     337.5,
+     229,
+     416
+    ],
+    "panel": [
+     313.5,
+     337.5,
+     220,
+     416
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       314.5,
+       343,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       314.5,
+       383.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       314.5,
+       424,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       314.5,
+       464.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       314.5,
+       505,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       314.5,
+       545.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       314.5,
+       586,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       314.5,
+       626.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       314.5,
+       667,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       314.5,
+       707.5,
+       218,
+       40.5
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "right-medium",
+   "font": "medium",
+   "anchor": [
+    1100,
+    300
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    1100,
+    300,
+    160,
+    106
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      1101,
+      305,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      1101,
+      337,
+      158,
+      32
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      1101,
+      369,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": true,
+    "wrapper": [
+     877,
+     333,
+     228,
+     370
+    ],
+    "panel": [
+     877,
+     333,
+     220,
+     370
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       878,
+       338,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       878,
+       374,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       878,
+       410,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       878,
+       446,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       878,
+       482,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       878,
+       518,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       878,
+       554,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       878,
+       590,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       878,
+       626,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       878,
+       662,
+       218,
+       36
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "bottom-medium",
+   "font": "medium",
+   "anchor": [
+    150,
+    700
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    150,
+    686,
+    160,
+    106
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      151,
+      691,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      151,
+      723,
+      158,
+      32
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      151,
+      755,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": false,
+    "wrapper": [
+     305,
+     512,
+     228,
+     370
+    ],
+    "panel": [
+     313,
+     512,
+     220,
+     370
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       314,
+       517,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       314,
+       553,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       314,
+       589,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       314,
+       625,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       314,
+       661,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       314,
+       697,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       314,
+       733,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       314,
+       769,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       314,
+       805,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       314,
+       841,
+       218,
+       36
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "bottom-right-medium",
+   "font": "medium",
+   "anchor": [
+    1100,
+    700
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    1100,
+    686,
+    160,
+    106
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      1101,
+      691,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      1101,
+      723,
+      158,
+      32
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      1101,
+      755,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": true,
+    "wrapper": [
+     877,
+     512,
+     228,
+     370
+    ],
+    "panel": [
+     877,
+     512,
+     220,
+     370
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       878,
+       517,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       878,
+       553,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       878,
+       589,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       878,
+       625,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       878,
+       661,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       878,
+       697,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       878,
+       733,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       878,
+       769,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       878,
+       805,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       878,
+       841,
+       218,
+       36
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "edge-right-medium",
+   "font": "medium",
+   "anchor": [
+    900,
+    300
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    900,
+    300,
+    160,
+    106
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      901,
+      305,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      901,
+      337,
+      158,
+      32
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      901,
+      369,
+      158,
+      32
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": true,
+    "wrapper": [
+     677,
+     333,
+     228,
+     370
+    ],
+    "panel": [
+     677,
+     333,
+     220,
+     370
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       678,
+       338,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       678,
+       374,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       678,
+       410,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       678,
+       446,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       678,
+       482,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       678,
+       518,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       678,
+       554,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       678,
+       590,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       678,
+       626,
+       218,
+       36
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       678,
+       662,
+       218,
+       36
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "bottom-large",
+   "font": "large",
+   "anchor": [
+    150,
+    640
+   ],
+   "viewport": [
+    1280,
+    800
+   ],
+   "root": [
+    150,
+    640,
+    160,
+    119
+   ],
+   "items": [
+    {
+     "label": "重命名",
+     "rect": [
+      151,
+      645.5,
+      158,
+      36
+     ],
+     "haspopup": null,
+     "expanded": null
+    },
+    {
+     "label": "颜色",
+     "rect": [
+      151,
+      681.5,
+      158,
+      36
+     ],
+     "haspopup": "menu",
+     "expanded": "true"
+    },
+    {
+     "label": "删除标签",
+     "rect": [
+      151,
+      717.5,
+      158,
+      36
+     ],
+     "haspopup": null,
+     "expanded": null
+    }
+   ],
+   "sub": {
+    "parent": "颜色",
+    "left": false,
+    "wrapper": [
+     304.5,
+     512,
+     229,
+     416
+    ],
+    "panel": [
+     313.5,
+     512,
+     220,
+     416
+    ],
+    "children": [
+     {
+      "label": "红",
+      "rect": [
+       314.5,
+       517.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "橙",
+      "rect": [
+       314.5,
+       558,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "琥珀",
+      "rect": [
+       314.5,
+       598.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "绿",
+      "rect": [
+       314.5,
+       639,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "青",
+      "rect": [
+       314.5,
+       679.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "蓝",
+      "rect": [
+       314.5,
+       720,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "靛",
+      "rect": [
+       314.5,
+       760.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "紫",
+      "rect": [
+       314.5,
+       801,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "粉",
+      "rect": [
+       314.5,
+       841.5,
+       218,
+       40.5
+      ]
+     },
+     {
+      "label": "灰",
+      "rect": [
+       314.5,
+       882,
+       218,
+       40.5
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "keyboard": {
+  "sequenceA": [
+   {
+    "key": "(打开)",
+    "label": "重命名",
+    "index": 0,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "颜色",
+    "index": 1,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowRight",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "橙",
+    "index": 3,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "琥珀",
+    "index": 4,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "橙",
+    "index": 3,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "End",
+    "label": "删除标签",
+    "index": 12,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "重命名",
+    "index": 0,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "Home",
+    "label": "重命名",
+    "index": 0,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowLeft",
+    "label": "重命名",
+    "index": 0,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "颜色",
+    "index": 1,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "橙",
+    "index": 3,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowRight",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "Home",
+    "label": "重命名",
+    "index": 0,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "删除标签",
+    "index": 12,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   }
+  ],
+  "sequenceB": [
+   {
+    "key": "ArrowDown",
+    "label": "颜色",
+    "index": 1,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "橙",
+    "index": 3,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "颜色",
+    "index": 1,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "重命名",
+    "index": 0,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowUp",
+    "label": "删除标签",
+    "index": 12,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   }
+  ],
+  "sequenceC": [
+   {
+    "key": "ArrowRight",
+    "label": "重命名",
+    "index": 0,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "颜色",
+    "index": 1,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowRight",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "橙",
+    "index": 3,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "琥珀",
+    "index": 4,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowLeft",
+    "label": "颜色",
+    "index": 1,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowRight",
+    "label": "红",
+    "index": 2,
+    "total": 13,
+    "expanded": [
+     null,
+     "true",
+     null
+    ]
+   },
+   {
+    "key": "ArrowLeft",
+    "label": "颜色",
+    "index": 1,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowLeft",
+    "label": "颜色",
+    "index": 1,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   },
+   {
+    "key": "ArrowDown",
+    "label": "删除标签",
+    "index": 2,
+    "total": 3,
+    "expanded": [
+     null,
+     "false",
+     null
+    ]
+   }
+  ],
+  "escInSubmenu": {
+   "menuStillOpen": false
+  }
+ },
+ "hover": {
+  "parentBgInSubmenu": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "expanded": "true"
+  },
+  "childBg": [
+   "rgb(234, 238, 245)",
+   "rgba(0, 0, 0, 0)"
+  ],
+  "bridgeKeepsOpen": {
+   "x": 311,
+   "panelLeft": 313,
+   "wrapperLeft": 305,
+   "open": true
+  },
+  "rootToRoot": {
+   "afterDel30": false,
+   "afterDel280": false,
+   "afterRename30": false,
+   "bridgeOverRow": [
+    306,
+    385
+   ],
+   "bridgeOverRowOpen": true,
+   "afterParentClick": {
+    "menu": true,
+    "open": false
+   }
+  }
+ }
+}
