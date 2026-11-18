@@ -37,12 +37,15 @@ func openPage(t *testing.T, spec Spec, width, height int, view func(l *Look, c u
 	page := ui.NewPage(ui.PageConfig{
 		View: func(c ui.C) {
 			c.Canvas().SetReduceMotion(spec.Motion == MotionLevelOff)
+			look.BeginPaint()
 			view(look, c)
 		},
 		Theme: &look.Theme, Background: &bg,
 	})
 	var canvas gfx.Canvas
-	session, err := headless.Open(page.Config(app.Config{Title: t.Name(), Width: width, Height: height}), &canvas, headless.Options{Scale: 1})
+	// OnKey 与窗口里一样接上 Tab 可达（reach.go）。
+	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height, OnKey: look.TabKey})
+	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)
 	}

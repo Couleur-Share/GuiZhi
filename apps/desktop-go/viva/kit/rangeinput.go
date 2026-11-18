@@ -38,6 +38,7 @@ func (l *Look) RangeInput(c ui.C, state *ui.SliderState, spec RangeSpec) (change
 	anim := ui.ID(c) // 悬停放大的动画键：SliderBase 自己的命中 ID 不对外，另取一个稳定的
 	box := ui.SliderBase(c, state).FillWidth().Height(l.Rem(rangeHeightRem)).
 		Range(spec.Min, spec.Max).Step(spec.Step).Label(spec.Name)
+	l.noteStop(box)
 	hovered := box.State().Hovered || state.Dragging()
 	p := l.hoverTo(c.Canvas(), anim, 0, hovered, DurationQuick)
 	changed = box.Changed()

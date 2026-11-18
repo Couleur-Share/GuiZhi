@@ -51,6 +51,7 @@ func (l *Look) Swatch(c ui.C, spec SwatchSpec) ui.Box {
 	size := l.Rem(2.5)
 	box := ui.Row(c).Width(size).Height(size).Shrink(0).Items(ui.Center).Justify(ui.Center).
 		HitWith(id, spec.Name, gfx.HitOptions{Role: gfx.RoleButton, Selected: spec.On, Hint: spec.Name, Cursor: gfx.PointerCursorHand})
+	l.noteStop(box)
 	state := box.State()
 	canvas := c.Canvas()
 	p := l.hoverTo(canvas, id, 0, state.Hovered, DurationBase)

@@ -134,6 +134,9 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 		opts.Cursor = gfx.PointerCursorHand
 	}
 	box := row.HitWith(id, name, opts)
+	if !spec.Disabled {
+		l.noteStop(box)
+	}
 	hovered := box.State().Hovered && !spec.Disabled
 	// 过渡进度在声明时取一次：文字与图标的颜色要在声明里定下，不能等到绘制。
 	p := l.hoverTo(c.Canvas(), id, 0, hovered, st.Transition)

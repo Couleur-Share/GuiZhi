@@ -1,0 +1,412 @@
+{
+  "variant": "light-royal-blue-medium-800x600",
+  "presses": [
+    {
+      "n": 1,
+      "tag": "button",
+      "name": "数据备份",
+      "top": 180,
+      "bottom": 215.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 2,
+      "tag": "button",
+      "name": "网络设置",
+      "top": 219.5,
+      "bottom": 255,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 3,
+      "tag": "button",
+      "name": "采集与转写",
+      "top": 259,
+      "bottom": 294.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 4,
+      "tag": "button",
+      "name": "模型服务",
+      "top": 298.5,
+      "bottom": 334,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 5,
+      "tag": "button",
+      "name": "MCP 接入",
+      "top": 338,
+      "bottom": 373.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 6,
+      "tag": "button",
+      "name": "快捷按键",
+      "top": 377.5,
+      "bottom": 413,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 7,
+      "tag": "button",
+      "name": "关于应用",
+      "top": 417,
+      "bottom": 452.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 8,
+      "tag": "button",
+      "name": "浅色",
+      "top": 161,
+      "bottom": 202.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 9,
+      "tag": "button",
+      "name": "深色",
+      "top": 161,
+      "bottom": 202.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 10,
+      "tag": "button",
+      "name": "跟随系统",
+      "top": 161,
+      "bottom": 202.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 11,
+      "tag": "button",
+      "name": "宝蓝",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 12,
+      "tag": "button",
+      "name": "雾蓝",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 13,
+      "tag": "button",
+      "name": "烟紫",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 14,
+      "tag": "button",
+      "name": "豆绿",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 15,
+      "tag": "button",
+      "name": "杏橘",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 16,
+      "tag": "button",
+      "name": "青黛",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 17,
+      "tag": "button",
+      "name": "自定义",
+      "top": 328.5,
+      "bottom": 368.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 18,
+      "tag": "button",
+      "name": "小, 14px",
+      "top": 466.5,
+      "bottom": 526.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 19,
+      "tag": "button",
+      "name": "中, 16px",
+      "top": 466.5,
+      "bottom": 526.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 20,
+      "tag": "button",
+      "name": "大, 18px",
+      "top": 466.5,
+      "bottom": 526.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 0
+    },
+    {
+      "n": 21,
+      "tag": "button",
+      "name": "跟随系统",
+      "top": 303.5,
+      "bottom": 345,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 357
+    },
+    {
+      "n": 22,
+      "tag": "button",
+      "name": "关闭",
+      "top": 303.5,
+      "bottom": 345,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 357
+    },
+    {
+      "n": 23,
+      "tag": "button",
+      "name": "减弱",
+      "top": 303.5,
+      "bottom": 345,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 357
+    },
+    {
+      "n": 24,
+      "tag": "button",
+      "name": "标准",
+      "top": 303.5,
+      "bottom": 345,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 357
+    },
+    {
+      "n": 25,
+      "tag": "button",
+      "name": "选择图片",
+      "top": 435,
+      "bottom": 471,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 357
+    },
+    {
+      "n": 26,
+      "tag": "input",
+      "name": "",
+      "top": 523.8,
+      "bottom": 543.8,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 27,
+      "tag": "input",
+      "name": "",
+      "top": 523.8,
+      "bottom": 543.8,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 28,
+      "tag": "button",
+      "name": "知识库",
+      "top": 12,
+      "bottom": 90,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 29,
+      "tag": "button",
+      "name": "处理中心",
+      "top": 98,
+      "bottom": 176,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 30,
+      "tag": "button",
+      "name": "AI 问答",
+      "top": 197,
+      "bottom": 275,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 31,
+      "tag": "button",
+      "name": "Wiki",
+      "top": 283,
+      "bottom": 361,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 32,
+      "tag": "button",
+      "name": "采集",
+      "top": 382,
+      "bottom": 460,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 33,
+      "tag": "button",
+      "name": "设置",
+      "top": 544,
+      "bottom": 588,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 34,
+      "tag": "button",
+      "name": "展开",
+      "top": 7.5,
+      "bottom": 39.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 35,
+      "tag": "input",
+      "name": "",
+      "top": 5.5,
+      "bottom": 41.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 36,
+      "tag": "button",
+      "name": "打开命令面板",
+      "top": 13,
+      "bottom": 34,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 37,
+      "tag": "button",
+      "name": "新建",
+      "top": 7.5,
+      "bottom": 39.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 38,
+      "tag": "button",
+      "name": "创建方式",
+      "top": 7.5,
+      "bottom": 39.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 39,
+      "tag": "button",
+      "name": "最小化",
+      "top": -0.5,
+      "bottom": 47.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    },
+    {
+      "n": 40,
+      "tag": "button",
+      "name": "最大化",
+      "top": -0.5,
+      "bottom": 47.5,
+      "areaTop": 48,
+      "areaBottom": 600,
+      "scrollTop": 667
+    }
+  ],
+  "viewport": {
+    "clientHeight": 552,
+    "scrollHeight": 1219
+  },
+  "distinct": 37,
+  "maxScrollTop": 667,
+  "allVisibleWhenFocused": false
+}

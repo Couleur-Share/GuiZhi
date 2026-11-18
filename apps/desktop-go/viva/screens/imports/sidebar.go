@@ -115,6 +115,7 @@ func (s *Screen) filterRow(c ui.C, row filterRowSpec, count int, active bool) {
 	box := ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(2)).
 		PadSides(l.Space(1.5), l.Space(3), l.Space(1.5), l.Space(3)).
 		HitWith(id, row.label+" "+strconv.Itoa(count), gfx.HitOptions{Role: gfx.RoleButton, Selected: active, Cursor: gfx.PointerCursorHand})
+	l.TabStop(box) // 侧栏滚动区里的 Tab 停靠点：滚出视野时由 kit 滚进来（台账 B-030）
 
 	// 选中与悬停各用一个进度量：悬停中点选时底色从 accent/50 补间到 primary/15，与 CSS 的过渡一致。
 	ph := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationSmooth)

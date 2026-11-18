@@ -38,6 +38,7 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.8)))).
 		Focused(ui.Look{}.Ring(2, ring)).
 		TransitionWith(l.Motion(DurationQuick, EaseStandard))
+	l.noteStop(box)
 	if open {
 		box = box.Ring(2, ring)
 	}

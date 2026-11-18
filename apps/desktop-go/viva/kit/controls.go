@@ -48,6 +48,8 @@ func (l *Look) SwitchWith(c ui.C, on *bool, spec SwitchSpec) ui.Box {
 	track := ui.SwitchBase(c, on, spec.Label).Size(width, height).Shrink(0).HitOutset(0, 0, 0, 0)
 	if spec.Disabled {
 		track = track.Disabled(true)
+	} else {
+		l.noteStop(track)
 	}
 	state := track.State()
 

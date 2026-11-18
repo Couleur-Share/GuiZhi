@@ -31,6 +31,12 @@ type rootFixture struct {
 // openRoot 在 1280×800、缩放 1 的无头会话里打开 Root，默认直接进设置页。
 func openRoot(t *testing.T, mutate func(*Options)) *rootFixture {
 	t.Helper()
+	return openRootSize(t, 1280, 800, mutate)
+}
+
+// openRootSize 同 openRoot，窗口大小由调用方指定。窗口按键钩子与生产一致（Tab 可达，台账 B-030）。
+func openRootSize(t *testing.T, width, height int, mutate func(*Options)) *rootFixture {
+	t.Helper()
 	vapp.SetInterfaceFontFamily(InterfaceFont)
 	f := &rootFixture{fake: &servicestest.Settings{}}
 	opts := Options{
@@ -46,7 +52,7 @@ func openRoot(t *testing.T, mutate func(*Options)) *rootFixture {
 	t.Cleanup(f.root.Close)
 	page := ui.NewPage(ui.PageConfig{View: f.root.View, Theme: f.root.ThemeRef(), Background: f.root.BackgroundRef()})
 	var canvas gfx.Canvas
-	session, err := headless.Open(page.Config(vapp.Config{Title: "test", Width: 1280, Height: 800}), &canvas, headless.Options{Scale: 1})
+	session, err := headless.Open(page.Config(vapp.Config{Title: "test", Width: width, Height: height, OnKey: f.root.OnKey}), &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)
 	}

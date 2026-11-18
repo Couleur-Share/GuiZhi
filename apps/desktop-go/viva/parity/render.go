@@ -92,10 +92,16 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 	} else {
 		view = s.Build(look)
 	}
+	// 与窗口一致：每次绘制开始登记 Tab 停靠点，按键经 TabKey（Tab 可达与聚焦跟随滚动，台账 B-030）。
+	declare := view
+	view = func(c ui.C) {
+		look.BeginPaint()
+		declare(c)
+	}
 	page := ui.NewPage(ui.PageConfig{View: view, Theme: &look.Theme, Background: &background})
 	var canvas gfx.Canvas
 	session, err := headless.Open(
-		page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height}),
+		page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height, OnKey: look.TabKey}),
 		&canvas, headless.Options{Scale: 1})
 	if err != nil {
 		return nil, nil, fmt.Errorf("打开无头会话失败：%w", err)

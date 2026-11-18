@@ -57,6 +57,7 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 			side, markSide, radius := l.Rem(1), l.Rem(0.75), l.Rem(0.25)
 			box = ui.CheckboxBase(c.Key("box"), checked, spec.Label).Size(side, side).Shrink(0).HitOutset(0, 0, 0, 0).
 				Items(ui.Center).Justify(ui.Center)
+			l.noteStop(box)
 			canvas := c.Canvas()
 			hover := l.hoverTo(canvas, anim, 0, box.State().Hovered, DurationBase)
 			active := l.hoverTo(canvas, anim, 1, *checked, DurationBase)

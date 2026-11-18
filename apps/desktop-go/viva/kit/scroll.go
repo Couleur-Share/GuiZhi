@@ -32,6 +32,16 @@ type ScrollView struct {
 	// State 是滚动区的状态：窗口化的行列在估计的内容高度收敛时用它让「停在末端」的视口继续停在末端（ScrollToEnd）。
 	// 只在本帧声明期间有效，不要留着。
 	State *ui.ScrollState
+
+	reach *reachArea // 区里的 Tab 停靠点登记（reach.go）；窗口化的行列据此声明自己不登记
+}
+
+// markWindowed 告诉滚动区：区里的行是窗口化声明的（RowWindow），停靠点只登记了视窗里的行，
+// Tab 可达的补充在这个区里不插手（行为同补充之前，台账 B-029 单独评估）。
+func (v ScrollView) markWindowed() {
+	if v.reach != nil {
+		v.reach.windowed = true
+	}
 }
 
 // AtEnd 报告上一帧布局之后视口是否停在内容末端（内容不超出视口时也成立）。
@@ -47,14 +57,21 @@ func (v ScrollView) Span() (lo, hi float32) {
 func (l *Look) ScrollAreaView(c ui.C, pad [4]float32, body func(ScrollView)) ui.Box {
 	box := ui.Scroll(c)
 	state := box.ScrollState()
-	view := ScrollView{Offset: state.Offset, Viewport: state.Viewport, Content: state.Content, Pad: pad, State: state}
+	// 区里声明的可聚焦控件登记到这个区域名下（Tab 可达与聚焦跟随滚动，见 reach.go）；快照在画完时取。
+	area := l.reach.enter(state)
+	view := ScrollView{Offset: state.Offset, Viewport: state.Viewport, Content: state.Content, Pad: pad, State: state, reach: area}
 	right := pad[1]
 	if state.Content > state.Viewport+0.5 {
 		right += scrollbarPx
 	}
-	return box.PadSides(pad[0], right, pad[2], pad[3]).
-		DrawOver(func(d *ui.DrawContext) { l.paintScrollThumb(d, box.ScrollState()) }).
+	out := box.PadSides(pad[0], right, pad[2], pad[3]).
+		DrawOver(func(d *ui.DrawContext) {
+			l.paintScrollThumb(d, box.ScrollState())
+			l.settleReach(d, area)
+		}).
 		Children(func() { body(view) })
+	l.reach.leave()
+	return out
 }
 
 // paintScrollThumb 在滚动区右缘画拇指。state.Content 是内容总高（含内边距），Viewport 是视口高（不含内边距）。

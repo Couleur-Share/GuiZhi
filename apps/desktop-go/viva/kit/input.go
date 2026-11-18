@@ -67,6 +67,7 @@ func (l *Look) Input(c ui.C, f *ui.Field, label, placeholder string, spec InputS
 		FontSize(spec.Size).
 		Weight(spec.Weight).
 		Color(l.Col(ink))
+	l.noteStop(box)
 	if spec.Mono {
 		box = box.Mono()
 	}

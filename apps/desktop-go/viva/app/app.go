@@ -92,6 +92,7 @@ func Run(opts Options) error {
 			TitlebarHeight: look.Rem(3),
 			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },
 			ClearColor:     clearColor(look.Col(look.T.Background)),
+			OnKey:          root.OnKey, // Tab 可达：下一个停靠点在滚动区视野之外时先滚进视野（台账 B-030，kit/reach.go）
 		})
 		// 外壳任务在 OnWake 里排空：窗口隐藏（收在托盘）时 Viva 仍会在重绘之前调用它，托盘的创建与销毁不会卡在隐藏的窗口里。
 		prevWake := config.OnWake

@@ -118,6 +118,7 @@ func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
 	// 「停在末端」要求内容真的超出视口：内容不超出时 AtEnd 恒成立（没有可滚的范围），
 	// 那只是列表还短（读取中、刚从空状态进来），不是用户滚到了底；把它当成末端会让第一次量到行就把列表拽到底部。
 	atEnd := spec.View.State != nil && spec.View.Content > spec.View.Viewport+0.5 && spec.View.AtEnd()
+	spec.View.markWindowed()
 	if w.converging && (atEnd || w.wasAtEnd) {
 		spec.View.State.ScrollToEnd()
 	}

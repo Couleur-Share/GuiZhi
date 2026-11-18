@@ -351,14 +351,19 @@ var registry = map[string]parity.Scene{
 			}
 			return parity.MoveOverRolePrefix(s, gfx.RoleButton, "选择图片")
 		}, scrolledBottomWaivers...),
-	// 先滚再 Tab：Viva 的命中区按裁剪区收窄，滚出可视区的控件不在 Tab 环里（台账 B-030），键盘走不到它；
-	// 渲染层是 Tab 到它、浏览器把它滚进视野。两边最终的状态（按钮聚焦、滚动位置）相同，这里比的是这个状态。
+	// 先 Tab 再滚：渲染层的场景脚本是先把控件滚到离内容区上沿 120px，再按一次 Tab 进入键盘模态、程序聚焦（浏览器不会再动滚动位置）；
+	// Viva 没有程序聚焦，只能从头按 Tab 走过去，途中每一次落点都会按浏览器的规则跟随滚动（kit/reach.go，台账 B-030），
+	// 所以走到之后再把控件滚回 120px：比的是「按钮聚焦（键盘环）、滚动位置固定」这个终态。
+	// 逐键对照 React 的 Tab 环在 viva/app/root_tabreach_test.go。
 	"settings.appearance.pick-focus": appearanceScene("settings.appearance.pick-focus", nil,
 		func(s *headless.Session) error {
+			if err := focusByTab(gfx.RoleButton, "选择图片")(s); err != nil {
+				return err
+			}
 			if err := scrollToControl(gfx.RoleButton, "选择图片", 120)(s); err != nil {
 				return err
 			}
-			return focusByTab(gfx.RoleButton, "选择图片")(s)
+			return parity.ParkPointer(s)
 		}, scrolledBottomWaivers...),
 	"settings.appearance.segment-pressed": appearanceScene("settings.appearance.segment-pressed", nil,
 		func(s *headless.Session) error { return parity.PressRole(s, gfx.RoleButton, "跟随系统") }, appearanceInkWaivers...),

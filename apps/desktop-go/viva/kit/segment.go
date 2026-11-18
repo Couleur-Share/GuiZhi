@@ -59,6 +59,7 @@ func (l *Look) Segment(c ui.C, spec SegmentSpec) ui.Box {
 		id := ui.ID(c)
 		row := ui.Row(c).Grow(1).MinWidth(0).Items(ui.Center).Justify(ui.Center).PadSides(padY, padX, padY, padX)
 		box = row.HitWith(id, spec.Name, gfx.HitOptions{Role: gfx.RoleButton, Selected: spec.On, Cursor: gfx.PointerCursorHand})
+		l.noteStop(box)
 		state := box.State()
 
 		// 过渡的时长与曲线由「变化之后的样式」决定（见文件头）。

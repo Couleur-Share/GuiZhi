@@ -162,6 +162,7 @@ func (l *Look) pickerTrigger(c ui.C, idOut *gfx.ID, name string, fill tokens.Col
 	radius := l.Rem(0.75) // rounded-lg
 	box := ui.Column(c).Width(l.Rem(2.5)).Height(l.Rem(2.25)).Shrink(0).Pad(l.Space(1)+1).
 		HitWith(id, name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: open})
+	l.noteStop(box)
 	p := l.hoverTo(c.Canvas(), id, 0, box.State().Hovered, DurationDefault)
 	border := MixToken(t.Border, t.Primary.WithAlpha(0.5), p)
 	return box.Draw(func(d *ui.DrawContext) {
