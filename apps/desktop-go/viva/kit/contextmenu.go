@@ -8,6 +8,7 @@ import (
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/icons"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // 上下文菜单（渲染层 components/ui/ContextMenu.tsx，台账 B-007）
@@ -45,6 +46,9 @@ type MenuItem struct {
 	Description string
 	// Icon 是标签前的图标；ViewBox 为 0 表示没有。
 	Icon gfx.Icon
+	// Dot 非零时，标签前画一枚纯色圆点来代替图标：12px 的圆在 16px 的图标槽里居中（标签颜色菜单里的色板，
+	// 渲染层 <span class="h-3 w-3 rounded-full bg-*">）。颜色是固定的品牌色，不随悬停变化。与 Icon 同时给时画 Icon。
+	Dot tokens.Color
 	// Shortcut 是右侧的快捷键提示，可空。
 	Shortcut string
 	// Destructive 为真时文字与图标一直是危险色（悬停也不变成强调色）。
@@ -252,7 +256,7 @@ func (l *Look) menuItemSize(canvas *gfx.Canvas, it MenuItem, padY float32, popup
 		h += l.Rem(TextXS.Line)
 	}
 	w = 2*padX + text
-	if it.Icon.ViewBox > 0 {
+	if it.Icon.ViewBox > 0 || it.Dot != (tokens.Color{}) {
 		w += l.Rem(1) + gap
 	}
 	if it.Shortcut != "" {
@@ -318,8 +322,11 @@ func (l *Look) menuRow(c ui.C, it MenuItem, rs menuRowSpec) (gfx.ID, bool) {
 		}
 	})
 	row.Children(func() {
-		if it.Icon.ViewBox > 0 {
+		switch {
+		case it.Icon.ViewBox > 0:
 			l.Icon(c, it.Icon, l.Rem(1), fg).Shrink(0)
+		case it.Dot != (tokens.Color{}):
+			l.menuDot(c, it.Dot)
 		}
 		ui.Column(c.Key("text")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
 			l.Text(c, it.Label, TextSM, WeightNormal, fg, Ellipsis())
@@ -335,4 +342,14 @@ func (l *Look) menuRow(c ui.C, it MenuItem, rs menuRowSpec) (gfx.ID, bool) {
 		}
 	})
 	return id, row.Clicked()
+}
+
+// menuDot 是菜单项前的色点：16px 的图标槽，里面居中一枚 12px 的圆（渲染层 w-4 h-4 的包裹里放 h-3 w-3 rounded-full）。
+func (l *Look) menuDot(c ui.C, color tokens.Color) {
+	slot, dot := l.Rem(1), l.Rem(0.75)
+	ui.Row(c.Key("dot")).Size(slot, slot).Shrink(0).Items(ui.Center).Justify(ui.Center).Children(func() {
+		ui.Row(c.Key("dot-fill")).Size(dot, dot).Shrink(0).Draw(func(d *ui.DrawContext) {
+			l.PaintSurface(d, Surface{Bg: color, Radius: dot / 2})
+		})
+	})
 }

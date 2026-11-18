@@ -44,6 +44,13 @@ var tailwindPalette = map[string]string{
 	"amber-600":   "#d97706",
 	"amber-900":   "#78350f",
 	"emerald-500": "#10b981",
+	// 标签色点（type-meta.tsx 的 TAG_DOT_CLASSES）：十个颜色里除上面已有的 red / amber / green / blue 的 500 档之外的六个。
+	"orange-500": "#f97316",
+	"teal-500":   "#14b8a6",
+	"indigo-500": "#6366f1",
+	"purple-500": "#a855f7",
+	"pink-500":   "#ec4899",
+	"gray-400":   "#9ca3af",
 }
 
 // White 是 Tailwind 的 text-white / bg-white。
