@@ -50,7 +50,8 @@ func (w *Window) sidebarToggle(c ui.C) {
 	}
 	c = c.Key("toggle")
 	ui.Row(c).Width(l.Rem(2)).Shrink(0).Children(func() {
-		w.iconButton(c, icons.PanelLeft, l.Rem(1), label, l.Rem(0.5), func() { w.toggleSidebar(c) })
+		// rounded-lg：本应用的 Tailwind 把 lg 映射到 --radius（0.75rem），不是默认的 0.5rem（台账 B-006 复核时用圆角审计发现）。
+		w.iconButton(c, icons.PanelLeft, l.Rem(1), label, l.Rem(0.75), func() { w.toggleSidebar(c) })
 	})
 }
 
@@ -91,7 +92,7 @@ func (w *Window) searchBox(c ui.C, wide bool) {
 			// 底层的面板：pointer-events-none absolute inset-0 rounded-lg border，取搜索栏的语义令牌。
 			ui.Row(c).Absolute().Inset(0).Draw(func(d *ui.DrawContext) {
 				l.PaintSurface(d, kit.Surface{
-					Bg: t.UiSearchBg, Border: t.UiSearchBorder, BorderW: 1, Radius: l.Rem(0.5), Shadow: t.UiSearchShadow,
+					Bg: t.UiSearchBg, Border: t.UiSearchBorder, BorderW: 1, Radius: l.Rem(0.75), Shadow: t.UiSearchShadow,
 				})
 			})
 			// 输入区：h-9 w-full border border-transparent pl-9（边框 1px 透明，所以文字从 37px 起）text-sm，pr-32（知识库）/ pr-28。
@@ -145,7 +146,8 @@ func (w *Window) shortcutChip(c ui.C, height float32) {
 			bg = t.Accent.WithAlpha(0.6)
 		}
 		box.Draw(func(d *ui.DrawContext) {
-			l.PaintSurface(d, kit.Surface{Bg: bg, Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.375)})
+			// rounded-md = calc(var(--radius) - 2px)，即 10px（根字号 16px）。
+			l.PaintSurface(d, kit.Surface{Bg: bg, Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.75) - 2})
 		}).Children(func() {
 			// text-[10px] font-mono：行高继承 1.5 倍（15px）。Viva 的固定间距文字按整数字格排（宽度取整、行高取字格高），
 			// 与 Chromium 按字体真实字距排的结果不同（台账 A-006）：这里把行盒与宽度做成渲染层的值，字形仍按 Viva 的字格画。
@@ -185,15 +187,17 @@ func (w *Window) updateButton(c ui.C, wide bool) {
 	}
 	c = c.Key("update")
 	id := ui.ID(c)
-	box := ui.Row(c).Height(l.Rem(2)).Shrink(0).Items(ui.Center).Gap(l.Space(1.5)).PadX(l.Space(3)).
+	// 1px 边框占位：渲染层的 border 在盒内，宽度 = 边框 2px + px-3 24px + 图标 + gap + 文字（高度 h-8 是边框盒的高度）。
+	box := ui.Row(c).Height(l.Rem(2)).Shrink(0).Items(ui.Center).Gap(l.Space(1.5)).PadX(l.Space(3)+1).
 		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton})
 	bg := t.Primary.WithAlpha(0.1)
 	if box.State().Hovered {
 		bg = t.Primary.WithAlpha(0.2)
 	}
 	box.Draw(func(d *ui.DrawContext) {
-		// 渲染层是虚线边框（border-dashed）；Chromium 的虚线节奏还没有对照采集，这里先画实线：台账 B-006。
-		l.PaintSurface(d, kit.Surface{Bg: bg, Border: t.Primary.WithAlpha(0.5), BorderW: 1, Radius: l.Rem(0.5)})
+		// border border-dashed border-primary/50：底色铺满整个边框盒，虚线按 Chromium 的节奏画在边框环里，线段之间透出底色。
+		l.PaintSurface(d, kit.Surface{Bg: bg, Radius: l.Rem(0.75)})
+		l.PaintDashedBorder(d, t.Primary.WithAlpha(0.5), 1, l.Rem(0.75))
 	}).Children(func() {
 		l.Icon(c, icons.Download, l.Rem(1), t.Primary).Shrink(0)
 		if wide {
@@ -216,7 +220,7 @@ func (w *Window) newItemButton(c ui.C, wide bool) {
 	newLabel := locales.HeaderNew()
 	caretLabel := locales.HeaderCreateMenu()
 	var mainHover, caretHover bool
-	radius := l.Rem(0.5)
+	radius := l.Rem(0.75) // rounded-lg（--radius）：主按钮 12px 0 0 12px，箭头按钮 0 12px 12px 0
 	bgFor := func(hover bool) tokens.Color {
 		if hover {
 			return t.Primary.WithAlpha(0.9)
