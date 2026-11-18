@@ -34,8 +34,8 @@ func openableItemID(task services.ImportTask) string {
 //
 // group/row relative rounded-xl border px-3 py-2 transition-colors：选中 border-primary/50 bg-primary/10，
 // 否则 border-border/70 bg-background/50，悬停 bg-accent/30。悬停与「焦点在行内」影响前导槽与浮出的动作条，
-// 整行的命中区只用来感知悬停（不进可访问树）。
-func (s *Screen) taskRow(c ui.C, v View, task services.ImportTask, now int64) {
+// 整行的命中区只用来感知悬停（不进可访问树）。返回行的最外层盒子：窗口化的行列（kit.RowWindow）布局后读它的高度。
+func (s *Screen) taskRow(c ui.C, v View, task services.ImportTask, now int64) ui.Box {
 	l := s.Look
 	t := l.T
 	canvas := c.Canvas()
@@ -56,7 +56,7 @@ func (s *Screen) taskRow(c ui.C, v View, task services.ImportTask, now int64) {
 	border := kit.MixToken(t.Border.WithAlpha(0.7), t.Primary.WithAlpha(0.5), pc)
 
 	pad := func(n float32) float32 { return l.Space(n) + 1 } // 内边距加 1px 边框
-	ui.Column(c).FillWidth().PadSides(pad(2), pad(3), pad(2), pad(3)).
+	return ui.Column(c).FillWidth().PadSides(pad(2), pad(3), pad(2), pad(3)).
 		HitWith(id, "", gfx.HitOptions{SkipFocus: true, SkipTab: true}).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: bg, Border: border, BorderW: 1, Radius: l.Rem(0.75)})

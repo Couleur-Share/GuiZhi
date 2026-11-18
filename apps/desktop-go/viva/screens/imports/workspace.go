@@ -310,7 +310,7 @@ func (s *Screen) listArea(c ui.C, v View, now int64) {
 	if v.HasLoaded {
 		s.loading.Opacity(l, c.Canvas(), false) // 复位：下次再读取时重新计时
 	}
-	l.ScrollArea(c.Key("list"), [4]float32{l.Space(3), l.Space(5), l.Space(3), l.Space(5)}, func() {
+	l.ScrollAreaView(c.Key("list"), [4]float32{l.Space(3), l.Space(5), l.Space(3), l.Space(5)}, func(view kit.ScrollView) {
 		switch {
 		case !v.HasLoaded:
 			s.loadingState(c)
@@ -323,34 +323,41 @@ func (s *Screen) listArea(c ui.C, v View, now int64) {
 		case len(v.Visible) == 0:
 			s.filteredEmpty(c)
 		default:
-			s.taskList(c, v, now)
+			s.taskList(c, v, now, view)
 		}
 	}).FillWidth().Grow(1).MinHeight(0)
 }
 
 // taskList 是任务行与底部的「加载更早的任务」：space-y-1.5。
-func (s *Screen) taskList(c ui.C, v View, now int64) {
+//
+// 渲染层把已加载的任务整表声明；这里只声明视口里的行与上下各几行（kit.RowWindow，台账 B-028）：
+// 窗口外的行用等高的空位顶着，滚动条与内容总高按全部行算，版面与整表声明一致。
+func (s *Screen) taskList(c ui.C, v View, now int64, view kit.ScrollView) {
 	l := s.Look
 	t := l.T
-	ui.Column(c.Key("tasks")).FillWidth().Gap(l.Space(1.5)).Children(func() {
-		for _, task := range v.Visible {
-			s.taskRow(c, v, task, now)
-		}
-		if v.NextCursor == "" {
-			return
-		}
-		// mt-3 被 space-y-1.5 的 margin-top 盖掉（后者选择器的优先级更高），所以它与上一行只隔 gap。
-		// flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm text-muted-foreground
-		// hover:bg-muted/60 disabled:opacity-50，没有 transition。
-		b := l.Button(c.Key("load-more"), kit.ButtonSpec{
-			Label: locales.ImportsLoadMoreHistory(), Full: true, Disabled: v.LoadingMore, Busy: v.LoadingMore, BusySize: l.Rem(0.875),
-		}, kit.ButtonStyle{
-			Height: l.Rem(2.25), Radius: l.Rem(0.75), Gap: l.Space(2), Text: kit.TextSM, Weight: kit.WeightNormal,
-			Fg: t.MutedForeground, Border: t.Border, BorderW: 1, BgHover: t.Muted.WithAlpha(0.6), Transition: kit.DurationNone,
-		})
-		if b.Clicked() {
-			s.Store.Spawn(func() { s.Store.LoadMore(s.Ctx) })
-		}
+	s.window.Seed = l.Rem(5) // 一行任务（含状态与元信息两行）大约五个 rem 高
+	s.window.Rows(c, kit.RowsSpec{
+		Name: "tasks", N: len(v.Visible), Gap: l.Space(1.5), View: view,
+		Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang())},
+		Key:   func(i int) string { return v.Visible[i].ID },
+		Row:   func(i int) ui.Box { return s.taskRow(c, v, v.Visible[i], now) },
+		After: func() {
+			if v.NextCursor == "" {
+				return
+			}
+			// mt-3 被 space-y-1.5 的 margin-top 盖掉（后者选择器的优先级更高），所以它与上一行只隔 gap。
+			// flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border text-sm text-muted-foreground
+			// hover:bg-muted/60 disabled:opacity-50，没有 transition。
+			b := l.Button(c.Key("load-more"), kit.ButtonSpec{
+				Label: locales.ImportsLoadMoreHistory(), Full: true, Disabled: v.LoadingMore, Busy: v.LoadingMore, BusySize: l.Rem(0.875),
+			}, kit.ButtonStyle{
+				Height: l.Rem(2.25), Radius: l.Rem(0.75), Gap: l.Space(2), Text: kit.TextSM, Weight: kit.WeightNormal,
+				Fg: t.MutedForeground, Border: t.Border, BorderW: 1, BgHover: t.Muted.WithAlpha(0.6), Transition: kit.DurationNone,
+			})
+			if b.Clicked() {
+				s.Store.Spawn(func() { s.Store.LoadMore(s.Ctx) })
+			}
+		},
 	})
 }
 

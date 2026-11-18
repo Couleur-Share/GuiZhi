@@ -72,6 +72,7 @@ type Screen struct {
 	confirm      kit.ConfirmState
 	rowHover     kit.HoverGroups
 	loading      kit.Delayed
+	window       kit.RowWindow // 任务行的窗口化声明（台账 B-028）：只声明看得见的行
 
 	mu           sync.Mutex    // 保护 pendingClear 与 detail 里由后台写入的字段：界面线程在帧首取走或读出
 	pendingClear *clearConfirm // 预览完成、等界面线程打开的确认框

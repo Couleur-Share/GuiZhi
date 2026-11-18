@@ -18,15 +18,43 @@ const scrollbarPx float32 = 8
 //
 // pad 是内容四边的内边距（上、右、下、左），它在滚动条槽之内。
 func (l *Look) ScrollArea(c ui.C, pad [4]float32, body func()) ui.Box {
+	return l.ScrollAreaView(c, pad, func(ScrollView) { body() })
+}
+
+// ScrollView 是滚动区在上一帧布局之后的几何：窗口化的行列（RowWindow）据此决定这一帧声明哪些行。
+// 首帧布局之前 Viewport 为 0。
+type ScrollView struct {
+	Offset   float32    // 已经滚过的高度
+	Viewport float32    // 视口高（不含内边距）
+	Content  float32    // 内容总高（不含内边距）
+	Pad      [4]float32 // 内容四边的内边距（上、右、下、左）
+
+	// State 是滚动区的状态：窗口化的行列在估计的内容高度收敛时用它让「停在末端」的视口继续停在末端（ScrollToEnd）。
+	// 只在本帧声明期间有效，不要留着。
+	State *ui.ScrollState
+}
+
+// AtEnd 报告上一帧布局之后视口是否停在内容末端（内容不超出视口时也成立）。
+func (v ScrollView) AtEnd() bool { return v.Offset >= v.Content-v.Viewport-0.5 }
+
+// Span 是视口在「内容区坐标」里的上沿与下沿：内容区的 0 点在上内边距之后，
+// 滚动区里能看见的是内边距在内的整块高度（视口高加上、下内边距）。
+func (v ScrollView) Span() (lo, hi float32) {
+	return v.Offset - v.Pad[0], v.Offset + v.Viewport + v.Pad[2]
+}
+
+// ScrollAreaView 是 ScrollArea，另把滚动区上一帧的几何交给 body。
+func (l *Look) ScrollAreaView(c ui.C, pad [4]float32, body func(ScrollView)) ui.Box {
 	box := ui.Scroll(c)
 	state := box.ScrollState()
+	view := ScrollView{Offset: state.Offset, Viewport: state.Viewport, Content: state.Content, Pad: pad, State: state}
 	right := pad[1]
 	if state.Content > state.Viewport+0.5 {
 		right += scrollbarPx
 	}
 	return box.PadSides(pad[0], right, pad[2], pad[3]).
 		DrawOver(func(d *ui.DrawContext) { l.paintScrollThumb(d, box.ScrollState()) }).
-		Children(body)
+		Children(func() { body(view) })
 }
 
 // paintScrollThumb 在滚动区右缘画拇指。state.Content 是内容总高（含内边距），Viewport 是视口高（不含内边距）。
