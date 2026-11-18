@@ -14,6 +14,9 @@ import "time"
 type Services struct {
 	Imports Imports
 
+	// Library 是知识库侧栏的数据（计数、合集、标签）；nil 时知识库模块按「尚未迁移」处理。
+	Library Library
+
 	// Settings 与 Prefs 是设置与界面偏好；nil 时界面用默认值、改动只在内存里（测试里不关心设置时可以不给）。
 	Settings Settings
 	Prefs    Prefs
