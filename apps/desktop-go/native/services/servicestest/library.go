@@ -60,7 +60,7 @@ func (f *Library) FailOn(method string, err error) {
 	f.failures[method] = err
 }
 
-// HoldCounts 让之后的 Counts 卡住，直到返回的函数被调用。
+// HoldCounts 让下一次 Counts 卡住，直到返回的函数被调用（只卡一次，之后的调用不受影响）。
 func (f *Library) HoldCounts() (release func()) {
 	gate := make(chan struct{})
 	f.mu.Lock()
@@ -110,6 +110,7 @@ func (f *Library) Counts(ctx context.Context, q services.LibraryFacetQuery) (ser
 	f.queries = append(f.queries, q)
 	f.calls = append(f.calls, "Counts")
 	gate, err, counts := f.gate, f.failures["Counts"], f.counts
+	f.gate = nil // 只卡下一次
 	f.mu.Unlock()
 	if gate != nil {
 		select {
