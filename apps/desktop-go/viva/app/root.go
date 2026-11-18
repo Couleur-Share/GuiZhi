@@ -12,6 +12,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	importsscreen "guizhi-mygo-shell/viva/screens/imports"
+	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
@@ -35,6 +36,9 @@ type Root struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	stopImports  func()
+
+	// 知识库模块：目前只有二级侧栏（工作区随 M2-2 迁入）。Services.Library 为空时是 nil，侧栏按「尚未迁移」处理。
+	library *libraryscreen.Screen
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -81,7 +85,9 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	}
 	r.win.Page = opts.Page
 	r.systemDark.Store(opts.SystemDark)
+	r.win.Modules = map[shell.Module]shell.ModuleView{}
 	r.mountImports(invalidate)
+	r.mountLibrary(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -110,8 +116,26 @@ func (r *Root) mountImports(invalidate func()) {
 			},
 		},
 	}
-	r.win.Modules = map[shell.Module]shell.ModuleView{
-		shell.ModuleImports: {Panel: r.imports.Panel, Workspace: r.imports.Workspace},
+	r.win.Modules[shell.ModuleImports] = shell.ModuleView{Panel: r.imports.Panel, Workspace: r.imports.Workspace}
+}
+
+// mountLibrary 装配知识库模块（渲染层 components/library）：Store 持有筛选与计数，Screen 是二级侧栏。
+// 工作区迁入之前，这个模块的右侧仍是「尚未迁移」的占位。
+func (r *Root) mountLibrary(invalidate func()) {
+	svc := r.opts.Services.Library
+	if svc == nil {
+		return
+	}
+	store := libraryscreen.NewStore(svc, r.guard, invalidate)
+	r.library = &libraryscreen.Screen{
+		Store: store, Ctx: r.ctx, Guard: r.guard, Prefs: r.opts.Services.Prefs, Now: r.opts.Services.Now,
+	}
+	view := r.win.Modules[shell.ModuleLibrary]
+	view.Panel = r.library.Panel
+	r.win.Modules[shell.ModuleLibrary] = view
+	if r.importsStore != nil {
+		// 采集任务完成：条目与计数都变了（渲染层 import.store 的 handleChanged）。
+		r.importsStore.OnCompleted = func(task services.ImportTask) { store.OnImportCompleted(r.ctx, task) }
 	}
 }
 
@@ -156,6 +180,9 @@ func (r *Root) syncLook(c ui.C) {
 		if r.imports != nil {
 			r.imports.Look = r.look
 		}
+		if r.library != nil {
+			r.library.Look = r.look
+		}
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -197,6 +224,9 @@ func (r *Root) View(c ui.C) {
 		r.win.ActiveImports = r.importsStore.View().ActiveCount
 	}
 	r.win.View(c)
+	if r.library != nil {
+		r.library.EndFrame()
+	}
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)
 	}
@@ -221,6 +251,9 @@ func (r *Root) Close() {
 	r.closeIslands()
 	if r.importsStore != nil {
 		r.importsStore.FlushRemovals()
+	}
+	if r.library != nil {
+		r.library.Store.FlushRemovals()
 	}
 	if r.stopImports != nil {
 		r.stopImports()

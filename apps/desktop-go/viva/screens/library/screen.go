@@ -1,0 +1,115 @@
+package library
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"sync"
+	"time"
+
+	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/kit"
+)
+
+// Screen 是「知识库」模块的二级侧栏界面（渲染层 components/library/SidebarLibraryPanel）：
+// 范围页签、智能视图、合集、平台、标签与回收站；工作区随后续里程碑迁入。
+//
+// 状态都在 Store 里；Screen 只保存界面自己的东西：行菜单、新建与重命名弹窗、智能视图的列表与弹窗、行悬停的分组登记。
+// 所有方法都在界面线程里调用。
+type Screen struct {
+	Look  *kit.Look
+	Store *Store
+	// Ctx 是后台请求用的上下文（应用生命周期）。
+	Ctx context.Context
+	// Guard 是变更类操作的失败通道（与 Store 里的是同一个）；Guard.Notify 同时是提示条的入口。
+	Guard kit.Guard
+	// Prefs 是智能视图的存储（界面偏好）；nil 时智能视图只留在内存里。
+	Prefs services.Prefs
+
+	// Now 与 NewID 给智能视图的创建用；对照与测试注入固定值。空表示取系统时钟与随机 ID。
+	Now   func() time.Time
+	NewID func() string
+
+	groups     kit.HoverGroups
+	showUnused bool // 标签分区的「显示未使用的标签」开关；刻意不持久化，退出模块即复位（渲染层同）
+	menu       rowMenu
+	edit       editDialog
+	smart      smartViews
+
+	// mounted 与 shown 是渲染层「挂载」的对应：侧栏这一帧没画（切到别的模块、设置页，或侧栏收起）就当作卸载，
+	// 下次再画时重新进入（EndFrame）。
+	mounted, shown bool
+
+	mu       sync.Mutex // 保护下面由后台写入的字段：界面线程在帧首取走
+	finished *editOutcome
+}
+
+// nowTime 是此刻。
+func (s *Screen) nowTime() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
+}
+
+// newID 生成智能视图的 ID：渲染层用 crypto.randomUUID，这里取 16 个随机字节的十六进制。
+func (s *Screen) newID() string {
+	if s.NewID != nil {
+		return s.NewID()
+	}
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return time.Now().Format("20060102150405.000000000")
+	}
+	return hex.EncodeToString(raw[:])
+}
+
+// EndFrame 在每一帧结束时由根调用：这一帧没有画侧栏，就当作卸载，下次再画时重新进入。
+func (s *Screen) EndFrame() {
+	if !s.shown {
+		s.mounted = false
+	}
+	s.shown = false
+}
+
+// Enter 在知识库模块出现时调用（渲染层 LibraryWorkspace 与侧栏挂载）：重新读取智能视图与全部数据，
+// 并把只属于这次挂载的界面状态（未使用标签的开关、菜单、弹窗）复位。
+func (s *Screen) Enter() {
+	s.showUnused = false
+	s.menu = rowMenu{rects: s.menu.rects}
+	s.edit = editDialog{}
+	s.smart.reset(ReadSavedViews(s.Prefs))
+	s.Store.Load(s.Ctx)
+}
+
+// Panel 是二级侧栏里的内容。外层是 flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-3：内容溢出时在这里滚动，
+// 回收站一块 mt-auto 贴在底部（内容不满一屏时）。
+func (s *Screen) Panel(c ui.C) {
+	l := s.Look
+	if !s.mounted {
+		s.mounted = true
+		s.Enter()
+	}
+	s.shown = true
+	s.groups.Begin()
+	s.settleEdit()
+	v := s.Store.View()
+
+	l.ScrollAreaView(c.Key("panel-scroll"), [4]float32{0, l.Space(2), l.Space(3), l.Space(2)}, func(view kit.ScrollView) {
+		ui.Column(c.Key("body")).FillWidth().MinHeight(view.Viewport).Children(func() {
+			s.scopeTabs(c, v)
+			s.smartViewsSection(c, v)
+			s.collectionsSection(c, v)
+			s.platformsSection(c, v)
+			s.tagsSection(c, v)
+			ui.Row(c.Key("spacer")).Grow(1)
+			s.trashSection(c, v)
+		})
+	}).Grow(1).FillWidth().MinHeight(0)
+
+	s.rowMenuView(c, v)
+	s.editDialogView(c, v)
+	s.smartDialogView(c, v)
+}

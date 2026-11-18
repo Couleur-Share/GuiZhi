@@ -39,7 +39,7 @@ type catalogOps struct {
 	label   func() string
 	exists  func(v View, id string) bool
 	remove  func(ctx context.Context, id string) (bool, error)
-	missing string
+	missing func() error // 服务端说目标已不存在时的错误（渲染层是写死的中文 Error，不走 i18n）
 	refetch func(ctx context.Context)
 }
 
@@ -56,7 +56,7 @@ func (s *Store) ops(k catalogKind) catalogOps {
 				return false
 			},
 			remove:  s.svc.DeleteCollection,
-			missing: "合集已不存在，请刷新列表",
+			missing: func() error { return errors.New("合集已不存在，请刷新列表") },
 			refetch: s.FetchCollections,
 		}
 	}
@@ -71,7 +71,7 @@ func (s *Store) ops(k catalogKind) catalogOps {
 			return false
 		},
 		remove:  s.svc.DeleteTag,
-		missing: "标签已不存在，请刷新列表",
+		missing: func() error { return errors.New("标签已不存在，请刷新列表") },
 		refetch: s.FetchTags,
 	}
 }
@@ -248,7 +248,7 @@ func (s *Store) scheduleDelete(ctx context.Context, k catalogKind, id string, de
 				return err
 			}
 			if !removed {
-				return errors.New(op.missing)
+				return op.missing()
 			}
 			return nil
 		})
