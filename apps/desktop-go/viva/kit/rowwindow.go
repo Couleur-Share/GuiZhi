@@ -25,11 +25,19 @@ type RowsSpec struct {
 	Name  string             // 行列容器的键名；空取 "rows"
 	N     int                // 总行数
 	Gap   float32            // 行与行之间的间距
-	Key   func(i int) string // 第 i 行的稳定键（任务 ID 之类）：同一序号换了键，旧的实测高度作废
+	Key   func(i int) string // 第 i 行的稳定键（任务 ID 之类）：同一序号换了键，旧的实测高度作废；定高模式用不到，可为 nil
 	Row   func(i int) ui.Box // 声明第 i 行，返回它的最外层盒子；窗口在绘制时读它布局后的高度
 	View  ScrollView         // 所在滚动区上一帧布局后的几何（ScrollAreaView 给出）
 	Epoch RowEpoch
 	After func() // 声明在最后一行之后、同属这一列的内容（如「加载更早的任务」按钮），与行之间同样隔 Gap
+
+	// Fixed 大于 0 是定高模式：每一行都恰好这么高（不含行距），由 Row 保证（Misfit 能查出不符的行）。
+	// 位置按序号直接算：不估计、不实测、不随宽度作废，声明与布局只跟看得见的行数有关（与总行数无关，
+	// 也不再逐帧遍历全部行的键），所以没有变高模式的两处近似：往上滚进没量过的行时的位移，与滑块拖到中段的换算
+	// （台账 B-029 的 (1) 前半与 (2)）。仍然没有的：列表上方增删行时让可见内容不动的滚动锚定（(1) 后半），
+	// 与焦点在滚出窗口的行上时的保留（(3)）。
+	// 换了行高、或在定高与变高之间切换时，调用方应同时换 Epoch.Variant，让变高模式留着的旧实测作废。
+	Fixed float32
 }
 
 // RowWindow 把一长列高度不一的行窗口化：每帧只声明视口里的行与上下各 Overscan 行，窗口外的行用两块等高的空位顶着，
@@ -40,7 +48,10 @@ type RowsSpec struct {
 // 下一帧起位置按实测算。这与 Viva 自带的 ui.List 同一套办法，区别在于 ui.List 把每行当成可选的列表项
 // （Option 角色、Tab 停靠、方向键选行、点击选中），那会给可访问树与键盘行为添上渲染层没有的东西，所以这里不用它。
 //
-// 已知的局限（台账 B-029）：滚动锚定。Chromium 在视口上方的内容变高或变矮时会调整滚动位置，让看得见的内容不动；
+// 定高模式（RowsSpec.Fixed）：行高在同一视图模式内固定的列表（知识库的卡片列表）不需要估计也不需要实测，位置按序号直接算，
+// 下面的前两处近似（估计高度造成的位移、滑块拖到中段的换算）因此不存在，每帧的开销也与总行数无关；滚动锚定与焦点的局限仍在。
+//
+// 已知的局限（变高模式，台账 B-029）：滚动锚定。Chromium 在视口上方的内容变高或变矮时会调整滚动位置，让看得见的内容不动；
 // 这里没有：往上滚进从没量过的行时，该行的实测高度与估计之差会让可见内容位移一次；列表上方插入新行，可见内容也会随之下移。
 //
 // 零值可用。一个窗口化的列表一个 RowWindow，只能在界面线程使用。
@@ -64,6 +75,15 @@ type RowWindow struct {
 	converging, wasAtEnd bool
 
 	first, last int // 本帧声明的行区间 [first, last)
+
+	// 最近一次 Rows 的参数，Reveal 据此换算第 i 行的位置。
+	n     int
+	gap   float32
+	fixed float32 // 定高模式的行高；0 是变高模式
+
+	// 定高模式下第一条实测高度与 Fixed 不符的行（-1 没有）与它的高度，见 Misfit。
+	misfit  int
+	misfitH float32
 }
 
 // windowRow 是本帧声明的一行：序号与它的盒子（布局之后读高度）。
@@ -112,6 +132,10 @@ func (w *RowWindow) fallback() float32 {
 // 列里依次是：窗口之前所有行的空位（有的话）、窗口里的行、窗口之后所有行的空位（有的话）、After。
 // 列的 Gap 会落在相邻的每两个孩子之间，空位的高度因此各减一个 Gap，整列总高与不窗口化时相同。
 func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
+	w.n, w.gap, w.fixed = spec.N, spec.Gap, spec.Fixed
+	if spec.Fixed > 0 {
+		return w.fixedRows(c, spec)
+	}
 	// 拖滚动条到底、或滚轮一口气滚到底：视口停在「估计的末端」，实际总高要等末尾几行量过才知道。
 	// 估计收敛的这几帧里让视口跟着落到真正的末端，否则会停在离末尾还差几行的地方
 	// （浏览器里的虚拟列表同样有这个现象，这里补上）。
@@ -233,6 +257,96 @@ func (w *RowWindow) measure(d *ui.DrawContext) {
 	}
 	if changed {
 		d.Canvas.RequestFrame()
+	}
+}
+
+// fixedRows 是定高模式的 Rows：第 i 行的上沿恰好是 i × (Fixed + Gap)，窗口与两块空位都由算术直接得出，
+// 与行数无关（1 万行与 50 行一样只声明看得见的几行），也不依赖任何实测。
+func (w *RowWindow) fixedRows(c ui.C, spec RowsSpec) ui.Box {
+	spec.View.markWindowed()
+	w.converging, w.wasAtEnd = false, false // 变高模式留下的标志在定高模式下没有意义
+	first, last := w.fixedSpan(spec)
+	w.first, w.last = first, last
+	name := spec.Name
+	if name == "" {
+		name = "rows"
+	}
+	n, pitch := spec.N, float64(spec.Fixed+spec.Gap)
+	return ui.Column(c.Key(name)).FillWidth().Gap(spec.Gap).Draw(w.checkFixed).Children(func() {
+		w.rows = w.rows[:0]
+		if first > 0 {
+			ui.Slot(c).FillWidth().Shrink(0).Height(float32(float64(first)*pitch) - spec.Gap)
+		}
+		for i := first; i < last; i++ {
+			w.rows = append(w.rows, windowRow{index: i, box: spec.Row(i)})
+		}
+		if last < n {
+			ui.Slot(c).FillWidth().Shrink(0).Height(float32(float64(n-last)*pitch) - spec.Gap)
+		}
+		if spec.After != nil {
+			spec.After()
+		}
+	})
+}
+
+// fixedSpan 是定高模式这一帧要声明的行区间 [first, last)：与视口相交的行，再向两侧各扩 Overscan 行。
+func (w *RowWindow) fixedSpan(spec RowsSpec) (first, last int) {
+	n := spec.N
+	if n == 0 {
+		return 0, 0
+	}
+	lo, hi := spec.View.Span()
+	if spec.View.Viewport <= 0 { // 还没布局过：视口高度未知
+		lo, hi = 0, w.fallback()
+	}
+	pitch := float64(spec.Fixed + spec.Gap)
+	// 第一条下沿在视口上沿之下的行；第一条上沿已在视口下沿之外的行。偏移落在内容之外（列表缩短之后的那一帧）时从末行起。
+	f := min(max(int(math.Floor(float64(lo)/pitch)), 0), n-1)
+	l := int(math.Ceil(float64(hi) / pitch))
+	ov := w.overscan()
+	return max(f-ov, 0), min(max(l, f+1)+ov, n)
+}
+
+// checkFixed 在绘制时核对本帧各行的实测高度是否等于 Fixed：不符是调用方违反了定高的约定（版面会错位），
+// 记下第一条，测试里用 Misfit 断言；运行时不为它多要一帧。
+func (w *RowWindow) checkFixed(*ui.DrawContext) {
+	w.misfit, w.misfitH = -1, 0
+	for _, r := range w.rows {
+		if h := r.box.Rect().Height; h > 0 && math.Abs(float64(h-w.fixed)) > 0.01 {
+			w.misfit, w.misfitH = r.index, h
+			return
+		}
+	}
+}
+
+// Misfit 返回定高模式下最近一次绘制里第一条实测高度与 Fixed 不符的行（序号与实测高度）；没有不符的返回 ok=false。
+func (w *RowWindow) Misfit() (index int, height float32, ok bool) {
+	return w.misfit, w.misfitH, w.fixed > 0 && w.misfit >= 0
+}
+
+// Reveal 把第 i 行滚进视野，就近对齐：已经完全在视野里就不动，在上方靠上沿，在下方靠下沿
+// （键盘选行时浏览器的 scrollIntoView({block: "nearest"})）。view 取本帧声明时滚动区给出的几何。
+// 定高模式下位置是精确的；变高模式按当前估计的位置，行量到之前是近似的。偏移的夹取由布局完成。
+func (w *RowWindow) Reveal(view ScrollView, i int) {
+	if view.State == nil || i < 0 || i >= w.n {
+		return
+	}
+	var top, bottom float32
+	if w.fixed > 0 {
+		top = float32(float64(i) * float64(w.fixed+w.gap))
+		bottom = top + w.fixed
+	} else {
+		if i+1 >= len(w.top) {
+			return
+		}
+		top, bottom = float32(w.top[i]), float32(w.top[i+1])-w.gap
+	}
+	lo, hi := view.Span()
+	switch {
+	case top < lo:
+		view.State.ScrollTo(top + view.Pad[0])
+	case bottom > hi:
+		view.State.ScrollTo(bottom - view.Viewport - view.Pad[2])
 	}
 }
 

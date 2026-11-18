@@ -176,6 +176,7 @@ type windowRig struct {
 	order []int      // 第 i 行显示哪个下标（高度与文字都跟它走）；nil 是原顺序
 	view  ScrollView // 最近一帧声明时滚动区给出的几何
 	flat  float32    // 非零时所有行同高（让估计恰好等于实测，总高可以逐像素对拍）
+	fixed float32    // 非零时用定高模式声明（RowsSpec.Fixed，此时不给 Key）
 }
 
 func (r *windowRig) index(i int) int {
@@ -202,20 +203,32 @@ func (r *windowRig) tail(c ui.C) {
 
 func openWindowed(t *testing.T, n int) *windowRig {
 	t.Helper()
+	return openWindowedWith(t, n, nil)
+}
+
+// openWindowedWith 在第一帧之前让 setup 调整试验台（行高、定高模式）。
+func openWindowedWith(t *testing.T, n int, setup func(*windowRig)) *windowRig {
+	t.Helper()
 	r := &windowRig{w: &RowWindow{Seed: 45}, n: n, pad: testPad}
+	if setup != nil {
+		setup(r)
+	}
 	r.harness = openPage(t, still(), testViewW, testViewH, func(l *Look, c ui.C) {
 		r.calls = 0
 		ui.Column(c.Key("page")).Fill().Children(func() {
 			l.ScrollAreaView(c.Key("list"), r.pad, func(view ScrollView) {
 				r.view = view
-				r.w.Rows(c, RowsSpec{
-					Name: "rows", N: r.n, Gap: testGap, View: view, Epoch: r.epoch,
-					Key: func(i int) string { return testKey(r.index(i)) },
+				spec := RowsSpec{
+					Name: "rows", N: r.n, Gap: testGap, View: view, Epoch: r.epoch, Fixed: r.fixed,
 					Row: func(i int) ui.Box { r.calls++; return r.row(c, i) },
 					After: func() {
 						r.tail(c)
 					},
-				})
+				}
+				if r.fixed == 0 { // 定高模式不需要键
+					spec.Key = func(i int) string { return testKey(r.index(i)) }
+				}
+				r.w.Rows(c, spec)
 			}).FillWidth().Grow(1).MinHeight(0)
 		})
 	})

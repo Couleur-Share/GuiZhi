@@ -260,30 +260,42 @@ func TestTabAcrossAGapLongerThanTheViewport(t *testing.T) {
 func TestWindowedAreaIsLeftToTheRouter(t *testing.T) {
 	// 窗口化的行列只声明视窗里的行，停靠点登记不完整：这样的区不插手，Tab 的行为同补充之前（B-029）。
 	// 20 行、每行一枚 32px 的按钮，视窗 110px 看得见 0..3（3 露出一半）；第 4 行声明了（Overscan）但在视野之外，没有命中区。
-	var win RowWindow
-	h := openPage(t, still(), 200, reachViewH, func(l *Look, c ui.C) {
-		ui.Column(c.Key("page")).Fill().Children(func() {
-			l.ScrollAreaView(c.Key("area"), [4]float32{}, func(view ScrollView) {
-				win.Rows(c, RowsSpec{
-					N: 20, View: view, Key: func(i int) string { return reachName(i) },
-					Row: func(i int) ui.Box { return reachButton(l, c, fmt.Sprintf("w%d", i), reachName(i)) },
+	// 变高与定高两种模式都是窗口化的，各跑一遍。
+	for _, mode := range []struct {
+		name  string
+		fixed float32
+	}{{"变高", 0}, {"定高", 32}} {
+		t.Run(mode.name, func(t *testing.T) {
+			var win RowWindow
+			h := openPage(t, still(), 200, reachViewH, func(l *Look, c ui.C) {
+				ui.Column(c.Key("page")).Fill().Children(func() {
+					l.ScrollAreaView(c.Key("area"), [4]float32{}, func(view ScrollView) {
+						spec := RowsSpec{
+							N: 20, View: view, Fixed: mode.fixed,
+							Row: func(i int) ui.Box { return reachButton(l, c, fmt.Sprintf("w%d", i), reachName(i)) },
+						}
+						if mode.fixed == 0 {
+							spec.Key = func(i int) string { return reachName(i) }
+						}
+						win.Rows(c, spec)
+					}).FillWidth().Grow(1).MinHeight(0)
 				})
-			}).FillWidth().Grow(1).MinHeight(0)
+			})
+			var names []string
+			for range 5 {
+				h.keys("tab")
+				names = append(names, h.focusedName())
+			}
+			want := []string{reachName(0), reachName(1), reachName(2), reachName(3), reachName(0)}
+			for i := range want {
+				if names[i] != want[i] {
+					t.Fatalf("窗口化的区里 Tab 应当只走看得见的行，第五次绕回开头：期望 %v，实际 %v", want, names)
+				}
+			}
+			if n, _ := h.focused(); !sameY(n.Bounds.Y, 0) {
+				t.Errorf("窗口化的区不应当被滚动：按钮 0 离上沿 %.1f", n.Bounds.Y)
+			}
 		})
-	})
-	var names []string
-	for range 5 {
-		h.keys("tab")
-		names = append(names, h.focusedName())
-	}
-	want := []string{reachName(0), reachName(1), reachName(2), reachName(3), reachName(0)}
-	for i := range want {
-		if names[i] != want[i] {
-			t.Fatalf("窗口化的区里 Tab 应当只走看得见的行，第五次绕回开头：期望 %v，实际 %v", want, names)
-		}
-	}
-	if n, _ := h.focused(); !sameY(n.Bounds.Y, 0) {
-		t.Errorf("窗口化的区不应当被滚动：按钮 0 离上沿 %.1f", n.Bounds.Y)
 	}
 }
 
