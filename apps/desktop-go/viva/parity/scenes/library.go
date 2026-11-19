@@ -2,7 +2,9 @@ package scenes
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,13 +22,45 @@ import (
 )
 
 // 知识库侧栏（M2-1）的整窗场景：rail + 顶栏 + 侧栏面板，以及面板上弹出的菜单、对话框与提示。
-// 工作区（M2-2 之前没有）在两侧都是空白：React 采集器把侧栏旁边的内容容器隐去（scripts/parity/lib/react-library.mjs），
-// Viva 这边登记一块空工作区。夹具与 React 采集器共用（viva/parity/testdata/library-fixture.json）。
+// 工作区在这一批场景里两侧都是空白：React 采集器把侧栏旁边的内容容器隐去（scripts/parity/lib/react-library.mjs），
+// Viva 这边登记一块空工作区；列表栏（M2-2）的场景见 library_list.go（list 选项打开）。
+// 夹具与 React 采集器共用（viva/parity/testdata/library-fixture.json）。
 
 // libraryOptions 对应 React 采集器 enterLibrary 的选项。
 type libraryOptions struct {
 	variant    string // data | empty | long | many
 	smartViews string // 夹具里的智能视图集名；空表示没有保存过
+
+	// list 为 true 时工作区放真实的列表栏（M2-2）；右侧详情栏仍是空白（M2-4 才迁入，React 一侧同样隐去）。
+	list bool
+	// fault 是列表读取的故障注入（只在 list 时有意义）。
+	fault listFault
+	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
+	view string
+}
+
+// listFault 是列表读取的故障：与 React 采集器里 config.list.fault 一一对应。
+type listFault string
+
+const (
+	faultNone listFault = ""
+	// faultHold：列表请求永不返回（读取中画面）。
+	faultHold listFault = "hold"
+	// faultFail：列表请求失败（错误态画面）。
+	faultFail listFault = "fail"
+)
+
+// listFailMessage 是故障注入时的失败原因，两侧同文。
+const listFailMessage = "磁盘读取失败：知识库文件暂时无法访问"
+
+// holdRelease 是读取中画面里，卡住的读取被放走（取消上下文）的延时：比一次渲染从收尾到采集完成长得多即可。
+const holdRelease = 20 * time.Second
+
+// libraryEnv 是一次渲染里操作步骤能用到的东西，由 prepare 装配页面时填入；每次渲染各一份（见 libraryEnvScene）。
+type libraryEnv struct {
+	store  *libraryscreen.Store
+	screen *libraryscreen.Screen
+	ctx    context.Context
 }
 
 // parkMode 是场景收尾时对指针与焦点的处理，与 React 采集器一一对应。
@@ -44,9 +78,21 @@ const (
 // libraryStep 是场景的操作步骤；每一步结束时画面都已落定。look 是这次渲染的外观（需要按目标滚动时用，见 libraryReveal）。
 type libraryStep func(s *headless.Session, look *kit.Look) error
 
-// libraryScene 是知识库侧栏整窗的场景。页面与步骤由 Prepare 一起装配：同一个场景值会被并行渲染多次，
-// Store 与偏好必须每次渲染各一份（见 importsScene）。
+// libraryScene 是知识库侧栏整窗的场景（步骤不需要碰 Store）。
 func libraryScene(id string, opt libraryOptions, steps libraryStep, mode parkMode, waivers ...parity.Waiver) parity.Scene {
+	var env libraryEnvStep
+	if steps != nil {
+		env = func(s *headless.Session, look *kit.Look, _ *libraryEnv) error { return steps(s, look) }
+	}
+	return libraryEnvScene(id, opt, env, mode, waivers...)
+}
+
+// libraryEnvStep 是要用到 libraryEnv（直接驱动 Store，例如搜索词防抖到点之后的那次读取）的步骤。
+type libraryEnvStep func(s *headless.Session, look *kit.Look, e *libraryEnv) error
+
+// libraryEnvScene 是知识库整窗的场景。页面与步骤由 Prepare 一起装配：同一个场景值会被并行渲染多次，
+// Store 与偏好必须每次渲染各一份（见 importsScene）。
+func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode parkMode, waivers ...parity.Waiver) parity.Scene {
 	prepare := func(look *kit.Look) (func(c ui.C), func(s *headless.Session) error) {
 		fix, err := parity.LoadLibraryFixture()
 		if err != nil {
@@ -62,23 +108,44 @@ func libraryScene(id string, opt libraryOptions, steps libraryStep, mode parkMod
 			}
 			prefs.Put(settings.PrefSmartViews, string(raw))
 		}
+		if opt.view != "" {
+			prefs.Put(settings.PrefLibraryViewMode, strconv.Quote(opt.view))
+		}
 		notifier := kit.NewNotifier(nil)
 		guard := kit.Guard{Notify: notifier}
 		store := libraryscreen.NewStore(svc, guard, nil)
+		ctx, cancel := context.WithCancel(context.Background())
 		// 对照要确定：不起真实定时器，后台动作同步执行。
 		store.After = func(time.Duration, func()) func() { return func() {} }
 		store.Spawn = func(fn func()) { fn() }
+		if opt.list {
+			svc.SeedEntries(data.Entries)
+			switch opt.fault {
+			case faultFail:
+				svc.FailOn("List", errors.New(listFailMessage))
+			case faultHold:
+				// 请求卡在服务里永不返回：读取要放到后台，否则整个会话被它卡住；场景收尾时取消上下文放它走。
+				svc.HoldList()
+				store.Spawn = func(fn func()) { go fn() }
+			}
+		}
 		next := 0
 		screen := &libraryscreen.Screen{
-			Look: look, Store: store, Ctx: context.Background(), Guard: guard, Prefs: prefs,
-			Now:   func() time.Time { return time.UnixMilli(1_794_790_800_000) },
-			NewID: func() string { next++; return fmt.Sprintf("parity-view-%d", next) },
+			Look: look, Store: store, Ctx: ctx, Guard: guard, Prefs: prefs,
+			Now:    func() time.Time { return time.UnixMilli(fix.Now) },
+			Loc:    time.FixedZone(fix.Timezone, 8*3600),
+			Locale: kit.ParseDateLocale(fix.Locale),
+			NewID:  func() string { next++; return fmt.Sprintf("parity-view-%d", next) },
+		}
+		workspace := blankWorkspace
+		if opt.list {
+			workspace = screen.Workspace
 		}
 		w := &shellscreen.Window{
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleLibrary,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F", Notifier: notifier,
 			Modules: map[shellscreen.Module]shellscreen.ModuleView{
-				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: blankWorkspace},
+				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace},
 			},
 		}
 		view := func(c ui.C) {
@@ -86,12 +153,24 @@ func libraryScene(id string, opt libraryOptions, steps libraryStep, mode parkMod
 			screen.EndFrame()
 		}
 		compact := look.Viewport <= compactMaxWidth
+		env := &libraryEnv{store: store, screen: screen, ctx: ctx}
 		run := func(s *headless.Session) error {
-			if err := openLibraryCompactSidebar(s, compact); err != nil {
-				return err
+			if opt.fault == faultHold {
+				// 卡住的读取要到画面采集完才放走：这里一收尾就取消的话，读取带着「context canceled」回来，
+				// 读取中的画面被错误态顶掉（采集在 run 返回之后）。采集在毫秒内完成，放走的时间留得宽裕。
+				time.AfterFunc(holdRelease, cancel)
+			} else {
+				defer cancel()
+			}
+			// 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，
+			// 需要点侧栏行的场景自己开关（listOpenSidebar、listCloseSidebar；React 一侧同理，见 enterLibrary）。
+			if !opt.list {
+				if err := openLibraryCompactSidebar(s, compact); err != nil {
+					return err
+				}
 			}
 			if steps != nil {
-				if err := steps(s, look); err != nil {
+				if err := steps(s, look, env); err != nil {
 					return err
 				}
 			}
@@ -117,7 +196,7 @@ func libraryScene(id string, opt libraryOptions, steps libraryStep, mode parkMod
 }
 
 // libraryBaseWaivers 是侧栏各场景共有的已登记偏差：分区标题与图标选择器分组标题的字距（A-013）、
-// 平台行「YouTube」的字偶距（A-014）、彩色表情字形的 alpha（A-023）、省略号前的空格（C-006，待裁决）、
+// 平台行「YouTube」的字偶距（A-014）、彩色表情字形的 alpha（A-023）、省略号前的空格（A-025）、
 // 小字标品牌图标的墨迹（A-003）、行尾计数「1」的笔画偏淡（A-016）。
 func libraryBaseWaivers() []parity.Waiver {
 	var out []parity.Waiver
@@ -215,13 +294,13 @@ func wordmarkIconWaivers() []parity.Waiver {
 	return out
 }
 
-// ellipsisSpaceWaivers 登记 C-006（待裁决）：被省略号截断的文字，截断点前若是空格，Chromium 把空格留着（「name …」），
+// ellipsisSpaceWaivers 登记 A-025（由 C-006 经用户 2026-11-19 裁决接受后转入）：被省略号截断的文字，截断点前若是空格，Chromium 把空格留着（「name …」），
 // Viva 的省略号逻辑去掉前缀右侧的空格（「name…」，gfx/wrap.go 的 trimSpaceRight，没有选项），省略号左移一个空格宽
 // （text-sm 的小、中、大字号档 12.25、14、15.75px：空格宽 3.4、3.9、4.4px；对照里再加上省略号字形量法的零点几像素）。
 // 只放过「渲染层的文字以空格加省略号收尾」的文字宽度；其余照常判定。
 var ellipsisSpaceWaivers = []parity.Waiver{{
-	Ledger: "C-006", Layer: parity.LayerL2, Kind: "text-width", Subject: " …」", MinDelta: 3, MaxDelta: 5.6,
-	Note: "省略号前的空格：Chromium 留着，Viva 去掉，省略号左移一个空格宽（待用户裁决：接受或自己做截断）",
+	Ledger: "A-025", Layer: parity.LayerL2, Kind: "text-width", Subject: " …」", MinDelta: 3, MaxDelta: 5.6,
+	Note: "省略号前的空格：Chromium 留着，Viva 去掉，省略号左移一个空格宽（用户 2026-11-19 裁决接受，A-025）",
 }}
 
 // blankWorkspace 是还没做的知识库工作区：一块空白，只占位。

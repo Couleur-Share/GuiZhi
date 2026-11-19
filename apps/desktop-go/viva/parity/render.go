@@ -223,6 +223,7 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		}
 		// 文字被裁剪矩形截掉的右半段不算「呈现出来」：React 一侧同样只记看得见的部分（输入框的内容盒、
 		// 溢出隐藏的祖先），两边都按可见宽度比较；否则一段被裁掉的占位文字会让遮罩与墨迹区域越出输入框。
+		full := painted
 		if t.HasClip {
 			if right := float64(t.ClipOf.X + t.ClipOf.Width); float64(t.Bounds.X)+painted > right {
 				painted = math.Max(right-float64(t.Bounds.X), 0)
@@ -242,7 +243,7 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 			// Snapshot.Texts 是裁剪之前画过的所有文字；滚出滚动容器的文字不在 Labels（真正画出来的）里。
 			// 标成 Hidden：比较时它不算「呈现出来的文字」，但仍可补全一段折行文字的原文（口径见台账 A-010）。
 			// 裁剪线只切到行盒的空白（行距）、没碰到字形所在内容区的文字同样算看不见（台账 G-011）。
-			Hidden: !isDrawn(snap.Labels, t) || contentClippedOut(t, baseline),
+			Hidden: !isDrawn(snap.Labels, t) || contentClippedOut(t, baseline) || clippedOutX(t, full),
 		})
 		f.TextRects = append(f.TextRects, f.Texts[len(f.Texts)-1].Rects...)
 	}
@@ -280,6 +281,19 @@ func contentClippedOut(t gfx.Text, baseline float64) bool {
 	a, d := kit.ChromeContentRows(t.Style.Weight, float64(t.Style.Size))
 	top, bottom := baseline-float64(a), baseline+float64(d)
 	return bottom <= float64(t.ClipOf.Y) || top >= float64(t.ClipOf.Y+t.ClipOf.Height)
+}
+
+// clippedOutX 报告文字的绘制宽度（自 Bounds.X 起、未被右缘截断前的宽度）是否整个落在裁剪矩形的左缘之左或右缘之右。
+//
+// 渲染层的采集把与所属元素可见部分没有横向相交的行片段丢掉（react-facts.mjs 的 TEXTS_EXPR：横向滚出滚动容器的折行片段）；
+// Viva 一侧折行文字的每一行是单独的文字，滚动后整行落在裁剪线外的那一行仍在 Labels 里，要在这里按同一把尺子标成看不见
+// （口径是「呈现出来的文字」，台账 A-010）。裁剪线只切到字形的一部分、或没有裁剪的文字不受影响。
+func clippedOutX(t gfx.Text, painted float64) bool {
+	if !t.HasClip {
+		return false
+	}
+	x := float64(t.Bounds.X)
+	return x >= float64(t.ClipOf.X+t.ClipOf.Width) || x+painted <= float64(t.ClipOf.X)
 }
 
 // isDrawn 报告 text 是否真的被画出来了：labels 里有同样内容、位置相差不超过 1 个逻辑像素

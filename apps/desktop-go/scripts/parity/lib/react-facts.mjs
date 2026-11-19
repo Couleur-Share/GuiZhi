@@ -37,9 +37,52 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
  *
  * 为什么要这个：渲染层把滚出可视区的节点仍留在 DOM 与可访问树里，Viva 只对看得见的内容出无障碍节点与文字
  * （台账 A-010）。对照只比「呈现出来」的部分，两边都按看得见的内容采，才是同口径。
+ *
+ * 遮挡（场景选用）：页面里可以放 window.__parityOccluders（元素数组，场景在页内设置，重载即清）。
+ * 吸附表头（sticky thead）盖在行上面，渲染层的节点与文字照旧在 DOM 里，IntersectionObserver 不认「盖住」；
+ * Viva 的套件没有 z-index，只能把行区域裁在表头下沿（台账 A-027），被盖住的部分不出节点与文字。
+ * 这里把遮挡元素盖住的上缘一段从可见部分里扣掉（只处理整宽盖住可见区上缘的情形，吸附表头就是这种），两边才是同一批「呈现出来」的内容。
  */
-const VISIBLE_RECTS_SRC = `const visibleRects = (targets) => new Promise((resolve) => {
+const VISIBLE_RECTS_SRC = `// 自 start（含）起沿祖先链，会裁剪内容的块（overflow 非 visible）的内边距盒（扣掉滚动条）与视口的交集。
+  const clipRegionOf = (start) => {
+    let left = 0;
+    let top = 0;
+    let right = window.innerWidth;
+    let bottom = window.innerHeight;
+    for (let a = start; a && a !== document.documentElement; a = a.parentElement) {
+      const acs = getComputedStyle(a);
+      if ((acs.overflowX === "visible" && acs.overflowY === "visible") || acs.display === "inline") continue;
+      const ar = a.getBoundingClientRect();
+      const al = ar.left + (parseFloat(acs.borderLeftWidth) || 0);
+      const at = ar.top + (parseFloat(acs.borderTopWidth) || 0);
+      left = Math.max(left, al);
+      top = Math.max(top, at);
+      right = Math.min(right, al + a.clientWidth);
+      bottom = Math.min(bottom, at + a.clientHeight);
+    }
+    return { left, top, right, bottom };
+  };
+  const visibleRects = (targets) => new Promise((resolve) => {
   const out = new Array(targets.length).fill(null);
+  const occlude = (target, r) => {
+    const occluders = window.__parityOccluders;
+    if (!occluders || occluders.length === 0 || r[2] <= 0 || r[3] <= 0) return r;
+    let [x, y, w, h] = r;
+    for (const o of occluders) {
+      if (!o.isConnected || o.contains(target)) continue;
+      // 遮挡元素自己看得见的部分：滚出视口的那一截（横向滚动后表头的左段在滚动容器之外）不盖住任何东西。
+      const ob = o.getBoundingClientRect();
+      const oc = clipRegionOf(o.parentElement);
+      const b = { left: Math.max(ob.left, oc.left), top: Math.max(ob.top, oc.top), right: Math.min(ob.right, oc.right), bottom: Math.min(ob.bottom, oc.bottom) };
+      if (b.left <= x + 0.5 && b.right >= x + w - 0.5 && b.top <= y + 0.5 && b.bottom > y) {
+        const cut = Math.min(b.bottom - y, h);
+        y += cut;
+        h -= cut;
+        if (h <= 0.001) return [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, 0, 0];
+      }
+    }
+    return [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(w * 1000) / 1000, Math.round(h * 1000) / 1000];
+  };
   const index = new Map();
   targets.forEach((t, i) => {
     if (!t) return;
@@ -50,7 +93,7 @@ const VISIBLE_RECTS_SRC = `const visibleRects = (targets) => new Promise((resolv
   const io = new IntersectionObserver((entries) => {
     for (const e of entries) {
       const r = e.intersectionRect;
-      for (const i of index.get(e.target) ?? []) out[i] = [Math.round(r.x * 1000) / 1000, Math.round(r.y * 1000) / 1000, Math.round(r.width * 1000) / 1000, Math.round(r.height * 1000) / 1000];
+      for (const i of index.get(e.target) ?? []) out[i] = occlude(e.target, [Math.round(r.x * 1000) / 1000, Math.round(r.y * 1000) / 1000, Math.round(r.width * 1000) / 1000, Math.round(r.height * 1000) / 1000]);
     }
     io.disconnect();
     resolve(out);
@@ -89,6 +132,8 @@ const MEASURE_FN = `async function (...nodes) {
       k: "e",
       tag: n.localName,
       testId: n.getAttribute("data-testid"),
+      // aria-current 不在 CDP 的 AX 属性表里（getFullAXTree 看不到），页码按钮的「当前页」靠它表达：顺带读 DOM 属性。
+      ...(n.getAttribute("aria-current") ? { current: n.getAttribute("aria-current") } : {}),
       box: [round(b.x), round(b.y), round(b.width), round(b.height)],
       ...(proxy ? { proxy: proxy.localName } : {}),
       scroll: [n.scrollLeft, n.scrollTop, n.scrollWidth, n.scrollHeight],
@@ -199,6 +244,88 @@ const TEXTS_EXPR = `(async () => {
     const [x, y, , h] = rects[0];
     return { shown: text.slice(0, lo) + "…", rect: [x, y, round(widthOf(lo) + ellipsisWidth), h] };
   };
+  // -webkit-line-clamp 截断（line-clamp-N）：DOM 文本仍是全文，Chromium 只留前 N 行，最后一行重排成「放得下的前缀 + …」，
+  // Range 给出的矩形里混着重排前后的片段与被隐藏的行，不能直接用。同样采集「看得见的文字」：在原位置旁放一份不截断的副本
+  // （同宽、同样式，只去掉截断），按字符矩形的纵坐标分行，取前 N 行；最后一行取最长前缀，使「前缀宽度 + 省略号宽度」不超过内容盒宽度
+  // （与 ellipsize 同一条规则）。只处理文字节点直接位于截断元素之下的写法；其余写法不复算，对照时文字不一致会直接报出来。
+  const clampLines = (node, el, cs, rects) => {
+    const n = parseInt(cs.webkitLineClamp, 10);
+    if (!(n > 0) || cs.overflowY === "visible" || el.scrollHeight <= el.clientHeight + 0.5) return null;
+    if (node.parentElement !== el) return null;
+    const index = [...el.childNodes].indexOf(node);
+    const clone = el.cloneNode(true);
+    clone.removeAttribute("id");
+    clone.removeAttribute("data-testid");
+    const box = el.getBoundingClientRect();
+    Object.assign(clone.style, {
+      webkitLineClamp: "unset", display: "block", overflow: "visible", position: "absolute", visibility: "hidden",
+      pointerEvents: "none", height: "auto", maxHeight: "none", boxSizing: "border-box", width: box.width + "px",
+    });
+    el.parentElement.insertBefore(clone, el);
+    try {
+      const text = clone.childNodes[index];
+      const probe = document.createRange();
+      const data = text.data;
+      const charRect = (k) => {
+        probe.setStart(text, k);
+        probe.setEnd(text, k + 1);
+        const r = probe.getBoundingClientRect();
+        return r.height > 0 ? r : null;
+      };
+      // 行首下标：纵坐标变了就是新的一行。
+      const starts = [];
+      let lastY = null;
+      for (let k = 0; k < data.length; k++) {
+        const r = charRect(k);
+        if (!r) continue;
+        if (lastY === null || r.y > lastY + 1) { starts.push(k); lastY = r.y; }
+      }
+      if (starts.length <= n) return null;
+      const lineRect = (from, to) => {
+        probe.setStart(text, from);
+        probe.setEnd(text, to);
+        const bs = [...probe.getClientRects()].filter((b) => b.width > 0 && b.height > 0);
+        const x = Math.min(...bs.map((b) => b.x));
+        const right = Math.max(...bs.map((b) => b.x + b.width));
+        return { x, y: bs[0].y, width: right - x, height: bs[0].height };
+      };
+      const first = lineRect(0, starts[1]);
+      const dx = rects[0][0] - first.x;
+      const dy = rects[0][1] - first.y;
+      const out = [];
+      for (let i = 0; i < n - 1; i++) {
+        const b = lineRect(starts[i], starts[i + 1]);
+        out.push([round(b.x + dx), round(b.y + dy), round(b.width), round(b.height)]);
+      }
+      measure.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(" ");
+      const ellipsisWidth = measure.measureText("…").width;
+      const px = (name) => parseFloat(cs.getPropertyValue(name)) || 0;
+      const avail = clone.clientWidth - px("padding-left") - px("padding-right");
+      const from = starts[n - 1];
+      const widthOf = (k) => {
+        probe.setStart(text, from);
+        probe.setEnd(text, k);
+        return probe.getBoundingClientRect().width;
+      };
+      let lo = from;
+      let hi = starts[n];
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (widthOf(mid) + ellipsisWidth <= avail + 1e-6) lo = mid;
+        else hi = mid - 1;
+      }
+      const code = data.charCodeAt(lo - 1);
+      if (lo > from && code >= 0xd800 && code <= 0xdbff) lo -= 1; // 不把代理对劈开
+      const last = lineRect(from, Math.max(lo, from + 1));
+      out.push([round(last.x + dx), round(last.y + dy), round(widthOf(lo) + ellipsisWidth), round(last.height)]);
+      return { shown: data.slice(0, lo) + "…", rects: out };
+    } finally {
+      clone.remove();
+    }
+  };
+  // 文字实际被裁掉的右缘：自身与祖先里会裁剪的块的内边距盒右缘（扣掉滚动条），再加视口右缘。
+  // 不能拿所属元素自己的外框当裁剪线：文字溢出自己的盒子、但没有祖先裁它时（侧栏图标位里 19px 宽的表情），整个字形都画得出来。
+  const clipRightOf = (el) => clipRegionOf(el).right;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
   let node;
   while ((node = walker.nextNode())) {
@@ -221,12 +348,12 @@ const TEXTS_EXPR = `(async () => {
     }
     if (rects.length === 0) continue;
     const lh = parseFloat(cs.lineHeight);
-    const cut = ellipsize(node, el, cs, rects);
+    const cut = ellipsize(node, el, cs, rects) ?? clampLines(node, el, cs, rects);
     out.push({
       // 被省略号截断时，text 是看得见的「前缀 + …」，full 才是 DOM 原文；rects 取截断后的宽度。
       text: cut ? cut.shown : node.data,
       ...(cut ? { full: node.data } : {}),
-      rects: cut ? [cut.rect] : rects,
+      rects: cut ? (cut.rects ?? [cut.rect]) : rects,
       font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),
       size: parseFloat(cs.fontSize),
       weight: Number(cs.fontWeight),
@@ -247,7 +374,13 @@ const TEXTS_EXPR = `(async () => {
       // 文字被祖先的 overflow 裁掉一部分（滚动区域的底边压住按钮文字之类）：记下看得见的区域，
       // 比较端量墨迹时只取这一块，免得把裁剪线以外的别的图形（页脚、边线）当成文字的墨迹。
       const cut = t.rects.some(([x, y, w, h]) => x < v[0] - 0.5 || y < v[1] - 0.5 || x + w > v[0] + v[2] + 0.5 || y + h > v[1] + v[3] + 0.5);
-      if (cut) t.clip = v;
+      if (cut) {
+        t.clip = v;
+        // 右半段被祖先裁掉的文字只记看得见的宽度：Viva 一侧的绘制宽度同样按裁剪矩形的右缘截断（viva/parity/render.go），两边口径一致。
+        // 只认真正的裁剪（clipRightOf）：文字只是溢出所属元素的盒子、没有祖先裁它时，字形整个都画出来，宽度照记。
+        const right = clipRightOf(owners[i]);
+        t.rects = t.rects.map(([x, y, w, h]) => (x + w > right + 0.5 ? [x, y, round(Math.max(right - x, 0)), h] : [x, y, w, h]));
+      }
     }
     if (t.rects.length > 0) kept.push(t);
   });
@@ -493,7 +626,7 @@ export async function collectFacts(session, { regionSelector = null, scene, vari
       name: n.name,
       ...(n.description !== undefined ? { description: n.description } : {}),
       ...(n.value !== undefined ? { value: n.value } : {}),
-      props: n.props,
+      props: m?.current ? { ...n.props, current: m.current } : n.props,
       // 位置换算到区域坐标系；未被裁剪时尺寸不变
       box: visibleBox ? [r3(visibleBox[0] - region.x), r3(visibleBox[1] - region.y), visibleBox[2], visibleBox[3]] : null,
       ...(clipped ? { fullBox: [r3(box[0] - region.x), r3(box[1] - region.y), box[2], box[3]] } : {}),

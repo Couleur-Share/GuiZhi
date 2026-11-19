@@ -17,15 +17,22 @@ import (
 //go:embed testdata/library-fixture.json
 var libraryFixtureJSON []byte
 
-// LibraryVariant 是侧栏的一份数据：合集、标签与计数。
+// LibraryVariant 是知识库的一份数据：合集、标签与计数（侧栏），以及列表里的条目（M2-2）。
+// 条目与计数互不推导：计数是侧栏上显示的数字，条目是列表里实际有的行，两者不必相符。
 type LibraryVariant struct {
 	Counts      services.LibraryCounts       `json:"counts"`
 	Collections []services.LibraryCollection `json:"collections"`
 	Tags        []services.LibraryTag        `json:"tags"`
+	Entries     []services.LibraryEntry      `json:"entries"`
 }
 
 // LibraryFixture 是夹具的内容。
 type LibraryFixture struct {
+	// Now、Timezone 与 Locale 是两侧共用的「现在」、时区与区域：条目时间的写法（今天写时分，其余写日期）取决于它们。
+	// React 采集器把 Date.now() 与时区钉在这里（lib/react-library.mjs），Viva 场景用同一组值。
+	Now      int64  `json:"now"`
+	Timezone string `json:"timezone"`
+	Locale   string `json:"locale"`
 	// Variants 按名称给出几份数据：data（日常）、empty（空库）、long（超长名称与超 99 的计数）、many（成排的行）。
 	Variants map[string]LibraryVariant `json:"variants"`
 	// SmartViews 按名称给出智能视图的存储内容（渲染层 localStorage 里的原始 JSON 数组，Viva 一侧原样放进偏好）。

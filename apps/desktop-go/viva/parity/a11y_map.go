@@ -33,6 +33,13 @@ var reactIgnoredRoles = map[string]bool{
 	// 表单：Modal 里的 <form> 是 Chromium 导出的 form 地标，只把对话框里的字段与按钮分区，本身没有状态与操作
 	// （同上，登记见台账 A-004 的 2026-11-18 补充）；里面的输入框、按钮、标题照常逐个比较。
 	"form": true,
+	// 表格结构：<table> 导出的 table / rowgroup / row / columnheader / cell 只把单元格分行分列，本身没有状态与操作；
+	// Viva 的 gfx.Role 没有这些角色（登记见台账 A-004 的 2026-11-19 补充）。里面的复选框、按钮、分隔条与文字照常逐个比较。
+	"table":        true,
+	"rowgroup":     true,
+	"row":          true,
+	"columnheader": true,
+	"cell":         true,
 }
 
 // reactIgnoredUnnamed 是「无名时不参与结构比较」的 Chromium 角色：没有可访问名的图片是装饰性图标
@@ -56,12 +63,14 @@ var reactRoleMap = map[string]string{
 	"link":      "link",
 	"tab":       "tab",
 	"menuitem":  "menuitem",
-	"menu":      "menu",
-	"menubar":   "menubar",
-	"listbox":   "listbox",
-	"option":    "option",
-	"separator": "separator",
-	"status":    "status",
+	// 勾选菜单项（列设置）：Viva 没有 menuitemcheckbox，用 menuitem 加 Selected 表达勾选（台账 A-004 的 2026-11-19 补充）。
+	"menuitemcheckbox": "menuitem",
+	"menu":             "menu",
+	"menubar":          "menubar",
+	"listbox":          "listbox",
+	"option":           "option",
+	"separator":        "separator",
+	"status":           "status",
 	// alert：Viva 的 gfx.Role 没有 alert，用「status + 立即播报」表达同一件事（台账 A-012）。
 	"alert":    "status",
 	"grid":     "grid",
@@ -223,6 +232,16 @@ func NormalizeReact(f *Facts) (out []Norm, unmapped []string) {
 			if v, has := n.Prop("pressed"); has && (v == "true" || v == "mixed") {
 				states["pressed"] = "true"
 			}
+			// 当前页（aria-current="page"，页码按钮）：采集器把它记在 props.current；Viva 同样用 Selected 表达（台账 A-004 的 2026-11-19 补充）。
+			if v, has := n.Prop("current"); has && v == "page" {
+				states["pressed"] = "true"
+			}
+		}
+		// 勾选菜单项只比较「勾选」：未勾选与没有 aria-checked 在 Viva 一侧不可区分（HitOptions 只有 Selected，同 A-011）。
+		if n.Role == "menuitemcheckbox" {
+			if v, has := n.Prop("checked"); has && v == "true" {
+				states["selected"] = "true"
+			}
 		}
 		desc := NormText(n.Description)
 		if desc == name {
@@ -273,6 +292,12 @@ func NormalizeViva(f *Facts) []Norm {
 			// 与 NormalizeReact 对应：Viva 的 Selected 就是切换钮的「按下」。
 			if v, has := n.Prop("selected"); has && v == "true" {
 				states["pressed"] = "true"
+			}
+		}
+		if n.Role == "menuitem" {
+			// 与 NormalizeReact 对应：勾选菜单项的「勾选」在 Viva 里是 Selected。
+			if v, has := n.Prop("selected"); has && v == "true" {
+				states["selected"] = "true"
 			}
 		}
 		for _, key := range roleStates[n.Role] {
