@@ -42,6 +42,8 @@ type View struct {
 	// 三份读取各自的失败原因（台账 B-036，渲染层没有这个状态）：只在「这份数据从没成功读到过、且最近一次读取失败」时非空，
 	// 侧栏据此在对应分区的位置显示错误态而不是空态；读到过之后的刷新失败只留日志，不清已有的数据，也不进这里。
 	CountsError, CollectionsError, TagsError string
+	// List 是条目列表的状态（store_list.go）。
+	List ListView
 }
 
 // DeletionUndoWindow 是删除合集、标签后的撤销窗口，与撤销提示条的停留时长一致（渲染层 DELETION_UNDO_WINDOW_MS）。
@@ -68,6 +70,7 @@ type Store struct {
 
 	// countsSeq 是计数请求的序号：请求可能乱序返回，不能让旧筛选的数字覆盖新筛选（渲染层 countsRequestSeq）。
 	countsSeq int
+	list      listState
 
 	// 撤销窗口内已从界面隐藏、尚未提交给后端的删除。重新读取列表时必须绕开它，否则被删的行会在窗口内闪回来。
 	pending map[pendingKey]struct{}
@@ -87,7 +90,8 @@ func NewStore(svc services.Library, guard kit.Guard, invalidate func()) *Store {
 			return func() { t.Stop() }
 		},
 		Spawn:          func(fn func()) { go fn() },
-		view:           View{Filters: Filters{Scope: services.LibraryScopeAll}},
+		view:           View{Filters: Filters{Scope: services.LibraryScopeAll}, List: initialList()},
+		list:           listState{cursors: map[int]string{1: ""}},
 		pending:        map[pendingKey]struct{}{},
 		pendingCommits: map[int]func(){},
 	}
@@ -109,11 +113,16 @@ func (s *Store) wake() {
 // ---- 筛选 ----
 
 // update 改筛选并在后台重新读取（渲染层 updateFilters）：筛选立即生效；没有变化也照样重新读取。
+// 同一刻列表回到第一页、丢掉全部分页游标、清掉选中与多选，并让旧筛选在途的读取作废（台账 B-033 的 (2)(3)）。
 func (s *Store) update(ctx context.Context, mutate func(*Filters)) {
 	s.mu.Lock()
 	next := s.view.Filters
 	mutate(&next)
 	s.view.Filters = next
+	s.resetPaging()
+	s.resetSelection()
+	s.list.seq++
+	s.view.List.Loading = true
 	s.mu.Unlock()
 	s.wake()
 	s.Spawn(func() { s.RefreshAll(ctx) })
@@ -159,18 +168,13 @@ func (s *Store) ApplyFilters(ctx context.Context, target Filters) {
 
 // ---- 读取 ----
 
-// RefreshAll 重新读取筛选相关的全部数据（渲染层 refreshAll）。条目列表随 M2-2 迁入。
-func (s *Store) RefreshAll(ctx context.Context) {
-	s.RefreshCounts(ctx)
-}
-
 // RefreshCounts 重新读取侧栏计数。只认最后发出的那次请求：旧请求晚到不覆盖，失败也只对最后一次留痕。
 // 读取失败不打扰用户（计数是背景信息，没有用户动作），只进日志。
 func (s *Store) RefreshCounts(ctx context.Context) {
 	s.mu.Lock()
 	s.countsSeq++
 	seq := s.countsSeq
-	query := s.view.Filters.FacetQuery()
+	query := s.facetQuery()
 	s.mu.Unlock()
 
 	counts, err := s.svc.Counts(ctx, query)
@@ -195,6 +199,9 @@ func (s *Store) RefreshCounts(ctx context.Context) {
 
 // Load 是知识库工作区挂载时的读取（渲染层 LibraryWorkspace 的挂载 effect）：计数、合集、标签各在后台读一遍。
 func (s *Store) Load(ctx context.Context) {
+	s.mu.Lock()
+	s.view.List.Loading = true // 第一帧就是加载态，不是「暂无条目」
+	s.mu.Unlock()
 	s.Spawn(func() { s.RefreshAll(ctx) })
 	s.Spawn(func() { s.FetchCollections(ctx) })
 	s.Spawn(func() { s.FetchTags(ctx) })
