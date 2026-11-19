@@ -36,8 +36,8 @@ type ScrollView struct {
 	reach *reachArea // 区里的 Tab 停靠点登记（reach.go）；窗口化的行列据此声明自己不登记
 }
 
-// markWindowed 告诉滚动区：区里的行是窗口化声明的（RowWindow），停靠点只登记了视窗里的行，
-// Tab 可达的补充在这个区里不插手（行为同补充之前，台账 B-029 单独评估）。
+// markWindowed 告诉滚动区：区里的行是窗口化声明的（RowWindow），而且窗口裁掉了一部分行，停靠点只登记了视窗里的行，
+// Tab 可达的补充在这个区里不插手（行为同补充之前，台账 B-029 单独评估）。窗口把整列都声明了的不调用它（RowWindow.noteTruncation）。
 func (v ScrollView) markWindowed() {
 	if v.reach != nil {
 		v.reach.windowed = true

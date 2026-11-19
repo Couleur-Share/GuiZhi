@@ -45,6 +45,9 @@ type tableState struct {
 	firstRow string
 	// reveal 是「选中行滚进视口」的状态（tablereveal.go）。
 	reveal tableReveal
+	// window 是行列的窗口（kit.RowWindow，台账 B-047）；overscan 大于 0 时覆盖默认的上下多声明行数（测试用）。
+	window   kit.RowWindow
+	overscan int
 }
 
 // colResizer 是一列表头拖动把手的状态（渲染层 ItemTableHeaderCell 的 isDragging 与拖动起点）。
@@ -141,7 +144,7 @@ func (s *Screen) tableArea(c ui.C, v View) {
 	empty := len(list.Entries) == 0
 	cols := visibleColumns(s.table.cols)
 	l.ScrollArea2D(c.Key("table-scroll"), func(view kit.Scroll2D) {
-		s.revealSelected(view, list.SelectedID)
+		s.revealSelected(view, list)
 		content := ui.Column(c.Key("table-content")).FillWidth().Shrink(0).
 			PadSides(l.Space(tableAreaPadY), l.Space(tableAreaPadX), l.Space(tableAreaPadY), l.Space(tableAreaPadX)).
 			Draw(func(d *ui.DrawContext) { s.noteOrigin(d) })
@@ -233,12 +236,16 @@ type stickyGeometry struct {
 	overflow float32
 }
 
+// tableTop 是表格顶在滚动内容里的位置：上内边距 + 按钮行 + mb-2 + 面板的 1px 边框。
+func (s *Screen) tableTop() float32 {
+	l := s.Look
+	return l.Space(tableAreaPadY) + s.table.topRowH + l.Space(2) + 1
+}
+
 func (s *Screen) stickyAt(view kit.Scroll2D, minW float32) stickyGeometry {
 	l := s.Look
-	padX, padY := l.Space(tableAreaPadX), l.Space(tableAreaPadY)
-	// 表格顶在内容里的位置：上内边距 + 按钮行 + mb-2 + 面板的 1px 边框。
-	tableTop := padY + s.table.topRowH + l.Space(2) + 1
-	g := stickyGeometry{headerTop: max(0, view.Offset-tableTop)}
+	padX := l.Space(tableAreaPadX)
+	g := stickyGeometry{headerTop: max(0, view.Offset-s.tableTop())}
 	// 表头不能越出表格：表格滚出去了，吸附的表头跟着走（它的包含块是表格）。
 	if h := s.table.tableH; h > 0 {
 		g.headerTop = min(g.headerTop, max(0, h-s.headHeight()))

@@ -21,6 +21,10 @@ const (
 	scrollAuto  scrollAlign = iota // 由当前位置决定：见 scrollIndexTarget
 	scrollStart                    // 行的上沿对齐视口上沿
 	scrollEnd                      // 行的下沿对齐视口下沿
+
+	// scrollNearest 是浏览器的 scrollIntoView({ block: "nearest" })（ScrollNearest）：完全在视口里不动，否则出去多少补多少。
+	// 表格视图用它（RevealNearest）；它不是虚拟列表的 scrollToIndex，没有「末行靠到最大滚动量」那一条。
+	scrollNearest
 )
 
 // scrollIndexTarget 算 scrollToIndex(i, {align}) 该把滚动区滚到哪里。
@@ -38,6 +42,13 @@ const (
 //   - 靠上：目标是 start。
 //   - 目标夹在 [0, maxOffset]。
 func scrollIndexTarget(start, end, offset, size, maxOffset float32, last bool, align scrollAlign) (target float32, resolved scrollAlign, move bool) {
+	if align == scrollNearest {
+		dy := ScrollNearest(start-offset, end-offset, 0, size)
+		if dy == 0 {
+			return offset, scrollNearest, false
+		}
+		return min(max(offset+dy, 0), maxOffset), scrollNearest, true
+	}
 	if align == scrollAuto {
 		switch {
 		case end >= offset+size:
@@ -70,6 +81,10 @@ type scrollReq struct {
 // 请求在 Rows 里按这一帧最新的行位置执行，调用方不必先有几何；同一时刻只有最后一次请求有效。
 func (w *RowWindow) ScrollToIndex(i int) { w.req = &scrollReq{index: i} }
 
+// RevealNearest 请求下一次 Rows 把第 i 行按 scrollIntoView({ block: "nearest" }) 的规则滚进视野：完全在视口里不动，
+// 否则出去多少补多少。其余同 ScrollToIndex；MeasureAll 的列表在每一行都量过之前请求保持挂起（位置是估计的，滚了会偏）。
+func (w *RowWindow) RevealNearest(i int) { w.req = &scrollReq{index: i, align: scrollNearest} }
+
 // itemSpan 是第 i 行的上下沿（内容区坐标，不含上内边距，行距不计入下沿）。
 func (w *RowWindow) itemSpan(i int) (start, end float32) {
 	if w.fixed > 0 {
@@ -88,6 +103,16 @@ func (w *RowWindow) scrollRequested(c ui.C, spec *RowsSpec) {
 	}
 }
 
+// revealViewport 是定位请求判定「行在不在视野里」所用的视口高（含上下内边距）：虚拟列表取整之后的 clientHeight；
+// 浏览器的 scrollIntoView（nearest）按实际的小数几何算（高 DPI 缩放下视口高常带小数）。
+func revealViewport(view ScrollView, align scrollAlign) float32 {
+	size := view.Viewport + view.Pad[0] + view.Pad[2]
+	if align == scrollNearest {
+		return size
+	}
+	return float32(math.Round(float64(size)))
+}
+
 // applyScroll 是 scrollRequested 的算术：返回请求是否因为还没有几何而延期。
 func (w *RowWindow) applyScroll(view *ScrollView, n int) (deferred bool) {
 	r := w.req
@@ -101,11 +126,13 @@ func (w *RowWindow) applyScroll(view *ScrollView, n int) (deferred bool) {
 	if view.State == nil || view.Viewport <= 0 {
 		return true // 首帧还没有布局：留到下一帧
 	}
+	if w.measureAll && w.unmeasured > 0 {
+		return true // 整列声明、行高还没量完：位置只是估计，等量完这一帧再滚
+	}
 	start, end := w.itemSpan(r.index)
 	start, end = start+view.Pad[0], end+view.Pad[0]
-	size := float32(math.Round(float64(view.Viewport + view.Pad[0] + view.Pad[2])))
 	maxOffset := max(view.Content-view.Viewport, 0)
-	target, align, move := scrollIndexTarget(start, end, view.Offset, size, maxOffset, r.index == n-1, r.align)
+	target, align, move := scrollIndexTarget(start, end, view.Offset, revealViewport(*view, r.align), maxOffset, r.index == n-1, r.align)
 	if !move {
 		w.req = nil // auto 判定这一行已完全在视野里
 		return false

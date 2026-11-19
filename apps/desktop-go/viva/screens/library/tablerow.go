@@ -24,8 +24,8 @@ const chipTextPx = 10
 // 行高由操作列撑起：py-2 加 28px 的按钮是 44px，再加上下边框（border-collapse 下各占一半）共 45px；
 // 标题折成两行时是 61px。行与行之间的线以网格线为中心，画在下一行的顶上（盖住两行的底色）；最后一行没有下边框。
 
-// tableRow 声明一行。
-func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry, e services.LibraryEntry, index int, last bool) {
+// tableRow 声明一行（index 是它在本页的序号），返回它的最外层盒子：窗口化的行列（kit.RowWindow）在绘制时读它布局后的高度。
+func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry, e services.LibraryEntry, index int, last bool) ui.Box {
 	l := s.Look
 	t := l.T
 	list := v.List
@@ -58,7 +58,7 @@ func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry
 	radius := l.Rem(0.75) - 1 // 面板的内圆角：最后一行的底边贴着它
 	rowTop := row
 	rowTop.Draw(func(d *ui.DrawContext) {
-		s.noteRowTop(d, index, e.ID, active)
+		s.noteRowsOrigin(d, index)
 		corner := float32(0)
 		if last {
 			corner = radius
@@ -79,6 +79,7 @@ func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry
 	if row.Clicked() {
 		s.rowClicked(list, e, row.ClickModifiers())
 	}
+	return row
 }
 
 // rowClicked 处理行上的一次点击（渲染层 ItemTableView 的 handleRowClick）：Ctrl/Meta 切换勾选，Shift 选一段，

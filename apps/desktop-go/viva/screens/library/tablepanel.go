@@ -1,6 +1,8 @@
 package library
 
 import (
+	"math"
+
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -68,19 +70,66 @@ func (s *Screen) tablePanel(c ui.C, v View, cols []tableColumn, view kit.Scroll2
 					// 于是行仍落在随滚动应在的位置，被表头盖住的那一段看不见，表格总高不变。没有吸附时两处的量都是 0。
 					s.tableHead(c, v, cols, geo)
 					ui.Column(c.Key("rows")).FillWidth().Shrink(0).Clip().Children(func() {
-						ui.Column(c.Key("rows-body")).FillWidth().Shrink(0).MarginTop(-geo.headerTop).Children(func() {
-							for i, e := range entries {
-								s.tableRow(c, v, cols, geo, e, i, i == len(entries)-1)
-							}
-						})
+						s.tableRows(c, v, cols, geo, view)
 					})
 				})
 		})
 }
 
+// tableOverscanRows 是行列窗口在视口上下各多声明的行数（与卡片列表同值）。
+const tableOverscanRows = 8
+
+// tableRows 声明全部行：渲染层的表格没有窗口化（整页行都挂在 DOM 里），这里每行的位置与整页声明时逐像素相同，
+// 但只声明视口附近的行（kit.RowWindow，台账 B-047）：一页 100 行时每帧只声明约 30 行，帧耗时与每页行数无关。
+//
+// 行高不能靠估计（标题折成一行或两行、高度差 16px）：RowsSpec.MeasureAll 让每次换内容（换页、换列配置、改字号档）的第一帧
+// 整页声明、布局之后量完每一行，之后窗口才裁——所以窗口里每一行的位置与整表声明时完全一致。
+// 吸附表头靠行列自己的负上外边距拉回（见 tablePanel），窗口的位置按行列的自然位置算，不受吸附影响。
+func (s *Screen) tableRows(c ui.C, v View, cols []tableColumn, geo stickyGeometry, view kit.Scroll2D) {
+	l := s.Look
+	t := &s.table
+	entries := v.List.Entries
+	t.window.Seed, t.window.Overscan = s.rowMinHeight(), tableOverscanRows
+	if t.overscan > 0 {
+		t.window.Overscan = t.overscan
+	}
+	// 复选框的悬停记在行外（checkHover）：它所在的行滚出窗口、不再声明时要清掉，否则滚回来的第一帧会凭旧标记亮一下。
+	// 只清这一帧开头的旧值：别的行声明时可能已经把它改成了新的悬停行。
+	prevHover, prevSeen := t.checkHover, false
+	t.window.Rows(c, kit.RowsSpec{
+		Name: "rows-body", N: len(entries), MeasureAll: true,
+		View:  view.RowsView(s.tableTop()+s.headHeight(), l.Space(tableAreaPadY)+1),
+		Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: s.tableEpoch(v, cols)},
+		Key:   func(i int) string { return entries[i].ID },
+		Row: func(i int) ui.Box {
+			prevSeen = prevSeen || (prevHover != "" && entries[i].ID == prevHover)
+			return s.tableRow(c, v, cols, geo, entries[i], i, i == len(entries)-1)
+		},
+	}).Shrink(0).MarginTop(-geo.headerTop)
+	if prevHover != "" && !prevSeen && t.checkHover == prevHover {
+		t.checkHover = ""
+	}
+}
+
+// tableEpoch 汇总会改变行高（折行）的输入：本页内容换了几次（同一序号的条目就地改了标题）与各列的宽度。
+// 行里只有标题格会折行（line-clamp-2，别的格子都是单行或截断）：它的有效宽度由各列宽度决定（列的显隐也体现在宽度序列里），
+// 文字由条目内容决定。根字号（字号档）由 RowEpoch.RootPx 带，窗口宽度的变化与行的键（换了条目）由行列自己核对；
+// 界面语言与列的 ID 不在其中——没有哪个格子的行高随它们变（「无标题」占位在最窄的标题列里也只占一行）。
+// 以后哪个格子可能折行，就把决定它宽度或文字的输入加到这里（台账 B-047）。
+func (s *Screen) tableEpoch(v View, cols []tableColumn) int {
+	h := uint64(14695981039346656037) // FNV-1a
+	mix := func(x uint64) { h = (h ^ x) * 1099511628211 }
+	mix(uint64(v.List.EntriesRev))
+	for _, col := range cols {
+		mix(uint64(math.Float32bits(col.Width)))
+	}
+	return int(h)
+}
+
 // noteTable 记下表格上一帧布局后的高度与宽度：表头吸附的下限（不能越出表格）与吸附列的几何要用。变了就再要一帧。
 func (s *Screen) noteTable(d *ui.DrawContext) {
 	t := &s.table
+	t.reveal.tableX = d.Rect.X
 	if abs32(d.Rect.Height-t.tableH) > 0.01 || abs32(d.Rect.Width-t.tableW) > 0.01 {
 		t.tableH, t.tableW = d.Rect.Height, d.Rect.Width
 		d.Canvas.RequestFrame()

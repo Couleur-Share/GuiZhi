@@ -14,6 +14,22 @@ type Scroll2D struct {
 
 	// State 只在本帧声明期间有效，不要留着。
 	State *ui.ScrollState
+
+	reach *reachArea // 区里的 Tab 停靠点登记（reach.go）；窗口化的行列（RowsView）据此声明自己不登记
+}
+
+// RowsView 把二维滚动区的几何换算成窗口化行列（RowWindow）要的 ScrollView：行列的坐标系以它自己的上沿为 0 点。
+//
+//	origin 行列的上沿在滚动内容里的位置（上方的内边距、按钮行、表头都算在内）
+//	below  行列的下沿之后还有多少内容（内边距、边框）
+//
+// 视口扣掉这两段、内容也扣掉这两段，行列看到的「视口上下沿」（Span）就是视口在行列坐标里的位置，
+// 最大滚动量（内容减视口）不变。ScrollArea 的内边距由滚动框自己带，二维滚动区的内边距在内容里，所以要这样换算。
+func (v Scroll2D) RowsView(origin, below float32) ScrollView {
+	return ScrollView{
+		Offset: v.Offset, Viewport: v.Viewport - origin - below, Content: v.Content - origin - below,
+		Pad: [4]float32{origin, 0, below, 0}, State: v.State, reach: v.reach,
+	}
 }
 
 // ScrollArea2D 复刻渲染层的 overflow-auto 滚动容器（两个方向都可能溢出，带自定义的 webkit 滚动条）：
@@ -39,12 +55,12 @@ func (l *Look) ScrollArea2D(c ui.C, body func(Scroll2D)) ui.Box {
 			state = box.ScrollState()
 			vertical = state.Content > state.Viewport+0.5
 			horiz = state.ContentWidth > state.ViewportWidth+0.5
+			area := l.reach.enter(state)
 			view := Scroll2D{
 				Offset: state.Offset, OffsetX: state.OffsetX,
 				Viewport: state.Viewport, ViewportW: state.ViewportWidth,
-				Content: state.Content, ContentW: state.ContentWidth, State: state,
+				Content: state.Content, ContentW: state.ContentWidth, State: state, reach: area,
 			}
-			area := l.reach.enter(state)
 			box.DrawOver(func(d *ui.DrawContext) { l.settleReach(d, area) }).Children(func() { body(view) })
 			l.reach.leave()
 			if vertical {

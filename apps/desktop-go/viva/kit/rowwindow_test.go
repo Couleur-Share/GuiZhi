@@ -173,10 +173,17 @@ type windowRig struct {
 	n     int
 	pad   [4]float32
 	epoch RowEpoch
-	order []int      // 第 i 行显示哪个下标（高度与文字都跟它走）；nil 是原顺序
-	view  ScrollView // 最近一帧声明时滚动区给出的几何
-	flat  float32    // 非零时所有行同高（让估计恰好等于实测，总高可以逐像素对拍）
-	fixed float32    // 非零时用定高模式声明（RowsSpec.Fixed，此时不给 Key）
+	// callLog 是每一帧声明的行数（按帧的先后，最近一帧还没有收进来：它在 calls 里）。
+	callLog []int
+	order   []int      // 第 i 行显示哪个下标（高度与文字都跟它走）；nil 是原顺序
+	view    ScrollView // 最近一帧声明时滚动区给出的几何
+	flat    float32    // 非零时所有行同高（让估计恰好等于实测，总高可以逐像素对拍）
+	fixed   float32    // 非零时用定高模式声明（RowsSpec.Fixed，此时不给 Key）
+	// measureAll 为真时用 RowsSpec.MeasureAll 声明；overscan 非零时覆盖窗口的默认上下多声明行数；
+	// partial 数的是「行高没量完就裁了窗口」的帧数（MeasureAll 下必须为 0）。
+	measureAll bool
+	overscan   int
+	partial    int
 }
 
 func (r *windowRig) index(i int) int {
@@ -213,13 +220,19 @@ func openWindowedWith(t *testing.T, n int, setup func(*windowRig)) *windowRig {
 	if setup != nil {
 		setup(r)
 	}
+	if r.overscan > 0 {
+		r.w.Overscan = r.overscan
+	}
 	r.harness = openPage(t, still(), testViewW, testViewH, func(l *Look, c ui.C) {
+		if r.calls > 0 {
+			r.callLog = append(r.callLog, r.calls)
+		}
 		r.calls = 0
 		ui.Column(c.Key("page")).Fill().Children(func() {
 			l.ScrollAreaView(c.Key("list"), r.pad, func(view ScrollView) {
 				r.view = view
 				spec := RowsSpec{
-					Name: "rows", N: r.n, Gap: testGap, View: view, Epoch: r.epoch, Fixed: r.fixed,
+					Name: "rows", N: r.n, Gap: testGap, View: view, Epoch: r.epoch, Fixed: r.fixed, MeasureAll: r.measureAll,
 					Row: func(i int) ui.Box { r.calls++; return r.row(c, i) },
 					After: func() {
 						r.tail(c)
@@ -229,6 +242,9 @@ func openWindowedWith(t *testing.T, n int, setup func(*windowRig)) *windowRig {
 					spec.Key = func(i int) string { return testKey(r.index(i)) }
 				}
 				r.w.Rows(c, spec)
+				if r.measureAll && r.calls < r.n && r.w.unmeasured > 0 {
+					r.partial++ // 违例：MeasureAll 的行列在行高还没量完时就裁了窗口
+				}
 			}).FillWidth().Grow(1).MinHeight(0)
 		})
 	})

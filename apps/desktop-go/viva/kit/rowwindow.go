@@ -38,6 +38,14 @@ type RowsSpec struct {
 	// 与焦点在滚出窗口的行上时的保留（(3)）。
 	// 换了行高、或在定高与变高之间切换时，调用方应同时换 Epoch.Variant，让变高模式留着的旧实测作废。
 	Fixed float32
+
+	// MeasureAll 用于「渲染层没有窗口化、整表声明」的列表（知识库的表格）：每一行的高度要与整表声明时一模一样，
+	// 不能有估计高度带来的位移。只要还有没量过的行（换了页、换了列配置、改了字号档，所有行都作废），这一帧就把整列声明出来，
+	// 布局之后一次量完每一行；量完之后位置全是实测，窗口才开始只声明视口附近的行——视口里的画面与整表声明逐像素相同。
+	// 代价是每次换内容多一帧整表声明（与不窗口化时同价），换来的是稳态每帧只跟看得见的行数有关。
+	// 因为实测先于窗口，这一模式没有变高模式的估计收敛（停在末端的视口跟着落到末端）：不需要，也不该有——
+	// 换页后视口留在原偏移，由布局夹取，与浏览器一致。
+	MeasureAll bool
 }
 
 // RowWindow 把一长列高度不一的行窗口化：每帧只声明视口里的行与上下各 Overscan 行，窗口外的行用两块等高的空位顶着，
@@ -76,13 +84,16 @@ type RowWindow struct {
 
 	first, last int // 本帧声明的行区间 [first, last)
 
+	unmeasured int // 本帧声明时还没有实测高度的行数（align 算出）；为 0 表示每一行的位置都是实测的
+
 	// req 是待办的滚动请求（ScrollToIndex，rowscroll.go）。
 	req *scrollReq
 
 	// 最近一次 Rows 的参数，Reveal 据此换算第 i 行的位置。
-	n     int
-	gap   float32
-	fixed float32 // 定高模式的行高；0 是变高模式
+	n          int
+	gap        float32
+	fixed      float32 // 定高模式的行高；0 是变高模式
+	measureAll bool    // RowsSpec.MeasureAll
 
 	// 定高模式下第一条实测高度与 Fixed 不符的行（-1 没有）与它的高度，见 Misfit。
 	misfit  int
@@ -135,7 +146,7 @@ func (w *RowWindow) fallback() float32 {
 // 列里依次是：窗口之前所有行的空位（有的话）、窗口里的行、窗口之后所有行的空位（有的话）、After。
 // 列的 Gap 会落在相邻的每两个孩子之间，空位的高度因此各减一个 Gap，整列总高与不窗口化时相同。
 func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
-	w.n, w.gap, w.fixed = spec.N, spec.Gap, spec.Fixed
+	w.n, w.gap, w.fixed, w.measureAll = spec.N, spec.Gap, spec.Fixed, spec.MeasureAll
 	if spec.Fixed > 0 {
 		return w.fixedRows(c, spec)
 	}
@@ -145,8 +156,7 @@ func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
 	// 「停在末端」要求内容真的超出视口：内容不超出时 AtEnd 恒成立（没有可滚的范围），
 	// 那只是列表还短（读取中、刚从空状态进来），不是用户滚到了底；把它当成末端会让第一次量到行就把列表拽到底部。
 	atEnd := spec.View.State != nil && spec.View.Content > spec.View.Viewport+0.5 && spec.View.AtEnd()
-	spec.View.markWindowed()
-	if w.converging && (atEnd || w.wasAtEnd) {
+	if !spec.MeasureAll && w.converging && (atEnd || w.wasAtEnd) {
 		spec.View.State.ScrollToEnd()
 	}
 	w.converging, w.wasAtEnd = false, atEnd
@@ -154,6 +164,7 @@ func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
 	w.scrollRequested(c, &spec)
 	first, last := w.visible(spec)
 	w.first, w.last = first, last
+	w.noteTruncation(spec, first, last)
 	if w.draw == nil {
 		w.draw = w.measure
 	}
@@ -179,6 +190,14 @@ func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
 	})
 }
 
+// noteTruncation 在窗口真的裁掉了行（上方或下方有没声明的行）时，告诉滚动区：这里的停靠点登记不完整，Tab 可达的补充不插手。
+// 窗口把整列都声明了（短的列表）时登记是完整的，序号稳定，补充照常工作：与不窗口化的列表行为一致。
+func (w *RowWindow) noteTruncation(spec RowsSpec, first, last int) {
+	if first > 0 || last < spec.N {
+		spec.View.markWindowed()
+	}
+}
+
 // align 让内部数组与这一帧的行对齐，并重算各行上沿。
 func (w *RowWindow) align(spec RowsSpec) {
 	n := spec.N
@@ -200,6 +219,7 @@ func (w *RowWindow) align(spec RowsSpec) {
 			known++
 		}
 	}
+	w.unmeasured = n - known
 	estimate := float64(w.seed())
 	if known > 0 {
 		estimate = sum / float64(known)
@@ -222,6 +242,9 @@ func (w *RowWindow) visible(spec RowsSpec) (first, last int) {
 	n := spec.N
 	if n == 0 {
 		return 0, 0
+	}
+	if spec.MeasureAll && w.unmeasured > 0 { // 还有没量过的行：整列声明，布局之后一次量完（见 RowsSpec.MeasureAll）
+		return 0, n
 	}
 	lo, hi := spec.View.Span()
 	if spec.View.Viewport <= 0 { // 还没布局过：视口高度未知
@@ -269,11 +292,11 @@ func (w *RowWindow) measure(d *ui.DrawContext) {
 // fixedRows 是定高模式的 Rows：第 i 行的上沿恰好是 i × (Fixed + Gap)，窗口与两块空位都由算术直接得出，
 // 与行数无关（1 万行与 50 行一样只声明看得见的几行），也不依赖任何实测。
 func (w *RowWindow) fixedRows(c ui.C, spec RowsSpec) ui.Box {
-	spec.View.markWindowed()
 	w.converging, w.wasAtEnd = false, false // 变高模式留下的标志在定高模式下没有意义
 	w.scrollRequested(c, &spec)
 	first, last := w.fixedSpan(spec)
 	w.first, w.last = first, last
+	w.noteTruncation(spec, first, last)
 	name := spec.Name
 	if name == "" {
 		name = "rows"
@@ -332,6 +355,23 @@ func (w *RowWindow) checkFixed(*ui.DrawContext) {
 // Misfit 返回定高模式下最近一次绘制里第一条实测高度与 Fixed 不符的行（序号与实测高度）；没有不符的返回 ok=false。
 func (w *RowWindow) Misfit() (index int, height float32, ok bool) {
 	return w.misfit, w.misfitH, w.fixed > 0 && w.misfit >= 0
+}
+
+// ItemSpan 是第 i 行在行列坐标系里的上下沿（行距不计入下沿；行列的上沿是 0 点），取自最近一次 Rows 的位置表。
+// exact 为真表示位置是精确的：定高模式按序号算，变高模式每一行都量过（MeasureAll 整列声明量完之后就是这样）；
+// 否则按估计高度算，只能当近似用。序号越界时全返回零值。
+func (w *RowWindow) ItemSpan(i int) (top, bottom float32, exact bool) {
+	if i < 0 || i >= w.n {
+		return 0, 0, false
+	}
+	if w.fixed > 0 {
+		top = float32(float64(i) * float64(w.fixed+w.gap))
+		return top, top + w.fixed, true
+	}
+	if i+1 >= len(w.top) {
+		return 0, 0, false
+	}
+	return float32(w.top[i]), float32(w.top[i+1]) - w.gap, w.unmeasured == 0
 }
 
 // Reveal 把第 i 行滚进视野，就近对齐：已经完全在视野里就不动，在上方靠上沿，在下方靠下沿
