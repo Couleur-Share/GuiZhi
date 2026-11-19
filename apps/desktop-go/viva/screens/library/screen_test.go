@@ -111,6 +111,35 @@ func TestFacetRowsToggleSelection(t *testing.T) {
 	}
 }
 
+// 回收站行（盘点 library.sidebar.i-trash）：点它把范围换成回收站、行选中，并按新范围重算计数；
+// 在回收站里再叠加一个分面，范围仍是回收站，但这一行不再选中（渲染层 isTrashActive 要求没有任何分面）。
+func TestTrashRowSelectsTheTrashScopeOnlyWithoutFacets(t *testing.T) {
+	r := newRig(t)
+	trash := locales.LibraryScopeTrash()
+	r.click(gfx.RoleButton, trash)
+	if got := r.view().Filters.Scope; got != services.LibraryScopeTrash {
+		t.Fatalf("点「%s」后范围 = %q，期望 %q", trash, got, services.LibraryScopeTrash)
+	}
+	if !r.mustNode(gfx.RoleButton, trash).Selected {
+		t.Error("回收站范围且没有分面时，回收站行应当选中")
+	}
+	if q := r.svc.CountQueries(); q[len(q)-1].Scope != services.LibraryScopeTrash {
+		t.Errorf("最近一次计数查询的范围 = %q，应按回收站重算", q[len(q)-1].Scope)
+	}
+	r.click(gfx.RoleButton, "工作")
+	if got := r.view().Filters.Scope; got != services.LibraryScopeTrash {
+		t.Errorf("在回收站里叠加分面后范围 = %q，应仍是回收站", got)
+	}
+	if r.mustNode(gfx.RoleButton, trash).Selected {
+		t.Error("叠加了分面之后，回收站行不应再选中")
+	}
+	// 回收站行是范围而不是分面：再点一次不会取消范围
+	r.click(gfx.RoleButton, trash)
+	if got := r.view().Filters.Scope; got != services.LibraryScopeTrash {
+		t.Errorf("再点回收站行后范围 = %q，不应被取消", got)
+	}
+}
+
 func TestUnusedTagsAreHiddenUntilToggled(t *testing.T) {
 	r := newRig(t)
 	show := locales.LibraryShowUnusedTags(1)
