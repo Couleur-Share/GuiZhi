@@ -16,7 +16,7 @@ import (
 //     键盘聚焦时整个命中区铺 primary/20。
 //
 // 宽度读写都在 ColumnResizerState.Width：调用方用它去定那一栏的宽度，拖动在绘制阶段更新它并请求重绘。
-// 保存由 OnCommit 负责——拖动结束、按键与双击才调用，不在每次指针移动时写盘。
+// 保存由 OnCommit 负责——拖动结束（按下后动过）、按键与双击才调用，不在每次指针移动时写盘，点一下没有拖动也不调用。
 
 // 键盘步长（渲染层 ColumnResizer.handleKeyDown）。
 const (
@@ -30,6 +30,7 @@ type ColumnResizerState struct {
 	Width float32
 
 	dragging           bool
+	moved              bool // 按下之后指针动过：渲染层只在 onResize（每次移动、按键、双击）里写宽度，点一下不动就一个字也不写
 	startX, startWidth float32
 }
 
@@ -51,23 +52,20 @@ type ColumnResizerSpec struct {
 func clampWidth(v, lo, hi float32) float32 { return min(max(v, lo), hi) }
 
 // ColumnResizer 声明把手：8 px 宽、撑满父容器高度，不收缩。调用方把它放进一个定位好的容器（通常是绝对定位在栏的右缘）。
+//
+// 键盘用 Box.Shortcut 注册，而具名的容器按「焦点落在容器里面」匹配，焦点就在容器自己身上时匹配不到（同取色器的色块，见 pickerPad）；
+// 所以把手本体放进一层同大小的外壳，快捷键挂在外壳上，把手自己才是拿焦点的那一个。
 func (l *Look) ColumnResizer(c ui.C, st *ColumnResizerState, spec ColumnResizerSpec) ui.Box {
 	if st.Width == 0 {
 		st.Width = clampWidth(spec.Default, spec.Min, spec.Max)
 	}
-	id := ui.ID(c)
-	box := ui.Column(c).Width(l.Rem(0.5)).FillHeight().Shrink(0).HitWith(id, spec.Name, gfx.HitOptions{
-		Role:   gfx.RoleSeparator,
-		Cursor: gfx.PointerCursorResizeHorizontal,
-		// 渲染层是 role=separator 加 aria-valuenow / valuemin / valuemax：当前宽度与上下限。
-		Range: gfx.ValueRange{Now: float64(st.Width), Min: float64(spec.Min), Max: float64(spec.Max), Set: true},
-	})
 	commit := func(width float32) {
 		st.Width = width
 		if spec.OnCommit != nil {
 			spec.OnCommit(width)
 		}
 	}
+	shell := ui.Column(c).Width(l.Rem(0.5)).FillHeight().Shrink(0)
 	// 键盘：与渲染层相同的步长；快捷键只在把手有焦点时生效。
 	for _, step := range []struct {
 		mods gfx.Modifiers
@@ -83,12 +81,24 @@ func (l *Look) ColumnResizer(c ui.C, st *ColumnResizerState, spec ColumnResizerS
 		{0, "enter", func() float32 { return spec.Default }},
 		{0, " ", func() float32 { return spec.Default }}, // 空格键按字符给出：Shortcut 的键名表里没有 "space"
 	} {
-		if box.Shortcut(step.mods, step.key) {
+		if shell.Shortcut(step.mods, step.key) {
 			commit(clampWidth(step.to(), spec.Min, spec.Max))
 		}
 	}
+	return shell.Children(func() { l.columnResizerBar(c.Key("bar"), st, spec, commit) })
+}
+
+// columnResizerBar 是把手本体：占满外壳，带命中区、指针拖动与竖线的绘制。
+func (l *Look) columnResizerBar(c ui.C, st *ColumnResizerState, spec ColumnResizerSpec, commit func(float32)) {
+	id := ui.ID(c)
+	box := ui.Column(c).FillWidth().FillHeight().HitWith(id, spec.Name, gfx.HitOptions{
+		Role:   gfx.RoleSeparator,
+		Cursor: gfx.PointerCursorResizeHorizontal,
+		// 渲染层是 role=separator 加 aria-valuenow / valuemin / valuemax：当前宽度与上下限。
+		Range: gfx.ValueRange{Now: float64(st.Width), Min: float64(spec.Min), Max: float64(spec.Max), Set: true},
+	})
 	hovered := box.State().Hovered
-	return box.Draw(func(d *ui.DrawContext) {
+	box.Draw(func(d *ui.DrawContext) {
 		canvas := d.Canvas
 		if ev, ok := canvas.PointerOn(id); ok {
 			switch {
@@ -98,15 +108,18 @@ func (l *Look) ColumnResizer(c ui.C, st *ColumnResizerState, spec ColumnResizerS
 					st.dragging = false
 					commit(clampWidth(spec.Default, spec.Min, spec.Max))
 				} else {
-					st.dragging, st.startX, st.startWidth = true, ev.X, st.Width
+					st.dragging, st.moved, st.startX, st.startWidth = true, false, ev.X, st.Width
 				}
 				canvas.Consume()
 			case ev.Kind == gfx.PointerMove && st.dragging:
+				st.moved = true
 				st.Width = clampWidth(st.startWidth+ev.X-st.startX, spec.Min, spec.Max)
 				canvas.Consume()
 			case ev.Kind == gfx.PointerUp && st.dragging:
 				st.dragging = false
-				commit(st.Width)
+				if st.moved { // 点一下把手没有拖动：不提交（否则当前宽度被写成偏好）
+					commit(st.Width)
+				}
 				canvas.Consume()
 			}
 		}

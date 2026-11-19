@@ -53,6 +53,7 @@ type tableState struct {
 // colResizer 是一列表头拖动把手的状态（渲染层 ItemTableHeaderCell 的 isDragging 与拖动起点）。
 type colResizer struct {
 	dragging           bool
+	moved              bool // 按下之后指针动过：渲染层只在 onResize（每次移动）里写偏好，没动过就一个字也不写
 	startX, startWidth float32
 }
 
