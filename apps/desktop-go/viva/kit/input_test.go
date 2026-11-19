@@ -6,9 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/vivaui/viva/app"
-	"github.com/vivaui/viva/gfx"
-	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/tokens"
@@ -64,42 +61,32 @@ func TestChromeInputBaselineMatchesProbe(t *testing.T) {
 
 // TestInputPadLandsOnChromeBaseline 用无头渲染核对：按 InputPad 的内边距摆的 Viva 输入框，
 // 输入内容的基线落在 ChromeInputBaselineY 给的行上，并且与框顶的小数部分无关。
+// 七种框 × 四种顶边小数共 28 个位置并排画进同一页：每个无头会话都要新建一次 D3D 设备（约 55 ms），逐个开会话
+// 曾占掉整个包近四分之一的测试时间。格宽取整数，不改变各格顶边的小数部分。
 func TestInputPadLandsOnChromeBaseline(t *testing.T) {
 	look := NewLook(DefaultSpec())
 	black := tokens.RGBA(0, 0, 0, 1)
 	type box struct{ size, height float32 }
 	boxes := []box{{12.25, 31.5}, {14, 36}, {15.75, 40.5}, {15.75, 36}, {12.25, 28}, {14, 40}, {10.5, 28}}
-	for _, b := range boxes {
-		for _, frac := range []float32{0, 0.25, 0.5, 0.75} {
-			top := 20 + frac
-			var field ui.Field
-			field.SetText("HHHH")
-			page := ui.NewPage(ui.PageConfig{View: func(c ui.C) {
-				ui.Column(c).Fill().PadTop(top).PadLeft(10).Background(gfx.RGBA(255, 255, 255, 1)).Children(func() {
-					look.Input(c, &field, "测试", "", InputSpec{Size: b.size, Weight: WeightNormal, Color: black, Height: b.height}).Width(100)
-				})
-			}})
-			var canvas gfx.Canvas
-			session, err := headless.Open(page.Config(app.Config{Title: "input", Width: 140, Height: 100}), &canvas, headless.Options{Scale: 1})
-			if err != nil {
-				t.Fatal(err)
-			}
-			for i := 0; i < 3; i++ {
-				if err := session.Frame(); err != nil {
-					session.Close()
-					t.Fatal(err)
-				}
-			}
-			img, err := session.Image()
-			session.Close()
-			if err != nil {
-				t.Fatal(err)
-			}
-			got := lastInkRow(img, 0, 0, 140, 100) + 1
-			want := ChromeInputBaselineY(WeightNormal, float64(b.size), float64(top), float64(b.height))
-			if got != want {
-				t.Errorf("字号 %v 框高 %v 框顶 %v：Viva 基线行 %d，Chromium 模型 %d", b.size, b.height, top, got, want)
-			}
+	fracs := []float32{0, 0.25, 0.5, 0.75}
+	const cellInputW = 140
+	fields := make([]ui.Field, len(boxes)*len(fracs))
+	for i := range fields {
+		fields[i].SetText("HHHH")
+	}
+	topOf := func(i int) float32 { return 20 + fracs[i%len(fracs)] }
+	img := renderCells(t, len(fields), cellInputW, func(c ui.C, i int) {
+		b := boxes[i/len(fracs)]
+		ui.Column(c).Width(cellInputW).PadTop(topOf(i)).PadLeft(10).Children(func() {
+			look.Input(c, &fields[i], "测试", "", InputSpec{Size: b.size, Weight: WeightNormal, Color: black, Height: b.height}).Width(100)
+		})
+	})
+	for i := range fields {
+		b, top := boxes[i/len(fracs)], topOf(i)
+		got := lastInkRow(img, i*cellInputW, 0, cellInputW, cellH) + 1
+		want := ChromeInputBaselineY(WeightNormal, float64(b.size), float64(top), float64(b.height))
+		if got != want {
+			t.Errorf("字号 %v 框高 %v 框顶 %v：Viva 基线行 %d，Chromium 模型 %d", b.size, b.height, top, got, want)
 		}
 	}
 }

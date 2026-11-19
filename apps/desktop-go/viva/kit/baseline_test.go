@@ -7,9 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
-	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -201,44 +199,26 @@ func TestInlineBoxDrop(t *testing.T) {
 
 // TestVivaBaselineConstant 守住抄来的 Viva 常数：用无头渲染一行 "HHHH"，量出基线（H 竖笔的底边），
 // 与 VivaBaselineRow 的公式比较。Viva 升级后这个常数变了，这里会先红。
+// 六个字号并排画进同一页（每个无头会话都要新建一次 D3D 设备，逐个开会话是整个包最大的时间来源）；
+// 每格的 "HHHH" 顶边对齐到 Y=10，基线 = 该格最后一行墨迹的下一行，相对文字盒顶。
 func TestVivaBaselineConstant(t *testing.T) {
 	type sample struct {
 		size, height float32
 	}
-	for _, s := range []sample{{12, 16}, {14, 20}, {18, 28}, {16, 24}, {20, 28}, {24, 32}} {
-		got := renderedBaselineRow(t, s.size, s.height)
+	samples := []sample{{12, 16}, {14, 20}, {18, 28}, {16, 24}, {20, 28}, {24, 32}}
+	const top, width = 10, 120
+	img := renderCells(t, len(samples), width, func(c ui.C, i int) {
+		ui.Column(c).Width(width).Pad(top).Children(func() {
+			ui.Text(c, "HHHH").FontSize(samples[i].size).LineHeight(samples[i].height).Color(gfx.RGBA(0, 0, 0, 1))
+		})
+	})
+	for i, s := range samples {
+		got := lastInkRow(img, i*width, top, width, int(s.height)+8) + 1 - top
 		want := VivaBaselineRow(int(s.height), float64(s.size))
 		if got != want {
 			t.Errorf("字号 %v 行高 %v：渲染出的基线行 %d，公式 %d", s.size, s.height, got, want)
 		}
 	}
-}
-
-// renderedBaselineRow 画一行黑色 "HHHH"（顶边对齐到 Y=10），返回基线相对文字盒顶的行数。
-func renderedBaselineRow(t *testing.T, size, height float32) int {
-	t.Helper()
-	const top = 10
-	page := ui.NewPage(ui.PageConfig{View: func(c ui.C) {
-		ui.Column(c).Pad(top).Background(gfx.RGBA(255, 255, 255, 1)).Children(func() {
-			ui.Text(c, "HHHH").FontSize(size).LineHeight(height).Color(gfx.RGBA(0, 0, 0, 1))
-		})
-	}})
-	var canvas gfx.Canvas
-	session, err := headless.Open(page.Config(app.Config{Title: "baseline", Width: 120, Height: 80}), &canvas, headless.Options{Scale: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer session.Close()
-	for i := 0; i < 3; i++ {
-		if err := session.Frame(); err != nil {
-			t.Fatal(err)
-		}
-	}
-	img, err := session.Image()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return lastInkRow(img, 0, top, 120, int(height)+8) + 1 - top
 }
 
 // lastInkRow 返回区域内最后一行含“明显深色”像素的行号（绝对行号）。
