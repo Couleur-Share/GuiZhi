@@ -31,10 +31,17 @@ type Screen struct {
 	// Now 与 NewID 给智能视图的创建用；对照与测试注入固定值。空表示取系统时钟与随机 ID。
 	Now   func() time.Time
 	NewID func() string
+	// Loc 与 Locale 决定表格里时间的写法（今天写时分，其余写日期）；空表示本地时区与中文。
+	Loc    *time.Location
+	Locale kit.DateLocale
 
+	table      tableState // 表格视图的界面状态（列配置、二维滚动、分隔条拖拽；table.go）
 	groups     kit.HoverGroups
-	flex       kit.FlexColumn // 侧栏列：定高的 flex 列，内容溢出时行按 flex-shrink 压低（台账 B-034）
-	showUnused bool           // 标签分区的「显示未使用的标签」开关；刻意不持久化，退出模块即复位（渲染层同）
+	cardGroups kit.HoverGroups // 工作区卡片的悬停分组：卡片里嵌着的类型图标（带 title）悬停时，卡片仍算悬停
+	pane       listPane        // 工作区里列表栏的界面状态（pane.go）
+	searchStop func()          // 顶栏搜索的防抖排期（search.go）
+	flex       kit.FlexColumn  // 侧栏列：定高的 flex 列，内容溢出时行按 flex-shrink 压低（台账 B-034）
+	showUnused bool            // 标签分区的「显示未使用的标签」开关；刻意不持久化，退出模块即复位（渲染层同）
 	menu       rowMenu
 	edit       editDialog
 	smart      smartViews
@@ -53,6 +60,14 @@ func (s *Screen) nowTime() time.Time {
 		return s.Now()
 	}
 	return time.Now()
+}
+
+// loc 是时间的时区。
+func (s *Screen) loc() *time.Location {
+	if s.Loc != nil {
+		return s.Loc
+	}
+	return time.Local
 }
 
 // newID 生成智能视图的 ID：渲染层用 crypto.randomUUID，这里取 16 个随机字节的十六进制。
@@ -89,11 +104,7 @@ func (s *Screen) Enter() {
 // 回收站一块 mt-auto 贴在底部（内容不满一屏时）。
 func (s *Screen) Panel(c ui.C) {
 	l := s.Look
-	if !s.mounted {
-		s.mounted = true
-		s.Enter()
-	}
-	s.shown = true
+	s.ensureMounted()
 	s.groups.Begin()
 	s.settleEdit()
 	v := s.Store.View()

@@ -288,6 +288,38 @@ func (s *Store) SelectPage() {
 	s.SetSelection(merged)
 }
 
+// TogglePageSelection 切换本页的全选（渲染层 ItemTableView 的 togglePageSelection，表头复选框与「本页」按钮共用）：
+// 本页条目已全部在多选集合里就把本页取消，否则把本页并入；两条路径都经 SetSelection，起点取集合里最后一个。
+func (s *Store) TogglePageSelection() {
+	s.mu.Lock()
+	page := s.view.List.Entries
+	current := slices.Clone(s.view.List.Selection)
+	allSelected := len(page) > 0
+	for _, e := range page {
+		if !slices.Contains(current, e.ID) {
+			allSelected = false
+			break
+		}
+	}
+	var next []string
+	if allSelected {
+		for _, id := range current {
+			if !slices.ContainsFunc(page, func(e services.LibraryEntry) bool { return e.ID == id }) {
+				next = append(next, id)
+			}
+		}
+	} else {
+		next = current
+		for _, e := range page {
+			if !slices.Contains(next, e.ID) {
+				next = append(next, e.ID)
+			}
+		}
+	}
+	s.mu.Unlock()
+	s.SetSelection(next)
+}
+
 // ClearSelection 清空多选。
 func (s *Store) ClearSelection() {
 	s.mu.Lock()

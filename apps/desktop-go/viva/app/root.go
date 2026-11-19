@@ -87,6 +87,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 		r.win.Module = opts.Module
 	}
 	r.win.Page = opts.Page
+	r.applyPanePrefs()
 	r.systemDark.Store(opts.SystemDark)
 	r.win.Modules = map[shell.Module]shell.ModuleView{}
 	r.mountImports(invalidate)
@@ -135,7 +136,9 @@ func (r *Root) mountLibrary(invalidate func()) {
 	}
 	view := r.win.Modules[shell.ModuleLibrary]
 	view.Panel = r.library.Panel
+	view.Workspace = r.library.Workspace
 	r.win.Modules[shell.ModuleLibrary] = view
+	r.win.OnSearch = r.library.SearchTyped
 	if r.importsStore != nil {
 		// 采集任务完成：条目与计数都变了（渲染层 import.store 的 handleChanged）。
 		r.importsStore.OnCompleted = func(task services.ImportTask) { store.OnImportCompleted(r.ctx, task) }

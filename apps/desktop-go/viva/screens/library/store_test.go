@@ -60,6 +60,32 @@ func newHarness(t *testing.T) *harness {
 	return h
 }
 
+// spawnQueue 让后台动作排队而不执行，由测试决定何时放行（Store.Spawn 的替身）。
+// 放行期间新产生的后台动作（RefreshAll 里与计数并行的列表读取）就地执行：队列里的任务等着的正是它们，
+// 排到队尾只会让放行永远卡在 WaitGroup 上。
+type spawnQueue struct {
+	queued   []func()
+	draining bool
+}
+
+func (q *spawnQueue) Spawn(fn func()) {
+	if q.draining {
+		fn()
+		return
+	}
+	q.queued = append(q.queued, fn)
+}
+
+// Run 依次执行队列里已有的任务。
+func (q *spawnQueue) Run() {
+	q.draining = true
+	defer func() { q.draining = false }()
+	for _, fn := range q.queued {
+		fn()
+	}
+	q.queued = nil
+}
+
 func (h *harness) wakeCount() int {
 	h.wakeMu.Lock()
 	defer h.wakeMu.Unlock()
@@ -153,8 +179,8 @@ func TestLoadReadsCountsCollectionsAndTags(t *testing.T) {
 func TestFilterChangeAppliesImmediatelyAndRecountsWithTheNewQuery(t *testing.T) {
 	h := newHarness(t)
 	// 让后台读取排队不执行，证明筛选在读取之前就已经生效（渲染层 updateFilters 先 set 再 void refreshAll）。
-	var queued []func()
-	h.store.Spawn = func(fn func()) { queued = append(queued, fn) }
+	var queue spawnQueue
+	h.store.Spawn = queue.Spawn
 	h.store.SetScope(h.ctx, services.LibraryScopeFavorites)
 	if got := h.store.View().Filters.Scope; got != services.LibraryScopeFavorites {
 		t.Fatalf("筛选没有立即生效：%q", got)
@@ -162,9 +188,7 @@ func TestFilterChangeAppliesImmediatelyAndRecountsWithTheNewQuery(t *testing.T) 
 	if len(h.svc.CountQueries()) != 0 {
 		t.Fatal("读取不该在界面线程里同步发生")
 	}
-	for _, fn := range queued {
-		fn()
-	}
+	queue.Run()
 	if q := h.lastQuery(); q.Scope != services.LibraryScopeFavorites {
 		t.Errorf("计数查询的范围 %q", q.Scope)
 	}

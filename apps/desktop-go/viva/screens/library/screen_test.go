@@ -424,17 +424,17 @@ func TestEditFailureKeepsDialogOpenAndExplainsWhy(t *testing.T) {
 // 提交在途时再按回车或再点确认不会发出第二个请求（台账 C-005）。
 func TestSubmitIsIgnoredWhileARequestIsInFlight(t *testing.T) {
 	r := newRig(t)
-	var queued []func()
-	r.store.Spawn = func(fn func()) { queued = append(queued, fn) }
+	var queue spawnQueue
+	r.store.Spawn = queue.Spawn
 	r.click(gfx.RoleButton, locales.LibraryNewCollection())
 	r.typeText("读书")
 	r.keys("Enter")
 	r.keys("Enter")
 	r.click(gfx.RoleButton, locales.CommonConfirm())
-	if len(queued) != 1 {
-		t.Fatalf("在途期间排了 %d 个后台请求，期望 1", len(queued))
+	if len(queue.queued) != 1 {
+		t.Fatalf("在途期间排了 %d 个后台请求，期望 1", len(queue.queued))
 	}
-	queued[0]()
+	queue.Run()
 	r.frames(3)
 	if r.has(gfx.RoleHeading, locales.LibraryNewCollection()) {
 		t.Error("请求完成后弹窗应关闭")

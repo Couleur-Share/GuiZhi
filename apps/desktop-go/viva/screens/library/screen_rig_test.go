@@ -240,12 +240,12 @@ func (r *rig) focusedIs(role gfx.Role, name string) bool {
 // view 是 Store 此刻的快照。
 func (r *rig) view() View { return r.store.View() }
 
-// mutating 是服务收到的变更类调用（读取类的 Counts / Collections / Tags 不算）。
+// mutating 是服务收到的变更类调用（读取类的 Counts / Collections / Tags / List 不算）。
 func (r *rig) mutating() []string {
 	var out []string
 	for _, call := range r.svc.Calls() {
 		switch call {
-		case "Counts", "Collections", "Tags":
+		case "Counts", "Collections", "Tags", "List":
 		default:
 			out = append(out, call)
 		}
