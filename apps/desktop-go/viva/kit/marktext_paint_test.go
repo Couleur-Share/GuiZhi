@@ -95,7 +95,7 @@ func TestTextMarkedVerticalCentering(t *testing.T) {
 		ui.Column(c).Fill().Background(white).Children(func() {
 			for i, tc := range cases {
 				cc := c.Key(fmt.Sprintf("case-%d", i))
-				ui.Column(cc).Absolute().Left(10).Top(float32(10+i*pitch)).Width(217).Children(func() {
+				ui.Column(cc).Absolute().Left(10).Top(float32(10 + i*pitch)).Width(217).Children(func() {
 					l.TextMarked(cc.Key("m"), "好的设计是尽可能少的设计", "设计", tc.size, tc.line, tc.weight, black, MarkOptions{})
 				})
 			}
@@ -143,7 +143,7 @@ func TestMarkShapeMatchesRoundedPath(t *testing.T) {
 			for i, tc := range cases {
 				for side := 0; side < 2; side++ {
 					cc := c.Key(fmt.Sprintf("shape-%d-%d", i, side))
-					ui.Column(cc).Absolute().Left(float32(10+side*offset)).Top(float32(10+i*pitch)).Width(tc.w).Height(tc.h).
+					ui.Column(cc).Absolute().Left(float32(10 + side*offset)).Top(float32(10 + i*pitch)).Width(tc.w).Height(tc.h).
 						Draw(func(d *ui.DrawContext) {
 							if side == 0 {
 								PaintRoundedCorners(d, d.Rect, markBg, tc.rl, tc.rr, tc.rr, tc.rl)
