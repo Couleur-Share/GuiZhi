@@ -42,7 +42,8 @@ var checkMark = gfx.Icon{
 	},
 }
 
-// Checkbox 画一个复选框，*checked 在点击与按键时翻转。返回方框这个控件（Clicked / Changed 照常可用）。
+// Checkbox 画一个复选框，*checked 在点击与按键时翻转，返回时已含本帧的翻转（调用方可以立刻与旧值比较）。
+// 返回方框这个控件（Clicked / Changed 照常可用）。
 func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 	t := l.T
 	var box ui.Box
@@ -85,5 +86,9 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 				l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)
 			}
 		})
+	// 方框翻转的值要在返回前就落到 *checked 上：ui.CheckboxBase 只在第一次问 Clicked / Changed 或本页结束时才写入，
+	// 调用方在同一帧里拿 *checked 与调用前比较（表格的行选择框、表头的全选框）会一直看到旧值，点击就丢了。
+	// 悬停与选中的过渡目标在上面已按旧值算过，所以画面的时间线不变：点击这一帧还是旧状态，下一帧才是新状态。
+	_ = box.Changed()
 	return box
 }
