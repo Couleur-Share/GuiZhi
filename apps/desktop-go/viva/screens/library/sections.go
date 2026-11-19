@@ -1,6 +1,7 @@
 package library
 
 import (
+	"cmp"
 	"strings"
 
 	"github.com/vivaui/viva/gfx"
@@ -68,6 +69,17 @@ func (s *Screen) hint(c ui.C, key, text string) {
 	})
 }
 
+// loadFailed 在分区的位置声明读取失败的错误态（台账 B-036；渲染层把读不出来画成空态，这里按 AGENTS.md 画成错误态）：
+// 原因加「重试」，重试重新读取三份数据。是 min-height:auto 的普通弹性项，key 区分各分区里的那一个。
+func (s *Screen) loadFailed(c ui.C, key, message string) {
+	s.flex.Item(kit.FlexItem{Shrink: true, MinAuto: true})
+	ui.Column(c.Key("failed-" + key)).FillWidth().Children(func() {
+		if s.Look.LoadErrorState(c, message) {
+			s.Store.Load(s.Ctx)
+		}
+	})
+}
+
 // collectionGlyph 是合集行的图标：有 emoji 画 emoji（text-sm leading-none），否则是 16px 的文件夹。
 func (s *Screen) collectionGlyph(icon string) func(c ui.C, fg tokens.Color) {
 	l := s.Look
@@ -85,6 +97,10 @@ func (s *Screen) collectionsSection(c ui.C, v View, view kit.ScrollView) {
 			s.openEdit(editCreateCollection, services.LibraryCollection{}, services.LibraryTag{})
 		}
 	})
+	if v.CollectionsError != "" { // 从没读到过：不能画成「还没有合集」（B-036）
+		s.loadFailed(c, "collections", v.CollectionsError)
+		return
+	}
 	if len(v.Collections) == 0 {
 		s.hint(c, "collections", locales.LibraryNoCollections())
 		return
@@ -110,6 +126,10 @@ func (s *Screen) collectionsSection(c ui.C, v View, view kit.ScrollView) {
 func (s *Screen) platformsSection(c ui.C, v View) {
 	l := s.Look
 	s.sectionHeading(c, "platforms", locales.LibraryPlatforms(), nil)
+	if v.CountsError != "" { // 平台来自计数；计数从没读到过时不能画成「采集网页或视频后按来源分组」（B-036）
+		s.loadFailed(c, "platforms", v.CountsError)
+		return
+	}
 	var shown []string
 	for _, p := range SourcePlatforms {
 		if countOf(v.Counts, byPlatform, p) > 0 || p == v.Filters.Platform {
@@ -143,6 +163,12 @@ func tagVisible(v View, tag services.LibraryTag) bool {
 // 开关刻意不持久化：它是「清理一下」时才用的临时视图。标签行与合集行一样只声明看得见的几行（台账 B-035）。
 func (s *Screen) tagsSection(c ui.C, v View, view kit.ScrollView) {
 	l := s.Look
+	// 标签列表或计数从没读到过：哪些标签有条目是由计数定的，读不出来时整个分区画成错误态，不画成「在条目详情中添加标签」（B-036）。
+	if reason := cmp.Or(v.TagsError, v.CountsError); reason != "" {
+		s.sectionHeading(c, "tags", locales.LibraryTags(), nil)
+		s.loadFailed(c, "tags", reason)
+		return
+	}
 	var unused int
 	for _, tag := range v.Tags {
 		if !tagVisible(v, tag) {
@@ -207,6 +233,12 @@ func (s *Screen) trashSection(c ui.C, v View) {
 	}
 	s.flex.Item(kit.FlexItem{Shrink: true, MinAuto: true, MarginTopAuto: true})
 	ui.Column(c.Key("trash")).FillWidth().PadTop(l.Space(4)).Children(func() {
+		if v.CountsError != "" { // 回收站的数字读不出来：不画成没有计数的一行（B-036）
+			if l.LoadErrorState(c, v.CountsError) {
+				s.Store.Load(s.Ctx)
+			}
+			return
+		}
 		s.rowBox(c, rowSpec{
 			Key:   "trash",
 			Icon:  func(c ui.C, fg tokens.Color) { l.Icon(c, icons.Trash2, l.Rem(1), fg) },

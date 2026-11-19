@@ -39,6 +39,9 @@ type View struct {
 	Counts      *services.LibraryCounts
 	Collections []services.LibraryCollection
 	Tags        []services.LibraryTag
+	// 三份读取各自的失败原因（台账 B-036，渲染层没有这个状态）：只在「这份数据从没成功读到过、且最近一次读取失败」时非空，
+	// 侧栏据此在对应分区的位置显示错误态而不是空态；读到过之后的刷新失败只留日志，不清已有的数据，也不进这里。
+	CountsError, CollectionsError, TagsError string
 }
 
 // DeletionUndoWindow 是删除合集、标签后的撤销窗口，与撤销提示条的停留时长一致（渲染层 DELETION_UNDO_WINDOW_MS）。
@@ -60,6 +63,8 @@ type Store struct {
 
 	mu   sync.Mutex
 	view View
+	// 合集与标签是否成功读到过（B-036：只有从没读到过时，读取失败才进错误态）。
+	collectionsLoaded, tagsLoaded bool
 
 	// countsSeq 是计数请求的序号：请求可能乱序返回，不能让旧筛选的数字覆盖新筛选（渲染层 countsRequestSeq）。
 	countsSeq int
@@ -175,13 +180,15 @@ func (s *Store) RefreshCounts(ctx context.Context) {
 		s.mu.Unlock()
 		return
 	}
-	if err == nil {
-		s.view.Counts = &counts
+	switch {
+	case err == nil:
+		s.view.Counts, s.view.CountsError = &counts, ""
+	case s.view.Counts == nil: // 从没读到过：侧栏要显示错误态（B-036）；读到过的数字留着
+		s.view.CountsError = err.Error()
 	}
 	s.mu.Unlock()
 	if err != nil {
 		s.guard.Background("library.counts", fmt.Errorf("加载侧栏计数失败：%w", err))
-		return
 	}
 	s.wake()
 }

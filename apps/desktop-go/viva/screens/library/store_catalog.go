@@ -109,26 +109,36 @@ func (s *Store) visibleTagsLocked(all []services.LibraryTag) []services.LibraryT
 // FetchCollections 重新读取合集。读取失败不打扰用户（没有用户动作），只进日志。
 func (s *Store) FetchCollections(ctx context.Context) {
 	list, err := s.svc.Collections(ctx)
+	s.mu.Lock()
+	switch {
+	case err == nil:
+		s.view.Collections, s.view.CollectionsError = s.visibleCollectionsLocked(list), ""
+		s.collectionsLoaded = true
+	case !s.collectionsLoaded: // 从没读到过：侧栏要显示错误态（B-036）；读到过的列表留着
+		s.view.CollectionsError = err.Error()
+	}
+	s.mu.Unlock()
 	if err != nil {
 		s.guard.Background("library.collections", fmt.Errorf("加载集合列表失败：%w", err))
-		return
 	}
-	s.mu.Lock()
-	s.view.Collections = s.visibleCollectionsLocked(list)
-	s.mu.Unlock()
 	s.wake()
 }
 
 // FetchTags 重新读取标签。
 func (s *Store) FetchTags(ctx context.Context) {
 	list, err := s.svc.Tags(ctx)
+	s.mu.Lock()
+	switch {
+	case err == nil:
+		s.view.Tags, s.view.TagsError = s.visibleTagsLocked(list), ""
+		s.tagsLoaded = true
+	case !s.tagsLoaded: // 同上
+		s.view.TagsError = err.Error()
+	}
+	s.mu.Unlock()
 	if err != nil {
 		s.guard.Background("library.tags", fmt.Errorf("加载标签列表失败：%w", err))
-		return
 	}
-	s.mu.Lock()
-	s.view.Tags = s.visibleTagsLocked(list)
-	s.mu.Unlock()
 	s.wake()
 }
 
