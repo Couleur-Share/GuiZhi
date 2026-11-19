@@ -138,6 +138,7 @@ func (p tablePair) same(t *testing.T, step string) {
 
 // 一页 100 行：窗口每帧只声明视口附近的行，并且每一行都量过（整页声明那一帧量的）。
 func TestTableDeclaresOnlyTheRowsNearTheViewport(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	p := openTablePair(t, tableOpts{pageSize: 100, preselect: -1})
 	n := len(p.win.view().List.Entries)
 	if n != 100 {
@@ -169,6 +170,7 @@ func TestTableDeclaresOnlyTheRowsNearTheViewport(t *testing.T) {
 
 // 滚轮：小步、大步、跳到底、跳回顶，每一步都与整页声明逐像素相同（吸附的表头与操作列也在其中）。
 func TestTableWindowMatchesTheFullTableWhileScrolling(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	p := openTablePair(t, tableOpts{pageSize: 100, preselect: -1})
 	for _, dy := range []float32{37, 300, 1700, 5000, -2200, 100000, -100000, 450, 9, 1e7, -1e7} {
 		p.scroll(t, dy)
@@ -185,6 +187,7 @@ func TestTableWindowMatchesTheFullTableWhileScrolling(t *testing.T) {
 
 // 键盘：方向键、End、Home 移动选中行，选中行按 scrollIntoView({block:"nearest"}) 滚进视口，落点与整页声明一致。
 func TestTableKeysMatchTheFullTable(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	p := openTablePair(t, tableOpts{pageSize: 100, preselect: -1})
 	for _, key := range []string{"down", "down", "down", "end", "up", "up", "home", "down", "end"} {
 		p.each(func(r *rig) { r.press(key) })
@@ -205,6 +208,7 @@ func TestTableKeysMatchTheFullTable(t *testing.T) {
 
 // 挂载时已有选中行（先在卡片视图里选了、再切到表格）：纵向按「最近」滚进视口，与整页声明一致；选中的行在窗口之外也一样。
 func TestTableRevealsAPreselectedRowOutsideTheWindow(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	p := openTablePair(t, tableOpts{pageSize: 100, preselect: 70})
 	p.same(t, "挂载")
 	first, last := p.win.screen.table.window.Declared()
@@ -226,6 +230,7 @@ func TestTableRevealsAPreselectedRowOutsideTheWindow(t *testing.T) {
 // 选中行滚进视口的绝对落点（参照对拍看不出两边同时错的接线）：带着选中行切到表格时，表格横向滚过内边距那一段，
 // 渲染层 scrollIntoView 的真实呈现，默认列下 17px；以及末行只露出下沿（nearest），不靠到最大滚动量——后面还有 13px 的内边距与边框。
 func TestTableRevealsTheSelectedRowTheWayTheBrowserDoes(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	// 夹具的工作区（1040px）比默认列的最小宽度宽、表格不溢出；标题列加宽之后才有横向的可滚范围。
 	plain := openTable(t, tableOpts{pageSize: 100, preselect: -1, setup: widenTitle(480)})
 	selected := openTable(t, tableOpts{pageSize: 100, preselect: 0, setup: widenTitle(480)})
@@ -260,6 +265,7 @@ func TestTableRevealsTheSelectedRowTheWayTheBrowserDoes(t *testing.T) {
 // 复选框是套件控件，不在行的悬停分组里，行的悬停底色靠 checkHover 补：指针停在复选框上时标记要一直留着，
 // 不能被「行滚出窗口」的清理误清掉。
 func TestTableKeepsTheCheckboxHoverWhileThePointerStaysOnIt(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	var e services.LibraryEntry
 	for _, c := range r.view().List.Entries {
@@ -277,6 +283,7 @@ func TestTableKeepsTheCheckboxHoverWhileThePointerStaysOnIt(t *testing.T) {
 
 // 换页：整页内容换了，行高全部作废、整页声明一帧量完再窗口化。参照是直接打开第 2 页的新会话（没有第 1 页留下的任何东西）。
 func TestTableMeasuresEveryRowAgainAfterPaging(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	win := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	win.wheel(t, 1500)
 	win.store.SetPage(win.screen.Ctx, 2)
@@ -307,6 +314,7 @@ func widenTitle(width float32) func(s *Screen) {
 // 列宽变了：标题列的宽度决定标题折成几行，行高跟着变；窗口据此重量（tableEpoch），不能拿旧的高度。
 // 参照是直接以那个列宽打开的新会话。
 func TestTableMeasuresEveryRowAgainWhenAColumnChangesWidth(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	win := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	win.wheel(t, 1800)
 	for _, width := range []float32{150, 520, 280} {
@@ -322,6 +330,7 @@ func TestTableMeasuresEveryRowAgainWhenAColumnChangesWidth(t *testing.T) {
 // 列的显隐变了：表格比最小宽度宽时各列按比例放大，隐藏一列让其余列（含标题列）变宽、标题折行随之变；
 // 列宽自己没变，窗口靠列的 ID 认出这次变化。参照是直接以那组列打开的新会话。
 func TestTableMeasuresEveryRowAgainWhenAColumnIsHidden(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	win := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	win.wheel(t, 1800)
 	win.screen.toggleColumn(colSnippet)
@@ -336,6 +345,7 @@ func TestTableMeasuresEveryRowAgainWhenAColumnIsHidden(t *testing.T) {
 
 // 字号档变了（根字号 16 → 18）：行高随之变，窗口靠 Epoch.RootPx 重量；参照是直接以那个字号档打开的新会话。
 func TestTableMeasuresEveryRowAgainWhenTheFontTierChanges(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	win := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	win.wheel(t, 1800)
 	win.look.RootPx = 18
@@ -348,6 +358,7 @@ func TestTableMeasuresEveryRowAgainWhenTheFontTierChanges(t *testing.T) {
 // 各列宽度此消彼长、总宽不变（表格宽度也不变）：行列只核对自己的宽度，看不出这次变化，靠 epoch 里的各列宽度；
 // 标题列的有效宽度变了（260 → 360px），折行随之变。参照是直接以那组列宽打开的新会话。
 func TestTableMeasuresEveryRowAgainWhenColumnWidthsTradeOffWithoutChangingTheTableWidth(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	entries := servicestest.GenerateEntries(400)
 	for i := range entries {
 		if entries[i].Title != "" {
@@ -380,6 +391,7 @@ func TestTableMeasuresEveryRowAgainWhenColumnWidthsTradeOffWithoutChangingTheTab
 
 // 条目就地改了标题（同一个 ID、内容换了）：行的键没变，靠 EntriesRev 让窗口重量；参照是直接以改后的数据打开的新会话。
 func TestTableMeasuresEveryRowAgainWhenTitlesAreEditedInPlace(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	original := servicestest.GenerateEntries(400)
 	edited := servicestest.GenerateEntries(400)
 	for i := range edited {
@@ -398,6 +410,7 @@ func TestTableMeasuresEveryRowAgainWhenTitlesAreEditedInPlace(t *testing.T) {
 // RowContentTop（对照场景用它算要滚多远）在窗口里与整页声明一致，窗口不在顶部时也一样；
 // 而窗口用的行列上沿（tableTop + headHeight）与实际画出来的位置相符。
 func TestTableRowContentTopMatchesTheFullTable(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	p := openTablePair(t, tableOpts{pageSize: 100, preselect: -1})
 	top0, ok := p.win.screen.RowContentTop(0)
 	if !ok {
@@ -441,6 +454,7 @@ func TestTableRowContentTopMatchesTheFullTable(t *testing.T) {
 // 整页内容换了（翻页）：行高全部作废，下一帧整页声明、行高要到绘制之后才量到——这一帧结束时位置只是估计，
 // RowContentTop 不能把它当真（对照场景据此决定滚多远）；再出一帧量完之后才可读。
 func TestTableRowContentTopWaitsForEveryRowToBeMeasured(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	if _, ok := r.screen.RowContentTop(0); !ok {
 		t.Fatal("前提不成立：稳定之后第 0 行的位置应可读")
@@ -459,6 +473,7 @@ func TestTableRowContentTopWaitsForEveryRowToBeMeasured(t *testing.T) {
 // 复选框的悬停记在行外（checkHover）：它所在的行滚出窗口、不再声明时标记要清掉，
 // 否则滚回来的第一帧那一行会凭旧标记亮一下（行自己的悬停处理没机会清它）。
 func TestTableForgetsTheCheckboxHoverOfARowThatLeftTheWindow(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r := openTable(t, tableOpts{pageSize: 100, preselect: -1})
 	entries := r.view().List.Entries
 	r.screen.table.checkHover = entries[3].ID
@@ -473,6 +488,7 @@ func TestTableForgetsTheCheckboxHoverOfARowThatLeftTheWindow(t *testing.T) {
 
 // 一页 20 行（默认）：窗口把整页都声明了，滚动区不被标成窗口化，Tab 照常走遍每一行并把它滚进视野——与窗口化之前一样（台账 B-030）。
 func TestTableTabReachesEveryRowOfADefaultPage(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r := wsRig(t)
 	r.click(gfx.RoleButton, locales.LibraryViewList())
 	r.frames(6)

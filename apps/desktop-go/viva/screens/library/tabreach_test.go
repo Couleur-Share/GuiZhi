@@ -60,6 +60,7 @@ func (r *rig) focusedLabel() (label string, inView bool, ok bool) {
 
 // 一路按 Tab：每个合集行、每个平台行的主按钮都轮得到，而且每次聚焦的控件都在视野里（滚动区跟着滚）。
 func TestTabVisitsEveryRowOfAScrolledSidebar(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r, collections, platforms := manyRowsRig(t)
 	visited := map[string]bool{}
 	last := platforms[len(platforms)-1]
@@ -84,6 +85,7 @@ func TestTabVisitsEveryRowOfAScrolledSidebar(t *testing.T) {
 // 走到底（回收站，侧栏的最后一个停靠点）之后一路按 Shift+Tab 回头：能回到最上面的范围页签（页签此时早已滚出视野），
 // 聚焦时它在视野里。
 func TestShiftTabReachesTheScopeTabsFromTheBottom(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	r, _, _ := manyRowsRig(t)
 	const bottom = "回收站"
 	for i := 0; i < 400; i++ {
@@ -116,6 +118,7 @@ func TestShiftTabReachesTheScopeTabsFromTheBottom(t *testing.T) {
 // 侧栏刚好往下滚了一点，最上面一排页签只露出一部分：键盘把焦点交给它时，滚动区要把它完全滚进视野
 // （浏览器对聚焦元素的对齐是 CenterIfNeeded：露出一部分就近靠边）。页签没有登记成停靠点，这一步就不会发生。
 func TestTabScrollsAPartlyHiddenScopeTabFullyIntoView(t *testing.T) {
+	t.Parallel() // 每个会话自带外观与页面、互不共享状态；并行压低整包耗时（表格窗口化的对拍测试占了约 7 s）
 	for _, dy := range []float32{20, 30} {
 		t.Run(fmt.Sprintf("滚%.0f", dy), func(t *testing.T) {
 			r, _, _ := manyRowsRig(t)

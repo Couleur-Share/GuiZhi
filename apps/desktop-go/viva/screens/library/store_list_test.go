@@ -185,6 +185,25 @@ func TestListSortAndPageSizeGoBackToThePageOne(t *testing.T) {
 	}
 }
 
+// 每页条数与页码都不会掉到 1 以下：越界的输入夹回 1，不会算出零页（总页数除以每页条数）或负的偏移。
+func TestListPageSizeAndPageNeverDropBelowOne(t *testing.T) {
+	h := listHarness(t)
+	h.store.Load(h.ctx)
+	h.store.SetPageSize(h.ctx, 0)
+	q := lastListQuery(h)
+	if v := h.store.View().List; v.PageSize != 1 || q.Limit != 1 || len(v.Entries) != 1 {
+		t.Fatalf("每页 0 条应夹回 1：每页 %d，条数 %d，查询 %+v", v.PageSize, len(v.Entries), q)
+	}
+	h.store.SetPageSize(h.ctx, -7)
+	if v := h.store.View().List; v.PageSize != 1 {
+		t.Fatalf("每页 -7 条应夹回 1，实际 %d", v.PageSize)
+	}
+	h.store.SetPage(h.ctx, -3)
+	if v := h.store.View().List; v.Page != 1 || lastListQuery(h).Offset != 0 {
+		t.Fatalf("第 -3 页应夹回第 1 页（偏移 0）：页 %d，查询 %+v", v.Page, lastListQuery(h))
+	}
+}
+
 // 搜索：回到第一页、清掉多选，发给后端的是去掉首尾空白的词，侧栏计数也带上它；
 // 结果出来后详情若还停在不在结果里的条目上就清掉；结果里有它就保留；清空搜索不动选中项。
 func TestListSearchResetsPagingAndClearsDetailOutsideResults(t *testing.T) {
