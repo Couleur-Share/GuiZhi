@@ -299,6 +299,100 @@ func TestListSelectionRules(t *testing.T) {
 	}
 }
 
+// 键盘移动选中项（渲染层 use-item-keyboard.ts 的 moveTo）：没有选中时 ↓ 落在第一条、↑ 落在最后一条，
+// 到头不循环，目标就是已选中的那条时不动也不唤醒界面，选中项不在本页（陈旧）按没有选中算，
+// 本页没有条目时什么也不做，多选集合不受影响。
+func TestMoveSelectionFollowsTheKeyboardRules(t *testing.T) {
+	h := listHarness(t)
+	h.store.Load(h.ctx)
+	ids := entryIDs(h.store.View().List)
+	selected := func() string { return h.store.View().List.SelectedID }
+	// moved 执行一次移动，返回是否唤醒了界面。
+	moved := func(m Move) bool {
+		before := h.wakeCount()
+		h.store.MoveSelection(m)
+		return h.wakeCount() > before
+	}
+
+	if !moved(MoveNext) || selected() != ids[0] {
+		t.Fatalf("没有选中时 ↓ 落在第一条：%q", selected())
+	}
+	if !moved(MoveNext) || selected() != ids[1] {
+		t.Fatalf("↓ 选下一条：%q", selected())
+	}
+	if !moved(MovePrev) || selected() != ids[0] {
+		t.Fatalf("↑ 选上一条：%q", selected())
+	}
+	if moved(MovePrev) || selected() != ids[0] {
+		t.Fatalf("到顶不循环、没有变化就不唤醒：%q", selected())
+	}
+	if !moved(MoveLast) || selected() != ids[19] {
+		t.Fatalf("End 选本页最后一条：%q", selected())
+	}
+	if moved(MoveNext) || moved(MoveLast) || selected() != ids[19] {
+		t.Fatalf("到底不循环：%q", selected())
+	}
+	if !moved(MoveFirst) || selected() != ids[0] || moved(MoveFirst) {
+		t.Fatalf("Home 选第一条，已在第一条时不动：%q", selected())
+	}
+
+	h.store.SelectItem("")
+	if !moved(MovePrev) || selected() != ids[19] {
+		t.Fatalf("没有选中时 ↑ 落在最后一条：%q", selected())
+	}
+	h.store.SelectItem("不在本页")
+	if !moved(MoveNext) || selected() != ids[0] {
+		t.Fatalf("选中项不在本页按没有选中算，↓ 落在第一条：%q", selected())
+	}
+	h.store.SelectItem("不在本页")
+	if !moved(MovePrev) || selected() != ids[19] {
+		t.Fatalf("选中项不在本页按没有选中算，↑ 落在最后一条：%q", selected())
+	}
+
+	h.store.SetSelection([]string{ids[3], ids[4]})
+	h.store.MoveSelection(MoveFirst)
+	if v := h.store.View().List; !slices.Equal(v.Selection, []string{ids[3], ids[4]}) {
+		t.Fatalf("移动选中项不动多选集合：%v", v.Selection)
+	}
+
+	h.store.SetSearch(h.ctx, "没有任何条目会命中这个词")
+	if n := len(h.store.View().List.Entries); n != 0 {
+		t.Fatalf("夹具失效：搜索之后本页应当没有条目，实际 %d", n)
+	}
+	h.store.SelectItem(ids[5])
+	if moved(MoveNext) || moved(MoveLast) || selected() != ids[5] {
+		t.Fatalf("本页没有条目时什么也不做：%q", selected())
+	}
+}
+
+// EntriesRev 数的是「条目数组被整体换掉」的次数：每次读取成功加一（哪怕内容一样），失败的读取不加。
+func TestEntriesRevCountsEveryReplacementOfTheEntries(t *testing.T) {
+	h := listHarness(t)
+	rev := func() int { return h.store.View().List.EntriesRev }
+	if rev() != 0 {
+		t.Fatalf("还没读过：%d", rev())
+	}
+	h.store.Load(h.ctx)
+	first := rev()
+	if first == 0 {
+		t.Fatal("读到第一页之后应当加一")
+	}
+	h.store.FetchList(h.ctx)
+	if rev() != first+1 {
+		t.Fatalf("内容一样的重新读取也算换了数组：%d → %d", first, rev())
+	}
+	h.svc.FailOn("List", errors.New("数据库繁忙"))
+	h.store.FetchList(h.ctx)
+	if rev() != first+1 {
+		t.Fatalf("读取失败不换数组：%d", rev())
+	}
+	h.svc.FailOn("List", nil)
+	h.store.SetSort(h.ctx, services.LibrarySortTitle, services.LibraryOrderAsc)
+	if rev() != first+2 {
+		t.Fatalf("排序换了读取：%d", rev())
+	}
+}
+
 // 翻页保留多选（渲染层「翻页保留冻结的 ID」）：跨页选择是批量操作的基础。
 func TestListPagingKeepsTheSelection(t *testing.T) {
 	h := listHarness(t)

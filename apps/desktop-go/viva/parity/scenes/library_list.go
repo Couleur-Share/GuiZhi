@@ -91,6 +91,22 @@ const (
 	listSidebarScroll          float32 = 4000
 )
 
+// listKeys 按一个键 times 次（对应 React 采集器的 pressKeys）：窗口级键盘（方向键、Home、End，B-045）的整窗对照；
+// 每次按完等画面落定。键盘焦点不在任何控件上（没有按过 Tab），与 React 一侧「焦点在 body」一致。
+func listKeys(key string, times int) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		for range times {
+			if err := s.Keys(key); err != nil {
+				return err
+			}
+			if err := s.Rest(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 // listWaitSpinner 让读取中的转圈走过 250 ms 的延迟与淡入（React 一侧等 600 ms 才取图）。
 func listWaitSpinner(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
 	return s.Advance(600 * time.Millisecond)
@@ -305,4 +321,8 @@ func init() {
 	reg("app.window.library.list-filters-open", list, listChain(listApplyFacets(facetsThree...), listOpenFilterSummary), parkKeepFocus,
 		append([]parity.Waiver{overlayInkWaiver}, cards...)...)
 	reg("app.window.library.list-page2", list, listChain(listPickPageSize("10"), listClickButton("下一页")), parkAll, cards...)
+	// 窗口级键盘（B-045）：方向键移动选中，选中行被移出视野时滚进视野（虚拟列表 scrollToIndex 的 auto 对齐，台账 B-029）。
+	reg("app.window.library.list-keys-down", list, listKeys("down", 12), parkAll, cards...)
+	reg("app.window.library.list-keys-end", list, listKeys("end", 1), parkAll, cards...)
+	reg("app.window.library.list-keys-up", list, listChain(listKeys("end", 1), listKeys("up", 14)), parkAll, cards...)
 }

@@ -81,6 +81,7 @@ func (s *Screen) cardRows(c ui.C, v View, view kit.ScrollView) {
 	query := list.searchTerm()
 	s.pane.window.Seed = cardSeed
 	s.pane.window.Overscan = 8
+	s.pane.reveal.noteReveal(list, &s.pane.window)
 	s.pane.window.Rows(c, kit.RowsSpec{
 		Name: "cards", N: len(list.Entries), View: view,
 		Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang())},

@@ -1,0 +1,3064 @@
+{
+  "variant": "light-royal-blue-medium-1280x800",
+  "cases": [
+    {
+      "id": "A1",
+      "title": "↓ 连按 22 次（从没有选中开始，页内 20 条）",
+      "rows": [
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 2,
+          "row": [
+            90,
+            135.25
+          ],
+          "card": [
+            96,
+            135.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 3,
+          "row": [
+            135,
+            199.5
+          ],
+          "card": [
+            141,
+            199.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 4,
+          "row": [
+            200,
+            283.75
+          ],
+          "card": [
+            206,
+            283.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 5,
+          "row": [
+            284,
+            329.25
+          ],
+          "card": [
+            290,
+            329.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 6,
+          "row": [
+            329,
+            393.5
+          ],
+          "card": [
+            335,
+            393.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 7,
+          "row": [
+            394,
+            439.25
+          ],
+          "card": [
+            400,
+            439.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 8,
+          "row": [
+            439,
+            484.25
+          ],
+          "card": [
+            445,
+            484.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 9,
+          "row": [
+            484,
+            548.5
+          ],
+          "card": [
+            490,
+            548.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 10,
+          "row": [
+            549,
+            594.25
+          ],
+          "card": [
+            555,
+            594.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 1,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 11,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 46,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 12,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 91,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 13,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 136,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 14,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 181,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 15,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 226,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 16,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 271,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 17,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 316,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 18,
+          "row": [
+            593,
+            638.25
+          ],
+          "card": [
+            599,
+            638.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A1",
+          "key": "ArrowDown",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "title": "End、Home、End、↑ ×3",
+      "rows": [
+        {
+          "label": "A2",
+          "key": "End",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A2",
+          "key": "Home",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A2",
+          "key": "End",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A2",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 18,
+          "row": [
+            540,
+            585.25
+          ],
+          "card": [
+            546,
+            585.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A2",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 17,
+          "row": [
+            495,
+            540.25
+          ],
+          "card": [
+            501,
+            540.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A2",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 16,
+          "row": [
+            450,
+            495.25
+          ],
+          "card": [
+            456,
+            495.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "title": "Home 之后 ↑（到头不循环）",
+      "rows": [
+        {
+          "label": "A3",
+          "key": "Home",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A3",
+          "key": "ArrowUp",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "title": "修饰键：Shift+↓、Ctrl+↓、Alt+↓、Ctrl+Home（Home 之后各按一次）",
+      "rows": [
+        {
+          "label": "A4",
+          "key": "Home",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A4",
+          "key": "Shift+ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A4",
+          "key": "Control+ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A4",
+          "key": "Alt+ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A4",
+          "key": "Control+Home",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A5",
+      "title": "没有选中时 ↑",
+      "rows": [
+        {
+          "label": "A5",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A6",
+      "title": "焦点在「下一页」按钮上按 ↓ ×2",
+      "rows": [
+        {
+          "label": "A6",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:下一页",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A6",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:下一页",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A7",
+      "title": "End 之后 ↑ ×16（选中项越过视口上沿）",
+      "rows": [
+        {
+          "label": "A7",
+          "key": "End",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 19,
+          "row": [
+            585,
+            630.25
+          ],
+          "card": [
+            591,
+            630.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 18,
+          "row": [
+            540,
+            585.25
+          ],
+          "card": [
+            546,
+            585.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 17,
+          "row": [
+            495,
+            540.25
+          ],
+          "card": [
+            501,
+            540.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 16,
+          "row": [
+            450,
+            495.25
+          ],
+          "card": [
+            456,
+            495.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 15,
+          "row": [
+            405,
+            450.25
+          ],
+          "card": [
+            411,
+            450.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 14,
+          "row": [
+            360,
+            405.25
+          ],
+          "card": [
+            366,
+            405.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 13,
+          "row": [
+            315,
+            360.25
+          ],
+          "card": [
+            321,
+            360.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 12,
+          "row": [
+            270,
+            315.25
+          ],
+          "card": [
+            276,
+            315.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 11,
+          "row": [
+            225,
+            270.25
+          ],
+          "card": [
+            231,
+            270.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 10,
+          "row": [
+            180,
+            225.25
+          ],
+          "card": [
+            186,
+            225.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 9,
+          "row": [
+            115,
+            179.5
+          ],
+          "card": [
+            121,
+            179.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 8,
+          "row": [
+            70,
+            115.25
+          ],
+          "card": [
+            76,
+            115.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 369,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 7,
+          "row": [
+            25,
+            70.25
+          ],
+          "card": [
+            31,
+            70.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 329,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 6,
+          "row": [
+            0,
+            64.5
+          ],
+          "card": [
+            6,
+            64.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 284,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 5,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 200,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 4,
+          "row": [
+            0,
+            83.75
+          ],
+          "card": [
+            6,
+            83.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "A7",
+          "key": "ArrowUp",
+          "scrollTop": 135,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 3,
+          "row": [
+            0,
+            64.5
+          ],
+          "card": [
+            6,
+            64.5
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "A8",
+      "title": "↓ ×20（间隔 80 ms）的 scrollTop 变化时间线",
+      "keyTimes": [
+        2,
+        107,
+        201,
+        293,
+        386,
+        480,
+        587,
+        679,
+        772,
+        880,
+        971,
+        1064,
+        1156,
+        1265,
+        1359,
+        1465,
+        1557,
+        1666,
+        1760,
+        1852
+      ],
+      "changes": [
+        [
+          0,
+          0
+        ],
+        [
+          1081,
+          1
+        ],
+        [
+          1171,
+          46
+        ],
+        [
+          1277,
+          91
+        ],
+        [
+          1369,
+          136
+        ],
+        [
+          1480,
+          181
+        ],
+        [
+          1568,
+          226
+        ],
+        [
+          1680,
+          271
+        ],
+        [
+          1769,
+          316
+        ],
+        [
+          1864,
+          369
+        ]
+      ]
+    },
+    {
+      "id": "B1",
+      "title": "↓↓ 选中第二条后空格 ×3（切换勾选）",
+      "rows": [
+        {
+          "label": "B1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B1",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": "1",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B1",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B1",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": "1",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "B2",
+      "title": "点击第 3 张卡片（按钮持有焦点）后按空格 ×2",
+      "afterClick": {
+        "scrollTop": 0,
+        "clientHeight": 638,
+        "scrollHeight": 1007,
+        "selectedIndex": 2,
+        "row": [
+          90,
+          135.25
+        ],
+        "card": [
+          96,
+          135.25
+        ],
+        "checked": [],
+        "bulkCount": null,
+        "mounted": [
+          0,
+          19
+        ],
+        "active": "button@row2:如何构建本地优先的个人知识库",
+        "page": "1 / 2"
+      },
+      "rows": [
+        {
+          "label": "B2",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 2,
+          "row": [
+            90,
+            135.25
+          ],
+          "card": [
+            96,
+            135.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row2:如何构建本地优先的个人知识库",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B2",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 2,
+          "row": [
+            90,
+            135.25
+          ],
+          "card": [
+            96,
+            135.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row2:如何构建本地优先的个人知识库",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "B3",
+      "title": "↓↓ 后空格、↓、空格（勾选跟着选中项走）",
+      "rows": [
+        {
+          "label": "B3",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": "1",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B3",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 2,
+          "row": [
+            90,
+            135.25
+          ],
+          "card": [
+            96,
+            135.25
+          ],
+          "checked": [
+            1
+          ],
+          "bulkCount": "1",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B3",
+          "key": " ",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 2,
+          "row": [
+            90,
+            135.25
+          ],
+          "card": [
+            96,
+            135.25
+          ],
+          "checked": [
+            1
+          ],
+          "bulkCount": "2",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B3",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 3,
+          "row": [
+            135,
+            199.5
+          ],
+          "card": [
+            141,
+            199.5
+          ],
+          "checked": [
+            1,
+            2
+          ],
+          "bulkCount": "2",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        },
+        {
+          "label": "B3",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 639,
+          "scrollHeight": 1007,
+          "selectedIndex": 4,
+          "row": [
+            200,
+            283.75
+          ],
+          "card": [
+            206,
+            283.75
+          ],
+          "checked": [
+            1,
+            2
+          ],
+          "bulkCount": "2",
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "title": "点击第 1 张卡片后 Tab ×30（焦点序列与滚动、挂载范围）",
+      "rows": [
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row1:产品设计原则：极简与克制",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row2:如何构建本地优先的个人知识库",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row3:Transformer 架构详解",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row4:一条标题很长很长、需要折成两行才",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row5:无标题",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row6:Designing Data-I",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row7:旅行计划：京都五日",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row8:小红书：极简桌面布置灵感",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row9:YouTube: The Fut",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row10:播客：产品经理的第一性原理",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 1,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -1,
+            44.25
+          ],
+          "card": [
+            5,
+            44.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row11:技术论坛：SQLite WAL ",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row12:会议纪要 2026-11-12",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row13:读书清单",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row14:视频：Rust 所有权三十分钟入",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row15:灵感：用颜色编码标签的方案",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row16:网页收藏：CSS 容器查询指南",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row17:AI 提示词工程笔记",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 346,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -346,
+            -300.75
+          ],
+          "card": [
+            -340,
+            -300.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row18:设计系统：语义令牌清单",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button@row19:小红书：咖啡拉花教程",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:每页",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:下一页",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "div:调整列表宽度",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:知识库",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:处理中心",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:AI 问答",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:Wiki",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:采集",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:设置",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:收起",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C1",
+          "key": "Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "input:",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "title": "再 Shift+Tab ×8",
+      "rows": [
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:收起",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:设置",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:采集",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:Wiki",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:AI 问答",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:处理中心",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:知识库",
+          "page": "1 / 2"
+        },
+        {
+          "label": "C2",
+          "key": "Shift+Tab",
+          "scrollTop": 361,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            -361,
+            -315.75
+          ],
+          "card": [
+            -355,
+            -315.75
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "div:调整列表宽度",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "D1",
+      "title": "指针停在第 4 张可见卡片上，按 ↓ ×14（选中项越过视口底部，列表程序化滚动）",
+      "hover": {
+        "label": "D1",
+        "point": [
+          436,
+          287.25
+        ],
+        "rowAtPointBefore": 3,
+        "scroll": {
+          "first": 0,
+          "last": 91
+        },
+        "atEnd": {
+          "hovered": 4,
+          "atPoint": 4
+        },
+        "everDiverged": false,
+        "catchUpMs": null,
+        "mouseEventsAfter": [
+          {
+            "type": "pointerout",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "pointerover",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "mouseout",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 935,
+            "row": 3
+          },
+          {
+            "type": "mouseover",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 935,
+            "row": 4
+          }
+        ],
+        "scrollEvents": 3
+      }
+    },
+    {
+      "id": "D2",
+      "title": "指针停在第 4 张可见卡片上，点「下一页」（内容整体替换，指针不动）",
+      "hover": {
+        "label": "D2",
+        "point": [
+          436,
+          287.25
+        ],
+        "rowAtPointBefore": 3,
+        "scroll": {
+          "first": 0,
+          "last": 0
+        },
+        "atEnd": {
+          "hovered": 3,
+          "atPoint": 3
+        },
+        "everDiverged": false,
+        "catchUpMs": null,
+        "mouseEventsAfter": [
+          {
+            "type": "pointerover",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          },
+          {
+            "type": "mouseover",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 11,
+            "row": 3
+          }
+        ],
+        "scrollEvents": 0
+      }
+    },
+    {
+      "id": "D3",
+      "title": "指针停在第 2 张可见卡片上，Tab ×14（焦点走出视口，浏览器把它滚进视野）",
+      "hover": {
+        "label": "D3",
+        "point": [
+          436,
+          187.63
+        ],
+        "rowAtPointBefore": 1,
+        "scroll": {
+          "first": 0,
+          "last": 346
+        },
+        "atEnd": {
+          "hovered": 7,
+          "atPoint": 7
+        },
+        "everDiverged": false,
+        "catchUpMs": null,
+        "mouseEventsAfter": [
+          {
+            "type": "pointerout",
+            "trusted": true,
+            "t": 814,
+            "row": 1
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "pointerleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "pointerover",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "pointerenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "mouseout",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "mouseleave",
+            "trusted": true,
+            "t": 815,
+            "row": 1
+          },
+          {
+            "type": "mouseover",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          },
+          {
+            "type": "mouseenter",
+            "trusted": true,
+            "t": 815,
+            "row": 7
+          }
+        ],
+        "scrollEvents": 2
+      }
+    }
+  ],
+  "initial": {
+    "scrollTop": 0,
+    "clientHeight": 638,
+    "scrollHeight": 1007,
+    "selectedIndex": null,
+    "row": null,
+    "card": null,
+    "checked": [],
+    "bulkCount": null,
+    "mounted": [
+      0,
+      19
+    ],
+    "active": "body",
+    "page": "1 / 2"
+  }
+}

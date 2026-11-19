@@ -50,6 +50,10 @@ type Screen struct {
 	// 下次再画时重新进入（EndFrame）。
 	mounted, shown bool
 
+	// wsShown 是这一帧画了工作区；wsActive 是上一帧画了（EndFrame 把前者交给后者）：窗口级键盘（keyboard.go）只在工作区挂着时生效，
+	// 按键发生在两次绘制之间，所以看上一帧的。
+	wsShown, wsActive bool
+
 	mu       sync.Mutex // 保护下面由后台写入的字段：界面线程在帧首取走
 	finished *editOutcome
 }
@@ -88,6 +92,10 @@ func (s *Screen) EndFrame() {
 		s.mounted = false
 	}
 	s.shown = false
+	s.wsActive, s.wsShown = s.wsShown, false
+	if !s.wsActive {
+		s.pane.reveal = cardReveal{} // 工作区卸载：下次挂载时已有选中行要重新滚进视野
+	}
 }
 
 // Enter 在知识库模块出现时调用（渲染层 LibraryWorkspace 与侧栏挂载）：重新读取智能视图与全部数据，

@@ -38,8 +38,11 @@ type rig struct {
 	look     *kit.Look
 	// hidden 为真时这一帧不画侧栏（模拟切到别的模块）。
 	hidden bool
-	nextID int
-	copied []string
+	// workspace 为真时侧栏右边画工作区（列表栏）；wsHidden 为真时这一帧不画它（模拟切到别的模块，侧栏仍在）。
+	workspace, wsHidden bool
+	canvas              gfx.Canvas
+	nextID              int
+	copied              []string
 }
 
 // libraryFixture 是常用的数据：两个合集、三个标签，其中一个标签没有条目。
@@ -87,6 +90,9 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 		m(r)
 	}
 
+	// 窗口级键盘（方向键、Home、End、空格，B-045）与生产同一处接线：经 Look.KeyHook，焦点从画布读。
+	r.look.KeyHook = func(e gfx.KeyEvent) gfx.EventResult { return r.screen.ListKey(e, &r.canvas) }
+
 	bg := r.look.Col(r.look.T.Background)
 	pg := ui.NewPage(ui.PageConfig{
 		View: func(c ui.C) {
@@ -98,15 +104,18 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 						r.screen.Panel(c)
 					}
 				})
+				if r.workspace && !r.wsHidden {
+					ui.Column(c.Key("ws")).Grow(1).MinWidth(0).FillHeight().Children(func() { r.screen.Workspace(c) })
+				}
 			})
 			r.screen.EndFrame()
 			r.look.Toasts(c, r.notifier)
 		},
 		Theme: &r.look.Theme, Background: &bg,
 	})
-	var canvas gfx.Canvas
-	config := pg.Config(app.Config{Title: t.Name(), Width: 1280, Height: 800, OnKey: r.look.OnKey})
-	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
+	config := pg.Config(app.Config{Title: t.Name(), Width: 1280, Height: 800})
+	config.OnKey = kit.KeyFirst(r.look.OnKey, config.OnKey) // 与窗口同一处接线（app.bindInput）：钩子在先，页面的按键路由在后
+	session, err := headless.Open(config, &r.canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)
 	}

@@ -22,6 +22,9 @@ var PageSizeOptions = []int{10, 20, 50, 100}
 // ListView 是条目列表此刻的快照；切片在 Store 里整体替换，快照拿到之后不会被改。
 type ListView struct {
 	Entries []services.LibraryEntry
+	// EntriesRev 是 Entries 被整体换掉的次数（渲染层里 entries 数组的引用变了）：界面据此重做「依赖 entries」的副作用
+	// （选中行滚进视野、内容换了之后悬停刷新）。
+	EntriesRev int
 	// Total 是符合筛选的总数（不是本页条数）。
 	Total          int
 	Page, PageSize int
@@ -129,6 +132,7 @@ func (s *Store) FetchList(ctx context.Context) {
 		}
 	}
 	l.Entries, l.Total, l.Loading, l.LoadError = page.Entries, page.Total, false, ""
+	l.EntriesRev++
 	// 有下一页就记下它的游标；没有就丢掉本页之后的全部游标。
 	if page.NextCursor != "" {
 		s.list.cursors[l.Page+1] = page.NextCursor
@@ -217,6 +221,52 @@ func (s *Store) SelectItem(id string) {
 	s.view.List.SelectedID = id
 	s.mu.Unlock()
 	s.wake()
+}
+
+// Move 是列表键盘的选中移动方式（渲染层 use-item-keyboard.ts 的 moveTo）。
+type Move uint8
+
+const (
+	MoveNext  Move = iota // ↓：没有选中时选第一条
+	MovePrev              // ↑：没有选中时选最后一条
+	MoveFirst             // Home
+	MoveLast              // End
+)
+
+// MoveSelection 按键盘的方式移动选中项（渲染层 use-item-keyboard.ts 的 moveTo）：目标夹在本页范围内（到头不循环），
+// 与已选中的是同一条就不动；本页没有条目时什么也不做。多选集合不受影响。
+func (s *Store) MoveSelection(m Move) {
+	s.mu.Lock()
+	l := &s.view.List
+	n := len(l.Entries)
+	if n == 0 {
+		s.mu.Unlock()
+		return
+	}
+	cur := slices.IndexFunc(l.Entries, func(e services.LibraryEntry) bool { return e.ID == l.SelectedID })
+	var to int
+	switch m {
+	case MoveNext:
+		to = cur + 1 // 没有选中（-1）时落在第一条
+	case MovePrev:
+		to = cur - 1
+		if cur < 0 {
+			to = n - 1
+		}
+	case MoveFirst:
+		to = 0
+	case MoveLast:
+		to = n - 1
+	}
+	to = max(0, min(to, n-1))
+	changed := l.Entries[to].ID != l.SelectedID
+	if changed {
+		l.SelectedID = l.Entries[to].ID
+	}
+	s.mu.Unlock()
+	if changed {
+		s.wake()
+	}
 }
 
 // ToggleSelection 切换一条在多选集合里的有无，并把它设为 Shift 范围选择的起点（渲染层 toggleSelection）。

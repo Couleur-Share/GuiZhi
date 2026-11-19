@@ -38,6 +38,8 @@ type listPane struct {
 	// window 窗口化卡片行；cardHeight 是各卡片上一帧布局后的自然高度（取整行高用，见 entryRow）；
 	// sort* 是排序菜单与它的锚点（排序按钮上一帧的外框）。
 	window     kit.RowWindow
+	reveal     cardReveal // 选中行滚进视野（渲染层 ItemList 的 effect，keyboard.go）
+	entriesRev int        // 上一帧见到的 EntriesRev：内容换了要补一次悬停刷新（台账 B-037）
 	cardHeight map[string]float32
 	sortMenu   kit.MenuState
 	sortOpen   bool
@@ -143,14 +145,27 @@ func (s *Screen) listWidths() (width, hi float32) {
 func (s *Screen) Workspace(c ui.C) {
 	s.ensureMounted()
 	s.loadPane()
+	s.wsShown = true
 	s.cardGroups.Begin()
 	v := s.Store.View()
+	s.noteEntriesChanged(v.List)
 	if s.pane.view == ViewList {
+		s.pane.reveal = cardReveal{} // 卡片列表卸载：下次挂载时已有选中行要重新滚进视野
 		s.tableWorkspace(c, v)
 		return
 	}
 	s.table.reveal = tableReveal{} // 表格卸载：下次挂载时已有选中行要重新滚进视口
 	s.cardWorkspace(c, v)
+}
+
+// noteEntriesChanged 在列表内容整体换了（翻页、筛选、重新取数）的那一帧请求补一次悬停刷新：渲染层里换内容之后
+// Chromium 会补发 pointerover，指针底下的新行立刻有悬停态；Viva 只在指针事件里重算悬停（台账 B-037）。
+func (s *Screen) noteEntriesChanged(list ListView) {
+	if s.pane.entriesRev == list.EntriesRev {
+		return
+	}
+	s.pane.entriesRev = list.EntriesRev
+	s.Look.RequestHoverRefresh()
 }
 
 // cardWorkspace 是卡片视图的布局：flex h-full min-h-0 flex-1 overflow-hidden，左边列表栏，右边详情栏。

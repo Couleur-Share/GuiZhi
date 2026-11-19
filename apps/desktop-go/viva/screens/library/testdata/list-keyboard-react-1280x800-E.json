@@ -1,0 +1,193 @@
+{
+  "variant": "light-royal-blue-medium-1280x800",
+  "cases": [
+    {
+      "id": "E1",
+      "title": "排序下拉打开后 ↓↓ Esc",
+      "afterClick": {
+        "scrollTop": 0,
+        "clientHeight": 638,
+        "scrollHeight": 1007,
+        "selectedIndex": null,
+        "row": null,
+        "card": null,
+        "checked": [],
+        "bulkCount": null,
+        "mounted": [
+          0,
+          19
+        ],
+        "active": "button:最近更新",
+        "page": "1 / 2"
+      },
+      "rows": [
+        {
+          "label": "E1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:最近更新",
+          "page": "1 / 2"
+        },
+        {
+          "label": "E1",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:最近更新",
+          "page": "1 / 2"
+        },
+        {
+          "label": "E1",
+          "key": "Escape",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    },
+    {
+      "id": "E2",
+      "title": "右键菜单打开后 ↓↓ Esc",
+      "afterClick": {
+        "scrollTop": 0,
+        "clientHeight": 638,
+        "scrollHeight": 1007,
+        "selectedIndex": null,
+        "row": null,
+        "card": null,
+        "checked": [],
+        "bulkCount": null,
+        "mounted": [
+          0,
+          19
+        ],
+        "active": "button:收藏",
+        "page": "1 / 2"
+      },
+      "rows": [
+        {
+          "label": "E2",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 0,
+          "row": [
+            0,
+            45.25
+          ],
+          "card": [
+            6,
+            45.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:收藏",
+          "page": "1 / 2"
+        },
+        {
+          "label": "E2",
+          "key": "ArrowDown",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "button:收藏",
+          "page": "1 / 2"
+        },
+        {
+          "label": "E2",
+          "key": "Escape",
+          "scrollTop": 0,
+          "clientHeight": 638,
+          "scrollHeight": 1007,
+          "selectedIndex": 1,
+          "row": [
+            45,
+            90.25
+          ],
+          "card": [
+            51,
+            90.25
+          ],
+          "checked": [],
+          "bulkCount": null,
+          "mounted": [
+            0,
+            19
+          ],
+          "active": "body",
+          "page": "1 / 2"
+        }
+      ]
+    }
+  ]
+}

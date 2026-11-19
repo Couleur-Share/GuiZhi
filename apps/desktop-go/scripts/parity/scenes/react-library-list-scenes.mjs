@@ -132,6 +132,18 @@ export const chain = (...steps) => async (win, session) => {
   for (const step of steps) await step(win, session);
 };
 
+/**
+ * 按键 times 次（与 Go 一侧 listKeys 一致）：窗口级键盘（use-item-keyboard.ts）的整窗对照。
+ * 每次按完等 120 ms，最后再等 300 ms：虚拟列表的 scrollToIndex 按帧校正测量值，不是一步到位。
+ */
+export const pressKeys = (key, times = 1) => async (win) => {
+  for (let i = 0; i < times; i++) {
+    await win.keyboard.press(key);
+    await win.waitForTimeout(120);
+  }
+  await win.waitForTimeout(300);
+};
+
 /** 读取中的转圈有 250 ms 的延迟与淡入：等 600 ms 再取图。 */
 export const waitSpinner = (win) => win.waitForTimeout(600);
 
@@ -150,4 +162,7 @@ export const LIBRARY_LIST_SCENES = {
   "app.window.library.list-filters": listScene({}, applyFacets(...FACETS_TWO)),
   "app.window.library.list-filters-open": listScene({}, chain(applyFacets(...FACETS_THREE), openFilterSummary), { keepFocus: true }),
   "app.window.library.list-page2": listScene({}, chain(pickPageSize("10"), clickButtonByName("下一页"))),
+  "app.window.library.list-keys-down": listScene({}, pressKeys("ArrowDown", 12)),
+  "app.window.library.list-keys-end": listScene({}, pressKeys("End")),
+  "app.window.library.list-keys-up": listScene({}, chain(pressKeys("End"), pressKeys("ArrowUp", 14))),
 };

@@ -148,7 +148,16 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace},
 			},
 		}
+		// 窗口级键盘（方向键、Home、End、空格，B-045）与生产同一处接线：经 Look.KeyHook，焦点从此刻的画布读。
+		var canvas *gfx.Canvas
+		look.KeyHook = func(e gfx.KeyEvent) gfx.EventResult {
+			if canvas == nil {
+				return gfx.EventResult{}
+			}
+			return screen.ListKey(e, canvas)
+		}
 		view := func(c ui.C) {
+			canvas = c.Canvas()
 			w.View(c)
 			screen.EndFrame()
 		}
