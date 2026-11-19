@@ -154,7 +154,7 @@ func openTipScrollPage(t *testing.T) (*harness, *tipScrollPage) {
 	return openPage(t, still(), 800, 600, p.view), p
 }
 
-// scrollAt 在 (x, y) 处滚一下（指针留在那里），随后出几帧。
+// scrollAt 在 (x, y) 处滚一下（指针留在那里），随后像窗口消息循环那样处理滚轮钩子请求的指针移动（pumpHover），再出几帧。
 func (h *harness) scrollAt(x, y, dy float32) {
 	h.t.Helper()
 	if err := h.session.Move(x, y); err != nil {
@@ -163,20 +163,18 @@ func (h *harness) scrollAt(x, y, dy float32) {
 	if err := h.session.Scroll(gfx.ScrollEvent{X: x, Y: y, DeltaY: dy, Precise: true}); err != nil {
 		h.t.Fatalf("滚动失败：%v", err)
 	}
+	if !h.rawWheel {
+		h.pumpHover()
+	}
 	h.frames(3)
 }
 
-// refreshHover 在原位补一次指针移动：渲染层在滚动停下之后会补发一次假的鼠标移动来刷新悬停，
-// 而 Viva 只在指针事件里重算悬停（滚轮不算，台账 B-031），所以测试替它补这一下。
-func (h *harness) refreshHover(x, y float32) {
-	h.t.Helper()
-	h.moveTo(x, y)
-}
-
-// 钉住 Viva v0.6.4 的行为（台账 B-031）：滚轮滚动之后悬停仍指着滚走的那个元素，直到下一次指针事件。
-// 升级 Viva 之后这条测试若失败，说明它已经会刷新悬停：删掉 B-031 与 refreshHover。
+// 钉住 Viva v0.6.4 自己的行为（台账 B-031）：滚轮滚动之后悬停仍指着滚走的那个元素，直到下一次指针事件。
+// 这就是窗口要用 RefreshHoverAfterWheel 补一次指针移动的原因；rawWheel 让 scrollAt 不替窗口补，露出 Viva 的本来面目。
+// 升级 Viva 之后这条测试若失败，说明它已经会刷新悬停：删掉 B-031、wheel.go 与窗口里的接线。
 func TestVivaWheelScrollDoesNotRefreshHover(t *testing.T) {
 	h, p := openTipScrollPage(t)
+	h.rawWheel = true
 	h.moveTo(100, 100)
 	before := p.hovered
 	if before.IsZero() {
@@ -184,9 +182,12 @@ func TestVivaWheelScrollDoesNotRefreshHover(t *testing.T) {
 	}
 	h.scrollAt(100, 100, 70) // 宿主 2 滚走了，指针底下换成宿主 4
 	if p.hovered != before {
-		t.Fatal("滚轮之后 Viva 已经刷新了悬停：B-031 不再成立，删掉登记与 refreshHover")
+		t.Fatal("滚轮之后 Viva 已经刷新了悬停：B-031 不再成立，删掉登记、wheel.go 与窗口里的接线")
 	}
-	h.refreshHover(100, 100)
+	if len(h.hoverPosts) != 1 {
+		t.Fatalf("滚轮钩子应当请求一次指针移动，实际 %d 次", len(h.hoverPosts))
+	}
+	h.pumpHover()
 	if p.hovered == before {
 		t.Fatal("滚动之后补一次指针移动，悬停应当换到指针底下的新宿主")
 	}
@@ -206,14 +207,12 @@ func TestTooltipScrollDismissesUntilPointerMeetsAnotherHost(t *testing.T) {
 	if h.shown(tipOf(2)) {
 		t.Fatal("滚动之后气泡仍在")
 	}
-	h.refreshHover(100, 100)
 	h.advance(2 * TooltipDelay)
 	h.frames(2)
 	if h.shown(tipOf(2)) {
 		t.Fatal("滚完之后指针仍在同一个宿主上，不应再出气泡")
 	}
 	h.scrollAt(100, 100, 60) // 共 70：指针底下换成宿主 4（90..130）
-	h.refreshHover(100, 100)
 	h.advance(TooltipDelay + 10*time.Millisecond)
 	h.frames(2)
 	if !h.shown(tipOf(4)) {
@@ -235,7 +234,6 @@ func TestTooltipNotShownWhileScrolling(t *testing.T) {
 		}
 	}
 	h.scrollAt(100, 100, 50) // 最后一步让指针底下换一个宿主
-	h.refreshHover(100, 100)
 	h.advance(TooltipDelay + 10*time.Millisecond)
 	h.frames(2)
 	n := 0

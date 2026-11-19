@@ -24,6 +24,12 @@ type harness struct {
 	t       *testing.T
 	look    *Look
 	session *headless.Session
+
+	// 窗口的滚轮钩子（RefreshHoverAfterWheel，与 viva/app.Run 同一接线）请求的指针移动按先后排在 hoverPosts 里；
+	// pumpHover 把它们送进会话，等价于窗口消息循环处理 PostMessage 过来的 WM_MOUSEMOVE。
+	// rawWheel 为真时 scrollAt 不送，用来钉住 Viva 自己的行为（台账 B-031）。
+	hoverPosts []hoverPost
+	rawWheel   bool
 }
 
 // openPage 用 spec 装配外观，在 width×height、缩放 1 的无头会话里打开 view，并出几帧到版面稳定。
@@ -43,14 +49,16 @@ func openPage(t *testing.T, spec Spec, width, height int, view func(l *Look, c u
 		Theme: &look.Theme, Background: &bg,
 	})
 	var canvas gfx.Canvas
-	// OnKey 与窗口里一样接上 Tab 可达（reach.go）。
+	h := &harness{t: t, look: look}
+	// OnKey 与窗口里一样接上 Tab 可达（reach.go），OnScroll 接上滚轮之后的悬停刷新（wheel.go）。
 	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height, OnKey: look.OnKey})
+	config.OnScroll = RefreshHoverAfterWheel(config.OnScroll, h.postHover)
 	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)
 	}
 	t.Cleanup(session.Close)
-	h := &harness{t: t, look: look, session: session}
+	h.session = session
 	h.frames(4)
 	return h
 }
