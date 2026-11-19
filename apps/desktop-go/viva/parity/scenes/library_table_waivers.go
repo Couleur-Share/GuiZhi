@@ -16,6 +16,7 @@ func tableBaseWaivers() []parity.Waiver {
 	out := semiboldKerningWaivers()
 	out = append(out, headerInkWaivers()...)
 	out = append(out, snippetKerningWaivers()...)
+	out = append(out, sourceEllipsisWaivers()...)
 	return append(out, parity.Waiver{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "icon-box", MaxDelta: 1.5,
 		Note: "居中的来源单元格里，「YouTube」的字偶距使文字比渲染层宽 2.3px，同一格里的图标偏半个宽度差（≤ 1.3px）",
@@ -76,6 +77,17 @@ func snippetKerningWaivers() []parity.Waiver {
 			})
 	}
 	return out
+}
+
+// sourceEllipsisWaivers 登记 A-014 在来源列上的另一处后果（B-046 (7)(a)）：大字号档里居中的来源单元格放不下「YouTube」，
+// 文字被省略号截断。400 字重下 Chromium 做字偶距、Viva 不做（Yo、Tu 两个字偶对共 −0.1886em，13.5 px 时 2.55 px），
+// 不做字偶距的「YouTu…」比单元格的内容宽多，所以渲染层截成「YouTu…」、Viva 截成「YouT…」。
+// 只放过渲染层截成「YouTu…」这一种结果（Subject 是报告里带引号的写法），别的截断点照常判定。
+func sourceEllipsisWaivers() []parity.Waiver {
+	return []parity.Waiver{{
+		Ledger: "A-014", Layer: parity.LayerL1, Kind: "ellipsis-cut", Subject: "「YouTu…」",
+		Note: "字偶距：Chromium 做、Viva 不做，来源列的「YouTube」在 Viva 里宽出一截，省略号前少放一个字符（「YouTu…」对「YouT…」）",
+	}}
 }
 
 // headRunes 取 s 的前 n 个字符。

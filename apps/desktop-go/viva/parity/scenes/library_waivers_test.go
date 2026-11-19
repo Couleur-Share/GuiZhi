@@ -35,3 +35,25 @@ func TestWordmarkIconWaiverSubjectsMatchReportFormat(t *testing.T) {
 		}
 	}
 }
+
+// TestSourceEllipsisWaiverMatchesOnlyTheReactCut 守住 B-046 (7)(a) 的登记：Subject 要对得上 L1 报告里带引号的写法
+// （「YouTu…」），并且只放过渲染层截成「YouTu…」这一种结果，别的截断点照常判定。
+func TestSourceEllipsisWaiverMatchesOnlyTheReactCut(t *testing.T) {
+	waivers := sourceEllipsisWaivers()
+	matches := func(subject string) bool {
+		for _, w := range waivers {
+			if strings.Contains(subject, w.Subject) {
+				return true
+			}
+		}
+		return false
+	}
+	if !matches("「YouTu…」") {
+		t.Errorf("渲染层截成「YouTu…」时应被登记放过（Subject 的写法与报告不一致？）")
+	}
+	for _, other := range []string{"「YouT…」", "「YouTub…」", "「YouTube」", "「Bilibili」"} {
+		if matches(other) {
+			t.Errorf("%s 没有登记，却被放过", other)
+		}
+	}
+}
