@@ -37,12 +37,20 @@ type rowSpec struct {
 
 const rowMinHeightPx = 32 // min-h-[32px]：px 字面量，不随字号档缩放
 
-// sidebarRow 声明一行（渲染层 LibrarySidebarRow，知识库侧栏的通用行：智能视图、合集、平台、标签、回收站）。
+// sidebarRow 声明侧栏列（FlexColumn）里直接挂着的一行：先登记它的 flex 属性（行有显式的 min-h-[32px]，所以内容溢出时
+// 可以被压到 32，台账 B-034），再声明行本身。
+func (s *Screen) sidebarRow(c ui.C, spec rowSpec) {
+	s.flex.Item(kit.FlexItem{Shrink: true, MinHeight: rowMinHeightPx})
+	s.rowBox(c, spec)
+}
+
+// rowBox 声明一行（渲染层 LibrarySidebarRow，知识库侧栏的通用行：智能视图、合集、平台、标签、回收站）。
 //
 // group/row relative flex min-h-[32px] items-center rounded-lg transition-colors duration-smooth：选中 bg-primary/15 text-primary，
 // 否则 text-sidebar-foreground/70，悬停 bg-sidebar-accent/50 text-sidebar-foreground。行里是整行的主按钮（图标、名称）
 // 与行尾 24px 的槽：槽里的计数与「更多」按钮共用一个位置，悬停或焦点在行内时交叉淡入淡出，行内元素不位移。
-func (s *Screen) sidebarRow(c ui.C, spec rowSpec) {
+// 回收站的行包在 mt-auto 的块里，不是列的直接孩子，直接用本函数。
+func (s *Screen) rowBox(c ui.C, spec rowSpec) {
 	l := s.Look
 	t := l.T
 	canvas := c.Canvas()
@@ -109,7 +117,7 @@ func (s *Screen) rowMain(c ui.C, id gfx.ID, spec rowSpec, fg tokens.Color) ui.Bo
 	}
 	return box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
-			l.PaintRing(d, 2, t.Primary.WithAlpha(0.4), l.Rem(0.75))
+			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.4), l.Rem(0.75)) // 行的底色在外层盒里，主按钮自己透明：环要空心
 		}
 	}).Children(func() {
 		// 图标槽：flex h-4 w-4 shrink-0 items-center justify-center text-sm leading-none
@@ -168,7 +176,7 @@ func (s *Screen) moreButton(c ui.C, id gfx.ID, name string, rowHovered bool, fg 
 	po := l.HoverProgress(c, id, 0, rowHovered || state.FocusVisible, kit.DurationQuick)
 	return box.Opacity(po).Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
-			l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25)) // 全局 button:focus-visible
+			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25)) // 全局 button:focus-visible；按钮没有悬停时是透明的：环要空心
 		}
 		if d.State.Hovered {
 			l.PaintSurface(d, kit.Surface{Bg: t.Foreground.WithAlpha(0.1), Radius: l.Rem(0.25)}) // hover:bg-foreground/10，rounded

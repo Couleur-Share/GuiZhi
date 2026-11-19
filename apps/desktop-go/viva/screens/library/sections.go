@@ -28,10 +28,17 @@ func byPlatform(c *services.LibraryCounts) map[string]int   { return c.ByPlatfor
 // sectionHeading 是分区标题（渲染层 SectionHeading）：mb-1 mt-4 flex shrink-0 items-center justify-between gap-2 px-3，
 // 左边是 truncate text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/80 的名称，右边是可选的小按钮。
 func (s *Screen) sectionHeading(c ui.C, key, label string, action func(c ui.C)) {
+	s.headingRow(c, key, label, action, false)
+}
+
+// headingRow 声明分区标题一行。shrinkable 为真是智能视图那一份：渲染层 SmartViewsSection 自己写的标题漏了 shrink-0，
+// 是个 min-height:auto 的普通弹性项——它带着权重参加溢出时的收缩分摊，只是压不下去（台账 B-034，见 kit.FlexColumn）。
+func (s *Screen) headingRow(c ui.C, key, label string, action func(c ui.C), shrinkable bool) {
 	l := s.Look
 	t := l.T
-	ui.Row(c.Key("heading-"+key)).FillWidth().Shrink(0).Items(ui.Center).Justify(ui.Between).Gap(l.Space(2)).
-		MarginTop(l.Space(4)).MarginBottom(l.Space(1)).PadSides(0, l.Space(3), 0, l.Space(3)).Children(func() {
+	s.flex.Item(kit.FlexItem{Shrink: shrinkable, MinAuto: shrinkable, MarginTop: l.Space(4), MarginBottom: l.Space(1)})
+	ui.Row(c.Key("heading-"+key)).FillWidth().Items(ui.Center).Justify(ui.Between).Gap(l.Space(2)).
+		PadSides(0, l.Space(3), 0, l.Space(3)).Children(func() {
 		// uppercase：Latin 字母大写显示，中文不受影响；字距 tracking-wider = 0.05em。
 		l.TextTracked(c.Key("label"), strings.ToUpper(label), kit.TextXS, kit.WeightSemibold, t.SidebarForeground.WithAlpha(0.8), 0.05)
 		if action != nil {
@@ -52,9 +59,10 @@ func (s *Screen) headingButton(c ui.C, icon gfx.Icon, label string, rest float32
 	})
 }
 
-// hint 是分区里没有内容时的说明：px-3 py-1 text-xs text-sidebar-foreground/75。
+// hint 是分区里没有内容时的说明：px-3 py-1 text-xs text-sidebar-foreground/75。是 min-height:auto 的普通弹性项。
 func (s *Screen) hint(c ui.C, key, text string) {
 	l := s.Look
+	s.flex.Item(kit.FlexItem{Shrink: true, MinAuto: true})
 	ui.Row(c.Key("hint-"+key)).FillWidth().PadSides(l.Space(1), l.Space(3), l.Space(1), l.Space(3)).Children(func() {
 		l.Text(c.Key("text"), text, kit.TextXS, kit.WeightNormal, l.T.SidebarForeground.WithAlpha(0.75), kit.Wrapped())
 	})
@@ -64,9 +72,7 @@ func (s *Screen) hint(c ui.C, key, text string) {
 func (s *Screen) collectionGlyph(icon string) func(c ui.C, fg tokens.Color) {
 	l := s.Look
 	if emoji := jsTrim(icon); emoji != "" {
-		return func(c ui.C, fg tokens.Color) {
-			l.TextPx(c, emoji, l.Rem(0.875), l.Rem(0.875), kit.WeightNormal, fg)
-		}
+		return func(c ui.C, fg tokens.Color) { s.emojiGlyph(c, emoji, l.Rem(0.875), l.Rem(1), fg) } // 图标槽 h-4 w-4
 	}
 	return func(c ui.C, fg tokens.Color) { l.Icon(c, icons.Folder, l.Rem(1), fg) }
 }
@@ -188,15 +194,17 @@ func (s *Screen) tagsSection(c ui.C, v View) {
 	}
 }
 
-// trashSection 是底部的回收站一行：mt-auto pt-4，贴在内容的末端；内容不满一屏时贴着面板底部（由外层的撑开元素保证）。
+// trashSection 是底部的回收站一行：mt-auto pt-4 的块，内容不满一屏时贴着面板底部（auto 上外边距拿走富余高度）；
+// 块本身是 min-height:auto 的普通弹性项，行是块里的内容，不是列的直接孩子。
 func (s *Screen) trashSection(c ui.C, v View) {
 	l := s.Look
 	count := 0
 	if v.Counts != nil {
 		count = v.Counts.Trash
 	}
-	ui.Column(c.Key("trash")).FillWidth().Shrink(0).PadTop(l.Space(4)).Children(func() {
-		s.sidebarRow(c, rowSpec{
+	s.flex.Item(kit.FlexItem{Shrink: true, MinAuto: true, MarginTopAuto: true})
+	ui.Column(c.Key("trash")).FillWidth().PadTop(l.Space(4)).Children(func() {
+		s.rowBox(c, rowSpec{
 			Key:   "trash",
 			Icon:  func(c ui.C, fg tokens.Color) { l.Icon(c, icons.Trash2, l.Rem(1), fg) },
 			Label: locales.LibraryScopeTrash(), Count: count,

@@ -123,6 +123,38 @@ func TestReadSavedViewsKeepsTheFirstThirty(t *testing.T) {
 	}
 }
 
+// 30 条上限的边界（渲染层 slice(0, 30)）：29、30 条全留，31 条丢掉第 31 条。读与写各验一遍；
+// 写的一侧数存储里的原始数组——经 ReadSavedViews 读回会再截一次，把「写入没截」的错误遮住。
+func TestSavedViewsCapBoundaryOnReadAndOnWrite(t *testing.T) {
+	for _, n := range []int{29, 30, 31} {
+		want := min(n, MaxSavedViews)
+		t.Run(fmt.Sprintf("%d条", n), func(t *testing.T) {
+			var parts []string
+			var views []SavedView
+			for i := 0; i < n; i++ {
+				parts = append(parts, fmt.Sprintf(`{"id":"v%d","name":"视图%d","scope":"all"}`, i, i))
+				views = append(views, SavedView{ID: fmt.Sprintf("v%d", i), Name: fmt.Sprintf("视图%d", i), Filters: Filters{Scope: "all"}})
+			}
+			read := newMemPrefs()
+			read.putRaw("[" + strings.Join(parts, ",") + "]")
+			if got := ReadSavedViews(read); len(got) != want {
+				t.Errorf("读出 %d 条，期望 %d", len(got), want)
+			}
+			write := newMemPrefs()
+			if err := WriteSavedViews(write, views); err != nil {
+				t.Fatal(err)
+			}
+			var stored []json.RawMessage
+			if err := json.Unmarshal(write.data[settings.PrefSmartViews], &stored); err != nil {
+				t.Fatal(err)
+			}
+			if len(stored) != want {
+				t.Errorf("存储里写了 %d 条，期望 %d", len(stored), want)
+			}
+		})
+	}
+}
+
 func TestReadSavedViewsTruncatesNamesLikeJavaScript(t *testing.T) {
 	long := strings.Repeat("字", 70)
 	p := newMemPrefs()

@@ -26,11 +26,12 @@ func (m *smartViews) reset(views []SavedView) {
 // 标题的按钮打开「保存智能视图」弹窗；每个视图一行，行尾的「更多」按钮直接删除（不是菜单）。
 func (s *Screen) smartViewsSection(c ui.C, v View) {
 	m := &s.smart
-	s.sectionHeading(c, "smart", locales.LibrarySmartViews(), func(c ui.C) {
+	// 智能视图的标题是渲染层 SmartViewsSection 自己写的一份，漏了 shrink-0（也没有 truncate）：可收缩的 min-height:auto 弹性项。
+	s.headingRow(c, "smart", locales.LibrarySmartViews(), func(c ui.C) {
 		if s.headingButton(c, icons.BookmarkPlus, locales.LibrarySmartViewSaveCurrent(), 0.8).Clicked() {
 			m.open = true
 		}
-	})
+	}, true)
 	l := s.Look
 	for _, view := range m.views {
 		s.sidebarRow(c, rowSpec{
@@ -48,7 +49,7 @@ func (s *Screen) smartViewsSection(c ui.C, v View) {
 }
 
 // removeSmartView 删除一个视图（渲染层 remove）：立即生效，没有确认也没有撤销。
-// 写入失败时界面照常更新（渲染层把写入错误吞掉了），另外弹出提示让用户知道没存上（台账 C-005）。
+// 写入失败时列表保持原样并弹出错误提示（渲染层：localStorage 写入抛错、setViews 没执行，用户什么也看不到；提示是台账 C-005 的增强）。
 func (s *Screen) removeSmartView(id string) {
 	m := &s.smart
 	next := make([]SavedView, 0, len(m.views))
@@ -57,26 +58,32 @@ func (s *Screen) removeSmartView(id string) {
 			next = append(next, view)
 		}
 	}
-	s.persistSmartViews(next)
+	s.persistSmartViews(locales.LibrarySmartViewDelete(), next)
 }
 
-// persistSmartViews 写入并更新界面上的列表。
-func (s *Screen) persistSmartViews(next []SavedView) {
-	if err := WriteSavedViews(s.Prefs, next); err != nil {
-		s.Guard.Report(locales.LibrarySmartViewSaveTitle(), err)
+// persistSmartViews 把视图列表写进偏好，写成功才更新界面上的列表并返回 true；
+// 失败由 Guard 以 action 为动作名弹出带原因的错误提示、记日志，返回 false，界面上的列表不变
+// （渲染层的写入抛错时同样不更新列表，只是没有提示，台账 C-005）。
+func (s *Screen) persistSmartViews(action string, next []SavedView) bool {
+	ok := s.Guard.Run(action, func() error { return WriteSavedViews(s.Prefs, next) })
+	if ok {
+		s.smart.views = next
 	}
-	s.smart.views = next
+	return ok
 }
 
 // saveSmartView 把当前筛选存成一个视图放在最前面（渲染层 saveCurrent）。名称为空什么都不做。
 // 界面上的列表取完整的 next（可能超过 30 条），存储里只留 30 条，与渲染层一致。
+// 写入失败时弹窗与已输入的名称都留着（渲染层的异常冒出了点击处理器，后面的收起与清空没执行），用户可以直接重试。
 func (s *Screen) saveSmartView(f Filters) {
 	m := &s.smart
 	view, ok := NewSavedView(m.name.Text(), f, s.nowTime(), s.newID)
 	if !ok {
 		return
 	}
-	s.persistSmartViews(append([]SavedView{view}, m.views...))
+	if !s.persistSmartViews(locales.LibrarySmartViewSaveTitle(), append([]SavedView{view}, m.views...)) {
+		return
+	}
 	m.name.SetText("")
 	m.open = false
 }

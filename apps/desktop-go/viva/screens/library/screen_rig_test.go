@@ -122,6 +122,10 @@ func (r *rig) frames(n int) {
 		if err := r.session.Frame(); err != nil {
 			r.t.Fatalf("出帧失败：%v", err)
 		}
+		// 侧栏列的每个孩子都要登记 flex 属性（一一对应、同序）；漏登记会退回「全部不收缩」，与渲染层有出入。
+		if !r.hidden && r.screen.flex.Mismatch() {
+			r.t.Fatalf("侧栏列登记的 flex 项数与实际声明的孩子数不符（漏了 s.flex.Item？）")
+		}
 	}
 }
 
@@ -206,6 +210,27 @@ func (r *rig) typeText(text string) {
 func (r *rig) hasText(text string) bool {
 	for _, got := range r.session.Texts() {
 		if got == text {
+			return true
+		}
+	}
+	return false
+}
+
+// inkAlpha 是画面上第一处恰好等于 text 的文字的不透明度（含所在分组的 Opacity，与对照工具判断「看不看得见」同一个量）；
+// 没有这行文字时 ok 为假。
+func (r *rig) inkAlpha(text string) (alpha float32, ok bool) {
+	for _, t := range r.session.Snapshot().Texts {
+		if t.Value == text {
+			return t.Style.Color.Alpha, true
+		}
+	}
+	return 0, false
+}
+
+// focusedIs 报告键盘焦点是否正落在 role、name 的节点上。
+func (r *rig) focusedIs(role gfx.Role, name string) bool {
+	for _, n := range r.session.Access() {
+		if n.Focused && n.Role == role && n.Label == name {
 			return true
 		}
 	}

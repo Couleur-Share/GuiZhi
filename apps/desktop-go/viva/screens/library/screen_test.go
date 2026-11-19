@@ -331,6 +331,46 @@ func TestRenameTagUsesTheNarrowDialogWithoutIcons(t *testing.T) {
 	}
 }
 
+// 提交时图标去首尾空白（渲染层 icon.trim()）：旧库迁移来的图标可能带空格；只有空白的图标等于没有图标。
+func TestSubmitTrimsTheIconLikeTheRenderer(t *testing.T) {
+	for _, tc := range []struct{ name, icon, want string }{
+		{"带空格的 emoji", "  🦄  ", "🦄"},
+		{"只有空白", "   ", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newRig(t, func(r *rig) {
+				counts, cols, tags := libraryFixture()
+				cols[0].Icon = tc.icon
+				r.svc.Seed(counts, cols, tags)
+			})
+			openRenameCollection(r)
+			r.keys("cmd+a")
+			r.typeText("项目")
+			r.click(gfx.RoleButton, locales.CommonConfirm())
+			if c := r.svc.CollectionsNow()[0]; c.Name != "项目" || c.Icon != tc.want {
+				t.Errorf("提交后合集 = %+v，期望名称「项目」图标 %q", c, tc.want)
+			}
+		})
+	}
+}
+
+// 只有空白的图标在侧栏里按「没有图标」画文件夹，不会画出一行空白文字当 emoji。
+func TestWhitespaceOnlyIconIsDrawnAsTheFolder(t *testing.T) {
+	r := newRig(t, func(r *rig) {
+		counts, cols, tags := libraryFixture()
+		cols[0].Icon = "   "
+		r.svc.Seed(counts, cols, tags)
+	})
+	for _, text := range r.session.Texts() {
+		if text != "" && strings.TrimSpace(text) == "" {
+			t.Fatalf("画面上有一行只有空白的文字 %q：空白图标应按没有图标画文件夹", text)
+		}
+	}
+	if !r.hasText("📚") {
+		t.Error("有图标的合集仍应把图标画成文字（对照用例：阅读）")
+	}
+}
+
 func TestEditFailureKeepsDialogOpenAndExplainsWhy(t *testing.T) {
 	r := newRig(t)
 	r.svc.FailOn("UpdateCollection", errors.New("磁盘已满"))
@@ -515,6 +555,29 @@ func TestSmartViewsSaveApplyAndRemove(t *testing.T) {
 	}
 }
 
+// 新保存的视图排在最前面（渲染层 [view, ...views]）；保存成功后弹窗关闭、名称输入清空，再次打开是空的。
+func TestSavedSmartViewsListNewestFirstAndTheDraftIsClearedAfterSaving(t *testing.T) {
+	r := newRig(t)
+	save := func(name string) {
+		r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
+		r.typeText(name)
+		r.click(gfx.RoleButton, locales.CommonSave())
+	}
+	save("甲")
+	save("乙")
+	saved := ReadSavedViews(r.prefs)
+	if len(saved) != 2 || saved[0].Name != "乙" || saved[1].Name != "甲" {
+		t.Fatalf("存储里的顺序 = %+v，期望新的在前（乙、甲）", saved)
+	}
+	if a, b := r.mustNode(gfx.RoleButton, "乙").Bounds.Y, r.mustNode(gfx.RoleButton, "甲").Bounds.Y; a >= b {
+		t.Errorf("列表里新视图应排在上面：乙 y=%v，甲 y=%v", a, b)
+	}
+	r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
+	if got := r.mustNode(gfx.RoleTextField, locales.LibrarySmartViewNamePlaceholder()).Value; got != "" {
+		t.Errorf("保存成功后名称输入应清空，再次打开时是 %q", got)
+	}
+}
+
 func TestSmartViewDialogCancelKeepsTheDraftAndBlankNameSavesNothing(t *testing.T) {
 	r := newRig(t)
 	r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
@@ -535,17 +598,53 @@ func TestSmartViewDialogCancelKeepsTheDraftAndBlankNameSavesNothing(t *testing.T
 	}
 }
 
-func TestSmartViewSaveFailureIsReportedButTheListStillUpdates(t *testing.T) {
+// 写入失败（台账 C-005）：渲染层的 localStorage 写入抛错、setViews 与后面的收起、清空都没执行，列表不变、表单留着、没有任何提示；
+// Viva 与它一致（列表不变、弹窗与已输入的名称都留着，可以重试），另外弹出带原因的错误提示并记日志。
+func TestSmartViewSaveFailureIsReportedAndNothingChanges(t *testing.T) {
 	r := newRig(t)
 	r.prefs.FailSetWith(errors.New("配置文件只读"))
 	r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
 	r.typeText("临时")
 	r.click(gfx.RoleButton, locales.CommonSave())
-	if !r.has(gfx.RoleButton, "临时") {
-		t.Error("界面上的列表照常更新（与渲染层一致）")
+	if r.has(gfx.RoleButton, "临时") {
+		t.Error("写入失败时列表不应出现新视图")
 	}
-	if !r.session.HasText("配置文件只读") && !strings.Contains(strings.Join(r.log.entries(), "\n"), "配置文件只读") {
-		t.Errorf("写入失败应有提示或日志；画面文字 %q", r.session.Texts())
+	if !r.has(gfx.RoleHeading, locales.LibrarySmartViewSaveTitle()) {
+		t.Error("写入失败时弹窗应保持打开，让用户重试")
+	}
+	if got := r.mustNode(gfx.RoleTextField, locales.LibrarySmartViewNamePlaceholder()).Value; got != "临时" {
+		t.Errorf("写入失败时已输入的名称应保留，实际 %q", got)
+	}
+	if !r.hasText(locales.CommonOperationFailed(locales.LibrarySmartViewSaveTitle())) {
+		t.Errorf("应弹出「保存智能视图失败」的错误提示；画面文字 %q", r.session.Texts())
+	}
+	if logs := strings.Join(r.log.entries(), "\n"); !strings.Contains(logs, "配置文件只读") {
+		t.Errorf("失败原因应进日志，实际 %q", logs)
+	}
+	if len(ReadSavedViews(r.prefs)) != 0 {
+		t.Error("写入失败时存储里不应有视图")
+	}
+	// 重试：存储恢复后再点保存就成功，列表出现新视图、弹窗关闭
+	r.prefs.FailSetWith(nil)
+	r.click(gfx.RoleButton, locales.CommonSave())
+	if !r.has(gfx.RoleButton, "临时") || r.has(gfx.RoleHeading, locales.LibrarySmartViewSaveTitle()) || len(ReadSavedViews(r.prefs)) != 1 {
+		t.Errorf("重试成功后应出现视图并关闭弹窗；存储里 %d 条", len(ReadSavedViews(r.prefs)))
+	}
+}
+
+// 删除时写入失败：行留在列表里（存储里也还在），弹出「删除智能视图失败」。
+func TestSmartViewDeleteFailureKeepsTheRowAndIsReported(t *testing.T) {
+	r := newRig(t)
+	r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
+	r.typeText("留着")
+	r.click(gfx.RoleButton, locales.CommonSave())
+	r.prefs.FailSetWith(errors.New("磁盘已满"))
+	r.click(gfx.RoleButton, locales.LibrarySmartViewDelete())
+	if !r.has(gfx.RoleButton, "留着") || len(ReadSavedViews(r.prefs)) != 1 {
+		t.Error("写入失败时视图应还在列表与存储里")
+	}
+	if !r.hasText(locales.CommonOperationFailed(locales.LibrarySmartViewDelete())) {
+		t.Errorf("应弹出「删除智能视图失败」的错误提示；画面文字 %q", r.session.Texts())
 	}
 }
 
@@ -570,5 +669,43 @@ func TestReenteringThePanelResetsItsState(t *testing.T) {
 	r.click(gfx.RoleButton, locales.LibraryNewCollection())
 	if got := r.mustNode(gfx.RoleTextField, locales.LibraryNamePlaceholder()).Value; got != "" {
 		t.Errorf("新建合集的输入框应是空的，实际 %q", got)
+	}
+}
+
+// 行菜单随挂载复位：侧栏不在的这段时间里菜单的状态没人管，回来时不能还开着。
+func TestReenteringThePanelClosesTheRowMenu(t *testing.T) {
+	r := newRig(t)
+	r.rightClick(gfx.RoleButton, "go")
+	if !r.has(gfx.RoleMenu, "") {
+		t.Fatal("右键标签行应打开菜单")
+	}
+	r.hidden = true
+	r.frames(3)
+	r.hidden = false
+	r.frames(3)
+	if r.has(gfx.RoleMenu, "") {
+		t.Error("重新进入后行菜单应关闭")
+	}
+}
+
+// 智能视图随挂载重新读取：侧栏不在的时候别处（设置页的导入、另一个窗口）改了存储，回来要看到新的内容，
+// 而不是退回空列表或停在旧列表上。
+func TestReenteringThePanelRereadsTheSmartViews(t *testing.T) {
+	r := newRig(t)
+	r.click(gfx.RoleButton, locales.LibrarySmartViewSaveCurrent())
+	r.typeText("甲")
+	r.click(gfx.RoleButton, locales.CommonSave())
+	if !r.has(gfx.RoleButton, "甲") {
+		t.Fatal("保存后列表里应有「甲」")
+	}
+	r.hidden = true
+	r.frames(3)
+	if err := WriteSavedViews(r.prefs, []SavedView{{ID: "ext", Name: "外来", Filters: Filters{Scope: "all"}}}); err != nil {
+		t.Fatal(err)
+	}
+	r.hidden = false
+	r.frames(3)
+	if !r.has(gfx.RoleButton, "外来") || r.has(gfx.RoleButton, "甲") {
+		t.Errorf("重新进入后应读到存储里的内容（外来），而不是旧列表或空列表；画面文字 %q", r.session.Texts())
 	}
 }

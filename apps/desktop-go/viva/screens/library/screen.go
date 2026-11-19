@@ -33,7 +33,8 @@ type Screen struct {
 	NewID func() string
 
 	groups     kit.HoverGroups
-	showUnused bool // 标签分区的「显示未使用的标签」开关；刻意不持久化，退出模块即复位（渲染层同）
+	flex       kit.FlexColumn // 侧栏列：定高的 flex 列，内容溢出时行按 flex-shrink 压低（台账 B-034）
+	showUnused bool           // 标签分区的「显示未使用的标签」开关；刻意不持久化，退出模块即复位（渲染层同）
 	menu       rowMenu
 	edit       editDialog
 	smart      smartViews
@@ -98,13 +99,14 @@ func (s *Screen) Panel(c ui.C) {
 	v := s.Store.View()
 
 	l.ScrollAreaView(c.Key("panel-scroll"), [4]float32{0, l.Space(2), l.Space(3), l.Space(2)}, func(view kit.ScrollView) {
-		ui.Column(c.Key("body")).FillWidth().MinHeight(view.Viewport).Children(func() {
+		// 列的每个孩子都要在声明之前登记 flex 属性（s.flex.Item，一一对应、同序）；回收站块的 mt-auto 在 FlexColumn 里解算。
+		s.flex.Begin(view.Viewport)
+		s.flex.Box(c.Key("body")).Children(func() {
 			s.scopeTabs(c, v)
 			s.smartViewsSection(c, v)
 			s.collectionsSection(c, v)
 			s.platformsSection(c, v)
 			s.tagsSection(c, v)
-			ui.Row(c.Key("spacer")).Grow(1)
 			s.trashSection(c, v)
 		})
 	}).Grow(1).FillWidth().MinHeight(0)

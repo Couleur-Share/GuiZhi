@@ -37,6 +37,7 @@ func (s *Screen) scopeTabs(c ui.C, v View) {
 		{services.LibraryScopeFavorites, locales.LibraryScopeFavorites(), icons.Star, n(func(c *services.LibraryCounts) int { return c.Favorites })},
 		{services.LibraryScopeArchived, locales.LibraryScopeArchived(), icons.Archive, n(func(c *services.LibraryCounts) int { return c.Archived })},
 	}
+	s.flex.Item(kit.FlexItem{Shrink: true, MinAuto: true}) // 外层的 pt-3 块是 min-height:auto 的普通弹性项
 	ui.Column(c.Key("tabs-wrap")).FillWidth().PadTop(l.Space(3)).Children(func() {
 		ui.Row(c.Key("tabs")).FillWidth().Gap(l.Space(1)).Pad(l.Space(1)).
 			Draw(func(d *ui.DrawContext) {
@@ -75,7 +76,7 @@ func (s *Screen) scopeTab(c ui.C, tab scopeTab, active bool) {
 
 	box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
-			l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), radius) // 全局 button:focus-visible
+			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), radius) // 全局 button:focus-visible；未选中的页签底色透明：环要空心
 		}
 		l.PaintSurface(d, kit.Surface{Bg: bg, Radius: radius, Shadows: shadows})
 	}).Children(func() {

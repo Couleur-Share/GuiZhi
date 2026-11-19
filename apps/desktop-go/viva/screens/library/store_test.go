@@ -457,7 +457,9 @@ func TestScheduleDeleteHidesNowAndCommitsAfterTheWindow(t *testing.T) {
 	if slices.Contains(h.svc.Calls(), "DeleteCollection:c1") {
 		t.Fatal("窗口内不该提交给后端")
 	}
-	h.clock.Advance(DeletionUndoWindow - time.Millisecond)
+	// 撤销窗口是 8 秒（渲染层 collection.store.ts / tag.store.ts 的 DELETION_UNDO_WINDOW_MS = 8000）：
+	// 字面量写在这里而不引用常量，常量被改了测试才会红。
+	h.clock.Advance(8*time.Second - time.Millisecond)
 	if slices.Contains(h.svc.Calls(), "DeleteCollection:c1") {
 		t.Fatal("窗口还没到就提交了")
 	}
