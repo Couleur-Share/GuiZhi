@@ -115,15 +115,27 @@ func (s *Screen) entryCard(c ui.C, v ListView, e services.LibraryEntry, query st
 			// block text-sm font-medium leading-snug line-clamp-2：渲染层的 line-clamp-2 不生效（Tailwind 3.4 里 display 工具类排在
 			// line-clamp 之后，`block` 把 `-webkit-box` 盖掉了），长标题整段折行、卡片随之变高，这里照渲染出来的样子不截断。
 			// 500 档字重按渲染层不做字偶距的宽度折行（kit.TextNoKern，台账 A-026 / B-044）。
-			l.TextNoKern(c.Key("title"), title, l.Rem(0.875), l.Rem(0.875)*1.375, kit.WeightMedium, fg, kit.NoKernOptions{})
+			// 搜索时标题里的命中词包进 mark（highlightText，台账 B-041）：只有真标题才标（空标题的「无标题」不标），没有命中走原来的排法。
+			titleSize, titleLine := l.Rem(0.875), l.Rem(0.875)*1.375
+			marked := false
+			if query != "" && e.Title != "" {
+				_, marked = l.TextMarked(c.Key("title"), title, query, titleSize, titleLine, kit.WeightMedium, fg, kit.MarkOptions{})
+			}
+			if !marked {
+				l.TextNoKern(c.Key("title"), title, titleSize, titleLine, kit.WeightMedium, fg, kit.NoKernOptions{})
+			}
 			if query != "" && e.Snippet != "" {
 				snippet := t.MutedForeground
 				if selected {
 					snippet = t.PrimaryForeground.WithAlpha(0.8)
 				}
 				// mt-0.5 block text-xs leading-snug line-clamp-2（同样不生效）
-				l.TextPx(c.Key("snippet"), e.Snippet, l.Rem(0.75), l.Rem(0.75)*1.375, kit.WeightNormal, snippet, kit.Wrapped()).
-					MarginTop(l.Space(0.5))
+				snippetSize, snippetLine := l.Rem(0.75), l.Rem(0.75)*1.375
+				text, ok := l.TextMarked(c.Key("snippet"), e.Snippet, query, snippetSize, snippetLine, kit.WeightNormal, snippet, kit.MarkOptions{})
+				if !ok {
+					text = l.TextPx(c.Key("snippet"), e.Snippet, snippetSize, snippetLine, kit.WeightNormal, snippet, kit.Wrapped())
+				}
+				text.MarginTop(l.Space(0.5))
 			}
 		})
 		// mt-0.5 flex shrink-0 items-center gap-1：星标与类型图标。

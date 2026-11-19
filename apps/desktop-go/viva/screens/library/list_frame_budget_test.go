@@ -5,8 +5,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 
+	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/viva/internal/frametime"
 	"guizhi-mygo-shell/viva/locales"
@@ -31,13 +33,39 @@ func TestListFrameBudget(t *testing.T) {
 		for _, total := range []int{100, 10000} {
 			for _, page := range []int{20, 50, 100} {
 				name := fmt.Sprintf("%s_%d_entries_page_%d", view, total, page)
-				t.Run(name, func(t *testing.T) { measureListFrames(t, name, view == "table", total, page) })
+				t.Run(name, func(t *testing.T) { measureListFrames(t, name, view == "table", total, page, "") })
 			}
+		}
+	}
+	// 搜索命中词高亮（台账 B-041）：夹具里每条的标题（「条目 N」）与摘要都含「条目」，所以本页每一行的标题与摘要都带 mark，
+	// 是高亮排版最重的情形；与上面同规模、同页大小的无搜索读数并排看。
+	for _, view := range []string{"card", "table"} {
+		for _, page := range []int{20, 100} {
+			name := fmt.Sprintf("%s_10000_entries_page_%d_search", view, page)
+			t.Run(name, func(t *testing.T) { measureListFrames(t, name, view == "table", 10000, page, "条目") })
 		}
 	}
 }
 
-func measureListFrames(t *testing.T, name string, table bool, total, pageSize int) {
+// cardOrNamed 找一行的按钮：表格行的按钮名是标题（r.cardOf）；卡片在搜索时的名字是「标题 + 空格 + 摘要」（cardName）。
+func cardOrNamed(r *rig, e services.LibraryEntry, search string) (app.AccessNode, bool) {
+	if n, ok := r.cardOf(e); ok {
+		return n, true
+	}
+	title := e.Title
+	if title == "" {
+		title = locales.LibraryUntitled()
+	}
+	for _, n := range r.session.Access() {
+		if n.Role == gfx.RoleButton && n.Label == cardName(title, e, search) {
+			return n, true
+		}
+	}
+	return app.AccessNode{}, false
+}
+
+// search 非空时先搜索，并核对本页确实画出了命中高亮，免得「没有高亮」的读数冒充「有高亮」的读数。
+func measureListFrames(t *testing.T, name string, table bool, total, pageSize int, search string) {
 	heapBefore := frametime.HeapInUse()
 	r := wsRig(t, func(r *rig) { r.svc.SeedEntries(servicestest.GenerateEntries(total)) })
 	if table {
@@ -48,6 +76,13 @@ func measureListFrames(t *testing.T, name string, table bool, total, pageSize in
 		r.store.SetPageSize(r.screen.Ctx, pageSize)
 		r.frames(4)
 	}
+	if search != "" {
+		r.store.SetSearch(r.screen.Ctx, search)
+		r.frames(4)
+		if len(r.markedTexts()) == 0 {
+			t.Fatalf("搜索 %q 之后本页没有画出命中高亮，读数无效", search)
+		}
+	}
 	// 「全部」范围只数在用的条目（库规模 100 时 80 条，1 万时 8000 条），所以一页至多是 min(页大小, 总数) 条。
 	n := len(r.view().List.Entries)
 	if want := min(pageSize, r.view().List.Total); n != want {
@@ -55,11 +90,11 @@ func measureListFrames(t *testing.T, name string, table bool, total, pageSize in
 	}
 	t.Logf("%s 打开列表后 Go 堆增量（含无头会话）：%d KiB", name, (int64(frametime.HeapInUse())-int64(heapBefore))/1024)
 
-	first, ok := r.cardOf(r.view().List.Entries[0])
+	first, ok := cardOrNamed(r, r.view().List.Entries[0], search)
 	if !ok {
 		t.Fatal("找不到第一行（夹具失效）")
 	}
-	second, ok := r.cardOf(r.view().List.Entries[1])
+	second, ok := cardOrNamed(r, r.view().List.Entries[1], search)
 	if !ok {
 		t.Fatal("找不到第二行（夹具失效）")
 	}

@@ -130,14 +130,23 @@ func (s *Screen) tableCell(c ui.C, v View, geo stickyGeometry, col tableColumn, 
 			s.Store.ToggleSelection(e.ID)
 		}
 	case colTitle:
-		s.cell(cc, col).Children(func() { s.titleCell(cc, e, title) })
+		s.cell(cc, col).Children(func() { s.titleCell(cc, e, title, list.searchTerm()) })
 	case colSnippet:
 		s.cell(cc, col).Children(func() {
 			if e.Snippet == "" {
 				s.dash(cc, kit.TextXS, t.MutedForeground.WithAlpha(0.4))
 				return
 			}
-			l.Text(cc.Key("snippet"), e.Snippet, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Ellipsis()).Grow(1).MinWidth(0)
+			// block truncate text-xs：搜索时命中词包进 mark（台账 B-041），单行放不下以省略号收尾。
+			text, ok := ui.Box{}, false
+			if query := list.searchTerm(); query != "" {
+				text, ok = l.TextMarked(cc.Key("snippet"), e.Snippet, query, l.Rem(kit.TextXS.Size), l.Rem(kit.TextXS.Line), kit.WeightNormal,
+					t.MutedForeground, kit.MarkOptions{Truncate: true})
+			}
+			if !ok {
+				text = l.Text(cc.Key("snippet"), e.Snippet, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Ellipsis())
+			}
+			text.Grow(1).MinWidth(0)
 		})
 	case colTags:
 		s.cell(cc, col).Children(func() { s.tagsCell(cc, e) })
@@ -175,7 +184,7 @@ func (s *Screen) dash(c ui.C, st kit.TextStyle, color tokens.Color) {
 }
 
 // titleCell 是标题格：flex min-w-0 items-center gap-1.5，依次是类型图标、置顶图标、标题按钮、星标。
-func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title string) {
+func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title, query string) {
 	l := s.Look
 	t := l.T
 	typeMeta := kit.GetItemTypeMeta(e.ItemType)
@@ -191,7 +200,7 @@ func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title string) {
 		if e.IsPinned {
 			l.Icon(c.Key("pin"), icons.Pin, l.Rem(0.875), t.Primary)
 		}
-		s.titleButton(c, e, title)
+		s.titleButton(c, e, title, query)
 		if e.IsFavorite {
 			l.IconFilled(c.Key("star"), icons.Star, l.Rem(0.875), tokens.Tailwind("amber-400"))
 		}
@@ -200,7 +209,7 @@ func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title string) {
 
 // titleButton 是标题按钮：min-w-0 line-clamp-2 break-words text-left text-sm font-medium text-primary transition-colors
 // hover:text-primary/80 hover:underline；点击打开详情浮层（随 M2-4 迁入，台账 B-043），在那之前选中这一行。
-func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title string) {
+func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title, query string) {
 	l := s.Look
 	t := l.T
 	bc := c.Key("open")
@@ -215,8 +224,15 @@ func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title string) {
 	box.Children(func() {
 		// 500 档字重：Chromium 不做字偶距、Viva 做，钮宽（= 文字宽）与折行点按渲染层的宽度自己排（台账 A-026 / B-044）；
 		// line-clamp-2 至多两行，悬停的下划线每一行各画一条。
-		l.TextNoKern(bc.Key("text"), title, l.Rem(kit.TextSM.Size), l.Rem(kit.TextSM.Line), kit.WeightMedium, color,
-			kit.NoKernOptions{MaxLines: 2, Underline: hovered})
+		size, line := l.Rem(kit.TextSM.Size), l.Rem(kit.TextSM.Line)
+		// 搜索时命中词包进 mark（台账 B-041；表格里的标题连「无标题」也标），悬停下划线每个文字片段各一条。
+		if query != "" {
+			if _, ok := l.TextMarked(bc.Key("text"), title, query, size, line, kit.WeightMedium, color,
+				kit.MarkOptions{MaxLines: 2, Underline: hovered}); ok {
+				return
+			}
+		}
+		l.TextNoKern(bc.Key("text"), title, size, line, kit.WeightMedium, color, kit.NoKernOptions{MaxLines: 2, Underline: hovered})
 	})
 	if box.Clicked() {
 		s.Store.SelectItem(e.ID)
