@@ -206,6 +206,44 @@ func (l *Look) settleReach(d *ui.DrawContext, a *reachArea) {
 	a.boxes = a.boxes[:0]
 }
 
+// RevealNear 把「纵向范围含 y」的停靠点里离 x 最近的那一个滚进它所在滚动区的视野（规则同聚焦跟随：CenterIfNeeded），
+// 返回滚动位置是否动了；没有这样的停靠点或已完全在视野里时返回 false。
+//
+// 给对照脚本用：渲染层里 Playwright 的 click 先对目标做 scrollIntoViewIfNeeded 再点，而 Viva 的可访问树里没有滚出视野的
+// 控件（命中区按裁剪区收窄、不相交就不声明），脚本只能按目标的文字行（Snapshot.Texts 是裁剪之前的所有文字，滚出视野的行也在）
+// 找到它，再让这里把它所在的停靠点滚进来。(x, y) 取上一帧的窗口坐标；调用之后要出一帧，新的滚动位置才画出来。
+// 纵向含 y、横向取最近：行的文字落在行的停靠点里（横向距离 0），图标按钮没有文字、与同一行的文字只差横向位置。
+func (l *Look) RevealNear(x, y float32) bool {
+	var (
+		best     *reachArea
+		bestRect gfx.Rect
+		bestGap  = float32(math.MaxFloat32)
+	)
+	for _, a := range l.reach.areas {
+		if a.windowed {
+			continue // 窗口化的区停靠点登记不完整
+		}
+		for _, r := range a.snap {
+			if y < r.Y || y >= r.Y+r.Height {
+				continue
+			}
+			gap := max(r.X-x, x-(r.X+r.Width), 0)
+			if gap < bestGap || (gap == bestGap && r.Width*r.Height < bestRect.Width*bestRect.Height) {
+				best, bestRect, bestGap = a, r, gap
+			}
+		}
+	}
+	if best == nil {
+		return false
+	}
+	to, moved := best.reveal(bestRect, l.scalePx())
+	if !moved {
+		return false
+	}
+	best.state.ScrollTo(to)
+	return true
+}
+
 // takeScrolled 读走并清掉「本次绘制里有滚动区滚动过」的标记（提示层的传感器用，见 TooltipState.update）。
 func (l *Look) takeScrolled() bool {
 	s := l.reach.scrolled

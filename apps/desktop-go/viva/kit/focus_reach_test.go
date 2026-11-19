@@ -336,6 +336,45 @@ func TestRevealFollowsChromiumsCenterIfNeeded(t *testing.T) {
 	}
 }
 
+// 对照脚本用的 RevealNear（渲染层里 Playwright 的 click 先 scrollIntoViewIfNeeded）：
+// 按窗口高度找到停靠点并滚进视野，规则与聚焦跟随相同；看不见的行也找得到（Viva 的可访问树里没有它们）。
+func TestRevealNearScrollsTheStopAtThatHeightIntoView(t *testing.T) {
+	r := openReach(t, false)
+	topOf := func(i int) float32 {
+		n, ok := r.node(gfx.RoleButton, reachName(i))
+		if !ok {
+			t.Fatalf("可访问树里没有 %q", reachName(i))
+		}
+		return n.Bounds.Y - r.areaTop
+	}
+	// 视野 0..110，按钮 i 占 32i..32i+32，偏移 0。
+	if r.look.RevealNear(100, 48) {
+		t.Errorf("完全在视野里的停靠点不应当滚动")
+	}
+	if r.look.RevealNear(100, 400) {
+		t.Errorf("该高度没有停靠点，不应当滚动")
+	}
+	if !r.look.RevealNear(100, 112) { // 按钮 3：96..128，露出一半
+		t.Fatalf("露出一半的停靠点应当滚动")
+	}
+	r.frames(3)
+	if got := topOf(3); !sameY(got, 78) { // 下沿对齐：偏移 18
+		t.Errorf("露出一半的停靠点应当下沿对齐：按钮 3 离上沿 %.1f，期望 78", got)
+	}
+	// 偏移 18：按钮 7 在 206..238，完全在视野之下，居中该是偏移 185，夹在最大偏移 146。
+	if !r.look.RevealNear(100, 222) {
+		t.Fatalf("视野之外的停靠点应当滚动")
+	}
+	r.frames(3)
+	if got := topOf(7); !sameY(got, 78) {
+		t.Errorf("夹在最大偏移：按钮 7 离上沿 %.1f，期望 78", got)
+	}
+	// 已经到底：再要求滚进视野的目标就在眼前，没有动作。
+	if r.look.RevealNear(100, 100) {
+		t.Errorf("已经完全可见的停靠点不应当再滚动")
+	}
+}
+
 func TestTabPastEndOfAScrolledAreaIsLeftToTheRouter(t *testing.T) {
 	// 没有区外按钮时，最后一枚之后 Tab：路由器绕回窗口 Tab 环的开头（按钮 0），那一枚现在在视野之外，
 	// 没有命中区，所以环里只有看得见的几枚：不报错、不死循环就行。
