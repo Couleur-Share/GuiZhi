@@ -14,6 +14,10 @@ import (
 	"guizhi-mygo-shell/viva/tokens"
 )
 
+// chipTextPx 是表格里标签小块、状态小块与「+N」的字号：渲染层是 text-[10px]，px 字面量不随字号档（根字号 14 / 16 / 18px）缩放，
+// 所以不能写成 Rem(0.625)——中档（16px）里两者相等，只有小档与大档才看得出来（M2-2 的 T2 抓到）。
+const chipTextPx = 10
+
 // 表格行（渲染层 ItemTableRow）：tr group cursor-pointer border-b border-border/50 transition-colors last:border-b-0
 // hover:bg-accent/50，选中 bg-primary/10、勾选 bg-primary/5（悬停盖过它们）。
 //
@@ -242,8 +246,8 @@ func (s *Screen) tagsCell(c ui.C, e services.LibraryEntry) {
 			s.tagChip(c.Key("tag-"+tag.ID), tag)
 		}
 		if extra := len(e.Tags) - 2; extra > 0 {
-			// shrink-0 text-[10px] text-muted-foreground/60：没有显式行高，继承 table 的 text-sm（20px）。
-			l.TextPx(c.Key("more"), "+"+strconv.Itoa(extra), l.Rem(0.625), l.Rem(1.25), kit.WeightNormal, t.MutedForeground.WithAlpha(0.6))
+			// shrink-0 text-[10px] text-muted-foreground/60：没有显式行高，继承 table 的 text-sm（1.25rem 行高）。
+			l.TextPx(c.Key("more"), "+"+strconv.Itoa(extra), chipTextPx, l.Rem(1.25), kit.WeightNormal, t.MutedForeground.WithAlpha(0.6))
 		}
 	})
 }
@@ -252,7 +256,7 @@ func (s *Screen) tagsCell(c ui.C, e services.LibraryEntry) {
 func (s *Screen) tagChip(c ui.C, tag services.LibraryTag) {
 	l := s.Look
 	bg, fg := s.tagChipColors(tag.ColorKey)
-	size := l.Rem(0.625)
+	size := float32(chipTextPx)
 	ui.Row(c).Shrink(1).MinWidth(0).MaxWidth(l.Rem(5)).Items(ui.Center).
 		PadSides(l.Space(0.5), l.Space(1.5), l.Space(0.5), l.Space(1.5)).
 		Draw(func(d *ui.DrawContext) {
@@ -301,7 +305,7 @@ func (s *Screen) sourceCell(c ui.C, e services.LibraryEntry) {
 func (s *Screen) statusChip(c ui.C, status string) {
 	l := s.Look
 	t := l.T
-	size := l.Rem(0.625)
+	size := float32(chipTextPx)
 	label := locales.LibraryStatusUnknown()
 	switch status {
 	case "active":
