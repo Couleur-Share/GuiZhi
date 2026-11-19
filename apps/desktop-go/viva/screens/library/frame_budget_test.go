@@ -13,8 +13,8 @@ import (
 
 // TestFrameBudget 读出知识库侧栏的帧耗时（模块完成定义第 4 条：稳态帧 ≤ 2 ms、滚动一步 ≤ 6 ms）。
 //
-// 侧栏的合集与标签没有窗口化（渲染层也是整表渲染），所以按「合集与标签各有多少」取四档：夹具、基准库副本的规模
-// （40 个合集、120 个标签：`D:\Project\GuiZhi-bench\seed\data\knowledge.db` 的实际数量）、较大、压力。
+// 侧栏的合集与标签行是窗口化的（kit.FlexColumn.Run，台账 B-035），耗时与行数基本无关；按「合集与标签各有多少」取五档：
+// 夹具、基准库副本的规模（40 个合集、120 个标签：`D:\Project\GuiZhi-bench\seed\data\knowledge.db` 的实际数量）、较大、压力、极端。
 // 无头会话的 Frame() 只记录绘制命令、不栅格化，所以量的是界面线程的出帧成本（布局 + 记录）；
 // 栅格化加回读另量一次（Image()），作为真窗口里绘制成本的上界。
 // 耗时与机器有关，默认跳过：VIVA_FRAME_BUDGET=1 go test ./viva/screens/library -run TestFrameBudget -v -count=1。
@@ -31,6 +31,7 @@ func TestFrameBudget(t *testing.T) {
 		{"40_collections_120_tags_seed_size", 40, 120},
 		{"100_collections_300_tags", 100, 300},
 		{"200_collections_500_tags", 200, 500},
+		{"1000_collections_5000_tags", 1000, 5000},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

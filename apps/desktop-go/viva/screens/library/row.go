@@ -37,11 +37,19 @@ type rowSpec struct {
 
 const rowMinHeightPx = 32 // min-h-[32px]：px 字面量，不随字号档缩放
 
-// sidebarRow 声明侧栏列（FlexColumn）里直接挂着的一行：先登记它的 flex 属性（行有显式的 min-h-[32px]，所以内容溢出时
-// 可以被压到 32，台账 B-034），再声明行本身。
+// sidebarRowItem 是侧栏列里一行的 flex 属性：行有显式的 min-h-[32px]，所以内容溢出时可以被压到 32（台账 B-034）。
+var sidebarRowItem = kit.FlexItem{Shrink: true, MinHeight: rowMinHeightPx}
+
+// sidebarRow 声明侧栏列（FlexColumn）里直接挂着的一行：先登记它的 flex 属性，再声明行本身。
 func (s *Screen) sidebarRow(c ui.C, spec rowSpec) {
-	s.flex.Item(kit.FlexItem{Shrink: true, MinHeight: rowMinHeightPx})
+	s.flex.Item(sidebarRowItem)
 	s.rowBox(c, spec)
+}
+
+// sidebarRun 声明侧栏列里一段窗口化的行（合集、标签：数量没有上限，台账 B-035）：只声明看得见的几行加上下各几行的余量，
+// 其余由占位代表；每一行的高度与位置与整段都声明时完全相同（kit.FlexColumn.Run）。row 里直接调用 rowBox，不要再登记 flex 属性。
+func (s *Screen) sidebarRun(c ui.C, key string, n int, view kit.ScrollView, row func(i int)) {
+	s.flex.Run(c, kit.FlexRun{Key: key, N: n, Item: sidebarRowItem, View: view, Estimate: rowMinHeightPx, Row: row})
 }
 
 // rowBox 声明一行（渲染层 LibrarySidebarRow，知识库侧栏的通用行：智能视图、合集、平台、标签、回收站）。

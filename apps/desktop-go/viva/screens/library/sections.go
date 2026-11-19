@@ -78,7 +78,8 @@ func (s *Screen) collectionGlyph(icon string) func(c ui.C, fg tokens.Color) {
 }
 
 // collectionsSection 是「合集」分区：标题带「新建合集」按钮，下面是各合集行，没有合集时给一句说明。
-func (s *Screen) collectionsSection(c ui.C, v View) {
+// 合集行数没有上限，只声明看得见的几行（台账 B-035，见 kit.FlexColumn.Run）。
+func (s *Screen) collectionsSection(c ui.C, v View, view kit.ScrollView) {
 	s.sectionHeading(c, "collections", locales.LibraryCollections(), func(c ui.C) {
 		if s.headingButton(c, icons.FolderPlus, locales.LibraryNewCollection(), 0.5).Clicked() {
 			s.openEdit(editCreateCollection, services.LibraryCollection{}, services.LibraryTag{})
@@ -88,8 +89,9 @@ func (s *Screen) collectionsSection(c ui.C, v View) {
 		s.hint(c, "collections", locales.LibraryNoCollections())
 		return
 	}
-	for _, col := range v.Collections {
-		s.sidebarRow(c, rowSpec{
+	s.sidebarRun(c, "collections", len(v.Collections), view, func(i int) {
+		col := v.Collections[i]
+		s.rowBox(c, rowSpec{
 			Key: "collection:" + col.ID, Icon: s.collectionGlyph(col.Icon), Label: col.Name,
 			Count:  countOf(v.Counts, byCollection, col.ID),
 			Active: v.Filters.CollectionID == col.ID,
@@ -100,7 +102,7 @@ func (s *Screen) collectionsSection(c ui.C, v View) {
 			OnMore:    func(e moreEvent) { s.toggleMenu(e, s.collectionMenuItems(col)) },
 			OnContext: func(at gfx.Point) { s.popMenu(at, s.collectionMenuItems(col)) },
 		})
-	}
+	})
 }
 
 // platformsSection 是「平台」分区（采集来源，派生分组，没有行菜单）：只列当前分面下有条目的平台，已选的保留；
@@ -138,8 +140,8 @@ func tagVisible(v View, tag services.LibraryTag) bool {
 }
 
 // tagsSection 是「标签」分区：标题上的眼睛按钮切换「显示未使用的标签」（没有可露出的就不摆；开着时保留，否则关不回去）。
-// 开关刻意不持久化：它是「清理一下」时才用的临时视图。
-func (s *Screen) tagsSection(c ui.C, v View) {
+// 开关刻意不持久化：它是「清理一下」时才用的临时视图。标签行与合集行一样只声明看得见的几行（台账 B-035）。
+func (s *Screen) tagsSection(c ui.C, v View, view kit.ScrollView) {
 	l := s.Look
 	var unused int
 	for _, tag := range v.Tags {
@@ -172,9 +174,10 @@ func (s *Screen) tagsSection(c ui.C, v View) {
 		s.hint(c, "tags", locales.LibraryNoTags())
 		return
 	}
-	for _, tag := range shown {
+	s.sidebarRun(c, "tags", len(shown), view, func(i int) {
+		tag := shown[i]
 		dot := tagDotColor(tag.ColorKey)
-		s.sidebarRow(c, rowSpec{
+		s.rowBox(c, rowSpec{
 			Key: "tag:" + tag.ID, Label: tag.Name,
 			Icon: func(c ui.C, _ tokens.Color) {
 				size := l.Rem(0.625) // h-2.5 w-2.5 rounded-full
@@ -191,7 +194,7 @@ func (s *Screen) tagsSection(c ui.C, v View) {
 			OnMore:    func(e moreEvent) { s.toggleMenu(e, s.tagMenuItems(tag)) },
 			OnContext: func(at gfx.Point) { s.popMenu(at, s.tagMenuItems(tag)) },
 		})
-	}
+	})
 }
 
 // trashSection 是底部的回收站一行：mt-auto pt-4 的块，内容不满一屏时贴着面板底部（auto 上外边距拿走富余高度）；

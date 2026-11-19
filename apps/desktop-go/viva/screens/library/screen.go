@@ -104,9 +104,9 @@ func (s *Screen) Panel(c ui.C) {
 		s.flex.Box(c.Key("body")).Children(func() {
 			s.scopeTabs(c, v)
 			s.smartViewsSection(c, v)
-			s.collectionsSection(c, v)
+			s.collectionsSection(c, v, view)
 			s.platformsSection(c, v)
-			s.tagsSection(c, v)
+			s.tagsSection(c, v, view)
 			s.trashSection(c, v)
 		})
 	}).Grow(1).FillWidth().MinHeight(0)
