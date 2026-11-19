@@ -30,9 +30,15 @@ func translatedSnapShift(rect gfx.Rect, tx, ty, side float32) (dx, dy float32) {
 // snapShiftAxis 是一根轴上的偏移：pos 是变换之后的位置，t 是平移，size 是容器尺寸，side 是图标边长。
 // 取整用 roundHalfUp（baseline.go），即 Chromium 的 LayoutUnit::Round：四舍五入，恰好一半向 +∞。
 func snapShiftAxis(pos, t, size, side float32) float32 {
+	return snapShiftLocal(pos, t, (size-side)/2)
+}
+
+// snapShiftLocal 与 snapShiftAxis 相同，只是图标在容器里的偏移 local 直接给出（图标不一定居中：
+// 搜索框右端那一组里，清除钮的图标在组的左端，偏移是按钮的内边距）。
+func snapShiftLocal(pos, t, local float32) float32 {
 	layout := float64(pos) - float64(t) // 变换之前的版面位置 L
 	u := layout - roundHalfUp(layout)
-	w := float64(size-side)/2 + u
+	w := float64(local) + u
 	return float32(roundHalfUp(w) - w)
 }
 
@@ -61,6 +67,21 @@ func PaintIconExact(canvas *gfx.Canvas, ic gfx.Icon, bounds gfx.Rect, tint gfx.C
 	n := int(math.Ceil(sideDev + math.Max(fx, fy) - 1e-6)) // 掩码要装得下带偏移的图标
 	origin := gfx.Point{X: float32(ix / scale), Y: float32(iy / scale)}
 	paintCoverage(canvas, iconCoverageSide(ic, sideDev, n, fx, fy), n, origin, float32(scale), tint)
+}
+
+// IconInTranslated 是 Icon 的一种：图标在一个 absolute top-1/2 -translate-y-1/2 居中的容器（group）里，
+// 落笔位置按上面的规则算：group 是容器变换之后的外框（由外层在绘制时填好，比图标先画），
+// 图标在容器里的偏移取自它自己的外框与 group 的差。容器是几个并排的子元素时用它（搜索框右端的清除钮与快捷键提示一组），
+// 容器自己就是图标按钮时用 Button 的 TranslateCentered。外框（IconSink 报的）仍是版面位置。
+func (l *Look) IconInTranslated(c ui.C, ic gfx.Icon, size float32, color tokens.Color, group *gfx.Rect) ui.Box {
+	col := l.Col(color)
+	return ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
+		mark := l.markIcon(d)
+		dx := snapShiftLocal(group.X, 0, d.Rect.X-group.X)
+		dy := snapShiftLocal(group.Y, -group.Height/2, d.Rect.Y-group.Y)
+		PaintIconExact(d.Canvas, ic, d.Rect, d.Fade(col), dx, dy)
+		l.reportIcon(d, mark)
+	})
 }
 
 // IconShifted 是 Icon 的一种：落笔位置在版面位置上再加 *shift（逻辑像素，由外层在绘制时填好，见 Button 的 TranslateCentered），

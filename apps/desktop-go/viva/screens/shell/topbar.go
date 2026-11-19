@@ -149,20 +149,28 @@ func (w *Window) noteSearchText() {
 }
 
 // searchTools 是搜索框右端的一组控件。
+//
+// 渲染层的这一组是 absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1：组自己按内容定高、用平移居中，
+// 所以 Chromium 画里面的 SVG 图标走「变换容器」的取整规则（kit/icon_snap.go），落笔位置与版面位置差零点几个像素。
+// 外层仍是占满搜索框高度的行（版面位置相同），里面的组按内容定高、纵向居中，组变换之后的外框在绘制时记下，清除钮的图标据此落笔。
 func (w *Window) searchTools(c ui.C, height float32, clear, chip bool) {
 	l := w.Look
-	ui.Row(c.Key("tools")).Absolute().Right(l.Space(2)).Top(0).Height(height).Items(ui.Center).Gap(l.Space(1)).Children(func() {
-		if clear {
-			w.clearSearchButton(c)
-		}
-		if chip {
-			w.shortcutChip(c)
-		}
+	var group gfx.Rect
+	ui.Row(c.Key("tools")).Absolute().Right(l.Space(2)).Top(0).Height(height).Items(ui.Center).Children(func() {
+		ui.Row(c.Key("group")).Items(ui.Center).Gap(l.Space(1)).Draw(func(d *ui.DrawContext) { group = d.Rect }).Children(func() {
+			if clear {
+				w.clearSearchButton(c, &group)
+			}
+			if chip {
+				w.shortcutChip(c)
+			}
+		})
 	})
 }
 
 // clearSearchButton 是清除搜索的按钮：rounded p-1 transition-colors hover:bg-accent/60，里面 h-3.5 w-3.5 的 X（muted）。
-func (w *Window) clearSearchButton(c ui.C) {
+// group 是它所在那一组变换之后的外框（见 searchTools）。
+func (w *Window) clearSearchButton(c ui.C, group *gfx.Rect) {
 	l := w.Look
 	t := l.T
 	c = c.Key("clear")
@@ -178,7 +186,7 @@ func (w *Window) clearSearchButton(c ui.C) {
 		}
 		l.PaintSurface(d, kit.Surface{Bg: t.Accent.WithAlpha(0.6 * p), Radius: l.Rem(0.25)})
 	}).Children(func() {
-		l.Icon(c.Key("icon"), icons.X, l.Rem(0.875), t.MutedForeground)
+		l.IconInTranslated(c.Key("icon"), icons.X, l.Rem(0.875), t.MutedForeground, group)
 	})
 	if box.Clicked() {
 		w.search.SetText("")

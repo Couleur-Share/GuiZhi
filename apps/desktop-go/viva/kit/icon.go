@@ -99,7 +99,7 @@ func PaintIcon(canvas *gfx.Canvas, ic gfx.Icon, bounds gfx.Rect, tint gfx.Color)
 		return
 	}
 	if !rasterizable(ic) {
-		canvas.DrawIcon(ic, bounds, tint)
+		canvas.DrawIcon(ic, nativeIconBounds(canvas, bounds), tint)
 		return
 	}
 	origin, sideDev, n, ok := iconPlacement(canvas, bounds)
@@ -107,6 +107,26 @@ func PaintIcon(canvas *gfx.Canvas, ic gfx.Icon, bounds gfx.Rect, tint gfx.Color)
 		return
 	}
 	paintCoverage(canvas, iconCoverageSide(ic, sideDev, n, 0, 0), n, origin, canvas.PixelScale(), tint)
+}
+
+// nativeIconBounds 把 bounds 改写成 Viva 原生 DrawIcon 会「原样」落笔的整设备像素方块，让多色与填充图标的原点和描边图标一致。
+//
+// 原生 DrawIcon 先把边长取整，再按「居中位置」取整原点（gfx/icon.go 的 iconTarget）：12.25px 的图标落在 292.375 时，
+// 居中后是 292.375 + 6.125 − 6 = 292.5，向上取整到 293；而 Chromium 的规则是原点吸附到最近的整设备像素（见 PaintIcon）、
+// 即 292——墨迹低一整行（B-042，M2-2 表格小字号档的 168 处「墨迹错位 垂直 +1」都是它）。
+// 这里按 iconPlacement 的规则先吸附原点，边长仍取整（原生路径画不出带小数的边长，墨迹总量的差由 A-003 登记），
+// DrawIcon 对这样的方块再取整是恒等变换。边长为零时原样交还。
+func nativeIconBounds(canvas *gfx.Canvas, bounds gfx.Rect) gfx.Rect {
+	origin, sideDev, _, ok := iconPlacement(canvas, bounds)
+	if !ok {
+		return bounds
+	}
+	pixels := math.Floor(sideDev + 0.5)
+	if pixels < 1 {
+		return bounds
+	}
+	side := float32(pixels / float64(canvas.PixelScale()))
+	return gfx.Rect{X: origin.X, Y: origin.Y, Width: side, Height: side}
 }
 
 // iconPlacement 求图标在 bounds 里的落笔位置：原点（逻辑坐标，已吸附到最近的整设备像素）、边长（设备像素，可带小数）与掩码边长。
