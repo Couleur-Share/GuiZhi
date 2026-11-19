@@ -22,6 +22,10 @@ type FlexItem struct {
 	MarginTop, MarginBottom float32
 	// MarginTopAuto 对应 mt-auto：容器有富余高度时，富余全部归这个子项的上外边距（把它推到容器末端）；MarginTop 此时忽略。
 	MarginTopAuto bool
+
+	// 下面两项只由 FlexColumn.Run 登记（窗口化的行段，见 flexrun.go），调用方不要设。
+	runKey string // 属于哪一段；"" 是普通孩子
+	hidden int    // 大于 0 是一个占位孩子，代表这一段里 hidden 个没声明的行
 }
 
 // FlexColumn 复刻渲染层 `flex h-full min-h-0 flex-col overflow-y-auto` 的列：容器有定高（滚动区的视口高），
@@ -57,21 +61,32 @@ type FlexColumn struct {
 	items []FlexItem
 
 	nodes    []flexNode // 草稿：解算用，不在绘制路径上分配
+	spans    []flexSpan // 每个孩子在 nodes 里的范围（占位孩子对应一串节点）
 	mismatch bool       // 最近一次版面发现登记的子项数与实际声明的不符
+
+	runs  []runState // 窗口化的行段（Run）：几何跨帧保留，窗口按上一帧的几何算
+	dirty bool       // 布局之后发现某段声明的窗口盖不住看得见的行：绘制时再要一帧
 }
+
+// flexSpan 是一个孩子占用的解算节点 [first, first+count)：普通孩子一个，占位孩子 hidden 个。
+type flexSpan struct{ first, count int }
 
 // Begin 开始新一帧的声明：room 是容器的定高（滚动区的视口高，首帧布局之前为 0——此时不收缩）；之前登记的子项清空。
 func (f *FlexColumn) Begin(room float32) {
 	f.room = max(room, 0)
 	f.items = f.items[:0]
+	for i := range f.runs {
+		f.runs[i].declared = false
+	}
 }
 
 // Item 登记紧接着要声明的那个孩子的 flex 属性：登记与孩子必须一一对应、同序。
 func (f *FlexColumn) Item(item FlexItem) { f.items = append(f.items, item) }
 
 // Box 声明容器：占满可用宽度，至少与视口一样高（mt-auto 的子项靠它贴底）。调用方继续链式设置后自己调用 Children。
+// 容器的 Draw 被占用（窗口化的行段在布局之后发现窗口没盖住看得见的行时，靠它再要一帧），调用方不要再设。
 func (f *FlexColumn) Box(c ui.C) ui.Box {
-	return ui.CustomLayout(c, f).FillWidth().MinHeight(f.room)
+	return ui.CustomLayout(c, f).FillWidth().MinHeight(f.room).Draw(f.requestWhenStale)
 }
 
 // Mismatch 报告最近一次版面里，登记的子项数是否与实际声明的孩子数不符。不符时版面退回「全部不收缩、没有外边距」，
@@ -208,32 +223,54 @@ func roundDivAway(num, den int64) int64 {
 }
 
 // load 把登记的子项与版面给出的首选高度合成解算用的节点。数目不符时全部按「不收缩、无外边距」处理。
+// 窗口化的行段（Run）里没声明的行由占位孩子代表：展开成 hidden 个与已声明的行同规格、同内容高的节点，
+// 解算与每个行都声明时完全相同（分摊、取整、下限都逐行算），只是这些行没有实体。
 func (f *FlexColumn) load(ctx *ui.LayoutContext) []flexNode {
 	n := ctx.Count()
-	if cap(f.nodes) < n {
-		f.nodes = make([]flexNode, n)
-	} else {
-		f.nodes = f.nodes[:n]
-	}
 	f.mismatch = len(f.items) != n
+	f.nodes = f.nodes[:0]
+	f.spans = f.spans[:0]
 	for i := 0; i < n; i++ {
-		node := flexNode{base: pxToLU(max(ctx.Height(i), 0))}
-		if !f.mismatch {
-			it := f.items[i]
-			node.shrink = it.Shrink
-			node.min = pxToLU(max(it.MinHeight, 0))
-			if it.MinAuto {
-				node.min = node.base
-			}
-			node.auto = it.MarginTopAuto
-			if !it.MarginTopAuto {
-				node.mt = pxToLU(it.MarginTop)
-			}
-			node.mb = pxToLU(it.MarginBottom)
+		if f.mismatch {
+			f.spans = append(f.spans, flexSpan{len(f.nodes), 1})
+			f.nodes = append(f.nodes, flexNode{base: pxToLU(max(ctx.Height(i), 0))})
+			continue
 		}
-		f.nodes[i] = node
+		it := f.items[i]
+		if it.hidden > 0 {
+			base := f.runBase(ctx, it.runKey)
+			f.spans = append(f.spans, flexSpan{len(f.nodes), it.hidden})
+			for k := 0; k < it.hidden; k++ {
+				f.nodes = append(f.nodes, nodeOf(it, base))
+			}
+			continue
+		}
+		f.spans = append(f.spans, flexSpan{len(f.nodes), 1})
+		f.nodes = append(f.nodes, nodeOf(it, pxToLU(max(ctx.Height(i), 0))))
 	}
 	return f.nodes
+}
+
+// nodeOf 按子项的 flex 属性与内容高（1/64 px）生成解算节点。
+func nodeOf(it FlexItem, base int32) flexNode {
+	node := flexNode{base: base, shrink: it.Shrink, min: pxToLU(max(it.MinHeight, 0)), auto: it.MarginTopAuto, mb: pxToLU(it.MarginBottom)}
+	if it.MinAuto {
+		node.min = node.base
+	}
+	if !it.MarginTopAuto {
+		node.mt = pxToLU(it.MarginTop)
+	}
+	return node
+}
+
+// runBase 是某一段里行的内容高：段里的行同规格同内容，取第一个已声明的行；一个都没有（不会发生：窗口至少声明一行）返回 0。
+func (f *FlexColumn) runBase(ctx *ui.LayoutContext, key string) int32 {
+	for i, it := range f.items {
+		if it.runKey == key && it.hidden == 0 {
+			return pxToLU(max(ctx.Height(i), 0))
+		}
+	}
+	return 0
 }
 
 // MeasureWidth 是内容想要的宽度：容器占满可用宽度，用不到。
@@ -254,13 +291,19 @@ func (f *FlexColumn) MeasureHeight(ctx *ui.LayoutContext) float32 {
 }
 
 // PlaceHeight 按解算结果摆放每个孩子的高度与上缘；容器比内容高时，富余空间归 mt-auto 的孩子。
+// 占位孩子占满它代表的那些行（行与行之间没有外边距，所以是各行高度之和）。
 func (f *FlexColumn) PlaceHeight(ctx *ui.LayoutContext, bounds ui.Rect) {
 	nodes := f.load(ctx)
 	resolveFlexColumn(nodes, pxToLU(f.room), pxToLU(bounds.Height))
-	for i := range nodes {
-		ctx.SetHeight(i, luToPx(nodes[i].size))
-		ctx.SetY(i, bounds.Y+luToPx(nodes[i].top))
+	for i, sp := range f.spans {
+		var size int64
+		for k := sp.first; k < sp.first+sp.count; k++ {
+			size += int64(nodes[k].size)
+		}
+		ctx.SetHeight(i, luToPx(int32(size)))
+		ctx.SetY(i, bounds.Y+luToPx(nodes[sp.first].top))
 	}
+	f.noteRuns(nodes)
 }
 
 var _ ui.Layout = (*FlexColumn)(nil)
