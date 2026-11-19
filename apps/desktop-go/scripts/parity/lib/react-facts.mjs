@@ -155,6 +155,18 @@ const TEXTS_EXPR = `(async () => {
       testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
     };
   };
+  // 看得见的文字：自身与全部祖先 opacity 的乘积，再乘文字色 alpha。低于 0.01 的文字不是「呈现出来的文字」——
+  // 悬停或焦点在行内时淡出的行尾计数（opacity-0）、text-transparent 的叠层。口径与 Viva 一侧 collectViva 一致
+  // （kit.VisibleInkAlpha = 0.01：那边透明的文字不进采集），两边比的都是用户看得见的字（台账 G-010）。
+  const inkAlpha = (el, cs) => {
+    let o = 1;
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      o *= Number(getComputedStyle(e).opacity);
+      if (o < 0.001) return 0;
+    }
+    const a = cs.color.startsWith("rgba(") ? parseFloat(cs.color.split(",")[3]) : 1;
+    return o * (Number.isFinite(a) ? a : 1);
+  };
   // text-overflow: ellipsis 截断：DOM 文本仍是全文，浏览器画出的是「放得下的前缀 + …」。
   // 采集的是「看得见的文字」（Viva 的 Ellipsis 同样只留可见部分），所以按 Chromium 的规则复算截断点：
   // 取最长的前缀，使「前缀宽度 + 省略号宽度」不超过内容盒宽度。只处理单行、文字节点直接位于截断元素之下的常见写法
@@ -200,6 +212,7 @@ const TEXTS_EXPR = `(async () => {
     if (!el) continue;
     const cs = getComputedStyle(el);
     if (cs.display === "none" || cs.visibility === "hidden") continue;
+    if (inkAlpha(el, cs) < 0.01) continue;
     const range = document.createRange();
     range.selectNodeContents(node);
     const rects = [];

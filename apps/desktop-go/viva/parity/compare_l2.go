@@ -165,6 +165,7 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 	case abs(dx) > allowX || abs(dy) > th.Metrics.InkMaxDeltaY:
 		rep.addDelta(float64(max(abs(dx), abs(dy))), LayerL2, "ink", subject, "墨迹错位：水平 %+d、垂直 %+d 像素（上限 %d、%d；正值表示 Viva 相对 React 偏右、偏下）",
 			dx, dy, allowX, th.Metrics.InkMaxDeltaY)
+		rep.Issues[len(rep.Issues)-1].DY = float64(abs(dy))
 	case ratio < th.Metrics.InkMassMin || ratio > th.Metrics.InkMassMax:
 		rep.addDelta(math.Abs(ratio-1), LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
 			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)

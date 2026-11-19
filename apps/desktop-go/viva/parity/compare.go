@@ -25,6 +25,10 @@ type Issue struct {
 	Overlay bool `json:"overlay,omitempty"`
 	// Delta 是偏差的大小（像素），只有外框、文字宽度、图标外框与墨迹位移这几类度量问题带；其余为 0。
 	Delta float64 `json:"delta,omitempty"`
+	// DY 是墨迹错位问题里纵向位移的绝对值（像素）；其余问题为 0。Delta 是水平、纵向两者的较大值，
+	// 单靠它分不出「只是横向错位」与「纵向也错了」：字距、字偶距这类只会沿行方向错位的原因，其已登记的偏差
+	// 不应连带放过纵向的错位（Waiver.MaxDY，缺省 0 即一概不放过）。
+	DY float64 `json:"dy,omitempty"`
 	// Dir 是墨迹总量问题的方向：+1 表示 Viva 的墨迹比 React 多，-1 表示少；其余问题为 0。
 	// 已登记的偏差有方向（灰度抗锯齿使 Viva 偏多，小字号笔画使 Viva 偏少），据此分开匹配（Waiver.Dir）。
 	Dir int8 `json:"dir,omitempty"`

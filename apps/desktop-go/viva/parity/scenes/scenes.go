@@ -30,8 +30,8 @@ var pageSettingsWaivers = []parity.Waiver{
 		Note: "快捷键提示是固定间距文字，Viva 把字格宽度取整（5.498→5px），一行 11 个字符窄 5.48px；行盒与外框宽度已按渲染层留出",
 	},
 	{
-		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "Alt+Shift+F",
-		Note: "同上：字格取整使整行墨迹整体偏短，左缘与每个字符的位置累计最多差一个字格（5.5px）",
+		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "Alt+Shift+F", MaxDY: 1,
+		Note: "同上：字格取整使整行墨迹整体偏短，左缘与每个字符的位置累计最多差一个字格（5.5px）；小、大字号档纵向另差 1 像素（Viva 偏下，等宽字体的基线，台账 B-022）",
 	},
 }
 
@@ -218,8 +218,8 @@ var toastMonoWaivers = []parity.Waiver{
 		Note: "详情原文是固定间距文字，Viva 把字格取整（Consolas 11px 的 6.048→6px），整行偏短最多 2.6px",
 	},
 	{
-		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "SQLITE_BUSY",
-		Note: "同上：字格取整使每行墨迹整体偏短，字形位置累计最多差一个字格",
+		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "SQLITE_BUSY", MaxDY: 1,
+		Note: "同上：字格取整使每行墨迹整体偏短，字形位置累计最多差一个字格；大字号档纵向另差 1 像素（Viva 偏下，等宽字体的基线，台账 B-022）",
 	},
 }
 
@@ -584,8 +584,8 @@ func monoFieldWaivers(subject string, maxWidth float64) []parity.Waiver {
 			Note: "输入框里的固定间距文字，Viva 把字格取整（Consolas 的 7.70→8px 等），整行与渲染层的宽度差在半个字格×字数以内",
 		},
 		{
-			Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: 2,
-			Note: "同上：字格取整使每个字符的位置累计最多差两个像素（大字号档的纵向基线还差一个像素）",
+			Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: 2, MaxDY: 1,
+			Note: "同上：字格取整使每个字符的位置累计最多差两个像素（大字号档的纵向基线另差一个像素，台账 B-022）",
 		},
 	}
 }

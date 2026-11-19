@@ -30,6 +30,9 @@ var reactIgnoredRoles = map[string]bool{
 	"complementary": true,
 	"navigation":    true,
 	"main":          true,
+	// 表单：Modal 里的 <form> 是 Chromium 导出的 form 地标，只把对话框里的字段与按钮分区，本身没有状态与操作
+	// （同上，登记见台账 A-004 的 2026-11-18 补充）；里面的输入框、按钮、标题照常逐个比较。
+	"form": true,
 }
 
 // reactIgnoredUnnamed 是「无名时不参与结构比较」的 Chromium 角色：没有可访问名的图片是装饰性图标

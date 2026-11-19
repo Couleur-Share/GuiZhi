@@ -241,7 +241,8 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 			Overlay:  t.Layer >= kit.OverlayLayerMin,
 			// Snapshot.Texts 是裁剪之前画过的所有文字；滚出滚动容器的文字不在 Labels（真正画出来的）里。
 			// 标成 Hidden：比较时它不算「呈现出来的文字」，但仍可补全一段折行文字的原文（口径见台账 A-010）。
-			Hidden: !isDrawn(snap.Labels, t),
+			// 裁剪线只切到行盒的空白（行距）、没碰到字形所在内容区的文字同样算看不见（台账 G-011）。
+			Hidden: !isDrawn(snap.Labels, t) || contentClippedOut(t, baseline),
 		})
 		f.TextRects = append(f.TextRects, f.Texts[len(f.Texts)-1].Rects...)
 	}
@@ -263,6 +264,22 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		}
 	}
 	return f
+}
+
+// contentClippedOut 报告文字的内容区（基线上 A 行、下 D 行，与渲染层 Range 外框同一把尺子）是否被裁剪矩形整个切掉。
+//
+// 渲染层判断「文字呈现出来了」用的是内容区与所属元素可见部分的相交（react-facts.mjs 的 TEXTS_EXPR）；
+// Viva 的标签外框是整个行盒，比内容区多出上下的行距（15.75px 的字：行盒 22.5，内容区 20），
+// 滚动区域的边缘恰好落在这段行距里时，Viva 的行盒与裁剪区相交 1~2 个像素，而渲染层认为文字整个在线外。
+// 这 1~2 个像素是空白，两边实际画面一样；口径统一到内容区后，两边的「呈现出来的文字」才是同一批（台账 G-011）。
+// 没有裁剪、或内容区与裁剪区有正面积相交的文字都不受影响。
+func contentClippedOut(t gfx.Text, baseline float64) bool {
+	if !t.HasClip {
+		return false
+	}
+	a, d := kit.ChromeContentRows(t.Style.Weight, float64(t.Style.Size))
+	top, bottom := baseline-float64(a), baseline+float64(d)
+	return bottom <= float64(t.ClipOf.Y) || top >= float64(t.ClipOf.Y+t.ClipOf.Height)
 }
 
 // isDrawn 报告 text 是否真的被画出来了：labels 里有同样内容、位置相差不超过 1 个逻辑像素

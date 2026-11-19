@@ -19,6 +19,9 @@ type Waiver struct {
 	Subject string
 	// Overlay 为真时，只放过出在浮层文字上的问题（Issue.Overlay）：同一段文字在页面层里出的问题照常判定。
 	Overlay bool
+	// Emoji 为真时，只放过主题是单个彩色表情字形的问题（Issue.Subject 形如「💼」）：
+	// 表情目录有上百个，逐个写 Subject 既冗长又会漏；按「是不是表情」圈定范围，普通文字的同类偏差照常判定。
+	Emoji bool
 	// MaxDelta 大于 0 时，只放过偏差大小（Issue.Delta，像素）不超过它的问题；没有记大小的问题不放过。
 	// 用于「某个已登记的原因造成的次像素位移」：原因本身（如字距差）放过，同一处更大的偏差仍要判定。
 	MaxDelta float64
@@ -26,6 +29,11 @@ type Waiver struct {
 	// 例如字距差必然使一行文字宽 字符数 × 字距，比这小得多的偏差是别的问题；同一段文字出现在别处（遮罩背后的任务行）
 	// 时，那里的偏差也不会因为文字相同而被放过。
 	MinDelta float64
+	// MaxDY 是墨迹错位里纵向位移（Issue.DY）允许的最大值；缺省 0 表示不放过任何纵向错位（台账 G-012）。
+	// 字距、字偶距、字格取整这类原因只会让文字沿行方向错位；Delta 取水平与纵向的较大值，所以「横向错 2 像素」的登记
+	// 如果不限纵向，会把「纵向错 1 像素」的基线问题一并放过（M2-1 里先后藏过分组标题与表情的两处真缺陷）。
+	// 确有已登记的纵向偏差时（如等宽快捷键提示的基线，B-022），显式写出它的上限，让纵向偏差也有名有姓。
+	MaxDY float64
 	// Dir 非零时，只放过方向相同的墨迹总量问题（Issue.Dir：+1 Viva 偏多，-1 Viva 偏少）：
 	// 灰度抗锯齿使 Viva 偏多（A-009），小字号拉丁笔画使 Viva 偏少（A-016），两类原因不能互相冒名。
 	Dir int8
@@ -51,16 +59,43 @@ func (w Waiver) matches(is Issue) bool {
 	if w.Overlay && !is.Overlay {
 		return false
 	}
+	if w.Emoji && !emojiSubject(is.Subject) {
+		return false
+	}
 	if w.MaxDelta > 0 && (is.Delta <= 0 || is.Delta > w.MaxDelta+1e-9) {
 		return false
 	}
 	if w.MinDelta > 0 && (is.Delta <= 0 || is.Delta < w.MinDelta-1e-9) {
 		return false
 	}
+	if is.DY > w.MaxDY+1e-9 {
+		return false
+	}
 	if w.Dir != 0 && w.Dir != is.Dir {
 		return false
 	}
 	return w.Subject == "" || strings.Contains(is.Subject, w.Subject)
+}
+
+// emojiSubject 报告 Issue.Subject（「文字」的写法）里的文字是不是单个彩色表情：
+// 一个表情基本字符，后面可跟变体选择符 U+FE0F、肤色修饰符与 ZWJ 连接的序列。
+// 范围取表情所在的区块（Emoticons 与补充图形区 U+1F000–1FAFF、杂项符号与装饰符号 U+2600–27BF、
+// 杂项技术符号 U+2300–23FF、杂项符号和箭头 U+2B00–2BFF）；普通文字、数字与标点都不算。
+func emojiSubject(subject string) bool {
+	text := strings.TrimSuffix(strings.TrimPrefix(subject, "「"), "」")
+	base := 0
+	for _, r := range text {
+		switch {
+		case r == 0xFE0F || r == 0x200D || (r >= 0x1F3FB && r <= 0x1F3FF):
+			// 变体选择符、ZWJ、肤色修饰符：只能跟在表情之后。
+		case (r >= 0x1F000 && r <= 0x1FAFF) || (r >= 0x2600 && r <= 0x27BF) ||
+			(r >= 0x2300 && r <= 0x23FF) || (r >= 0x2B00 && r <= 0x2BFF):
+			base++
+		default:
+			return false
+		}
+	}
+	return base > 0
 }
 
 // applyWaivers 把报告里被 waivers 覆盖的问题移到 Waived。

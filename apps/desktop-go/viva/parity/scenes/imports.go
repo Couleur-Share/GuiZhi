@@ -236,7 +236,7 @@ func modalTitleWaivers(title string) []parity.Waiver {
 		},
 		{
 			Ledger: "A-013", Layer: parity.LayerL2, Kind: "ink", Subject: title, MaxDelta: n*0.5625/2 + 1,
-			Note: "同上：标题被拉宽，墨迹整体位移最多宽度差的一半",
+			Note: "同上：标题被拉宽，墨迹整体位移最多宽度差的一半（只管横向）",
 		},
 	}
 }
@@ -259,7 +259,7 @@ var kerningWaivers = []parity.Waiver{
 	},
 	{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: "网页文章", MaxDelta: 2,
-		Note: "同上：该文字在含字偶对那段文字的左侧，整行居中，位置偏 Δ/2（大字号档 1.27px）再加半像素取整，墨迹最佳位移 2 像素",
+		Note: "同上：该文字在含字偶对那段文字的左侧，整行居中，位置偏 Δ/2（大字号档 1.27px）再加半像素取整，墨迹最佳位移 2 像素（只管横向）",
 	},
 }
 
@@ -273,7 +273,7 @@ var detailKerningWaivers = []parity.Waiver{
 	},
 	{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: "YouTube", MaxDelta: 2,
-		Note: "同上：整行宽度差 2.26px 累积成墨迹剖面的最佳对齐位移 2 像素",
+		Note: "同上：整行宽度差 2.26px 累积成墨迹剖面的最佳对齐位移 2 像素（只管横向）",
 	},
 	{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "text-width", Subject: "https://", MaxDelta: 2,
@@ -298,7 +298,7 @@ var tinyIconWaivers = []parity.Waiver{{
 func kerningInkWaiver(subject string) parity.Waiver {
 	return parity.Waiver{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: 1,
-		Note: "字偶距：整行宽度差（< 1px）累积成墨迹剖面的最佳对齐位移 1 像素",
+		Note: "字偶距：整行宽度差（< 1px）累积成墨迹剖面的最佳对齐位移 1 像素（只管横向）",
 	}
 }
 
@@ -314,7 +314,7 @@ var tooltipBreakWaivers = []parity.Waiver{
 	},
 	{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "ink", Subject: "zhihu.com", MaxDelta: 8,
-		Note: "同上：折行点差一个字符，整段墨迹的最佳对齐位移差一个字符宽度",
+		Note: "同上：折行点差一个字符，整段墨迹的最佳对齐位移差一个字符宽度（只管横向）",
 	},
 }
 

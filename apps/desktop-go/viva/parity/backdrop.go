@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/vivaui/viva/headless"
+	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/kit"
 )
@@ -42,7 +43,8 @@ type BackdropSpec struct {
 	// PanelRole、PanelName 是遮罩之上、不被模糊的面板在 Viva 可访问树里的角色与名称（渲染层是 alertdialog / dialog，Viva 一侧映射成 group）。
 	PanelRole, PanelName string
 	// BaseSteps 把页面带到「对话框打开之前」的状态：与 Scene.Steps 里打开对话框之前的那部分一致，空表示不需要任何操作。
-	BaseSteps func(s *headless.Session) error
+	// look 是这次「打开之前」渲染自己的外观（滚动到目标这类步骤要它，见 kit.Look.RevealNear）。
+	BaseSteps func(s *headless.Session, look *kit.Look) error
 }
 
 // Backdrop 是一次比较里已解析的模糊区域。
@@ -79,7 +81,14 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 		return nil, fmt.Errorf("Viva 事实里没有 %s「%s」，无法确定遮罩之上的面板", s.PanelRole, s.PanelName)
 	}
 	base := scene
-	base.Steps, base.Prepare, base.Backdrop = s.BaseSteps, nil, nil
+	base.Steps, base.Prepare, base.Backdrop = nil, nil, nil
+	if s.BaseSteps != nil {
+		// 步骤要用这次渲染自己的 look：经 Prepare 把页面（Build）与步骤一起装配。
+		build, steps := scene.Build, s.BaseSteps
+		base.Prepare = func(look *kit.Look) (func(c ui.C), func(sess *headless.Session) error) {
+			return build(look), func(sess *headless.Session) error { return steps(sess, look) }
+		}
+	}
 	if !withImage {
 		// 只比事实：不光栅化，但仍要渲染一次对话框打开之前的页面，找出被模态拿出可访问树的节点。
 		baseFacts, err := RenderFacts(base, viva.Variant, viva.Region)
