@@ -91,7 +91,10 @@ type Window struct {
 	OnBack          func()
 	OnToggleSidebar func()
 	// OnPanelWidth 在二级侧栏宽度定下来（拖动结束、按键、双击）之后调用，用来保存。
-	OnPanelWidth  func(width float32)
+	OnPanelWidth func(width float32)
+	// OnSearch 在知识库模块的搜索框文字变了之后调用（输入或点清除按钮）：渲染层的顶栏把文字存在本地状态里，
+	// 停下 300 ms 后才交给知识库 store；防抖由接收方做。
+	OnSearch      func(text string)
 	OnUpdate      func()
 	OnNewCapture  func()
 	OnOpenPalette func()
@@ -110,6 +113,8 @@ type Window struct {
 	// search 是顶栏搜索框（知识库模块下可输入）。
 	search  ui.Field // 知识库模块的搜索框
 	trigger ui.Field // 其余模块的只读入口（始终为空，点击与按键打开命令面板）
+	// searchSeen 是已经通知过 OnSearch 的搜索框文字。
+	searchSeen string
 
 	// createMenuOpen 是「新建」旁边的创建方式菜单是否展开；createMenu 是菜单自己的状态，
 	// createMenuAt 是打开那一刻算出的菜单左上角（渲染层只在点击时取一次锚点，之后布局变了菜单也不跟随），

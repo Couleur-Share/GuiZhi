@@ -16,6 +16,9 @@ const (
 	DateLocaleEN DateLocale = "en-US"
 )
 
+// zh 报告是否按中文写法输出。空值取中文：界面默认语言是中文，调用方没接系统区域设置时，不能让中文界面里冒出 02:05 PM 这样的英文时间。
+func (l DateLocale) zh() bool { return l == DateLocaleZH || l == "" }
+
 // ParseDateLocale 把系统区域名（zh-CN、en-GB、de-DE……）归到上面两套格式之一。
 func ParseDateLocale(tag string) DateLocale {
 	if strings.HasPrefix(strings.ToLower(tag), "zh") {
@@ -37,7 +40,7 @@ func FormatItemTime(ms int64, now time.Time, loc *time.Location, locale DateLoca
 		loc = time.Local
 	}
 	t, n := time.UnixMilli(ms).In(loc), now.In(loc)
-	zh := locale == DateLocaleZH
+	zh := locale.zh()
 	switch {
 	case sameDay(t, n):
 		if zh {
@@ -64,7 +67,7 @@ func FormatDateTime(ms int64, loc *time.Location, locale DateLocale) string {
 		loc = time.Local
 	}
 	t := time.UnixMilli(ms).In(loc)
-	if locale == DateLocaleZH {
+	if locale.zh() {
 		return fmt.Sprintf("%d/%d/%d %02d:%02d:%02d", t.Year(), int(t.Month()), t.Day(), t.Hour(), t.Minute(), t.Second())
 	}
 	return fmt.Sprintf("%d/%d/%d, %s", int(t.Month()), t.Day(), t.Year(), t.Format("3:04:05 PM"))

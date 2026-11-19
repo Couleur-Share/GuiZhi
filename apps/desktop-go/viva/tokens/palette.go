@@ -51,6 +51,25 @@ var tailwindPalette = map[string]string{
 	"purple-500": "#a855f7",
 	"pink-500":   "#ec4899",
 	"gray-400":   "#9ca3af",
+	// 标签小块的文字色（type-meta.tsx 的 TAG_COLOR_CLASSES：浅色 text-*-700、深色 text-*-300）：九个彩色的 300 档，
+	// 以及 700 档里上面还没有的（red-700 已有）。
+	"red-300":    "#fca5a5",
+	"orange-300": "#fdba74",
+	"orange-700": "#c2410c",
+	"amber-300":  "#fcd34d",
+	"amber-700":  "#b45309",
+	"green-300":  "#86efac",
+	"green-700":  "#15803d",
+	"teal-300":   "#5eead4",
+	"teal-700":   "#0f766e",
+	"blue-300":   "#93c5fd",
+	"blue-700":   "#1d4ed8",
+	"indigo-300": "#a5b4fc",
+	"indigo-700": "#4338ca",
+	"purple-300": "#d8b4fe",
+	"purple-700": "#7e22ce",
+	"pink-300":   "#f9a8d4",
+	"pink-700":   "#be185d",
 }
 
 // White 是 Tailwind 的 text-white / bg-white。

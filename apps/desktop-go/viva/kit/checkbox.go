@@ -23,8 +23,10 @@ import (
 
 // CheckboxSpec 描述一个复选框。
 type CheckboxSpec struct {
-	// Label 是文字标签，也是可访问名。
+	// Label 是文字标签，也是可访问名；空表示没有文字（渲染层只给 ariaLabel 的复选框，如表格的行选择框）。
 	Label string
+	// Name 是没有文字标签时的可访问名（渲染层的 ariaLabel）。
+	Name string
 }
 
 // checkMark 是对勾：viewBox 12，M2 6 L5 9 L10 3，笔画 2（渲染层 Checkbox 里的内联 SVG）。
@@ -55,7 +57,11 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 			// 悬停与选中的过渡挂在专用的动画 ID 上：CheckboxBase 的命中 ID 由 *checked 的地址决定，取不到。
 			anim := ui.ID(c.Key("anim"))
 			side, markSide, radius := l.Rem(1), l.Rem(0.75), l.Rem(0.25)
-			box = ui.CheckboxBase(c.Key("box"), checked, spec.Label).Size(side, side).Shrink(0).HitOutset(0, 0, 0, 0).
+			name := spec.Label
+			if name == "" {
+				name = spec.Name
+			}
+			box = ui.CheckboxBase(c.Key("box"), checked, name).Size(side, side).Shrink(0).HitOutset(0, 0, 0, 0).
 				Items(ui.Center).Justify(ui.Center)
 			l.noteStop(box)
 			canvas := c.Canvas()
@@ -75,7 +81,9 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 				// 看不见的图标只是不比墨迹（compare_icons.go 的 invisibleReactIcons）。
 				l.Icon(c.Key("mark"), checkMark, markSide, t.PrimaryForeground.WithAlpha(t.PrimaryForeground.A*active))
 			})
-			l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)
+			if spec.Label != "" {
+				l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)
+			}
 		})
 	return box
 }

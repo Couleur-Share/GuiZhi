@@ -122,43 +122,97 @@ func (w *Window) searchBox(c ui.C, wide bool) {
 			ui.Row(c).Absolute().Left(l.Space(3)).Top((height-l.Rem(1))/2).Size(l.Rem(1), l.Rem(1)).Children(func() {
 				l.Icon(c, icons.Search, l.Rem(1), t.MutedForeground).Shrink(0)
 			})
-			// 右侧的快捷键提示：absolute right-2，垂直居中；sm 以上才显示。
-			if wide && w.SearchShortcut != "" {
-				w.shortcutChip(c, height)
+			// 右侧的一组：absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1，里面是清除按钮（知识库、有搜索词时）
+			// 与快捷键提示（sm 以上才显示）。
+			clear := library && w.search.Text() != ""
+			if clear || (wide && w.SearchShortcut != "") {
+				w.searchTools(c, height, clear, wide && w.SearchShortcut != "")
+			}
+			if library {
+				w.noteSearchText()
 			}
 		})
 	})
 }
 
+// noteSearchText 在知识库的搜索框文字变了之后通知外壳（渲染层 TopBar 的 setSearchQuery：本地状态，300 ms 防抖后才进知识库 store，
+// 防抖由接收方做）。清除按钮改的也是同一个文字，所以走同一条路。
+func (w *Window) noteSearchText() {
+	text := w.search.Text()
+	if text == w.searchSeen {
+		return
+	}
+	w.searchSeen = text
+	if w.OnSearch != nil {
+		w.OnSearch(text)
+	}
+}
+
+// searchTools 是搜索框右端的一组控件。
+func (w *Window) searchTools(c ui.C, height float32, clear, chip bool) {
+	l := w.Look
+	ui.Row(c.Key("tools")).Absolute().Right(l.Space(2)).Top(0).Height(height).Items(ui.Center).Gap(l.Space(1)).Children(func() {
+		if clear {
+			w.clearSearchButton(c)
+		}
+		if chip {
+			w.shortcutChip(c)
+		}
+	})
+}
+
+// clearSearchButton 是清除搜索的按钮：rounded p-1 transition-colors hover:bg-accent/60，里面 h-3.5 w-3.5 的 X（muted）。
+func (w *Window) clearSearchButton(c ui.C) {
+	l := w.Look
+	t := l.T
+	c = c.Key("clear")
+	id := ui.ID(c)
+	label := locales.HeaderClearSearch()
+	box := ui.Row(c).Items(ui.Center).Justify(ui.Center).Pad(l.Space(1)).Shrink(0).
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
+	l.TabStop(box)
+	p := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
+	box.Draw(func(d *ui.DrawContext) {
+		if d.State.FocusVisible {
+			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25))
+		}
+		l.PaintSurface(d, kit.Surface{Bg: t.Accent.WithAlpha(0.6 * p), Radius: l.Rem(0.25)})
+	}).Children(func() {
+		l.Icon(c.Key("icon"), icons.X, l.Rem(0.875), t.MutedForeground)
+	})
+	if box.Clicked() {
+		w.search.SetText("")
+	}
+}
+
 // shortcutChip 是搜索框右端的快捷键提示按钮：rounded-md border border-border/70 bg-background/60 px-1.5 py-0.5 font-mono text-[10px]。
-func (w *Window) shortcutChip(c ui.C, height float32) {
+func (w *Window) shortcutChip(c ui.C) {
 	l := w.Look
 	t := l.T
 	label := locales.HeaderOpenCommandPalette()
-	ui.Row(c.Key("chip")).Absolute().Right(l.Space(2)).Top(0).Height(height).Items(ui.Center).Children(func() {
-		id := ui.ID(c)
-		box := ui.Row(c).Items(ui.Center).PadSides(l.Space(0.5)+1, l.Space(1.5)+1, l.Space(0.5)+1, l.Space(1.5)+1).
-			HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Hint: label})
-		fg := t.MutedForeground
-		bg := t.Background.WithAlpha(0.6)
-		if box.State().Hovered {
-			fg = t.Foreground
-			bg = t.Accent.WithAlpha(0.6)
-		}
-		box.Draw(func(d *ui.DrawContext) {
-			// rounded-md = calc(var(--radius) - 2px)，即 10px（根字号 16px）。
-			l.PaintSurface(d, kit.Surface{Bg: bg, Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.75) - 2})
-		}).Children(func() {
-			// text-[10px] font-mono：行高继承 1.5 倍（15px）。Viva 的固定间距文字按整数字格排（宽度取整、行高取字格高），
-			// 与 Chromium 按字体真实字距排的结果不同（台账 A-006）：这里把行盒与宽度做成渲染层的值，字形仍按 Viva 的字格画。
-			ui.Row(c).Width(kit.MonoAdvance(w.SearchShortcut, 10)).Height(15).Items(ui.Center).Children(func() {
-				ui.Text(c, w.SearchShortcut).FontSize(10).Color(l.Col(fg)).Mono()
-			})
+	c = c.Key("chip")
+	id := ui.ID(c)
+	box := ui.Row(c).Items(ui.Center).PadSides(l.Space(0.5)+1, l.Space(1.5)+1, l.Space(0.5)+1, l.Space(1.5)+1).
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Hint: label})
+	fg := t.MutedForeground
+	bg := t.Background.WithAlpha(0.6)
+	if box.State().Hovered {
+		fg = t.Foreground
+		bg = t.Accent.WithAlpha(0.6)
+	}
+	box.Draw(func(d *ui.DrawContext) {
+		// rounded-md = calc(var(--radius) - 2px)，即 10px（根字号 16px）。
+		l.PaintSurface(d, kit.Surface{Bg: bg, Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.75) - 2})
+	}).Children(func() {
+		// text-[10px] font-mono：行高继承 1.5 倍（15px）。Viva 的固定间距文字按整数字格排（宽度取整、行高取字格高），
+		// 与 Chromium 按字体真实字距排的结果不同（台账 A-006）：这里把行盒与宽度做成渲染层的值，字形仍按 Viva 的字格画。
+		ui.Row(c).Width(kit.MonoAdvance(w.SearchShortcut, 10)).Height(15).Items(ui.Center).Children(func() {
+			ui.Text(c, w.SearchShortcut).FontSize(10).Color(l.Col(fg)).Mono()
 		})
-		if box.Clicked() && w.OnOpenPalette != nil {
-			w.OnOpenPalette()
-		}
 	})
+	if box.Clicked() && w.OnOpenPalette != nil {
+		w.OnOpenPalette()
+	}
 }
 
 // topActions 是搜索右边的一组：ml-2 gap-1 pr-1；有更新时先是虚线边框的更新按钮与一条竖分隔线，然后是「新建」拆分按钮。

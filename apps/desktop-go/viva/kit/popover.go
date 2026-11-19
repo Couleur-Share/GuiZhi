@@ -16,6 +16,10 @@ import (
 //   - 左上角夹回视口：left ∈ [m, vw − 宽 − m]，top ∈ [m, vh − 高 − m]（高度是面板布局之后量到的）；
 //   - 焦点离开面板与触发钮这一组时关闭（onBlur）。
 //
+// 列设置菜单（ColumnConfigMenu）是另一类：fixed + right 定位、不夹回视口，只在点外面与 Esc 时收起——
+// 焦点离开、窗口缩放都不关。这一类用 PopoverSpec.Persistent 表达，右缘对齐用 AnchorRight，内边距只有上下用 Insets，
+// 面板的可访问角色用 Role（menu）。
+//
 // 与渲染层的差异：面板的可访问角色 dialog 在 Viva 里只有 group（台账 A-004）；
 // 面板内容的高度要量过才知道，首帧先透明画一次（不让一块矮面板闪一帧）。
 
@@ -55,6 +59,15 @@ type PopoverSpec struct {
 	Pad     float32 // 内边距（p-3），不含 1px 边框
 	Radius  float32
 	Shadows []tokens.Shadow
+	// Insets 是内边距的四边（上、右、下、左，不含 1px 边框）；nil 取四边都是 Pad。
+	Insets *[4]float32
+	// Role 是面板的可访问角色；零值取 group（渲染层的 dialog 在 Viva 里只有 group，台账 A-004）。
+	Role gfx.Role
+	// AnchorRight 让 Anchor.X 是面板的右缘（渲染层 fixed + right 定位），而不是左缘。
+	AnchorRight bool
+	// Persistent 让弹层只在点外面与 Esc 时收起：焦点离开、窗口缩放都不关，也不把面板夹回视口
+	//（ColumnConfigMenu 没有 onBlur 与 resize 监听，位置是展开那一刻的 top/right）。
+	Persistent bool
 	// Trigger 是触发钮上一帧的外框：点它只关闭，不再往下传（否则收起会被传给触发钮、再展开一次）。
 	Trigger gfx.Rect
 	// Content 声明面板里的内容（一个竖排，宽度撑满面板的内容区）。
@@ -71,13 +84,13 @@ func (l *Look) Popover(c ui.C, st *PopoverState, spec PopoverSpec) (closed, byKe
 	// 窗口尺寸变了：关闭（closeOnResize）。
 	if st.viewport == nil {
 		st.viewport = &gfx.Point{X: bounds.Width, Y: bounds.Height}
-	} else if st.viewport.X != bounds.Width || st.viewport.Y != bounds.Height {
+	} else if !spec.Persistent && (st.viewport.X != bounds.Width || st.viewport.Y != bounds.Height) {
 		st.Close()
 		return true, false
 	}
 	// 焦点曾在组里、现在不在了：关闭（onBlur 里 relatedTarget 既不在面板也不在触发钮）。
 	in := st.Group.Focused(canvas) != ""
-	if st.inside && !in {
+	if !spec.Persistent && st.inside && !in {
 		st.Close()
 		return true, false
 	}
@@ -89,15 +102,32 @@ func (l *Look) Popover(c ui.C, st *PopoverState, spec PopoverSpec) (closed, byKe
 		return true, byKey
 	}
 
-	width := min(spec.Width, bounds.Width-2*spec.Margin)
-	height := 2 + 2*spec.Pad + st.contentH
-	left := max(spec.Margin, min(st.Anchor.X, bounds.Width-width-spec.Margin))
-	top := max(spec.Margin, min(st.Anchor.Y, bounds.Height-height-spec.Margin))
+	inset := [4]float32{spec.Pad, spec.Pad, spec.Pad, spec.Pad}
+	if spec.Insets != nil {
+		inset = *spec.Insets
+	}
+	width := spec.Width
+	if !spec.Persistent {
+		width = min(width, bounds.Width-2*spec.Margin)
+	}
+	height := 2 + inset[0] + inset[2] + st.contentH
+	left, top := st.Anchor.X, st.Anchor.Y
+	if spec.AnchorRight {
+		left -= width
+	}
+	if !spec.Persistent {
+		left = max(spec.Margin, min(left, bounds.Width-width-spec.Margin))
+		top = max(spec.Margin, min(top, bounds.Height-height-spec.Margin))
+	}
 	rect := gfx.Rect{X: left, Y: top, Width: width, Height: height}
 
 	surface := Surface{Bg: t.Popover, Border: t.Border, BorderW: 1, Radius: spec.Radius, Shadows: spec.Shadows}
+	role := spec.Role
+	if role == 0 {
+		role = gfx.RoleGroup
+	}
 	panelC := c.Key("panel")
-	panel := l.floatingPanel(panelC, bandSelectPanel, rect).Pad(1 + spec.Pad)
+	panel := l.floatingPanel(panelC, bandSelectPanel, rect).PadSides(1+inset[0], 1+inset[1], 1+inset[2], 1+inset[3])
 	if st.contentH == 0 {
 		panel = panel.Opacity(0)
 	}
@@ -105,7 +135,7 @@ func (l *Look) Popover(c ui.C, st *PopoverState, spec PopoverSpec) (closed, byKe
 		l.PaintSurface(d, surface)
 		// 面板是不透明的：按在它的边距上不能落到下面的背景层（那会关闭面板）。
 		d.Canvas.Block(d.Rect)
-		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, spec.Name, gfx.HitOptions{})
+		d.Canvas.ContainerWithOptions(d.Rect, role, spec.Name, gfx.HitOptions{})
 	}).Children(func() {
 		ui.Column(panelC.Key("body")).FillWidth().Draw(func(d *ui.DrawContext) {
 			if h := d.Rect.Height; h > 0 && abs32(h-st.contentH) > 0.01 {

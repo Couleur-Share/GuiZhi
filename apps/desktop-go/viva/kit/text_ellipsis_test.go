@@ -13,7 +13,7 @@ import (
 
 // 渲染层（Chromium）的 text-overflow: ellipsis 不去掉截断点前的空格（「alpha beta …」）；
 // Viva 的省略号逻辑把前缀右侧的空格去掉（「alpha beta…」，gfx/wrap.go 的 trimSpaceRight，只认 ASCII 空格，没有选项）。
-// 这是台账里登记的已知偏差（C-006，待用户裁决）：这条测试把「Viva 现在就是这样」写成可执行的事实——截断点正好在空格之前时，
+// 这是台账里登记的已知偏差（A-025；原 C-006，用户 2026-11-19 裁决接受）：这条测试把「Viva 现在就是这样」写成可执行的事实——截断点正好在空格之前时，
 // 省略号前没有空格；哪天 Viva 升级后保留了空格，这条测试失败，台账条目就该关闭（那时 library 场景里的 ellipsisSpaceWaivers 也一并去掉）。
 const ellipsisSample = "alpha beta gamma delta epsilon"
 
@@ -51,7 +51,7 @@ func TestVivaEllipsisDropsTheSpaceBeforeTheCut(t *testing.T) {
 		}
 		prefix := strings.TrimSuffix(row.value, "…")
 		if strings.HasSuffix(prefix, " ") || strings.HasSuffix(prefix, "\u00a0") {
-			t.Fatalf("行 %d：Viva 的省略号前保留了空格 %q，台账 C-006 可以关闭了", i, row.value)
+			t.Fatalf("行 %d：Viva 的省略号前保留了空格 %q，台账 A-025 可以关闭了", i, row.value)
 		}
 		if strings.HasPrefix(ellipsisSample, prefix) && strings.HasPrefix(ellipsisSample[len(prefix):], " ") {
 			cutBeforeSpace++
