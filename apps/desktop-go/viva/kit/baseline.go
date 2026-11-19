@@ -60,6 +60,30 @@ func ChromeBaselineRow(weight float32, sizeDev, lineDev float64) int {
 	return int(math.Floor((lineDev-(a+d))/2) + a)
 }
 
+// ChromeContentRows 是渲染层一行文字的「内容区」在基线之上、之下各占的行数（设备像素，整数）：A、D 按字号取整，
+// 与 ChromeBaselineRow 同一套取整。渲染层用 Range 取到的文字外框就是内容区（顶 = 基线 − A，高 = A + D）；
+// 对照采集拿它判断「裁剪线是不是切到了字形所在的位置」，两边用同一把尺子（台账 G-011）。
+func ChromeContentRows(weight float32, sizeDev float64) (ascent, descent int) {
+	f := faceOfWeight(weight)
+	return int(roundHalfUp(f.ascent * sizeDev)), int(roundHalfUp(f.descent * sizeDev))
+}
+
+// StrutTextTop 是渲染层「块容器里直接放一个行内 span」（<div><span className="text-xs …">）时，行盒顶到 span 行盒顶的距离。
+//
+// span 落在匿名行盒里，与容器继承来的正文行（支柱 strut：根字号、行高 1.5、常规字重）按基线对齐，行盒上沿由两者中较高的撑起。
+// 每个行内盒「基线之上」的高度是 A + floor((L − (A+D))/2)（就是 ChromeBaselineRow），所以
+//
+//	距离 = max(支柱基线之上, span 基线之上) − span 基线之上。
+//
+// 根字号 16px、12px 的 span（行高 16px）时是 6px（0.375rem）；但 A、D 与半行距各自取整，不能按 rem 缩放：
+// 14px 根字号（10.5px 的 span）是 4px 而不是 5.25px，18px 根字号（13.5px 的 span）是 6px 而不是 6.75px
+// （2026-11-18，知识库弹窗的「图标」标签在小字号档比渲染层低一行，台账 M2-1 对照记录）。
+func StrutTextTop(rootPx, spanPx, spanLinePx float64, spanWeight float32) float64 {
+	strut := float64(ChromeBaselineRow(WeightNormal, rootPx, rootPx*1.5))
+	span := float64(ChromeBaselineRow(spanWeight, spanPx, spanLinePx))
+	return math.Max(strut, span) - span
+}
+
 // VivaLabelRows 是 Viva 给一行文字（盒高 line 逻辑像素）分配的纹理行数：painter 先把逻辑高度四舍五入到整数
 // （app/painter.go appendTextLabel 的 roundPixel），平台再按缩放换成设备像素并向上取整。
 // 行高带 0.25 小数（例如输入框的 字号+6 = 18.25）时，四舍五入与向上取整差一行；.5 与 .75 两者相同。

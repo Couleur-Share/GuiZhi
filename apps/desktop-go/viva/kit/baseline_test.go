@@ -46,6 +46,61 @@ func TestChromeBaselineMatchesProbe(t *testing.T) {
 	}
 }
 
+// TestChromeContentRowsMatchProbe 把 ChromeContentRows（基线之上 A 行、之下 D 行）也钉在同一份实测上：
+// 夹具里的 contentTop 与 contentHeight 是渲染层 Range 取到的文字外框（相对行盒顶），即 A = 基线 − contentTop、
+// A + D = contentHeight。G-011 的「字形是否被裁剪线切掉」按这两个数判，两边用同一把尺子，所以 A 与 D 各自都得和 Chromium 一致
+// （只核对 A + D 会放过「A 多一行、D 少一行」的互补错误）。
+func TestChromeContentRowsMatchProbe(t *testing.T) {
+	raw, err := os.ReadFile("testdata/chrome-text-probe.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Samples []struct {
+			Size, Baseline, ContentTop, ContentHeight float64
+			Weight                                    int
+		} `json:"samples"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Samples) < 300 {
+		t.Fatalf("夹具样本只有 %d 组，期望覆盖完整矩阵", len(doc.Samples))
+	}
+	// 字号 × 字重去重：A、D 只与它们有关（行高不影响内容区的大小）。
+	type key struct {
+		size   float64
+		weight int
+	}
+	seen := map[key]bool{}
+	bad := 0
+	for _, s := range doc.Samples {
+		if s.ContentHeight == 0 {
+			t.Fatalf("夹具缺 contentHeight：字号 %v 字重 %v（需要重新生成）", s.Size, s.Weight)
+		}
+		k := key{s.Size, s.Weight}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		a, d := ChromeContentRows(vivaWeightOfCSS(t, s.Weight), s.Size)
+		wantA := s.Baseline - s.ContentTop
+		if float64(a) != wantA || float64(a+d) != s.ContentHeight {
+			bad++
+			if bad <= 8 {
+				t.Errorf("字号 %v 字重 %v：模型 A=%d D=%d（高 %d），Chromium A=%v D=%v（高 %v）",
+					s.Size, s.Weight, a, d, a+d, wantA, s.ContentHeight-wantA, s.ContentHeight)
+			}
+		}
+	}
+	if bad > 0 {
+		t.Errorf("共 %d/%d 组（字号×字重）与模型不符", bad, len(seen))
+	}
+	if len(seen) < 20 {
+		t.Errorf("字号×字重只有 %d 组，样本太少", len(seen))
+	}
+}
+
 // vivaWeightOfCSS 把夹具里的 CSS 字重换成 Viva 的字重刻度（theme.go：Regular 0、Medium 0.15、Semibold 0.23、Bold 0.40）。
 func vivaWeightOfCSS(t *testing.T, css int) float32 {
 	t.Helper()
@@ -83,6 +138,30 @@ func TestBaselineShiftKnownCases(t *testing.T) {
 	for _, c := range cases {
 		if got := BaselineShift(c.weight, c.size, c.line, 1); got != c.wantShiftDev {
 			t.Errorf("%s：平移 %v，期望 %v", c.name, got, c.wantShiftDev)
+		}
+	}
+}
+
+// TestStrutTextTop 钉住「块容器里直接放一个行内 span」时，行盒顶到 span 行盒顶的距离（text-xs：0.75rem / 1rem）。
+// 期望值由 LayoutNG 的行内盒模型手算（A、D 各自取整，半行距向下取整，行盒上沿取支柱与 span 中较高的）；
+// 小字号档的 4px 与 2026-11-18 在 app.window.library.dlg-collection-new 量到的「图标」标签位置相符：
+// 标签内容区顶 292.5 = 名称输入框底 274.5 + 间距 14 + 4。
+func TestStrutTextTop(t *testing.T) {
+	cases := []struct {
+		name             string
+		root, span, line float64
+		weight           float32
+		want             float64
+	}{
+		{"中档 12px/16 常规", 16, 12, 16, WeightNormal, 6},
+		{"中档 12px/16 半粗：A=13，比常规的 12 高一行", 16, 12, 16, WeightSemibold, 5},
+		{"小档 10.5px/14 常规", 14, 10.5, 14, WeightNormal, 4},
+		{"大档 13.5px/18 常规", 18, 13.5, 18, WeightNormal, 6},
+		{"span 比支柱高时没有空白", 14, 28, 36, WeightNormal, 0},
+	}
+	for _, c := range cases {
+		if got := StrutTextTop(c.root, c.span, c.line, c.weight); got != c.want {
+			t.Errorf("%s：StrutTextTop = %v，期望 %v", c.name, got, c.want)
 		}
 	}
 }
