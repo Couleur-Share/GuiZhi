@@ -5,7 +5,7 @@
  * 切到表格的办法就是点工具条上的「列表视图」；leaveLibrary 会把视图模式与表格列配置复位，不带进后面的场景。
  * Viva 一侧（viva/parity/scenes/library_table.go）做同样的操作，最终画面才可比。
  */
-import { chain, listScene, pickPageSize, waitSpinner, applyFacets, clickButtonByName } from "./react-library-list-scenes.mjs";
+import { chain, listScene, pickPageSize, waitSpinner, applyFacets, clickButtonByName, searchList } from "./react-library-list-scenes.mjs";
 
 /** 切到列表视图：点工具条上的视图切换钮，等表格（或它的空态）出现。 */
 const viewTable = async (win) => {
@@ -37,6 +37,13 @@ const activateThenTable = async (win) => {
   await win.mouse.click(box.x + 24, box.y + box.height / 2);
   await win.waitForTimeout(250);
   await viewTable(win);
+};
+
+/** 指针停在名为 title 的标题按钮正中：标题按钮进入悬停态（文字色 text-primary/80，带下划线）。 */
+const hoverTitle = (title) => async (win) => {
+  const box = await win.getByTestId("item-table").getByRole("button", { name: title, exact: true }).first().boundingBox();
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await win.waitForTimeout(250);
 };
 
 /** 打开「列设置」菜单。 */
@@ -95,4 +102,8 @@ export const LIBRARY_TABLE_SCENES = {
   "app.window.library.table-loading": listScene({ fault: "hold" }, chain(viewTable, waitSpinner)),
   "app.window.library.table-error": listScene({ fault: "fail" }, viewTable),
   "app.window.library.table-page2": listScene({}, chain(viewTable, pickPageSize("10"), clickButtonByName("下一页"))),
+  // 搜索命中词高亮（B-041）：标题钮（至多两行）与摘要（单行省略号）里的命中词包进 mark。
+  "app.window.library.table-search-hit": listScene({}, chain(viewTable, searchList("设计"))),
+  "app.window.library.table-search-hit-latin": listScene({}, chain(viewTable, searchList("design"))),
+  "app.window.library.table-search-hit-hover": listScene({}, chain(viewTable, searchList("设计"), hoverTitle("产品设计原则：极简与克制")), { keepPointer: true }),
 };

@@ -55,6 +55,20 @@ func tableHoverRow(row int) libraryEnvStep {
 	}
 }
 
+// tableHoverTitle 把指针停在名为 title 的标题按钮正中（对应 React 采集器的 hoverTitle）：标题进入悬停态（文字色 text-primary/80，带下划线）。
+func tableHoverTitle(title string) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		b, err := listCard(s, title)
+		if err != nil {
+			return err
+		}
+		if err := s.Move(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+			return err
+		}
+		return s.Rest()
+	}
+}
+
 // tableHoverResizer 把指针停在「标题」列右缘的拖动把手上：中间那条细线显出（group-hover:bg-primary/70）。
 func tableHoverResizer(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
 	n, ok := s.AccessByRole(gfx.RoleSeparator, "调整「标题」列宽")
@@ -150,4 +164,15 @@ func init() {
 	reg("app.window.library.table-loading", libraryOptions{variant: "data", list: true, view: "list", fault: faultHold}, listWaitSpinner, parkAll)
 	reg("app.window.library.table-error", libraryOptions{variant: "data", list: true, view: "list", fault: faultFail}, nil, parkAll)
 	reg("app.window.library.table-page2", table, listChain(listPickPageSize("10"), listClickButton("下一页")), parkAll, base...)
+	// 搜索命中词高亮（B-041）：搜索中排序按钮禁用，「相关度」带透明度（A-009 的延伸），与卡片视图同一处放过项。
+	// 命中词把标题拆成片段，标题片段的放过项按片段登记（library_search_waivers.go）；摘要是单行省略号，首个普通片段与整段摘要同头，
+	// 已被 base 里的 snippetKerningWaivers 覆盖。
+	searching := func(query string) []parity.Waiver {
+		out := append([]parity.Waiver{opacityInkWaiver("「相关度」")}, base...)
+		out = append(out, searchTitleKerningWaivers(query)...)
+		return append(out, tinyGlyphInkWaivers()...)
+	}
+	reg("app.window.library.table-search-hit", table, listSearch("设计"), parkAll, searching("设计")...)
+	reg("app.window.library.table-search-hit-latin", table, listSearch("design"), parkAll, searching("design")...)
+	reg("app.window.library.table-search-hit-hover", table, listChain(listSearch("设计"), tableHoverTitle("产品设计原则：极简与克制")), parkNone, searching("设计")...)
 }

@@ -314,6 +314,17 @@ func init() {
 	reg("app.window.library.list-error", libraryOptions{variant: "data", list: true, fault: faultFail}, nil, parkAll)
 	// 搜索中排序按钮禁用（disabled:opacity-50），「相关度」是整组带透明度的文字（A-009 的延伸）。
 	reg("app.window.library.list-search-empty", list, listSearch("没有任何条目含有这个词"), parkAll, opacityInkWaiver("「相关度」"))
+	// 搜索命中词高亮（B-041）：标题与摘要里的命中词包进 mark；同样是搜索中，排序按钮禁用、「相关度」带透明度。
+	// 命中词把标题与摘要拆成片段，放过项按片段登记（library_search_waivers.go）；摘要折行，折行点可能差一个词（A-014）。
+	searching := func(query string) []parity.Waiver {
+		out := append([]parity.Waiver{opacityInkWaiver("「相关度」")}, cards...)
+		out = append(out, searchTitleKerningWaivers(query)...)
+		out = append(out, cardSnippetKerningWaivers(query)...)
+		return append(out, tinyGlyphInkWaivers()...)
+	}
+	reg("app.window.library.list-search-hit", list, listSearch("设计"), parkAll, searching("设计")...)
+	reg("app.window.library.list-search-hit-latin", list, listSearch("design"), parkAll, searching("design")...)
+	reg("app.window.library.list-search-hit-selected", list, listChain(listSearch("设计"), listClickCard("产品设计原则：极简与克制")), parkAll, searching("设计")...)
 	reg("app.window.library.list-sort-menu", list, listClickSort, parkKeepFocus, append([]parity.Waiver{overlayInkWaiver}, cards...)...)
 	reg("app.window.library.list-sort-title", list, listChain(listClickSort, listPickMenuItem("标题 A→Z")), parkAll, cards...)
 	reg("app.window.library.list-trash", list, listApplyFacets("回收站"), parkAll, cards...)

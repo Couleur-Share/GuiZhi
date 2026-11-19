@@ -40,6 +40,10 @@ var reactIgnoredRoles = map[string]bool{
 	"row":          true,
 	"columnheader": true,
 	"cell":         true,
+	// 高亮：搜索命中词的 <mark> 导出 mark 角色，只把命中的那几个字标出来，本身没有状态与操作；Viva 的 gfx.Role 没有对应角色
+	// （登记见台账 A-004 的 2026-11-20 补充）。里面的文字照常逐段比较（文字序列、位置、颜色）；底色目前只有 L3 像素比较兜底
+	// （L2 的令牌与绘制比较尚未实现，G-001）。
+	"mark": true,
 }
 
 // reactIgnoredUnnamed 是「无名时不参与结构比较」的 Chromium 角色：没有可访问名的图片是装饰性图标

@@ -323,6 +323,256 @@ const TEXTS_EXPR = `(async () => {
       clone.remove();
     }
   };
+  // text-overflow: ellipsis 截断，而宿主里不止一个文字节点（搜索命中词：文字、<mark>、文字……；台账 B-041）：
+  // Chromium 按整行内容取最长的前缀，使「前缀宽度 + 省略号宽度」放得下；命中词（行内盒）整段收在前缀里时，它右侧的内边距也算进前缀宽度。
+  // 省略号接在被截掉的第一个字符所在的那段里：截断点在某个节点之内就是「该节点的前缀 + …」；恰好落在节点之间就是后一个节点只剩「…」。
+  // 一个宿主只算一次：截断点之前的节点原样，截断点所在的节点只留前缀加省略号，之后的节点没有可见部分。
+  // 只处理单行（white-space: nowrap 的 truncate 类）；宿主里只有一个文字节点的写法走上面的 ellipsize，这里返回 undefined。
+  const lineCuts = new Map();
+  const ellipsisHostOf = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.textOverflow === "ellipsis" && cs.overflowX !== "visible") return e;
+      if (cs.display !== "inline") return null;
+    }
+    return null;
+  };
+  const lineCutOf = (host) => {
+    if (lineCuts.has(host)) return lineCuts.get(host);
+    let result;
+    const cs = getComputedStyle(host);
+    const texts = [];
+    const tw = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+    for (let t; (t = tw.nextNode()); ) if (t.data.length > 0) texts.push(t);
+    if (texts.length > 1 && host.scrollWidth > host.clientWidth) {
+      const px = (style, name) => parseFloat(style.getPropertyValue(name)) || 0;
+      const hb = host.getBoundingClientRect();
+      const left = hb.x + px(cs, "border-left-width") + px(cs, "padding-left");
+      const avail = host.clientWidth - px(cs, "padding-left") - px(cs, "padding-right");
+      measure.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(" ");
+      const ell = measure.measureText("…").width;
+      const probe = document.createRange();
+      const total = texts.reduce((n, t) => n + t.data.length, 0);
+      const locate = (k) => {
+        for (let i = 0; i < texts.length; i++) {
+          if (k <= texts[i].data.length) return [i, k];
+          k -= texts[i].data.length;
+        }
+        return [texts.length - 1, texts[texts.length - 1].data.length];
+      };
+      const prefixWidth = (k) => {
+        if (k === 0) return 0;
+        const [i, off] = locate(k);
+        probe.setStart(texts[0], 0);
+        probe.setEnd(texts[i], off);
+        let w = probe.getBoundingClientRect().right - left;
+        if (off === texts[i].data.length) {
+          for (let n = texts[i], e = n.parentElement; e && e !== host && e.lastChild === n; n = e, e = e.parentElement) {
+            const ecs = getComputedStyle(e);
+            w += px(ecs, "padding-right") + px(ecs, "border-right-width");
+          }
+        }
+        return w;
+      };
+      if (prefixWidth(total) > avail + 1e-6) {
+        let lo = 0;
+        let hi = total;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (prefixWidth(mid) + ell <= avail + 1e-6) lo = mid;
+          else hi = mid - 1;
+        }
+        let [i, off] = locate(lo);
+        if (off > 0) {
+          const code = texts[i].data.charCodeAt(off - 1);
+          if (code >= 0xd800 && code <= 0xdbff) off -= 1; // 不把代理对劈开
+        }
+        if (off === texts[i].data.length && i < texts.length - 1) { i += 1; off = 0; }
+        result = { nodes: texts, index: i, offset: off, ell };
+      }
+    }
+    lineCuts.set(host, result);
+    return result;
+  };
+  // -webkit-line-clamp 截断，而宿主里不止一个文字节点（表格的标题按钮：文字、<mark>、文字……；台账 B-041）。
+  // 做法同 clampLines：在原位置旁放一份不截断的副本，按字符矩形的纵坐标分行，取前 N 行；最后一行取最长前缀，
+  // 使「前缀宽度（命中词整段收在前缀里时含它右侧的内边距）+ 省略号宽度」不超过内容盒宽度，省略号接在被截掉的第一个字符所在的那段里。
+  // 结果记截断点所在的节点与偏移，以及这个节点在各个可见行上的矩形；截断点之前的节点原样，之后的节点没有可见部分。
+  const clampCuts = new Map();
+  const clampHostOf = (el) => {
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (parseInt(cs.webkitLineClamp, 10) > 0 && cs.overflowY !== "visible") return e;
+      if (cs.display !== "inline") return null;
+    }
+    return null;
+  };
+  const textNodesOf = (root) => {
+    const list = [];
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let t; (t = tw.nextNode()); ) if (t.data.length > 0) list.push(t);
+    return list;
+  };
+  const clampCutOf = (host) => {
+    if (clampCuts.has(host)) return clampCuts.get(host);
+    let result;
+    const cs = getComputedStyle(host);
+    const n = parseInt(cs.webkitLineClamp, 10);
+    const live = textNodesOf(host);
+    if (live.length > 1 && host.scrollHeight > host.clientHeight + 0.5) {
+      const clone = host.cloneNode(true);
+      clone.removeAttribute("id");
+      clone.removeAttribute("data-testid");
+      const box = host.getBoundingClientRect();
+      Object.assign(clone.style, {
+        webkitLineClamp: "unset", display: "block", overflow: "visible", position: "absolute", visibility: "hidden",
+        pointerEvents: "none", height: "auto", maxHeight: "none", boxSizing: "border-box", width: box.width + "px",
+      });
+      host.parentElement.insertBefore(clone, host);
+      try {
+        result = (() => {
+          const texts = textNodesOf(clone);
+          const px = (style, name) => parseFloat(style.getPropertyValue(name)) || 0;
+          const probe = document.createRange();
+          const offsets = []; // 各节点第一个字符的全局下标
+          let total = 0;
+          for (const t of texts) { offsets.push(total); total += t.data.length; }
+          // 字符 k 所在的 [节点, 偏移]；前缀 [0,k) 的结尾落在节点边界上时算前一个节点的末尾。
+          const locate = (k) => {
+            let i = texts.length - 1;
+            while (i > 0 && offsets[i] > k) i--;
+            return [i, k - offsets[i]];
+          };
+          const locateEnd = (k) => {
+            let i = texts.length - 1;
+            while (i > 0 && offsets[i] >= k) i--;
+            return [i, k - offsets[i]];
+          };
+          const charRect = (k) => {
+            const [i, off] = locate(k);
+            probe.setStart(texts[i], off);
+            probe.setEnd(texts[i], off + 1);
+            const r = probe.getBoundingClientRect();
+            return r.height > 0 ? r : null;
+          };
+          // 行首下标：纵坐标变了就是新的一行。
+          const starts = [];
+          let lastY = null;
+          for (let k = 0; k < total; k++) {
+            const r = charRect(k);
+            if (!r) continue;
+            if (lastY === null || r.y > lastY + 1) { starts.push(k); lastY = r.y; }
+          }
+          if (starts.length <= n) return undefined;
+          const from = starts[n - 1];
+          const ccs = getComputedStyle(clone);
+          const avail = clone.clientWidth - px(ccs, "padding-left") - px(ccs, "padding-right");
+          measure.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(" ");
+          const ell = measure.measureText("…").width;
+          // 前缀收在命中词（行内盒）末尾时，它右侧的内边距也算进宽度。
+          const pads = (i, off) => {
+            let w = 0;
+            if (off === texts[i].data.length) {
+              for (let m = texts[i], e = m.parentElement; e && e !== clone && e.lastChild === m; m = e, e = e.parentElement) {
+                const ecs = getComputedStyle(e);
+                w += px(ecs, "padding-right") + px(ecs, "border-right-width");
+              }
+            }
+            return w;
+          };
+          const prefixRange = (k) => {
+            const [ai, aoff] = locate(from);
+            const [bi, boff] = locateEnd(k);
+            probe.setStart(texts[ai], aoff);
+            probe.setEnd(texts[bi], boff);
+            return [probe.getBoundingClientRect(), pads(bi, boff)];
+          };
+          const prefixWidth = (k) => {
+            if (k <= from) return 0;
+            const [r, pad] = prefixRange(k);
+            return r.width + pad;
+          };
+          let lo = from;
+          let hi = starts[n];
+          while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (prefixWidth(mid) + ell <= avail + 1e-6) lo = mid;
+            else hi = mid - 1;
+          }
+          let [i, off] = locateEnd(lo);
+          if (off > 0) {
+            const code = texts[i].data.charCodeAt(off - 1);
+            if (code >= 0xd800 && code <= 0xdbff) off -= 1; // 不把代理对劈开
+          }
+          if (off === texts[i].data.length && i < texts.length - 1) { i += 1; off = 0; }
+          // 副本与原件的位置差：用第一个字符对齐（它一定在第一行，永远看得见）。
+          probe.setStart(live[0], 0);
+          probe.setEnd(live[0], 1);
+          const l0 = probe.getBoundingClientRect();
+          const c0 = charRect(0);
+          const dx = l0.x - c0.x;
+          const dy = l0.y - c0.y;
+          // 截断点所在的节点在各个可见行上的片段 [x, y, 宽, 高]（副本坐标）。
+          const s = offsets[i];
+          const e = s + off;
+          const pieces = [];
+          for (let li = 0; li < n; li++) {
+            const a = Math.max(starts[li], s);
+            const b = Math.min(li < n - 1 ? starts[li + 1] : lo, e);
+            if (b <= a) continue;
+            probe.setStart(texts[i], a - s);
+            probe.setEnd(texts[i], b - s);
+            const bs = [...probe.getClientRects()].filter((r) => r.width > 0 && r.height > 0);
+            const x = Math.min(...bs.map((r) => r.x));
+            const right = Math.max(...bs.map((r) => r.x + r.width));
+            pieces.push({ x, y: bs[0].y, w: right - x, h: bs[0].height, last: li === n - 1 });
+          }
+          if (pieces.length === 0) {
+            // 截断点恰在节点之间（或最后一行连一个字符也放不下）：这个节点只剩「…」，接在前一段内容的右边。
+            if (lo > from) {
+              const [r, pad] = prefixRange(lo);
+              pieces.push({ x: r.right + pad, y: r.y, w: 0, h: r.height, last: true });
+            } else {
+              const r = charRect(from);
+              pieces.push({ x: r.x, y: r.y, w: 0, h: r.height, last: true });
+            }
+          }
+          const rects = pieces.map((p) => [round(p.x + dx), round(p.y + dy), round(p.last ? p.w + ell : p.w), round(p.h)]);
+          return { nodes: live, index: i, offset: off, rects };
+        })();
+      } finally {
+        clone.remove();
+      }
+    }
+    clampCuts.set(host, result);
+    return result;
+  };
+  // 返回 undefined：这个节点不属于「多节点的截断宿主」，沿用 ellipsize / clampLines；"hidden"：被截掉，没有可见部分；
+  // null：在截断点之前、完整可见；对象：截断点所在的节点，{ shown, rect } 或 { shown, rects }。
+  const multiNodeCut = (node, el, rects) => {
+    const clampHost = clampHostOf(el);
+    if (clampHost) {
+      const cut = clampCutOf(clampHost);
+      if (!cut) return undefined;
+      const at = cut.nodes.indexOf(node);
+      if (at < 0 || at < cut.index) return null;
+      if (at > cut.index) return "hidden";
+      return { shown: node.data.slice(0, cut.offset) + "…", rects: cut.rects };
+    }
+    const host = ellipsisHostOf(el);
+    if (!host) return undefined;
+    const cut = lineCutOf(host);
+    if (!cut) return undefined;
+    const at = cut.nodes.indexOf(node);
+    if (at < 0 || at < cut.index) return null;
+    if (at > cut.index) return "hidden";
+    const probe = document.createRange();
+    probe.setStart(node, 0);
+    probe.setEnd(node, cut.offset);
+    const inside = cut.offset > 0 ? probe.getBoundingClientRect().width : 0;
+    const [x, y, , h] = rects[0];
+    return { shown: node.data.slice(0, cut.offset) + "…", rect: [x, y, round(inside + cut.ell), h] };
+  };
   // 文字实际被裁掉的右缘：自身与祖先里会裁剪的块的内边距盒右缘（扣掉滚动条），再加视口右缘。
   // 不能拿所属元素自己的外框当裁剪线：文字溢出自己的盒子、但没有祖先裁它时（侧栏图标位里 19px 宽的表情），整个字形都画得出来。
   const clipRightOf = (el) => clipRegionOf(el).right;
@@ -348,7 +598,9 @@ const TEXTS_EXPR = `(async () => {
     }
     if (rects.length === 0) continue;
     const lh = parseFloat(cs.lineHeight);
-    const cut = ellipsize(node, el, cs, rects) ?? clampLines(node, el, cs, rects);
+    const multi = multiNodeCut(node, el, rects);
+    if (multi === "hidden") continue;
+    const cut = multi === undefined ? ellipsize(node, el, cs, rects) ?? clampLines(node, el, cs, rects) : multi;
     out.push({
       // 被省略号截断时，text 是看得见的「前缀 + …」，full 才是 DOM 原文；rects 取截断后的宽度。
       text: cut ? cut.shown : node.data,

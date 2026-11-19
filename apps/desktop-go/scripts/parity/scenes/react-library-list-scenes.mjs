@@ -68,12 +68,17 @@ const BLUR_X = 200;
 const BLUR_Y = 20;
 
 /** 顶栏搜索：点搜索框、打字，等 300 ms 防抖与随后的读取落定，再点空白处失焦。 */
-function searchList(text) {
+export function searchList(text) {
   return async (win) => {
     await win.getByTestId("topbar-search").click();
     await win.keyboard.type(text);
     await win.waitForTimeout(800);
     await win.mouse.click(BLUR_X, BLUR_Y);
+    // 顶栏的空白处是窗口拖动区：点它不一定让输入框失焦（悬停类场景不收尾 park 时，实测搜索框仍带聚焦环，Viva 一侧已失焦），
+    // 所以显式失焦；其余场景收尾的 park 本来就会失焦，终态不变。
+    await win.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
     await win.waitForTimeout(250);
   };
 }
@@ -156,6 +161,10 @@ export const LIBRARY_LIST_SCENES = {
   "app.window.library.list-loading": listScene({ fault: "hold" }, waitSpinner),
   "app.window.library.list-error": listScene({ fault: "fail" }),
   "app.window.library.list-search-empty": listScene({}, searchList("没有任何条目含有这个词")),
+  // 搜索命中词高亮（B-041）：标题与摘要里的命中词包进 mark（琥珀底、深琥珀字、两侧 2px 内边距、圆角 rounded-sm）。
+  "app.window.library.list-search-hit": listScene({}, searchList("设计")),
+  "app.window.library.list-search-hit-latin": listScene({}, searchList("design")),
+  "app.window.library.list-search-hit-selected": listScene({}, chain(searchList("设计"), clickCard("产品设计原则：极简与克制"))),
   "app.window.library.list-sort-menu": listScene({}, openSort, { keepFocus: true }),
   "app.window.library.list-sort-title": listScene({}, pickSort("标题 A→Z")),
   "app.window.library.list-trash": listScene({}, applyFacets("回收站")),
