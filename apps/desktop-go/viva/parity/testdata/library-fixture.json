@@ -1,0 +1,131 @@
+{
+  "variants": {
+    "data": {
+      "counts": {"uncategorized":7,"all":128,"favorites":12,"archived":5,"trash":3,"byCollection":{"col-work":34,"col-study":52,"col-reading":21,"col-ideas":12,"col-travel":8,"col-rainbow":2},"byTag":{"tag-ai":41,"tag-product":18,"tag-read":9,"tag-video":27,"tag-draft":4},"byPlatform":{"bilibili":22,"youtube":17,"xiaohongshu":6,"web":63,"local":9}},
+      "collections": [
+        {"id":"col-work","name":"工作","icon":"💼","sortOrder":0,"itemCount":34,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-study","name":"学习笔记","icon":"📚","sortOrder":1,"itemCount":52,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-reading","name":"阅读清单","icon":null,"sortOrder":2,"itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-ideas","name":"灵感","icon":"💡","sortOrder":3,"itemCount":12,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-travel","name":"旅行计划","icon":"✈️","sortOrder":4,"itemCount":8,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-rainbow","name":"自定义图标","icon":"🌈","sortOrder":5,"itemCount":2,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-empty","name":"待整理","icon":"📦","sortOrder":6,"itemCount":0,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ],
+      "tags": [
+        {"id":"tag-ai","name":"AI","colorKey":"indigo","itemCount":41,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-product","name":"产品设计","colorKey":"pink","itemCount":18,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-read","name":"待读","colorKey":"amber","itemCount":9,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-video","name":"视频课程","colorKey":"red","itemCount":27,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-draft","name":"草稿","colorKey":"gray","itemCount":4,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-old","name":"旧项目","colorKey":"teal","itemCount":0,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-misc","name":"杂项","colorKey":"green","itemCount":0,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-archive","name":"归档用","colorKey":"purple","itemCount":0,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ]
+    },
+    "empty": {
+      "counts": {"uncategorized":0,"all":0,"favorites":0,"archived":0,"trash":0,"byCollection":{},"byTag":{},"byPlatform":{}},
+      "collections": [
+
+      ],
+      "tags": [
+
+      ]
+    },
+    "long": {
+      "counts": {"uncategorized":150,"all":2048,"favorites":99,"archived":100,"trash":12345,"byCollection":{"col-long":1234,"col-q4":100,"col-short":99},"byTag":{"tag-long-en":100,"tag-long-zh":7,"tag-short":1},"byPlatform":{"web":100000,"bilibili":99}},
+      "collections": [
+        {"id":"col-long","name":"一个名字特别特别特别特别长的合集，用来检查侧栏里文字截断与省略号的表现是否一致","icon":"💼","sortOrder":0,"itemCount":1234,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-q4","name":"Quarterly Planning and Roadmap Review Notes 2026 Q4","icon":"📊","sortOrder":1,"itemCount":100,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-short","name":"短名","icon":"📚","sortOrder":2,"itemCount":99,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ],
+      "tags": [
+        {"id":"tag-long-en","name":"an-extremely-long-english-tag-name-that-should-be-truncated","colorKey":"blue","itemCount":100,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-long-zh","name":"超长标签名超长标签名超长标签名超长标签名超长标签名","colorKey":"pink","itemCount":7,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-short","name":"短","colorKey":"orange","itemCount":1,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ]
+    },
+    "many": {
+      "counts": {"uncategorized":9,"all":480,"favorites":31,"archived":17,"trash":6,"byCollection":{"col-m01":10,"col-m02":17,"col-m03":24,"col-m04":31,"col-m05":9,"col-m06":16,"col-m07":23,"col-m08":30,"col-m09":8,"col-m10":15,"col-m11":22,"col-m12":29,"col-m13":7,"col-m14":14,"col-m15":21,"col-m16":28,"col-m17":6,"col-m18":13,"col-m19":20,"col-m20":27,"col-m21":5,"col-m22":12,"col-m23":19,"col-m24":26,"col-m25":4,"col-m26":11,"col-m27":18,"col-m28":25},"byTag":{"tag-m01":6,"tag-m02":11,"tag-m03":16,"tag-m04":21,"tag-m05":26,"tag-m06":31,"tag-m07":36,"tag-m08":1,"tag-m09":6,"tag-m10":11,"tag-m11":16,"tag-m12":21,"tag-m13":26,"tag-m14":31,"tag-m15":36,"tag-m16":1,"tag-m17":6,"tag-m18":11,"tag-m19":16,"tag-m20":21,"tag-m21":26,"tag-m22":31,"tag-m23":36,"tag-m24":1,"tag-m25":6,"tag-m26":11,"tag-m27":16,"tag-m28":21,"tag-m29":26,"tag-m30":31,"tag-m31":36,"tag-m32":1,"tag-m33":6,"tag-m34":11,"tag-m35":16,"tag-m36":21},"byPlatform":{"douyin":2,"bilibili":5,"xiaohongshu":8,"youtube":11,"v2ex":14,"nga":17,"linuxdo":20,"nodeseek":23,"appinn":26,"twolibra":29,"wechat":32,"web":35,"local":38}},
+      "collections": [
+        {"id":"col-m01","name":"合集 01","icon":"💼","sortOrder":0,"itemCount":10,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m02","name":"合集 02","icon":"💡","sortOrder":1,"itemCount":17,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m03","name":"合集 03","icon":"🎨","sortOrder":2,"itemCount":24,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m04","name":"合集 04","icon":"🏠","sortOrder":3,"itemCount":31,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m05","name":"合集 05","icon":"💰","sortOrder":4,"itemCount":9,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m06","name":"合集 06","icon":"✈️","sortOrder":5,"itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m07","name":"合集 07","icon":"⭐","sortOrder":6,"itemCount":23,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m08","name":"合集 08","icon":"📚","sortOrder":7,"itemCount":30,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m09","name":"合集 09","icon":"💼","sortOrder":8,"itemCount":8,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m10","name":"合集 10","icon":"💡","sortOrder":9,"itemCount":15,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m11","name":"合集 11","icon":"🎨","sortOrder":10,"itemCount":22,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m12","name":"合集 12","icon":"🏠","sortOrder":11,"itemCount":29,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m13","name":"合集 13","icon":"💰","sortOrder":12,"itemCount":7,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m14","name":"合集 14","icon":"✈️","sortOrder":13,"itemCount":14,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m15","name":"合集 15","icon":"⭐","sortOrder":14,"itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m16","name":"合集 16","icon":"📚","sortOrder":15,"itemCount":28,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m17","name":"合集 17","icon":"💼","sortOrder":16,"itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m18","name":"合集 18","icon":"💡","sortOrder":17,"itemCount":13,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m19","name":"合集 19","icon":"🎨","sortOrder":18,"itemCount":20,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m20","name":"合集 20","icon":"🏠","sortOrder":19,"itemCount":27,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m21","name":"合集 21","icon":"💰","sortOrder":20,"itemCount":5,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m22","name":"合集 22","icon":"✈️","sortOrder":21,"itemCount":12,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m23","name":"合集 23","icon":"⭐","sortOrder":22,"itemCount":19,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m24","name":"合集 24","icon":"📚","sortOrder":23,"itemCount":26,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m25","name":"合集 25","icon":"💼","sortOrder":24,"itemCount":4,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m26","name":"合集 26","icon":"💡","sortOrder":25,"itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m27","name":"合集 27","icon":"🎨","sortOrder":26,"itemCount":18,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"col-m28","name":"合集 28","icon":"🏠","sortOrder":27,"itemCount":25,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ],
+      "tags": [
+        {"id":"tag-m01","name":"标签 01","colorKey":"orange","itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m02","name":"标签 02","colorKey":"amber","itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m03","name":"标签 03","colorKey":"green","itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m04","name":"标签 04","colorKey":"teal","itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m05","name":"标签 05","colorKey":"blue","itemCount":26,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m06","name":"标签 06","colorKey":"indigo","itemCount":31,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m07","name":"标签 07","colorKey":"purple","itemCount":36,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m08","name":"标签 08","colorKey":"pink","itemCount":1,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m09","name":"标签 09","colorKey":"gray","itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m10","name":"标签 10","colorKey":"red","itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m11","name":"标签 11","colorKey":"orange","itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m12","name":"标签 12","colorKey":"amber","itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m13","name":"标签 13","colorKey":"green","itemCount":26,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m14","name":"标签 14","colorKey":"teal","itemCount":31,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m15","name":"标签 15","colorKey":"blue","itemCount":36,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m16","name":"标签 16","colorKey":"indigo","itemCount":1,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m17","name":"标签 17","colorKey":"purple","itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m18","name":"标签 18","colorKey":"pink","itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m19","name":"标签 19","colorKey":"gray","itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m20","name":"标签 20","colorKey":"red","itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m21","name":"标签 21","colorKey":"orange","itemCount":26,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m22","name":"标签 22","colorKey":"amber","itemCount":31,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m23","name":"标签 23","colorKey":"green","itemCount":36,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m24","name":"标签 24","colorKey":"teal","itemCount":1,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m25","name":"标签 25","colorKey":"blue","itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m26","name":"标签 26","colorKey":"indigo","itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m27","name":"标签 27","colorKey":"purple","itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m28","name":"标签 28","colorKey":"pink","itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m29","name":"标签 29","colorKey":"gray","itemCount":26,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m30","name":"标签 30","colorKey":"red","itemCount":31,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m31","name":"标签 31","colorKey":"orange","itemCount":36,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m32","name":"标签 32","colorKey":"amber","itemCount":1,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m33","name":"标签 33","colorKey":"green","itemCount":6,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m34","name":"标签 34","colorKey":"teal","itemCount":11,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m35","name":"标签 35","colorKey":"blue","itemCount":16,"createdAt":1794700000000,"updatedAt":1794700000000},
+        {"id":"tag-m36","name":"标签 36","colorKey":"indigo","itemCount":21,"createdAt":1794700000000,"updatedAt":1794700000000}
+      ]
+    }
+  },
+  "smartViews": {
+    "basic": [
+      {"id":"sv-fav-work","name":"工作库的收藏","scope":"favorites","collectionId":"col-work","tagId":null,"platform":null,"createdAt":1794700000000},
+      {"id":"sv-bili","name":"最近的视频","scope":"all","collectionId":null,"tagId":null,"platform":"bilibili","createdAt":1794700000000},
+      {"id":"sv-archived","name":"只看归档","scope":"archived","collectionId":null,"tagId":null,"platform":null,"createdAt":1794700000000}
+    ],
+    "long": [
+      {"id":"sv-long","name":"一个特别特别特别特别特别特别特别特别特别特别特别特别特别特别长的智能视图名称，最多保存六十个字符","scope":"all","collectionId":null,"tagId":null,"platform":null,"createdAt":1794700000000},
+      {"id":"sv-en","name":"A smart view whose name is written in English and is quite long indeed","scope":"favorites","collectionId":null,"tagId":null,"platform":null,"createdAt":1794700000000},
+      {"id":"sv-short","name":"短","scope":"all","collectionId":null,"tagId":null,"platform":null,"createdAt":1794700000000}
+    ]
+  }
+}

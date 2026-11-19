@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { IMPORTS_FIXTURE, enterImports, leaveImports } from "../lib/react-imports.mjs";
 import { resetToasts, showToasts } from "../lib/react-toast.mjs";
+import { LIBRARY_SCENES } from "./react-library-scenes.mjs";
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
 async function openSettingsSection(win, section) {
@@ -465,6 +466,8 @@ const selectedSwatch = (win) => win.locator(SETTINGS_CONTENT_SCROLLER).locator('
 const customSwatch = (win) => win.getByRole("button", { name: "自定义", exact: true }).first();
 
 export const SCENES = {
+  // 知识库侧栏（M2-1）：场景在 react-library-scenes.mjs
+  ...LIBRARY_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,
