@@ -28,7 +28,11 @@ type rootFixture struct {
 	redraws atomic.Int32 // 设置被别处改动后请求重绘的次数
 
 	hoverPosts [][2]float32 // 滚轮之后请求的指针移动（Options.HoverRefresh 的记录器；测试不碰系统消息）
+	hoverHere  int          // 键盘滚动、列表换内容之后请求的「指针此刻位置」的刷新次数（Options.HoverRefreshHere 的记录器）
 }
+
+// recordHoverHere 是无头测试里的 Options.HoverRefreshHere：只记次数，不发系统消息。
+func (f *rootFixture) recordHoverHere() { f.hoverHere++ }
 
 // recordHover 是无头测试里的 Options.HoverRefresh：只记录，不发系统消息。
 func (f *rootFixture) recordHover(x, y float32) {
@@ -49,9 +53,10 @@ func openRootSize(t *testing.T, width, height int, mutate func(*Options)) *rootF
 	opts := Options{
 		Services: services.Services{Settings: f.fake}, Page: shell.PageSettings,
 		// 结果不随运行机器的系统「减少动态效果」变化；默认关闭动效，让画面总在终态（动画时钟只在无头会话里手动推进）。
-		OSReduceMotion: func() bool { return false },
-		Appearance:     func(s kit.Spec) kit.Spec { s.Motion = kit.MotionLevelOff; return s },
-		HoverRefresh:   f.recordHover,
+		OSReduceMotion:   func() bool { return false },
+		Appearance:       func(s kit.Spec) kit.Spec { s.Motion = kit.MotionLevelOff; return s },
+		HoverRefresh:     f.recordHover,
+		HoverRefreshHere: f.recordHoverHere,
 	}
 	if mutate != nil {
 		mutate(&opts)

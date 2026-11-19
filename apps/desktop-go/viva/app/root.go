@@ -47,7 +47,8 @@ type Root struct {
 
 	look     *kit.Look
 	lookSpec kit.Spec
-	theme    gfx.Theme // ui.Page 读它的当前值
+	canvas   *gfx.Canvas // 窗口的画布（第一次绘制时记下）：窗口级键盘读此刻的焦点
+	theme    gfx.Theme   // ui.Page 读它的当前值
 	bg       gfx.Color
 
 	systemDark atomic.Bool // 系统当前是否深色（由系统外观监听更新）
@@ -180,6 +181,8 @@ func (r *Root) syncLook(c ui.C) {
 		}
 		r.look, r.lookSpec = kit.NewLook(spec), spec
 		r.look.Scale = scale
+		r.look.HoverRefresh = r.refreshHoverHere
+		r.look.KeyHook = r.listKey
 		r.theme = r.look.Theme
 		r.bg = r.look.Col(r.look.T.Background)
 		r.win.Look, r.settings.Look = r.look, r.look
@@ -192,6 +195,7 @@ func (r *Root) syncLook(c ui.C) {
 	}
 	if c != nil {
 		canvas := c.Canvas()
+		r.canvas = canvas
 		r.look.Scale = float32(canvas.PixelScale())
 		// 动效关闭档：让 Viva 的过渡与入退场直接到终态（它自己的「减少动态效果」开关就是这个语义）；
 		// 其余档位播放动画，时长由 kit 按档位给出。
@@ -211,8 +215,8 @@ func (r *Root) Services() services.Services { return r.opts.Services }
 func (r *Root) Notifier() *kit.Notifier { return r.notifier }
 func (r *Root) Guard() kit.Guard        { return r.guard }
 
-// OnKey 是窗口按键的前置钩子：收起悬停提示（B-017）与 Tab 可达（滚动区里滚入视野，B-030），见 kit.Look.OnKey。
-// 窗口线程调用；Look 还没装配好（第一次绘制之前）时不插手。
+// OnKey 是窗口按键的前置钩子：收起悬停提示（B-017）与 Tab 可达（滚动区里滚入视野，B-030），再加上知识库列表的窗口级键盘
+// （方向键、Home、End、空格，B-045，经 Look.KeyHook），见 kit.Look.OnKey。窗口线程调用；Look 还没装配好（第一次绘制之前）时不插手。
 func (r *Root) OnKey(e gfx.KeyEvent) gfx.EventResult {
 	if r.look == nil {
 		return gfx.EventResult{}
@@ -220,9 +224,32 @@ func (r *Root) OnKey(e gfx.KeyEvent) gfx.EventResult {
 	return r.look.OnKey(e)
 }
 
+// listKey 是 Look.KeyHook：知识库列表的窗口级键盘。还没有画布（第一次绘制之前）或没有装配知识库时不插手。
+func (r *Root) listKey(e gfx.KeyEvent) gfx.EventResult {
+	if r.library == nil || r.canvas == nil {
+		return gfx.EventResult{}
+	}
+	return r.library.ListKey(e, r.canvas)
+}
+
 // errHoverRefreshNoWindow 是补发悬停刷新时找不到本进程 Viva 窗口的诊断信息：只写日志，不给用户看
 // （所以走 errors.New，符合「诊断信息用中文、界面文案进 i18n」的约定，见 nocjk_test.go）。
-var errHoverRefreshNoWindow = errors.New("没有找到 Viva 主窗口，滚轮滚动之后悬停不会自动刷新（台账 B-031）")
+var errHoverRefreshNoWindow = errors.New("没有找到 Viva 主窗口，滚动（滚轮、键盘）或列表换内容之后悬停不会自动刷新（台账 B-031、B-037）")
+
+// refreshHoverHere 是 kit.Look.HoverRefresh：请求窗口在指针此刻的位置补一次指针移动（台账 B-037）。
+// 通道是 Options.HoverRefreshHere，空时用系统实现；找不到窗口时与 OnScroll 一样只记一次日志。
+func (r *Root) refreshHoverHere() {
+	if post := r.opts.HoverRefreshHere; post != nil {
+		post()
+		return
+	}
+	if postHoverRefreshHere() || !r.hoverWarned.CompareAndSwap(false, true) {
+		return
+	}
+	if log := r.opts.Services.Log; log != nil {
+		log.AppError("native", "hover-refresh", errHoverRefreshNoWindow.Error())
+	}
+}
 
 // OnScroll 包住页面的滚轮处理：滚轮滚动了内容之后，请求窗口在原位补一次指针移动，让悬停跟上（台账 B-031，见 kit.RefreshHoverAfterWheel）。
 // 窗口线程调用。补发的通道是 Options.HoverRefresh，空时用系统实现；系统实现找不到窗口（Viva 升级后窗口类名变了之类）

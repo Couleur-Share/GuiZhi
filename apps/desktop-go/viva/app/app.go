@@ -61,6 +61,9 @@ type Options struct {
 	// HoverRefresh 在滚轮滚动了内容之后被调用，请求窗口在 (x, y)（逻辑像素、窗口坐标）补一次指针移动，让悬停跟上（台账 B-031）。
 	// 空表示用系统实现（Windows 上向主窗口 PostMessage(WM_MOUSEMOVE)，hover_windows.go）；无头测试注入记录器，不碰系统消息。
 	HoverRefresh func(x, y float32)
+	// HoverRefreshHere 在键盘滚动、Tab 滚动、列表换内容之后被调用，请求窗口在指针此刻的位置补一次指针移动（台账 B-037）。
+	// 空表示用系统实现（Windows 上取光标位置、指针在本窗口上时 PostMessage(WM_MOUSEMOVE)）；无头测试注入记录器。
+	HoverRefreshHere func()
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -122,10 +125,12 @@ func Run(opts Options) error {
 
 // bindInput 把 Root 的窗口级输入钩子接到窗口配置上（page.Config 之后调用）。Run 与无头测试共用这一处接线，
 // 测试走的就是生产的接线：
-//   - OnKey：Tab 可达（下一个停靠点在滚动区视野之外时先滚进视野，台账 B-030，kit/reach.go）与悬停提示的收起（B-017）；
+//   - OnKey：Tab 可达（下一个停靠点在滚动区视野之外时先滚进视野，台账 B-030，kit/reach.go）、悬停提示的收起（B-017）与
+//     知识库列表的窗口级键盘（B-045）排在页面自己的按键路由之前（kit.KeyFirst）——不能直接换掉 config.OnKey，那是页面的路由，
+//     换掉它菜单、下拉里的方向键就不动了；
 //   - OnScroll：滚轮滚动了内容之后补一次指针移动，让悬停跟上（台账 B-031，kit/wheel.go）。
 func bindInput(config *vapp.Config, root *Root) {
-	config.OnKey = root.OnKey
+	config.OnKey = kit.KeyFirst(root.OnKey, config.OnKey)
 	config.OnScroll = root.OnScroll(config.OnScroll)
 }
 

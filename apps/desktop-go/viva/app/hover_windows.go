@@ -27,6 +27,16 @@ var (
 	procGetDpiForWindow    = user32.NewProc("GetDpiForWindow")
 	procPostMessageW       = user32.NewProc("PostMessageW")
 	procGetKeyState        = user32.NewProc("GetKeyState")
+	procGetCursorPos       = user32.NewProc("GetCursorPos")
+	procScreenToClient     = user32.NewProc("ScreenToClient")
+	procGetClientRect      = user32.NewProc("GetClientRect")
+	procWindowFromPoint    = user32.NewProc("WindowFromPoint")
+)
+
+// winPoint 与 winRect 是 POINT 与 RECT。
+type (
+	winPoint struct{ x, y int32 }
+	winRect  struct{ left, top, right, bottom int32 }
 )
 
 // postHoverRefresh 向本线程上的 Viva 主窗口发一条 WM_MOUSEMOVE，坐标是 (x, y)（逻辑像素、窗口坐标），
@@ -43,6 +53,96 @@ func postHoverRefresh(x, y float32) bool {
 	}
 	ok, _, _ := procPostMessageW.Call(hwnd, wmMouseMove, mouseKeyState(), clientPoint(x, y, windowScale(hwnd)))
 	return ok != 0
+}
+
+// postHoverRefreshHere 在指针此刻的位置补一次指针移动（台账 B-037）：键盘滚动列表、Tab 把控件滚进视野、列表换了内容
+// 之后，指针底下可能换了元素，渲染层（Chromium）会自己补发 pointerover，Viva 只在指针事件里重算悬停。
+// 指针不在本窗口上（在窗口之外，或被别的窗口盖着）时什么也不做、按「已处理」返回：Chromium 在指针不在视图上时同样不补；
+// 返回 false 表示没有找到窗口或消息没有发出去。只能在窗口线程调用。
+func postHoverRefreshHere() bool {
+	hwnd := findOwnWindow()
+	if hwnd == 0 {
+		return false
+	}
+	return refreshHoverAt(hwnd, sysHoverProbe)
+}
+
+// hoverProbe 是补发悬停刷新要问系统的几件事：光标在哪、那里是哪个窗口、换算成客户区坐标、客户区多大、投递消息。
+// 生产实现是 sysHoverProbe（user32 调用）；测试换成替身——真光标与真窗口不能在测试里摆弄（不得移动用户的光标）。
+type hoverProbe struct {
+	cursor   func() (winPoint, bool)                          // 光标的屏幕坐标
+	windowAt func(pt winPoint) uintptr                        // 屏幕坐标处最上面的窗口，没有为 0
+	toClient func(hwnd uintptr, pt winPoint) (winPoint, bool) // 屏幕坐标换算成窗口客户区坐标
+	client   func(hwnd uintptr) (winRect, bool)               // 窗口客户区的范围
+	post     func(hwnd, lparam uintptr) bool                  // 向窗口投递 WM_MOUSEMOVE
+}
+
+// sysHoverProbe 是 hoverProbe 的系统实现。
+var sysHoverProbe = hoverProbe{
+	cursor: func() (winPoint, bool) {
+		var pt winPoint
+		ok, _, _ := procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+		return pt, ok != 0
+	},
+	windowAt: func(pt winPoint) uintptr {
+		// WindowFromPoint 的 POINT 按值传：x64 上是一个 64 位寄存器，x 在低 32 位。
+		under, _, _ := procWindowFromPoint.Call(uintptr(uint32(pt.x)) | uintptr(uint32(pt.y))<<32)
+		return under
+	},
+	toClient: func(hwnd uintptr, pt winPoint) (winPoint, bool) {
+		ok, _, _ := procScreenToClient.Call(hwnd, uintptr(unsafe.Pointer(&pt)))
+		return pt, ok != 0
+	},
+	client: func(hwnd uintptr) (winRect, bool) {
+		var area winRect
+		ok, _, _ := procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&area)))
+		return area, ok != 0
+	},
+	post: func(hwnd, lparam uintptr) bool {
+		ok, _, _ := procPostMessageW.Call(hwnd, wmMouseMove, mouseKeyState(), lparam)
+		return ok != 0
+	},
+}
+
+// refreshHoverAt 是 postHoverRefreshHere 的流程：问光标、问光标下的窗口（屏幕坐标）、换算客户区坐标、问客户区范围，
+// 再由 hoverTarget 决定补不补；系统调用失败返回 false，光标不在本窗口上按「已处理」返回 true。
+func refreshHoverAt(hwnd uintptr, p hoverProbe) bool {
+	screen, ok := p.cursor()
+	if !ok {
+		return false
+	}
+	under := p.windowAt(screen)
+	local, ok := p.toClient(hwnd, screen)
+	if !ok {
+		return false
+	}
+	area, ok := p.client(hwnd)
+	if !ok {
+		return false
+	}
+	lparam, post := hoverTarget(hwnd, under, local, area)
+	if !post {
+		return true // 光标在别的窗口上、窗口收在托盘里，或在客户区之外：不是我们的事
+	}
+	return p.post(hwnd, lparam)
+}
+
+// hoverTarget 决定要不要补一次指针移动、补在哪：光标下面的窗口（under）必须就是本窗口（hwnd），
+// 客户区坐标（设备像素）必须落在客户区里；满足时返回 WM_MOUSEMOVE 的 lParam。
+// 纯函数：真光标不能在测试里挪，判断逻辑用字面值对拍。
+func hoverTarget(hwnd, under uintptr, client winPoint, area winRect) (lparam uintptr, post bool) {
+	if under != hwnd {
+		return 0, false
+	}
+	return clientMoveParam(client, area)
+}
+
+// clientMoveParam 把客户区坐标（设备像素）换成 WM_MOUSEMOVE 的 lParam；点在客户区之外时 inside 为假。
+func clientMoveParam(pt winPoint, client winRect) (lparam uintptr, inside bool) {
+	if pt.x < client.left || pt.y < client.top || pt.x >= client.right || pt.y >= client.bottom {
+		return 0, false
+	}
+	return clientPoint(float32(pt.x), float32(pt.y), 1), true
 }
 
 // findOwnWindow 找本线程上的 Viva 主窗口：同类名、属于当前线程、没有所有者的顶层窗口。找不到返回 0。
