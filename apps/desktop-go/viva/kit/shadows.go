@@ -15,6 +15,11 @@ var (
 		{X: 0, Y: 10, Blur: 15, Spread: -3, Color: black10},
 		{X: 0, Y: 4, Blur: 6, Spread: -4, Color: black10},
 	}
+	// ShadowXL 是 shadow-xl：组合筛选的弹层（`0 20px 25px -5px / 0 8px 10px -6px`，各 10% 黑）。
+	ShadowXL = []tokens.Shadow{
+		{X: 0, Y: 20, Blur: 25, Spread: -5, Color: black10},
+		{X: 0, Y: 8, Blur: 10, Spread: -6, Color: black10},
+	}
 	// Shadow2XL 是 shadow-2xl：确认对话框、提示。
 	Shadow2XL = []tokens.Shadow{
 		{X: 0, Y: 25, Blur: 50, Spread: -12, Color: black25},

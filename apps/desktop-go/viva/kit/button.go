@@ -67,6 +67,9 @@ type ButtonSpec struct {
 	Busy bool
 	// NoRing 去掉键盘聚焦环（少数控件自己有聚焦样式）。
 	NoRing bool
+	// Autofocus 让按钮在它第一次出现的那一帧取得键盘焦点（弹层打开时 panel.querySelector("button")?.focus()）；
+	// 一直在画面上的按钮不会被它拉回焦点。
+	Autofocus bool
 	// Description 是可访问描述（title 属性在可访问树里的副产物）。
 	Description string
 	// Groups 非空时，按钮把自己的命中区登记到名为 Group 的悬停分组里（group-hover/<名> 用）。
@@ -129,7 +132,7 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 	if spec.Center {
 		row = row.Justify(ui.Center)
 	}
-	opts := gfx.HitOptions{Role: gfx.RoleButton, Disabled: spec.Disabled, Selected: spec.Toggle && spec.On, Description: spec.Description, Hint: spec.Hint}
+	opts := gfx.HitOptions{Role: gfx.RoleButton, Disabled: spec.Disabled, Selected: spec.Toggle && spec.On, Description: spec.Description, Hint: spec.Hint, Autofocus: spec.Autofocus}
 	if !spec.Disabled {
 		opts.Cursor = gfx.PointerCursorHand
 	}

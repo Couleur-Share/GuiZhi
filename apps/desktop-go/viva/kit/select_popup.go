@@ -39,6 +39,8 @@ type SelectSpec struct {
 	MenuMinWidth float32
 	// AlignEnd 让面板与触发器右边缘对齐；贴右侧边缘的控件用它才不会越界。
 	AlignEnd bool
+	// Trigger 非空时触发按钮用这一套样式（渲染层的 triggerClassName 覆盖），此时 Width 不起作用：按钮按内容收缩。
+	Trigger *SelectTriggerStyle
 }
 
 // Select 是带弹层的下拉（渲染层 Select）：触发按钮加一块选项面板。返回这一帧选中的值与是否发生了选择。
@@ -53,8 +55,13 @@ func (l *Look) Select(c ui.C, st *SelectState, spec SelectSpec) (picked string, 
 			break
 		}
 	}
-	trigger := l.SelectTrigger(c, spec.Label, display, spec.Width, st.Open).
-		DrawOver(func(d *ui.DrawContext) { st.anchor = d.Rect })
+	var trigger ui.Box
+	if spec.Trigger != nil {
+		trigger = l.selectTriggerCompact(c, spec.Label, display, *spec.Trigger, st.Open)
+	} else {
+		trigger = l.SelectTrigger(c, spec.Label, display, spec.Width, st.Open)
+	}
+	trigger = trigger.DrawOver(func(d *ui.DrawContext) { st.anchor = d.Rect })
 	if trigger.Clicked() {
 		st.Open = !st.Open
 	}

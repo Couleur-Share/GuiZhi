@@ -46,6 +46,11 @@ type MenuItem struct {
 	Description string
 	// Icon 是标签前的图标；ViewBox 为 0 表示没有。
 	Icon gfx.Icon
+	// IconColor 非零时图标用这个颜色而不是随悬停变化的文字色（渲染层 icon 节点自带的 text-primary）；缺省随文字色。
+	IconColor tokens.Color
+	// Blank 为真且没有图标与色点时，在标签前留一个 16px 的空槽（渲染层给没选中的项放 <span className="h-4 w-4">，
+	// 好让有对勾与没对勾的项文字对齐）。
+	Blank bool
 	// Dot 非零时，标签前画一枚纯色圆点来代替图标：12px 的圆在 16px 的图标槽里居中（标签颜色菜单里的色板，
 	// 渲染层 <span class="h-3 w-3 rounded-full bg-*">）。颜色是固定的品牌色，不随悬停变化。与 Icon 同时给时画 Icon。
 	Dot tokens.Color
@@ -256,7 +261,7 @@ func (l *Look) menuItemSize(canvas *gfx.Canvas, it MenuItem, padY float32, popup
 		h += l.Rem(TextXS.Line)
 	}
 	w = 2*padX + text
-	if it.Icon.ViewBox > 0 || it.Dot != (tokens.Color{}) {
+	if it.Icon.ViewBox > 0 || it.Dot != (tokens.Color{}) || it.Blank {
 		w += l.Rem(1) + gap
 	}
 	if it.Shortcut != "" {
@@ -324,9 +329,18 @@ func (l *Look) menuRow(c ui.C, it MenuItem, rs menuRowSpec) (gfx.ID, bool) {
 	row.Children(func() {
 		switch {
 		case it.Icon.ViewBox > 0:
-			l.Icon(c, it.Icon, l.Rem(1), fg).Shrink(0)
+			color := fg
+			if it.IconColor != (tokens.Color{}) {
+				color = it.IconColor
+				if it.Disabled {
+					color = fade(color, 0.5)
+				}
+			}
+			l.Icon(c, it.Icon, l.Rem(1), color).Shrink(0)
 		case it.Dot != (tokens.Color{}):
 			l.menuDot(c, it.Dot)
+		case it.Blank:
+			ui.Slot(c.Key("blank")).Size(l.Rem(1), l.Rem(1)).Shrink(0)
 		}
 		ui.Column(c.Key("text")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
 			l.Text(c, it.Label, TextSM, WeightNormal, fg, Ellipsis())
