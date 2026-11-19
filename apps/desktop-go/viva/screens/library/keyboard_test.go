@@ -392,7 +392,7 @@ func TestListClickingAVisibleCardDoesNotScroll(t *testing.T) {
 // 渲染层那个 effect 的依赖是 selectedId 与 entries 两个，不是只看选中项。
 func TestListRevealFollowsTheSelectionWhenTheEntriesAreReordered(t *testing.T) {
 	r := wsRig(t)
-	top, bottom := r.viewport() // 先量：一页放下全部条目之后只有一页，分页条里没有翻页按钮了（高度不变）
+	top, bottom := r.viewport()            // 先量：一页放下全部条目之后只有一页，分页条里没有翻页按钮了（高度不变）
 	r.store.SetPageSize(r.screen.Ctx, 100) // 排序只改变选中项的位置
 	r.frames(3)
 	for i := 0; i < 4; i++ {

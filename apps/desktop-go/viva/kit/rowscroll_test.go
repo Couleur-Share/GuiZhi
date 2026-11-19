@@ -101,12 +101,12 @@ func TestScrollIndexTargetRules(t *testing.T) {
 // scrollRig 是 React 读数那一屏：窗口高 638、下内边距 8、各行高度取 reactRowHeights（无行距），行高是声明的，所以量到的与声明的一致。
 type scrollRig struct {
 	*harness
-	w        *RowWindow
-	n        int
-	heights  func(i int) float32
-	fixed    float32
-	view     ScrollView
-	hover    int // 悬停刷新请求的次数（Look.HoverRefresh）
+	w       *RowWindow
+	n       int
+	heights func(i int) float32
+	fixed   float32
+	view    ScrollView
+	hover   int // 悬停刷新请求的次数（Look.HoverRefresh）
 }
 
 func openScrollRig(t *testing.T, n int, seed float32, heights func(i int) float32, fixed float32) *scrollRig {
