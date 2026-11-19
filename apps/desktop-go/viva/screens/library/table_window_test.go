@@ -252,7 +252,7 @@ func TestTableRevealsTheSelectedRowTheWayTheBrowserDoes(t *testing.T) {
 	}
 	before := rowY()
 	plain.wheel(t, 1e7) // 再滚到底
-	if rest := before - rowY(); math.Abs(float64(rest-(plain.look.Space(tableAreaPadY)+1))) > 1 {
+	if rest := before - rowY(); math.Abs(float64(rest-(plain.look.Space(tableAreaPadY)+1))) > 0.5 {
 		t.Fatalf("选中末行之后距最大滚动量应还差 %.1f（下内边距加边框），实际 %.2f", plain.look.Space(tableAreaPadY)+1, rest)
 	}
 }
