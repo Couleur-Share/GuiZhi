@@ -16,6 +16,7 @@ func newLibraryAdapterForTest(t *testing.T) (libraryAdapter, *Bridge) {
 	l.register(b)
 	l.registerCatalogWrite(b)
 	l.registerWrite(b)
+	l.registerList(b)
 	return libraryAdapter{b: b}, b
 }
 
@@ -135,5 +136,115 @@ func TestLibraryAdapterTagsAndFacetCountsAgainstRealHandlers(t *testing.T) {
 	removed, err = svc.DeleteTag(ctx, beta.ID)
 	if err != nil || removed {
 		t.Fatalf("再删一次应返回 false 而不是错误：%v %v", removed, err)
+	}
+}
+
+// 条目列表经真实处理器往返：DTO 与处理器输出对得上（合集、标签按名称排序、置顶与收藏、范围的含义），
+// 置顶条目排在最前，游标翻页取到不重叠的两页，换了筛选之后旧游标被拒绝（界面必须在筛选变化时丢掉游标）。
+func TestLibraryAdapterListAgainstRealHandlers(t *testing.T) {
+	ctx := t.Context()
+	svc, b := newLibraryAdapterForTest(t)
+
+	col, err := svc.CreateCollection(ctx, "合集甲", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	create := func(in map[string]any) string {
+		t.Helper()
+		item, err := callAs[struct {
+			ID string `json:"id"`
+		}](ctx, b, "knowledge:create", in)
+		if err != nil || item.ID == "" {
+			t.Fatalf("创建条目 %v：%v", in, err)
+		}
+		return item.ID
+	}
+	patch := func(id string, in map[string]any) {
+		t.Helper()
+		if _, err := b.call(ctx, "knowledge:update", id, in); err != nil {
+			t.Fatalf("修改条目 %s %v：%v", id, in, err)
+		}
+	}
+	first := create(map[string]any{"title": "甲", "content": "关于量子退火的笔记", "collectionId": col.ID, "tagNames": []string{"beta", "alpha"}})
+	pinned := create(map[string]any{"title": "乙", "content": "乙的正文", "tagNames": []string{"alpha"}})
+	patch(pinned, map[string]any{"isPinned": true})
+	starred := create(map[string]any{"title": "丙", "content": "丙的正文"})
+	patch(starred, map[string]any{"isFavorite": true})
+	archived := create(map[string]any{"title": "丁", "content": "丁的正文"})
+	patch(archived, map[string]any{"status": "archived"})
+
+	ids := func(p services.LibraryPage) []string {
+		out := make([]string, len(p.Entries))
+		for i, e := range p.Entries {
+			out[i] = e.ID
+		}
+		return out
+	}
+
+	all, err := svc.List(ctx, services.LibraryListQuery{Scope: services.LibraryScopeAll, Limit: 10})
+	if err != nil || all.Total != 3 || len(all.Entries) != 3 || all.NextCursor != "" {
+		t.Fatalf("全部范围（不含归档）：%+v %v", all, err)
+	}
+	if all.Entries[0].ID != pinned || !all.Entries[0].IsPinned {
+		t.Fatalf("置顶条目应排在最前：%v", ids(all))
+	}
+	var got services.LibraryEntry
+	for _, e := range all.Entries {
+		if e.ID == first {
+			got = e
+		}
+	}
+	if got.Title != "甲" || got.ItemType != services.LibraryTypeNote || got.Status != services.LibraryStatusActive ||
+		got.CollectionID != col.ID || got.IsPinned || got.IsFavorite || got.DeletedAt != 0 || got.CreatedAt == 0 || got.UpdatedAt == 0 {
+		t.Fatalf("字段映射：%+v", got)
+	}
+	if len(got.Tags) != 2 || got.Tags[0].Name != "alpha" || got.Tags[1].Name != "beta" || got.Tags[0].ID == "" || got.Tags[0].ColorKey == "" {
+		t.Fatalf("标签应按名称排序并带上颜色：%+v", got.Tags)
+	}
+	if got.ReviewStatus != "clear" || got.ReviewReasons == nil {
+		t.Fatalf("复核状态缺省为 clear，原因不为 nil：%q %v", got.ReviewStatus, got.ReviewReasons)
+	}
+
+	for _, c := range []struct {
+		name  string
+		query services.LibraryListQuery
+		want  []string
+	}{
+		{"收藏", services.LibraryListQuery{Scope: services.LibraryScopeFavorites}, []string{starred}},
+		{"归档", services.LibraryListQuery{Scope: services.LibraryScopeArchived}, []string{archived}},
+		{"未归合集（不含归档）", services.LibraryListQuery{Scope: services.LibraryScopeUncategorized}, []string{pinned, starred}},
+		{"合集分面", services.LibraryListQuery{Scope: services.LibraryScopeAll, CollectionID: col.ID}, []string{first}},
+		{"搜索", services.LibraryListQuery{Scope: services.LibraryScopeAll, Search: "量子退火"}, []string{first}},
+	} {
+		c.query.Limit = 10
+		page, err := svc.List(ctx, c.query)
+		if err != nil || len(page.Entries) != len(c.want) || page.Total != len(c.want) {
+			t.Fatalf("%s：%+v %v", c.name, page, err)
+		}
+		for i, id := range c.want {
+			if page.Entries[i].ID != id {
+				t.Fatalf("%s：应为 %v，实际 %v", c.name, c.want, ids(page))
+			}
+		}
+	}
+
+	// 游标翻页：两页不重叠、总数不变；换了筛选之后旧游标被拒绝。
+	one, err := svc.List(ctx, services.LibraryListQuery{Scope: services.LibraryScopeAll, Limit: 2})
+	if err != nil || len(one.Entries) != 2 || one.Total != 3 || one.NextCursor == "" {
+		t.Fatalf("第一页：%+v %v", one, err)
+	}
+	two, err := svc.List(ctx, services.LibraryListQuery{Scope: services.LibraryScopeAll, Limit: 2, Cursor: one.NextCursor})
+	if err != nil || len(two.Entries) != 1 || two.Total != 3 || two.NextCursor != "" {
+		t.Fatalf("第二页：%+v %v", two, err)
+	}
+	for _, e := range two.Entries {
+		for _, prev := range one.Entries {
+			if e.ID == prev.ID {
+				t.Fatalf("两页不应重叠：%v / %v", ids(one), ids(two))
+			}
+		}
+	}
+	if _, err := svc.List(ctx, services.LibraryListQuery{Scope: services.LibraryScopeFavorites, Limit: 2, Cursor: one.NextCursor}); err == nil {
+		t.Fatal("换了筛选之后，旧游标应被拒绝")
 	}
 }

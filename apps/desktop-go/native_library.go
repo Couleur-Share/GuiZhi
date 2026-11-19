@@ -19,6 +19,10 @@ func (a libraryAdapter) Counts(ctx context.Context, q services.LibraryFacetQuery
 	return callAs[services.LibraryCounts](ctx, a.b, "knowledge:counts", q)
 }
 
+func (a libraryAdapter) List(ctx context.Context, q services.LibraryListQuery) (services.LibraryPage, error) {
+	return callAs[services.LibraryPage](ctx, a.b, "knowledge:list", q)
+}
+
 func (a libraryAdapter) Collections(ctx context.Context) ([]services.LibraryCollection, error) {
 	return callAs[[]services.LibraryCollection](ctx, a.b, "collection:list")
 }

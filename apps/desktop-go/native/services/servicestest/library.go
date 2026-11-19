@@ -24,6 +24,11 @@ type Library struct {
 	queries     []services.LibraryFacetQuery
 	gate        chan struct{}
 	nextID      int
+
+	// 条目列表（见 library_list.go）：条目全集、收到的列表查询、让下一次 List 卡住的闸门。
+	entries     []services.LibraryEntry
+	listQueries []services.LibraryListQuery
+	listGate    chan struct{}
 }
 
 var _ services.Library = (*Library)(nil)
@@ -45,7 +50,7 @@ func (f *Library) SetCounts(counts services.LibraryCounts) {
 	f.mu.Unlock()
 }
 
-// FailOn 让某个方法（"Counts"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
+// FailOn 让某个方法（"Counts"、"List"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
 // "Tags"、"UpdateTag"、"DeleteTag"）返回 err；err 为 nil 取消注入。
 func (f *Library) FailOn(method string, err error) {
 	f.mu.Lock()

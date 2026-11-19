@@ -65,11 +65,14 @@ type LibraryTagPatch struct {
 	ColorKey *string
 }
 
-// Library 是知识库侧栏用到的数据能力（渲染层 collection.store、tag.store 与 knowledge.store 的计数）。
-// 对应的 IPC 频道：knowledge:counts、collection:*、tag:*。
+// Library 是知识库界面用到的数据能力（渲染层 collection.store、tag.store 与 knowledge.store 的计数、条目列表）。
+// 对应的 IPC 频道：knowledge:counts、knowledge:list、collection:*、tag:*。
 type Library interface {
 	// Counts 返回侧栏计数（knowledge:counts）。
 	Counts(ctx context.Context, q LibraryFacetQuery) (LibraryCounts, error)
+
+	// List 返回一页条目（knowledge:list）。游标绑定查询条件：条件变了之后旧游标会被拒绝。
+	List(ctx context.Context, q LibraryListQuery) (LibraryPage, error)
 
 	// Collections 按 sort_order 列出全部合集（collection:list）。
 	Collections(ctx context.Context) ([]LibraryCollection, error)

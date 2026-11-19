@@ -1,0 +1,11 @@
+{
+  "note": "GenerateEntries 的填充文字（基准与对照用的测试数据，不是界面文案；放在这里是因为 nocjk 门禁不允许 Go 源码里有中文字面量）",
+  "tags": [
+    { "id": "tag-a", "name": "产品设计", "colorKey": "blue" },
+    { "id": "tag-b", "name": "待读", "colorKey": "amber" },
+    { "id": "tag-c", "name": "灵感", "colorKey": "pink" }
+  ],
+  "title": "条目 %d",
+  "longTitle": "一条标题很长很长、需要折成两行才能放下的知识条目 %d：关于本地优先的个人知识库的设计取舍与实现笔记",
+  "snippet": "条目 %d 的摘要……"
+}
