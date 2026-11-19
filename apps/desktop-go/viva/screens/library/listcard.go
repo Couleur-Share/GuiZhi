@@ -114,7 +114,8 @@ func (s *Screen) entryCard(c ui.C, v ListView, e services.LibraryEntry, query st
 		ui.Column(c.Key("text")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
 			// block text-sm font-medium leading-snug line-clamp-2：渲染层的 line-clamp-2 不生效（Tailwind 3.4 里 display 工具类排在
 			// line-clamp 之后，`block` 把 `-webkit-box` 盖掉了），长标题整段折行、卡片随之变高，这里照渲染出来的样子不截断。
-			l.TextPx(c.Key("title"), title, l.Rem(0.875), l.Rem(0.875)*1.375, kit.WeightMedium, fg, kit.Wrapped())
+			// 500 档字重按渲染层不做字偶距的宽度折行（kit.TextNoKern，台账 A-026 / B-044）。
+			l.TextNoKern(c.Key("title"), title, l.Rem(0.875), l.Rem(0.875)*1.375, kit.WeightMedium, fg, kit.NoKernOptions{})
 			if query != "" && e.Snippet != "" {
 				snippet := t.MutedForeground
 				if selected {

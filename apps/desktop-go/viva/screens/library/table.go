@@ -43,8 +43,6 @@ type tableState struct {
 	checkHover string
 	// firstRow 是本页第一行的 ID：它的上线是表头的下边框，由表头画。
 	firstRow string
-	// titleWrapped 记下哪些行的标题折成了多行：悬停的下划线只画单行文字（kit.Underline），折行的不画。
-	titleWrapped map[string]bool
 	// reveal 是「选中行滚进视口」的状态（tablereveal.go）。
 	reveal tableReveal
 }

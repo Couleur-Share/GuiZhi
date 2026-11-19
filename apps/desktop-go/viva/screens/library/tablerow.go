@@ -211,19 +211,11 @@ func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title string) {
 	hovered := box.State().Hovered
 	p := l.HoverProgress(bc, id, 0, hovered, kit.DurationDefault)
 	color := kit.MixToken(t.Primary, t.Primary.WithAlpha(0.8), p)
-	line := l.Rem(1.25)
-	box.Draw(func(d *ui.DrawContext) {
-		// 折成多行的标题不画下划线（kit.Underline 只管单行），记下来供下一帧判断。
-		wrapped := d.Rect.Height > line*1.5
-		if s.table.titleWrapped == nil {
-			s.table.titleWrapped = map[string]bool{}
-		}
-		if s.table.titleWrapped[e.ID] != wrapped {
-			s.table.titleWrapped[e.ID] = wrapped
-			d.Canvas.RequestFrame()
-		}
-	}).Children(func() {
-		l.Text(bc.Key("text"), title, kit.TextSM, kit.WeightMedium, color, kit.LineClamp(2), kit.Underline(hovered && !s.table.titleWrapped[e.ID]))
+	box.Children(func() {
+		// 500 档字重：Chromium 不做字偶距、Viva 做，钮宽（= 文字宽）与折行点按渲染层的宽度自己排（台账 A-026 / B-044）；
+		// line-clamp-2 至多两行，悬停的下划线每一行各画一条。
+		l.TextNoKern(bc.Key("text"), title, l.Rem(kit.TextSM.Size), l.Rem(kit.TextSM.Line), kit.WeightMedium, color,
+			kit.NoKernOptions{MaxLines: 2, Underline: hovered})
 	})
 	if box.Clicked() {
 		s.Store.SelectItem(e.ID)
@@ -313,13 +305,29 @@ func (s *Screen) statusChip(c ui.C, status string) {
 	case "archived":
 		label = locales.LibraryStatusArchived()
 	}
-	ui.Row(c.Key("status")).Shrink(0).Items(ui.Center).
+	// 渲染层的标签是 td（继承 table 的 text-sm）里的 inline-flex：与单元格的文字支柱按基线对齐，比居中低一截（kit.InlineBoxDrop），
+	// 居中的盒按外边距盒居中，所以上外边距取两倍。
+	ui.Row(c.Key("status")).Shrink(0).Items(ui.Center).MarginTop(2*s.statusChipDrop(size)).
 		PadSides(l.Space(0.5)+1, l.Space(1.5)+1, l.Space(0.5)+1, l.Space(1.5)+1).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.4), Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.25)})
 		}).Children(func() {
 		l.TextPx(c.Key("label"), label, size, size, kit.WeightNormal, t.MutedForeground)
 	})
+}
+
+// statusChipDrop 是状态标签比单元格居中低多少（逻辑像素，kit.InlineBoxDrop）：支柱是表格的 text-sm（0.875rem / 1.25rem），
+// 标签 leading-none（行高 = 字号），上内边距 = py-0.5 + 1px 边框，盒高 = 行高 + 两倍上内边距，基线离顶 = 上内边距 + 文字的基线行。
+// 小 / 中 / 大字号档是 1.125 / 2 / 2.75 px（渲染层实测，kit.TestInlineBoxDrop）。
+func (s *Screen) statusChipDrop(size float32) float32 {
+	l := s.Look
+	scale := l.Scale
+	if scale <= 0 {
+		scale = 1
+	}
+	pad := l.Space(0.5) + 1
+	base := float32(kit.ChromeBaselineRow(kit.WeightNormal, float64(size*scale), float64(size*scale))) / scale
+	return kit.InlineBoxDrop(kit.WeightNormal, l.Rem(0.875), l.Rem(1.25), size+2*pad, pad+base, scale)
 }
 
 // dateText 是时间格：text-xs text-muted-foreground，里面一个带 title 的 span，悬停出完整的日期时间。
@@ -354,8 +362,15 @@ func (s *Screen) actionsCell(c ui.C, v View, geo stickyGeometry, col tableColumn
 	if last && geo.right <= geo.overflow {
 		br = inner
 	}
+	// 按钮在单元格内容区里垂直居中：border-collapse 下内容区上沿让出 0.5px 的半条上边框、下沿让出半条下边框（最后一行没有下边框），
+	// 与行里别的单元格同一口径（tableRow 的 PadSides）。绝对定位的这一格自己补上，否则最后一行的按钮比渲染层高 0.25px，
+	// 半像素处落笔取整差一行（M2-2 的 T2：table-page2 小字号档，台账 B-046）。底色仍铺满整行。
+	bottomHalf := float32(0.5)
+	if last {
+		bottomHalf = 0
+	}
 	ui.Row(c.Key("actions")).Absolute().Top(0).Bottom(0).Right(geo.right).Width(width).Items(ui.Center).Justify(ui.Center).
-		Gap(l.Space(0.5)).
+		PadSides(0.5, 0, bottomHalf, 0).Gap(l.Space(0.5)).
 		Draw(func(d *ui.DrawContext) {
 			rect := stickyRect(d.Rect, geo)
 			kit.PaintRoundedCorners(d, rect, t.Card, 0, 0, br, 0)

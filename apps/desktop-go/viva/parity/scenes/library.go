@@ -274,21 +274,25 @@ var smallWordmarkIconWaivers = wordmarkIconWaivers()
 
 func wordmarkIconWaivers() []parity.Waiver {
 	rows := []struct {
-		size, name string  // 图标边长（逻辑像素）与图标
+		size, name string  // 图标边长（逻辑像素，照报告里 fmtBox 的两位小数写法）与图标
 		lo, hi     float64 // 墨迹总量比 −1 的实测范围（Viva 偏多）
 	}{
-		{"16", "小红书", 0.32, 0.36},
-		{"14", "小红书", 0.33, 0.37},
-		{"14", "哔哩哔哩", 0.18, 0.20},
-		{"18", "小红书", 0.35, 0.39},
-		{"18", "哔哩哔哩", 0.15, 0.21},
+		{"16.00", "小红书", 0.32, 0.36},
+		{"14.00", "小红书", 0.33, 0.37},
+		{"14.00", "哔哩哔哩", 0.18, 0.20},
+		{"18.00", "小红书", 0.35, 0.39},
+		{"18.00", "哔哩哔哩", 0.15, 0.21},
+		// 知识库表格的来源列用 h-3.5 w-3.5（0.875rem）的图标：小、大字号档是 12.25、15.75px（中档 14px 就是上面的 14）。
+		// T2 的 13 个表格场景实测：12.25px 的 96 处在 0.3841–0.3856，15.75px 的 84 处在 0.3784–0.3789（B-046）。
+		{"12.25", "小红书", 0.38, 0.39},
+		{"15.75", "小红书", 0.37, 0.38},
 	}
 	out := make([]parity.Waiver, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, parity.Waiver{
-			Ledger: "A-003", Layer: parity.LayerL2, Kind: "ink-mass", Subject: " " + r.size + ".00 " + r.size + ".00]",
+			Ledger: "A-003", Layer: parity.LayerL2, Kind: "ink-mass", Subject: " " + r.size + " " + r.size + "]",
 			Dir: 1, MinDelta: r.lo, MaxDelta: r.hi,
-			Note: r.size + "px 细笔画品牌图标（" + r.name + "）：细笔画在 Skia 里偏淡，Viva 按精确面积覆盖，墨迹总量偏多",
+			Note: strings.TrimSuffix(r.size, ".00") + "px 细笔画品牌图标（" + r.name + "）：细笔画在 Skia 里偏淡，Viva 按精确面积覆盖，墨迹总量偏多",
 		})
 	}
 	return out

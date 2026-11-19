@@ -235,10 +235,10 @@ const (
 // Chromium 对这两档字重不做字偶距（font-kerning:auto 与 none 的宽度逐位相同，取证见台账 A-026），与 400、700 字重（A-014）相反：
 // 那两档 Chromium 做、Viva 不做。逐字符的字宽两边一致，差的只是字偶对的总和。
 //
-// 后果有三种：整行偏窄（text-width，实测最大 5.4px，是「YouTube: The Future of Local-First Software」）；
-// 同一行里拉丁字母之后的汉字整体左移（ink，≤ 4px）；整行宽度恰在折行边界上时 Viva 比渲染层多放下一个词
-// （「Designing Data-Intensive Applications」249.08px，卡片标题盒 248.x px：渲染层放不下「Applications」折到第二行，
-// Viva 放得下），第二行的宽度差是一个词的宽度。行数与卡片高度两边一致（都是两行），位置不受影响。
+// 后果：整行偏窄（text-width，实测最大 5.4px，是「YouTube: The Future of Local-First Software」）；
+// 同一行里拉丁字母之后的汉字整体左移（ink，≤ 4px）。这里只登记这两种字形层面的差：
+// 标题的占位与折行（钮宽、折行点、行数）早已改按渲染层不做字偶距的宽度自己排（kit.TextNoKern，台账 B-044），
+// 不再有「整行宽度恰在折行边界上、Viva 多放下一个词 / 一个汉字」的翻转，对应的放过项随之删除（2026-11-19）。
 // 各档按「应有的大小」框住：字号档放大时字偶距按字号放大（15.75px 时约 1.125 倍）。
 func semiboldKerningWaivers() []parity.Waiver {
 	fix, err := parity.LoadLibraryFixture()
@@ -265,40 +265,13 @@ func semiboldKerningWaivers() []parity.Waiver {
 				Note: "同上：整行宽度差累积成墨迹剖面的最佳对齐位移（只管横向，纵向错位照常判定）",
 			})
 	}
-	return append(out,
-		parity.Waiver{
-			Ledger: "A-026", Layer: parity.LayerL2, Kind: "text-width", Subject: "Designing Data-Intensive Applications", MaxDelta: semiboldWrapCap,
-			Note: "字偶距使整行宽度恰落在折行边界之内：Viva 比渲染层多放下一个词（Applications），第二行宽度差是这个词的宽度",
-		},
-		// 同一原因的另一种形态：拉丁字母夹在汉字中间时，折行点差一个汉字（只出在大字号档，18px 根字号下 15.75px 一个字）。
-		// 第二行少一个字：宽度差正好是一个字宽，墨迹总量少一半上下（一行只剩一两个字）。
-		parity.Waiver{
-			Ledger: "A-026", Layer: parity.LayerL2, Kind: "text-width", Subject: "SQLite WAL", MinDelta: 5, MaxDelta: semiboldFlipCap,
-			Note: "字偶距使整行宽度恰落在折行边界之内：Viva 第一行多放下一个汉字，第二行少一个字，宽度差是一个字宽",
-		},
-		parity.Waiver{
-			Ledger: "A-026", Layer: parity.LayerL2, Kind: "ink-mass", Subject: "SQLite WAL", Dir: -1, MinDelta: 0.3, MaxDelta: 0.7,
-			Note: "同上：第二行只剩一个字，墨迹总量比渲染层的两个字少（Viva / React 约 0.46）",
-		})
+	return out
 }
 
 const (
-	semiboldWidthCap float64 = 7   // 字偶对之和的上限：实测最大 5.4px（14px），字号档放大后约 6.1px
-	semiboldInkCap   float64 = 5   // 墨迹剖面最佳位移的上限：实测最大 4px
-	semiboldWrapCap  float64 = 120 // 折行边界上多放下一个词（Applications）：16px 档约 84px，大字号档约 95px
-	semiboldFlipCap  float64 = 16  // 折行边界上多放下一个汉字：大字号档一个字 15.75px
+	semiboldWidthCap float64 = 7 // 字偶对之和的上限：实测最大 5.4px（14px），字号档放大后约 6.1px
+	semiboldInkCap   float64 = 5 // 墨迹剖面最佳位移的上限：实测最大 4px
 )
-
-// searchClearIconWaiver 登记 B-042：搜索框右端的清除钮（0.875rem 的 X，小字号档下盒子是 12.25px，纵向落在 14.375）。
-// Chromium 把 SVG 的盒子按上下两边各自取整（14.375→14、26.625→27，实际画在 13px 高的盒子里，中心 20.5），
-// 套件的图标落笔只取整原点、边长保持 12.25（中心 20.125）：墨迹比渲染层高 1 个像素（实测包围盒 y 17..24 对 16..23）。
-// 版面盒子两边一致（差 0.02px 以内），问题只在绘制；修复要改套件的图标落笔并回归全家族，排在 M4。
-func searchClearIconWaiver() parity.Waiver {
-	return parity.Waiver{
-		Ledger: "B-042", Layer: parity.LayerL2, Kind: "ink", Subject: "[715.27 14.38 12.25 12.25]", MaxDelta: 1, MaxDY: 1,
-		Note: "套件的图标落笔只取整原点，Chromium 按盒子两边各自取整：小字号档的搜索清除钮墨迹高 1 像素",
-	}
-}
 
 // hasLatinLetter 报告 s 里有没有 ASCII 字母。
 func hasLatinLetter(s string) bool {
@@ -324,7 +297,7 @@ func init() {
 	reg("app.window.library.list-loading", libraryOptions{variant: "data", list: true, fault: faultHold}, listWaitSpinner, parkAll)
 	reg("app.window.library.list-error", libraryOptions{variant: "data", list: true, fault: faultFail}, nil, parkAll)
 	// 搜索中排序按钮禁用（disabled:opacity-50），「相关度」是整组带透明度的文字（A-009 的延伸）。
-	reg("app.window.library.list-search-empty", list, listSearch("没有任何条目含有这个词"), parkAll, opacityInkWaiver("「相关度」"), searchClearIconWaiver())
+	reg("app.window.library.list-search-empty", list, listSearch("没有任何条目含有这个词"), parkAll, opacityInkWaiver("「相关度」"))
 	reg("app.window.library.list-sort-menu", list, listClickSort, parkKeepFocus, append([]parity.Waiver{overlayInkWaiver}, cards...)...)
 	reg("app.window.library.list-sort-title", list, listChain(listClickSort, listPickMenuItem("标题 A→Z")), parkAll, cards...)
 	reg("app.window.library.list-trash", list, listApplyFacets("回收站"), parkAll, cards...)
