@@ -124,13 +124,6 @@ func (l *Look) TextPx(c ui.C, s string, size, line, weight float32, color tokens
 
 // paintUnderline 画 Underline 的那条线：外层盒子就是渲染层的行盒，线的位置按渲染层的基线模型（ChromeBaselineRow）算。
 func (l *Look) paintUnderline(d *ui.DrawContext, s string, size, line, weight float32, color tokens.Color, align textAlign) {
-	scale := l.Scale
-	if scale <= 0 {
-		scale = 1
-	}
-	sizeDev, lineDev := float64(size)*float64(scale), float64(line)*float64(scale)
-	top := math.Floor(float64(d.Rect.Y)*float64(scale) + 0.5) // 行盒顶对设备像素四舍五入
-	row := top + float64(ChromeBaselineRow(weight, sizeDev, lineDev)) + 1
 	width := min(d.Canvas.TextWidthWeight(s, size, weight), d.Rect.Width)
 	x := d.Rect.X
 	switch align {
@@ -139,6 +132,19 @@ func (l *Look) paintUnderline(d *ui.DrawContext, s string, size, line, weight fl
 	case alignEnd:
 		x += d.Rect.Width - width
 	}
+	l.fillUnderline(d, d.Rect.Y, x, width, size, line, weight, color)
+}
+
+// fillUnderline 在行盒顶为 lineTop 的那一行文字下画线：1 个设备像素厚，在 round(行盒顶) + 基线行 + 1 这一行，
+// 横向从 x 起、宽 width。单行（paintUnderline）与逐行（TextNoKern 的每一行）共用这套几何。
+func (l *Look) fillUnderline(d *ui.DrawContext, lineTop, x, width, size, line, weight float32, color tokens.Color) {
+	scale := l.Scale
+	if scale <= 0 {
+		scale = 1
+	}
+	sizeDev, lineDev := float64(size)*float64(scale), float64(line)*float64(scale)
+	top := math.Floor(float64(lineTop)*float64(scale) + 0.5) // 行盒顶对设备像素四舍五入
+	row := top + float64(ChromeBaselineRow(weight, sizeDev, lineDev)) + 1
 	d.Canvas.Fill(gfx.Rect{X: x, Y: float32(row / float64(scale)), Width: width, Height: 1 / scale}, d.Fade(l.Col(color)))
 }
 

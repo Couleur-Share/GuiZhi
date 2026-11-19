@@ -63,6 +63,9 @@ type Look struct {
 
 	// reach 是各滚动区的 Tab 停靠点登记（B-030，见 reach.go）：控件声明时写入，窗口的 OnKey 经 TabKey 读取。
 	reach reachSet
+
+	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
+	advances noKernCache
 }
 
 // IconDraw 是 IconSink 收到的一次图标绘制：外框（窗口坐标），以及它是否画在浮层层级里（对话框、下拉面板、提示）。

@@ -3,6 +3,7 @@ package kit
 import (
 	"encoding/json"
 	"image"
+	"math"
 	"os"
 	"testing"
 
@@ -163,6 +164,38 @@ func TestStrutTextTop(t *testing.T) {
 		if got := StrutTextTop(c.root, c.span, c.line, c.weight); got != c.want {
 			t.Errorf("%s：StrutTextTop = %v，期望 %v", c.name, got, c.want)
 		}
+	}
+}
+
+// TestInlineBoxDrop 钉住「td（text-sm 支柱）里放 inline-flex 状态标签」时，标签比居中低多少。
+// 期望值是 2026-11-19 在 app.window.library.table-columns 的 React 参照里量到的：标签外框顶对单元格居中位置的差
+// （小档 行 [153.25 39.5]、标签 [166.375 15.5]，居中 165.25 → 1.125；中档 行 [174.5 45]、标签 [191 16] → 2；大档 行 [195.75 50.5]、标签 [215.5 16.5] → 2.75）。
+// 标签：text-[10px] leading-none（10px 行高）、px-1.5 py-0.5、1px 边框，上内边距 = py + 1，盒高 = 10 + 2×上内边距，基线离顶 = 上内边距 + 8。
+func TestInlineBoxDrop(t *testing.T) {
+	cases := []struct {
+		name              string
+		strutSize, strutL float32
+		pad               float32 // 标签的上内边距（py-0.5 + 1px 边框）
+		want              float32
+	}{
+		{"小字号档 text-sm 12.25/17.5", 12.25, 17.5, 1.75 + 1, 1.125},
+		{"中字号档 text-sm 14/20", 14, 20, 2 + 1, 2},
+		{"大字号档 text-sm 15.75/22.5", 15.75, 22.5, 2.25 + 1, 2.75},
+	}
+	for _, c := range cases {
+		base := float32(ChromeBaselineRow(WeightNormal, 10, 10)) // 8
+		h, b := 10+2*c.pad, c.pad+base
+		if got := InlineBoxDrop(WeightNormal, c.strutSize, c.strutL, h, b, 1); math.Abs(float64(got-c.want)) > 1e-6 {
+			t.Errorf("%s：InlineBoxDrop = %v，期望 %v", c.name, got, c.want)
+		}
+	}
+	// 行内盒与支柱是同一个行盒（高 20、基线离顶 15，就是 14px/20 常规字的行盒）：居中就是渲染层的位置，不能凭空多出偏移。
+	if got := InlineBoxDrop(WeightNormal, 14, 20, 20, 15, 1); got != 0 {
+		t.Errorf("与支柱重合的行内盒应没有偏移，得 %v", got)
+	}
+	// 缩放 2：同一个盒子按设备像素取整支柱的 ascent/descent，结果仍以逻辑像素给出（12.25px 的支柱在 2x 下 A=25、D=6，行高 35 设备像素）。
+	if got := InlineBoxDrop(WeightNormal, 12.25, 17.5, 15.5, 10.75, 2); math.Abs(float64(got-1.125)) > 0.51 {
+		t.Errorf("缩放 2 的偏移 %v 离缩放 1 的 1.125 超过半个逻辑像素", got)
 	}
 }
 

@@ -161,6 +161,32 @@ func InlineFlexExtra(weight float32, size, line, icon, scale float32) float32 {
 	return max(0, b-sb)
 }
 
+// InlineBoxDrop 是「块容器里放一个行内盒（inline-flex、inline-block），容器把内容垂直居中」时，行内盒的上沿比「居中放置」低多少，
+// 单位逻辑像素。典型场景是表格单元格（td align-middle，里面一个 inline-flex 的状态标签）。
+//
+// 渲染层里，单元格的内容是一个匿名行盒：容器继承来的字体与行高（支柱 strut）和行内盒按基线对齐，行盒由两者中较高的上沿、
+// 较深的下沿撑起，整个行盒再在单元格里居中。设行内盒高 h、基线离顶 b（inline-flex 取第一项文字的基线：上内边距 + 文字的
+// ChromeBaselineRow），支柱基线之上 As（ChromeBaselineRow）、之下 Ds（行高 − As），则
+//
+//	A = max(As, b)，H = A + max(Ds, h − b)    // 行盒的基线之上与总高
+//	行内盒顶 = 行盒顶 + (A − b)，行盒顶 = 居中位置 + (C − H)/2，居中位置的盒顶 = (C − h)/2
+//	Δ = (A − b) − (H − h)/2                  // 与单元格内容区高 C 无关
+//
+// 2026-11-19 在知识库表格的状态标签（td 继承 table 的 text-sm，标签 text-[10px] leading-none px-1.5 py-0.5 加 1px 边框）上与渲染层实测吻合：
+// 小 / 中 / 大字号档的 Δ 是 1.125 / 2 / 2.75 px。调用方把标签放进居中的盒里时，用 MarginTop(2Δ) 把它压下去（居中的盒按外边距盒居中，位移是外边距的一半）。
+// strutWeight、strutSize、strutLine 是支柱的字重、字号与行高；boxHeight、boxBaseline 是行内盒的高与基线（逻辑像素）。
+func InlineBoxDrop(strutWeight float32, strutSize, strutLine, boxHeight, boxBaseline, scale float32) float32 {
+	if scale <= 0 {
+		scale = 1
+	}
+	as := float64(ChromeBaselineRow(strutWeight, float64(strutSize)*float64(scale), float64(strutLine)*float64(scale))) / float64(scale)
+	ds := float64(strutLine) - as
+	h, b := float64(boxHeight), float64(boxBaseline)
+	ascent := math.Max(as, b)
+	height := ascent + math.Max(ds, h-b)
+	return float32((ascent - b) - (height-h)/2)
+}
+
 // BaselineShift 返回把 Viva 的文字基线移到渲染层基线所需的平移，单位逻辑像素（设备像素差除以缩放）。
 // 正值向下。size、line 是逻辑像素，scale 是设备像素与逻辑像素之比（缩放 100% 时为 1）。
 func BaselineShift(weight float32, size, line, scale float32) float32 {
