@@ -26,6 +26,13 @@ type rootFixture struct {
 	session *headless.Session
 	fake    *servicestest.Settings
 	redraws atomic.Int32 // 设置被别处改动后请求重绘的次数
+
+	hoverPosts [][2]float32 // 滚轮之后请求的指针移动（Options.HoverRefresh 的记录器；测试不碰系统消息）
+}
+
+// recordHover 是无头测试里的 Options.HoverRefresh：只记录，不发系统消息。
+func (f *rootFixture) recordHover(x, y float32) {
+	f.hoverPosts = append(f.hoverPosts, [2]float32{x, y})
 }
 
 // openRoot 在 1280×800、缩放 1 的无头会话里打开 Root，默认直接进设置页。
@@ -44,6 +51,7 @@ func openRootSize(t *testing.T, width, height int, mutate func(*Options)) *rootF
 		// 结果不随运行机器的系统「减少动态效果」变化；默认关闭动效，让画面总在终态（动画时钟只在无头会话里手动推进）。
 		OSReduceMotion: func() bool { return false },
 		Appearance:     func(s kit.Spec) kit.Spec { s.Motion = kit.MotionLevelOff; return s },
+		HoverRefresh:   f.recordHover,
 	}
 	if mutate != nil {
 		mutate(&opts)
@@ -52,7 +60,9 @@ func openRootSize(t *testing.T, width, height int, mutate func(*Options)) *rootF
 	t.Cleanup(f.root.Close)
 	page := ui.NewPage(ui.PageConfig{View: f.root.View, Theme: f.root.ThemeRef(), Background: f.root.BackgroundRef()})
 	var canvas gfx.Canvas
-	session, err := headless.Open(page.Config(vapp.Config{Title: "test", Width: width, Height: height, OnKey: f.root.OnKey}), &canvas, headless.Options{Scale: 1})
+	config := page.Config(vapp.Config{Title: "test", Width: width, Height: height})
+	bindInput(&config, f.root) // 与 Run 同一处接线：OnKey（Tab 可达、提示收起）与 OnScroll（滚轮之后的悬停刷新）
+	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)
 	}

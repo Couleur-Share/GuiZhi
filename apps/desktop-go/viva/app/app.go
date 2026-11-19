@@ -58,6 +58,9 @@ type Options struct {
 	OSReduceMotion func() bool
 	// Shell 是外壳接线（关闭策略、托盘、界面命令；见 shell.go）：nil 表示没有（截图、对照与无头测试：关窗口就是关闭）。
 	Shell Shell
+	// HoverRefresh 在滚轮滚动了内容之后被调用，请求窗口在 (x, y)（逻辑像素、窗口坐标）补一次指针移动，让悬停跟上（台账 B-031）。
+	// 空表示用系统实现（Windows 上向主窗口 PostMessage(WM_MOUSEMOVE)，hover_windows.go）；无头测试注入记录器，不碰系统消息。
+	HoverRefresh func(x, y float32)
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -92,8 +95,8 @@ func Run(opts Options) error {
 			TitlebarHeight: look.Rem(3),
 			WindowControls: func() vapp.WindowControlsStyle { return shell.ControlsStyle(root.Look()) },
 			ClearColor:     clearColor(look.Col(look.T.Background)),
-			OnKey:          root.OnKey, // Tab 可达：下一个停靠点在滚动区视野之外时先滚进视野（台账 B-030，kit/reach.go）
 		})
+		bindInput(&config, root)
 		// 外壳任务在 OnWake 里排空：窗口隐藏（收在托盘）时 Viva 仍会在重绘之前调用它，托盘的创建与销毁不会卡在隐藏的窗口里。
 		prevWake := config.OnWake
 		config.OnWake = func() {
@@ -115,6 +118,15 @@ func Run(opts Options) error {
 		}
 		return nil
 	})
+}
+
+// bindInput 把 Root 的窗口级输入钩子接到窗口配置上（page.Config 之后调用）。Run 与无头测试共用这一处接线，
+// 测试走的就是生产的接线：
+//   - OnKey：Tab 可达（下一个停靠点在滚动区视野之外时先滚进视野，台账 B-030，kit/reach.go）与悬停提示的收起（B-017）；
+//   - OnScroll：滚轮滚动了内容之后补一次指针移动，让悬停跟上（台账 B-031，kit/wheel.go）。
+func bindInput(config *vapp.Config, root *Root) {
+	config.OnKey = root.OnKey
+	config.OnScroll = root.OnScroll(config.OnScroll)
 }
 
 // clearColor 把 gfx 颜色换成窗口配置用的颜色类型。

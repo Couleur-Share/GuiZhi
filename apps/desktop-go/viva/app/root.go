@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -51,6 +52,8 @@ type Root struct {
 
 	systemDark atomic.Bool // 系统当前是否深色（由系统外观监听更新）
 	ready      sync.Once
+
+	hoverWarned atomic.Bool // 悬停刷新找不到窗口的日志只记一次（OnScroll）
 
 	shellState // 外壳接线：跨线程任务、关闭对话框、网页岛（root_shell.go）
 }
@@ -212,6 +215,28 @@ func (r *Root) OnKey(e gfx.KeyEvent) gfx.EventResult {
 		return gfx.EventResult{}
 	}
 	return r.look.OnKey(e)
+}
+
+// errHoverRefreshNoWindow 是补发悬停刷新时找不到本进程 Viva 窗口的诊断信息：只写日志，不给用户看
+// （所以走 errors.New，符合「诊断信息用中文、界面文案进 i18n」的约定，见 nocjk_test.go）。
+var errHoverRefreshNoWindow = errors.New("没有找到 Viva 主窗口，滚轮滚动之后悬停不会自动刷新（台账 B-031）")
+
+// OnScroll 包住页面的滚轮处理：滚轮滚动了内容之后，请求窗口在原位补一次指针移动，让悬停跟上（台账 B-031，见 kit.RefreshHoverAfterWheel）。
+// 窗口线程调用。补发的通道是 Options.HoverRefresh，空时用系统实现；系统实现找不到窗口（Viva 升级后窗口类名变了之类）
+// 时悬停会停在滚走的元素上，所以记一条日志（只记一次），不让它悄悄失效。
+func (r *Root) OnScroll(next func(gfx.ScrollEvent) gfx.EventResult) func(gfx.ScrollEvent) gfx.EventResult {
+	post := r.opts.HoverRefresh
+	if post == nil {
+		post = func(x, y float32) {
+			if postHoverRefresh(x, y) || !r.hoverWarned.CompareAndSwap(false, true) {
+				return
+			}
+			if log := r.opts.Services.Log; log != nil {
+				log.AppError("native", "hover-refresh", errHoverRefreshNoWindow.Error())
+			}
+		}
+	}
+	return kit.RefreshHoverAfterWheel(next, post)
 }
 
 // View 声明整个窗口内容。
