@@ -114,14 +114,23 @@ func TestNoKernClampEndsWithEllipsis(t *testing.T) {
 	}
 }
 
-// 首尾空白去掉、连续空白折成一个空格（white-space: normal），换行与制表符当空格。
+// 首尾空白去掉、连续空白折成一个空格（white-space: normal），换行、回车与制表符当空格；
+// 不换行空格、全角空格、各种宽度的空格、换页不折叠（Chromium 实测，见 isCollapsibleSpace）。
 func TestCollapseSpaces(t *testing.T) {
 	for in, want := range map[string]string{
-		"  a  b\t\nc  ": "a b c",
-		"":              "",
-		"   ":           "",
-		"一  二":          "一 二",
-		"x":             "x",
+		"  a  b\t\nc  ":   "a b c",
+		"a \r\n b":        "a b",
+		"":                "",
+		"   ":             "",
+		"一  二":            "一 二",
+		"x":               "x",
+		"第一章\u3000总则":     "第一章\u3000总则",
+		"A\u00a0\u00a0B":  "A\u00a0\u00a0B",
+		"a\u2003b\u2009c": "a\u2003b\u2009c",
+		"a\fb":            "a\fb",
+		" \u3000 a":       "\u3000 a",
+		"a\u3000 \u3000b": "a\u3000 \u3000b",
+		"a \u00a0 b":      "a \u00a0 b",
 	} {
 		if got := collapseSpaces(in); got != want {
 			t.Errorf("collapseSpaces(%q) = %q，期望 %q", in, got, want)

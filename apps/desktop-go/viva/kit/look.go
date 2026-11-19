@@ -73,6 +73,8 @@ type Look struct {
 
 	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
 	advances noKernCache
+	// markShapes 是命中词底色的圆角矩形（按尺寸与圆角缓存，见 marktext.go 的 markShape）。
+	markShapes map[markShapeKey]gfx.Icon
 }
 
 // IconDraw 是 IconSink 收到的一次图标绘制：外框（窗口坐标），以及它是否画在浮层层级里（对话框、下拉面板、提示）。

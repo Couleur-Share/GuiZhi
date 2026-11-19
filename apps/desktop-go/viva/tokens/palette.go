@@ -43,6 +43,7 @@ var tailwindPalette = map[string]string{
 	"amber-500":   "#f59e0b",
 	"amber-600":   "#d97706",
 	"amber-900":   "#78350f",
+	"amber-950":   "#451a03", // 搜索命中词（mark）的字色：highlight-text.tsx 的 text-amber-950
 	"emerald-500": "#10b981",
 	// 标签色点（type-meta.tsx 的 TAG_DOT_CLASSES）：十个颜色里除上面已有的 red / amber / green / blue 的 500 档之外的六个。
 	"orange-500": "#f97316",

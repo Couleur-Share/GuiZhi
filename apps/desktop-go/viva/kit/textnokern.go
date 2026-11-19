@@ -2,7 +2,6 @@ package kit
 
 import (
 	"strings"
-	"unicode"
 
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -55,6 +54,8 @@ type noKernCache struct {
 	generation uint32
 	advance    map[advanceKey]float32
 	lines      map[noKernKey][]string
+	marked     map[markKey]*markResult // 带命中词高亮的文字（marktext.go）的排版结果
+	models     map[modelKey]*markModel // 同上：（原文，命中词）→ 命中模型，没有命中为 nil
 }
 
 // noKern 返回当前字体代的缓存；字体换代后先清空。
@@ -62,6 +63,8 @@ func (l *Look) noKern(canvas *gfx.Canvas) *noKernCache {
 	cache := &l.advances
 	if generation := canvas.FontGeneration(); cache.advance == nil || cache.generation != generation {
 		cache.advance, cache.lines, cache.generation = make(map[advanceKey]float32, 256), make(map[noKernKey][]string, 64), generation
+		cache.marked = make(map[markKey]*markResult, 16)
+		cache.models = make(map[modelKey]*markModel, 16)
 	}
 	return cache
 }
@@ -87,12 +90,18 @@ func (l *Look) NoKernWidth(canvas *gfx.Canvas, s string, size, weight float32) f
 	return w
 }
 
-// collapseSpaces 按 CSS 的 white-space: normal 折叠空白：连续的空格、制表符、换行变成一个空格，首尾的空白去掉。
+// isCollapsibleSpace 报告 r 在 white-space: normal 下会不会被折叠。Chromium 实测（scripts/parity/tools/probe-collapse.mjs，
+// 14px、「a」「b」之间放一个或两个同样的字符）只有空格、制表符、换行、回车折成一个空格；不换行空格 U+00A0、全角空格 U+3000、
+// 各种宽度的空格（U+2000 起）、换页、竖制表符、U+0085、行分隔符与段分隔符都原样保留（各占各自的宽度）。
+// 所以不能用 unicode.IsSpace：它把后面这些也算空白，全角空格会被折成窄得多的半角空格。
+func isCollapsibleSpace(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }
+
+// collapseSpaces 按 CSS 的 white-space: normal 折叠空白：连续的空格、制表符、换行、回车变成一个空格，首尾的空白去掉。
 func collapseSpaces(s string) string {
 	var b strings.Builder
 	space := false
 	for _, r := range s {
-		if unicode.IsSpace(r) {
+		if isCollapsibleSpace(r) {
 			space = true
 			continue
 		}
