@@ -153,6 +153,7 @@ func (a *reachArea) reveal(r gfx.Rect, scale float32) (to float32, moved bool) {
 func (l *Look) settleReach(d *ui.DrawContext, a *reachArea) {
 	if off := a.state.Offset; a.seen && math.Abs(float64(off-a.last)) > 0.01 {
 		l.reach.scrolled = true
+		l.RequestHoverRefresh() // 偏移变了（键盘、Tab、程序化滚动都算）：指针底下可能换了元素，补一次指针移动（B-037）
 	}
 	a.seen, a.last = true, a.state.Offset
 	if a.windowed {

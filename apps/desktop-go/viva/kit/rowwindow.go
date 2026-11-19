@@ -76,6 +76,9 @@ type RowWindow struct {
 
 	first, last int // 本帧声明的行区间 [first, last)
 
+	// req 是待办的滚动请求（ScrollToIndex，rowscroll.go）。
+	req *scrollReq
+
 	// 最近一次 Rows 的参数，Reveal 据此换算第 i 行的位置。
 	n     int
 	gap   float32
@@ -148,6 +151,7 @@ func (w *RowWindow) Rows(c ui.C, spec RowsSpec) ui.Box {
 	}
 	w.converging, w.wasAtEnd = false, atEnd
 	w.align(spec)
+	w.scrollRequested(c, &spec)
 	first, last := w.visible(spec)
 	w.first, w.last = first, last
 	if w.draw == nil {
@@ -257,6 +261,8 @@ func (w *RowWindow) measure(d *ui.DrawContext) {
 	}
 	if changed {
 		d.Canvas.RequestFrame()
+	} else if r := w.req; r != nil && r.applied {
+		w.req = nil // 行高稳定了：位置不会再变，滚动请求办完
 	}
 }
 
@@ -265,6 +271,7 @@ func (w *RowWindow) measure(d *ui.DrawContext) {
 func (w *RowWindow) fixedRows(c ui.C, spec RowsSpec) ui.Box {
 	spec.View.markWindowed()
 	w.converging, w.wasAtEnd = false, false // 变高模式留下的标志在定高模式下没有意义
+	w.scrollRequested(c, &spec)
 	first, last := w.fixedSpan(spec)
 	w.first, w.last = first, last
 	name := spec.Name
@@ -310,6 +317,9 @@ func (w *RowWindow) fixedSpan(spec RowsSpec) (first, last int) {
 // checkFixed 在绘制时核对本帧各行的实测高度是否等于 Fixed：不符是调用方违反了定高的约定（版面会错位），
 // 记下第一条，测试里用 Misfit 断言；运行时不为它多要一帧。
 func (w *RowWindow) checkFixed(*ui.DrawContext) {
+	if r := w.req; r != nil && r.applied {
+		w.req = nil // 定高：位置是算出来的，一次到位
+	}
 	w.misfit, w.misfitH = -1, 0
 	for _, r := range w.rows {
 		if h := r.box.Rect().Height; h > 0 && math.Abs(float64(h-w.fixed)) > 0.01 {

@@ -51,7 +51,8 @@ func openPage(t *testing.T, spec Spec, width, height int, view func(l *Look, c u
 	var canvas gfx.Canvas
 	h := &harness{t: t, look: look}
 	// OnKey 与窗口里一样接上 Tab 可达（reach.go），OnScroll 接上滚轮之后的悬停刷新（wheel.go）。
-	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height, OnKey: look.OnKey})
+	config := page.Config(app.Config{Title: t.Name(), Width: width, Height: height})
+	config.OnKey = KeyFirst(look.OnKey, config.OnKey) // 与窗口同一处接线（app.bindInput）
 	config.OnScroll = RefreshHoverAfterWheel(config.OnScroll, h.postHover)
 	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {

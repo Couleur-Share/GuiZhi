@@ -113,6 +113,29 @@ func sameY(a, b float32) bool { return math.Abs(float64(a-b)) <= 0.5 }
 //	7 在视野之外（224..256 − 114 = 110..142），居中该是偏移 185，夹在最大偏移 146，→ 224−146 = 78。
 var reachDown = [reachStops]float32{0, 32, 64, 78, 39, 71, 78, 78}
 
+// 滚动区的偏移变了（Tab 滚进视野、程序化滚动、键盘……，不止滚轮）：指针底下可能换了元素，请求补一次指针移动（台账 B-037）；
+// 偏移没变的帧不请求，也不会因为请求本身再引出请求。
+func TestAScrollOffsetChangeRequestsAHoverRefresh(t *testing.T) {
+	r := openReach(t, false)
+	posts := 0
+	r.look.HoverRefresh = func() { posts++ }
+	r.tabTo(3, false) // 0、1、2 完全看得见，不滚动
+	if posts != 0 {
+		t.Fatalf("没有滚动时不该请求悬停刷新，实际 %d 次", posts)
+	}
+	r.tabTo(1, false) // 3 露出一半：滚动
+	if posts == 0 {
+		t.Fatal("Tab 把停靠点滚进了视野，应当请求悬停刷新")
+	}
+	settled := posts
+	r.frames(5)
+	if posts != settled {
+		t.Fatalf("偏移没再变的帧不该再请求，%d → %d", settled, posts)
+	}
+	r.look.HoverRefresh = nil
+	r.tabTo(1, false) // 没有接线：不崩
+}
+
 func TestTabWalksEveryStopAndScrollsItIntoView(t *testing.T) {
 	r := openReach(t, false)
 	names, tops := r.tabTo(reachStops, false)

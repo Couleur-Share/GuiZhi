@@ -2,6 +2,19 @@ package kit
 
 import "github.com/vivaui/viva/gfx"
 
+// RequestHoverRefresh 请求窗口在指针此刻的位置补一次指针移动（台账 B-037）。
+//
+// 渲染层（Chromium）在任何让指针底下换成别的元素的变化之后——滚轮、键盘滚动、Tab 把控件滚进视野、列表换了内容——
+// 都会补发 pointerover / pointerenter 让悬停跟上（读数见 scripts/parity/tools/probe-list-keyboard.mjs 的 D1–D3：
+// 方向键滚动、翻页换内容、Tab 滚动之后，悬停行都与指针底下的行一致，补发的事件都是 trusted 的）。
+// Viva 只在指针事件里重算悬停：这里把「滚动区偏移变了」（settleReach）与「列表换了内容」两路都接到同一个请求上。
+// 没有接线（HoverRefresh 为空）时什么也不做。
+func (l *Look) RequestHoverRefresh() {
+	if l.HoverRefresh != nil {
+		l.HoverRefresh()
+	}
+}
+
 // RefreshHoverAfterWheel 包住窗口的 OnScroll：滚轮把内容滚动之后，请求窗口在原位补一次指针移动，让悬停跟上（台账 B-031）。
 //
 // 渲染层（Chromium）在滚动之后会立刻重算悬停：指针底下换成了别的元素，就在同一帧里补发 pointerout / pointerleave /

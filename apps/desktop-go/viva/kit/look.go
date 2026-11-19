@@ -64,6 +64,13 @@ type Look struct {
 	// reach 是各滚动区的 Tab 停靠点登记（B-030，见 reach.go）：控件声明时写入，窗口的 OnKey 经 TabKey 读取。
 	reach reachSet
 
+	// HoverRefresh 请求窗口在指针此刻的位置补一次指针移动，让悬停跟上（台账 B-037）：窗口接线时设置，nil 表示不补（对照与单测）。
+	// 窗口实现要自己判断指针在不在窗口里：不在就什么也不做。
+	HoverRefresh func()
+	// KeyHook 是界面的窗口级键盘（知识库列表的方向键、Home、End、空格，台账 B-045）：在 Look 自己的按键处理之后运行，
+	// 结果与它合并（MergeKey）。窗口接线时设置；nil 表示没有（对照用自己的接线，单测）。
+	KeyHook func(gfx.KeyEvent) gfx.EventResult
+
 	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
 	advances noKernCache
 }
