@@ -9,6 +9,7 @@ import (
 	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // Module 是 rail 上的一个模块入口（渲染层 AppModule）。
@@ -116,7 +117,12 @@ func (w *Window) railButton(c ui.C, it railItem) {
 	}
 }
 
-// railBadge 画图标盒右上角的数字角标（处理中心的待处理数、采集的进行中数；ring-2 ring-sidebar-background 描边）。
+// badgeRingColor 是角标的描边色。角标的类名是 ring-2 ring-sidebar-background，但 tailwind.config.js 的 sidebar 色
+// 没有 background 这一项，ring-sidebar-background 不生成样式，ring-2 用 Tailwind 的缺省环色 rgb(59 130 246 / 0.5)
+// （渲染层事实：角标的 box-shadow 是 rgba(59, 130, 246, 0.5) 0px 0px 0px 2px）。此前这里画成了 Sidebar 色。
+var badgeRingColor = tokens.RGBA(59, 130, 246, 0.5)
+
+// railBadge 画图标盒右上角的数字角标（处理中心的待处理数、采集的进行中数；ring-2 描边，缺省环色，见 badgeRingColor）。
 //
 // 渲染层另有一个采集忙碌时的琥珀色呼吸圆点，但它只在「没有角标」时出现，而采集的忙碌条件（进行中数 > 0）
 // 恰好就是它有角标的条件，所以那个圆点在现行源码里不会被渲染，这里不画（盘点见台账「渲染层不可达分支」）。
@@ -140,8 +146,11 @@ func (w *Window) railBadge(c ui.C, m Module) {
 		ui.Row(c).Absolute().Top(-l.Space(1)).Right(-l.Space(1)).Height(l.Rem(1)).MinWidth(l.Rem(1)).
 			Items(ui.Center).Justify(ui.Center).PadX(l.Space(1)).
 			Draw(func(d *ui.DrawContext) {
-				l.PaintRing(d, 2, t.Sidebar, l.Rem(1))
-				l.PaintSurface(d, kit.Surface{Bg: t.Foreground, Radius: l.Rem(1), Shadow: t.ShadowSm})
+				// box-shadow 列表是「ring-2、shadow-sm」：环在上、shadow-sm 在下，背景盖在两者之内；
+				// 环只出现在盒子外侧，所以用空心环（PaintRingBand），不会透出环色。
+				l.PaintSurface(d, kit.Surface{Radius: l.Rem(1), Shadow: t.ShadowSm})
+				l.PaintRingBand(d, 2, badgeRingColor, l.Rem(1))
+				l.PaintSurface(d, kit.Surface{Bg: t.Foreground, Radius: l.Rem(1)})
 			}).
 			Children(func() {
 				l.Text(c, text, kit.TextStyle{Size: 0.75, Line: 0.75}, kit.WeightSemibold, t.Background)

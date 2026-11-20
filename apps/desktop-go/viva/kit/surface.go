@@ -87,6 +87,27 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	}
 }
 
+// PaintCastShadow 画 caster 的外阴影（盒子自己的部分挖掉），只留落在 clip 里的部分；阴影按 CSS 的高斯定义算，
+// 网格逐设备像素一格、整格取格中心的值，与盒子大小无关。
+//
+// 用在「别的元素把阴影投到已经画好的内容上」的地方：侧栏（z-20）的阴影投在比它先画的工作区之上，
+// Viva 里侧栏先画、工作区后画、侧栏又自带裁剪，只能在整行画完之后补一遍（台账 B-046 (7)(c)）。
+// PaintSurface 对大盒子走 Viva 的距离场阴影，模糊半径只有 2px 时右缘外第二列的 1 个灰阶落不到
+// （0 1px 2px 0 rgba(0,0,0,.04)：渲染层是 3、1 两个灰阶，距离场只画出 3、0）。
+func (l *Look) PaintCastShadow(d *ui.DrawContext, caster, clip gfx.Rect, radius float32, sh tokens.Shadow) {
+	if sh.IsZero() {
+		return
+	}
+	scale := d.Canvas.PixelScale()
+	outer := SnapRect(caster, scale)
+	if outer.Width <= 0 || outer.Height <= 0 {
+		return
+	}
+	d.Canvas.Clip(SnapRect(clip, scale))
+	defer d.Canvas.Unclip()
+	paintGaussianShadowStep(d, outer, radius, sh, 0)
+}
+
 // PaintRing 在 d.Rect 外画一圈实心环（Tailwind 的 ring-2：box-shadow 0 0 0 Npx color）。
 // 环画在盒子之下的一圈，盒子本身随后用 PaintSurface 画；radius 是盒子的圆角。
 func (l *Look) PaintRing(d *ui.DrawContext, width float32, color tokens.Color, radius float32) {

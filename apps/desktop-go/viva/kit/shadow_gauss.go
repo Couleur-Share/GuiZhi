@@ -53,6 +53,15 @@ func (l *Look) paintShadow(d *ui.DrawContext, caster gfx.Rect, radius float32, s
 // 四个圆角方块仍然会画阴影，它们在圆弧里面的那部分最多把半透明的底色压暗一两个灰阶，不透明的底色则完全盖住。
 // 阴影矩形的圆角（radius + spread）在这里忽略：σ 比它大一个量级，卷积结果与直角矩形的差别不到半个灰阶。
 func paintGaussianShadow(d *ui.DrawContext, caster gfx.Rect, radius float32, sh tokens.Shadow) {
+	paintGaussianShadowStep(d, caster, radius, sh, gaussMeshStep)
+}
+
+// paintGaussianShadowStep 同 paintGaussianShadow，网格线的间距由调用方给（逻辑像素）。
+//
+// step 不大于 0 表示「逐设备像素」：每个设备像素一格，整格取一个值（格中心处高斯的值），不在格内插值。
+// 一格里值变化很快时（模糊半径只有几像素），格边上取值再线性插到像素中心，尾部会偏大一到三成（σ=2 时第四列 0.045 对 0.040），
+// 取整后多出 1 个灰阶；整格取中心值，像素中心上的值就是定义给的值。
+func paintGaussianShadowStep(d *ui.DrawContext, caster gfx.Rect, radius float32, sh tokens.Shadow, step float32) {
 	canvas := d.Canvas
 	scale := canvas.PixelScale()
 	if scale <= 0 {
@@ -68,18 +77,34 @@ func paintGaussianShadow(d *ui.DrawContext, caster gfx.Rect, radius float32, sh 
 	reach := 3 * sigma // 三倍标准差之外的尾巴不到 0.14%，乘上 0.25 的不透明度远小于一个灰阶
 	corner := min(max(radius, 0), min(caster.Width, caster.Height)/2)
 	right, bottom := caster.X+caster.Width, caster.Y+caster.Height
-	xs := gaussLines(ax, bx, reach, scale, caster.X, caster.X+corner, right-corner, right)
-	ys := gaussLines(ay, by, reach, scale, caster.Y, caster.Y+corner, bottom-corner, bottom)
+	flat := step <= 0
+	if flat {
+		step = 1 / scale
+	}
+	xs := gaussLinesStep(ax, bx, reach, scale, step, caster.X, caster.X+corner, right-corner, right)
+	ys := gaussLinesStep(ay, by, reach, scale, step, caster.Y, caster.Y+corner, bottom-corner, bottom)
 	if len(xs) < 2 || len(ys) < 2 {
 		return
 	}
-	gx, gy := gaussProfile(xs, ax, bx, sigma), gaussProfile(ys, ay, by, sigma)
-
 	base := d.Fade(gfxColor(sh.Color))
-	tint := func(i, j int) gfx.Color {
-		c := base
-		c.Alpha = base.Alpha * gx[i] * gy[j]
-		return c
+	var tints func(i, j int) [4]gfx.Color
+	if flat {
+		cx, cy := gaussCells(xs, ax, bx, sigma), gaussCells(ys, ay, by, sigma)
+		tints = func(i, j int) [4]gfx.Color {
+			c := base
+			c.Alpha = base.Alpha * cx[i] * cy[j]
+			return [4]gfx.Color{c, c, c, c}
+		}
+	} else {
+		gx, gy := gaussProfile(xs, ax, bx, sigma), gaussProfile(ys, ay, by, sigma)
+		tint := func(i, j int) gfx.Color {
+			c := base
+			c.Alpha = base.Alpha * gx[i] * gy[j]
+			return c
+		}
+		tints = func(i, j int) [4]gfx.Color {
+			return [4]gfx.Color{tint(i, j), tint(i+1, j), tint(i, j+1), tint(i+1, j+1)}
+		}
 	}
 	const eps = 0.001
 	for j := 0; j+1 < len(ys); j++ {
@@ -92,7 +117,7 @@ func paintGaussianShadow(d *ui.DrawContext, caster gfx.Rect, radius float32, sh 
 			if inColumn || inRow {
 				continue
 			}
-			t := [4]gfx.Color{tint(i, j), tint(i+1, j), tint(i, j+1), tint(i+1, j+1)}
+			t := tints(i, j)
 			if max(max(t[0].Alpha, t[1].Alpha), max(t[2].Alpha, t[3].Alpha)) < gaussMinAlpha {
 				continue
 			}
@@ -108,11 +133,17 @@ func paintGaussianShadow(d *ui.DrawContext, caster gfx.Rect, radius float32, sh 
 // 两条边附近每 gaussMeshStep 一条（透明度在这里变化），中间平坦处不加；extra 是必须对齐的位置（投影盒子「十字」的边界）。
 // 网格线落在整设备像素上：相邻格子的外沿羽化正好是 0 或 1，拼缝处不会出现一条淡线。
 func gaussLines(a, b, reach, scale float32, extra ...float32) []float32 {
+	return gaussLinesStep(a, b, reach, scale, gaussMeshStep, extra...)
+}
+
+// gaussLinesStep 同 gaussLines，网格线的间距由调用方给：模糊半径很小时（侧栏的 0 1px 2px，过渡带只有几像素），
+// 8 px 一条的网格会把带内的值线性插成一条斜线（右缘外第二列的 1 个灰阶就这样丢了），要逐设备像素取样。
+func gaussLinesStep(a, b, reach, scale, step float32, extra ...float32) []float32 {
 	lo, hi := snapEdge(a-reach, scale), snapEdge(b+reach, scale)
 	lines := make([]float32, 0, 56)
 	lines = append(lines, lo, hi)
 	for _, edge := range [2]float32{a, b} {
-		for p := edge - reach; p < edge+reach; p += gaussMeshStep {
+		for p := edge - reach; p < edge+reach; p += step {
 			lines = append(lines, snapEdge(p, scale))
 		}
 		lines = append(lines, snapEdge(edge+reach, scale))
@@ -139,6 +170,16 @@ func gaussProfile(lines []float32, a, b, sigma float32) []float32 {
 	out := make([]float32, len(lines))
 	for i, p := range lines {
 		out[i] = float32(normalCDF(float64((p-a)/sigma)) - normalCDF(float64((p-b)/sigma)))
+	}
+	return out
+}
+
+// gaussCells 是沿一条轴的透明度因子，每格（相邻两条网格线之间）一个值，取格中心处的值。
+func gaussCells(lines []float32, a, b, sigma float32) []float32 {
+	out := make([]float32, max(len(lines)-1, 0))
+	for i := range out {
+		mid := (lines[i] + lines[i+1]) / 2
+		out[i] = float32(normalCDF(float64((mid-a)/sigma)) - normalCDF(float64((mid-b)/sigma)))
 	}
 	return out
 }
