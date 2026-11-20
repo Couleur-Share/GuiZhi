@@ -650,14 +650,15 @@ func init() {
 		libraryOpenTagColors("产品设计"), parkKeepFocus, overlayInkWaiver)
 	// 对话框：名称框自动聚焦（带聚焦环），整个过程里焦点都在对话框内，所以一律保留焦点；
 	// 模态，遮罩背后的页面模糊（A-007，Modal 的 backdrop-blur-md 是 12），页眉标题带字距（A-013）。
-	dialog := func(id, title, reveal string, steps libraryStep) {
+	// extra 是只属于这一个对话框的登记（A-023 的浮层延伸：图标选择器里选中的表情，见 overlayEmojiInkWaiver）。
+	dialog := func(id, title, reveal string, steps libraryStep, extra ...parity.Waiver) {
 		registry[id] = withBackdrop(
-			libraryScene(id, data, steps, parkKeepFocus, append(modalTitleWaivers(title), overlayInkWaiver)...),
+			libraryScene(id, data, steps, parkKeepFocus, append(append(modalTitleWaivers(title), overlayInkWaiver), extra...)...),
 			libraryModalBackdrop(title, reveal))
 	}
 	dialog("app.window.library.dlg-collection-new", "新建合集", "", libraryClickButton("新建合集"))
 	dialog("app.window.library.dlg-collection-new-filled", "新建合集", "",
-		libraryChain(libraryClickButton("新建合集"), libraryType("读书笔记"), libraryClickButton("📖")))
+		libraryChain(libraryClickButton("新建合集"), libraryType("读书笔记"), libraryClickButton("📖")), overlayEmojiInkWaiver)
 	dialog("app.window.library.dlg-collection-rename", "重命名", "旅行计划",
 		libraryChain(libraryOpenRowMenu("旅行计划"), libraryClickMenuItem("重命名")))
 	dialog("app.window.library.dlg-collection-rename-custom", "重命名", "自定义图标",

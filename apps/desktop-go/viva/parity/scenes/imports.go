@@ -289,7 +289,8 @@ var detailKerningWaivers = []parity.Waiver{
 // 上限 0.16：比量到的 0.153 略宽，同一枚图标更大的偏差照常判定。
 var tinyIconWaivers = []parity.Waiver{{
 	// 主题名里「 8.75 8.75]」是外框的宽高：只放过这个尺寸的图标（外框写成 [x y w h]），不依赖它在页面上的位置。
-	Ledger: "A-003", Layer: parity.LayerL2, Kind: "ink-mass", Subject: " 8.75 8.75]", MaxDelta: 0.16,
+	// 方向 +1（Viva 偏多）：G-024 之后每条墨迹总量登记都要有方向；实测 48 份报告全是偏多、偏差 0.1529–0.1531。
+	Ledger: "A-003", Layer: parity.LayerL2, Kind: "ink-mass", Subject: " 8.75 8.75]", Dir: 1, MaxDelta: 0.16,
 	Note: "8.75px 的 Copy 图标（笔画 0.73px）：Skia 的采样量化与 Viva 的精确面积覆盖差更大，墨迹量比 1.14–1.153",
 }}
 

@@ -39,9 +39,25 @@ var pageSettingsWaivers = []parity.Waiver{
 // Viva 的 LCD / 灰度是整窗开关（渲染器按窗口清屏色一次决定），同一帧里无法只让浮层用灰度，
 // 所以浮层文字的墨迹总量系统性偏大（2026-11-16 在 select-close-action 的 36 个变体里实测 1.15–1.31 倍）。
 // 只放过浮层里文字的墨迹总量比；位置、字重、颜色、字号照常判定，页面层的同一段文字也照常判定。
+//
+// 范围（台账 G-024）：只放过「Viva 偏多」（Dir +1）、比值不超过 1.5（MaxDelta 0.5）。A-009 的依据是 LCD 比灰度多出覆盖，
+// 只支持「偏多」；此前这条登记没有方向与上限，Viva 的墨迹少到 0.36 倍也被放过，C-008（被禁用的实心主按钮文字被淡出两次）
+// 因此自 M2-1 起藏了四个场景。上限取对终版输出的全量扫描（15 个输出目录、5466 份报告、12890 次放过）实测的最大比值 1.478，
+// 向外留 0.02 余量：有新场景超过 1.5 时先查原因，不要先放宽。没有写 MinDelta：墨迹总量问题本来只在偏差超过 0.15 时才产生。
 var overlayInkWaiver = parity.Waiver{
-	Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Overlay: true,
+	Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Overlay: true, Dir: 1, MaxDelta: 0.5,
 	Note: "浮层文字：渲染层灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（位置、字重、颜色、字号均一致）",
+}
+
+// overlayEmojiInkWaiver 登记 A-023 在浮层里的延伸：新建合集对话框的图标选择器里，选中的表情「📖」在 Viva 里的墨迹总量
+// 只有渲染层的 0.837–0.848 倍（T1 与 T2 各变体里恰好低于 0.85 阈值的那几个；其余变体在阈值之内）。方向与 A-023 在侧栏行上的
+// 「Viva 偏多」相反，也不是 A-009 的 LCD 效应（彩色字形不走 ClearType）：两边画出的表情位置、大小一致，肉眼可见的差别是
+// 渲染层的纵向蓝边更饱和、Viva 的偏淡（细边的栅格化不同，原因没有逐项验证）。
+// 只放过浮层里单个彩色表情、Viva 偏少、偏差在 [0.15, 0.17] 的墨迹总量比；偏差范围取实测向外取整到 0.01。
+// 只登记在出现它的场景上，别的对话框里的表情不因此被放过。
+var overlayEmojiInkWaiver = parity.Waiver{
+	Ledger: "A-023", Layer: parity.LayerL2, Kind: "ink-mass", Overlay: true, Emoji: true, Dir: -1, MinDelta: 0.15, MaxDelta: 0.17,
+	Note: "浮层里的彩色表情：Viva 的墨迹总量比渲染层少 15%–17%（纵向细蓝边偏淡；位置与大小一致，原因未逐项验证）",
 }
 
 // withOverlayInk 在 waivers 之外再加上 overlayInkWaiver，返回新切片（不改动 waivers 的底层数组：它被多个场景共用）。
