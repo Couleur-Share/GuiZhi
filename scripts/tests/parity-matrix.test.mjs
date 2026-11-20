@@ -3,10 +3,13 @@
  *   - 色相预设与字号档读自渲染层源码，当前必须是 6 个色相 × 3 档字号 × 3 个视口 × 2 种明暗；
  *   - 档位大小固定为 T0=2、T1=4、T2=36、T3=108，变体键唯一且能往返解析；
  *   - 渲染层增删色相/字号档时这里会红：先按 §2 的规矩评估矩阵与档位，再更新本测试与文档。
+ * 同文件还守着对照采集器的两个不依赖浏览器的小件：界面语言参数的缺省与非法取值（台账 G-017），
+ * 以及「看得见的文字」按 text-transform 变换、遇到没实现的取值就报错（台账 G-020）。
  */
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadMatrix, parseAppearanceSource, parseVariantKey, tierVariants, variantKey } from "../../apps/desktop-go/scripts/parity/lib/matrix.mjs";
+import { VISIBLE_TEXT_SRC } from "../../apps/desktop-go/scripts/parity/lib/react-facts.mjs";
 import { parityLanguage } from "../../apps/desktop-go/scripts/parity/lib/react-state.mjs";
 
 const matrix = loadMatrix();
@@ -43,10 +46,25 @@ test("读不到预设时明确报错，不静默得到空矩阵", () => {
   assert.throws(() => parseAppearanceSource("export const nothing = 1;"), /MORANDI_THEMES/);
 });
 
-test("参照的界面语言：缺省 zh（矩阵不含语言维度，台账 G-017），PARITY_LANG=en 只给英文试点，别的取值直接报错", () => {
+test("参照的界面语言：缺省 zh（矩阵不含语言维度，台账 G-017），PARITY_LANG=en 只给英文变体，别的取值直接报错", () => {
   assert.equal(parityLanguage({}), "zh");
   assert.equal(parityLanguage({ PARITY_LANG: "zh" }), "zh");
   assert.equal(parityLanguage({ PARITY_LANG: "en" }), "en");
   assert.throws(() => parityLanguage({ PARITY_LANG: "fr" }), /只能是 zh 或 en/);
   assert.throws(() => parityLanguage({ PARITY_LANG: "" }), /只能是 zh 或 en/);
+});
+
+const visibleText = new Function(`${VISIBLE_TEXT_SRC}\nreturn visibleText;`)();
+
+test("看得见的文字：none 原样，uppercase 与 lowercase 按画出来的字变换，中文不受影响（台账 G-020）", () => {
+  assert.equal(visibleText("Smart views", "none"), "Smart views");
+  assert.equal(visibleText("Smart views", "uppercase"), "SMART VIEWS");
+  assert.equal(visibleText("#3B82f6", "lowercase"), "#3b82f6");
+  assert.equal(visibleText("智能视图 Tags…", "uppercase"), "智能视图 TAGS…");
+  assert.equal(visibleText("智能视图", "uppercase"), "智能视图");
+});
+
+test("没实现的 text-transform 直接报错，不悄悄按原文记", () => {
+  assert.throws(() => visibleText("a b", "capitalize"), /没有实现 text-transform: capitalize/);
+  assert.throws(() => visibleText("a b", "full-width"), /台账 G-020/);
 });

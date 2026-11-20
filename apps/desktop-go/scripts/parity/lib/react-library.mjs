@@ -19,14 +19,15 @@ import path from "node:path";
 import { SETTLE_CSS, parityLanguage, settle } from "./react-state.mjs";
 
 /**
- * 进入知识库要点的几个控件，按参照的界面语言取可访问名（renderer 的 i18n：nav.library、common.expand、library.newCollection）。
- * 只覆盖进入流程；各场景自己的交互步骤仍按中文界面写（英文试点只用不需要交互的静止场景，台账 G-017）。
+ * 进入知识库与切到表格视图要点的几个控件，按参照的界面语言取可访问名
+ * （renderer 的 i18n：nav.library、common.expand、library.newCollection、library.viewList）。
+ * 只覆盖进入流程；各场景自己的交互步骤仍按中文界面写（英文变体只用不需要交互的静止场景，台账 G-017）。
  */
 const NAV_LABELS = {
-  zh: { library: "知识库", expand: "展开", newCollection: "新建合集" },
-  en: { library: "Library", expand: "Expand", newCollection: "New collection" },
+  zh: { library: "知识库", expand: "展开", newCollection: "新建合集", viewList: "列表视图" },
+  en: { library: "Library", expand: "Expand", newCollection: "New collection", viewList: "List view" },
 };
-const navLabel = (key) => NAV_LABELS[parityLanguage()][key];
+export const navLabel = (key) => NAV_LABELS[parityLanguage()][key];
 
 /** 夹具：与 Viva 场景共用同一份 JSON。 */
 export const LIBRARY_FIXTURE = JSON.parse(

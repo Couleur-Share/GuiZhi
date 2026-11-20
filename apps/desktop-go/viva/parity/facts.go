@@ -160,7 +160,8 @@ func (n Node) Prop(key string) (string, bool) {
 // 两者的差异由比较端按各自语义处理，见 compare_text.go。
 type Text struct {
 	// Text 是看得见的文字。React 侧遇到 text-overflow: ellipsis 的截断时是「放得下的前缀 + …」（采集器按 Chromium 的规则复算），
-	// 原文在 Full 里；其余情况与 DOM 文本相同。
+	// 原文在 Full 里；元素的计算样式 text-transform 为 uppercase / lowercase 时是变换之后的字（画面上看到的，台账 G-020，
+	// Full 仍是 DOM 原文）；其余情况与 DOM 文本相同。
 	Text       string    `json:"text"`
 	Full       string    `json:"full,omitempty"`
 	Rects      []Box     `json:"rects"`

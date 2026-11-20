@@ -101,6 +101,21 @@ const VISIBLE_RECTS_SRC = `// 自 start（含）起沿祖先链，会裁剪内�
   for (const t of index.keys()) io.observe(t);
 });`;
 
+/**
+ * 看得见的文字：`text-transform` 改变的是画出来的字，不是 DOM 文本（小节标题的 `uppercase`、取色器的十六进制框）。
+ * 英文界面里 DOM 是「Smart views」、画面是「SMART VIEWS」；Viva 直接画大写，L1 的文字比较必须拿画出来的字比（台账 G-020）。
+ * 只实现渲染层用到的 uppercase 与 lowercase；遇到别的取值直接抛错，不悄悄按原文记（记下的会是错的文字）。
+ * 单独成串、不含反引号与模板插值，所以既能拼进页内表达式，也能在单测里用 new Function 取出来跑。
+ */
+export const VISIBLE_TEXT_SRC = `const visibleText = (s, transform) => {
+  switch (transform) {
+    case "none": return s;
+    case "uppercase": return s.toUpperCase();
+    case "lowercase": return s.toLowerCase();
+    default: throw new Error("采集器没有实现 text-transform: " + transform + "（台账 G-020）；先补上再采这个场景");
+  }
+};`;
+
 /** 在页内对一批节点（Element 或 Text）取外框与样式；通过 Runtime.callFunctionOn 的多个参数传入。 */
 const MEASURE_FN = `async function (...nodes) {
   const PROPS = ${JSON.stringify(STYLE_PROPS)};
@@ -157,6 +172,7 @@ const MEASURE_FN = `async function (...nodes) {
  */
 const TEXTS_EXPR = `(async () => {
   ${VISIBLE_RECTS_SRC}
+  ${VISIBLE_TEXT_SRC}
   const out = [];
   const owners = []; // 与 out 一一对应的所属元素，用来按可见部分裁掉滚出可视区的文字
   const round = (n) => Math.round(n * 1000) / 1000;
@@ -168,7 +184,7 @@ const TEXTS_EXPR = `(async () => {
     if (cs.display === "none" || cs.visibility === "hidden") return null;
     // 采「看得见的文字」：text-transform（取色器的十六进制框是 uppercase）改变的是画出来的字，不是 value。
     const raw = el.value || el.getAttribute("placeholder") || "";
-    const text = cs.textTransform === "uppercase" ? raw.toUpperCase() : cs.textTransform === "lowercase" ? raw.toLowerCase() : raw;
+    const text = visibleText(raw, cs.textTransform);
     if (!text) return null;
     const b = el.getBoundingClientRect();
     if (b.width <= 0 || b.height <= 0) return null;
@@ -603,7 +619,8 @@ const TEXTS_EXPR = `(async () => {
     const cut = multi === undefined ? ellipsize(node, el, cs, rects) ?? clampLines(node, el, cs, rects) : multi;
     out.push({
       // 被省略号截断时，text 是看得见的「前缀 + …」，full 才是 DOM 原文；rects 取截断后的宽度。
-      text: cut ? cut.shown : node.data,
+      // text 再按 text-transform 变成画出来的字（uppercase 的小节标题，台账 G-020），full 始终是 DOM 原文。
+      text: visibleText(cut ? cut.shown : node.data, cs.textTransform),
       ...(cut ? { full: node.data } : {}),
       rects: cut ? (cut.rects ?? [cut.rect]) : rects,
       font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),

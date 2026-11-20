@@ -6,10 +6,11 @@
  * Viva 一侧（viva/parity/scenes/library_table.go）做同样的操作，最终画面才可比。
  */
 import { chain, listScene, pickPageSize, waitSpinner, applyFacets, clickButtonByName, searchList } from "./react-library-list-scenes.mjs";
+import { navLabel } from "../lib/react-library.mjs";
 
 /** 切到列表视图：点工具条上的视图切换钮，等表格（或它的空态）出现。 */
 const viewTable = async (win) => {
-  await win.getByRole("button", { name: "列表视图", exact: true }).click();
+  await win.getByRole("button", { name: navLabel("viewList"), exact: true }).click();
   await win.getByTestId("item-table").waitFor({ state: "visible" });
   await win.waitForTimeout(300);
 };
