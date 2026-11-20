@@ -1,0 +1,115 @@
+package reader
+
+import (
+	"embed"
+	"path"
+	"strconv"
+	"strings"
+)
+
+// assets 是阅读页面的构建产物（apps/desktop-go/jsgen/build-reader.mts 生成，入库；CI 要求与重新生成的结果一致）。
+//
+//go:embed assets
+var assets embed.FS
+
+// scheme 是岛的自有 scheme：页面地址 gzreader://doc/index.html。与默认的 gzisland 区分开，日志与排查时一眼看出是阅读岛。
+const scheme = "gzreader"
+
+// readerCSP 是阅读岛的内容安全策略：以 island.DefaultCSP 为底，只放宽图片——文章里的远程图片与渲染层一样直接加载
+// （渲染层的阅读区同样是 <img src="https://…">），脚本、样式、字体、媒体、连接仍然只许自有 scheme。
+const readerCSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' data: blob: https: http:; font-src 'self' data:; media-src 'self' data: blob:; " +
+	"connect-src 'self'; frame-src about:; object-src 'none'; base-uri 'none'; form-action 'none'"
+
+const htmlTag = `<html lang="zh-CN">`
+
+// 默认外观：与渲染层 globals.css 里 :root 的默认值一致（浅色、色相 210、饱和度 35、根字号 16 px）。
+var defaultTheme = Theme{Hue: 210, Saturation: 35, BasePx: 16, Motion: MotionStandard}
+
+// serve 是 island.Config.Serve：按路径提供页面文件与本地媒体。路径不含主机名与查询串，没有前导斜杠（兼容有的情形）。
+func (h *Host) serve(p string) (mime string, data []byte, ok bool) {
+	p = strings.TrimPrefix(p, "/")
+	switch {
+	case p == "" || p == "index.html":
+		raw, err := assets.ReadFile("assets/index.html")
+		if err != nil {
+			return "", nil, false
+		}
+		return "text/html; charset=utf-8", bakeHTML(raw, h.req.Theme, h.req.Lang), true
+	case strings.HasPrefix(p, "media/"):
+		return h.serveMedia(strings.TrimPrefix(p, "media/"))
+	}
+	return serveAsset(p)
+}
+
+// serveAsset 提供 assets/ 下的静态文件：只认规整的相对路径（没有 ..、反斜杠、冒号、空字节）。
+func serveAsset(p string) (string, []byte, bool) {
+	if strings.ContainsAny(p, "\\:\x00") || path.Clean(p) != p || strings.HasPrefix(p, ".") {
+		return "", nil, false
+	}
+	data, err := assets.ReadFile("assets/" + p)
+	if err != nil {
+		return "", nil, false
+	}
+	return assetMIME(p), data, true
+}
+
+func assetMIME(p string) string {
+	switch strings.ToLower(path.Ext(p)) {
+	case ".js", ".mjs":
+		return "text/javascript; charset=utf-8"
+	case ".css":
+		return "text/css; charset=utf-8"
+	case ".html":
+		return "text/html; charset=utf-8"
+	case ".json":
+		return "application/json; charset=utf-8"
+	case ".svg":
+		return "image/svg+xml"
+	case ".woff2":
+		return "font/woff2"
+	case ".woff":
+		return "font/woff"
+	case ".png":
+		return "image/png"
+	}
+	return "application/octet-stream"
+}
+
+// serveMedia 提供 media/<scheme>/<名称>：scheme 只认 local-image 与 local-video，名称交给 Media 校验。
+func (h *Host) serveMedia(rest string) (string, []byte, bool) {
+	if h.opts.Media == nil {
+		return "", nil, false
+	}
+	kind, name, found := strings.Cut(rest, "/")
+	if !found || name == "" || (kind != "local-image" && kind != "local-video") {
+		return "", nil, false
+	}
+	return h.opts.Media(kind, name)
+}
+
+// bakeHTML 把外观烘进 index.html 的 <html> 标签：页面脚本执行之前样式表就已经按当前主题算出令牌，
+// 打开岛时不会先闪一下默认的浅色背景再换成深色（脚本随后的 applyTheme 写入同样的值，不产生变化）。
+func bakeHTML(raw []byte, theme Theme, lang Lang) []byte {
+	if theme.Validate() != nil {
+		theme = defaultTheme
+	}
+	var tag strings.Builder
+	tag.WriteString(`<html lang="`)
+	if lang == LangEn {
+		tag.WriteString("en")
+	} else {
+		tag.WriteString("zh-CN")
+	}
+	tag.WriteString(`"`)
+	if theme.Dark {
+		tag.WriteString(` class="dark"`)
+	}
+	tag.WriteString(` style="--theme-hue:` + formatNumber(theme.Hue) + `;--theme-saturation:` + formatNumber(theme.Saturation) +
+		`;--base-font-size:` + formatNumber(theme.BasePx) + `px"`)
+	tag.WriteString(` data-motion="` + string(theme.Motion) + `">`)
+	return []byte(strings.Replace(string(raw), htmlTag, tag.String(), 1))
+}
+
+// formatNumber 与 JavaScript 的 String(number) 在这里用到的数值范围内一致：整数不带小数点，小数取最短表示。
+func formatNumber(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
