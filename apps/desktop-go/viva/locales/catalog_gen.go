@@ -15147,12 +15147,12 @@ func NativeIslandWebview2Missing() string {
 	return "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
 }
 
-// NativeLibraryResultLine 是 native.library.resultLine：{{id}}：{{result}}
-func NativeLibraryResultLine(id, result any) string {
+// NativeLibraryResultSeparator 是 native.library.resultSeparator：：
+func NativeLibraryResultSeparator() string {
 	if useEn() {
-		return fmtArg(id) + "：" + fmtArg(result)
+		return "："
 	}
-	return fmtArg(id) + "：" + fmtArg(result)
+	return "："
 }
 
 // NativeLanguageNameZh 是 native.languageName.zh：简体中文

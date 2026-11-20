@@ -267,22 +267,15 @@ func (s *Screen) pickerChip(c ui.C, tag services.LibraryTag) (remove bool) {
 }
 
 // chipRemove 是小块里的移除钮：rounded-full opacity-60 transition-opacity hover:opacity-100，里面一枚 h-3 w-3 的 X。
-// 渲染层里它是 button 里放一个行内的 svg：按钮继承文字的字号与行高，图标按基线对齐，所以盒子是 12px 宽、一个行盒高，
-// 图标顶离盒顶 = 基线离行顶减图标高（不是居中）。
+// 渲染层里 svg 是块级（Tailwind 预检样式 svg { display: block }），按钮就是 12×12，在 h-6 的小块里被 items-center 居中
+// （实测按钮外框 12×12；早先按「行内 svg 按基线对齐」算成 12×16，台账 L2 外框差 4px）。
 func (s *Screen) chipRemove(c ui.C, name string, fg tokens.Color) bool {
 	l := s.Look
 	t := l.T
-	size, line := l.Rem(0.75), l.Rem(1)
-	scale := l.Scale
-	if scale <= 0 {
-		scale = 1
-	}
-	base := float32(kit.ChromeBaselineRow(kit.WeightNormal, float64(size*scale), float64(line*scale))) / scale
-	above := max(base, size)
-	height := above + max(line-base, 0)
+	size := l.Rem(0.75)
 	id := ui.ID(c)
 	label := locales.LibraryRemoveTag(name)
-	box := ui.Column(c).Size(size, height).Shrink(0).
+	box := ui.Column(c).Size(size, size).Shrink(0).
 		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 	l.TabStop(box)
 	p := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
@@ -292,7 +285,7 @@ func (s *Screen) chipRemove(c ui.C, name string, fg tokens.Color) bool {
 			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), 9999)
 		}
 	}).Children(func() {
-		l.Icon(c.Key("icon"), icons.X, size, ink).MarginTop(above - size)
+		l.Icon(c.Key("icon"), icons.X, size, ink)
 	})
 	return box.Clicked()
 }

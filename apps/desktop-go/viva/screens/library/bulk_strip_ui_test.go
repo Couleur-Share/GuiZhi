@@ -109,19 +109,28 @@ func TestBatchResultsStripShowsTheOutcomeAndRetriesOnlyTheFailures(t *testing.T)
 				t.Fatalf("结果条缺「%s」", label)
 			}
 		}
-		okLine, failLine := ids[0]+"："+locales.CommonSuccess(), ids[1]+"：磁盘已满"
-		if r.hasText(okLine) || r.hasText(failLine) {
+		// 渲染层是 <li>{id}：{outcome}</li>：编号、全角冒号、结果是三个相邻的文字节点，画面文字也是连着的三段。
+		hasLine := func(id, outcome string) bool {
+			texts := r.session.Texts()
+			for i := 0; i+2 < len(texts); i++ {
+				if texts[i] == id && texts[i+1] == locales.NativeLibraryResultSeparator() && texts[i+2] == outcome {
+					return true
+				}
+			}
+			return false
+		}
+		if hasLine(ids[0], locales.CommonSuccess()) || hasLine(ids[1], "磁盘已满") {
 			t.Fatal("「逐条结果」应是折叠的")
 		}
 		r.click(gfx.RoleButton, locales.LibraryWorkflowResults(3))
-		if !r.hasText(okLine) || !r.hasText(failLine) || !r.hasText(ids[2]+"："+locales.CommonSuccess()) {
+		if !hasLine(ids[0], locales.CommonSuccess()) || !hasLine(ids[1], "磁盘已满") || !hasLine(ids[2], locales.CommonSuccess()) {
 			t.Fatalf("展开后应逐条列出结果；画面文字 %q", r.session.Texts())
 		}
 		if !r.mustNode(gfx.RoleButton, locales.LibraryWorkflowResults(3)).Expanded {
 			t.Fatal("展开后可访问状态应是已展开")
 		}
 		r.click(gfx.RoleButton, locales.LibraryWorkflowResults(3))
-		if r.hasText(okLine) {
+		if hasLine(ids[0], locales.CommonSuccess()) {
 			t.Fatal("再点一次应折叠")
 		}
 

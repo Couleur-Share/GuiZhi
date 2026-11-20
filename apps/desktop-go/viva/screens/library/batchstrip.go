@@ -94,7 +94,14 @@ func (s *Screen) batchDetails(c ui.C, b BatchState) {
 			if !r.OK {
 				outcome = r.Error
 			}
-			l.Text(c.Key("result-"+r.ID), locales.NativeLibraryResultLine(r.ID, outcome), kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped())
+			// 渲染层是 <li>{row.id}：{outcome}</li>：三个相邻的文字节点（编号、全角冒号、结果），采集到的文字行也是三段。
+			// 这里三段并排：编号与冒号一行排完，结果占余下的宽度（过长的失败原因在结果自己的盒里折行）。
+			key := c.Key("result-" + r.ID)
+			ui.Row(key).FillWidth().Items(ui.Start).Children(func() {
+				l.Text(key.Key("id"), r.ID, kit.TextXS, kit.WeightNormal, t.Foreground)
+				l.Text(key.Key("sep"), locales.NativeLibraryResultSeparator(), kit.TextXS, kit.WeightNormal, t.Foreground)
+				l.Text(key.Key("outcome"), outcome, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped()).Grow(1).Shrink(1).MinWidth(0)
+			})
 		}
 	}).FillWidth().MaxHeight(l.Rem(9))
 }
