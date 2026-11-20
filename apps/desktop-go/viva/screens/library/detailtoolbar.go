@@ -271,12 +271,7 @@ func (s *Screen) findBar(c ui.C, active ReadingTab) {
 	if active == TabReplies {
 		placeholder = locales.LibraryForumRepliesFilterPlaceholder()
 	}
-	// 外层包装是 w-full max-w-[calc(100%-1rem)]、条本身再取 max-w-[calc(100%-1rem)]：条宽 = min(18rem, 面板宽 − 2rem)，右缘离面板 0.5rem。
-	width := l.Rem(18)
-	if p.panelW > 0 {
-		width = min(width, p.panelW-l.Rem(2))
-	}
-	ui.Row(c).Absolute().Top(l.Space(11)).Right(l.Space(2)).Width(width).Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
+	ui.Row(c).Absolute().Top(l.Space(11)).Right(l.Space(2)).Width(findBarWidth(l, p.panelW)).Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
 		PadSides(0, l.Space(1)+1, 0, l.Space(1)+1). // p-1 加 border 的 1px；竖向的 24px 子项在 32px 里居中，与 22px 内容盒里溢出居中同位
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
@@ -328,6 +323,16 @@ func (s *Screen) findBar(c ui.C, active ReadingTab) {
 				p.findOpen = false
 			}
 		})
+}
+
+// findBarWidth 是查找条的宽：外层包装是 w-full max-w-[calc(100%-1rem)]、条本身再取 max-w-[calc(100%-1rem)]，
+// 所以条宽 = min(18rem, 面板宽 − 2rem)，右缘离面板 0.5rem；面板宽还没量到（首帧，panelW 为 0）时取 18rem。
+func findBarWidth(l *kit.Look, panelW float32) float32 {
+	width := l.Rem(18)
+	if panelW > 0 {
+		width = min(width, panelW-l.Rem(2))
+	}
+	return width
 }
 
 // findStep 在命中之间循环移动（渲染层 goPrev / goNext）：没有命中时什么也不做。
