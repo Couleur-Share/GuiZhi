@@ -15,6 +15,8 @@ import (
 type ModuleView struct {
 	Panel     func(c ui.C)
 	Workspace func(c ui.C)
+	// HidePanel 非空且返回真时，这一帧整块二级侧栏（含紧凑布局下的浮层与遮罩）不挂载：知识库的专注阅读（渲染层 App.tsx 的 !(isFocusReadingMode && appModule === "library")）。
+	HidePanel func() bool
 }
 
 // panelBounds 是二级侧栏的宽度范围（渲染层 ui.store.ts 的 SIDEBAR_PANEL_WIDTH_*）。
@@ -37,7 +39,8 @@ func (w *Window) panelWidth() float32 {
 // body 是顶栏下面的区域（渲染层 relative flex min-h-0 flex-1 overflow-hidden）：
 // 首页时左边是二级侧栏，右边是工作区；紧凑布局下侧栏展开时浮在工作区上方，后面垫一层遮罩。
 func (w *Window) body(c ui.C) {
-	home := w.Page == PageHome
+	view := w.Modules[w.module()]
+	home := w.Page == PageHome && !(view.HidePanel != nil && view.HidePanel()) // 专注阅读：不挂载侧栏，其余照首页的布局排
 	collapsed := w.sidebarCollapsed(c)
 	compact := w.compact(c)
 	inline := home && !compact && !collapsed // 侧栏在行内（不是紧凑布局下的浮层）

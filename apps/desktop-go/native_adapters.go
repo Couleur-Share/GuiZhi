@@ -10,7 +10,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
+
+	"github.com/egoist/mygo"
 
 	"guizhi-mygo-shell/native/services"
 )
@@ -217,8 +220,20 @@ func (a logAdapter) AppError(scope, action, message string) {
 // newNativeServices 装配原生界面依赖的全部能力。
 func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 	return services.Services{
-		Imports: importsAdapter{b: b, hub: hub},
-		Library: libraryAdapter{b: b},
-		Log:     logAdapter{b: b},
+		Imports:      importsAdapter{b: b, hub: hub},
+		Library:      libraryAdapter{b: b},
+		Log:          logAdapter{b: b},
+		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
+	}
+}
+
+// webLinkOpener 把「打开系统浏览器」包成只放行 http / https 的版本：条目的来源链接来自采集到的网页，不能让它借 ShellExecute 启动 file:、ms-settings: 之类的协议。
+func webLinkOpener(open func(string) error) func(string) error {
+	return func(raw string) error {
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("不支持的链接：只能打开 http 或 https 地址")
+		}
+		return open(u.String())
 	}
 }

@@ -15147,12 +15147,28 @@ func NativeIslandWebview2Missing() string {
 	return "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
 }
 
+// NativeLibraryNotMigrated 是 native.library.notMigrated：「{{action}}」的原生界面还没有做，计划在 {{milestone}} 完成（台账 {{ledger}}）
+func NativeLibraryNotMigrated(action, milestone, ledger any) string {
+	if useEn() {
+		return "“" + fmtArg(action) + "” is not available in the native UI yet; planned for " + fmtArg(milestone) + " (ledger " + fmtArg(ledger) + ")"
+	}
+	return "「" + fmtArg(action) + "」的原生界面还没有做，计划在 " + fmtArg(milestone) + " 完成（台账 " + fmtArg(ledger) + "）"
+}
+
 // NativeLibraryResultSeparator 是 native.library.resultSeparator：：
 func NativeLibraryResultSeparator() string {
 	if useEn() {
 		return "："
 	}
 	return "："
+}
+
+// NativeLibraryReasonSeparator 是 native.library.reasonSeparator：；
+func NativeLibraryReasonSeparator() string {
+	if useEn() {
+		return "；"
+	}
+	return "；"
 }
 
 // NativeLanguageNameZh 是 native.languageName.zh：简体中文

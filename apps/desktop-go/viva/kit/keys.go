@@ -20,6 +20,15 @@ func (l *Look) OnKey(e gfx.KeyEvent) gfx.EventResult {
 	return res
 }
 
+// OnShortcut 是窗口 OnShortcut 的入口：带修饰键的可打印字符（Ctrl+S、Alt+Z 一类）与每一个不带修饰键的普通字符都先来这里问一遍，
+// 所以没有接钩子时立即返回零值、有钩子时由钩子自己尽快放行。Viva 把这些键与 OnKey 的具名键分成两条路（app.Config.OnShortcut）。
+func (l *Look) OnShortcut(e gfx.KeyEvent) gfx.EventResult {
+	if l.ShortcutHook == nil {
+		return gfx.EventResult{}
+	}
+	return l.ShortcutHook(e)
+}
+
 // KeyFirst 把窗口按键钩子 first 排在页面自己的按键处理 page（page.Config 装上的 OnKey：拖动取消、焦点组与菜单里方向键的移动、
 // 下拉的键盘、快捷键、字段的 OnKey……，再交给 base）之前：钩子先看到每一次按键（Tab 要在页面遍历之前滚进视野，列表键盘在菜单
 // 打开时也要看到方向键），它没有处理（Handled 为假）的，再交给页面，两边的结果合并。

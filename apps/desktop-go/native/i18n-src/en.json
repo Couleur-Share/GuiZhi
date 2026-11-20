@@ -5,7 +5,9 @@
       "webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working."
     },
     "library": {
-      "resultSeparator": "："
+      "notMigrated": "“{{action}}” is not available in the native UI yet; planned for {{milestone}} (ledger {{ledger}})",
+      "resultSeparator": "：",
+      "reasonSeparator": "；"
     },
     "languageName": {
       "zh": "简体中文",

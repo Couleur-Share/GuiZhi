@@ -70,6 +70,9 @@ type Look struct {
 	// KeyHook 是界面的窗口级键盘（知识库列表的方向键、Home、End、空格，台账 B-045）：在 Look 自己的按键处理之后运行，
 	// 结果与它合并（MergeKey）。窗口接线时设置；nil 表示没有（对照用自己的接线，单测）。
 	KeyHook func(gfx.KeyEvent) gfx.EventResult
+	// ShortcutHook 是界面的窗口级快捷键（知识库详情的 Ctrl+S、Ctrl+F、Alt+Z）：带修饰键的可打印字符不走 OnKey、走 OnShortcut，
+	// 窗口接线时设置；nil 表示没有。每敲一个字都会来问一遍，钩子要立刻放行不相干的键。
+	ShortcutHook func(gfx.KeyEvent) gfx.EventResult
 
 	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
 	advances noKernCache

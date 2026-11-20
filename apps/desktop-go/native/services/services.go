@@ -24,6 +24,10 @@ type Services struct {
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 
+	// OpenExternal 用系统默认浏览器打开链接（条目详情里的来源链接）；只接受 http / https，其余协议返回错误。
+	// nil 时点击弹失败提示（测试与对照里不接线）。
+	OpenExternal func(url string) error
+
 	// Now 返回当前时间；测试注入固定值，nil 时用 time.Now。
 	Now func() time.Time
 }

@@ -55,6 +55,10 @@ type ButtonSpec struct {
 	// Suffix 是标签后面另一段文字（批量按钮的计数），颜色取 SuffixColor；可访问名是「标签 后缀」。
 	Suffix      string
 	SuffixColor tokens.Color
+	// SuffixPx 非零时后缀按这个字号（逻辑像素）排，行高仍取按钮字号档的行高（子元素只改 font-size，行高继承；
+	// 例如标签页里 text-xs 按钮的 text-[10px] 字数）；SuffixFade 非零时后缀取标签此刻的颜色再乘这个不透明度（opacity-60 的 span），
+	// 不再用 SuffixColor。
+	SuffixPx, SuffixFade float32
 	// Icon 是文字前的图标；ViewBox 为 0 表示没有。IconSize 缺省 1rem。
 	Icon     gfx.Icon
 	IconSize float32
@@ -234,7 +238,15 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 			}
 		}
 		if spec.Suffix != "" {
-			l.Text(c.Key("suffix"), spec.Suffix, st.Text, weight, suffixFg)
+			ink := suffixFg
+			if spec.SuffixFade > 0 {
+				ink = fade(fg, spec.SuffixFade)
+			}
+			if spec.SuffixPx > 0 {
+				l.TextPx(c.Key("suffix"), spec.Suffix, spec.SuffixPx, l.Rem(st.Text.Line), weight, ink)
+			} else {
+				l.Text(c.Key("suffix"), spec.Suffix, st.Text, weight, ink)
+			}
 		}
 	})
 }

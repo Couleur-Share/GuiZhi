@@ -217,3 +217,44 @@ func TestImportsAdapterOnChangeReceivesPush(t *testing.T) {
 		t.Fatalf("OnChange 回调次数 = %d，期望 1", n.Load())
 	}
 }
+
+// webLinkOpener 只放行带主机名的 http / https 地址：来源链接来自采集到的网页，其余协议（file:、javascript:、ms-settings: 等）一律拒绝，
+// 被拒绝时不能调到系统的打开动作；放行时交给系统的是解析后重新序列化的地址。
+func TestWebLinkOpenerOnlyAllowsHTTPAndHTTPS(t *testing.T) {
+	cases := []struct {
+		raw     string
+		want    string // 非空：应放行并交出这个地址
+		blocked bool
+	}{
+		{raw: "https://example.com/a?b=1#c", want: "https://example.com/a?b=1#c"},
+		{raw: "http://example.com", want: "http://example.com"},
+		{raw: "HTTPS://Example.com/x", want: "https://Example.com/x"}, // 协议名大小写不敏感，序列化后统一小写
+		{raw: "file:///C:/Windows/System32/calc.exe", blocked: true},
+		{raw: "javascript:alert(1)", blocked: true},
+		{raw: "ms-settings:network", blocked: true},
+		{raw: "//example.com/x", blocked: true}, // 没有协议
+		{raw: "https:///nohost", blocked: true}, // 没有主机名
+		{raw: "https://", blocked: true},
+		{raw: "", blocked: true},
+		{raw: "https://exa mple.com/", blocked: true}, // 解析失败
+	}
+	for _, c := range cases {
+		var got []string
+		open := webLinkOpener(func(u string) error { got = append(got, u); return nil })
+		err := open(c.raw)
+		if c.blocked {
+			if err == nil || len(got) != 0 {
+				t.Errorf("%q 应被拒绝且不调用系统打开，实际 err=%v 调用 %v", c.raw, err, got)
+			}
+			continue
+		}
+		if err != nil || len(got) != 1 || got[0] != c.want {
+			t.Errorf("%q 应放行并交出 %q，实际 err=%v 调用 %v", c.raw, c.want, err, got)
+		}
+	}
+	// 系统打开失败原样返回（界面把它弹成带原因的提示）。
+	failing := webLinkOpener(func(string) error { return os.ErrPermission })
+	if err := failing("https://example.com"); err != os.ErrPermission {
+		t.Errorf("系统打开失败的原因应原样返回，实际 %v", err)
+	}
+}

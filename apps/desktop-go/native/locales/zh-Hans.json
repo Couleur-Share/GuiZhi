@@ -3730,7 +3730,22 @@
   "commandPalette_noResults": "没有匹配结果",
   "native_island_starting": "正在打开阅读视图…",
   "native_island_webview2Missing": "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。",
+  "native_library_notMigrated": "「{action}」的原生界面还没有做，计划在 {milestone} 完成（台账 {ledger}）",
+  "@native_library_notMigrated": {
+    "placeholders": {
+      "action": {
+        "type": "Object"
+      },
+      "milestone": {
+        "type": "Object"
+      },
+      "ledger": {
+        "type": "Object"
+      }
+    }
+  },
   "native_library_resultSeparator": "：",
+  "native_library_reasonSeparator": "；",
   "native_languageName_zh": "简体中文",
   "native_languageName_en": "English",
   "native_settings_loadAction": "读取设置",

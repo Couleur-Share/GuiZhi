@@ -19802,6 +19802,18 @@ func (msgs Messages) NativeIslandWebview2Missing() string {
 	return Catalog.Format(msgs.locale, "native_island_webview2Missing", nil)
 }
 
+// NativeLibraryNotMigrated says "「{action}」的原生界面还没有做，计划在 {milestone} 完成（台账 {ledger}）"
+// in the language the app shows.
+func NativeLibraryNotMigrated(action any, milestone any, ledger any) string {
+	return In(i18n.Locale()).NativeLibraryNotMigrated(action, milestone, ledger)
+}
+
+// NativeLibraryNotMigrated says "「{action}」的原生界面还没有做，计划在 {milestone} 完成（台账 {ledger}）"
+// in the language of msgs.
+func (msgs Messages) NativeLibraryNotMigrated(action any, milestone any, ledger any) string {
+	return Catalog.Format(msgs.locale, "native_library_notMigrated", map[string]any{"action": action, "milestone": milestone, "ledger": ledger})
+}
+
 // NativeLibraryResultSeparator says "："
 // in the language the app shows.
 func NativeLibraryResultSeparator() string { return In(i18n.Locale()).NativeLibraryResultSeparator() }
@@ -19810,6 +19822,16 @@ func NativeLibraryResultSeparator() string { return In(i18n.Locale()).NativeLibr
 // in the language of msgs.
 func (msgs Messages) NativeLibraryResultSeparator() string {
 	return Catalog.Format(msgs.locale, "native_library_resultSeparator", nil)
+}
+
+// NativeLibraryReasonSeparator says "；"
+// in the language the app shows.
+func NativeLibraryReasonSeparator() string { return In(i18n.Locale()).NativeLibraryReasonSeparator() }
+
+// NativeLibraryReasonSeparator says "；"
+// in the language of msgs.
+func (msgs Messages) NativeLibraryReasonSeparator() string {
+	return Catalog.Format(msgs.locale, "native_library_reasonSeparator", nil)
 }
 
 // NativeLanguageNameZh says "简体中文"
