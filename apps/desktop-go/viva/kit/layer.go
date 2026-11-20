@@ -37,6 +37,15 @@ const (
 	bandTooltip    ui.Band = 9
 )
 
+// 盖在原生视图（阅读岛）之上的非模态控件用的层号：原生视图只在声明它的那一层上「开洞」，同层与更低层画的东西都被它盖住，
+// 所以阅读区上方的悬浮控件（查找条、退出专注钮）要抬到更高的一层。本应用没有用 Viva 的 LayerPaneChrome（1），这里借它：
+//   - BandOverIsland：详情在页面层（卡片视图、专注阅读）时用；低于 Modal（3），模态遮罩与对话框仍然盖得住它；
+//   - BandOverIslandInModal：详情在 Modal 里（表格视图的详情浮层）时用；原生视图在 Modal 的层上，所以要比它高一层。
+const (
+	BandOverIsland        ui.Band = 1
+	BandOverIslandInModal         = bandSelectDismiss
+)
+
 // OverlayLayerMin 是浮层的最低层号：画在这一层及以上的文字属于浮层（对照工具据此区分浮层文字，见台账 A-009）。
 const OverlayLayerMin = uint16(bandModal)
 

@@ -139,6 +139,7 @@ type Host struct {
 	ready     bool
 	failedKey viewKey
 	failed    bool
+	failErr   error
 	deadline  time.Time
 
 	req   Request
@@ -203,6 +204,18 @@ func (h *Host) Close() {
 	h.shown = false
 }
 
+// Failure 返回 req 这份内容的岛为什么不可用（打不开、握手超时、协议不符）；没有失败或失败属于别的内容时为 nil。
+// 调用方据此画「读取失败 + 重试」而不是空白（AGENTS.md：加载失败不能渲染成正常空态）。
+func (h *Host) Failure(req Request) error {
+	if h.failed && h.failedKey == (viewKey{req.ItemID, req.Tab, req.View.Kind}) {
+		return h.failErr
+	}
+	return nil
+}
+
+// Retry 清掉失败记录：下一帧重新尝试打开。
+func (h *Host) Retry() { h.failed, h.failErr = false, nil }
+
 // Open 报告岛此刻是否开着。
 func (h *Host) Open() bool { return h.page != nil }
 
@@ -260,7 +273,7 @@ func (h *Host) open(key viewKey) bool {
 		return false
 	}
 	h.page, h.ready, h.rendered = page, false, false
-	h.failed = false
+	h.failed, h.failErr = false, nil
 	h.sent = sent{}
 	timeout := h.opts.ReadyTimeout
 	if timeout <= 0 {
@@ -294,7 +307,7 @@ func (h *Host) closePage() {
 // fail 关掉页面并通知 Handler；同一份内容不再重试（避免每帧反复开）。
 func (h *Host) fail(key viewKey, err error) {
 	h.closePage()
-	h.failed, h.failedKey = true, key
+	h.failed, h.failedKey, h.failErr = true, key, err
 	h.diag(err)
 	if h.handler != nil {
 		h.handler.Failed(err)

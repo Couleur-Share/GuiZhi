@@ -18,7 +18,7 @@ import (
 //	  relative flex min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-panel
 //	    工具栏（标签页 + 工具）、复核提醒、查找条（绝对定位）、阅读区
 //
-// 阅读区本里程碑留白（台账 B-059）；工具栏上需要 AI、转写、总结、讨论刷新的动作画出来但未接线（台账 B-060）。
+// 阅读区由岛里的页面渲染（detailreader.go；没接宿主时留白）；工具栏上需要 AI、转写、总结、讨论刷新的动作画出来但未接线（台账 B-060）。
 
 // catalogAutoOpenMin 是渲染层 ForumFloorCatalog 的 CATALOG_AUTO_OPEN_MIN：讨论条数不少于它时，楼层目录默认展开。
 const catalogAutoOpenMin = 20
@@ -47,22 +47,23 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 	if !showFind {
 		p.findOpen = false // 渲染层 effect：查找入口没了就关掉查找条
 	}
+	live := s.readerLive(item, caps, active)
 	ui.Column(c.Key("content")).FillWidth().Grow(1).MinHeight(0).Children(func() {
 		ui.Column(c.Key("panel")).FillWidth().Grow(1).MinHeight(0).Clip().
 			Draw(func(d *ui.DrawContext) {
-				p.panelW = d.Rect.Width
+				p.panelW, p.panelRect = d.Rect.Width, d.Rect
 				l.PaintSurface(d, kit.Surface{Bg: t.UiPanelBg, Shadow: t.UiPanelShadow})
 			}).
 			Children(func() {
 				s.panelToolbar(c.Key("toolbar"), item, caps, active, showFind)
 				s.reviewNotice(c, v, item, caps.Trashed)
 				if p.findOpen && showFind {
-					s.findBar(c.Key("find"), active)
+					s.findBar(c.Key("find"), active, live)
 				} else {
 					p.findFocused = false
 				}
-				// min-h-0 flex-1（data-article-reader）：阅读区，M2-5 起。
-				ui.Column(c.Key("reader")).FillWidth().Grow(1).MinHeight(0)
+				// min-h-0 flex-1（data-article-reader）：阅读区。
+				s.readerArea(c, item, caps, active)
 			})
 	})
 }
@@ -83,7 +84,7 @@ func (s *Screen) panelToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, 
 		Children(func() {
 			ui.Flow(c.Key("line")).FillWidth().Items(ui.Center).Justify(ui.End).Gap(l.Space(3)).LineGap(l.Space(1)).Children(func() {
 				s.tabGroup(c.Key("tabs"), item, caps, active)
-				s.toolGroup(c.Key("tools"), caps, active, showFind)
+				s.toolGroup(c.Key("tools"), item, caps, active, showFind)
 			})
 		})
 }
@@ -162,14 +163,19 @@ func (s *Screen) panelTab(c ui.C, label string, icon gfx.Icon, on bool, suffix s
 
 // toolGroup 是工具那一组：ml-auto flex min-w-0 flex-wrap items-center gap-1。
 // 主题阅读可用时（themedAvailable）工具栏最前面是读者工具条的挂载点（渲染层 setReaderToolbar 的容器，原文 / AI 阅读 / 目录 / 编辑由阅读区
-// 经门户放进来，随 M2-5）：这一版它是空的，但仍占一个弹性子项（相邻的 gap 照算）；这时不摆「显示原文 / Markdown 渲染」（台账 B-059）。
-func (s *Screen) toolGroup(c ui.C, caps ItemCaps, active ReadingTab, showFind bool) {
+// 经门户放进来，见 detailreadertoolbar.go）：没有接阅读岛（也没开 ReaderToolbar）时它是空的，但仍占一个弹性子项（相邻的 gap 照算）；
+// 这时不摆「显示原文 / Markdown 渲染」（台账 B-059）。
+func (s *Screen) toolGroup(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab, showFind bool) {
 	l := s.Look
 	p := &s.detail.panel
 	themed := p.themedAvailable(active)
 	ui.Flow(c).Items(ui.Center).Gap(l.Space(1)).LineGap(l.Space(1)).Shrink(1).MinWidth(0).Children(func() {
 		if themed {
-			ui.Row(c.Key("reader-toolbar")).Items(ui.Center).MinWidth(0)
+			if s.readerToolbarOn() {
+				s.readerToolbar(c.Key("reader-toolbar"), item, caps, active)
+			} else {
+				ui.Row(c.Key("reader-toolbar")).Items(ui.Center).MinWidth(0)
+			}
 		}
 		if showFind {
 			label := locales.LibraryPanelFindOpen()
@@ -260,8 +266,11 @@ func (s *Screen) textToolButton(c ui.C, label string, icon gfx.Icon, busy bool) 
 
 // findBar 是查找条（渲染层 PanelFindBar，外面一层 absolute right-2 top-11 z-20 flex w-full max-w-[calc(100%-1rem)] justify-end）：
 // flex h-8 w-72 max-w-[calc(100%-1rem)] items-center gap-1 rounded-lg border border-border bg-background/95 p-1 shadow-lg。
-// 命中数本里程碑恒为 0（正文高亮与楼层过滤在阅读区里，M2-5）：输入非空时显示「无匹配」，上一个 / 下一个禁用（台账 B-059）。
-func (s *Screen) findBar(c ui.C, active ReadingTab) {
+// 命中数由阅读区的页面回报（p.findCount）；没有接岛时恒为 0：输入非空时显示「无匹配」，上一个 / 下一个禁用。
+//
+// lifted 为真时（阅读岛在场）条画在更高的一层：原生视图盖住同层与更低层画的东西，所以条改用 ui.Overlay 放在面板的右上角（窗口坐标、取上一帧
+// 量到的面板矩形，首帧没有就下一帧再画）；详情在表格视图的详情浮层里时，原生视图在浮层的层上，条要再高一层（kit.BandOverIslandInModal）。
+func (s *Screen) findBar(c ui.C, active ReadingTab, lifted bool) {
 	l := s.Look
 	t := l.T
 	p := &s.detail.panel
@@ -271,58 +280,82 @@ func (s *Screen) findBar(c ui.C, active ReadingTab) {
 	if active == TabReplies {
 		placeholder = locales.LibraryForumRepliesFilterPlaceholder()
 	}
-	ui.Row(c).Absolute().Top(l.Space(11)).Right(l.Space(2)).Width(findBarWidth(l, p.panelW)).Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
-		PadSides(0, l.Space(1)+1, 0, l.Space(1)+1). // p-1 加 border 的 1px；竖向的 24px 子项在 32px 里居中，与 22px 内容盒里溢出居中同位
-		Draw(func(d *ui.DrawContext) {
-			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
-		}).
-		Children(func() {
-			ui.Row(c.Key("field")).Grow(1).Basis(0).MinWidth(0).Height(l.Rem(1.5)).Items(ui.Center).Gap(l.Space(1)).
-				PadSides(0, l.Space(1.5), 0, l.Space(1.5)).Children(func() {
-				l.Icon(c.Key("icon"), icons.Search, l.Rem(0.75), t.MutedForeground.WithAlpha(0.7))
-				// text-[11px]：<input> 的内容高是继承来的 1.5 倍行高 16.5px，Viva 的输入框至少 Size+6，取 17。
-				// 渲染层的全局规则 input:focus-visible 给文本框 ring-2 ring-primary/50（框外 2 px，直角：<input> 没有圆角）；
-				// 底板与输入是两个元素（Box.Draw 画在输入内容之上），环由先声明的底板读后声明的输入的聚焦状态来画（同设置页的十六进制框）。
-				var input ui.Box
-				var ring float32
-				ui.Stack(c.Key("input-wrap")).Grow(1).Basis(0).MinWidth(0).Height(17).Children(func() {
-					// 环围着 <input> 的边框盒，它高 16.5（11px 的 1.5 倍行高）；Viva 的输入框取 17，环按 16.5 画、与输入框同一中线（上下各让 0.25），
-					// 否则框顶带小数的字号档里环的上下沿差一像素行（落进文字行矩形外扩 1 像素的墨迹区域，台账 G-028）。
-					ui.Row(c.Key("ring")).Absolute().Top(0.25).Right(0).Bottom(0.25).Left(0).Draw(func(d *ui.DrawContext) { l.PaintInputRing(d, ring, 0) })
-					input = l.Input(c.Key("input"), &p.find, placeholder, placeholder, kit.InputSpec{
-						Size: 11, Weight: kit.WeightNormal, Color: t.Foreground, Height: 17, Placeholder: t.MutedForeground.WithAlpha(0.6),
-					}).Absolute().Inset(0).AutoFocus()
-					ring = l.InputRing(c, ui.ID(c.Key("ring-anim")), input.State().Focused)
-				})
-				p.findFocused = input.State().Focused
-				if input.Changed() {
-					p.findQuery = p.find.Text()
-					p.findActive = 0
-				}
-				if p.findQuery != "" {
-					if s.inputClear(c.Key("clear")) {
-						p.find.SetText("")
-						p.findQuery, p.findActive = "", 0
-					}
-				}
+	bar := func(row ui.Box) ui.Box {
+		return row.Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
+			PadSides(0, l.Space(1)+1, 0, l.Space(1)+1). // p-1 加 border 的 1px；竖向的 24px 子项在 32px 里居中，与 22px 内容盒里溢出居中同位
+			Draw(func(d *ui.DrawContext) {
+				l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
 			})
-			if filtering {
-				text := locales.LibraryPanelFindEmptyShort()
-				if hasMatches {
-					text = locales.LibraryPanelFindMatchIndex(p.findActive+1, p.findCount)
-				}
-				l.TextPx(c.Key("count"), text, 10, 15, kit.WeightNormal, t.MutedForeground.WithAlpha(0.8)).Shrink(0)
-				if s.findNavButton(c.Key("prev"), locales.LibraryPanelFindPrevMatch(), icons.ChevronUp, !hasMatches) {
-					s.findStep(-1)
-				}
-				if s.findNavButton(c.Key("next"), locales.LibraryPanelFindNextMatch(), icons.ChevronDown, !hasMatches) {
-					s.findStep(1)
-				}
+	}
+	body := func() {
+		ui.Row(c.Key("field")).Grow(1).Basis(0).MinWidth(0).Height(l.Rem(1.5)).Items(ui.Center).Gap(l.Space(1)).
+			PadSides(0, l.Space(1.5), 0, l.Space(1.5)).Children(func() {
+			l.Icon(c.Key("icon"), icons.Search, l.Rem(0.75), t.MutedForeground.WithAlpha(0.7))
+			// text-[11px]：<input> 的内容高是继承来的 1.5 倍行高 16.5px，Viva 的输入框至少 Size+6，取 17。
+			// 渲染层的全局规则 input:focus-visible 给文本框 ring-2 ring-primary/50（框外 2 px，直角：<input> 没有圆角）；
+			// 底板与输入是两个元素（Box.Draw 画在输入内容之上），环由先声明的底板读后声明的输入的聚焦状态来画（同设置页的十六进制框）。
+			var input ui.Box
+			var ring float32
+			ui.Stack(c.Key("input-wrap")).Grow(1).Basis(0).MinWidth(0).Height(17).Children(func() {
+				// 环围着 <input> 的边框盒，它高 16.5（11px 的 1.5 倍行高）；Viva 的输入框取 17，环按 16.5 画、与输入框同一中线（上下各让 0.25），
+				// 否则框顶带小数的字号档里环的上下沿差一像素行（落进文字行矩形外扩 1 像素的墨迹区域，台账 G-028）。
+				ui.Row(c.Key("ring")).Absolute().Top(0.25).Right(0).Bottom(0.25).Left(0).Draw(func(d *ui.DrawContext) { l.PaintInputRing(d, ring, 0) })
+				input = l.Input(c.Key("input"), &p.find, placeholder, placeholder, kit.InputSpec{
+					Size: 11, Weight: kit.WeightNormal, Color: t.Foreground, Height: 17, Placeholder: t.MutedForeground.WithAlpha(0.6),
+				}).Absolute().Inset(0).AutoFocus()
+				ring = l.InputRing(c, ui.ID(c.Key("ring-anim")), input.State().Focused)
+			})
+			p.findFocused = input.State().Focused
+			if input.Changed() {
+				p.findQuery = p.find.Text()
+				p.findActive = 0
 			}
-			if s.findNavButton(c.Key("close"), locales.CommonClose(), icons.X, false) {
-				p.findOpen = false
+			if p.findQuery != "" {
+				if s.inputClear(c.Key("clear")) {
+					p.find.SetText("")
+					p.findQuery, p.findActive = "", 0
+				}
 			}
 		})
+		if filtering {
+			text := locales.LibraryPanelFindEmptyShort()
+			if hasMatches {
+				text = locales.LibraryPanelFindMatchIndex(p.findActive+1, p.findCount)
+			}
+			l.TextPx(c.Key("count"), text, 10, 15, kit.WeightNormal, t.MutedForeground.WithAlpha(0.8)).Shrink(0)
+			if s.findNavButton(c.Key("prev"), locales.LibraryPanelFindPrevMatch(), icons.ChevronUp, !hasMatches) {
+				s.findStep(-1)
+			}
+			if s.findNavButton(c.Key("next"), locales.LibraryPanelFindNextMatch(), icons.ChevronDown, !hasMatches) {
+				s.findStep(1)
+			}
+		}
+		if s.findNavButton(c.Key("close"), locales.CommonClose(), icons.X, false) {
+			p.findOpen = false
+		}
+	}
+	width := findBarWidth(l, p.panelW)
+	if !lifted {
+		bar(ui.Row(c).Absolute().Top(l.Space(11)).Right(l.Space(2)).Width(width)).Children(body)
+		return
+	}
+	r := p.panelRect
+	if r.Width <= 0 {
+		c.Canvas().RequestFrame() // 首帧还没有面板的矩形：下一帧再画
+		return
+	}
+	band := kit.BandOverIsland
+	if s.detail.modal.open {
+		band = kit.BandOverIslandInModal
+	}
+	bounds := gfx.Rect{X: r.X + r.Width - l.Space(2) - width, Y: r.Y + l.Space(11), Width: width, Height: l.Rem(2)}
+	layer := ui.Overlay(c, ui.OverlaySpec{Band: band, Bounds: bounds})
+	if s.detail.modal.open {
+		layer = l.WithinModal(&s.detail.modal.state, layer) // 在详情浮层里：焦点陷阱要放它进去
+	}
+	layer.Children(func() {
+		bar(ui.Row(c.Key("bar")).FillWidth()).Children(body)
+	})
 }
 
 // findBarWidth 是查找条的宽：外层包装是 w-full max-w-[calc(100%-1rem)]、条本身再取 max-w-[calc(100%-1rem)]，

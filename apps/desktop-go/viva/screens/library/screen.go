@@ -11,6 +11,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/reader"
 )
 
 // Screen 是「知识库」模块的二级侧栏界面（渲染层 components/library/SidebarLibraryPanel）：
@@ -40,10 +41,16 @@ type Screen struct {
 	HideDetail bool
 	// EditorPreview 报告设置里「编辑器默认预览」是否开着（每次现读）；nil 取默认值（开）。
 	EditorPreview func() bool
+	// ReaderToolbar 为真时即使没有接阅读岛宿主，工具栏里也画读者工具条（原文 / AI 阅读 / 目录 / 编辑）：对照场景专用，
+	// 用来单独比较这一组控件而不拉起 WebView。生产里接了宿主（SetReader）就总是画。
+	ReaderToolbar bool
 
 	// Loc 与 Locale 决定表格里时间的写法（今天写时分，其余写日期）；空表示本地时区与中文。
 	Loc    *time.Location
 	Locale kit.DateLocale
+
+	// readerHost 是阅读区的岛宿主（SetReader）；nil 时阅读区留白。
+	readerHost *reader.Host
 
 	table      tableState // 表格视图的界面状态（列配置、二维滚动、分隔条拖拽；table.go）
 	groups     kit.HoverGroups
@@ -119,6 +126,9 @@ func (s *Screen) EndFrame() {
 		// 卸载（切换模块）前保存未落盘内容（渲染层 LibraryWorkspace 的卸载 effect：flushPendingSave，不等结果）。
 		s.Store.Spawn(func() { s.Store.FlushPendingSave(s.Ctx) })
 		s.detail = detailUI{} // 详情栏、专注阅读（离开知识库即退出）与详情浮层同理
+	}
+	if s.readerHost != nil {
+		s.readerHost.EndFrame() // 这一帧阅读区没画出来（切了模块、关了详情、换到没有内容的标签）：关岛
 	}
 }
 

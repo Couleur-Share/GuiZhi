@@ -1,6 +1,7 @@
 package library
 
 import (
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/notes"
@@ -23,14 +24,25 @@ type panelState struct {
 	// canFind 是这一帧工具栏摆不摆查找入口（窗口键盘钩子的 Ctrl+F 据此判断），findFocused 是查找框此刻有没有键盘焦点（钩子的 Enter / Esc 据此判断），panelW 是上一帧面板宽。
 	canFind, findFocused bool
 	panelW               float32
-	find                 ui.Field
-	findQuery            string
-	findActive           int
-	findCount            int
+	// panelRect 是上一帧面板的位置与大小（窗口坐标）：阅读岛盖住同层的东西，查找条抬到更高的层时要按它定位（detailreader.go）。
+	panelRect  gfx.Rect
+	find       ui.Field
+	findQuery  string
+	findActive int
+	findCount  int
 	// focusFind 为真时下一帧把焦点交给查找框（渲染层打开查找条后 requestAnimationFrame focus）。
 	focusFind bool
 
 	catalogOpen bool
+
+	// tocOpen 是主题阅读「目录」浮层的开合，tocKey 是它当前属于哪份（条目 + 来源）；restoreTop 是这条刚打开时要恢复的阅读位置，
+	// 只对打开时的那个标签（restoreTab），换标签即作废（渲染层 changeTab 之后 restoredRef 恒为真，只在切换条目时恢复）；
+	// viewCache 是阅读区内容的切分缓存（detailreader.go）。
+	tocOpen    bool
+	tocKey     string
+	restoreTop *float64
+	restoreTab ReadingTab
+	viewCache  readerViewCache
 
 	// persisted 是已经写进阅读记忆的「条目 ID + 标签」，repliesPersisted 是讨论标签已写的搜索词与目录开关
 	// （渲染层两个 useEffect 的依赖：变了才写）。
@@ -113,7 +125,8 @@ func (s *Screen) syncPanel(item services.LibraryItem, caps ItemCaps) {
 	if caps.ShowRepliesTab {
 		replyCount = len(notes.ParseForumReplies(item.Content))
 	}
-	if mem, ok := LoadReadingMemory(s.Prefs, item.ID, s.nowTime()); ok && p.restorable(mem.Tab, caps, item) {
+	mem, remembered := LoadReadingMemory(s.Prefs, item.ID, s.nowTime())
+	if remembered && p.restorable(mem.Tab, caps, item) {
 		p.tab = mem.Tab
 		if mem.Tab == TabReplies && mem.RepliesQuery != nil {
 			p.findQuery = *mem.RepliesQuery
@@ -123,13 +136,19 @@ func (s *Screen) syncPanel(item services.LibraryItem, caps ItemCaps) {
 		if mem.CatalogOpen != nil {
 			p.catalogOpen = *mem.CatalogOpen
 		}
-		return
+	} else {
+		p.tab = TabBody
+		if item.ItemType == services.LibraryTypeForum && caps.ShowForumSummaryTab {
+			p.tab = TabSummary
+		}
+		p.catalogOpen = defaultCatalogOpen(replyCount)
 	}
-	p.tab = TabBody
-	if item.ItemType == services.LibraryTypeForum && caps.ShowForumSummaryTab {
-		p.tab = TabSummary
+	// 阅读位置：对实际显示的标签恢复（渲染层 useLayoutEffect 用 memory.scrollTopByTab[activeTab]，记忆里的标签这条不能用时也照样取回正文的位置）。
+	if active := p.activeTab(caps); remembered {
+		if top, ok := mem.ScrollTopByTab[active]; ok {
+			p.restoreTop, p.restoreTab = &top, active
+		}
 	}
-	p.catalogOpen = defaultCatalogOpen(replyCount)
 }
 
 // restorable 报告记忆里的标签这条还能不能用（渲染层那一长串条件：转写标签要看转写入口，图片的两个标签要看是图片条目）。
@@ -181,12 +200,13 @@ func (s *Screen) patchReading(itemID string, patch ReadingPatch) {
 	}
 }
 
-// changeTab 切换标签（渲染层 changeTab）：先把当前标签的滚动位置记进记忆（阅读区在 M2-5，这里没有滚动位置可记），
-// 再换标签、查找位置归零。
+// changeTab 切换标签（渲染层 changeTab）：先把当前标签的滚动位置记进记忆，再换标签、查找位置归零，并且此后不再恢复阅读位置
+// （restoredRef 置真）。当前标签的位置由页面持续上报、宿主在换内容时补报一次，所以这里不必另存。
 func (s *Screen) changeTab(item services.LibraryItem, caps ItemCaps, next ReadingTab) {
 	p := &s.detail.panel
 	p.tab = next
 	p.findActive = 0
+	p.restoreTop = nil
 	_ = item
 	_ = caps
 }

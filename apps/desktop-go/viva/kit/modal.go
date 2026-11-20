@@ -225,6 +225,22 @@ func (l *Look) pushModalScope(canvas *gfx.Canvas) func() {
 	return canvas.PopFocusScope
 }
 
+// WithinModal 让一个浮层（ui.Overlay）的命中区与焦点归入 st 这个 Modal 的焦点作用域。声明在 Modal 里的浮层按层号画在页面树之后，
+// 已经不在 Modal 的绘制作用域里，Modal 的焦点陷阱会把它挡在外面（输入框拿不到焦点、按钮点不到）。
+// 用于详情浮层里抬到原生视图之上的控件（查找条）；Modal 还没有开过（作用域为零）时什么都不做。
+func (l *Look) WithinModal(st *ModalState, box ui.Box) ui.Box {
+	if st.scope.IsZero() {
+		return box
+	}
+	var pop func()
+	return box.
+		Draw(func(d *ui.DrawContext) {
+			d.Canvas.PushFocusScope(st.scope)
+			pop = d.Canvas.PopFocusScope
+		}).
+		DrawOver(func(d *ui.DrawContext) { pop() })
+}
+
 // modalPresence 开启面板的入场：淡入 + 从 96% 放大 + 自下 16px 滑入（180 ms，ease-enter）；入场播完之后改用退场的
 // 时长与曲线（120 ms，ease-exit），撤掉面板时按它回放（渲染层的退场用 duration-quick ease-exit 走回起始态）。
 func modalPresence(canvas *gfx.Canvas, id gfx.ID, enter, exit gfx.Motion, slide, pivot gfx.Point) {

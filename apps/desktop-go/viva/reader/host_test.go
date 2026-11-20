@@ -488,6 +488,38 @@ func TestOpenFailureIsReportedOncePerContent(t *testing.T) {
 	}
 }
 
+func TestFailureIsReportedForTheFailedContentOnlyAndRetryClearsIt(t *testing.T) {
+	r := newRig(t)
+	r.opener.err = errors.New("WebView2 不可用")
+	r.frame()
+	if err := r.host.Failure(r.req); err == nil || !strings.Contains(err.Error(), "WebView2 不可用") {
+		t.Fatalf("失败要能查到原因：%v", err)
+	}
+	other := r.req
+	other.ItemID = "item-2"
+	if r.host.Failure(other) != nil {
+		t.Error("失败只属于那一份内容")
+	}
+	other = r.req
+	other.Tab = TabSummary
+	if r.host.Failure(other) != nil {
+		t.Error("换标签页是另一份内容")
+	}
+	r.opener.err = nil
+	r.frame()
+	if r.host.Open() {
+		t.Fatal("没点重试之前同一份内容不重开")
+	}
+	r.host.Retry()
+	if r.host.Failure(r.req) != nil {
+		t.Error("重试清掉失败记录")
+	}
+	r.frame()
+	if !r.host.Open() || r.host.Failure(r.req) != nil {
+		t.Error("重试之后下一帧重新打开")
+	}
+}
+
 func TestNoOpenerFails(t *testing.T) {
 	h := New(Options{})
 	rec := &recHandler{}
