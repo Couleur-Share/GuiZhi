@@ -21,33 +21,40 @@ import (
 // 窗口比表格的最小宽度窄时（800×600）表格撑在最小宽度上，列宽就是默认宽；窗口宽时表格拉伸，列宽要从把手的位置读。
 const typeColumnWidth = 84
 
-// tableHoverRow 把指针停在第 row 行（从 0 起）的「类型」列：整行进入悬停态，指针不落在标题按钮或操作按钮上
-// （对应 React 采集器的 hoverRow：该行第 5 个单元格的中心）。
+// tableRowPoint 是第 row 行（从 0 起）的「类型」列里的一个点：tableHoverRow 把指针停在这里（整行进入悬停态），
+// tableOpenTagPicker 右键点这里；指针都不落在标题按钮或操作按钮上
+// （对应 React 采集器的 hoverRow、openTagPicker：该行第 5 个单元格的中心）。
 // 类型列的横向范围取自它左右两边的拖动把手（「标签」与「类型」的列宽把手各压在列的右缘），纵向取这一行复选框的中心。
 // 窗口很窄时（800×600）类型列落在吸附的操作列底下，它右缘的把手整个在画布之外、不进可访问树：这时右缘按默认列宽算。
 // 横向位置不能随便取一个「在列里」的点：渲染层的指针恰好落在操作列里「更多」钮的右缘外 1px 处，偏几个像素就会点亮那枚钮。
+func tableRowPoint(s *headless.Session, row int) (x, y float32, err error) {
+	tags, ok := s.AccessByRole(gfx.RoleSeparator, "调整「标签」列宽")
+	if !ok {
+		return 0, 0, fmt.Errorf("找不到「标签」列的宽度把手")
+	}
+	tagsX := tags.Bounds.X + tags.Bounds.Width/2
+	kindX := tagsX + typeColumnWidth
+	if kind, found := s.AccessByRole(gfx.RoleSeparator, "调整「类型」列宽"); found {
+		kindX = kind.Bounds.X + kind.Bounds.Width/2
+	}
+	var boxes []gfx.Rect
+	for _, n := range s.Access() {
+		if n.Role == gfx.RoleCheckbox && strings.HasPrefix(n.Label, "选择「") {
+			boxes = append(boxes, n.Bounds)
+		}
+	}
+	if row >= len(boxes) {
+		return 0, 0, fmt.Errorf("表格里没有第 %d 行（只有 %d 行）", row, len(boxes))
+	}
+	return (tagsX + kindX) / 2, boxes[row].Y + boxes[row].Height/2, nil
+}
+
 func tableHoverRow(row int) libraryEnvStep {
 	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
-		tags, ok := s.AccessByRole(gfx.RoleSeparator, "调整「标签」列宽")
-		if !ok {
-			return fmt.Errorf("找不到「标签」列的宽度把手")
+		x, y, err := tableRowPoint(s, row)
+		if err != nil {
+			return err
 		}
-		tagsX := tags.Bounds.X + tags.Bounds.Width/2
-		kindX := tagsX + typeColumnWidth
-		if kind, found := s.AccessByRole(gfx.RoleSeparator, "调整「类型」列宽"); found {
-			kindX = kind.Bounds.X + kind.Bounds.Width/2
-		}
-		var boxes []gfx.Rect
-		for _, n := range s.Access() {
-			if n.Role == gfx.RoleCheckbox && strings.HasPrefix(n.Label, "选择「") {
-				boxes = append(boxes, n.Bounds)
-			}
-		}
-		if row >= len(boxes) {
-			return fmt.Errorf("表格里没有第 %d 行（只有 %d 行）", row, len(boxes))
-		}
-		x := (tagsX + kindX) / 2
-		y := boxes[row].Y + boxes[row].Height/2
 		if err := s.Move(x, y); err != nil {
 			return err
 		}

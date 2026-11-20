@@ -120,6 +120,65 @@ function pageInit({ fixture, configKey }) {
       nextCursor: end < hits.length ? `c:${end}` : null,
     };
   };
+  // 批量操作（M2-3）：freeze 返回筛选结果的全部 id；execute 对每个 id 执行命令并就地改条目，规则与 Go 一侧的假实现
+  // （native/services/servicestest/library_ops.go 的 ExecuteBatch）一致：回收站里的条目只有恢复与彻底删除能碰，
+  // 彻底删除只收回收站里的；config.batch.fail 里登记的 id 在 execute 时失败，原因取登记的文字。
+  const batchFail = config.batch?.fail ?? {};
+  const holdAfter = config.batch?.holdAfter ?? 0;
+  let executes = 0;
+  const byName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+  const tagNamed = (name) => {
+    let tag = tags.find((t) => t.name === name);
+    if (!tag) {
+      tag = { id: `tag-new-${tags.length + 1}`, name, colorKey: "gray", itemCount: 0, createdAt: 0, updatedAt: 0 };
+      tags.push(tag);
+      tags.sort(byName);
+    }
+    return tag;
+  };
+  /** 对一条执行命令；返回失败原因，成功返回空串。 */
+  const applyOne = (command, id) => {
+    const at = entries.findIndex((e) => e.id === id);
+    if (at < 0) return "条目已删除";
+    const entry = entries[at];
+    const inTrash = !!entry.deletedAt;
+    if (command.kind !== "restore" && command.kind !== "delete" && inTrash) return "条目已在回收站";
+    if (batchFail[id]) return batchFail[id];
+    switch (command.kind) {
+      case "update": {
+        const patch = command.patch ?? {};
+        if (patch.isFavorite !== undefined) entry.isFavorite = patch.isFavorite;
+        if (patch.isPinned !== undefined) entry.isPinned = patch.isPinned;
+        if (patch.collectionId !== undefined) entry.collectionId = patch.collectionId;
+        for (const name of patch.addTagNames ?? []) {
+          if (!entry.tags.some((t) => t.name === name)) entry.tags.push({ ...tagNamed(name) });
+        }
+        entry.tags.sort(byName);
+        entry.updatedAt = fixture.now;
+        return "";
+      }
+      case "status":
+        entry.status = command.status;
+        entry.updatedAt = fixture.now;
+        return "";
+      case "trash":
+        entry.deletedAt = fixture.now;
+        entry.updatedAt = fixture.now;
+        return "";
+      case "restore":
+        if (inTrash) {
+          entry.deletedAt = 0;
+          entry.updatedAt = fixture.now;
+        }
+        return "";
+      case "delete":
+        if (!inTrash) return "只能彻底删除回收站中的条目";
+        entries.splice(at, 1);
+        return "";
+      default:
+        return "批量操作类型无效";
+    }
+  };
   const listFault = config.list?.fault ?? "";
   const listApi = {
     list: (query) => {
@@ -132,6 +191,25 @@ function pageInit({ fixture, configKey }) {
     get: (id) => {
       const e = entries.find((x) => x.id === id);
       return Promise.resolve(e ? { ...JSON.parse(JSON.stringify(e)), content: "", sourceUrl: null, metadata: {} } : null);
+    },
+    // 批量选择：freeze 冻结筛选结果的 id（顺序与列表一致），execute 逐条执行。
+    selection: (command) => {
+      if (command.action === "freeze") {
+        const hits = entries.filter((e) => matches(e, command.query));
+        if (!(command.query.search ?? "").trim()) hits.sort((a, b) => compare(a, b, command.query.sortBy, command.query.sortOrder));
+        return Promise.resolve({ ok: true, ids: hits.map((e) => e.id) });
+      }
+      if (command.action === "execute") {
+        // holdAfter：第 N 次批量照常执行，之后的批量永不返回（批量进行中的画面，如重试失败项）。
+        executes += 1;
+        if (holdAfter > 0 && executes > holdAfter) return new Promise(() => {});
+        const results = [...new Set(command.ids)].map((id) => {
+          const error = applyOne(command.command, id);
+          return error ? { id, ok: false, error } : { id, ok: true };
+        });
+        return Promise.resolve({ ok: true, results });
+      }
+      return Promise.resolve({ ok: false, error: "不支持的选择命令" });
     },
   };
 

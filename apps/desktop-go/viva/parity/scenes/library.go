@@ -37,6 +37,11 @@ type libraryOptions struct {
 	fault listFault
 	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
 	view string
+	// batchFail 登记批量里会失败的条目（id → 失败原因）；与 React 采集器的 config.batch.fail 对应。
+	batchFail map[string]string
+	// holdBatch 为 true 时，场景里的 listHoldBatches 之后的第一次批量卡在服务里不返回（批量进行中的画面，如重试失败项）：
+	// 与 React 采集器的 config.batch.holdAfter 对应。卡住的批量要到画面采集完才放走，收尾的取消延后（同 faultHold）。
+	holdBatch bool
 }
 
 // listFault 是列表读取的故障：与 React 采集器里 config.list.fault 一一对应。
@@ -61,6 +66,7 @@ type libraryEnv struct {
 	store  *libraryscreen.Store
 	screen *libraryscreen.Screen
 	ctx    context.Context
+	svc    *servicestest.Library
 }
 
 // parkMode 是场景收尾时对指针与焦点的处理，与 React 采集器一一对应。
@@ -120,6 +126,9 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 		store.Spawn = func(fn func()) { fn() }
 		if opt.list {
 			svc.SeedEntries(data.Entries)
+			for id, reason := range opt.batchFail {
+				svc.FailBatchItem(id, reason)
+			}
 			switch opt.fault {
 			case faultFail:
 				svc.FailOn("List", errors.New(listFailMessage))
@@ -162,10 +171,10 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			screen.EndFrame()
 		}
 		compact := look.Viewport <= compactMaxWidth
-		env := &libraryEnv{store: store, screen: screen, ctx: ctx}
+		env := &libraryEnv{store: store, screen: screen, ctx: ctx, svc: svc}
 		run := func(s *headless.Session) error {
-			if opt.fault == faultHold {
-				// 卡住的读取要到画面采集完才放走：这里一收尾就取消的话，读取带着「context canceled」回来，
+			if opt.fault == faultHold || opt.holdBatch {
+				// 卡住的读取（或批量）要到画面采集完才放走：这里一收尾就取消的话，读取带着「context canceled」回来，
 				// 读取中的画面被错误态顶掉（采集在 run 返回之后）。采集在毫秒内完成，放走的时间留得宽裕。
 				time.AfterFunc(holdRelease, cancel)
 			} else {

@@ -29,11 +29,11 @@ export function listScene(options, steps, flags = {}) {
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** 卡片：列表栏里可访问名以标题开头的按钮。 */
-const card = (win, title) =>
+export const card = (win, title) =>
   win.getByTestId("item-list").getByRole("button", { name: new RegExp(`^${escapeRegExp(title)}`) }).first();
 
 /** 卡片左内边距里的点位：不压在置顶图标、星标与类型图标上（与 Viva 一侧 listCardAnchor 一致）。 */
-const CARD_ANCHOR = 24;
+export const CARD_ANCHOR = 24;
 
 /** 点一张卡片，等选中与详情读取落定。 */
 function clickCard(title) {

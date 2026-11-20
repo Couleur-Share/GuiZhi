@@ -17,6 +17,7 @@ import { resetToasts, showToasts } from "../lib/react-toast.mjs";
 import { LIBRARY_SCENES } from "./react-library-scenes.mjs";
 import { LIBRARY_LIST_SCENES } from "./react-library-list-scenes.mjs";
 import { LIBRARY_TABLE_SCENES } from "./react-library-table-scenes.mjs";
+import { LIBRARY_BULK_SCENES } from "./react-library-bulk-scenes.mjs";
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
 async function openSettingsSection(win, section) {
@@ -472,6 +473,7 @@ export const SCENES = {
   ...LIBRARY_SCENES,
   ...LIBRARY_LIST_SCENES,
   ...LIBRARY_TABLE_SCENES,
+  ...LIBRARY_BULK_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,
