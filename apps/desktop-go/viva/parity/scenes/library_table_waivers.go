@@ -15,6 +15,7 @@ import (
 func tableBaseWaivers() []parity.Waiver {
 	out := semiboldKerningWaivers()
 	out = append(out, headerInkWaivers()...)
+	out = append(out, englishHeaderKerningWaivers()...)
 	out = append(out, snippetKerningWaivers()...)
 	out = append(out, sourceEllipsisWaivers()...)
 	out = append(out, parity.Waiver{
@@ -60,12 +61,45 @@ func headerInkWaivers() []parity.Waiver {
 		locales.LibraryColumnSource(), locales.LibraryColumnCollection(), locales.LibraryColumnStatus(),
 		locales.LibraryColumnCreatedAt(), locales.LibraryColumnUpdatedAt(), locales.LibraryColumnActions(),
 	}
-	out := make([]parity.Waiver, 0, len(labels))
+	out := make([]parity.Waiver, 0, len(labels)+len(englishTableHeaders))
 	for _, label := range labels {
 		out = append(out, parity.Waiver{
 			Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Subject: "「" + label + "」", MinDelta: 0.1, MaxDelta: 0.4, Dir: 1,
 			Note: "吸附表头在合成层里用灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（位置、字重、颜色、字号均一致）",
 		})
+	}
+	// 英文界面的表头（G-017 的英文变体，B-051 收尾时暴露）：同一个成因，中档字号档实测 Title、Snippet、Updated、Actions 四个标签的墨迹总量比
+	// 为 1.153、1.154、1.155、1.169（上限 1.15）；范围同中文，只在中档字号档放过（英文变体只做中档，别的字号档没有读数）。
+	for _, label := range englishTableHeaders {
+		out = append(out, parity.Waiver{
+			Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Subject: "「" + label + "」", Variant: "medium", MinDelta: 0.1, MaxDelta: 0.4, Dir: 1,
+			Note: "英文表头：吸附表头在合成层里用灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（A-009 同因，中档字号档）",
+		})
+	}
+	return out
+}
+
+// englishTableHeaders 是表格表头在英文界面下画出来的字（顺序同 headerInkWaivers 里的中文标签）；
+// 与 locales 目录里英文的一致由 library_waivers_test.go 核对，目录改了这里要跟着改。
+var englishTableHeaders = []string{"Title", "Snippet", "Tags", "Type", "Source", "Collection", "Status", "Created", "Updated", "Actions"}
+
+// englishHeaderKerningWaivers 登记 A-026 在英文表头上的延伸：表头是 font-semibold（600），Chromium 不做字偶距、Viva 做，
+// 含 Ta、Ty 这类字偶对的标签 Viva 的绘制宽度窄一截：中档字号档实测「Tags」差 1.44px（墨迹水平 −1）、「Type」差 1.27px；
+// 没有字偶对的 Title、Snippet、Updated、Actions 等没有宽度差。成因是按字偶对推断的（与 A-026 同类），没有逐个字偶对核对。
+// 宽度差上限取 2px（实测最大 1.44px 向外取整），墨迹位移上限 2px，只管横向；只在中档字号档放过。
+func englishHeaderKerningWaivers() []parity.Waiver {
+	var out []parity.Waiver
+	for _, label := range []string{"Tags", "Type"} {
+		subject := "「" + label + "」"
+		out = append(out,
+			parity.Waiver{
+				Ledger: "A-026", Layer: parity.LayerL2, Kind: "text-width", Subject: subject, Variant: "medium", MaxDelta: 2,
+				Note: "英文表头的字偶距：Viva 对 600 字重做、Chromium 不做，含 Ta、Ty 字偶对的标签绘制宽度窄 ≤ 2px（中档字号档）",
+			},
+			parity.Waiver{
+				Ledger: "A-026", Layer: parity.LayerL2, Kind: "ink", Subject: subject, Variant: "medium", MaxDelta: 2,
+				Note: "同上：宽度差使墨迹剖面最佳对齐位移（只管横向，纵向错位照常判定）",
+			})
 	}
 	return out
 }

@@ -133,3 +133,75 @@ func TestEnglishHeadingWaiversAreMediumTierOnlyAndEnglishOnly(t *testing.T) {
 		}
 	}
 }
+
+// TestEnglishTableHeaderWaiversMatchCatalog 守住英文表头登记的 Subject：写死的英文标签要与 locales 目录里英文界面画出的字一致
+// （顺序同 headerInkWaivers 的中文标签）；目录改了而这里没改，登记会悄悄匹配不上。语言处理同上一个目录测试：不并行、结束时还原。
+func TestEnglishTableHeaderWaiversMatchCatalog(t *testing.T) {
+	locales.SetLang(locales.En)
+	t.Cleanup(func() { locales.SetLang(locales.Zh) })
+	want := []string{
+		locales.LibraryColumnTitle(), locales.LibraryColumnSnippet(), locales.LibraryColumnTags(), locales.LibraryColumnType(),
+		locales.LibraryColumnSource(), locales.LibraryColumnCollection(), locales.LibraryColumnStatus(),
+		locales.LibraryColumnCreatedAt(), locales.LibraryColumnUpdatedAt(), locales.LibraryColumnActions(),
+	}
+	if strings.Join(englishTableHeaders, "|") != strings.Join(want, "|") {
+		t.Fatalf("englishTableHeaders = %q，目录里英文界面画出来的是 %q", englishTableHeaders, want)
+	}
+}
+
+// TestEnglishHeaderWaiversOnlyMediumTierAndOnlyTheirLabels 守住英文表头登记的范围：A-009 的墨迹总量登记只在中档、只放过偏多的方向；
+// A-026 的字偶距登记只给「Tags」「Type」、只在中档，宽度差上限 2px；中文表头的登记不带字号档限制。
+func TestEnglishHeaderWaiversOnlyMediumTierAndOnlyTheirLabels(t *testing.T) {
+	const medium, small = "light-royal-blue-medium-1280x800", "light-royal-blue-small-1280x800"
+	anyMatch := func(ws []parity.Waiver, is parity.Issue, variant string) bool {
+		for _, w := range ws {
+			if w.MatchesIn(is, variant) {
+				return true
+			}
+		}
+		return false
+	}
+	ink := headerInkWaivers()
+	mass := func(label string, delta float64, dir int8) parity.Issue {
+		return parity.Issue{Layer: parity.LayerL2, Kind: "ink-mass", Subject: "「" + label + "」", Delta: delta, Dir: dir}
+	}
+	cases := []struct {
+		label   string
+		delta   float64
+		dir     int8
+		variant string
+		want    bool
+	}{
+		{"Actions", 0.169, 1, medium, true},   // 实测最大
+		{"Title", 0.153, 1, medium, true},     // 实测最小
+		{"Actions", 0.169, 1, small, false},   // 小字号档没有英文读数
+		{"Actions", 0.169, -1, medium, false}, // 偏少的方向不放过
+		{"Actions", 0.45, 1, medium, false},   // 超出 A-009 的范围
+		{"操作", 0.169, 1, small, true},         // 中文表头不带字号档限制
+	}
+	for _, c := range cases {
+		if got := anyMatch(ink, mass(c.label, c.delta, c.dir), c.variant); got != c.want {
+			t.Errorf("%s 墨迹总量偏差 %.3f（方向 %d，%s）：放过 = %v，期望 %v", c.label, c.delta, c.dir, c.variant, got, c.want)
+		}
+	}
+	kern := englishHeaderKerningWaivers()
+	width := func(label string, delta float64) parity.Issue {
+		return parity.Issue{Layer: parity.LayerL2, Kind: "text-width", Subject: "「" + label + "」", Delta: delta}
+	}
+	for _, c := range []struct {
+		label   string
+		delta   float64
+		variant string
+		want    bool
+	}{
+		{"Tags", 1.44, medium, true},
+		{"Type", 1.27, medium, true},
+		{"Tags", 2.5, medium, false},   // 超过 2px 上限
+		{"Tags", 1.44, small, false},   // 只在中档
+		{"Title", 1.44, medium, false}, // 没有字偶对的标签不登记
+	} {
+		if got := anyMatch(kern, width(c.label, c.delta), c.variant); got != c.want {
+			t.Errorf("%s 宽度差 %.2f（%s）：放过 = %v，期望 %v", c.label, c.delta, c.variant, got, c.want)
+		}
+	}
+}
