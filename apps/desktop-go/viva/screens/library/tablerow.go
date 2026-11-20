@@ -3,6 +3,7 @@ package library
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -151,9 +152,7 @@ func (s *Screen) tableCell(c ui.C, v View, geo stickyGeometry, col tableColumn, 
 	case colTags:
 		s.cell(cc, col).Children(func() { s.tagsCell(cc, e) })
 	case colType:
-		s.cell(cc, col).Justify(ui.Center).Children(func() {
-			l.Text(cc.Key("type"), kit.GetItemTypeMeta(e.ItemType).Label, kit.TextXS, kit.WeightNormal, t.MutedForeground)
-		})
+		s.typeCell(cc, col, kit.GetItemTypeMeta(e.ItemType).Label)
 	case colSource:
 		s.cell(cc, col).Justify(ui.Center).Children(func() { s.sourceCell(cc, e) })
 	case colCollection:
@@ -176,6 +175,35 @@ func (s *Screen) tableCell(c ui.C, v View, geo stickyGeometry, col tableColumn, 
 	case colActions:
 		s.actionsCell(cc, v, geo, col, e, overlay, list.SelectedID == e.ID, checked, last)
 	}
+}
+
+// typeCell 是类型格（台账 B-051）：td 里的普通文字，text-xs、居中、没有 whitespace-nowrap。
+//
+// 标签放得下内容宽（列宽减两侧内边距；表格比最小宽度宽时各列只会更宽，所以这是保守的判断）就是一行、居中：文字盒取文字的自然宽、
+// 由格子的 Justify(Center) 居中——中文标签与英文的短标签都走这里，画面与改造之前逐像素相同（文字盒比文字宽的话，字形边缘的
+// LCD 渗色不再被盒子裁掉，会在 59 个像素上与已对照过的中文画面不同，所以不能一律用宽盒子）。
+//
+// 放不下时（英文的「Web page」约 58px、「Document」约 60px，内容宽 52px）才走另一条路：td 里的普通文字在空格处折行，行高跟着长；
+// 放不进内容宽的单词不折也不裁——不可断的词超出内容盒时，居中的行退回行首对齐、整词向右溢出（渲染层里「Document」就是这样），
+// 所以文字盒的最小宽度取最宽的那个词，盒子撑满内容宽（Grow(1)，折行的两行才在格子里居中）、从内容盒的左缘起排。
+// 文字盒沿行方向默认可收缩（Viva 的 solveFlow：文字与容器在横轴上让位），放不下时才会折行，不必另写 Shrink。
+func (s *Screen) typeCell(c ui.C, col tableColumn, label string) {
+	l := s.Look
+	size := l.Rem(kit.TextXS.Size)
+	if c.Canvas().TextWidthWeight(label, size, kit.WeightNormal) <= col.Width-2*l.Space(cellPadX) {
+		s.cell(c, col).Justify(ui.Center).Children(func() {
+			l.Text(c.Key("type"), label, kit.TextXS, kit.WeightNormal, l.T.MutedForeground)
+		})
+		return
+	}
+	var widest float32
+	for _, word := range strings.Fields(label) {
+		widest = max(widest, c.Canvas().TextWidthWeight(word, size, kit.WeightNormal))
+	}
+	s.cell(c, col).Children(func() {
+		l.Text(c.Key("type"), label, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped(), kit.Centered()).
+			Grow(1).MinWidth(widest)
+	})
 }
 
 // dash 是空值占位的短横线。

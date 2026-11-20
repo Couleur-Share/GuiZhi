@@ -111,15 +111,17 @@ func (s *Screen) tableRows(c ui.C, v View, cols []tableColumn, geo stickyGeometr
 	}
 }
 
-// tableEpoch 汇总会改变行高（折行）的输入：本页内容换了几次（同一序号的条目就地改了标题）与各列的宽度。
-// 行里只有标题格会折行（line-clamp-2，别的格子都是单行或截断）：它的有效宽度由各列宽度决定（列的显隐也体现在宽度序列里），
-// 文字由条目内容决定。根字号（字号档）由 RowEpoch.RootPx 带，窗口宽度的变化与行的键（换了条目）由行列自己核对；
-// 界面语言与列的 ID 不在其中——没有哪个格子的行高随它们变（「无标题」占位在最窄的标题列里也只占一行）。
+// tableEpoch 汇总会改变行高（折行）的输入：本页内容换了几次（同一序号的条目就地改了标题）、各列的宽度与界面语言。
+// 行里会折行的格子有两个：标题格（line-clamp-2）与类型格（英文的「Web page」在空格处折成两行，台账 B-051）；别的格子都是单行或截断。
+// 标题格的有效宽度由各列宽度决定（列的显隐也体现在宽度序列里），文字由条目内容决定；类型格的文字随界面语言变，所以语言在键里
+// （中文的类型标签都不折行，换语言才会让行高变）。根字号（字号档）由 RowEpoch.RootPx 带，窗口宽度的变化与行的键（换了条目）
+// 由行列自己核对；列的 ID 不在其中——没有哪个格子的行高随它变（「无标题」占位在最窄的标题列里也只占一行）。
 // 以后哪个格子可能折行，就把决定它宽度或文字的输入加到这里（台账 B-047）。
 func (s *Screen) tableEpoch(v View, cols []tableColumn) int {
 	h := uint64(14695981039346656037) // FNV-1a
 	mix := func(x uint64) { h = (h ^ x) * 1099511628211 }
 	mix(uint64(v.List.EntriesRev))
+	mix(uint64(locales.CurrentLang()))
 	for _, col := range cols {
 		mix(uint64(math.Float32bits(col.Width)))
 	}
