@@ -121,6 +121,10 @@ func (s *Screen) tableCell(c ui.C, v View, geo stickyGeometry, col tableColumn, 
 			// inline-flex 的行内盒子落在基线上，比居中高 1px（行内盒基线对齐的结果）。
 			box.MarginBottom(2)
 			if box.State().Hovered {
+				// 渲染层的 onContextMenu 挂在整个 <tr> 上，复选框没有拦截它：方框上点右键同样出这一行的菜单（台账 B-057）。
+				// 方框的命中 ID 由 *checked 的地址决定、Viva 不暴露；指针在方框上时，悬停的命中盒就是它。
+				canvas := cc.Canvas()
+				s.watchContext(canvas, func(at gfx.Point) { s.openEntryMenu(at, e, true) }, canvas.Hovered())
 				s.table.checkHover = e.ID
 			} else if s.table.checkHover == e.ID {
 				s.table.checkHover = ""
