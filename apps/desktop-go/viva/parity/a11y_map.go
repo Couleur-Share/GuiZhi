@@ -44,6 +44,10 @@ var reactIgnoredRoles = map[string]bool{
 	// （登记见台账 A-004 的 2026-11-20 补充）。里面的文字照常逐段比较（文字序列、位置、颜色）；底色目前只有 L3 像素比较兜底
 	// （L2 的令牌与绘制比较尚未实现，G-001）。
 	"mark": true,
+	// 列表：逐条结果的 <ul> / <li> 导出 list / listitem，只把条目分行，本身没有状态与操作；Viva 的 gfx.Role 没有对应角色
+	// （登记见台账 G-022，用户 2026-11-20 追认）。里面的文字照常逐段比较（文字序列、位置、颜色）。
+	"list":     true,
+	"listitem": true,
 }
 
 // reactIgnoredUnnamed 是「无名时不参与结构比较」的 Chromium 角色：没有可访问名的图片是装饰性图标
@@ -90,6 +94,9 @@ var reactRoleMap = map[string]string{
 	// 应用区域（role="application"，取色器的饱和度/明度面板）：Viva 的 gfx.Role 没有 application，
 	// 同一条限制（台账 A-004），按带名字的分组比较：名称（含「可用方向键微调」的操作提示）、位置与大小照常逐个比较。
 	"application": "group",
+	// 折叠标题：<details> 的 <summary> 导出 DisclosureTriangle，Viva 的 kit.Disclosure 是带展开状态的 button（台账 G-022，
+	// 用户 2026-11-20 追认）。名称与位置照常逐个比较；roleStates 没有 button 一项，展开状态仍不进 L1，由 L4 兜底。
+	"DisclosureTriangle": "button",
 }
 
 // vivaIgnoredRoles 是 Viva 一侧不算可访问节点的角色：未声明角色的区域。

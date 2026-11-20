@@ -238,21 +238,6 @@ func wideTrackingWaivers(title string) []parity.Waiver {
 	return wideTracking(title, 0, "", "tracking-wide 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.025em（盒宽已补齐，后面的元素位置一致）")
 }
 
-// resultsDisclosureWaivers 登记 G-022（比较器的缺口，不是 Viva 的偏差）：比较器的角色映射表（a11y_map.go，哈希守卫）里没有
-// <details>/<summary> 导出的 DisclosureTriangle，也没有 <ul>/<li> 导出的 list / listitem，所以「逐条结果」这一块的 L1
-// 没法逐节点比较：React 的 DisclosureTriangle 被报为「未映射」，Viva 侧对应的 button 被报为「多出的节点」，是同一件事的两面。
-// 只放过这三种角色与这一枚钮；这一块的角色、名称与展开状态由 L4（viva/screens/library/bulk_strip_ui_test.go）兜底。
-// 假设性实验：把映射表补成 DisclosureTriangle → button、list / listitem → 忽略，四个批量结果场景的 L1 全部对齐，没有别的差异；
-// 映射表的改动要用户追认，追认之前按这里登记放过。报告里「未映射角色」一栏照常列出。
-var resultsDisclosureWaivers = []parity.Waiver{
-	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "unmapped-role", Subject: "DisclosureTriangle", Note: "比较器的角色映射表没有 <summary> 的 DisclosureTriangle（逐条结果的折叠钮）"},
-	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "unmapped-role", Subject: "listitem", Note: "比较器的角色映射表没有 <li> 的 listitem（逐条结果的每一行）"},
-	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "unmapped-role", Subject: "list", Note: "比较器的角色映射表没有 <ul> 的 list（逐条结果的列表）"},
-	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "extra-node", Subject: "button 「逐条结果（", Note: "Viva 的折叠钮是 button 并带展开状态；React 一侧对应的 DisclosureTriangle 未映射，所以被报为多出的节点"},
-	// 英文界面里折叠钮的名字是「Per-item results (N)」（与 library_bulk_waivers_test.go 核对目录，目录改了这里要跟着改）。
-	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "extra-node", Subject: "button 「Per-item results (", Note: "同上（英文界面的折叠钮名称）"},
-}
-
 func init() {
 	list := libraryOptions{variant: "data", list: true}
 	failing := libraryOptions{variant: "data", list: true, batchFail: map[string]string{batchFailID: batchFailReason}}
@@ -277,7 +262,7 @@ func init() {
 		registry[id] = withBackdrop(libraryEnvScene(id, list, steps, parkKeepFocus, withEnglishBulk(waivers)...), spec)
 	}
 	cards := semiboldKerningWaivers()
-	results := append(append([]parity.Waiver{}, cards...), resultsDisclosureWaivers...)
+	results := append([]parity.Waiver{}, cards...)
 	overlay := append([]parity.Waiver{overlayInkWaiver}, cards...)
 	base := tableBaseWaivers()
 	tableOverlay := append([]parity.Waiver{overlayInkWaiver}, base...)
