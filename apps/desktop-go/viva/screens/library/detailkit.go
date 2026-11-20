@@ -12,9 +12,11 @@ import (
 // 命中区、悬停过渡、聚焦环、禁用淡出与 kit.Button 同一套规则；内容（几段图标与文字）由 body 按 fg 自己画。
 type inlineSpec struct {
 	// Name 是可访问名；Hint 是渲染层的 title（悬停 320 ms 出气泡）；Role 缺省是按钮。
-	Name, Hint string
-	Role       gfx.Role
-	Disabled   bool
+	// Description 是可访问描述（渲染层 title 与名字不同时，Chromium 把它当描述，如来源链接的完整地址）；
+	// Value 是弹出菜单触发钮此刻显示的值（按钮里的文字，Chromium 的 combobox 值）。
+	Name, Hint, Description, Value string
+	Role                           gfx.Role
+	Disabled                       bool
 	// Popup 为真时它是 aria-haspopup="menu" 的触发钮（可访问树里是 combobox），Open 是菜单此刻开着。
 	Popup, Open bool
 
@@ -46,7 +48,10 @@ func (s *Screen) inlineButton(c ui.C, spec inlineSpec, body func(fg tokens.Color
 	case role == 0:
 		role = gfx.RoleButton
 	}
-	opts := gfx.HitOptions{Role: role, Disabled: spec.Disabled, Hint: spec.Hint, Expandable: spec.Popup, Expanded: spec.Popup && spec.Open}
+	opts := gfx.HitOptions{Role: role, Disabled: spec.Disabled, Hint: spec.Hint, Description: spec.Description, Expandable: spec.Popup, Expanded: spec.Popup && spec.Open}
+	if spec.Popup {
+		opts.Value = spec.Value
+	}
 	if !spec.Disabled {
 		opts.Cursor = gfx.PointerCursorHand
 	}

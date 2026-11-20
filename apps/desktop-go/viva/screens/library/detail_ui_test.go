@@ -2,6 +2,7 @@ package library
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -107,6 +108,17 @@ func (r *rig) clickPrefix(role gfx.Role, prefix string) {
 		}
 	}
 	r.t.Fatalf("找不到名字以 %q 开头的 %v", prefix, role)
+}
+
+// hasPrefix 判断有没有可访问名以 prefix 开头的 role 节点：折叠块的按钮名是整段摘要（标题加说明），不是标题本身。
+func (r *rig) hasPrefix(role gfx.Role, prefix string) bool {
+	r.t.Helper()
+	for _, n := range r.session.Access() {
+		if n.Role == role && strings.HasPrefix(n.Label, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // toastText 展开提示的「查看详情」，返回此刻画面上所有文字拼成的串（详情原文可能折成几行，所以拼起来再找）。
@@ -340,6 +352,40 @@ func TestTableRowOpensTheDetailModalAndAltArrowsStepThroughTheFrozenList(t *test
 	}
 }
 
+// 整理导航条的计数：「第几条 / 共几条」与跳过说明各是一段文字（JSX 里相邻的文本节点，对照按节点逐段比），
+// 拼起来读作「3 / 4 · 已跳过 1 条已删除资料」；跳过的条目不进「第几条」的走法，但仍占总数。
+func TestReviewBarShowsPositionTotalAndSkipped(t *testing.T) {
+	t.Parallel()
+	r := detailRig(t)
+	r.toTable()
+	entries := r.view().List.Entries
+	x, y := r.rowBlank(entries[0])
+	r.clickAt(x, y)
+	if !r.screen.DetailModalOpen() {
+		t.Fatal("点行应打开详情浮层")
+	}
+	screenText := func() string {
+		r.frames(2)
+		return strings.Join(r.session.Texts(), "")
+	}
+	total := len(entries)
+	if got, want := screenText(), fmt.Sprintf("1 / %d", total); !strings.Contains(got, want) {
+		t.Fatalf("刚打开时计数应是 %q，画面上的文字：%q", want, got)
+	}
+	if strings.Contains(screenText(), locales.LibraryWorkflowSkipped(1)) {
+		t.Fatal("还没有跳过任何条目，不该出现跳过说明")
+	}
+	r.svc.EditExternally(entries[1].ID, func(it *services.LibraryItem) { it.DeletedAt = 5 })
+	r.keys("alt+right")
+	if got := r.view().List.SelectedID; got != entries[2].ID {
+		t.Fatalf("Alt+→ 应跳过被删除的第二条停在第三条 %q，实际 %q", entries[2].ID, got)
+	}
+	want := fmt.Sprintf("3 / %d · %s", total, locales.LibraryWorkflowSkipped(1))
+	if got := screenText(); !strings.Contains(got, want) {
+		t.Fatalf("跳过一条之后计数应是 %q，画面上的文字：%q", want, got)
+	}
+}
+
 // Alt+方向键在输入框里不动（光标移动属于输入框）。
 func TestAltArrowsDoNothingWhileTypingInTheModal(t *testing.T) {
 	t.Parallel()
@@ -481,15 +527,16 @@ func TestReviewNoticeMarksTheItemReviewed(t *testing.T) {
 	t.Parallel()
 	r := detailRig(t)
 	r.openCard(detailReviewID)
-	if !r.has(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) {
+	// 折叠块的按钮名是整段摘要（标题、「已保留可读内容」、「查看缺口与复核」，与渲染层 <summary> 的文字一致），按开头找。
+	if !r.hasPrefix(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) {
 		t.Fatalf("待复核的条目应显示复核提醒，实际画面文字 %q", r.session.Texts())
 	}
-	r.click(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) // 先展开：「标记已复核」在展开的正文里
+	r.clickPrefix(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) // 先展开：「标记已复核」在展开的正文里
 	r.click(gfx.RoleButton, locales.LibraryMarkReviewed())
 	if n := len(r.svc.UpdateCalls()); n != 1 {
 		t.Fatalf("标记已复核应向服务发一次更新，实际 %d 次", n)
 	}
-	if r.has(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) {
+	if r.hasPrefix(gfx.RoleButton, locales.ArticleReaderImportIncomplete()) {
 		t.Fatal("标记之后复核提醒应消失")
 	}
 }

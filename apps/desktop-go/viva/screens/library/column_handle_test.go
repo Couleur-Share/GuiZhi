@@ -1,6 +1,7 @@
 package library
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -156,6 +157,26 @@ func TestListWidthResizerAppliesAndSavesTheWidth(t *testing.T) {
 		}
 		if got, want := edge(), x0+(c.width-320); got != want {
 			t.Fatalf("按 %s：分隔条应移到 %v，实际 %v", c.keys, want, got)
+		}
+	}
+}
+
+// 工作区宽度是 float32 量出来的：多一个 ulp（912.00006）不能漏进列表栏的上限——渲染层读的是 LayoutUnit 精度的 ResizeObserver 宽度，
+// 漏进去的话可访问树里分隔条的 valuemax 读成 512.0000610351562，与渲染层的 512 对不上（M2-4 英文变体 detail-review 实测，见台账 G-017 的 M2-4 更新）。
+// 真实的 1/64 px 差要保留；窄窗口时上限随宽度走，低于下限时夹到下限。
+func TestListWidthLimitIgnoresTheFloatNoiseOfTheMeasuredWorkspace(t *testing.T) {
+	t.Parallel()
+	r := wsRig(t)
+	p := &r.screen.pane
+	for _, c := range []struct{ ws, hi float32 }{
+		{912, 512}, {math.Nextafter32(912, 2000), 512}, {math.Nextafter32(912, 0), 512},
+		{912 + 1.0/64, 512 + 1.0/64},
+		{700, 300}, {600, 240},
+		{2000, 720}, // 宽窗口：夹在上限 720
+	} {
+		p.wsWidth = c.ws
+		if _, hi := r.screen.listWidths(); hi != c.hi {
+			t.Errorf("工作区宽 %v：列表栏上限应是 %v，实际 %v", c.ws, c.hi, hi)
 		}
 	}
 }

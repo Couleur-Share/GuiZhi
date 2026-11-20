@@ -39,19 +39,28 @@ func (s *Screen) syncNotices(itemID string) {
 }
 
 // summaryRow 声明一行 <summary>：行内的 disclosure 标记加文字，整行可点；返回是否被点击（调用方切换展开）。
-// padY 是 summary 自己的上下内边距（py-2 之类），extra 在文字右边追加内容（flex 的其它子项）。
-func (s *Screen) summaryRow(c ui.C, label string, open bool, size kit.TextStyle, padY float32, fg tokens.Color, extra func()) bool {
+// name 是可访问名；parts 是文字的分段：渲染层 JSX 里相邻的文本节点（`{title} · {date}`）各是一段，对照按文本节点逐段比，
+// 所以分段画；空表示整段 name 一段。padY 是 summary 自己的上下内边距（py-2 之类）。
+func (s *Screen) summaryRow(c ui.C, name string, parts []string, open bool, size kit.TextStyle, padY float32, fg tokens.Color) bool {
 	l := s.Look
 	marker := kit.ChromeDisclosureMarker(l.Rem(size.Size), l.Rem(size.Line), l.Scale)
 	sc := c.Key("summary")
+	if len(parts) == 0 {
+		parts = []string{name}
+	}
 	row := ui.Row(sc).FillWidth().Items(ui.Center).PadSides(padY, 0, padY, marker.Advance).
-		HitWith(ui.ID(sc), label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: open}).
-		Draw(func(d *ui.DrawContext) { kit.PaintDisclosure(d, d.Rect, marker, open, fg) })
+		HitWith(ui.ID(sc), name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: open}).
+		Draw(func(d *ui.DrawContext) {
+			// 标记画在第一行文字的行盒里（行盒顶 = 外框顶 + 上内边距），不是整个外框的顶：summary 带 py-2 时差 8 px。
+			line := d.Rect
+			line.Y += padY
+			line.Height -= 2 * padY
+			kit.PaintDisclosure(d, line, marker, open, fg)
+		})
 	l.TabStop(row)
 	row.Children(func() {
-		l.Text(sc.Key("label"), label, size, kit.WeightNormal, fg)
-		if extra != nil {
-			extra()
+		for i, part := range parts {
+			l.Text(sc.Key("label-"+strconv.Itoa(i)), part, size, kit.WeightNormal, fg)
 		}
 	})
 	return row.Clicked()
@@ -68,13 +77,14 @@ func (s *Screen) conflictNotice(c ui.C, v View, item services.LibraryItem) {
 	t := l.T
 	n := &s.detail.notice
 	c = c.Key("conflict")
-	ui.Column(c).FillWidth().Shrink(0).Pad(l.Space(3)).Draw(func(d *ui.DrawContext) {
+	// border-b 的 1 px 在盒内（Viva 的边线画在外框里面，不占位）：下内边距多留 1 px，整块 113 px 同渲染层。
+	ui.Column(c).FillWidth().Shrink(0).PadSides(l.Space(3), l.Space(3), l.Space(3)+1, l.Space(3)).Draw(func(d *ui.DrawContext) {
 		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleStatus, "", gfx.HitOptions{Live: gfx.LiveAssertive})
 		l.PaintSurface(d, kit.Surface{Bg: t.Muted})
 		l.PaintEdge(d, kit.EdgeBottom, 1, t.Border)
 	}).Children(func() {
 		l.Text(c.Key("text"), locales.LibraryDraftConflict(), kit.TextSM, kit.WeightNormal, t.Foreground, kit.Wrapped())
-		if s.summaryRow(c.Key("compare"), locales.LibraryDraftConflictCompare(), n.conflictOpen, kit.TextSM, l.Space(2), t.Foreground, nil) {
+		if s.summaryRow(c.Key("compare"), locales.LibraryDraftConflictCompare(), nil, n.conflictOpen, kit.TextSM, l.Space(2), t.Foreground) {
 			n.conflictOpen = !n.conflictOpen
 		}
 		if n.conflictOpen {
@@ -145,21 +155,24 @@ func (s *Screen) revisionsNotice(c ui.C, v View, item services.LibraryItem) {
 			l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.25)})
 		}).Children(func() {
 		label := locales.LibrarySourceRevisions(len(rev.Rows))
-		if s.summaryRow(c.Key("head"), label, n.revisionsOpen, kit.TextXS, 0, t.Foreground, nil) {
+		if s.summaryRow(c.Key("head"), label, nil, n.revisionsOpen, kit.TextXS, 0, t.Foreground) {
 			n.revisionsOpen = !n.revisionsOpen
 		}
 		if !n.revisionsOpen {
 			return
 		}
+		// 纵向外边距在块布局里相邻会折叠：说明文字 p.my-2 的下边距与随后的 p[role=alert]（无边距）、details.my-2 的上边距、
+		// 各 details.my-2 之间的上下边距，都折成 8 px 一道，不是各自相加的 16 px；最后一块的下边距在容器内边距之内，留着。
+		// 所以说明、读取失败行与每个版本都只在上面留 8 px，最后一个版本（没有版本时是说明本身不留）再留 8 px 在下面。
 		// p.my-2.text-muted-foreground：说明文字。
-		ui.Row(c.Key("hint")).FillWidth().MarginSides(l.Space(2), 0, l.Space(2), 0).Children(func() {
+		ui.Row(c.Key("hint")).FillWidth().MarginSides(l.Space(2), 0, 0, 0).Children(func() {
 			l.Text(c.Key("hint-text"), locales.LibrarySourceRevisionsHint(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).Shrink(1).MinWidth(0)
 		})
 		if rev.Error != "" {
 			s.revisionsError(c, rev.Error)
 		}
-		for _, row := range rev.Rows {
-			s.revisionRow(c.Key("row-"+row.ID), item, row)
+		for i, row := range rev.Rows {
+			s.revisionRow(c.Key("row-"+row.ID), item, row, i == len(rev.Rows)-1)
 		}
 	})
 }
@@ -168,7 +181,8 @@ func (s *Screen) revisionsNotice(c ui.C, v View, item services.LibraryItem) {
 func (s *Screen) revisionsError(c ui.C, message string) {
 	l := s.Look
 	t := l.T
-	ui.Row(c.Key("error")).FillWidth().Items(ui.Center).Draw(func(d *ui.DrawContext) {
+	// 上面留 8 px：是说明文字 p.my-2 的下边距（折叠后），错误行自己没有边距。
+	ui.Row(c.Key("error")).FillWidth().MarginSides(l.Space(2), 0, 0, 0).Items(ui.Center).Draw(func(d *ui.DrawContext) {
 		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleStatus, "", gfx.HitOptions{Live: gfx.LiveAssertive})
 	}).Children(func() {
 		l.Text(c.Key("error-text"), message, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped()).Shrink(1).MinWidth(0)
@@ -179,7 +193,8 @@ func (s *Screen) revisionsError(c ui.C, message string) {
 }
 
 // revisionRow 是一个来源版本（details.my-2）：summary 是「标题 · 采集时间」，展开后是正文预览、缺口原因与「采用」钮。
-func (s *Screen) revisionRow(c ui.C, item services.LibraryItem, row services.LibrarySourceVersion) {
+// last 为真时下面再留 my-2 的 8 px（上下边距折叠后只有最后一个版本的下边距落在容器里，见 revisionsNotice）。
+func (s *Screen) revisionRow(c ui.C, item services.LibraryItem, row services.LibrarySourceVersion, last bool) {
 	l := s.Look
 	t := l.T
 	n := &s.detail.notice
@@ -187,9 +202,15 @@ func (s *Screen) revisionRow(c ui.C, item services.LibraryItem, row services.Lib
 		n.revisionOpen = map[string]bool{}
 	}
 	open := n.revisionOpen[row.ID]
-	ui.Column(c).FillWidth().MarginSides(l.Space(2), 0, l.Space(2), 0).Children(func() {
-		head := row.Title + " · " + kit.FormatDateTime(row.CapturedAt, s.loc(), s.Locale)
-		if s.summaryRow(c.Key("head"), head, open, kit.TextXS, 0, t.Foreground, nil) {
+	bottom := float32(0)
+	if last {
+		bottom = l.Space(2)
+	}
+	ui.Column(c).FillWidth().MarginSides(l.Space(2), 0, bottom, 0).Children(func() {
+		// JSX 的 `{row.title} · {time}` 是三个相邻文本节点，对照按节点逐段比：分三段画（中间一段带前后空格，宽度同整段文字）。
+		when := kit.FormatDateTime(row.CapturedAt, s.loc(), s.Locale)
+		head := row.Title + " · " + when
+		if s.summaryRow(c.Key("head"), head, []string{row.Title, " · ", when}, open, kit.TextXS, 0, t.Foreground) {
 			n.revisionOpen[row.ID] = !open
 		}
 		if !open {
@@ -208,7 +229,8 @@ func (s *Screen) revisionRow(c ui.C, item services.LibraryItem, row services.Lib
 			_ = json.Unmarshal([]byte(row.ReviewJSON), &reasons)
 			l.Text(c.Key("missing"), locales.LibrarySourceRevisionMissing(strings.Join(reasons, locales.NativeLibraryReasonSeparator())), kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped())
 		}
-		if l.Button(c.Key("adopt"), kit.ButtonSpec{Label: locales.LibrarySourceRevisionAdopt()}, l.UISecondaryButton(kit.UIButtonSM)).Clicked() {
+		// inline-flex：按钮按内容宽、靠左，不拉满一行。
+		if l.Button(c.Key("adopt"), kit.ButtonSpec{Label: locales.LibrarySourceRevisionAdopt()}, l.UISecondaryButton(kit.UIButtonSM)).Self(ui.Start).Clicked() {
 			s.adoptRevision(item.ID, row)
 		}
 	})
@@ -230,7 +252,8 @@ func (s *Screen) reviewNotice(c ui.C, v View, item services.LibraryItem, disable
 	t := l.T
 	n := &s.detail.notice
 	c = c.Key("review")
-	ui.Column(c).FillWidth().Shrink(0).PadSides(l.Space(2.5), l.Space(6), l.Space(2.5), l.Space(6)).Draw(func(d *ui.DrawContext) {
+	// border-b 的 1 px 在盒内（同 conflictNotice）：下内边距多留 1 px。
+	ui.Column(c).FillWidth().Shrink(0).PadSides(l.Space(2.5), l.Space(6), l.Space(2.5)+1, l.Space(6)).Draw(func(d *ui.DrawContext) {
 		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, locales.LibraryReviewRequired(), gfx.HitOptions{})
 		l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.25)})
 		l.PaintEdge(d, kit.EdgeBottom, 1, t.Border.WithAlpha(0.5))
@@ -252,8 +275,10 @@ func (s *Screen) reviewSummary(c ui.C, n *noticeUI) {
 		amber = tokens.Tailwind("amber-400")
 	}
 	sc := c.Key("summary")
+	// 可访问名是 summary 里全部文字（标题、说明、右边的「查看缺口与复核」）按空格连起来，同渲染层的 DisclosureTriangle。
+	name := strings.Join([]string{locales.ArticleReaderImportIncomplete(), locales.ArticleReaderImportReadable(), locales.ArticleReaderReviewDetails()}, " ")
 	row := ui.Flow(sc).FillWidth().Items(ui.Center).Gap(l.Space(2)).
-		HitWith(ui.ID(sc), locales.ArticleReaderImportIncomplete(), gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: n.reviewOpen})
+		HitWith(ui.ID(sc), name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: n.reviewOpen})
 	l.TabStop(row)
 	row.Children(func() {
 		l.Icon(sc.Key("icon"), icons.TriangleAlert, l.Rem(1), amber)

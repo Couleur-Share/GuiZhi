@@ -94,7 +94,7 @@ func (w *Window) railButton(c ui.C, it railItem) {
 	switch {
 	case active:
 		fg = t.Foreground
-		surface.Bg, surface.Shadow = t.Primary.WithAlpha(0.15), t.ShadowSm
+		surface.Bg, surface.Shadows = t.Primary.WithAlpha(0.15), kit.ShadowSM
 	case hovered:
 		fg = t.SidebarForeground
 		surface.Bg = t.SidebarAccent.WithAlpha(0.5)
@@ -148,7 +148,7 @@ func (w *Window) railBadge(c ui.C, m Module) {
 			Draw(func(d *ui.DrawContext) {
 				// box-shadow 列表是「ring-2、shadow-sm」：环在上、shadow-sm 在下，背景盖在两者之内；
 				// 环只出现在盒子外侧，所以用空心环（PaintRingBand），不会透出环色。
-				l.PaintSurface(d, kit.Surface{Radius: l.Rem(1), Shadow: t.ShadowSm})
+				l.PaintSurface(d, kit.Surface{Radius: l.Rem(1), Shadows: kit.ShadowSM})
 				l.PaintRingBand(d, 2, badgeRingColor, l.Rem(1))
 				l.PaintSurface(d, kit.Surface{Bg: t.Foreground, Radius: l.Rem(1)})
 			}).
@@ -176,7 +176,7 @@ func (w *Window) railSettings(c ui.C) {
 		switch {
 		case active:
 			fg = t.Foreground
-			surface.Bg, surface.Shadow = t.Primary.WithAlpha(0.15), t.ShadowSm
+			surface.Bg, surface.Shadows = t.Primary.WithAlpha(0.15), kit.ShadowSM
 		case hovered:
 			fg = t.SidebarForeground
 			surface.Bg = t.SidebarAccent.WithAlpha(0.5)

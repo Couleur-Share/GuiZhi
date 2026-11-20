@@ -28,7 +28,7 @@ const (
 	ModalXL
 	Modal2XL
 	ModalFull
-	// ModalFullscreen 四周各留 64px，宽高随窗口（calc(100vw - 128px)）。
+	// ModalFullscreen 宽高随窗口：最大宽 calc(100vw - 128px)、高 calc(100vh - 128px)（见 fullscreenPanelSize）。
 	ModalFullscreen
 )
 
@@ -85,7 +85,18 @@ const (
 	modalBackdropAlpha     = 0.6  // bg-background/60
 	modalHeaderPadX        = 6    // px-6（Space 刻度）
 	modalHeaderPadY        = 4    // py-4
+
+	// fullscreenMargin 是 fullscreen 尺寸档里 calc(100vw - 128px) / calc(100vh - 128px) 的 128：px 字面量，不随字号档缩放。
+	fullscreenMargin = 128
 )
+
+// fullscreenPanelSize 是 size="fullscreen" 的面板外框尺寸（渲染层 SIZE_CONFIG.fullscreen）：最大宽 100vw-128px、高 100vh-128px，
+// 两者都是 px；外层容器的 p-16 却是 rem（14/16/18 px 根字号下是 56/64/72，即 inset）。所以宽还要被容器内容区夹一次
+// （大字号档内容区比 100vw-128 窄），高不被夹（大字号档面板比内容区还高 16px：渲染层顶边贴着内容区上沿、多出的部分伸到下面，
+// Viva 的居中遇到超高的子项也是同样的落法，TestModalFullscreenFollowsFontTiers 钉住）。
+func fullscreenPanelSize(bounds gfx.Rect, inset float32) (width, height float32) {
+	return min(bounds.Width-fullscreenMargin, bounds.Width-2*inset), bounds.Height - fullscreenMargin
+}
 
 // Modal 声明模态窗口，返回这一帧是否被要求关闭（点了关闭钮、遮罩，或按了 Esc）。
 // 调用方在收到 true 时自己把 Open 置假：关闭是否成立（例如有未保存的修改）由它决定。
@@ -119,8 +130,10 @@ func (l *Look) Modal(c ui.C, st *ModalState, spec ModalSpec) bool {
 		maxWidth = spec.Size.maxWidth()
 		slide    = gfx.Point{Y: modalSlide}
 	)
+	var panelW, panelH float32
 	if fullscr {
 		inset = l.Space(16) // p-16：离开系统窗口控件
+		panelW, panelH = fullscreenPanelSize(bounds, inset)
 	}
 	// 整窗一层：遮罩（吸收背后的点击）与面板在同一个焦点作用域里，与 Viva 自带 Dialog 同一套次序——
 	// 先进入作用域、画遮罩并登记它的命中区，面板随后声明，最后在作用域还开着时认领焦点陷阱（Tab 与指针都只在窗口里）。
@@ -139,7 +152,7 @@ func (l *Look) Modal(c ui.C, st *ModalState, spec ModalSpec) bool {
 		// 面板：border（1px）在盒内，页眉与内容区缩进一个边框宽（Chromium 的 border-box + overflow-hidden）。
 		panel := ui.Column(c.Key("panel")).FillWidth().MaxWidth(maxWidth).MinHeight(0).Pad(1)
 		if fullscr {
-			panel = panel.MaxWidth(bounds.Width - 2*inset).Height(bounds.Height - 2*inset)
+			panel = panel.MaxWidth(panelW).Height(panelH)
 		} else {
 			panel = panel.MaxHeight(bounds.Height * modalViewportMaxHeight)
 		}

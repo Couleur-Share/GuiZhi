@@ -219,7 +219,7 @@ func (s *Shell) navItem(c ui.C, wide bool, m menuEntry) bool {
 	switch {
 	case active:
 		color = t.PrimaryForeground
-		surface.Bg, surface.Shadow = t.Primary, t.ShadowSm
+		surface.Bg, surface.Shadows = t.Primary, kit.ShadowSM
 	case hovered:
 		surface.Bg = t.Muted.WithAlpha(0.7)
 	}

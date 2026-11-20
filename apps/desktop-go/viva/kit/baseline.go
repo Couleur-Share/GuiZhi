@@ -142,6 +142,29 @@ func InputPad(weight, size, height, scale float32) (top, bottom float32) {
 	return top, height - line - top
 }
 
+// TextareaPad 是 InputPad 的 <textarea> 版：返回让 Viva 输入框里那一行文字落在渲染层 <textarea> 首行位置所需的上、下内边距（逻辑像素）。
+//
+// <textarea> 的首行是普通文字的行盒：行盒顶在框顶之下 padTop 处（上内边距加边框），行高 lineHeight，基线 =
+// round(框顶 + padTop) + ChromeBaselineRow(行高)（不是 <input> 那种框内居中取整，见 ChromeInputBaselineY 的说明）。
+// 框顶带小数时两种落法差零到一行，所以不能拿 <input> 的位置加一个固定位移去补（位移要随框顶的小数部分变），
+// 而是照 InputPad 的办法直接给内边距：ChromeBaselineRow 与 VivaBaselineRow 都是整数设备像素行，取
+//
+//	top = padTop + (ChromeBaselineRow − VivaBaselineRow)
+//
+// 则 Viva 的基线 = round(框顶 + top) + VivaBaselineRow = round(框顶 + padTop) + ChromeBaselineRow，与框顶的小数部分无关。
+// 框高不变：bottom = 框高 − 行盒高 − top；调用方应保证框高放得下（bottom 不为负）。
+func TextareaPad(weight, size, height, padTop, lineHeight, scale float32) (top, bottom float32) {
+	if scale <= 0 {
+		scale = 1
+	}
+	sizeDev := float64(size) * float64(scale)
+	chrome := ChromeBaselineRow(weight, sizeDev, float64(lineHeight)*float64(scale))
+	line := size + 6 // components.inputLineBox：fontSize+6
+	viva := VivaBaselineRow(VivaLabelRows(line, scale), sizeDev)
+	top = float32((float64(padTop)*float64(scale) + float64(chrome-viva)) / float64(scale))
+	return top, height - line - top
+}
+
 // InlineFlexExtra 是「在一行文字的行盒里放一个行内弹性盒（图标加文字，items-center）」比一行文字多出的高度，单位逻辑像素。
 //
 // 渲染层里 <span class="inline-flex items-center"> 的基线取第一项（图标）的下沿：图标没有基线，由它的边框盒下沿合成，

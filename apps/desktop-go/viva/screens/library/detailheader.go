@@ -1,6 +1,7 @@
 package library
 
 import (
+	"math"
 	"net/url"
 	"strings"
 
@@ -56,7 +57,9 @@ func (s *Screen) detailHeader(c ui.C, v View, item services.LibraryItem, caps It
 	ui.Column(c).FillWidth().Shrink(0).PadSides(l.Space(5), l.Space(6), l.Space(3), l.Space(6)).Children(func() {
 		s.detailTitle(c, v, item, trashed)
 		// mt-2.5 flex flex-wrap items-start gap-x-3 gap-y-2：空间不足时整组操作换行，避免把元信息挤成碎片。
-		ui.Flow(c.Key("meta")).FillWidth().MarginTop(l.Space(2.5)).Items(ui.Start).Gap(l.Space(3)).LineGap(l.Space(2)).Children(func() {
+		// 动作区的 ml-auto：Viva 没有自动外边距，改让 Flow 的每一行靠行尾排（Justify 对每一行各自生效）。chip 行 Grow(1) 在自己那一行吃掉剩余空间，
+		// 与动作区同一行时它们照旧分摊；动作区折到下一行单独成行时，靠右（渲染层 ml-auto 的效果）。
+		ui.Flow(c.Key("meta")).FillWidth().MarginTop(l.Space(2.5)).Items(ui.Start).Justify(ui.End).Gap(l.Space(3)).LineGap(l.Space(2)).Children(func() {
 			s.detailChips(c, v, item, trashed)
 			s.detailActions(c, v, item, caps, trashed, onClose)
 		})
@@ -73,7 +76,8 @@ func (s *Screen) detailTitle(c ui.C, v View, item services.LibraryItem, trashed 
 	t := l.T
 	d := &s.detail
 	size := l.Rem(1.375)
-	height := l.Space(0.5) + size*1.375 // pt-0.5 加一行 leading-snug
+	// pt-0.5 加一行 leading-snug；渲染层按 scrollHeight 定高，scrollHeight 取整（32.25 → 32），所以框高是整数像素。
+	height := float32(math.Round(float64(l.Space(0.5) + size*1.375)))
 	// 新建的空白条目：光标直接落进标题（渲染层 titleFocusItemId）。每个条目一个输入控件：切换条目就是新控件，
 	// AutoFocus 在它第一次出现的那一帧生效。
 	key := c.Key("title-" + item.ID)
@@ -84,6 +88,8 @@ func (s *Screen) detailTitle(c ui.C, v View, item services.LibraryItem, trashed 
 	}
 	box := l.Input(key, &d.title, locales.LibraryTitlePlaceholder(), locales.LibraryTitlePlaceholder(), kit.InputSpec{
 		Size: size, Weight: kit.WeightSemibold, Color: t.Foreground, Height: height,
+		// 文字落在渲染层 textarea 首行的位置：行盒顶在 pt-0.5 之下，行高 leading-snug（框顶带小数时与 input 居中差一行）。
+		PadTop: l.Space(0.5), LineHeight: size * 1.375,
 		Placeholder: t.MutedForeground.WithAlpha(0.6),
 	}).FillWidth()
 	if focus {
@@ -179,7 +185,8 @@ func (s *Screen) metaChip(c ui.C, ic gfx.Icon, label string, tone chipTone, titl
 	row := ui.Row(c).Height(l.Rem(1.5)).Shrink(0).Items(ui.Center).Gap(l.Space(1)).
 		PadSides(0, l.Space(2)+1, 0, l.Space(2)+1)
 	if title != "" {
-		row = row.HitWith(ui.ID(c), "", gfx.HitOptions{Role: gfx.RoleGroup, Hint: title})
+		// 只有悬停气泡：渲染层的 <span title> 在可访问树里是无名的 generic，不是分组，不进可访问节点。
+		row = row.HitWith(ui.ID(c), "", gfx.HitOptions{SkipFocus: true, SkipTab: true, Hint: title})
 	}
 	row.Draw(func(d *ui.DrawContext) {
 		l.PaintSurface(d, kit.Surface{Border: border, BorderW: 1, Radius: l.Rem(0.75) - 2})
@@ -195,7 +202,7 @@ func (s *Screen) saveButton(c ui.C) {
 	l := s.Look
 	t := l.T
 	box := l.Button(c.Key("save"), kit.ButtonSpec{
-		Label: locales.LibrarySave(), Icon: icons.Save, IconSize: l.Rem(0.75), Hint: locales.LibrarySaveNow(),
+		Label: locales.LibrarySave(), Icon: icons.Save, IconSize: l.Rem(0.75), Hint: locales.LibrarySaveNow(), Description: locales.LibrarySaveNow(),
 	}, kit.ButtonStyle{
 		Height: l.Rem(1.5), PadX: l.Space(2), Radius: l.Rem(0.75) - 2, Gap: l.Space(1), FontPx: chipFont, LinePx: chipLine, Weight: kit.WeightMedium,
 		Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: t.Primary.WithAlpha(0.9), Transition: kit.DurationDefault,
@@ -231,7 +238,7 @@ func (s *Screen) collectionChip(c ui.C, v View, item services.LibraryItem, trash
 	}
 	cc := c.Key("collection")
 	box := s.inlineButton(cc, inlineSpec{
-		Name: name, Role: gfx.RoleCombobox, Popup: true, Open: d.collection.open, Disabled: trashed, DisabledOpacity: 0.6,
+		Name: name, Value: name, Role: gfx.RoleCombobox, Popup: true, Open: d.collection.open, Disabled: trashed, DisabledOpacity: 0.6,
 		Fg: t.MutedForeground, FgHover: t.Foreground, BgHover: t.Accent.WithAlpha(0.6),
 		Border: t.Border.WithAlpha(0.7), BorderHover: t.Border, BorderW: 1,
 		Radius: l.Rem(0.75) - 2, Height: l.Rem(1.5), PadX: l.Space(2) + 1, Gap: l.Space(1), Rect: &d.collectionRect,
@@ -365,7 +372,7 @@ func (s *Screen) sourceChip(c ui.C, item services.LibraryItem) {
 	if sv.href == "" {
 		row := ui.Row(cc).Height(l.Rem(1.5)).Shrink(0).Items(ui.Center).Gap(l.Space(1)).PadSides(0, l.Space(2)+1, 0, l.Space(2)+1)
 		if sv.tooltip != "" {
-			row = row.HitWith(ui.ID(cc), "", gfx.HitOptions{Role: gfx.RoleGroup, Hint: sv.tooltip})
+			row = row.HitWith(ui.ID(cc), "", gfx.HitOptions{SkipFocus: true, SkipTab: true, Hint: sv.tooltip})
 		}
 		row.Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Border: border, BorderW: 1, Radius: l.Rem(0.75) - 2})
@@ -379,7 +386,7 @@ func (s *Screen) sourceChip(c ui.C, item services.LibraryItem) {
 			hint = locales.LibraryMediaMetaOpenSource()
 		}
 		link := s.inlineButton(cc, inlineSpec{
-			Name: sv.label, Role: gfx.RoleLink, Hint: hint,
+			Name: sv.label, Role: gfx.RoleLink, Hint: hint, Description: hint,
 			Fg: fg, FgHover: t.Foreground, BgHover: t.Accent.WithAlpha(0.6), Border: border, BorderHover: t.Border, BorderW: 1,
 			Radius: l.Rem(0.75) - 2, Height: l.Rem(1.5), PadX: l.Space(2) + 1, Gap: l.Space(1),
 		}, func(color tokens.Color) { body(color, true) })
@@ -416,8 +423,7 @@ func (s *Screen) actionButtonStyle() kit.ButtonStyle {
 func (s *Screen) detailActions(c ui.C, v View, item services.LibraryItem, caps ItemCaps, trashed bool, onClose func()) {
 	l := s.Look
 	t := l.T
-	// ml-auto：与 chip 行同一行时 chip 行吃掉剩余空间，这一组贴着行尾；折到下一行时靠右。Viva 没有自动外边距，
-	// 给它一个极大的 Grow 比例的对手：chip 行 Grow(1)，这一组 Grow 极小且内容靠右。
+	// ml-auto：与 chip 行同一行时 chip 行吃掉剩余空间，这一组贴着行尾；折到下一行时靠右（由外层 Flow 的 Justify(End) 承担，见 detailHeader）。
 	ui.Row(c.Key("actions")).Shrink(0).Grow(0).MarginTop(-l.Space(1)).Items(ui.Center).Gap(l.Space(0.5)).Children(func() {
 		if trashed {
 			s.restoreButton(c, item)

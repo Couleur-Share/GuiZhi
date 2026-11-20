@@ -99,7 +99,7 @@ func (s *Screen) exitFocusButton(c ui.C) {
 	style := kit.ButtonStyle{
 		Height: l.Rem(2.5), PadX: l.Space(4), Radius: 9999, Gap: l.Space(2), Text: kit.TextSM, Weight: kit.WeightMedium,
 		Fg: t.Foreground, Bg: t.Background.WithAlpha(0.95), BgHover: t.Accent,
-		Border: t.Border, BorderW: 1, Shadow: t.ShadowLg, Transition: kit.DurationDefault,
+		Border: t.Border, BorderW: 1, Shadows: kit.ShadowLG, Transition: kit.DurationDefault,
 	}
 	box := l.Button(c.Key("exit-focus"), kit.ButtonSpec{
 		Label: locales.LibraryExitFocusReadingShort(), Icon: icons.Minimize2, IconSize: l.Rem(1),

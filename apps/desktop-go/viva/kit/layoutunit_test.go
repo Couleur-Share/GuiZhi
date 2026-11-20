@@ -3,6 +3,7 @@ package kit
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"testing"
@@ -198,6 +199,20 @@ func TestPxToLURoundsToTheNearestUnit(t *testing.T) {
 	}
 	if got := luToPx(28319); got != 442.484375 {
 		t.Errorf("luToPx(28319) = %v，期望 442.484375", got)
+	}
+}
+
+// QuantizeLU 抹掉 float32 的一个 ulp 噪声（912 量成 912.00006、801.99994），但保留真正的 1/64 小数。
+func TestQuantizeLURemovesTheFloatNoiseAndKeepsRealFractions(t *testing.T) {
+	cases := []struct{ in, want float32 }{
+		{912, 912}, {math.Nextafter32(912, 1000), 912}, {math.Nextafter32(802, 0), 802}, {801.99994, 802},
+		{442.484375, 442.484375}, {0.5, 0.5}, {0, 0}, {1.0 / 64, 1.0 / 64},
+		{912 + 1.0/64, 912 + 1.0/64}, // 真的差 1/64 px 的宽度不能被抹掉：渲染层的 ResizeObserver 也给这个值
+	}
+	for _, c := range cases {
+		if got := QuantizeLU(c.in); got != c.want {
+			t.Errorf("QuantizeLU(%v) = %v，期望 %v", c.in, got, c.want)
+		}
 	}
 }
 

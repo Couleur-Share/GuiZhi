@@ -28,6 +28,11 @@ func pxToLU(px float32) int32 { return int32(math.Round(float64(px) * luPerPx)) 
 // luToPx 把 1/64 单位换回逻辑像素（1/64 的整数倍在 float32 里是精确的，直到 2^18 像素）。
 func luToPx(v int32) float32 { return float32(v) / luPerPx }
 
+// QuantizeLU 把逻辑像素量化到 1/64 像素。渲染层经 ResizeObserver 等读到的宽度本来就是 LayoutUnit 的精度，
+// Viva 量出来的 float32 宽度可能多一个 ulp（912 量成 912.00006）：拿量到的宽度去算别的上下限之前先量化，
+// 噪声才不会漏进可访问树的 valuemax 之类的状态里（M2-4 英文变体 detail-review 实测：列表栏分隔条的上限 512 读成 512.0000610351562，见台账 G-017 的 M2-4 更新）。
+func QuantizeLU(px float32) float32 { return luToPx(pxToLU(px)) }
+
 // roundDivLU 是 num ÷ den 四舍五入（半数向上），num ≥ 0、den > 0。
 func roundDivLU(num, den int64) int64 { return (2*num + den) / (2 * den) }
 

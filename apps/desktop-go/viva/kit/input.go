@@ -29,9 +29,10 @@ type InputSpec struct {
 	// 这只在等宽字体下位置才与插入符严丝合缝（大小写字格同宽），所以要求 Mono（不等宽时 Upper 不生效）。
 	// 局限：内容长到超出输入框宽度而横向滚动时，叠画的一份不跟着滚；十六进制色值这类几个字符的输入不会遇到。
 	Upper bool
-	// ShiftY 把文字整体向下挪这么多逻辑像素（负数向上），框高与框内边距总和不变：<textarea> 一类控件的首行基线不在 <input>
-	// 的居中位置上（前者按行盒、后者居中取整），调用方按两者的差给出，让单行输入的文字落在多行输入的首行位置。
-	ShiftY float32
+	// LineHeight 非零时，文字按 <textarea> 首行的位置定位而不是 <input> 的框内居中：首行行盒顶在框顶之下 PadTop 处（上内边距加边框）、
+	// 行高 LineHeight（渲染层多行标题框 pt-0.5 加 leading-snug）。渲染层 textarea 的首行是普通文字，基线按行盒顶取整，
+	// 与 <input> 的居中取整随框顶小数差零到一行，所以不是固定位移（见 TextareaPad）。框高仍是 Height。
+	PadTop, LineHeight float32
 }
 
 // invisibleInkAlpha 是「看不见的文字」的不透明度（见 Input 的大写叠画）；对照工具把低于 VisibleInkAlpha 的文字当作不存在。
@@ -51,7 +52,9 @@ const VisibleInkAlpha = 0.01
 // 给了 spec.Placeholder 时返回的盒子用了 DrawOver：调用方不要再对它调 DrawOver（会顶掉占位符的绘制）。
 func (l *Look) Input(c ui.C, f *ui.Field, label, placeholder string, spec InputSpec) ui.Box {
 	top, bottom := InputPad(spec.Weight, spec.Size, spec.Height, l.Scale)
-	top, bottom = top+spec.ShiftY, bottom-spec.ShiftY
+	if spec.LineHeight > 0 {
+		top, bottom = TextareaPad(spec.Weight, spec.Size, spec.Height, spec.PadTop, spec.LineHeight, l.Scale)
+	}
 	own := spec.Placeholder != (tokens.Color{}) && placeholder != ""
 	shown := placeholder
 	if own {

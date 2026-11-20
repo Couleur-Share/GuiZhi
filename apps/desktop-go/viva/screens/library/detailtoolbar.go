@@ -72,16 +72,19 @@ func (s *Screen) panelToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, 
 	l := s.Look
 	t := l.T
 	pad := l.Space(1.5) + 1 // py-1.5 加上 border-y 的 1px
-	ui.Flow(c).FillWidth().Shrink(0).MinHeight(l.Rem(3)).Items(ui.Center).Justify(ui.End).
-		Gap(l.Space(3)).LineGap(l.Space(1)).PadSides(pad, l.Space(6), pad, l.Space(6)).
+	// 渲染层是 flex-wrap 容器：min-h-12 比一行高时（align-content 缺省 stretch）这一行被拉到内容盒那么高、里面的项居中；
+	// 折成多行时内容已经高过 min-h，不再有余量。「整块在内容盒里垂直居中」对这两种情形都成立。
+	ui.Column(c).FillWidth().Shrink(0).MinHeight(l.Rem(3)).Justify(ui.Center).PadSides(pad, l.Space(6), pad, l.Space(6)).
 		Draw(func(d *ui.DrawContext) {
 			border := t.Border.WithAlpha(0.5)
 			l.PaintEdge(d, kit.EdgeTop, 1, border)
 			l.PaintEdge(d, kit.EdgeBottom, 1, border)
 		}).
 		Children(func() {
-			s.tabGroup(c.Key("tabs"), item, caps, active)
-			s.toolGroup(c.Key("tools"), caps, active, showFind)
+			ui.Flow(c.Key("line")).FillWidth().Items(ui.Center).Justify(ui.End).Gap(l.Space(3)).LineGap(l.Space(1)).Children(func() {
+				s.tabGroup(c.Key("tabs"), item, caps, active)
+				s.toolGroup(c.Key("tools"), caps, active, showFind)
+			})
 		})
 }
 
@@ -158,11 +161,16 @@ func (s *Screen) panelTab(c ui.C, label string, icon gfx.Icon, on bool, suffix s
 }
 
 // toolGroup 是工具那一组：ml-auto flex min-w-0 flex-wrap items-center gap-1。
-// 主题阅读的读者工具条挂载点（themed.available）随 M2-5，这一版没有；因此「显示原文 / Markdown 渲染」对主题阅读条目也摆出来（台账 B-059）。
+// 主题阅读可用时（themedAvailable）工具栏最前面是读者工具条的挂载点（渲染层 setReaderToolbar 的容器，原文 / AI 阅读 / 目录 / 编辑由阅读区
+// 经门户放进来，随 M2-5）：这一版它是空的，但仍占一个弹性子项（相邻的 gap 照算）；这时不摆「显示原文 / Markdown 渲染」（台账 B-059）。
 func (s *Screen) toolGroup(c ui.C, caps ItemCaps, active ReadingTab, showFind bool) {
 	l := s.Look
 	p := &s.detail.panel
+	themed := p.themedAvailable(active)
 	ui.Flow(c).Items(ui.Center).Gap(l.Space(1)).LineGap(l.Space(1)).Shrink(1).MinWidth(0).Children(func() {
+		if themed {
+			ui.Row(c.Key("reader-toolbar")).Items(ui.Center).MinWidth(0)
+		}
 		if showFind {
 			label := locales.LibraryPanelFindOpen()
 			if s.toolButton(c.Key("find"), label, icons.Search, false, false) {
@@ -180,7 +188,7 @@ func (s *Screen) toolGroup(c ui.C, caps ItemCaps, active ReadingTab, showFind bo
 					s.notMigrated(caps.SummaryLabel, "M2-6", "B-060")
 				}
 			}
-			if !caps.Trashed {
+			if !caps.Trashed && !themed {
 				label := locales.LibraryRenderMarkdown()
 				if p.isPreview {
 					label = locales.LibraryShowSource()
@@ -271,16 +279,26 @@ func (s *Screen) findBar(c ui.C, active ReadingTab) {
 	ui.Row(c).Absolute().Top(l.Space(11)).Right(l.Space(2)).Width(width).Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
 		PadSides(0, l.Space(1)+1, 0, l.Space(1)+1). // p-1 加 border 的 1px；竖向的 24px 子项在 32px 里居中，与 22px 内容盒里溢出居中同位
 		Draw(func(d *ui.DrawContext) {
-			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadow: t.ShadowLg})
+			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
 		}).
 		Children(func() {
 			ui.Row(c.Key("field")).Grow(1).Basis(0).MinWidth(0).Height(l.Rem(1.5)).Items(ui.Center).Gap(l.Space(1)).
 				PadSides(0, l.Space(1.5), 0, l.Space(1.5)).Children(func() {
 				l.Icon(c.Key("icon"), icons.Search, l.Rem(0.75), t.MutedForeground.WithAlpha(0.7))
 				// text-[11px]：<input> 的内容高是继承来的 1.5 倍行高 16.5px，Viva 的输入框至少 Size+6，取 17。
-				input := l.Input(c.Key("input"), &p.find, placeholder, placeholder, kit.InputSpec{
-					Size: 11, Weight: kit.WeightNormal, Color: t.Foreground, Height: 17, Placeholder: t.MutedForeground.WithAlpha(0.6),
-				}).Grow(1).Basis(0).MinWidth(0).AutoFocus()
+				// 渲染层的全局规则 input:focus-visible 给文本框 ring-2 ring-primary/50（框外 2 px，直角：<input> 没有圆角）；
+				// 底板与输入是两个元素（Box.Draw 画在输入内容之上），环由先声明的底板读后声明的输入的聚焦状态来画（同设置页的十六进制框）。
+				var input ui.Box
+				var ring float32
+				ui.Stack(c.Key("input-wrap")).Grow(1).Basis(0).MinWidth(0).Height(17).Children(func() {
+					// 环围着 <input> 的边框盒，它高 16.5（11px 的 1.5 倍行高）；Viva 的输入框取 17，环按 16.5 画、与输入框同一中线（上下各让 0.25），
+					// 否则框顶带小数的字号档里环的上下沿差一像素行（落进文字行矩形外扩 1 像素的墨迹区域，台账 G-028）。
+					ui.Row(c.Key("ring")).Absolute().Top(0.25).Right(0).Bottom(0.25).Left(0).Draw(func(d *ui.DrawContext) { l.PaintInputRing(d, ring, 0) })
+					input = l.Input(c.Key("input"), &p.find, placeholder, placeholder, kit.InputSpec{
+						Size: 11, Weight: kit.WeightNormal, Color: t.Foreground, Height: 17, Placeholder: t.MutedForeground.WithAlpha(0.6),
+					}).Absolute().Inset(0).AutoFocus()
+					ring = l.InputRing(c, ui.ID(c.Key("ring-anim")), input.State().Focused)
+				})
 				p.findFocused = input.State().Focused
 				if input.Changed() {
 					p.findQuery = p.find.Text()

@@ -74,11 +74,18 @@ func findable(tab ReadingTab) bool {
 	return false
 }
 
-// showFindBar 报告工具栏上摆不摆查找入口（渲染层 showFindBar）：预览态（回收站里的条目只读、不算）、可查找的标签，
-// 文字稿要有内容、讨论与总结要有对应小节。主题阅读与公众号快照的查找在 M2-5 随阅读区一起做。
+// themedAvailable 是渲染层 useThemedReadingMode 的 available：不在网页快照里、且停在正文或讨论总结标签。
+// 主题阅读本身（AI 阅读版式、读者工具条里的原文 / AI 阅读 / 目录 / 编辑）随 M2-5；这里只认它「可用」这件事：
+// 它决定工具栏摆不摆读者工具条的挂载点、查找入口，以及要不要摆「显示原文 / Markdown 渲染」（台账 B-059）。
+func (p *panelState) themedAvailable(active ReadingTab) bool {
+	return !p.snapshotView && (active == TabBody || active == TabSummary)
+}
+
+// showFindBar 报告工具栏上摆不摆查找入口（渲染层 showFindBar）：预览态（回收站里的条目只读、不算）或主题阅读可用、可查找的标签，
+// 文字稿要有内容、讨论与总结要有对应小节。主题阅读与公众号快照里的查找本身在 M2-5 随阅读区一起做。
 func (p *panelState) showFindBar(active ReadingTab, caps ItemCaps) bool {
 	wechatPreview := caps.IsWechat && p.snapshotView // 渲染层 isWechatPreview：快照里也能查找
-	if !((p.isPreview && !caps.Trashed) || wechatPreview) || !findable(active) {
+	if !((p.isPreview && !caps.Trashed) || p.themedAvailable(active) || wechatPreview) || !findable(active) {
 		return false
 	}
 	switch active {

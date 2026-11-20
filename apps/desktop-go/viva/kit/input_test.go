@@ -91,36 +91,45 @@ func TestInputPadLandsOnChromeBaseline(t *testing.T) {
 	}
 }
 
-// TestInputShiftYMovesTheBaseline 核对 ShiftY：整数逻辑像素的位移让输入内容的基线正好挪同样多的设备像素行（缩放 1），
-// 框顶带小数时也一样；位移为 0 时与不设一致（上面的测试已钉在 Chromium 的行上）。
-func TestInputShiftYMovesTheBaseline(t *testing.T) {
+// TestInputTextareaLineMatchesChromium 核对 LineHeight/PadTop：文字落在渲染层 <textarea> 首行的位置（缩放 1）——
+// 基线 = round(框顶 + PadTop) + ChromeBaselineRow(行高)，框顶的小数部分变化时也一样（这正是固定位移补不了的地方）。
+func TestInputTextareaLineMatchesChromium(t *testing.T) {
 	look := NewLook(DefaultSpec())
 	black := tokens.RGBA(0, 0, 0, 1)
-	type box struct{ size, height float32 }
-	boxes := []box{{14, 36}, {12.25, 31.5}, {15.75, 40.5}}
-	shifts := []float32{0, 3, -2}
-	fracs := []float32{0, 0.5}
+	// 三档字号下的标题框（1.375rem 半粗、leading-snug、pt-0.5）与几组不同的行高、上内边距，覆盖 <input> 居中与 textarea 首行差 0 与差 1 两种情形。
+	type box struct {
+		size, height, padTop, lineHeight float32
+		weight                           float32
+	}
+	boxes := []box{
+		{19.25, 28, 1.75, 26.46875, WeightSemibold},
+		{22, 32, 2, 30.25, WeightSemibold},
+		{24.75, 36, 2.25, 34.03125, WeightSemibold},
+		{14, 36, 4, 21, WeightNormal},
+		{15.75, 40.5, 3, 24.5, WeightNormal},
+	}
+	fracs := []float32{0, 0.25, 0.5, 0.75}
 	const cellInputW = 140
-	n := len(boxes) * len(shifts) * len(fracs)
+	n := len(boxes) * len(fracs)
 	fields := make([]ui.Field, n)
 	for i := range fields {
 		fields[i].SetText("HHHH")
 	}
-	at := func(i int) (b box, shift, frac float32) {
-		return boxes[i/(len(shifts)*len(fracs))], shifts[i/len(fracs)%len(shifts)], fracs[i%len(fracs)]
-	}
+	at := func(i int) (b box, frac float32) { return boxes[i/len(fracs)], fracs[i%len(fracs)] }
 	img := renderCells(t, n, cellInputW, func(c ui.C, i int) {
-		b, shift, frac := at(i)
+		b, frac := at(i)
 		ui.Column(c).Width(cellInputW).PadTop(20 + frac).PadLeft(10).Children(func() {
-			look.Input(c, &fields[i], "测试", "", InputSpec{Size: b.size, Weight: WeightNormal, Color: black, Height: b.height, ShiftY: shift}).Width(100)
+			look.Input(c, &fields[i], "测试", "", InputSpec{
+				Size: b.size, Weight: b.weight, Color: black, Height: b.height, PadTop: b.padTop, LineHeight: b.lineHeight,
+			}).Width(100)
 		})
 	})
 	for i := range fields {
-		b, shift, frac := at(i)
+		b, frac := at(i)
 		got := lastInkRow(img, i*cellInputW, 0, cellInputW, cellH) + 1
-		want := ChromeInputBaselineY(WeightNormal, float64(b.size), float64(20+frac), float64(b.height)) + int(shift)
+		want := int(roundHalfUp(float64(20+frac+b.padTop))) + ChromeBaselineRow(b.weight, float64(b.size), float64(b.lineHeight))
 		if got != want {
-			t.Errorf("字号 %v 框高 %v 框顶小数 %v 位移 %v：基线行 %d，期望 %d", b.size, b.height, frac, shift, got, want)
+			t.Errorf("字号 %v 框高 %v 上内边距 %v 行高 %v 框顶小数 %v：基线行 %d，Chromium 模型 %d", b.size, b.height, b.padTop, b.lineHeight, frac, got, want)
 		}
 	}
 }

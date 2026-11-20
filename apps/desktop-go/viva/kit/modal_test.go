@@ -347,7 +347,7 @@ func TestModalSizes(t *testing.T) {
 	}
 }
 
-// 全屏：四周各留 64px。
+// 全屏：中号字（根字号 16px）下四周各留 64px。
 func TestModalFullscreen(t *testing.T) {
 	h, _ := openModalPage(t, still(), 1000, 700, func(p *modalPage) { p.size = ModalFullscreen })
 	openModal(h)
@@ -355,6 +355,29 @@ func TestModalFullscreen(t *testing.T) {
 	want := gfx.Rect{X: 64, Y: 64, Width: 1000 - 128, Height: 700 - 128}
 	if p.Bounds != want {
 		t.Errorf("全屏面板 %+v，期望 %+v", p.Bounds, want)
+	}
+}
+
+// 全屏随字号档：面板的最大宽高是 px（100vw-128、100vh-128），外层 p-16 是 rem（56/64/72）。
+// 渲染层实测（1280×800）：小号 [64 64 1152 672]、中号 [64 64 1152 672]、大号 [72 72 1136 672]——大号宽被内容区夹窄，高不夹、顶边贴内容区上沿。
+func TestModalFullscreenFollowsFontTiers(t *testing.T) {
+	cases := []struct {
+		tier string
+		want gfx.Rect
+	}{
+		{"small", gfx.Rect{X: 64, Y: 64, Width: 1152, Height: 672}},
+		{"medium", gfx.Rect{X: 64, Y: 64, Width: 1152, Height: 672}},
+		{"large", gfx.Rect{X: 72, Y: 72, Width: 1136, Height: 672}},
+	}
+	for _, tc := range cases {
+		spec := still()
+		spec.FontSize = tc.tier
+		h, _ := openModalPage(t, spec, 1280, 800, func(p *modalPage) { p.size = ModalFullscreen })
+		openModal(h)
+		p, _ := h.node(gfx.RoleGroup, modalTitle)
+		if p.Bounds != tc.want {
+			t.Errorf("%s 档全屏面板 %+v，期望 %+v", tc.tier, p.Bounds, tc.want)
+		}
 	}
 }
 

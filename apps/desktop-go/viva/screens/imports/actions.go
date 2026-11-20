@@ -122,7 +122,7 @@ func (s *Screen) actionBar(c ui.C, task services.ImportTask, active bool) {
 	ui.Row(c).Absolute().Top(l.Space(1.5)+1).Right(l.Space(2)+1).Items(ui.Center).Gap(l.Space(0.5)).
 		PadSides(pad(0.5), pad(1), pad(0.5), pad(1)).Opacity(p).
 		Draw(func(d *ui.DrawContext) {
-			l.PaintSurface(d, kit.Surface{Bg: t.Popover, Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadow: t.ShadowSm})
+			l.PaintSurface(d, kit.Surface{Bg: t.Popover, Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowSM})
 		}).
 		Children(func() {
 			for _, a := range s.rowActions(task) {

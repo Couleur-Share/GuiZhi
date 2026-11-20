@@ -135,7 +135,7 @@ func (s *Screen) listWidths() (width, hi float32) {
 	lo, top := float32(itemListBounds.Min), float32(itemListBounds.Max)
 	hi = top
 	if p.wsWidth > 0 {
-		hi = max(lo, min(top, p.wsWidth-detailMinWidth))
+		hi = max(lo, min(top, kit.QuantizeLU(p.wsWidth)-detailMinWidth)) // 渲染层读的是 ResizeObserver 的 LayoutUnit 宽度
 	}
 	return min(p.stored, hi), hi
 }

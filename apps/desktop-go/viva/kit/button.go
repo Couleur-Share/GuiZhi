@@ -32,6 +32,9 @@ type ButtonStyle struct {
 	// Dashed 让边框画成虚线（border-dashed），见 dashed.go。
 	Dashed bool
 	Shadow tokens.Shadow
+	// Shadows 是多层阴影（Tailwind 默认的 shadow-lg 等是两层带负扩散的阴影，见 shadows.go；不是 globals.css 的 --shadow-lg 令牌）；
+	// 与 Shadow 二选一。
+	Shadows []tokens.Shadow
 	// Ring 是聚焦环的颜色；零值取全局 button:focus-visible 的 ring-primary/50。
 	// FocusRing 为真时环跟 :focus 走（点击后仍留着），否则只在键盘聚焦（:focus-visible）时画。
 	Ring      tokens.Color
@@ -206,7 +209,7 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 			}
 			l.PaintRing(d, 2, ring, st.Radius)
 		}
-		surface := Surface{Bg: bg, Radius: st.Radius, Shadow: st.Shadow}
+		surface := Surface{Bg: bg, Radius: st.Radius, Shadow: st.Shadow, Shadows: st.Shadows}
 		if st.BorderW > 0 && !st.Dashed {
 			surface.Border, surface.BorderW = border, st.BorderW
 		}

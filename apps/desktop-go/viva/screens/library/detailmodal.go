@@ -95,24 +95,27 @@ func (s *Screen) reviewBar(c ui.C, v View) {
 	}
 	index := r.Index(v.List.SelectedID)
 	busy := v.Batch.Busy
-	label := strconv.Itoa(index+1) + " / " + strconv.Itoa(len(r.IDs))
+	// JSX 的 `{index + 1} / {reviewIds.length}{skipped ? ` · …` : ''}` 是相邻的文本节点（序号、「 / 」、总数、跳过说明各一段），
+	// 对照按节点逐段比，所以用 TextRuns 分段画（各段挨着排，宽度同整段文字）。
+	parts := []string{strconv.Itoa(index + 1), " / ", strconv.Itoa(len(r.IDs))}
 	if len(r.Skipped) > 0 {
-		label += " · " + locales.LibraryWorkflowSkipped(len(r.Skipped))
+		parts = append(parts, " · "+locales.LibraryWorkflowSkipped(len(r.Skipped)))
 	}
 	atFirst, atLast := index <= 0, index >= len(r.IDs)-1
 	ui.Flow(c.Key("review-bar")).FillWidth().Shrink(0).Items(ui.Center).Gap(l.Space(2)).
 		PadSides(l.Space(2), l.Space(4), l.Space(2)+1, l.Space(4)).
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeBottom, 1, t.Border) }).
 		Children(func() {
-			// mr-auto：自动外边距吃掉这一行的剩余宽度，把按钮推到行尾；这里让文字盒子增长，效果相同。
-			l.Text(c.Key("count"), label, kit.TextXS, kit.WeightNormal, t.MutedForeground).Grow(1)
+			// mr-auto：自动外边距吃掉这一行的剩余宽度，把按钮推到行尾；这里让文字行增长，效果相同。
+			l.TextRuns(c.Key("count"), kit.TextXS, kit.WeightNormal, t.MutedForeground, parts...).Grow(1)
 			nav := func(key, name string, disabled bool, style kit.ButtonStyle, dir int) {
-				spec := kit.ButtonSpec{Label: name, Disabled: disabled, Hint: ""}
+				spec := kit.ButtonSpec{Label: name, Disabled: disabled}
 				if dir != 0 && key != "save-next" {
 					spec.Hint = "Alt + →"
 					if dir < 0 {
 						spec.Hint = "Alt + ←"
 					}
+					spec.Description = spec.Hint // title 与按钮文字不同：可访问描述
 				}
 				if l.Button(c.Key(key), spec, style).Clicked() {
 					d := dir
