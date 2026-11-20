@@ -47,6 +47,8 @@ type View struct {
 	List ListView
 	// Batch 是批量状态条背后的状态（store_batch.go）。
 	Batch BatchState
+	// Detail 是右侧详情背后的状态（store_detail.go）。
+	Detail DetailView
 }
 
 // DeletionUndoWindow 是删除合集、标签后的撤销窗口，与撤销提示条的停留时长一致（渲染层 DELETION_UNDO_WINDOW_MS）。
@@ -65,9 +67,15 @@ type Store struct {
 	After func(d time.Duration, fn func()) (stop func())
 	// Spawn 在后台执行一个动作；默认开 goroutine，测试注入同步执行以保持确定性。
 	Spawn func(fn func())
+	// AutoSave 报告设置里的自动保存是否开着（渲染层 useSettingsStore 的 autoSave）；关着时编辑只进待保存队列，
+	// 由保存按钮、Ctrl+S、切换条目与改筛选时落盘。nil 按开着处理。
+	AutoSave func() bool
 
 	mu   sync.Mutex
 	view View
+	// detail 是详情的内部状态（store_detail.go）；bg 是 Store 自己发起读取与保存时用的 context（Load 时记下）。
+	detail detailState
+	bg     context.Context
 	// 合集与标签是否成功读到过（B-036：只有从没读到过时，读取失败才进错误态）。
 	collectionsLoaded, tagsLoaded bool
 
@@ -104,6 +112,7 @@ func NewStore(svc services.Library, guard kit.Guard, invalidate func()) *Store {
 		},
 		Spawn:          func(fn func()) { go fn() },
 		view:           View{Filters: Filters{Scope: services.LibraryScopeAll}, List: initialList()},
+		detail:         newDetailState(),
 		list:           listState{cursors: map[int]string{1: ""}},
 		pending:        map[pendingKey]struct{}{},
 		pendingCommits: map[int]func(){},
@@ -127,9 +136,26 @@ func (s *Store) wake() {
 
 // ---- 筛选 ----
 
-// update 改筛选并在后台重新读取（渲染层 updateFilters）：筛选立即生效；没有变化也照样重新读取。
+// update 改筛选并在后台重新读取（渲染层 updateFilters）：没有变化也照样重新读取。
 // 同一刻列表回到第一页、丢掉全部分页游标、清掉选中与多选，并让旧筛选在途的读取作废（台账 B-033 的 (2)(3)）。
+// 详情里有没落盘的编辑时，先落盘再换筛选；落盘失败筛选不变（改动留在待保存队列里，失败原因在详情头部）——台账 B-033 的 (1)。
 func (s *Store) update(ctx context.Context, mutate func(*Filters)) {
+	s.mu.Lock()
+	flush := s.needsFlushLocked()
+	s.mu.Unlock()
+	if !flush {
+		s.applyFilters(ctx, mutate)
+		return
+	}
+	s.Spawn(func() {
+		if s.FlushPendingSave(ctx) {
+			s.applyFilters(ctx, mutate)
+		}
+	})
+}
+
+// applyFilters 是 update 的落定部分：筛选立即生效，随后的重新读取放到后台。
+func (s *Store) applyFilters(ctx context.Context, mutate func(*Filters)) {
 	s.mu.Lock()
 	prev := s.view.Filters
 	next := prev
@@ -219,6 +245,7 @@ func (s *Store) RefreshCounts(ctx context.Context) {
 // Load 是知识库工作区挂载时的读取（渲染层 LibraryWorkspace 的挂载 effect）：计数、合集、标签各在后台读一遍。
 func (s *Store) Load(ctx context.Context) {
 	s.mu.Lock()
+	s.bg = ctx
 	s.view.List.Loading = true // 第一帧就是加载态，不是「暂无条目」
 	s.mu.Unlock()
 	s.Spawn(func() { s.RefreshAll(ctx) })

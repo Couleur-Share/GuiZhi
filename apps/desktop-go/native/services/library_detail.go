@@ -134,10 +134,14 @@ type LibrarySourceVersion struct {
 	CapturedAt int64  `json:"capturedAt"`
 }
 
+// JSLower 是 JS 的 String.prototype.toLowerCase：完整的 Unicode 映射、词尾 Σ。
+// 标签名的比较与键（合并、乐观回显）都以它为准，与渲染层行为一致。
+func JSLower(s string) string { return cases.Lower(language.Und).String(s) }
+
 // MergeDraftTags 按相对基线的增删合并标签，保留另一入口新增的标签（packages/shared 的 mergeDraftTags）：
-// 以去掉首尾空白并转小写（JS 的 toLowerCase：完整的 Unicode 映射、词尾 Σ）的名字作键，首次出现的位置、最后写入的值。
+// 以去掉首尾空白并转小写（JSLower）的名字作键，首次出现的位置、最后写入的值。
 func MergeDraftTags(base, edited, current []string) []string {
-	key := func(s string) string { return cases.Lower(language.Und).String(strings.TrimFunc(s, isJSSpace)) }
+	key := func(s string) string { return JSLower(strings.TrimFunc(s, isJSSpace)) }
 	wanted := map[string]bool{}
 	for _, n := range edited {
 		wanted[key(n)] = true

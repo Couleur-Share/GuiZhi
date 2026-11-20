@@ -99,9 +99,9 @@ func (s *Store) resetPaging() {
 	s.list.cursors = map[int]string{1: ""}
 }
 
-// resetSelection 清空选中与多选（渲染层 updateFilters 的重置）。mu 由调用方持有。
+// resetSelection 清空选中、详情与多选（渲染层 updateFilters 的重置）：在途的详情读取随之作废。mu 由调用方持有。
 func (s *Store) resetSelection() {
-	s.view.List.SelectedID = ""
+	s.clearDetailLocked()
 	s.view.List.setSelection(nil, "")
 }
 
@@ -207,7 +207,7 @@ func (s *Store) SetSearch(ctx context.Context, query string) {
 			return // 搜索词又变了，或搜索已清空：不动选中项
 		}
 		if !slices.ContainsFunc(l.Entries, func(e services.LibraryEntry) bool { return e.ID == l.SelectedID }) {
-			l.SelectedID = ""
+			s.clearDetailLocked()
 			s.wake()
 		}
 	})
@@ -244,12 +244,10 @@ func (s *Store) SetPageSize(ctx context.Context, size int) {
 
 // ---- 选中与多选 ----
 
-// SelectItem 选中一条（渲染层 selectItem 的选中部分；详情的读取随详情栏迁入）。空串取消选中。
+// SelectItem 选中一条并读取它的详情（渲染层 selectItem，store_detail.go）。空串取消选中。
+// 上一条有没落盘的编辑时先落盘，落盘失败就不动选中；选中已经选中的那条会重新读取详情。
 func (s *Store) SelectItem(id string) {
-	s.mu.Lock()
-	s.view.List.SelectedID = id
-	s.mu.Unlock()
-	s.wake()
+	s.selectItem(s.backgroundCtx(), id)
 }
 
 // Move 是列表键盘的选中移动方式（渲染层 use-item-keyboard.ts 的 moveTo）。
@@ -288,13 +286,10 @@ func (s *Store) MoveSelection(m Move) {
 		to = n - 1
 	}
 	to = max(0, min(to, n-1))
-	changed := l.Entries[to].ID != l.SelectedID
-	if changed {
-		l.SelectedID = l.Entries[to].ID
-	}
+	target, current := l.Entries[to].ID, l.SelectedID
 	s.mu.Unlock()
-	if changed {
-		s.wake()
+	if target != current {
+		s.SelectItem(target)
 	}
 }
 

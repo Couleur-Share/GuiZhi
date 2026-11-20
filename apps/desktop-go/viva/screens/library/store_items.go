@@ -12,8 +12,8 @@ import (
 // bulkMoveToCollection、toggleFavorite、togglePinned、setItemTags）。
 //
 // 对若干条的操作都经 store_batch.go 的 execute（逐条记账、可重试）；单条的收藏、置顶与改标签直接走 UpdateEntry，
-// 先在本地行上回显、再重取列表与计数。选中条目的详情草稿随 M2-4 迁入：到那时选中条目的改标签与翻转要先写进草稿再落盘，
-// 这里只处理列表上的行。
+// 先在本地行上回显、再重取列表与计数；返回的条目同时并进详情（ApplyServerEntry），详情里还没落盘的编辑叠在上面。
+// 选中条目的改标签不同：它走详情的草稿（store_detail.go），与正文、标题的编辑一起带基线保存。
 
 // MoveToTrash 把条目移到回收站，返回是否全部成功——调用方据此决定要不要弹「已移到回收站」的撤销提示，
 // 否则删失败了还会弹一句成功文案，用户以为删掉了。
@@ -90,7 +90,12 @@ func (s *Store) toggleFlag(ctx context.Context, id string, favorite bool) bool {
 		key := flagKey(favorite, id)
 		s.mu.Lock()
 		known := false
-		if i := slices.IndexFunc(s.view.List.Entries, func(e services.LibraryEntry) bool { return e.ID == id }); i >= 0 {
+		if sel := s.view.Detail.Item; sel != nil && sel.ID == id {
+			known = sel.IsPinned // 选中的条目以详情里的值为准
+			if favorite {
+				known = sel.IsFavorite
+			}
+		} else if i := slices.IndexFunc(s.view.List.Entries, func(e services.LibraryEntry) bool { return e.ID == id }); i >= 0 {
 			e := s.view.List.Entries[i]
 			known = e.IsPinned
 			if favorite {
@@ -120,17 +125,26 @@ func (s *Store) toggleFlag(ctx context.Context, id string, favorite bool) bool {
 			return err
 		}
 		if found {
-			s.applyEntry(updated)
+			s.ApplyServerEntry(updated)
 		}
 		s.RefreshAll(ctx)
 		return nil
 	})
 }
 
-// SetItemTags 整体替换一条的标签（渲染层 setItemTags 里非选中条目的路径）：回写这一行，再重读标签与计数——可能新建了标签。
+// SetItemTags 整体替换一条的标签（渲染层 setItemTags）：
+// 选中的条目走详情的草稿（写进待保存并立即落盘，失败显示在详情头部，不弹提示）；
+// 其余条目直接写回这一行，再重读标签与计数——可能新建了标签。
 func (s *Store) SetItemTags(ctx context.Context, id string, tagNames []string) bool {
 	if tagNames == nil {
 		tagNames = []string{} // nil 表示「不改」，空表示「清空」
+	}
+	s.mu.Lock()
+	selected := s.view.Detail.Item != nil && s.view.Detail.Item.ID == id && s.view.List.SelectedID == id
+	s.mu.Unlock()
+	if selected {
+		s.UpdateSelected(ctx, services.LibraryDraftFields{TagNames: tagNames})
+		return s.FlushPendingSave(ctx)
 	}
 	return s.guard.Run(locales.LibraryActionSetTags(), func() error {
 		updated, found, err := s.svc.UpdateEntry(ctx, id, services.LibraryEntryPatch{TagNames: tagNames})
@@ -140,7 +154,7 @@ func (s *Store) SetItemTags(ctx context.Context, id string, tagNames []string) b
 		if !found {
 			return nil
 		}
-		s.applyEntry(updated)
+		s.ApplyServerEntry(updated)
 		s.FetchTags(ctx)
 		s.RefreshCounts(ctx)
 		return nil
@@ -163,6 +177,13 @@ func (s *Store) SupplementWechat(ctx context.Context, ids []string) bool {
 // 摘要、类型等列表专属字段保持原样。Entries 整体替换，EntriesRev 加一。
 func (s *Store) applyEntry(updated services.LibraryEntry) {
 	s.mu.Lock()
+	s.applyEntryLocked(updated)
+	s.mu.Unlock()
+	s.wake()
+}
+
+// applyEntryLocked 是 applyEntry 的持锁版本，不唤醒界面。mu 由调用方持有。
+func (s *Store) applyEntryLocked(updated services.LibraryEntry) {
 	l := &s.view.List
 	entries := slices.Clone(l.Entries)
 	for i := range entries {
@@ -175,6 +196,4 @@ func (s *Store) applyEntry(updated services.LibraryEntry) {
 	}
 	l.Entries = entries
 	l.EntriesRev++
-	s.mu.Unlock()
-	s.wake()
 }
