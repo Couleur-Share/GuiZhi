@@ -83,7 +83,7 @@ func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry
 }
 
 // rowClicked 处理行上的一次点击（渲染层 ItemTableView 的 handleRowClick）：Ctrl/Meta 切换勾选，Shift 选一段，
-// 否则打开详情浮层。详情浮层随 M2-4 迁入（台账 B-043），在那之前只把这一行设为选中。
+// 否则打开详情浮层（先 BeginReview，成功才开，台账 B-052）。
 func (s *Screen) rowClicked(list ListView, e services.LibraryEntry, mods gfx.Modifiers) {
 	switch {
 	case mods&(gfx.ModifierControl|gfx.ModifierMeta) != 0:
@@ -91,7 +91,7 @@ func (s *Screen) rowClicked(list ListView, e services.LibraryEntry, mods gfx.Mod
 	case mods&gfx.ModifierShift != 0:
 		s.Store.RangeSelectTo(e.ID)
 	default:
-		s.Store.SelectItem(e.ID)
+		s.openDetail(e.ID)
 	}
 }
 
@@ -235,7 +235,7 @@ func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title, query string)
 }
 
 // titleButton 是标题按钮：min-w-0 line-clamp-2 break-words text-left text-sm font-medium text-primary transition-colors
-// hover:text-primary/80 hover:underline；点击打开详情浮层（随 M2-4 迁入，台账 B-043），在那之前选中这一行。
+// hover:text-primary/80 hover:underline；点击打开详情浮层。
 func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title, query string) {
 	l := s.Look
 	t := l.T
@@ -262,7 +262,7 @@ func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title, query strin
 		l.TextNoKern(bc.Key("text"), title, size, line, kit.WeightMedium, color, kit.NoKernOptions{MaxLines: 2, Underline: hovered})
 	})
 	if box.Clicked() {
-		s.Store.SelectItem(e.ID)
+		s.openDetail(e.ID)
 	}
 }
 

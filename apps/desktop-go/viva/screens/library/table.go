@@ -139,6 +139,7 @@ func (s *Screen) tableWorkspace(c ui.C, v View) {
 			s.entryMenuView(c, v)
 			s.tagPickerView(c, v)
 			s.itemConfirmView(c, v)
+			s.detailModalView(c, v)
 		})
 }
 

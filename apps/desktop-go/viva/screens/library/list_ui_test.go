@@ -403,12 +403,26 @@ func TestTableRowClicksSelectAndModifiersExtendTheSelection(t *testing.T) {
 	if l := r.view().List; l.SelectedID != entries[1].ID || len(l.Selection) != 0 {
 		t.Fatalf("点行里的空白处应选中这一行，实际 %q 多选 %v", l.SelectedID, l.Selection)
 	}
+	// 点行打开详情浮层（B-043）：浮层盖住表格，Esc 关掉之后才能点下一处。
+	if !r.screen.DetailModalOpen() {
+		t.Fatalf("点行应打开详情浮层")
+	}
+	r.keys("escape")
+	r.frames(3)
+	if r.screen.DetailModalOpen() {
+		t.Fatalf("Esc 应关闭详情浮层")
+	}
 	title, _ := r.cardOf(entries[2])
 	tx, ty := centerOf(title)
 	r.clickAt(tx, ty)
 	if got := r.view().List.SelectedID; got != entries[2].ID {
 		t.Fatalf("点标题钮应选中这一行，实际 %q", got)
 	}
+	if !r.screen.DetailModalOpen() {
+		t.Fatalf("点标题钮应打开详情浮层")
+	}
+	r.keys("escape")
+	r.frames(3)
 	x, y = r.rowBlank(entries[4])
 	r.clickAtWith("ctrl", x, y)
 	if l := r.view().List; !slices.Equal(l.Selection, []string{entries[4].ID}) || l.SelectedID != entries[2].ID {

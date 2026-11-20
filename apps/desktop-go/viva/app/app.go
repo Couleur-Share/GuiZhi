@@ -128,9 +128,11 @@ func Run(opts Options) error {
 //   - OnKey：Tab 可达（下一个停靠点在滚动区视野之外时先滚进视野，台账 B-030，kit/reach.go）、悬停提示的收起（B-017）与
 //     知识库列表的窗口级键盘（B-045）排在页面自己的按键路由之前（kit.KeyFirst）——不能直接换掉 config.OnKey，那是页面的路由，
 //     换掉它菜单、下拉里的方向键就不动了；
+//   - OnShortcut：带修饰键的可打印字符（知识库详情的 Ctrl+S、Ctrl+F、Alt+Z）在 Viva 里不走 OnKey，单独走这一条，同样排在页面的前面；
 //   - OnScroll：滚轮滚动了内容之后补一次指针移动，让悬停跟上（台账 B-031，kit/wheel.go）。
 func bindInput(config *vapp.Config, root *Root) {
 	config.OnKey = kit.KeyFirst(root.OnKey, config.OnKey)
+	config.OnShortcut = kit.KeyFirst(root.OnShortcut, config.OnShortcut)
 	config.OnScroll = root.OnScroll(config.OnScroll)
 }
 

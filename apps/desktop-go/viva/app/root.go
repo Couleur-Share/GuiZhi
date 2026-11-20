@@ -136,10 +136,14 @@ func (r *Root) mountLibrary(invalidate func()) {
 	store.AutoSave = func() bool { return r.store.Values().UI.AutoSave }
 	r.library = &libraryscreen.Screen{
 		Store: store, Ctx: r.ctx, Guard: r.guard, Prefs: r.opts.Services.Prefs, Now: r.opts.Services.Now,
+		OpenExternal: r.opts.Services.OpenExternal, Imports: r.opts.Services.Imports,
+		// 编辑器默认预览每次现读：设置在别处改了，下一次打开条目就按新值走。
+		EditorPreview: func() bool { return r.store.Values().UI.EditorMarkdownPreview },
 	}
 	view := r.win.Modules[shell.ModuleLibrary]
 	view.Panel = r.library.Panel
 	view.Workspace = r.library.Workspace
+	view.HidePanel = r.library.FocusReading
 	r.win.Modules[shell.ModuleLibrary] = view
 	r.win.OnSearch = r.library.SearchTyped
 	if r.importsStore != nil {
@@ -185,6 +189,7 @@ func (r *Root) syncLook(c ui.C) {
 		r.look.Scale = scale
 		r.look.HoverRefresh = r.refreshHoverHere
 		r.look.KeyHook = r.listKey
+		r.look.ShortcutHook = r.listShortcut
 		r.theme = r.look.Theme
 		r.bg = r.look.Col(r.look.T.Background)
 		r.win.Look, r.settings.Look = r.look, r.look
@@ -232,6 +237,22 @@ func (r *Root) listKey(e gfx.KeyEvent) gfx.EventResult {
 		return gfx.EventResult{}
 	}
 	return r.library.ListKey(e, r.canvas)
+}
+
+// OnShortcut 是窗口快捷键（带修饰键的可打印字符）的前置钩子，见 kit.Look.OnShortcut。窗口线程调用；Look 还没装配好时不插手。
+func (r *Root) OnShortcut(e gfx.KeyEvent) gfx.EventResult {
+	if r.look == nil {
+		return gfx.EventResult{}
+	}
+	return r.look.OnShortcut(e)
+}
+
+// listShortcut 是 Look.ShortcutHook：知识库详情的窗口级快捷键。没有装配知识库时不插手。
+func (r *Root) listShortcut(e gfx.KeyEvent) gfx.EventResult {
+	if r.library == nil {
+		return gfx.EventResult{}
+	}
+	return r.library.ListShortcut(e)
 }
 
 // errHoverRefreshNoWindow 是补发悬停刷新时找不到本进程 Viva 窗口的诊断信息：只写日志，不给用户看

@@ -19,7 +19,7 @@ import (
 //   - ↓ ↑ 选下一条 / 上一条（没有选中时 ↓ 选第一条、↑ 选最后一条；到头不循环），Home / End 选第一条 / 最后一条，
 //     都 preventDefault；选中项变了之后，卡片列表用 scrollToIndex 把它滚进视野（cardReveal），表格由 tableReveal 处理；
 //   - 空格切换选中条目的多选勾选（preventDefault）；焦点在 button、a、[role=menuitem] 上时让给它们（它们自己的空格是点击）；
-//   - Enter 打开选中条目（只在表格视图、焦点不在按钮链接上；随 M2-4 的详情浮层接），现在原样放行；
+//   - Enter 打开选中条目（只在表格视图、焦点不在按钮链接上）：先 BeginReview 再开详情浮层（detailmodal.go）；
 //   - Delete 删除多选，没有多选就删当前条目（回收站里是彻底删除，要确认；其余范围移到回收站并给撤销窗口），
 //     preventDefault；不看焦点在不在按钮上，没有可删的条目就放行；
 //   - Esc 退出多选：这一条属于批量条（ItemBulkBar 的 window 监听，条挂载即有选中项时才有），不看修饰键与焦点，也不拦截按键——
@@ -35,15 +35,32 @@ func (s *Screen) ListKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 	if !s.wsActive || e.Release {
 		return gfx.EventResult{}
 	}
+	// 详情相关的按键先于列表键盘（detailkeys.go）：它们各自独立，只有查找框里的 Esc / Enter 与列表无关地拦下按键。
+	detail := s.detailKey(e, canvas)
+	if detail.Handled {
+		return detail
+	}
+	res := s.listKey(e, canvas)
+	res.Repaint = res.Repaint || detail.Repaint
+	return res
+}
+
+// listKey 是列表键盘本体（ListKey 去掉详情那一环之后）。
+func (s *Screen) listKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 	v := s.Store.View()
 	if e.Key == gfx.KeyEscape {
-		if len(v.List.Selection) == 0 {
+		// Esc 退出多选属于批量条（列表栏里）；专注阅读模式下列表栏没有挂载，没有这件事。
+		if s.detail.focusReading || len(v.List.Selection) == 0 {
 			return gfx.EventResult{}
 		}
 		s.Store.ClearSelection()
 		return gfx.EventResult{Repaint: true}
 	}
 	if e.Modifiers&(gfx.ModifierControl|gfx.ModifierAlt|gfx.ModifierMeta) != 0 {
+		return gfx.EventResult{}
+	}
+	// 专注阅读模式下列表没有挂载；表格视图的详情浮层打开时列表键盘整体停用（渲染层 useItemListKeyboard 的 enabled）。
+	if s.detail.focusReading || s.detail.modal.open {
 		return gfx.EventResult{}
 	}
 	focus := kit.FocusOf(canvas)
@@ -63,6 +80,12 @@ func (s *Screen) ListKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 		s.Store.MoveSelection(MoveFirst)
 	case gfx.KeyEnd:
 		s.Store.MoveSelection(MoveLast)
+	case gfx.KeyEnter:
+		// Enter 打开选中条目：只在表格视图（onOpen 只有表格传），焦点在按钮、链接、菜单项上时让给它们。
+		if s.pane.view != ViewList || list.SelectedID == "" || focus.Activatable() {
+			return gfx.EventResult{}
+		}
+		s.openDetail(list.SelectedID)
 	case gfx.KeySpace:
 		if list.SelectedID == "" || focus.Activatable() {
 			return gfx.EventResult{}

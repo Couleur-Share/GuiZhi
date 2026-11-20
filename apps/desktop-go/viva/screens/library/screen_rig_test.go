@@ -92,6 +92,7 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 
 	// 窗口级键盘（方向键、Home、End、空格，B-045）与生产同一处接线：经 Look.KeyHook，焦点从画布读。
 	r.look.KeyHook = func(e gfx.KeyEvent) gfx.EventResult { return r.screen.ListKey(e, &r.canvas) }
+	r.look.ShortcutHook = r.screen.ListShortcut
 
 	bg := r.look.Col(r.look.T.Background)
 	pg := ui.NewPage(ui.PageConfig{
@@ -115,6 +116,7 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 	})
 	config := pg.Config(app.Config{Title: t.Name(), Width: 1280, Height: 800})
 	config.OnKey = kit.KeyFirst(r.look.OnKey, config.OnKey) // 与窗口同一处接线（app.bindInput）：钩子在先，页面的按键路由在后
+	config.OnShortcut = kit.KeyFirst(r.look.OnShortcut, config.OnShortcut)
 	session, err := headless.Open(config, &r.canvas, headless.Options{Scale: 1})
 	if err != nil {
 		t.Fatalf("打开无头会话失败：%v", err)

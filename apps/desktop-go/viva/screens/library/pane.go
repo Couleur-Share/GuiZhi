@@ -141,7 +141,7 @@ func (s *Screen) listWidths() (width, hi float32) {
 }
 
 // Workspace 是知识库模块的工作区（渲染层 components/library/LibraryWorkspace）：
-// 卡片视图是窄列表栏加常驻详情栏，列表视图是全宽表格。详情栏的内容随 M2-4 迁入，在那之前只有底色。
+// 卡片视图是窄列表栏加常驻详情栏，列表视图是全宽表格；专注阅读模式下只有详情栏（detail.go）。
 func (s *Screen) Workspace(c ui.C) {
 	s.ensureMounted()
 	s.loadPane()
@@ -150,6 +150,10 @@ func (s *Screen) Workspace(c ui.C) {
 	s.settleBulk()
 	v := s.Store.View()
 	s.noteEntriesChanged(v.List)
+	if s.detail.focusReading {
+		s.focusWorkspace(c, v)
+		return
+	}
 	if s.pane.view == ViewList {
 		s.pane.reveal = cardReveal{} // 卡片列表卸载：下次挂载时已有选中行要重新滚进视野
 		s.tableWorkspace(c, v)
@@ -171,8 +175,6 @@ func (s *Screen) noteEntriesChanged(list ListView) {
 
 // cardWorkspace 是卡片视图的布局：flex h-full min-h-0 flex-1 overflow-hidden，左边列表栏，右边详情栏。
 func (s *Screen) cardWorkspace(c ui.C, v View) {
-	l := s.Look
-	t := l.T
 	p := &s.pane
 	width, hi := s.listWidths()
 	if !p.resizer.Dragging() {
@@ -182,10 +184,7 @@ func (s *Screen) cardWorkspace(c ui.C, v View) {
 		Draw(func(d *ui.DrawContext) { p.wsWidth = d.Rect.Width }).
 		Children(func() {
 			s.listAside(c, v, p.resizer.Width, hi)
-			// min-w-0 flex-1 app-wallpaper-section：详情栏。
-			ui.Column(c.Key("detail")).Grow(1).MinWidth(0).FillHeight().Draw(func(d *ui.DrawContext) {
-				l.PaintSurface(d, kit.Surface{Bg: t.UiSectionBg})
-			})
+			s.detailColumn(c, v) // min-w-0 flex-1 app-wallpaper-section：详情栏
 		})
 }
 

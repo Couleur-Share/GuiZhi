@@ -31,6 +31,16 @@ type Screen struct {
 	// Now 与 NewID 给智能视图的创建用；对照与测试注入固定值。空表示取系统时钟与随机 ID。
 	Now   func() time.Time
 	NewID func() string
+	// OpenExternal 用系统默认浏览器打开链接（来源 chip 的链接）；nil 时点击弹失败提示（测试与对照里不接线）。
+	OpenExternal func(url string) error
+	// Imports 是采集队列（来源 chip 旁的「重新采集并待确认」入队）；nil 时点击弹失败提示。
+	Imports services.Imports
+	// HideDetail 为真时详情栏内容隐去、表格行与 Enter 只选中不开详情浮层：对照场景专用，口径与采集端的 HIDE_DETAIL_CSS 一致——
+	// 渲染层一侧同样只隐去详情内容、不改布局（M2-4 之前的场景用，它们比的是列表栏、侧栏与批量条）。生产里恒为假。
+	HideDetail bool
+	// EditorPreview 报告设置里「编辑器默认预览」是否开着（每次现读）；nil 取默认值（开）。
+	EditorPreview func() bool
+
 	// Loc 与 Locale 决定表格里时间的写法（今天写时分，其余写日期）；空表示本地时区与中文。
 	Loc    *time.Location
 	Locale kit.DateLocale
@@ -46,6 +56,7 @@ type Screen struct {
 	edit       editDialog
 	smart      smartViews
 	bulk       bulkState // 批量与条目操作的界面状态：条目菜单、批量条的浮层、确认框、结果条的展开（bulk.go）
+	detail     detailUI  // 详情栏的界面状态：标题框、头部菜单、通知条、内容面板、专注阅读与详情浮层（detail.go）
 
 	// mounted 与 shown 是渲染层「挂载」的对应：侧栏这一帧没画（切到别的模块、设置页，或侧栏收起）就当作卸载，
 	// 下次再画时重新进入（EndFrame）。
@@ -55,10 +66,12 @@ type Screen struct {
 	// 按键发生在两次绘制之间，所以看上一帧的。
 	wsShown, wsActive bool
 
-	mu          sync.Mutex // 保护下面由后台写入的字段：界面线程在帧首取走
-	finished    *editOutcome
-	confirmDone *confirmOutcome // 确认框后台动作的结果（settleBulk 在帧首取走）
-	confirmGen  uint64          // 确认框的代次：resetBulk 时递增，在途动作的结果据此作废
+	// detailShown 与 detailActive 同理，对应 ItemDetail 是否挂载（Ctrl+S 的前提）：卡片视图与专注阅读里它常驻，表格视图里只在详情浮层打开时。
+	detailShown, detailActive bool
+	mu                        sync.Mutex // 保护下面由后台写入的字段：界面线程在帧首取走
+	finished                  *editOutcome
+	confirmDone               *confirmOutcome // 确认框后台动作的结果（settleBulk 在帧首取走）
+	confirmGen                uint64          // 确认框的代次：resetBulk 时递增，在途动作的结果据此作废
 }
 
 // nowTime 是此刻。
@@ -97,11 +110,15 @@ func (s *Screen) EndFrame() {
 	s.shown = false
 	was := s.wsActive
 	s.wsActive, s.wsShown = s.wsShown, false
+	s.detailActive, s.detailShown = s.detailShown, false
 	if !s.wsActive {
 		s.pane.reveal = cardReveal{} // 工作区卸载：下次挂载时已有选中行要重新滚进视野
 	}
 	if was && !s.wsActive {
 		s.resetBulk() // 工作区卸载：菜单、浮层与确认框都是它的组件状态，随之丢掉
+		// 卸载（切换模块）前保存未落盘内容（渲染层 LibraryWorkspace 的卸载 effect：flushPendingSave，不等结果）。
+		s.Store.Spawn(func() { s.Store.FlushPendingSave(s.Ctx) })
+		s.detail = detailUI{} // 详情栏、专注阅读（离开知识库即退出）与详情浮层同理
 	}
 }
 

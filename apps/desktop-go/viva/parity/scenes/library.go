@@ -31,8 +31,11 @@ type libraryOptions struct {
 	variant    string // data | empty | long | many
 	smartViews string // 夹具里的智能视图集名；空表示没有保存过
 
-	// list 为 true 时工作区放真实的列表栏（M2-2）；右侧详情栏仍是空白（M2-4 才迁入，React 一侧同样隐去）。
+	// list 为 true 时工作区放真实的列表栏（M2-2）；右侧详情栏默认是空白（React 一侧同样隐去），detail 为真时才是真的详情（M2-4）。
 	list bool
+	// detail 为 true 时详情栏与表格视图的详情浮层是真的（只在 list 时有意义）；React 一侧改为隐去阅读区（HIDE_READER_CSS），
+	// 阅读区在 M2-5 迁入之前留白（台账 B-059）。
+	detail bool
 	// fault 是列表读取的故障注入（只在 list 时有意义）。
 	fault listFault
 	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
@@ -145,6 +148,8 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			Loc:    time.FixedZone(fix.Timezone, 8*3600),
 			Locale: kit.ParseDateLocale(fix.Locale),
 			NewID:  func() string { next++; return fmt.Sprintf("parity-view-%d", next) },
+			// M2-4 之前的场景比的是列表栏、侧栏与批量条：详情栏内容隐去（React 一侧用 HIDE_DETAIL_CSS），详情场景（detail）才画真的。
+			HideDetail: !opt.detail,
 		}
 		workspace := blankWorkspace
 		if opt.list {

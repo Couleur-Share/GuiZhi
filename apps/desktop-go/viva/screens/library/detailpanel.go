@@ -1,0 +1,185 @@
+package library
+
+import (
+	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/native/notes"
+	"guizhi-mygo-shell/native/services"
+)
+
+// 内容面板（渲染层 components/library/ContentPanel）：标签页与工具栏、评审提示、查找条，下面是阅读区。
+//
+// 阅读区（Markdown 预览、楼层讨论、网页快照、图库、主题阅读、文字稿、编辑器）归 M2-5 与 M2-6，这里是留白（台账 B-059）；
+// 工具栏上的动作（总结、刷新讨论、AI 排版、重新转写……）画出来但未接线：点击弹一条说明归属里程碑的失败提示（台账 B-060）。
+
+// panelState 是内容面板的界面状态（渲染层 ContentPanel 的 useState；随条目切换重置，对应渲染层的 viewItemId 判断）。
+type panelState struct {
+	itemID       string
+	tab          ReadingTab
+	isPreview    bool
+	snapshotView bool
+
+	findOpen bool
+	// canFind 是这一帧工具栏摆不摆查找入口（窗口键盘钩子的 Ctrl+F 据此判断），findFocused 是查找框此刻有没有键盘焦点（钩子的 Enter / Esc 据此判断），panelW 是上一帧面板宽。
+	canFind, findFocused bool
+	panelW               float32
+	find                 ui.Field
+	findQuery            string
+	findActive           int
+	findCount            int
+	// focusFind 为真时下一帧把焦点交给查找框（渲染层打开查找条后 requestAnimationFrame focus）。
+	focusFind bool
+
+	catalogOpen bool
+
+	// persisted 是已经写进阅读记忆的「条目 ID + 标签」，repliesPersisted 是讨论标签已写的搜索词与目录开关
+	// （渲染层两个 useEffect 的依赖：变了才写）。
+	persisted        string
+	repliesPersisted string
+}
+
+// activeTab 是此刻实际显示的标签：记忆里的标签这条没有时回正文（渲染层 activeTab）。
+func (p *panelState) activeTab(caps ItemCaps) ReadingTab {
+	if p.tabAvailable(p.tab, caps) {
+		return p.tab
+	}
+	return TabBody
+}
+
+// tabAvailable 报告标签 tab 在这条上有没有（渲染层 availableTabs）。
+func (p *panelState) tabAvailable(tab ReadingTab, caps ItemCaps) bool {
+	switch tab {
+	case TabBody:
+		return true
+	case TabTranscript:
+		return caps.ShowTranscriptTab
+	case TabImages:
+		return caps.ShowImagesTab
+	case TabRecognized:
+		return caps.ShowRecognizedTab
+	case TabSummary:
+		return caps.ShowForumSummaryTab
+	case TabReplies:
+		return caps.ShowRepliesTab
+	}
+	return false
+}
+
+// findable 是能用查找条的标签（渲染层 FINDABLE_TABS）。
+func findable(tab ReadingTab) bool {
+	switch tab {
+	case TabSummary, TabBody, TabTranscript, TabReplies:
+		return true
+	}
+	return false
+}
+
+// showFindBar 报告工具栏上摆不摆查找入口（渲染层 showFindBar）：预览态（回收站里的条目只读、不算）、可查找的标签，
+// 文字稿要有内容、讨论与总结要有对应小节。主题阅读与公众号快照的查找在 M2-5 随阅读区一起做。
+func (p *panelState) showFindBar(active ReadingTab, caps ItemCaps) bool {
+	wechatPreview := caps.IsWechat && p.snapshotView // 渲染层 isWechatPreview：快照里也能查找
+	if !((p.isPreview && !caps.Trashed) || wechatPreview) || !findable(active) {
+		return false
+	}
+	switch active {
+	case TabTranscript:
+		return caps.Transcript != ""
+	case TabReplies:
+		return caps.ShowRepliesTab
+	case TabSummary:
+		return caps.ShowForumSummaryTab
+	}
+	return true
+}
+
+// syncPanel 在条目切换时把面板状态换成这条的（渲染层 `viewItemId !== item.id` 那一段）：先按偏好决定要不要预览，
+// 再用阅读记忆恢复标签、讨论搜索词与目录开关；没有记忆时论坛条目有讨论总结就先看总结。
+func (s *Screen) syncPanel(item services.LibraryItem, caps ItemCaps) {
+	p := &s.detail.panel
+	if p.itemID == item.ID {
+		return
+	}
+	*p = panelState{itemID: item.ID}
+	p.isPreview = s.editorPreview() && jsTrim(item.Content) != ""
+
+	replyCount := 0
+	if caps.ShowRepliesTab {
+		replyCount = len(notes.ParseForumReplies(item.Content))
+	}
+	if mem, ok := LoadReadingMemory(s.Prefs, item.ID, s.nowTime()); ok && p.restorable(mem.Tab, caps, item) {
+		p.tab = mem.Tab
+		if mem.Tab == TabReplies && mem.RepliesQuery != nil {
+			p.findQuery = *mem.RepliesQuery
+			p.find.SetText(p.findQuery)
+		}
+		p.catalogOpen = defaultCatalogOpen(replyCount)
+		if mem.CatalogOpen != nil {
+			p.catalogOpen = *mem.CatalogOpen
+		}
+		return
+	}
+	p.tab = TabBody
+	if item.ItemType == services.LibraryTypeForum && caps.ShowForumSummaryTab {
+		p.tab = TabSummary
+	}
+	p.catalogOpen = defaultCatalogOpen(replyCount)
+}
+
+// restorable 报告记忆里的标签这条还能不能用（渲染层那一长串条件：转写标签要看转写入口，图片的两个标签要看是图片条目）。
+func (p *panelState) restorable(tab ReadingTab, caps ItemCaps, item services.LibraryItem) bool {
+	switch tab {
+	case TabBody:
+		return true
+	case TabSummary:
+		return caps.ShowForumSummaryTab
+	case TabReplies:
+		return caps.ShowRepliesTab
+	case TabTranscript:
+		return caps.ShowTranscriptTab
+	case TabImages, TabRecognized:
+		return item.ItemType == services.LibraryTypeImage
+	}
+	return false
+}
+
+// persistPanel 把标签与讨论状态写进阅读记忆（渲染层的两个 useEffect：标签变了写标签；讨论标签下搜索词或目录开关变了写它们）。
+func (s *Screen) persistPanel(item services.LibraryItem, active ReadingTab) {
+	p := &s.detail.panel
+	if key := item.ID + "\x00" + string(active); key != p.persisted {
+		p.persisted = key
+		s.patchReading(item.ID, ReadingPatch{Tab: active})
+	}
+	if active == TabReplies {
+		open := p.catalogOpen
+		query := p.findQuery
+		key := item.ID + "\x00" + query + "\x00" + boolKey(open)
+		if key != p.repliesPersisted {
+			p.repliesPersisted = key
+			s.patchReading(item.ID, ReadingPatch{RepliesQuery: &query, CatalogOpen: &open})
+		}
+	}
+}
+
+func boolKey(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
+}
+
+// patchReading 写阅读记忆；失败只记日志（位置丢了不影响阅读）。
+func (s *Screen) patchReading(itemID string, patch ReadingPatch) {
+	if err := PatchReadingMemory(s.Prefs, itemID, patch, s.nowTime()); err != nil {
+		s.Guard.Background("library.readingMemory", err)
+	}
+}
+
+// changeTab 切换标签（渲染层 changeTab）：先把当前标签的滚动位置记进记忆（阅读区在 M2-5，这里没有滚动位置可记），
+// 再换标签、查找位置归零。
+func (s *Screen) changeTab(item services.LibraryItem, caps ItemCaps, next ReadingTab) {
+	p := &s.detail.panel
+	p.tab = next
+	p.findActive = 0
+	_ = item
+	_ = caps
+}
