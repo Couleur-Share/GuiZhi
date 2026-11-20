@@ -82,6 +82,9 @@ type ButtonSpec struct {
 	// TranslateCentered 表示渲染层里这枚按钮自己是 absolute top-1/2 -translate-y-1/2 居中的：Chromium 对变换容器里的 SVG 图标
 	// 按「取整后的绘制偏移」落笔，位置与版面位置差半个像素以内（见 icon_snap.go）。纯图标按钮的图标据此偏移、不吸附整像素。
 	TranslateCentered bool
+	// IDOut 非空时，Button 把这枚按钮的命中盒标识写进去：需要读指针位置或键盘点击的调用方（点按钮在光标处开菜单）要用它。
+	// 不能自己先 ui.ID(c)——Button 的第一步就是取命中 ID，会消耗 c 上的键，两边取到的不是同一个。
+	IDOut *gfx.ID
 }
 
 // ringColor 是全局 button:focus-visible 的 ring-2 ring-primary/50。
@@ -102,6 +105,9 @@ func orSame(hover, base tokens.Color) tokens.Color {
 // 调用方若要给按钮命名（列表里的行），在传入的 c 上先 Key（Button 的第一步就是取命中 ID，会消耗这个键）。
 func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 	id := ui.ID(c)
+	if spec.IDOut != nil {
+		*spec.IDOut = id
+	}
 	if spec.Groups != nil {
 		spec.Groups.Add(spec.Group, id)
 	}
