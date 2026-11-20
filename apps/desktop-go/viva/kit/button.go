@@ -41,6 +41,10 @@ type ButtonStyle struct {
 	Transition DurationName
 	// DisabledOpacity 是禁用时整枚按钮的不透明度（disabled:opacity-50）；0 取 0.5。
 	DisabledOpacity float32
+	// Surface 是按钮背后的面板色，只在禁用时用：渲染层把整枚按钮合成一层再整体淡出，Viva 逐色淡出，有底色的按钮上
+	// 文字会比渲染层淡得多（台账 C-008 / B-058）。给出不透明的面板色，禁用时文字与图标改按整层淡出算（disabledInk）；
+	// 零值或半透明的面板（壁纸模式）表示不知道背后是什么，沿用逐色淡出。背后是透明的按钮（ghost）两种算法逐像素相同，不需要它。
+	Surface tokens.Color
 }
 
 // ButtonSpec 描述一枚按钮的内容与状态。
@@ -163,11 +167,16 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 	// 先按悬停混，再按「按下」混：按下态在终点盖过悬停，悬停中被点选时底色从悬停色补间到按下色。
 	pick := func(base, hover, pressed tokens.Color) tokens.Color {
 		mixed := MixToken(base, orSame(hover, base), p)
-		return fade(MixToken(mixed, orSame(pressed, mixed), on), opacity)
+		return MixToken(mixed, orSame(pressed, mixed), on)
 	}
-	fg := pick(st.Fg, st.FgHover, st.FgOn)
-	bg := pick(st.Bg, st.BgHover, st.BgOn)
-	border := pick(st.Border, st.BorderHover, st.BorderOn)
+	fgNow, bgNow, borderNow := pick(st.Fg, st.FgHover, st.FgOn), pick(st.Bg, st.BgHover, st.BgOn), pick(st.Border, st.BorderHover, st.BorderOn)
+	fg, bg, border := fade(fgNow, opacity), fade(bgNow, opacity), fade(borderNow, opacity)
+	suffixFg := fade(spec.SuffixColor, opacity)
+	if spec.Disabled {
+		// 底色与边框逐色淡出本来就对；文字、图标、转圈与后缀按整层淡出算（台账 C-008 / B-058）。
+		fg = disabledInk(fgNow, bgNow, opacity, st.Surface)
+		suffixFg = disabledInk(spec.SuffixColor, bgNow, opacity, st.Surface)
+	}
 	weight := st.Weight
 	if spec.Toggle && spec.On && st.WeightOn != 0 {
 		weight = st.WeightOn
@@ -225,7 +234,7 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 			}
 		}
 		if spec.Suffix != "" {
-			l.Text(c.Key("suffix"), spec.Suffix, st.Text, weight, fade(spec.SuffixColor, opacity))
+			l.Text(c.Key("suffix"), spec.Suffix, st.Text, weight, suffixFg)
 		}
 	})
 }

@@ -185,7 +185,7 @@ func (s *Screen) tagInputRow(c ui.C, f *ui.Field) (commit bool) {
 		}
 		add := l.Button(c.Key("add"), kit.ButtonSpec{Label: locales.CommonAdd(), Icon: icons.Plus, IconSize: l.Rem(0.75), Disabled: empty}, kit.ButtonStyle{
 			Height: height, PadX: l.Space(2), Radius: l.Rem(0.75) - 2, Gap: l.Space(1), Text: kit.TextXS, Weight: kit.WeightMedium,
-			Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: t.Primary.WithAlpha(0.9), Transition: kit.DurationDefault, DisabledOpacity: 0.4,
+			Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: t.Primary.WithAlpha(0.9), Transition: kit.DurationDefault, DisabledOpacity: 0.4, Surface: t.Popover,
 		})
 		if add.Clicked() {
 			commit = true

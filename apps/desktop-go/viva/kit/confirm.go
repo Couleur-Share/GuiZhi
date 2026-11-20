@@ -136,11 +136,11 @@ func (l *Look) ConfirmDialog(c ui.C, st *ConfirmState, spec ConfirmSpec) Confirm
 			}
 			ui.Row(c.Key("buttons")).FillWidth().Gap(l.Space(3)).Children(func() {
 				cancelID, confirmID = ui.ID(c.Key("cancel")), ui.ID(c.Key("confirm"))
-				if l.dialogButton(c.Key("cancel-button"), cancelID, cancelText, l.cancelButtonStyle(), spec.Loading, false, 0.5).Clicked() {
+				if l.dialogButton(c.Key("cancel-button"), cancelID, cancelText, l.cancelButtonStyle(), spec.Loading, false, 0.5, t.UiPanelStrongBg).Clicked() {
 					result = ConfirmDismissed
 				}
 				confirm := l.confirmButtonStyle(spec.Destructive)
-				if l.dialogButton(c.Key("confirm-button"), confirmID, confirmText, confirm, spec.Loading, spec.Loading, 0.6).Clicked() {
+				if l.dialogButton(c.Key("confirm-button"), confirmID, confirmText, confirm, spec.Loading, spec.Loading, 0.6, t.UiPanelStrongBg).Clicked() {
 					result = ConfirmAccepted
 				}
 			})
@@ -199,7 +199,8 @@ func (l *Look) confirmButtonStyle(destructive bool) dialogButtonStyle {
 
 // dialogButton 是对话框底部的一枚按钮：flex-1 h-10 px-4 rounded-lg text-sm font-medium，transition-colors（Tailwind 默认 150 ms）。
 // disabled 时降低不透明度（渲染层 disabled:opacity-*）；spinner 为真时文字前有一枚转圈（gap-2）。
-func (l *Look) dialogButton(c ui.C, id gfx.ID, label string, st dialogButtonStyle, disabled, spinner bool, disabledOpacity float32) ui.Box {
+// surface 是面板色（对话框面板的底），禁用时文字按整层淡出算（disabledInk，台账 C-008 / B-058）。
+func (l *Look) dialogButton(c ui.C, id gfx.ID, label string, st dialogButtonStyle, disabled, spinner bool, disabledOpacity float32, surface tokens.Color) ui.Box {
 	radius := l.Rem(0.75) // rounded-lg
 	padX := l.Space(4)    // px-4
 	// flex-1 的基准尺寸是 0%，但 border-box 下一个元素的外尺寸不能小于它的内边距加边框：
@@ -221,7 +222,7 @@ func (l *Look) dialogButton(c ui.C, id gfx.ID, label string, st dialogButtonStyl
 	return row.Children(func() {
 		fg := st.Fg
 		if disabled {
-			fg = fade(fg, disabledOpacity)
+			fg = disabledInk(st.Fg, st.Bg, disabledOpacity, surface)
 		}
 		if spinner {
 			l.Spinner(c.Key("spinner"), l.Rem(1), fg)

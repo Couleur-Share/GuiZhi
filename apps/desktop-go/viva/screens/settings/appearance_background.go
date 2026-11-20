@@ -63,7 +63,7 @@ func (a *Appearance) backgroundHeader(c ui.C, hasImage, enabled bool) {
 			primary := l.Button(c.Key("pick"), kit.ButtonSpec{Label: pick, Disabled: a.picking}, kit.ButtonStyle{
 				Height: l.Rem(2.25), PadX: l.Space(4), Radius: l.Rem(0.75), Text: kit.TextSM, Weight: kit.WeightMedium, // rounded-lg
 				Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: t.Primary.WithAlpha(0.9),
-				Transition: kit.DurationDefault, DisabledOpacity: 0.5,
+				Transition: kit.DurationDefault, DisabledOpacity: 0.5, Surface: t.SettingsCardBg,
 			})
 			if primary.Clicked() {
 				a.startPick()

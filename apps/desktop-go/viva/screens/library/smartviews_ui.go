@@ -148,7 +148,7 @@ func (s *Screen) formButtons(c ui.C, spec formButtons) (cancel, confirm bool) {
 		}).Clicked()
 		confirm = l.Button(c.Key("confirm"), kit.ButtonSpec{Label: spec.Confirm, Disabled: spec.ConfirmDisabled}, kit.ButtonStyle{
 			Height: height, PadX: spec.PadX, Radius: radius, Text: kit.TextSM, Weight: weight,
-			Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: hoverPrimary, Transition: transition,
+			Fg: t.PrimaryForeground, Bg: t.Primary, BgHover: hoverPrimary, Transition: transition, Surface: t.UiPanelStrongBg,
 		}).Clicked()
 	})
 	return cancel, confirm

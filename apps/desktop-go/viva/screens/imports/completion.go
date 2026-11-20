@@ -32,7 +32,7 @@ func (s *Screen) actionStyle(kind actionKind) kit.ButtonStyle {
 	t := l.T
 	st := kit.ButtonStyle{
 		Height: l.Rem(2), PadX: l.Space(3), Radius: l.Rem(0.75), Gap: l.Space(1.5), Text: kit.TextXS, Weight: kit.WeightNormal,
-		Transition: kit.DurationDefault, DisabledOpacity: 0.4,
+		Transition: kit.DurationDefault, DisabledOpacity: 0.4, Surface: t.UiPanelStrongBg, // 都在导入详情弹窗里
 	}
 	switch kind {
 	case actionPrimary:
