@@ -1,0 +1,191 @@
+{
+  "variant": "light-royal-blue-medium-1280x800",
+  "cases": [
+    {
+      "label": "移到合集菜单：键盘 Enter",
+      "events": [
+        {
+          "x": 0,
+          "y": 0,
+          "detail": 0
+        }
+      ],
+      "button": [
+        519,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        519,
+        79.5
+      ],
+      "buttonCenter": [
+        533,
+        65.5
+      ],
+      "panel": [
+        0,
+        0,
+        160,
+        266
+      ],
+      "selectionAfterEsc": false
+    },
+    {
+      "label": "移到合集菜单：键盘 Space",
+      "events": [
+        {
+          "x": 0,
+          "y": 0,
+          "detail": 0
+        }
+      ],
+      "button": [
+        519,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        519,
+        79.5
+      ],
+      "buttonCenter": [
+        533,
+        65.5
+      ],
+      "panel": [
+        0,
+        0,
+        160,
+        266
+      ],
+      "selectionAfterEsc": false
+    },
+    {
+      "label": "移到合集菜单：鼠标点击",
+      "events": [
+        {
+          "x": 533,
+          "y": 65,
+          "detail": 1
+        }
+      ],
+      "button": [
+        519,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        519,
+        79.5
+      ],
+      "buttonCenter": [
+        533,
+        65.5
+      ],
+      "panel": [
+        533,
+        65,
+        160,
+        266
+      ],
+      "selectionAfterEsc": false
+    },
+    {
+      "label": "批量标签浮层：键盘 Enter",
+      "events": [
+        {
+          "x": 0,
+          "y": 0,
+          "detail": 0
+        }
+      ],
+      "button": [
+        551,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        551,
+        79.5
+      ],
+      "buttonCenter": [
+        565,
+        65.5
+      ],
+      "panel": [
+        8,
+        8,
+        260,
+        205.5
+      ],
+      "selectionAfterEsc": false
+    },
+    {
+      "label": "批量标签浮层：键盘 Space",
+      "events": [
+        {
+          "x": 0,
+          "y": 0,
+          "detail": 0
+        }
+      ],
+      "button": [
+        551,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        551,
+        79.5
+      ],
+      "buttonCenter": [
+        565,
+        65.5
+      ],
+      "panel": [
+        8,
+        8,
+        260,
+        205.5
+      ],
+      "selectionAfterEsc": false
+    },
+    {
+      "label": "批量标签浮层：鼠标点击",
+      "events": [
+        {
+          "x": 565,
+          "y": 65,
+          "detail": 1
+        }
+      ],
+      "button": [
+        551,
+        51.5,
+        28,
+        28
+      ],
+      "buttonBottomLeft": [
+        551,
+        79.5
+      ],
+      "buttonCenter": [
+        565,
+        65.5
+      ],
+      "panel": [
+        565,
+        65,
+        260,
+        205.5
+      ],
+      "selectionAfterEsc": false
+    }
+  ]
+}

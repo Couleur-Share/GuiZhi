@@ -73,6 +73,9 @@ func TestBulkTagPopoverAddsTheTagToEverySelectedEntry(t *testing.T) {
 		if r.batchCount() != 0 || !r.hasText(hint) {
 			t.Fatal("只有空白也不提交")
 		}
+		if !r.mustNode(gfx.RoleButton, locales.CommonAdd()).Disabled {
+			t.Fatal("只有空白时「添加」也应禁用")
+		}
 
 		r.typeText("  新标签  ")
 		if r.mustNode(gfx.RoleButton, locales.CommonAdd()).Disabled {
@@ -106,6 +109,15 @@ func TestBulkTagPopoverAddsTheTagToEverySelectedEntry(t *testing.T) {
 		}
 		if len(r.svc.Batches()) != 3 {
 			t.Fatalf("三次提交应发三个批次，实际 %d", len(r.svc.Batches()))
+		}
+
+		// 提交的当下就关浮层，不等结果：有一条失败、多选还留着（批量条没有卸载）时浮层照样已收起。
+		r.svc.FailBatchItem(ids[1], "磁盘已满")
+		open()
+		r.typeText("会失败")
+		r.keys("Enter")
+		if r.has(gfx.RoleTextField, locales.LibraryTagsNewPlaceholder()) {
+			t.Fatal("提交之后浮层应已收起，哪怕有一条失败、多选还在")
 		}
 	})
 }
@@ -224,6 +236,17 @@ func TestTagPickerEditsOneEntrysTags(t *testing.T) {
 	r.keys("Escape")
 	if r.has(gfx.RoleButton, locales.LibraryRemoveTag("新")) {
 		t.Fatal("Esc 应收起浮层")
+	}
+
+	// 没提交的草稿不带到下一次打开。
+	r.rightClickEntry(e)
+	r.click(gfx.RoleMenuItem, locales.LibraryEditTags())
+	r.typeText("没提交的草稿")
+	r.keys("Escape")
+	r.rightClickEntry(e)
+	r.click(gfx.RoleMenuItem, locales.LibraryEditTags())
+	if value, _ := r.tagField(); value != "" {
+		t.Fatalf("没提交的草稿不该带到下一次打开，实际 %q", value)
 	}
 }
 

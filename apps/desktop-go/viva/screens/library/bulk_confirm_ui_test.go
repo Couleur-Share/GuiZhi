@@ -212,6 +212,21 @@ func TestDeleteForeverIsBusyWhileTheBatchRuns(t *testing.T) {
 	if r.batchCount() != 1 {
 		t.Fatalf("执行期间回车不该重复提交，实际 %d 个批次", r.batchCount())
 	}
+	// 钮禁用与回车失效是确认框的事；提交入口自己也拦忙碌中的重复提交（第二道防线）。Store 也会拒绝并发的批量，
+	// 但被拒的那一次会把「失败」送回确认框、让它提前解除忙碌——所以不仅看服务收到几个批次，还要看确认钮是否一直保持禁用。
+	for range 3 {
+		r.screen.runConfirm()
+	}
+	for range 10 {
+		r.frames(1)
+		time.Sleep(5 * time.Millisecond)
+		if !r.mustNode(gfx.RoleButton, locales.CommonConfirm()).Disabled {
+			t.Fatal("第一批还没结束，确认钮不该被重复提交的结果提前解除禁用")
+		}
+	}
+	if r.batchCount() != 1 {
+		t.Fatalf("忙碌中直接再调提交入口也不该多发批次，实际 %d 个批次", r.batchCount())
+	}
 
 	release()
 	r.waitUntil("成功后关框", func() bool { return !r.confirmOpen(locales.LibraryDeleteForever()) })
@@ -274,6 +289,27 @@ func TestEmptyTrashConfirmsThenFreezesAndDeletesEverything(t *testing.T) {
 		}
 		if r.confirmOpen(locales.LibraryEmptyTrash()) {
 			t.Fatal("成功后应关框")
+		}
+		if b.Command.ClearEvidence || len(r.svc.ClearedEvidence()) != 0 {
+			t.Fatalf("没勾「同时清除证据」时不该清证据，实际 %+v %v", b.Command, r.svc.ClearedEvidence())
+		}
+	})
+}
+
+// 清空回收站的确认框也带「同时清除历史问答中的相关证据」：勾上之后，回收站里的每一条都清掉证据。
+func TestEmptyTrashCanAlsoClearEvidence(t *testing.T) {
+	t.Parallel()
+	bothViews(t, func(t *testing.T, r *rig) {
+		r.goTrash()
+		r.click(gfx.RoleButton, locales.LibraryEmptyTrash())
+		r.click(gfx.RoleCheckbox, locales.LibraryDeleteEvidenceClear())
+		r.click(gfx.RoleButton, locales.CommonConfirm())
+		b := r.lastBatch()
+		if b.Command.Kind != services.LibraryBatchDelete || !b.Command.ClearEvidence || len(b.IDs) != 5 {
+			t.Fatalf("勾选之后应对回收站里的 5 条发带清证据的彻底删除，实际 %+v %v", b.Command, b.IDs)
+		}
+		if cleared := r.svc.ClearedEvidence(); !slices.Equal(cleared, b.IDs) {
+			t.Fatalf("服务应收到全部 5 条的清证据 %v，实际 %v", b.IDs, cleared)
 		}
 	})
 }

@@ -135,9 +135,16 @@ func TestBatchResultsStripShowsTheOutcomeAndRetriesOnlyTheFailures(t *testing.T)
 			t.Fatal("全部成功后不该再有「仅重试失败项」")
 		}
 
+		// 「逐条结果」的展开状态属于这一轮结果：展开着把结果条收起，再来一轮批量，新的结果条仍是折叠的。
+		r.click(gfx.RoleButton, locales.LibraryWorkflowResults(3))
 		r.click(gfx.RoleButton, locales.LibraryWorkflowDismiss())
 		if r.view().Batch.Visible() || r.has(gfx.RoleButton, locales.LibraryWorkflowDismiss()) {
 			t.Fatal("点「收起」应收起结果条")
+		}
+		r.selectIDs(r.ids(6, 7))
+		r.click(gfx.RoleButton, locales.LibraryArchive())
+		if r.mustNode(gfx.RoleButton, locales.LibraryWorkflowResults(2)).Expanded {
+			t.Fatal("新一轮结果的「逐条结果」应是折叠的，不该沿用上一轮的展开状态")
 		}
 	})
 }

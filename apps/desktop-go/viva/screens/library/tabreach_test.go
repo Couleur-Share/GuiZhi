@@ -8,6 +8,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 )
 
 // 侧栏滚动区里的 Tab 停靠点（台账 B-030）：Viva 的可访问树里没有滚出视野的控件，Tab 走到它之前得先有人把它滚进来；
@@ -139,5 +140,63 @@ func TestTabScrollsAPartlyHiddenScopeTabFullyIntoView(t *testing.T) {
 				t.Errorf("聚焦之后页签仍只露出 %.0f / %.0f：滚动区没有把它滚到完全可见", h, full)
 			}
 		})
+	}
+}
+
+// ---- 卡片列表（台账 B-045）----
+
+// focusedBounds 是键盘焦点所在节点的外框。
+func (r *rig) focusedBounds() (gfx.Rect, bool) {
+	for _, n := range r.session.Access() {
+		if n.Focused {
+			return n.Bounds, true
+		}
+	}
+	return gfx.Rect{}, false
+}
+
+// 卡片列表一页 20 张（默认）：窗口多声明视口上下各 8 行（与渲染层虚拟列表的 overscan 同值），整页都有 Tab 停靠点。
+// 点第一张卡片后连按 Tab，焦点依次走过本页第 2…20 张卡片、每张聚焦时都在视野里（滚动区跟着滚），随后是分页条的「每页」「下一页」
+// ——渲染层读数 C1（scripts/parity/tools/probe-list-keyboard.mjs：行 1…19 的按钮，随后是分页条）。
+func TestCardTabWalksEveryCardOfADefaultPageThenThePagination(t *testing.T) {
+	t.Parallel()
+	r := wsRig(t)
+	entries := r.view().List.Entries
+	if first, last := r.screen.pane.window.Declared(); first != 0 || last != len(entries) {
+		t.Fatalf("前提不成立：默认一页 %d 张卡片应被窗口整页声明，实际 [%d, %d)", len(entries), first, last)
+	}
+	title := func(e services.LibraryEntry) string {
+		if e.Title == "" {
+			return locales.LibraryUntitled()
+		}
+		return e.Title
+	}
+	top, bottom := r.viewport()
+	first, ok := r.cardOf(entries[0])
+	if !ok {
+		t.Fatal("找不到第一张卡片")
+	}
+	x, y := centerOf(first)
+	r.clickAt(x, y)
+	if label, _, ok := r.focusedLabel(); !ok || label != title(entries[0]) {
+		t.Fatalf("点第一张卡片之后焦点应在它身上，实际 %q（有焦点 %v）", label, ok)
+	}
+	for i := 1; i < len(entries); i++ {
+		r.keys("Tab")
+		label, _, ok := r.focusedLabel()
+		if !ok || label != title(entries[i]) {
+			t.Fatalf("第 %d 次 Tab：焦点应在第 %d 张卡片「%s」，实际 %q（有焦点 %v）", i, i+1, title(entries[i]), label, ok)
+		}
+		b, _ := r.focusedBounds()
+		if b.Y < top-1 || b.Y+b.Height > bottom+1 {
+			t.Fatalf("第 %d 次 Tab 聚焦「%s」时它不在视野里（%.1f..%.1f，视口 %.1f..%.1f）：滚动区没有跟着滚",
+				i, label, b.Y, b.Y+b.Height, top, bottom)
+		}
+	}
+	for _, want := range []string{locales.LibraryPageSize(), locales.LibraryNextPage()} {
+		r.keys("Tab")
+		if label, _, ok := r.focusedLabel(); !ok || label != want {
+			t.Fatalf("走完本页的卡片之后下一个停靠点应是分页条的「%s」，实际 %q（有焦点 %v）", want, label, ok)
+		}
 	}
 }
