@@ -607,49 +607,6 @@ func TestEmptyListNamesTheTrashSeparately(t *testing.T) {
 	}
 }
 
-// ---- 还没迁入的操作要有交代 ----
-
-// 批量与条目操作随 M2-3、M2-4 迁入；在那之前用户点了不能一声不响：弹出标题带操作名的错误提示，
-// 「查看详情」展开后能复制到原因原文，服务不收到任何变更。
-func TestOperationsNotMigratedYetExplainThemselves(t *testing.T) {
-	t.Parallel()
-	trashCards := func(r *rig) { r.click(gfx.RoleButton, locales.LibraryScopeTrash()) }
-	trashTable := func(r *rig) { trashCards(r); r.toTable() }
-	allTable := func(r *rig) { r.toTable() }
-	for _, op := range []struct {
-		name, action, label string
-		reason              error
-		setup               func(*rig)
-	}{
-		{"清空回收站", locales.LibraryActionEmptyTrash(), locales.LibraryEmptyTrash(), errBatchPending, trashCards},
-		{"全部符合筛选（卡片）", locales.LibraryActionSelectAllMatching(), locales.LibrarySelectAllMatching(), errSelectAllPending, trashCards},
-		{"全部符合筛选（表格）", locales.LibraryActionSelectAllMatching(), locales.LibrarySelectAllMatching(), errSelectAllPending, trashTable},
-		{"恢复", locales.LibraryRestore(), locales.LibraryRestore(), errRowActionPending, trashTable},
-		{"彻底删除", locales.LibraryDeleteForever(), locales.LibraryDeleteForever(), errRowActionPending, trashTable},
-		{"收藏", locales.LibraryFavorite(), locales.LibraryFavorite(), errRowActionPending, allTable},
-		{"取消收藏", locales.LibraryUnfavorite(), locales.LibraryUnfavorite(), errRowActionPending, allTable},
-		{"更多操作", locales.LibraryMoreActions(), locales.LibraryMoreActions(), errRowActionPending, allTable},
-	} {
-		t.Run(op.name, func(t *testing.T) {
-			t.Parallel()
-			r := wsRig(t)
-			op.setup(r)
-			r.clickInList(gfx.RoleButton, op.label)
-			if !r.hasText(locales.CommonOperationFailed(op.action)) {
-				t.Fatalf("点「%s」应弹出「%s」；画面文字 %q", op.name, locales.CommonOperationFailed(op.action), r.session.Texts())
-			}
-			r.click(gfx.RoleButton, locales.CommonViewDetail())
-			r.click(gfx.RoleButton, locales.CommonCopy())
-			if len(r.copied) != 1 || r.copied[0] != op.reason.Error() {
-				t.Fatalf("详情原文应是 %q，复制到 %q", op.reason.Error(), r.copied)
-			}
-			if got := r.mutating(); len(got) != 0 {
-				t.Errorf("还没迁入的操作不该改任何数据，服务收到 %q", got)
-			}
-		})
-	}
-}
-
 // clickInList 点工作区里（侧栏右边）第一个角色与名字都对得上的节点：侧栏里也有同名的「更多操作」。
 func (r *rig) clickInList(role gfx.Role, name string) {
 	r.t.Helper()
