@@ -6,12 +6,12 @@ import (
 	"math"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/headless"
 
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/parity"
 )
 
@@ -36,6 +36,32 @@ const (
 // 真实鼠标在 100% 缩放的屏幕上也只落在整数像素。会弹出锚在指针处浮层的点击，两边都点同一个整数点，浮层的锚点才一致；
 // 对应 React 采集器里的 Math.floor。
 func snap(v float32) float32 { return float32(math.Floor(float64(v))) }
+
+// lazyStep 在运行时才构造步骤：按钮名取当前界面语言的文案。场景在 init 里登记，那时语言还是默认的中文，
+// 英文变体要等 -lang en 设定之后才取名（对应 React 采集器里按 PARITY_LANG 取名的 label()）。
+func lazyStep(build func() libraryEnvStep) libraryEnvStep {
+	return func(s *headless.Session, look *kit.Look, env *libraryEnv) error { return build()(s, look, env) }
+}
+
+// clickLabel、clickLabelSnapped、facetLabel 是 listClickButton、listClickButtonSnapped、listApplyFacets 的按语言取名版本。
+func clickLabel(label func() string) libraryEnvStep {
+	return lazyStep(func() libraryEnvStep { return listClickButton(label()) })
+}
+
+func clickLabelSnapped(label func() string) libraryEnvStep {
+	return lazyStep(func() libraryEnvStep { return listClickButtonSnapped(label()) })
+}
+
+func facetLabel(label func() string) libraryEnvStep {
+	return lazyStep(func() libraryEnvStep { return listApplyFacets(label()) })
+}
+
+// prefixOf 取带占位的文案在占位之前的部分：「处理中，已核对 {n} 项」→「处理中，已核对 」，英文同理；
+// 用来按前缀找「逐条结果（N）」「选择「标题」」这类名字里带动态部分的节点。
+func prefixOf(format func(any) string) string {
+	s := format("\x00")
+	return s[:strings.IndexByte(s, 0)]
+}
 
 // listPaneLeft 是列表窗格的左缘（1280 宽下侧栏占到 368）：取行内按钮时，左边侧栏里的同名按钮（合集行的「更多操作」）不算。
 const listPaneLeft float32 = 368
@@ -99,7 +125,7 @@ func listRightClickCard(title string) libraryEnvStep {
 
 // listOpenDetails 点开结果条里的「逐条结果（N）」折叠区。
 func listOpenDetails(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
-	if err := clickRolePrefix(s, gfx.RoleButton, "逐条结果"); err != nil {
+	if err := clickRolePrefix(s, gfx.RoleButton, prefixOf(locales.LibraryWorkflowResults)); err != nil {
 		return err
 	}
 	return s.Rest()
@@ -115,12 +141,14 @@ func listHoldBatches(_ *headless.Session, _ *kit.Look, env *libraryEnv) error {
 
 // listWaitProcessing 等结果条换成「处理中，已核对 N 项」：卡住的批量在后台协程里改状态，点击返回时可能还没换。
 func listWaitProcessing(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+	// 大字号档下这句话在结果条里折行，折行处的空格不留在行尾，所以前缀也去掉末尾空白。
+	processing := strings.TrimSpace(prefixOf(locales.LibraryWorkflowProcessing))
 	for range 400 {
 		if err := s.Rest(); err != nil {
 			return err
 		}
 		for _, t := range s.Snapshot().Texts {
-			if strings.HasPrefix(t.Value, "处理中") {
+			if strings.HasPrefix(t.Value, processing) {
 				return nil
 			}
 		}
@@ -132,12 +160,7 @@ func listWaitProcessing(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
 // tableCheckRow 勾选表格里第 row 行（从 0 起）的复选框（对应 checkRow）。
 func tableCheckRow(row int) libraryEnvStep {
 	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
-		var boxes []gfx.Rect
-		for _, n := range s.Access() {
-			if n.Role == gfx.RoleCheckbox && strings.HasPrefix(n.Label, "选择「") {
-				boxes = append(boxes, n.Bounds)
-			}
-		}
+		boxes := tableRowBoxes(s)
 		if row >= len(boxes) {
 			return fmt.Errorf("表格里没有第 %d 行（只有 %d 行）", row, len(boxes))
 		}
@@ -154,8 +177,9 @@ func tableCheckRow(row int) libraryEnvStep {
 func tableOpenRowMore(row int) libraryEnvStep {
 	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
 		seen := 0
+		more := locales.LibraryMoreActions()
 		for _, n := range s.Access() {
-			if n.Role != gfx.RoleButton || n.Label != "更多操作" || n.Bounds.X < listPaneLeft {
+			if n.Role != gfx.RoleButton || n.Label != more || n.Bounds.X < listPaneLeft {
 				continue
 			}
 			if seen == row {
@@ -166,7 +190,7 @@ func tableOpenRowMore(row int) libraryEnvStep {
 			}
 			seen++
 		}
-		return fmt.Errorf("表格里没有第 %d 行的「更多操作」（只有 %d 个）", row, seen)
+		return fmt.Errorf("表格里没有第 %d 行的「%s」（只有 %d 个）", row, more, seen)
 	}
 }
 
@@ -183,7 +207,7 @@ func tableOpenTagPicker(row int) libraryEnvStep {
 		if err := s.Rest(); err != nil {
 			return err
 		}
-		if err := parity.ClickRole(s, gfx.RoleMenuItem, "编辑标签"); err != nil {
+		if err := parity.ClickRole(s, gfx.RoleMenuItem, locales.LibraryEditTags()); err != nil {
 			return err
 		}
 		return s.Rest()
@@ -194,19 +218,7 @@ func tableOpenTagPicker(row int) libraryEnvStep {
 // Viva 的文字没有字距，绘制宽度窄 字符数 × 0.025em（小、中、大字号档的 text-xs 是 10.5、12、13.5px，即每字 0.2625、0.3、0.3375px）；
 // 文字盒宽已按字数补齐（kit.TextTracked），后面的元素位置一致。与 headingTrackingWaivers（tracking-wider，0.05em）同一类，字距减半。
 func wideTrackingWaivers(title string) []parity.Waiver {
-	n := float64(utf8.RuneCountInString(title))
-	subject := "「" + title + "」"
-	return []parity.Waiver{
-		{
-			Ledger: "A-013", Layer: parity.LayerL2, Kind: "text-width", Subject: subject,
-			MinDelta: max(n*0.2625-0.3, 0.01), MaxDelta: n*0.3375 + 0.3,
-			Note: "tracking-wide 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.025em（盒宽已补齐，后面的元素位置一致）",
-		},
-		{
-			Ledger: "A-013", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: n*0.3375/2 + 1,
-			Note: "同上：字距使墨迹整体位移最多宽度差的一半（只管横向，纵向错位照常判定）",
-		},
-	}
+	return wideTracking(title, 0, "", "tracking-wide 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.025em（盒宽已补齐，后面的元素位置一致）")
 }
 
 // resultsDisclosureWaivers 登记 G-022（比较器的缺口，不是 Viva 的偏差）：比较器的角色映射表（a11y_map.go，哈希守卫）里没有
@@ -220,6 +232,8 @@ var resultsDisclosureWaivers = []parity.Waiver{
 	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "unmapped-role", Subject: "listitem", Note: "比较器的角色映射表没有 <li> 的 listitem（逐条结果的每一行）"},
 	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "unmapped-role", Subject: "list", Note: "比较器的角色映射表没有 <ul> 的 list（逐条结果的列表）"},
 	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "extra-node", Subject: "button 「逐条结果（", Note: "Viva 的折叠钮是 button 并带展开状态；React 一侧对应的 DisclosureTriangle 未映射，所以被报为多出的节点"},
+	// 英文界面里折叠钮的名字是「Per-item results (N)」（与 library_bulk_waivers_test.go 核对目录，目录改了这里要跟着改）。
+	{Ledger: "G-022", Layer: parity.LayerL1, Kind: "extra-node", Subject: "button 「Per-item results (", Note: "同上（英文界面的折叠钮名称）"},
 }
 
 func init() {
@@ -227,21 +241,23 @@ func init() {
 	failing := libraryOptions{variant: "data", list: true, batchFail: map[string]string{batchFailID: batchFailReason}}
 	holding := libraryOptions{variant: "data", list: true, batchFail: map[string]string{batchFailID: batchFailReason}, holdBatch: true}
 	table := libraryOptions{variant: "data", list: true, view: "list"}
+	// 每个场景都附上英文变体的登记（按 Subject 与变体匹配，中文变体不会命中，见 library_bulk_waivers.go）。
 	reg := func(id string, opt libraryOptions, steps libraryEnvStep, mode parkMode, waivers ...parity.Waiver) {
-		registry[id] = libraryEnvScene(id, opt, steps, mode, waivers...)
+		registry[id] = libraryEnvScene(id, opt, steps, mode, withEnglishBulk(waivers)...)
 	}
 	// 确认框是模态：遮罩背后的页面模糊（台账 A-007，ConfirmDialog 的 backdrop-blur-sm 是 4），遮罩之上是名为标题的对话框面板。
 	// before 是打开对话框之前把页面带到的状态（选中回收站里的两张卡片、切到回收站）：模糊背景要用这一页的清晰版本合成，
 	// 之后指针停到窗口角落（采集 React 时同样，对话框一打开背后就没有悬停）。这些步骤只走界面，不用场景的内部状态。
-	regConfirm := func(id string, before, steps libraryEnvStep, title string, waivers ...parity.Waiver) {
-		spec := confirmBackdrop(title)
+	regConfirm := func(id string, before, steps libraryEnvStep, title func() string, waivers ...parity.Waiver) {
+		spec := confirmBackdrop("")
+		spec.PanelNameFn = title
 		spec.BaseSteps = func(s *headless.Session, look *kit.Look) error {
 			if err := before(s, look, nil); err != nil {
 				return err
 			}
 			return parity.ParkPointer(s)
 		}
-		registry[id] = withBackdrop(libraryEnvScene(id, list, steps, parkKeepFocus, waivers...), spec)
+		registry[id] = withBackdrop(libraryEnvScene(id, list, steps, parkKeepFocus, withEnglishBulk(waivers)...), spec)
 	}
 	cards := semiboldKerningWaivers()
 	results := append(append([]parity.Waiver{}, cards...), resultsDisclosureWaivers...)
@@ -254,15 +270,17 @@ func init() {
 	tableOverlayTag := append(append(append([]parity.Waiver{}, tableOverlay...), tagHeading...), wideTrackingWaivers("AI 建议标签")...)
 
 	selectBoth := listSelectCards(pickA, pickB)
-	selectTrash := listChain(listApplyFacets("回收站"), listSelectCards(trashA, trashB))
-	favoriteBoth := listChain(selectBoth, listClickButton("批量收藏"))
+	selectTrash := listChain(facetLabel(locales.LibraryScopeTrash), listSelectCards(trashA, trashB))
+	favoriteBoth := listChain(selectBoth, clickLabel(locales.LibraryBulkFavorite))
 
 	reg("app.window.library.list-bulk", list, selectBoth, parkAll, cards...)
-	reg("app.window.library.list-bulk-move", list, listChain(selectBoth, listClickButtonSnapped("移动到合集")), parkKeepFocus, overlay...)
-	reg("app.window.library.list-bulk-tag", list, listChain(selectBoth, listClickButtonSnapped("批量打标签")), parkKeepFocus, overlayTag...)
+	reg("app.window.library.list-bulk-move", list, listChain(selectBoth, clickLabelSnapped(locales.LibraryBulkMoveTitle)), parkKeepFocus, overlay...)
+	reg("app.window.library.list-bulk-tag", list, listChain(selectBoth, clickLabelSnapped(locales.LibraryBulkAddTag)), parkKeepFocus, overlayTag...)
 	reg("app.window.library.list-bulk-trash", list, selectTrash, parkAll, cards...)
-	regConfirm("app.window.library.list-confirm-delete", selectTrash, listChain(selectTrash, listClickButton("彻底删除")), "彻底删除", overlay...)
-	regConfirm("app.window.library.list-confirm-empty-trash", listApplyFacets("回收站"), listChain(listApplyFacets("回收站"), listClickButton("清空回收站")), "清空回收站", overlay...)
+	// 确认框的标题与批量钮同一个键（library.deleteForever / library.emptyTrash）。
+	regConfirm("app.window.library.list-confirm-delete", selectTrash, listChain(selectTrash, clickLabel(locales.LibraryDeleteForever)), locales.LibraryDeleteForever, overlay...)
+	regConfirm("app.window.library.list-confirm-empty-trash", facetLabel(locales.LibraryScopeTrash),
+		listChain(facetLabel(locales.LibraryScopeTrash), clickLabel(locales.LibraryEmptyTrash)), locales.LibraryEmptyTrash, overlay...)
 	reg("app.window.library.list-menu-entry", list, listRightClickCard(pickB), parkKeepFocus, overlay...)
 	reg("app.window.library.list-menu-bulk", list, listChain(selectBoth, listRightClickCard(pickB)), parkKeepFocus, overlay...)
 	reg("app.window.library.list-batch-done", list, favoriteBoth, parkAll, results...)
@@ -272,8 +290,9 @@ func init() {
 	// 两枚钮 disabled:opacity-50：整组带透明度的文字在合成层里用灰度抗锯齿，Viva 整窗 LCD，墨迹总量偏大（A-009 的延伸）。
 	busyInk := append(append([]parity.Waiver{}, results...), opacityInkWaiver("「仅重试失败项」"), opacityInkWaiver("「收起」"))
 	reg("app.window.library.list-batch-busy", holding,
-		listChain(favoriteBoth, listHoldBatches, listClickButton("仅重试失败项"), listWaitProcessing), parkAll, busyInk...)
+		listChain(favoriteBoth, listHoldBatches, clickLabel(locales.LibraryWorkflowRetryFailed), listWaitProcessing), parkAll, busyInk...)
 	reg("app.window.library.table-bulk", table, listChain(tableCheckRow(0), tableCheckRow(2)), parkAll, base...)
 	reg("app.window.library.table-menu-more", table, tableOpenRowMore(1), parkKeepFocus, tableOverlay...)
-	reg("app.window.library.table-tag-picker", table, tableOpenTagPicker(1), parkKeepFocus, tableOverlayTag...)
+	// 800×600 里标签浮层的投影落在表格最后一行与吸附列底下的文字上：比较器的背景取样在投影渐变上不稳定（G-023）。
+	reg("app.window.library.table-tag-picker", table, tableOpenTagPicker(1), parkKeepFocus, append(append([]parity.Waiver{}, tableOverlayTag...), shadowRingWaivers()...)...)
 }

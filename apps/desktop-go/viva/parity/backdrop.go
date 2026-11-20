@@ -42,6 +42,9 @@ type BackdropSpec struct {
 	ScrimAlpha float32
 	// PanelRole、PanelName 是遮罩之上、不被模糊的面板在 Viva 可访问树里的角色与名称（渲染层是 alertdialog / dialog，Viva 一侧映射成 group）。
 	PanelRole, PanelName string
+	// PanelNameFn 非空时，面板名称在比较时才取（覆盖 PanelName）：场景在 init 里登记，那时界面语言还是默认的中文，
+	// 英文变体要等 -lang en 设定之后才能取到英文的面板名。
+	PanelNameFn func() string
 	// BaseSteps 把页面带到「对话框打开之前」的状态：与 Scene.Steps 里打开对话框之前的那部分一致，空表示不需要任何操作。
 	// look 是这次「打开之前」渲染自己的外观（滚动到目标这类步骤要它，见 kit.Look.RevealNear）。
 	BaseSteps func(s *headless.Session, look *kit.Look) error
@@ -68,8 +71,12 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 	}
 	b := &Backdrop{Sigma: s.Sigma}
 	found := false
+	panelName := s.PanelName
+	if s.PanelNameFn != nil {
+		panelName = s.PanelNameFn()
+	}
 	for _, n := range viva.Nodes {
-		if n.Role != s.PanelRole || NormText(n.Name) != s.PanelName {
+		if n.Role != s.PanelRole || NormText(n.Name) != panelName {
 			continue
 		}
 		if box, ok := n.BoxOK(); ok {
@@ -78,7 +85,7 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("Viva 事实里没有 %s「%s」，无法确定遮罩之上的面板", s.PanelRole, s.PanelName)
+		return nil, fmt.Errorf("Viva 事实里没有 %s「%s」，无法确定遮罩之上的面板", s.PanelRole, panelName)
 	}
 	base := scene
 	base.Steps, base.Prepare, base.Backdrop = nil, nil, nil

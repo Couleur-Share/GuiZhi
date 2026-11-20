@@ -10,6 +10,7 @@ import (
 	"github.com/vivaui/viva/headless"
 
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/parity"
 )
 
@@ -28,25 +29,36 @@ const typeColumnWidth = 84
 // 窗口很窄时（800×600）类型列落在吸附的操作列底下，它右缘的把手整个在画布之外、不进可访问树：这时右缘按默认列宽算。
 // 横向位置不能随便取一个「在列里」的点：渲染层的指针恰好落在操作列里「更多」钮的右缘外 1px 处，偏几个像素就会点亮那枚钮。
 func tableRowPoint(s *headless.Session, row int) (x, y float32, err error) {
-	tags, ok := s.AccessByRole(gfx.RoleSeparator, "调整「标签」列宽")
+	// 把手与复选框的可访问名随界面语言变（英文变体也要走这里），名称取自同一套文案键。
+	tagsHandle := locales.LibraryResizeColumn(locales.LibraryColumnTags())
+	tags, ok := s.AccessByRole(gfx.RoleSeparator, tagsHandle)
 	if !ok {
-		return 0, 0, fmt.Errorf("找不到「标签」列的宽度把手")
+		return 0, 0, fmt.Errorf("找不到 %q（标签列的宽度把手）", tagsHandle)
 	}
 	tagsX := tags.Bounds.X + tags.Bounds.Width/2
 	kindX := tagsX + typeColumnWidth
-	if kind, found := s.AccessByRole(gfx.RoleSeparator, "调整「类型」列宽"); found {
+	if kind, found := s.AccessByRole(gfx.RoleSeparator, locales.LibraryResizeColumn(locales.LibraryColumnType())); found {
 		kindX = kind.Bounds.X + kind.Bounds.Width/2
 	}
-	var boxes []gfx.Rect
-	for _, n := range s.Access() {
-		if n.Role == gfx.RoleCheckbox && strings.HasPrefix(n.Label, "选择「") {
-			boxes = append(boxes, n.Bounds)
-		}
-	}
+	boxes := tableRowBoxes(s)
 	if row >= len(boxes) {
 		return 0, 0, fmt.Errorf("表格里没有第 %d 行（只有 %d 行）", row, len(boxes))
 	}
 	return (tagsX + kindX) / 2, boxes[row].Y + boxes[row].Height/2, nil
+}
+
+// tableRowBoxes 是表格各行复选框的外框（从上到下）。表头的「选择本页全部」在英文界面里同样以 Select 打头，
+// 只按「选择某行」的前缀匹配会把它算成第 0 行（中文界面下前缀带「，没有这个问题），所以要把它排除。
+func tableRowBoxes(s *headless.Session) []gfx.Rect {
+	prefix := prefixOf(locales.LibrarySelectRow)
+	header := locales.LibrarySelectPageRows()
+	var boxes []gfx.Rect
+	for _, n := range s.Access() {
+		if n.Role == gfx.RoleCheckbox && n.Label != header && strings.HasPrefix(n.Label, prefix) {
+			boxes = append(boxes, n.Bounds)
+		}
+	}
+	return boxes
 }
 
 func tableHoverRow(row int) libraryEnvStep {
@@ -78,9 +90,10 @@ func tableHoverTitle(title string) libraryEnvStep {
 
 // tableHoverResizer 把指针停在「标题」列右缘的拖动把手上：中间那条细线显出（group-hover:bg-primary/70）。
 func tableHoverResizer(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
-	n, ok := s.AccessByRole(gfx.RoleSeparator, "调整「标题」列宽")
+	handle := locales.LibraryResizeColumn(locales.LibraryColumnTitle())
+	n, ok := s.AccessByRole(gfx.RoleSeparator, handle)
 	if !ok {
-		return fmt.Errorf("找不到「标题」列的宽度把手")
+		return fmt.Errorf("找不到 %q（标题列的宽度把手）", handle)
 	}
 	if err := s.Move(n.Bounds.X+n.Bounds.Width/2, n.Bounds.Y+n.Bounds.Height/2); err != nil {
 		return err
