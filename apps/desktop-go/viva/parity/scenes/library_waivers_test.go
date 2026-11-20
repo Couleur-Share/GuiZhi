@@ -2,8 +2,12 @@ package scenes
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
+
+	"guizhi-mygo-shell/viva/locales"
+	"guizhi-mygo-shell/viva/parity"
 )
 
 // TestWordmarkIconWaiverSubjectsMatchReportFormat 守住「登记的主题要对得上报告里的写法」。
@@ -54,6 +58,78 @@ func TestSourceEllipsisWaiverMatchesOnlyTheReactCut(t *testing.T) {
 	for _, other := range []string{"「YouT…」", "「YouTub…」", "「YouTube」", "「Bilibili」"} {
 		if matches(other) {
 			t.Errorf("%s 没有登记，却被放过", other)
+		}
+	}
+}
+
+// TestEnglishSidebarHeadingWaiversMatchCatalog 守住 A-013 英文延伸的登记：Subject 里写死的英文大写标题要与 locales 目录里
+// 英文界面真正画出来的字（`strings.ToUpper` 之后）一致；目录改了而这里没改，登记会悄悄匹配不上，英文变体里留下一片本该放过的失败。
+// 本测试临时把进程语言切到英文，不并行、结束时还原（`TestScenesMatchReactFacts` 的并行子测试在它之前就已结束）。
+func TestEnglishSidebarHeadingWaiversMatchCatalog(t *testing.T) {
+	locales.SetLang(locales.En)
+	t.Cleanup(func() { locales.SetLang(locales.Zh) })
+	want := []string{
+		strings.ToUpper(locales.LibrarySmartViews()), strings.ToUpper(locales.LibraryCollections()),
+		strings.ToUpper(locales.LibraryPlatforms()), strings.ToUpper(locales.LibraryTags()),
+	}
+	if strings.Join(englishSidebarHeadings, "|") != strings.Join(want, "|") {
+		t.Fatalf("englishSidebarHeadings = %q，目录里英文界面画出来的是 %q", englishSidebarHeadings, want)
+	}
+}
+
+// TestEnglishHeadingWaiversAreMediumTierOnlyAndEnglishOnly 守住登记的范围：英文标题的字偶距放宽只在中档字号档、只对英文标题有效；
+// 中文标题的登记照旧不带字号档限制，也没有被放宽。
+func TestEnglishHeadingWaiversAreMediumTierOnlyAndEnglishOnly(t *testing.T) {
+	width := func(ws []parity.Waiver) parity.Waiver {
+		for _, w := range ws {
+			if w.Kind == "text-width" {
+				return w
+			}
+		}
+		t.Fatal("没有 text-width 登记")
+		return parity.Waiver{}
+	}
+	latin := width(headingLatinTrackingWaivers("TAGS"))
+	zh := width(headingTrackingWaivers("标签"))
+	if latin.Variant != "medium" {
+		t.Errorf("英文标题的登记应只限中档字号档，Variant = %q", latin.Variant)
+	}
+	if zh.Variant != "" {
+		t.Errorf("中文标题的登记不应带字号档限制，Variant = %q", zh.Variant)
+	}
+	// TAGS（4 个字符）：字距 0.525–0.675 px/字符 → [1.8, 3.0]，英文再放宽字偶距 2px → 上限 5.0；中文标题的上限照旧不放宽。
+	if got, want := latin.MaxDelta, 4*0.675+0.3+latinHeadingKerningCap; math.Abs(got-want) > 1e-9 {
+		t.Errorf("英文 TAGS 的宽度差上限 = %v，期望 %v", got, want)
+	}
+	if got, want := zh.MaxDelta, 2*0.675+0.3; math.Abs(got-want) > 1e-9 {
+		t.Errorf("中文「标签」的宽度差上限 = %v，期望 %v（不应放宽）", got, want)
+	}
+	// 范围匹配：实测的四个英文标题宽度差（中档）都落在登记里，超过上限一点点的不放过，别的字号档不放过。
+	cases := []struct {
+		title   string
+		delta   float64
+		variant string
+		want    bool
+	}{
+		{"SMART VIEWS", 7.62, "light-royal-blue-medium-1280x800", true},
+		{"COLLECTIONS", 6.87, "light-royal-blue-medium-1280x800", true},
+		{"PLATFORMS", 6.47, "light-royal-blue-medium-1280x800", true},
+		{"TAGS", 3.84, "light-royal-blue-medium-1280x800", true},
+		{"TAGS", 5.2, "light-royal-blue-medium-1280x800", false}, // 超过 字距上限 + 字偶距 2px
+		{"TAGS", 1.0, "light-royal-blue-medium-1280x800", false}, // 小于字距应有的下限：是别的问题
+		{"TAGS", 3.84, "light-royal-blue-small-1280x800", false}, // 小字号档没有实测，不放过
+		{"TAGS", 3.84, "light-royal-blue-large-1280x800", false},
+	}
+	for _, c := range cases {
+		is := parity.Issue{Layer: parity.LayerL2, Kind: "text-width", Subject: "「" + c.title + "」", Delta: c.delta}
+		got := false
+		for _, w := range headingLatinTrackingWaivers(c.title) {
+			if w.MatchesIn(is, c.variant) {
+				got = true
+			}
+		}
+		if got != c.want {
+			t.Errorf("%s 宽度差 %.2f（%s）：放过 = %v，期望 %v", c.title, c.delta, c.variant, got, c.want)
 		}
 	}
 }

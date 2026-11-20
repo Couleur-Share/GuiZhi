@@ -60,6 +60,9 @@ type Waived struct {
 // matches 判断 w 是否覆盖 issue（不限变体：带 Variant 的登记在这里不匹配，见 matchesIn）。
 func (w Waiver) matches(is Issue) bool { return w.matchesIn(is, "") }
 
+// MatchesIn 是 matchesIn 的导出形式：供场景包的测试核对一条登记的范围（哪些偏差大小、哪些变体会被放过）。
+func (w Waiver) MatchesIn(is Issue, variant string) bool { return w.matchesIn(is, variant) }
+
 // matchesIn 判断 w 是否覆盖 variant 这个变体里的 issue。
 func (w Waiver) matchesIn(is Issue, variant string) bool {
 	if w.Variant != "" && !strings.Contains(variant, w.Variant) {

@@ -215,6 +215,9 @@ func libraryBaseWaivers() []parity.Waiver {
 	} {
 		out = append(out, headingTrackingWaivers(title)...)
 	}
+	for _, title := range englishSidebarHeadings {
+		out = append(out, headingLatinTrackingWaivers(title)...)
+	}
 	out = append(out, youtubeKerningWaivers...)
 	out = append(out, emojiWaivers...)
 	out = append(out, ellipsisSpaceWaivers...)
@@ -229,16 +232,38 @@ func libraryBaseWaivers() []parity.Waiver {
 // 文字盒宽已按字数补齐（kit.TextTracked），后面的元素位置一致。宽度差框在 [字符数×0.525−0.3, 字符数×0.675+0.3]，
 // 墨迹位移的上限是宽度差的一半再加 1 像素（相关峰的取整）；范围之外的偏差照常判定。
 func headingTrackingWaivers(title string) []parity.Waiver {
+	return trackingWaivers(title, 0, "",
+		"tracking-wider 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.05em（盒宽已补齐，后面的元素位置一致）")
+}
+
+// latinHeadingKerningCap 是英文大写标题在字距（A-013）之外再多出的字偶距宽度差的上限（A-013 的英文延伸，字偶距部分与 A-026 同类）：
+// Viva 对 600 字重做字偶距、Chromium 不做，大写拉丁标题里 TA、AR、AT 这类字偶对使 Viva 的整行更窄。
+// 中档字号档（text-xs = 12px）下四个标题在字距之外实测多出 1.02、0.27、1.07、1.44px（SMART VIEWS、COLLECTIONS、PLATFORMS、TAGS），
+// 上限取 2px（向外取整）。**只在中档字号档的变体里放过**：小、大字号档没有实测（英文变体只做中档，台账 G-017）。
+const latinHeadingKerningCap = 2.0
+
+// englishSidebarHeadings 是侧栏分区标题在英文界面下画出来的字（`strings.ToUpper` 之后）；
+// 与 locales 目录的英文一致由 library_waivers_test.go 核对，目录改了这里要跟着改。
+var englishSidebarHeadings = []string{"SMART VIEWS", "COLLECTIONS", "PLATFORMS", "TAGS"}
+
+// headingLatinTrackingWaivers 登记 A-013 在英文大写标题上的延伸：字距之外再加字偶距（latinHeadingKerningCap），只限中档字号档。
+func headingLatinTrackingWaivers(title string) []parity.Waiver {
+	return trackingWaivers(title, latinHeadingKerningCap, "medium",
+		"tracking-wider 的字距（Viva 没有字距）加字偶距（Viva 对 600 字重做、Chromium 不做，A-026 同类）：英文大写标题的绘制宽度窄 字符数 × 0.05em 再多 ≤ 2px（盒宽已补齐，后面的元素位置一致）")
+}
+
+// trackingWaivers 是分区标题字距登记的共同写法：kerningCap 是字距之外允许多出的宽度差，variant 非空时只在该字号档放过。
+func trackingWaivers(title string, kerningCap float64, variant, note string) []parity.Waiver {
 	n := float64(utf8.RuneCountInString(title))
 	subject := "「" + title + "」"
 	return []parity.Waiver{
 		{
-			Ledger: "A-013", Layer: parity.LayerL2, Kind: "text-width", Subject: subject,
-			MinDelta: max(n*0.525-0.3, 0.01), MaxDelta: n*0.675 + 0.3,
-			Note: "tracking-wider 的字距：Viva 没有字距，绘制宽度窄 字符数 × 0.05em（盒宽已补齐，后面的元素位置一致）",
+			Ledger: "A-013", Layer: parity.LayerL2, Kind: "text-width", Subject: subject, Variant: variant,
+			MinDelta: max(n*0.525-0.3, 0.01), MaxDelta: n*0.675 + 0.3 + kerningCap,
+			Note: note,
 		},
 		{
-			Ledger: "A-013", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: n*0.675/2 + 1,
+			Ledger: "A-013", Layer: parity.LayerL2, Kind: "ink", Subject: subject, Variant: variant, MaxDelta: n*0.675/2 + 1,
 			Note: "同上：字距使墨迹整体位移最多宽度差的一半（只管横向，纵向错位照常判定）",
 		},
 	}
