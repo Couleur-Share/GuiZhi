@@ -1,0 +1,16 @@
+/* 阅读岛的页面外壳：整页就是阅读区，高度链从 html 一路撑到 #root；岛里没有窗口滚动条。 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* 样式表是渲染阻塞的，脚本跑起来之前的第一帧就是正确的面板底色，不会闪白。 */
+html {
+  background: hsl(var(--card));
+}
+
+body {
+  overflow: hidden;
+}

@@ -7,3 +7,5 @@ apps/desktop-go/testdata/golden/** -text
 third-party/viva/** -text
 # go-winio（Viva 单实例包的依赖）同样按字节保存许可证原文
 third-party/go-winio/** -text
+# 阅读岛页面产物（apps/desktop-go/jsgen/build-reader.mts 生成并入库）按字节保存：与重新生成的结果逐字节比较，禁止 git 做换行转换
+apps/desktop-go/viva/reader/assets/** -text

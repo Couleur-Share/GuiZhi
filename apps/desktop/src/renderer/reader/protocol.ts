@@ -1,0 +1,269 @@
+/**
+ * 阅读岛的消息协议（v1）：Go 宿主（apps/desktop-go/viva/reader）与岛内页面之间只传文本，内容是 JSON。
+ *
+ * 方向与信任：
+ * - 宿主 → 页面（HostMessage）：宿主是可信的，但页面仍按形状校验，坏消息直接丢弃，不能让 React 渲染崩掉。
+ * - 页面 → 宿主（PageEvent）：宿主把它当作不可信输入校验（岛里可能渲染第三方内容，台账 A-018）；
+ *   这里的类型只是页面自己的约定，Go 一侧另有一份校验（viva/reader/protocol.go），两侧字段名必须一致。
+ *
+ * Reader island protocol v1: JSON text between the Go host and the page.
+ */
+
+export const READER_PROTOCOL = 1;
+
+export type ReaderLang = "zh" | "en";
+
+/** 动效档位：与渲染层写到 <html data-motion> 上的取值一致（globals.css 据此缩放或关闭动画）。 */
+export type ReaderMotion = "standard" | "reduced" | "off";
+
+/** 外观输入：与渲染层 applyTheme 写到 documentElement 上的东西一一对应（dark 类、--theme-*、--base-font-size、data-motion）。 */
+export interface ReaderTheme {
+  dark: boolean;
+  hue: number;
+  saturation: number;
+  /** 根字号，单位 px（14 / 16 / 18 三档，Tailwind 的 1rem）。 */
+  basePx: number;
+  /** 设置里的动效偏好与系统「减少动态效果」合并后的实际档位。 */
+  motion: ReaderMotion;
+}
+
+/** 内容面板的标签页（与渲染层 ReadingPanelTab 同一套取值）。 */
+export type ReaderTab =
+  | "body"
+  | "transcript"
+  | "images"
+  | "recognized"
+  | "summary"
+  | "replies";
+
+/**
+ * 阅读区此刻要显示的东西。每种对应渲染层 ContentPanel 里 data-article-reader 内的一个分支：
+ * - original：主题阅读的「原文」（ReconstructionReader 里的 MarkdownPreview，带目录浮层与标题位置跟踪）；
+ * - markdown：纯 Markdown 预览（图片条目的识别文字标签等）；
+ * - replies：论坛讨论（楼层卡片列表 + 楼层目录）；
+ * - gallery：图片条目的配图画廊。
+ */
+export type ReaderView =
+  | { kind: "none" }
+  | { kind: "original"; content: string; sourceKind: "body" | "summary" }
+  | { kind: "markdown"; content: string; tab: ReaderTab }
+  | { kind: "replies"; content: string }
+  | { kind: "gallery"; content: string };
+
+export interface HostInit {
+  t: "init";
+  v: number;
+  theme: ReaderTheme;
+  lang: ReaderLang;
+}
+
+export interface HostView {
+  t: "view";
+  /** 宿主给每次换内容编的序号：页面上报的事件都带着它，宿主据此丢掉旧内容的迟到事件。 */
+  seq: number;
+  /** 条目 ID 与标签：页面按它们决定要不要重建（渲染层的 key={item.id}）。 */
+  itemId: string;
+  tab: ReaderTab;
+  view: ReaderView;
+  /** 打开这条时要恢复的滚动位置（逻辑像素）；没有记忆为 null。 */
+  restoreTop: number | null;
+  /** 楼层目录是否展开（论坛讨论标签）。 */
+  catalogOpen: boolean;
+  /** 原文的标题目录浮层是否展开。 */
+  tocOpen: boolean;
+}
+
+export interface HostFind {
+  t: "find";
+  query: string;
+  /** 当前命中序号（从 0 起，越界取模）。 */
+  index: number;
+}
+
+export interface HostTheme {
+  t: "theme";
+  theme: ReaderTheme;
+  lang: ReaderLang;
+}
+
+export interface HostUi {
+  t: "ui";
+  catalogOpen: boolean;
+  tocOpen: boolean;
+}
+
+export type HostMessage =
+  | HostInit
+  | HostView
+  | HostFind
+  | HostTheme
+  | HostUi;
+
+export interface LightboxImageRef {
+  src: string;
+  alt?: string;
+}
+
+export type PageEvent =
+  | { t: "ready"; v: number }
+  | { t: "rendered"; seq: number }
+  | { t: "matches"; seq: number; count: number }
+  | { t: "scroll"; seq: number; top: number }
+  | { t: "catalog"; seq: number; open: boolean }
+  | { t: "toc"; seq: number; open: boolean }
+  | { t: "link"; seq: number; url: string }
+  | { t: "copy"; seq: number; text: string }
+  | { t: "lightbox"; seq: number; images: LightboxImageRef[]; index: number }
+  | { t: "toast"; seq: number; kind: "warning"; text: string }
+  | {
+      t: "key";
+      seq: number;
+      key: string;
+      ctrl: boolean;
+      alt: boolean;
+      shift: boolean;
+    }
+  | { t: "findReset"; seq: number }
+  | { t: "error"; seq: number; message: string };
+
+const TABS: ReadonlySet<string> = new Set([
+  "body",
+  "transcript",
+  "images",
+  "recognized",
+  "summary",
+  "replies",
+]);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseTheme(value: unknown): ReaderTheme | null {
+  if (!isRecord(value)) return null;
+  const { dark, hue, saturation, basePx, motion } = value;
+  if (
+    typeof dark !== "boolean" ||
+    typeof hue !== "number" ||
+    typeof saturation !== "number" ||
+    typeof basePx !== "number" ||
+    (motion !== "standard" && motion !== "reduced" && motion !== "off")
+  ) {
+    return null;
+  }
+  if (![hue, saturation, basePx].every(Number.isFinite)) return null;
+  // 根字号只认设置里的范围，防止坏值把整页字号弄成 0 或巨大。
+  if (basePx < 8 || basePx > 40) return null;
+  return { dark, hue, saturation, basePx, motion };
+}
+
+function parseLang(value: unknown): ReaderLang {
+  return value === "en" ? "en" : "zh";
+}
+
+function parseView(value: unknown): ReaderView | null {
+  if (!isRecord(value)) return null;
+  switch (value.kind) {
+    case "none":
+      return { kind: "none" };
+    case "original":
+      if (
+        typeof value.content === "string" &&
+        (value.sourceKind === "body" || value.sourceKind === "summary")
+      ) {
+        return {
+          kind: "original",
+          content: value.content,
+          sourceKind: value.sourceKind,
+        };
+      }
+      return null;
+    case "markdown":
+      if (
+        typeof value.content === "string" &&
+        typeof value.tab === "string" &&
+        TABS.has(value.tab)
+      ) {
+        return {
+          kind: "markdown",
+          content: value.content,
+          tab: value.tab as ReaderTab,
+        };
+      }
+      return null;
+    case "replies":
+    case "gallery":
+      if (typeof value.content === "string") {
+        return { kind: value.kind, content: value.content };
+      }
+      return null;
+    default:
+      return null;
+  }
+}
+
+/** 解析宿主发来的一条消息；形状不对返回 null。 */
+export function parseHostMessage(text: string): HostMessage | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!isRecord(raw)) return null;
+  switch (raw.t) {
+    case "init": {
+      const theme = parseTheme(raw.theme);
+      if (!theme || typeof raw.v !== "number") return null;
+      return { t: "init", v: raw.v, theme, lang: parseLang(raw.lang) };
+    }
+    case "view": {
+      const view = parseView(raw.view);
+      if (
+        !view ||
+        typeof raw.seq !== "number" ||
+        typeof raw.itemId !== "string" ||
+        typeof raw.tab !== "string" ||
+        !TABS.has(raw.tab)
+      ) {
+        return null;
+      }
+      const restoreTop =
+        typeof raw.restoreTop === "number" && Number.isFinite(raw.restoreTop)
+          ? Math.max(0, raw.restoreTop)
+          : null;
+      return {
+        t: "view",
+        seq: raw.seq,
+        itemId: raw.itemId,
+        tab: raw.tab as ReaderTab,
+        view,
+        restoreTop,
+        catalogOpen: raw.catalogOpen === true,
+        tocOpen: raw.tocOpen === true,
+      };
+    }
+    case "find":
+      if (typeof raw.query !== "string" || typeof raw.index !== "number") {
+        return null;
+      }
+      return {
+        t: "find",
+        query: raw.query,
+        index: Number.isFinite(raw.index) ? Math.trunc(raw.index) : 0,
+      };
+    case "theme": {
+      const theme = parseTheme(raw.theme);
+      if (!theme) return null;
+      return { t: "theme", theme, lang: parseLang(raw.lang) };
+    }
+    case "ui":
+      return {
+        t: "ui",
+        catalogOpen: raw.catalogOpen === true,
+        tocOpen: raw.tocOpen === true,
+      };
+    default:
+      return null;
+  }
+}
