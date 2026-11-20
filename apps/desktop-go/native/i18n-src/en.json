@@ -4,6 +4,9 @@
       "starting": "Opening the reading view…",
       "webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working."
     },
+    "library": {
+      "resultLine": "{{id}}：{{result}}"
+    },
     "languageName": {
       "zh": "简体中文",
       "en": "English"

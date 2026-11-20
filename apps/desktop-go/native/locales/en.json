@@ -1893,6 +1893,7 @@
   "commandPalette_noResults": "No matching results",
   "native_island_starting": "Opening the reading view…",
   "native_island_webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working.",
+  "native_library_resultLine": "{id}：{result}",
   "native_languageName_zh": "简体中文",
   "native_languageName_en": "English",
   "native_settings_loadAction": "Load settings",

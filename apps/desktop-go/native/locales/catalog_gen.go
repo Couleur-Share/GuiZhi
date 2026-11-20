@@ -19802,6 +19802,18 @@ func (msgs Messages) NativeIslandWebview2Missing() string {
 	return Catalog.Format(msgs.locale, "native_island_webview2Missing", nil)
 }
 
+// NativeLibraryResultLine says "{id}：{result}"
+// in the language the app shows.
+func NativeLibraryResultLine(id any, result any) string {
+	return In(i18n.Locale()).NativeLibraryResultLine(id, result)
+}
+
+// NativeLibraryResultLine says "{id}：{result}"
+// in the language of msgs.
+func (msgs Messages) NativeLibraryResultLine(id any, result any) string {
+	return Catalog.Format(msgs.locale, "native_library_resultLine", map[string]any{"id": id, "result": result})
+}
+
 // NativeLanguageNameZh says "简体中文"
 // in the language the app shows.
 func NativeLanguageNameZh() string { return In(i18n.Locale()).NativeLanguageNameZh() }

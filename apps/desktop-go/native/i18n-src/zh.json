@@ -4,6 +4,9 @@
       "starting": "正在打开阅读视图…",
       "webview2Missing": "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
     },
+    "library": {
+      "resultLine": "{{id}}：{{result}}"
+    },
     "languageName": {
       "zh": "简体中文",
       "en": "English"
