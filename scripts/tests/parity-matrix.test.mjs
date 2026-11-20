@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadMatrix, parseAppearanceSource, parseVariantKey, tierVariants, variantKey } from "../../apps/desktop-go/scripts/parity/lib/matrix.mjs";
+import { parityLanguage } from "../../apps/desktop-go/scripts/parity/lib/react-state.mjs";
 
 const matrix = loadMatrix();
 
@@ -40,4 +41,12 @@ test("T0/T1 是 T3 的子集，T1 包含 T0", () => {
 
 test("读不到预设时明确报错，不静默得到空矩阵", () => {
   assert.throws(() => parseAppearanceSource("export const nothing = 1;"), /MORANDI_THEMES/);
+});
+
+test("参照的界面语言：缺省 zh（矩阵不含语言维度，台账 G-017），PARITY_LANG=en 只给英文试点，别的取值直接报错", () => {
+  assert.equal(parityLanguage({}), "zh");
+  assert.equal(parityLanguage({ PARITY_LANG: "zh" }), "zh");
+  assert.equal(parityLanguage({ PARITY_LANG: "en" }), "en");
+  assert.throws(() => parityLanguage({ PARITY_LANG: "fr" }), /只能是 zh 或 en/);
+  assert.throws(() => parityLanguage({ PARITY_LANG: "" }), /只能是 zh 或 en/);
 });

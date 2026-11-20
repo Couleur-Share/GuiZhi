@@ -16,7 +16,17 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { SETTLE_CSS, settle } from "./react-state.mjs";
+import { SETTLE_CSS, parityLanguage, settle } from "./react-state.mjs";
+
+/**
+ * 进入知识库要点的几个控件，按参照的界面语言取可访问名（renderer 的 i18n：nav.library、common.expand、library.newCollection）。
+ * 只覆盖进入流程；各场景自己的交互步骤仍按中文界面写（英文试点只用不需要交互的静止场景，台账 G-017）。
+ */
+const NAV_LABELS = {
+  zh: { library: "知识库", expand: "展开", newCollection: "新建合集" },
+  en: { library: "Library", expand: "Expand", newCollection: "New collection" },
+};
+const navLabel = (key) => NAV_LABELS[parityLanguage()][key];
 
 /** 夹具：与 Viva 场景共用同一份 JSON。 */
 export const LIBRARY_FIXTURE = JSON.parse(
@@ -189,7 +199,7 @@ async function reloadClean(session) {
 export async function openCompactSidebar(win) {
   const compact = await win.evaluate(() => window.matchMedia("(max-width: 1179.98px)").matches);
   if (!compact) return;
-  await win.getByRole("button", { name: "展开", exact: true }).click();
+  await win.getByRole("button", { name: navLabel("expand"), exact: true }).click();
   await win.waitForTimeout(400); // 浮层的入场过渡（duration-smooth 280ms）
 }
 
@@ -213,8 +223,8 @@ export async function enterLibrary(session, options = {}) {
   }, { key: CONFIG_KEY, value: config, viewsKey: SMART_VIEWS_KEY, viewsValue: views });
   await reloadClean(session);
   const { page } = session;
-  await page.getByRole("button", { name: "知识库", exact: true }).click();
-  await page.getByRole("button", { name: "新建合集", exact: true }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: navLabel("library"), exact: true }).click();
+  await page.getByRole("button", { name: navLabel("newCollection"), exact: true }).waitFor({ state: "visible" });
   await page.waitForFunction((withList) => {
     const seen = window.__parityLibrary;
     return !!seen && seen.collections > 0 && seen.tags > 0 && seen.counts > 0 && (!withList || seen.list > 0);

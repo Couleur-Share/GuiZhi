@@ -22,17 +22,27 @@ const SETTINGS_KEY = "guizhi-settings";
 const SETTINGS_VERSION = 3; // stores/settings.store.ts 的 persist version
 
 /**
+ * 参照的界面语言：缺省 zh——冻结的场景矩阵不含语言维度（台账 G-017），全部既有参照都是中文界面。
+ * 英文试点用环境变量 PARITY_LANG=en 采集，输出放单独目录，不混进矩阵里的任何一次回归。
+ */
+export function parityLanguage(env = process.env) {
+  const lang = env.PARITY_LANG ?? "zh";
+  if (lang !== "zh" && lang !== "en") throw new Error(`PARITY_LANG 只能是 zh 或 en：${lang}`);
+  return lang;
+}
+
+/**
  * 写入外观设置与「已处理」标记，让首次引导与迁移提示不出现。
  * 色相预设要把 themeColor、themeHue、themeSaturation 三个字段一起写：启动时按后两者设置 --theme-hue / --theme-saturation，
  * 只写 themeColor 会悄悄回落到默认色相（royal-blue 恰好是默认值，所以只测它时发现不了）。
  */
 async function writeLocalState(page, variant, hue) {
-  await page.evaluate(({ key, version, variant: v, hue: h }) => {
+  await page.evaluate(({ key, version, variant: v, hue: h, lang }) => {
     const stored = JSON.parse(localStorage.getItem(key) || "null") ?? { state: {}, version };
     stored.version = version;
     stored.state = {
       ...stored.state,
-      language: "zh",
+      language: lang,
       themeMode: v.mode,
       isDarkMode: v.mode === "dark",
       themeColor: v.hue,
@@ -43,7 +53,7 @@ async function writeLocalState(page, variant, hue) {
     localStorage.setItem(key, JSON.stringify(stored));
     localStorage.setItem("guizhi-setup-dismissed", "1");
     localStorage.setItem("guizhi-migration-dismissed", "1");
-  }, { key: SETTINGS_KEY, version: SETTINGS_VERSION, variant, hue });
+  }, { key: SETTINGS_KEY, version: SETTINGS_VERSION, variant, hue, lang: parityLanguage() });
 }
 
 /** 读回页面上实际生效的外观，用于确认变体确实应用了（而不是悄悄回落到默认）。 */

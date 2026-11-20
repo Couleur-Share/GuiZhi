@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/parity"
 	"guizhi-mygo-shell/viva/parity/scenes"
 )
@@ -40,11 +41,18 @@ func main() {
 	filter := flag.String("variant", "", "只跑变体键包含该子串的变体")
 	stability := flag.Bool("stability", false, "采集稳定性检查：只比较两次 React 采集")
 	react2 := flag.String("react2", "", "稳定性检查的第二个 React 目录；空表示比 -react 里的 .r1 与 .r2")
+	lang := flag.String("lang", "zh", "Viva 一侧的界面语言 zh|en，须与参照的采集语言（PARITY_LANG）一致；缺省 zh——冻结的场景矩阵不含语言维度（台账 G-017），只有英文试点用 en")
 	flag.Parse()
 	if *scene == "" {
 		fmt.Fprintln(os.Stderr, "缺少 -scene；已登记：", strings.Join(scenes.IDs(), ", "))
 		os.Exit(2)
 	}
+	if *lang != "zh" && *lang != "en" {
+		fmt.Fprintf(os.Stderr, "-lang 只能是 zh 或 en：%s\n", *lang)
+		os.Exit(2)
+	}
+	// 语言是进程级状态（locales.SetLang）：只在对照工具里按参数设置，生产路径不经这里（台账 B-049：设置页的语言项尚未接线）。
+	locales.SetLang(locales.ParseLang(*lang))
 	runner := func() error { return run(*scene, *reactDir, *outDir, *filter) }
 	if *stability {
 		runner = func() error { return runStability(*scene, *reactDir, *react2, *outDir, *filter) }
