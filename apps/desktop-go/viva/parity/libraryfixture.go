@@ -56,3 +56,47 @@ func LoadLibraryFixture() (LibraryFixture, error) {
 	}
 	return f, nil
 }
+
+// libraryDetailFixtureJSON 是条目详情（M2-4）的数据夹具：列表投影里没有的正文、摘要、文字稿、来源与复核状态，
+// 来源版本，以及冲突与失败的场景数据。React 采集器（scripts/parity/lib/react-library.mjs）读的是同一个文件。
+//
+//go:embed testdata/library-detail-fixture.json
+var libraryDetailFixtureJSON []byte
+
+// LibraryDetail 是一条的详情字段（叠在列表夹具的同 ID 条目上）。
+type LibraryDetail struct {
+	Content    string `json:"content"`
+	Summary    string `json:"summary"`
+	Transcript string `json:"transcript"`
+	SourceURI  string `json:"sourceUri"`
+	// ReviewStatus 与 ReviewReasons 为空表示不改（列表夹具里全是 clear）。
+	ReviewStatus  string   `json:"reviewStatus"`
+	ReviewReasons []string `json:"reviewReasons"`
+}
+
+// LibraryDetailFixture 是详情夹具的内容。
+type LibraryDetailFixture struct {
+	// Details 按条目 ID 给出详情字段。
+	Details map[string]LibraryDetail `json:"details"`
+	// SourceVersions 按条目 ID 给出来源版本（新的在前）。
+	SourceVersions map[string][]services.LibrarySourceVersion `json:"sourceVersions"`
+	// Conflict 是保存冲突场景的两个标题：另一入口已改成的标题，与用户在标题框里改成的标题。
+	Conflict struct {
+		SavedTitle string `json:"savedTitle"`
+		MineTitle  string `json:"mineTitle"`
+	} `json:"conflict"`
+	// Failures 是读取与保存失败场景的失败原因（两侧同文）。
+	Failures struct {
+		Get  string `json:"get"`
+		Save string `json:"save"`
+	} `json:"failures"`
+}
+
+// LoadLibraryDetailFixture 解码详情夹具。
+func LoadLibraryDetailFixture() (LibraryDetailFixture, error) {
+	var f LibraryDetailFixture
+	if err := json.Unmarshal(libraryDetailFixtureJSON, &f); err != nil {
+		return LibraryDetailFixture{}, fmt.Errorf("解码知识库详情夹具失败：%w", err)
+	}
+	return f, nil
+}

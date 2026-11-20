@@ -216,6 +216,61 @@ const TEXTS_EXPR = `(async () => {
       testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
     };
   };
+  // 多行输入框（textarea）里的值与占位符同样不是 DOM 文本节点，但看得见（详情头部的标题框，台账 G-026）：折行由 Chromium 排，
+  // 所以在原位置放一份同宽、同样式的镜像（fixed、visibility:hidden，量完立刻移除），按 Range 的行片段取每一行的矩形，
+  // 与普通文字节点同一口径（行片段的内容区矩形）。内容盒取 clientWidth 扣内边距（有滚动条时窄一个滚动条宽），行从内容盒顶部起算、扣掉自身的滚动量。
+  const MIRROR_PROPS = [
+    "font-family", "font-size", "font-weight", "font-style", "font-stretch", "font-variant", "font-kerning", "font-feature-settings",
+    "font-variation-settings", "font-optical-sizing", "letter-spacing", "word-spacing", "text-transform", "text-indent", "text-rendering",
+    "line-height", "tab-size", "white-space", "overflow-wrap", "word-break", "line-break", "text-align", "direction",
+  ];
+  const textareaText = (el) => {
+    if (el.localName !== "textarea") return null;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return null;
+    const raw = el.value || el.getAttribute("placeholder") || "";
+    const text = visibleText(raw, cs.textTransform);
+    if (!text) return null;
+    const b = el.getBoundingClientRect();
+    if (b.width <= 0 || b.height <= 0) return null;
+    const px = (name) => parseFloat(cs.getPropertyValue(name)) || 0;
+    const left = b.x + px("border-left-width") + px("padding-left");
+    const top = b.y + px("border-top-width") + px("padding-top") - el.scrollTop;
+    const contentW = el.clientWidth - px("padding-left") - px("padding-right");
+    if (contentW <= 0) return null;
+    const mirror = document.createElement("div");
+    for (const p of MIRROR_PROPS) mirror.style.setProperty(p, cs.getPropertyValue(p));
+    Object.assign(mirror.style, {
+      position: "fixed", left: left + "px", top: top + "px", width: contentW + "px", margin: "0", padding: "0", border: "0",
+      boxSizing: "content-box", visibility: "hidden", pointerEvents: "none", overflow: "visible",
+    });
+    mirror.textContent = raw;
+    document.body.appendChild(mirror);
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(mirror.firstChild);
+      const rects = [];
+      for (const r of range.getClientRects()) {
+        if (r.width > 0 && r.height > 0) rects.push([round(r.x), round(r.y), round(r.width), round(r.height)]);
+      }
+      if (rects.length === 0) return null;
+      const lh = parseFloat(cs.lineHeight);
+      return {
+        text,
+        rects,
+        font: [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.fontStyle].join("|"),
+        size: parseFloat(cs.fontSize),
+        weight: Number(cs.fontWeight),
+        lineHeight: Number.isFinite(lh) ? lh : null,
+        color: el.value ? cs.color : getComputedStyle(el, "::placeholder").color,
+        tag: el.localName,
+        field: true,
+        testId: el.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
+      };
+    } finally {
+      mirror.remove();
+    }
+  };
   // 看得见的文字：自身与全部祖先 opacity 的乘积，再乘文字色 alpha。低于 0.01 的文字不是「呈现出来的文字」——
   // 悬停或焦点在行内时淡出的行尾计数（opacity-0）、text-transparent 的叠层。口径与 Viva 一侧 collectViva 一致
   // （kit.VisibleInkAlpha = 0.01：那边透明的文字不进采集），两边比的都是用户看得见的字（台账 G-010）。
@@ -596,7 +651,7 @@ const TEXTS_EXPR = `(async () => {
   let node;
   while ((node = walker.nextNode())) {
     if (node.nodeType === 1) {
-      const field = fieldText(node);
+      const field = fieldText(node) ?? textareaText(node);
       if (field) { out.push(field); owners.push(node); }
       continue;
     }

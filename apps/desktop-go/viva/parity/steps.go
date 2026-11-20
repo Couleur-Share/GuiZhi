@@ -3,7 +3,9 @@ package parity
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/vivaui/viva/components"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/headless"
 )
@@ -88,6 +90,39 @@ func ParkAndBlur(s *headless.Session) error {
 		return err
 	}
 	return ParkPointer(s)
+}
+
+// ParkCaretDark 把虚拟时钟推进到文本框插入符熄灭的相位中段，供取图用。
+//
+// 参照采集器把 caret-color 设成透明（scripts/parity/lib/react-state.mjs），参照图里没有插入符；Viva 的插入符聚焦后亮 530 ms、
+// 暗 530 ms，周而复始（components.CaretBlinkHalf，20 s 无动静后常亮），取图时恰好亮着就多出一道深色竖线。
+// 淡色文字（占位符）旁的一道深线会拉歪墨迹剖面（台账 G-028），所以焦点在文本框、文字又淡的场景，取图前调一次。
+//
+// since 是插入符开始计时的虚拟时刻：触发聚焦（或光标移动）的步骤开始之前读到的 s.Now()——步骤内部的事件处理不推进虚拟时钟。
+// 插入符从第一帧「带着焦点画出来」起计时，而聚焦在事件之后的那一帧才生效，所以这里先出两帧（时钟不动），让上一步的聚焦先落地、
+// 计时先开始，否则时钟一跳，计时反而从跳之后才起，取图时又恰好亮着。已经在暗相位中段（两侧各留 1/8 个半周期）则不再推进。
+func ParkCaretDark(s *headless.Session, since time.Duration) error {
+	for i := 0; i < 2; i++ {
+		if err := s.Frame(); err != nil {
+			return err
+		}
+	}
+	half := components.CaretBlinkHalf
+	period := 2 * half
+	phase := (s.Now() - since) % period
+	if phase < 0 {
+		phase += period
+	}
+	margin := half / 8
+	if phase >= half+margin && phase <= period-margin {
+		return nil
+	}
+	target := half + half/2 // 暗相位正中
+	advance := target - phase
+	if advance < 0 {
+		advance += period
+	}
+	return s.Advance(advance)
 }
 
 // hintHits 是窗口内、提示文字以任一前缀开头的命中区（声明了 Hint 的宿主）。

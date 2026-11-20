@@ -34,8 +34,15 @@ type libraryOptions struct {
 	// list 为 true 时工作区放真实的列表栏（M2-2）；右侧详情栏默认是空白（React 一侧同样隐去），detail 为真时才是真的详情（M2-4）。
 	list bool
 	// detail 为 true 时详情栏与表格视图的详情浮层是真的（只在 list 时有意义）；React 一侧改为隐去阅读区（HIDE_READER_CSS），
-	// 阅读区在 M2-5 迁入之前留白（台账 B-059）。
+	// 阅读区在 M2-5 迁入之前留白（台账 B-059）。详情字段取详情夹具（library-detail-fixture.json），两侧共用。
 	detail bool
+	// detailVersions 为 true 时详情夹具里的来源版本放进服务（React 一侧 config.detail.versions）。
+	detailVersions bool
+	// failGet、failSave 让详情读取、草稿保存失败（原因取详情夹具的 failures；React 一侧 config.detail.get、save 为 fail）。
+	failGet, failSave bool
+	// holdDetail 为 true 时，场景里的 detailHoldGet、detailHoldSave 会让之后的第一次详情读取（草稿保存）卡在服务里不返回：
+	// 读取中、保存中的画面（React 一侧 config.detail.get、save 为 hold）。卡住的请求要到画面采集完才放走（同 holdBatch）。
+	holdDetail bool
 	// fault 是列表读取的故障注入（只在 list 时有意义）。
 	fault listFault
 	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
@@ -128,7 +135,7 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 		store.After = func(time.Duration, func()) func() { return func() {} }
 		store.Spawn = func(fn func()) { fn() }
 		if opt.list {
-			svc.SeedEntries(data.Entries)
+			svc.SeedEntries(seedLibraryDetail(svc, data.Entries, opt))
 			for id, reason := range opt.batchFail {
 				svc.FailBatchItem(id, reason)
 			}
@@ -159,7 +166,7 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleLibrary,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F", Notifier: notifier,
 			Modules: map[shellscreen.Module]shellscreen.ModuleView{
-				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace},
+				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace, HidePanel: screen.FocusReading},
 			},
 		}
 		// 窗口级键盘（方向键、Home、End、空格，B-045）与生产同一处接线：经 Look.KeyHook，焦点从此刻的画布读。
@@ -170,6 +177,8 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			}
 			return screen.ListKey(e, canvas)
 		}
+		// 带修饰键的快捷键（Ctrl+S、Ctrl+F、Alt+Z）单走 OnShortcut，与生产同一处接线。
+		look.ShortcutHook = screen.ListShortcut
 		view := func(c ui.C) {
 			canvas = c.Canvas()
 			w.View(c)
@@ -178,7 +187,7 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 		compact := look.Viewport <= compactMaxWidth
 		env := &libraryEnv{store: store, screen: screen, ctx: ctx, svc: svc}
 		run := func(s *headless.Session) error {
-			if opt.fault == faultHold || opt.holdBatch {
+			if opt.fault == faultHold || opt.holdBatch || opt.holdDetail {
 				// 卡住的读取（或批量）要到画面采集完才放走：这里一收尾就取消的话，读取带着「context canceled」回来，
 				// 读取中的画面被错误态顶掉（采集在 run 返回之后）。采集在毫秒内完成，放走的时间留得宽裕。
 				time.AfterFunc(holdRelease, cancel)

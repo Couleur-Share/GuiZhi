@@ -102,6 +102,8 @@ func render(s Scene, v Variant, region Region, wantImage bool) (*Facts, image.Im
 	var canvas gfx.Canvas
 	config := page.Config(app.Config{Title: s.ID, Width: region.Width, Height: region.Height})
 	config.OnKey = kit.KeyFirst(look.OnKey, config.OnKey) // 与窗口同一处接线（app.bindInput）
+	// 带修饰键的可打印字符（知识库详情的 Ctrl+S、Ctrl+F、Alt+Z）单走 OnShortcut，同样与窗口一致。
+	config.OnShortcut = kit.KeyFirst(look.OnShortcut, config.OnShortcut)
 	session, err := headless.Open(config, &canvas, headless.Options{Scale: 1})
 	if err != nil {
 		return nil, nil, fmt.Errorf("打开无头会话失败：%w", err)

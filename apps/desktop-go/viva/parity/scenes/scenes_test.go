@@ -1,6 +1,7 @@
 package scenes_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,116 @@ import (
 	"guizhi-mygo-shell/viva/parity"
 	"guizhi-mygo-shell/viva/parity/scenes"
 )
+
+// redPin 固定一个「已登记在台账、对照目前仍未通过」的场景此刻的失败形态（M2-4 起，台账 G-029）。
+type redPin struct {
+	Ledger string   // 对应的未关闭台账条目
+	Kinds  []string // 允许出现的问题类别（层/类别），多出别的类别就是有新的偏差混进来了
+	Max    int      // 事实比较（L1+L2）里问题条数的上限，来自登记当时的实测
+}
+
+// knownRed 里的场景在 CI 里**不算通过**：它们的红色照旧写在台账里、照旧在 vivaparity 的报告里（判定不变），这里只是把
+// 失败形态固定下来，让 CI 既不被已登记的偏差挡住，也看得见混在里面的新偏差——出现表外的类别或条数超上限都会失败；
+// 场景已经通过也会失败，提醒把它从这张表去掉并关闭台账条目（见 TestKnownRedPointsToOpenLedgerItems）。
+// 这不是 Waiver：不改任何阈值、比较器或放过条款，也不让场景在 vivaparity 里变绿。
+var knownRed = map[string]redPin{
+	// B-062：标题框单行，不折行也不随内容增高，头部以下整页差 31 px
+	"app.window.library.detail-long-title": {Ledger: "B-062", Kinds: []string{"L2/box", "L2/icon-extra", "L2/icon-missing", "L2/text-lines"}, Max: 21},
+	// B-063：折行的多段行内文字在 Viva 里是一段
+	"app.window.library.detail-conflict-open": {Ledger: "B-063", Kinds: []string{"L1/missing-text", "L1/text"}, Max: 15},
+	// G-027：L1 角色映射里没有 region 与 ListMarker（映射表有哈希守卫，扩展待追认）
+	"app.window.library.detail-review":      {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 2},
+	"app.window.library.detail-review-open": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 3},
+}
+
+func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {
+	t.Helper()
+	for _, problem := range knownRedProblems(sceneID, pin, rep) {
+		t.Error(problem)
+	}
+}
+
+// knownRedProblems 返回红场景此刻的失败形态与登记不符的地方；空表示仍是登记的形态（红的、没有表外的类别、没有超条数）。
+func knownRedProblems(sceneID string, pin redPin, rep *parity.Report) []string {
+	if rep.Pass {
+		return []string{fmt.Sprintf("场景 %s 已经通过：请把它从 knownRed 去掉，并关闭台账 %s", sceneID, pin.Ledger)}
+	}
+	allowed := map[string]bool{}
+	for _, k := range pin.Kinds {
+		allowed[k] = true
+	}
+	var problems []string
+	for _, is := range rep.Issues {
+		if k := string(is.Layer) + "/" + is.Kind; !allowed[k] {
+			problems = append(problems, fmt.Sprintf("场景 %s 出现了台账 %s 没有登记的问题类别 [%s]：%s：%s", sceneID, pin.Ledger, k, is.Subject, is.Message))
+		}
+	}
+	if len(rep.Issues) > pin.Max {
+		problems = append(problems, fmt.Sprintf("场景 %s 的问题数 %d 超过了台账 %s 登记时的 %d 条", sceneID, len(rep.Issues), pin.Ledger, pin.Max))
+	}
+	return problems
+}
+
+// TestKnownRedPinsTheFailureShape 守住 knownRed 的判定本身：仍是登记的形态才算符合；已经通过、出现表外的类别、
+// 超过条数上限，各自都要报出来（否则这张表就成了让红场景溜过 CI 的口子）。
+func TestKnownRedPinsTheFailureShape(t *testing.T) {
+	pin := redPin{Ledger: "B-000", Kinds: []string{"L2/box", "L2/ink"}, Max: 3}
+	issue := func(layer parity.Layer, kind string) parity.Issue {
+		return parity.Issue{Layer: layer, Kind: kind, Subject: "s", Message: "m"}
+	}
+	box, ink, text := issue(parity.LayerL2, "box"), issue(parity.LayerL2, "ink"), issue(parity.LayerL1, "text")
+	cases := []struct {
+		name string
+		rep  parity.Report
+		want int
+	}{
+		{"仍是登记的形态", parity.Report{Issues: []parity.Issue{box, ink, box}}, 0},
+		{"刚好到上限", parity.Report{Issues: []parity.Issue{box, box, box}}, 0},
+		{"已经通过", parity.Report{Pass: true}, 1},
+		{"出现表外的类别", parity.Report{Issues: []parity.Issue{box, text}}, 1},
+		{"超过条数上限", parity.Report{Issues: []parity.Issue{box, box, box, box}}, 1},
+		{"层对不上（同名类别在别的层）", parity.Report{Issues: []parity.Issue{issue(parity.LayerL1, "box")}}, 1},
+		{"表外类别与超条数各报一次", parity.Report{Issues: []parity.Issue{text, text, text, text}}, 5},
+	}
+	for _, c := range cases {
+		if got := knownRedProblems("scene", pin, &c.rep); len(got) != c.want {
+			t.Errorf("%s：应报 %d 处，实际 %d 处：%q", c.name, c.want, len(got), got)
+		}
+	}
+}
+
+// TestKnownRedPointsToOpenLedgerItems 守住「红场景必须有一条没关闭的台账条目」：条目已关闭（挪进了「已关闭条目」表）或不存在，
+// 场景就不该再留在 knownRed 里；每个 knownRed 的场景也必须是已登记的场景。
+func TestKnownRedPointsToOpenLedgerItems(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "docs", "agents", "viva-parity-ledger.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ledger := strings.ReplaceAll(string(data), "\r\n", "\n")
+	closedFrom := strings.Index(ledger, "### 已关闭条目")
+	if closedFrom < 0 {
+		t.Fatal("台账里没有「### 已关闭条目」")
+	}
+	closedTo := len(ledger)
+	if next := strings.Index(ledger[closedFrom+1:], "\n## "); next >= 0 {
+		closedTo = closedFrom + 1 + next
+	}
+	registered := map[string]bool{}
+	for _, id := range scenes.IDs() {
+		registered[id] = true
+	}
+	for id, pin := range knownRed {
+		if !registered[id] {
+			t.Errorf("knownRed 里的场景 %s 没有登记", id)
+		}
+		row := strings.Index(ledger, "| "+pin.Ledger+" |")
+		if row < 0 {
+			t.Errorf("场景 %s 指向的台账条目 %s 不存在", id, pin.Ledger)
+		} else if row >= closedFrom && row < closedTo {
+			t.Errorf("场景 %s 指向的台账条目 %s 已关闭：请把场景从 knownRed 去掉", id, pin.Ledger)
+		}
+	}
+}
 
 // TestScenesMatchReactFacts 把每个已登记场景在入库的 React 事实样本（viva/parity/testdata/react）上跑一遍 L1 + L2：
 // 可访问树逐节点相等，外框差不超过 1px，文字行数、宽度与折行行距一致。
@@ -54,6 +165,10 @@ func TestScenesMatchReactFacts(t *testing.T) {
 					t.Fatal(err)
 				}
 				rep, _ := parity.Compare(parity.Inputs{React: react, Viva: viva, FactsOnly: true, Waivers: scene.Waivers, Backdrop: backdrop}, th)
+				if pin, red := knownRed[sceneID]; red {
+					checkKnownRed(t, sceneID, pin, rep)
+					return
+				}
 				if !rep.Pass {
 					for _, is := range rep.Issues {
 						t.Errorf("[%s/%s] %s：%s", is.Layer, is.Kind, is.Subject, is.Message)

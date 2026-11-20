@@ -1,0 +1,94 @@
+{
+  "details": {
+    "item-001": {
+      "content": "# Go 并发模式\n\n用 channel 传递数据所有权，而不是共享内存。\n\n- worker pool\n- pipeline\n- fan-in 与 fan-out",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
+    "item-003": {
+      "content": "本地优先的软件把数据放在用户自己的设备上，同步只是附加能力。\n\n本文拆解知识库的存储、索引与同步三层。",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": "https://example.com/blog/local-first-knowledge-base"
+    },
+    "item-004": {
+      "content": "> **平台**：bilibili\n> **作者**：李宏毅\n> **时长**：42:18\n\nTransformer 由编码器与解码器堆叠而成，核心是自注意力。",
+      "summary": "",
+      "transcript": "大家好，今天我们来讲 Transformer 的注意力机制。首先回顾一下序列到序列模型的基本结构。",
+      "sourceUri": "https://www.bilibili.com/video/BV1TD4y1h7vV"
+    },
+    "item-005": {
+      "content": "关于本地优先的取舍，见正文。",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
+    "item-006": {
+      "content": "SELECT id, title FROM items ORDER BY updated_at DESC;",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
+    "item-009": {
+      "content": "![桌面](asset://images/desk.png)\n\n极简桌面布置\n\n## 图中文字\n\n专注 · 留白 · 秩序",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
+    "item-012": {
+      "content": "## 讨论总结\n\n三位回复者一致认为：WAL 模式下备份必须带上 -wal 文件，或改用 VACUUM INTO。\n\n## 正文\n\n用 sqlite3 .backup 备份 WAL 模式的库时，只拷贝主文件会丢掉最近的写入。\n\n## 讨论（3 条）\n\n### 1 楼 · alice\n\n只拷主文件确实会丢数据，我踩过这个坑。\n\n### 2 楼 · bob\n\n> 回复 @alice（1 楼）：只拷主文件确实会丢数据\n\n用 VACUUM INTO 最省心。\n\n### 3 楼 · carol\n\n补充一点：checkpoint 之后再拷也可以。",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": "https://linux.do/t/topic/123456"
+    },
+    "item-014": {
+      "content": "",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
+    "item-017": {
+      "content": "容器查询让组件按自身宽度而不是视口宽度响应。",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": "https://example.com/css/container-queries",
+      "reviewStatus": "needs_review",
+      "reviewReasons": ["正文过短，可能没有抓取完整", "缺少发布时间"]
+    },
+    "item-042": {
+      "content": "未写完的草稿。",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    }
+  },
+  "sourceVersions": {
+    "item-003": [
+      {
+        "id": "sv-2",
+        "title": "如何构建本地优先的个人知识库",
+        "content": "新版正文：补充了索引层的增量更新策略。",
+        "transcript": "",
+        "reviewJson": "[]",
+        "capturedAt": 1794700000000
+      },
+      {
+        "id": "sv-1",
+        "title": "如何构建本地优先的个人知识库",
+        "content": "旧版正文：只有存储层。",
+        "transcript": "",
+        "reviewJson": "[\"正文被截断\"]",
+        "capturedAt": 1794600000000
+      }
+    ]
+  },
+  "conflict": {
+    "savedTitle": "学习笔记：Go 并发模式（另一入口已改）",
+    "mineTitle": "我的新标题"
+  },
+  "failures": {
+    "get": "磁盘读取失败：条目文件暂时无法访问",
+    "save": "磁盘写入失败：数据库暂时被占用"
+  }
+}
