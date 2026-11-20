@@ -80,11 +80,14 @@ func (s *Screen) columnMenuBody(c ui.C) {
 	l := s.Look
 	t := l.T
 	label := locales.LibraryColumnConfig()
-	// border-b border-border px-3 pb-2：标题行继承 16px / 24px 的行高（比 text-xs 的行盒高），文字落在基线上，离行顶 5px。
+	// border-b border-border px-3 pb-2：标题行继承根字号的 1rem / 1.5rem 行高（比 text-xs 的行盒高），文字落在基线上。
+	// 渲染层实测文字盒上沿离行顶 4、5、6px（根字号 14、16、18px，即 0.5rem-3px），下沿离行底恒为 3px
+	// （字体上下缘取整后，行内基线以下比 text-xs 的行盒多出的部分）；按 0.3125rem / 0.1875rem 推算在小、大档各差 0.375px，
+	// 大档上落笔取整差一行（M2-2 T2：table-columns-open 大字号档，台账 B-046 (6)）。
 	ui.Column(c.Key("head")).FillWidth().PadSides(0, l.Space(3), l.Space(2)+1, l.Space(3)).
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeBottom, 1, t.Border) }).
 		Children(func() {
-			ui.Column(c.Key("title-line")).FillWidth().PadSides(l.Rem(0.3125), 0, l.Rem(0.1875), 0).Children(func() {
+			ui.Column(c.Key("title-line")).FillWidth().PadSides(l.Rem(0.5)-3, 0, 3, 0).Children(func() {
 				// text-xs font-semibold uppercase tracking-wider
 				l.TextTracked(c.Key("title"), strings.ToUpper(label), kit.TextXS, kit.WeightSemibold, t.MutedForeground, 0.05)
 			})

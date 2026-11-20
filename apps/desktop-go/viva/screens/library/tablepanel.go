@@ -259,8 +259,11 @@ func (s *Screen) headActions(c ui.C, col tableColumn, geo stickyGeometry) {
 	if geo.topRight() {
 		round = inner
 	}
+	// 折叠边框模型下 thead 的内容区下沿让出半条下边框（tableHead 的 PadSides(0,0,0.5,0)），同行的表头格都在这块内容区里居中；
+	// 绝对定位的这一格不吃父级的内边距，自己补上这 0.5px，否则文字比同行别的表头低 0.25px，
+	// 半像素处落笔取整差一行（M2-2 T2：table-scrolled 大字号档，台账 B-046 (7)(b)）。与 actionsCell 的补法同一口径。
 	ui.Row(c.Key("th-actions")).Absolute().Top(0).Bottom(0).Right(geo.right).Width(width).Items(ui.Center).Justify(ui.Center).
-		PadSides(l.Space(cellPadY), l.Space(cellPadX), l.Space(cellPadY), l.Space(cellPadX)).
+		PadSides(l.Space(cellPadY), l.Space(cellPadX), l.Space(cellPadY)+0.5, l.Space(cellPadX)).
 		Draw(func(d *ui.DrawContext) {
 			rect := stickyRect(d.Rect, geo)
 			kit.PaintRoundedCorners(d, rect, t.Card, 0, round, 0, 0)
