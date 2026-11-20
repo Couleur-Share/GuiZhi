@@ -17,10 +17,37 @@ func tableBaseWaivers() []parity.Waiver {
 	out = append(out, headerInkWaivers()...)
 	out = append(out, snippetKerningWaivers()...)
 	out = append(out, sourceEllipsisWaivers()...)
-	return append(out, parity.Waiver{
+	out = append(out, parity.Waiver{
 		Ledger: "A-014", Layer: parity.LayerL2, Kind: "icon-box", MaxDelta: 1.5,
 		Note: "居中的来源单元格里，「YouTube」的字偶距使文字比渲染层宽 2.3px，同一格里的图标偏半个宽度差（≤ 1.3px）",
 	})
+	return append(out, sharedInkWaiver)
+}
+
+// sharedInkWaiver 登记 G-018（B-046 (4)）：吸附的「操作」列压住「更新时间」表头时，量「更新时间」墨迹的区域里整个包着「操作」那行文字，
+// 而「操作」的左缘在小数像素上（1205.5）：墨迹剖面是两行文字的合集，Viva 整像素落位、渲染层子像素定位（A-001）的半像素位移属于被包着的那一行，
+// 让外面这行的剖面对齐偏 1 列。前提由比较器按事实判定（Issue.Shared），所以同一行文字单独出现、或包着的那行左缘是整数像素时照常判定；
+// 只放过水平 1 像素（MaxDelta 1），纵向错位不放过（MaxDY 缺省 0）。
+var sharedInkWaiver = parity.Waiver{
+	Ledger: "G-018", Layer: parity.LayerL2, Kind: "ink", Shared: true, MaxDelta: 1,
+	Note: "量墨迹的区域里整个包着另一行小数左缘的文字（吸附列压住的表头）：剖面是两行的合集，被包着那行的半像素位移（A-001）让外面这行对齐偏 1 列",
+}
+
+// tableScrolledWaivers 是 table-scrolled 在 tableBaseWaivers 之外多带的两条（B-046 (5)(7)(b)）：
+//   - A-003 的延伸：小字号档里被面板下沿裁成半截的 14px 行内图标，看得见的只剩上半截，墨迹的大头是边缘的抗锯齿，Viva 比渲染层少约 0.25；
+//     前提（Issue.Clipped）由比较器按事实判定，没被裁的同一枚图标照常判定；只管小字号档、只放过偏少的方向、偏差不超过 0.26。
+//   - A-028：大字号档吸附的「操作」表头标签比同一行别的表头标签高一行，只放过这一个标签、只在大字号档、只放过 1 像素以内。
+func tableScrolledWaivers() []parity.Waiver {
+	return []parity.Waiver{
+		{
+			Ledger: "A-003", Layer: parity.LayerL2, Kind: "ink-mass", Subject: " 14.00 14.00]", Dir: -1, Clipped: true, Variant: "-small-", MaxDelta: 0.26,
+			Note: "被面板下沿裁成半截的行内图标：看得见的只剩上半截，边缘抗锯齿占墨迹的大头，Viva 的墨迹总量比渲染层少 0.24–0.25（A-003 的延伸）",
+		},
+		{
+			Ledger: "A-028", Layer: parity.LayerL2, Kind: "ink", Subject: "「" + locales.LibraryColumnActions() + "」", Variant: "-large-", MaxDelta: 1, MaxDY: 1,
+			Note: "大字号档吸附的「操作」表头标签，渲染层把它画得比同一行别的表头标签高一行（合成层原点取整，A-028）；Viva 与同行标签同一行",
+		},
+	}
 }
 
 // headerInkWaivers 登记 A-009 在吸附表头上的延伸：表头是 `sticky` 元素，Chromium 把它放进独立的合成层，

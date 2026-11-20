@@ -32,6 +32,13 @@ type Issue struct {
 	// Dir 是墨迹总量问题的方向：+1 表示 Viva 的墨迹比 React 多，-1 表示少；其余问题为 0。
 	// 已登记的偏差有方向（灰度抗锯齿使 Viva 偏多，小字号笔画使 Viva 偏少），据此分开匹配（Waiver.Dir）。
 	Dir int8 `json:"dir,omitempty"`
+	// Shared 表示墨迹问题的量墨迹区域里整个包着另一行 React 文字，且那行文字的左缘在小数像素上：量到的墨迹是两行文字的合集，
+	// 小数左缘的次像素位移（Viva 整像素落位、渲染层子像素定位，阈值 InkMaxDeltaXFractional 的依据）属于被包着的那一行，
+	// 不是这行自己的（吸附列压住的表头：「更新时间」整个在「操作」底下，台账 G-018）。已登记的偏差据此匹配（Waiver.Shared）。
+	Shared bool `json:"shared,omitempty"`
+	// Clipped 表示墨迹问题的文字或图标被祖先的裁剪线截掉了一截（看得见的区域比外框矮或窄超过 1px）：
+	// 区域里只剩字形的一部分，边缘的抗锯齿占墨迹的大头。已登记的偏差据此匹配（Waiver.Clipped）。
+	Clipped bool `json:"clipped,omitempty"`
 }
 
 // L1Result 汇总结构比较。

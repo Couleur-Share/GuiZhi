@@ -37,6 +37,15 @@ type Waiver struct {
 	// Dir 非零时，只放过方向相同的墨迹总量问题（Issue.Dir：+1 Viva 偏多，-1 Viva 偏少）：
 	// 灰度抗锯齿使 Viva 偏多（A-009），小字号拉丁笔画使 Viva 偏少（A-016），两类原因不能互相冒名。
 	Dir int8
+	// Shared 为真时，只放过量墨迹的区域里整个包着另一行小数左缘文字的墨迹问题（Issue.Shared，运行时由比较器按事实判定）：
+	// 同一行文字单独出现时的同类偏差照常判定。
+	Shared bool
+	// Clipped 为真时，只放过文字或图标被祖先裁剪线截掉一截的墨迹问题（Issue.Clipped，运行时由比较器按事实判定）：
+	// 没被裁的同类图标、文字照常判定。
+	Clipped bool
+	// Variant 非空时，只在变体键（如 "light-royal-blue-large-1280x800"）含有这段文字的变体里放过：
+	// 登记依据只在某一档字号、某种主题下取得时，不把它扩到别的变体。
+	Variant string
 	// Note 说明偏差的内容与范围，写进报告，供阅读报告的人不必翻台账。
 	Note string
 }
@@ -48,8 +57,20 @@ type Waived struct {
 	Note   string `json:"note,omitempty"`
 }
 
-// matches 判断 w 是否覆盖 issue。
-func (w Waiver) matches(is Issue) bool {
+// matches 判断 w 是否覆盖 issue（不限变体：带 Variant 的登记在这里不匹配，见 matchesIn）。
+func (w Waiver) matches(is Issue) bool { return w.matchesIn(is, "") }
+
+// matchesIn 判断 w 是否覆盖 variant 这个变体里的 issue。
+func (w Waiver) matchesIn(is Issue, variant string) bool {
+	if w.Variant != "" && !strings.Contains(variant, w.Variant) {
+		return false
+	}
+	if w.Shared && !is.Shared {
+		return false
+	}
+	if w.Clipped && !is.Clipped {
+		return false
+	}
 	if w.Layer != is.Layer {
 		return false
 	}
@@ -107,7 +128,7 @@ func applyWaivers(rep *Report, waivers []Waiver) {
 	for _, is := range rep.Issues {
 		waived := false
 		for _, w := range waivers {
-			if w.matches(is) {
+			if w.matchesIn(is, rep.Variant) {
 				rep.Waived = append(rep.Waived, Waived{Issue: is, Ledger: w.Ledger, Note: w.Note})
 				waived = true
 				break

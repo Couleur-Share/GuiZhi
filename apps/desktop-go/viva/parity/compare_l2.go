@@ -144,6 +144,7 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 		return nil
 	case rp.mass == 0 || vp.mass == 0:
 		rep.add(LayerL2, "ink", subject, "一侧没有墨迹：React 墨迹量 %.0f，Viva 墨迹量 %.0f", rp.mass, vp.mass)
+		markInkContext(&rep.Issues[len(rep.Issues)-1], in.React, rect, area, clip)
 		return nil
 	}
 	dy := bestShift(rp.rows, vp.rows)
@@ -166,6 +167,7 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 		rep.addDelta(float64(max(abs(dx), abs(dy))), LayerL2, "ink", subject, "墨迹错位：水平 %+d、垂直 %+d 像素（上限 %d、%d；正值表示 Viva 相对 React 偏右、偏下）",
 			dx, dy, allowX, th.Metrics.InkMaxDeltaY)
 		rep.Issues[len(rep.Issues)-1].DY = float64(abs(dy))
+		markInkContext(&rep.Issues[len(rep.Issues)-1], in.React, rect, area, clip)
 	case ratio < th.Metrics.InkMassMin || ratio > th.Metrics.InkMassMax:
 		rep.addDelta(math.Abs(ratio-1), LayerL2, "ink-mass", subject, "墨迹总量比 %.3f 超出 [%.2f, %.2f]（Viva / React；字重、颜色或字号可能不对）",
 			ratio, th.Metrics.InkMassMin, th.Metrics.InkMassMax)
@@ -174,6 +176,7 @@ func checkInk(rep *Report, in Inputs, th Thresholds, subject string, rect Box, f
 		if ratio < 1 {
 			rep.Issues[len(rep.Issues)-1].Dir = -1
 		}
+		markInkContext(&rep.Issues[len(rep.Issues)-1], in.React, rect, area, clip)
 	default:
 		rep.L2.InkOK++
 	}

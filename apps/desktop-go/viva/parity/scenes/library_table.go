@@ -157,7 +157,8 @@ func init() {
 	menu := append(append(append([]parity.Waiver{}, base...), headingTrackingWaivers("列设置")...), overlayInkWaiver)
 	reg("app.window.library.table-columns-open", table, tableOpenColumnMenu, parkKeepFocus, menu...)
 	reg("app.window.library.table-columns", table, tableToggleColumns("摘要", "合集", "状态", "创建时间"), parkAll, base...)
-	reg("app.window.library.table-scrolled", table, tableScroll, parkAll, base...)
+	// 滚动后的表头吸附在顶上：「操作」标签的取整（A-028）与被面板下沿裁成半截的小图标（A-003）只出在这个场景。
+	reg("app.window.library.table-scrolled", table, tableScroll, parkAll, append(append([]parity.Waiver{}, base...), tableScrolledWaivers()...)...)
 	reg("app.window.library.table-trash", table, listApplyFacets("回收站"), parkAll, base...)
 	reg("app.window.library.table-trash-empty", libraryOptions{variant: "empty", list: true, view: "list"}, listApplyFacets("回收站"), parkAll)
 	reg("app.window.library.table-empty", libraryOptions{variant: "empty", list: true, view: "list"}, nil, parkAll)
