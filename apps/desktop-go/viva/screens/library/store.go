@@ -82,7 +82,7 @@ type Store struct {
 	nextCommit     int
 
 	// OnEvidenceCleared 在彻底删除并选了「同时清除问答证据」之后，带着真正删掉的条目 ID 调用（渲染层 clearCachedConversationEvidence）。
-	// 问答随 M3 迁入，在此之前为 nil（台账 B-053）。
+	// 问答随 M3 迁入，在此之前为 nil（台账 B-054）。
 	OnEvidenceCleared func(ids []string)
 
 	// batchRun 是当前批次的回执键；newID 生成它（测试注入固定值）。
