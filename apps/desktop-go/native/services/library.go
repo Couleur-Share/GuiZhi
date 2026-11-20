@@ -105,4 +105,12 @@ type Library interface {
 	AiHandoff(ctx context.Context, id string, full bool) (LibraryHandoff, error)
 	// ExportAiHandoff 让用户另存交接稿（export:aiHandoff，弹出保存对话框）；用户取消时 Canceled 为真。
 	ExportAiHandoff(ctx context.Context, title, text string) (LibraryExportResult, error)
+
+	// GetItem 取一条的完整形态（knowledge:get）；found 为假表示条目不存在（已被删除）。
+	GetItem(ctx context.Context, id string) (item LibraryItem, found bool, err error)
+	// SaveDraft 保存编辑草稿（knowledge:saveDraft）：带基线比较，冲突时什么也不写、返回服务端的版本；
+	// 标签按相对基线的增删合并。错误（error）只表示调用本身失败；业务上的失败在 LibraryDraftResult 里。
+	SaveDraft(ctx context.Context, in LibraryDraftInput) (LibraryDraftResult, error)
+	// SourceVersions 列出一条的历次采集留下的来源版本，新的在前，最多 20 个（knowledge:selection source-versions）。
+	SourceVersions(ctx context.Context, id string) ([]LibrarySourceVersion, error)
 }

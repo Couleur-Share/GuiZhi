@@ -277,6 +277,12 @@ func (f *Library) applyPatch(e services.LibraryEntry, p services.LibraryEntryPat
 	if len(p.AddTagNames) > 0 {
 		e.Tags = f.withTags(e, p.AddTagNames, false)
 	}
+	if p.ReviewStatus != nil {
+		e.ReviewStatus = *p.ReviewStatus
+	}
+	if p.ReviewReasons != nil {
+		e.ReviewReasons = slices.Clone(p.ReviewReasons)
+	}
 	e.UpdatedAt = f.nowMs()
 	return e
 }

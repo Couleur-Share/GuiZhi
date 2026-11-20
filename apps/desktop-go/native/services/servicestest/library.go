@@ -32,6 +32,8 @@ type Library struct {
 
 	// 条目操作（见 library_ops.go）：批量回执、注入的失败、交接稿等。
 	ops opsState
+	// 条目详情（见 library_detail.go）：正文、来源版本、草稿保存记录与闸门。
+	detail detailState
 }
 
 var _ services.Library = (*Library)(nil)
@@ -54,7 +56,8 @@ func (f *Library) SetCounts(counts services.LibraryCounts) {
 }
 
 // FailOn 让某个方法（"Counts"、"List"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
-// "Tags"、"UpdateTag"、"DeleteTag"、"Freeze"、"ExecuteBatch"、"UpdateEntry"、"SupplementWechat"、"AiHandoff"、"ExportAiHandoff"）
+// "Tags"、"UpdateTag"、"DeleteTag"、"Freeze"、"ExecuteBatch"、"UpdateEntry"、"SupplementWechat"、"AiHandoff"、"ExportAiHandoff"、
+// "GetItem"、"SaveDraft"、"SourceVersions"）
 // 返回 err；err 为 nil 取消注入。
 func (f *Library) FailOn(method string, err error) {
 	f.mu.Lock()

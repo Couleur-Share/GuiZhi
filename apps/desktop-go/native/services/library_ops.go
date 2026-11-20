@@ -28,6 +28,10 @@ type LibraryEntryPatch struct {
 	TagNames []string
 	// AddTagNames 在原有标签之外追加（批量打标签）；不存在的标签会被新建。
 	AddTagNames []string
+	// ReviewStatus 改复核状态（LibraryReview*）；ReviewReasons 同时改原因：nil 表示不改，非 nil 的空切片表示清空。
+	// 只有详情里的「标记已复核」「采用来源版本」用到，批量命令不带。
+	ReviewStatus  *string
+	ReviewReasons []string
 }
 
 // MarshalJSON 只写出设置了的字段。
@@ -51,6 +55,12 @@ func (p LibraryEntryPatch) MarshalJSON() ([]byte, error) {
 	}
 	if p.AddTagNames != nil {
 		m["addTagNames"] = p.AddTagNames
+	}
+	if p.ReviewStatus != nil {
+		m["reviewStatus"] = *p.ReviewStatus
+	}
+	if p.ReviewReasons != nil {
+		m["reviewReasons"] = p.ReviewReasons
 	}
 	return json.Marshal(m)
 }
