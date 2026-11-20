@@ -142,19 +142,36 @@ func listHoldBatches(_ *headless.Session, _ *kit.Look, env *libraryEnv) error {
 // listWaitProcessing 等结果条换成「处理中，已核对 N 项」：卡住的批量在后台协程里改状态，点击返回时可能还没换。
 func listWaitProcessing(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
 	// 大字号档下这句话在结果条里折行，折行处的空格不留在行尾，所以前缀也去掉末尾空白。
-	processing := strings.TrimSpace(prefixOf(locales.LibraryWorkflowProcessing))
-	for range 400 {
+	found, err := waitTextPrefix(s, strings.TrimSpace(prefixOf(locales.LibraryWorkflowProcessing)), 400)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return errors.New("等不到结果条里的「处理中」")
+	}
+	return nil
+}
+
+// waitTextPrefix 等画面上出现以 prefix 开头的一行文字，最多轮询 attempts 轮（每轮约 7 ms，400 轮约 3 秒）；等不到返回 (false, nil)。
+//
+// 后台协程改了状态之后，场景里的 Store 没接 invalidate（没有人请求出帧），而 Session.Rest 只在有过渡时才走时钟、不出帧，
+// 所以每轮要先 Frame 让新状态上屏。只靠 Rest 的话，协程晚于点击之后的最后一帧改状态就永远等不到，偶发失败（M2-3 收口时撞上）。
+func waitTextPrefix(s *headless.Session, prefix string, attempts int) (bool, error) {
+	for range attempts {
+		if err := s.Frame(); err != nil {
+			return false, err
+		}
 		if err := s.Rest(); err != nil {
-			return err
+			return false, err
 		}
 		for _, t := range s.Snapshot().Texts {
-			if strings.HasPrefix(t.Value, processing) {
-				return nil
+			if strings.HasPrefix(t.Value, prefix) {
+				return true, nil
 			}
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	return errors.New("等不到结果条里的「处理中」")
+	return false, nil
 }
 
 // tableCheckRow 勾选表格里第 row 行（从 0 起）的复选框（对应 checkRow）。

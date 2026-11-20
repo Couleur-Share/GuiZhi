@@ -180,6 +180,14 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			} else {
 				defer cancel()
 			}
+			if opt.fault == faultHold {
+				// 读取中的场景里所有后台动作都在协程里：列表读取被卡住，计数、合集与标签却照常返回，落地的时刻不确定。
+				// 负载高时它们晚于截图，侧栏缺内容（给慢目录的实验里是缺整行；并行压测里出现过四个页签各宽 2 px，推断是只落了一部分、
+				// 滚动条槽有无不同，没有逐项核实），`go test` 里偶发；先等它们落地。
+				if err := waitSidebarLoaded(s, store); err != nil {
+					return err
+				}
+			}
 			// 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，
 			// 需要点侧栏行的场景自己开关（listOpenSidebar、listCloseSidebar；React 一侧同理，见 enterLibrary）。
 			if !opt.list {
@@ -664,4 +672,19 @@ func init() {
 		libraryChain(libraryOpenRowMenu("灵感"), libraryClickMenuItem("删除合集")), parkAll, overlayInkWaiver)
 	registry["app.window.library.toast-tag-deleted"] = libraryScene("app.window.library.toast-tag-deleted", data,
 		libraryChain(libraryOpenRowMenu("待读"), libraryClickMenuItem("删除标签")), parkAll, overlayInkWaiver)
+}
+
+// waitSidebarLoaded 等侧栏的三份数据（计数、合集、标签）读完：后台动作放在协程里的场景（faultHold）用它，
+// 每轮先 Frame（场景里的 Store 没接 invalidate，见 waitTextPrefix）再看 Store 的快照。夹具库的合集与标签都不为空。
+func waitSidebarLoaded(s *headless.Session, st *libraryscreen.Store) error {
+	for range 400 {
+		if err := s.Frame(); err != nil {
+			return err
+		}
+		if v := st.View(); v.Counts != nil && len(v.Collections) > 0 && len(v.Tags) > 0 {
+			return s.Rest()
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return errors.New("等不到侧栏的计数、合集与标签")
 }
