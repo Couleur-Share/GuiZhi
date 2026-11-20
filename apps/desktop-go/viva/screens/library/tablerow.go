@@ -1,7 +1,6 @@
 package library
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
@@ -35,7 +34,7 @@ func (s *Screen) tableRow(c ui.C, v View, cols []tableColumn, geo stickyGeometry
 	id := ui.ID(rc)
 	active := list.SelectedID == e.ID
 	checked := list.IsSelected(e.ID)
-	s.cardGroups.Add(e.ID, id)
+	s.rowHit(canvas, e, id, true)
 	hovered := s.cardGroups.Hovered(canvas) == e.ID || s.table.checkHover == e.ID
 
 	// 上下边框在 border-collapse 下各占一半（0.5px）；最后一行 last:border-b-0 没有下边框，所以比别的行矮 0.5px
@@ -220,7 +219,7 @@ func (s *Screen) titleCell(c ui.C, e services.LibraryEntry, title, query string)
 		// 类型图标外面的 span 带 title，悬停出类型名；它不可聚焦、不进 Tab 序列，悬停时整行仍算悬停。
 		tc := c.Key("type")
 		typeID := ui.ID(tc)
-		s.cardGroups.Add(e.ID, typeID)
+		s.rowHit(c.Canvas(), e, typeID, true)
 		ui.Row(tc).Shrink(0).Items(ui.Center).
 			HitWith(typeID, "", gfx.HitOptions{SkipFocus: true, SkipTab: true, Hint: typeMeta.Label}).Children(func() {
 			l.Icon(tc.Key("glyph"), typeMeta.Icon, l.Rem(0.875), t.MutedForeground.WithAlpha(0.7))
@@ -242,7 +241,7 @@ func (s *Screen) titleButton(c ui.C, e services.LibraryEntry, title, query strin
 	t := l.T
 	bc := c.Key("open")
 	id := ui.ID(bc)
-	s.cardGroups.Add(e.ID, id)
+	s.rowHit(c.Canvas(), e, id, true)
 	box := ui.Column(bc).Shrink(1).MinWidth(0).
 		HitWith(id, title, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 	l.TabStop(box)
@@ -381,16 +380,12 @@ func (s *Screen) dateText(c ui.C, e services.LibraryEntry, ms int64) {
 	t := l.T
 	dc := c.Key("date")
 	id := ui.ID(dc)
-	s.cardGroups.Add(e.ID, id)
+	s.rowHit(c.Canvas(), e, id, true)
 	full := kit.FormatDateTime(ms, s.loc(), s.Locale)
 	ui.Row(dc).Items(ui.Center).HitWith(id, "", gfx.HitOptions{SkipFocus: true, SkipTab: true, Hint: full}).Children(func() {
 		l.Text(dc.Key("text"), kit.FormatItemTime(ms, s.nowTime(), s.loc(), s.Locale), kit.TextXS, kit.WeightNormal, t.MutedForeground)
 	})
 }
-
-// errRowActionPending 是行内操作（收藏、恢复、彻底删除、更多）在条目操作迁入之前的失败原因：用户点了就要有交代，不能一声不响。
-// 卡片视图里也还没有条目操作（右键菜单、批量栏都随 M2-3 迁入，台账 B-043），所以提示里不能指给用户一个「请先去那边操作」的去处。
-var errRowActionPending = errors.New("条目操作尚未迁入原生界面，将随条目操作一起迁入")
 
 // actionsCell 是操作列：sticky right-0 z-20 bg-card p-0；里面先铺一层补回行底色的覆盖，再放按钮。
 // 类名里的左侧阴影（shadow-[-4px_0_8px_-4px_…]）不画：折叠边框模型（border-collapse: collapse）下 Chromium 不给单元格画 box-shadow，
@@ -421,16 +416,20 @@ func (s *Screen) actionsCell(c ui.C, v View, geo stickyGeometry, col tableColumn
 			kit.PaintRoundedCorners(d, rect, t.Card, 0, 0, br, 0)
 			kit.PaintRoundedCorners(d, rect, overlay, 0, 0, br, 0)
 		}).Children(func() {
+		id := e.ID
 		if v.Filters.Scope == services.LibraryScopeTrash {
-			s.rowAction(c, e, rowActionSpec{key: "restore", label: locales.LibraryRestore(), icon: icons.RotateCcw})
-			s.rowAction(c, e, rowActionSpec{key: "delete", label: locales.LibraryDeleteForever(), icon: icons.CircleX, destructive: true})
+			s.rowAction(c, e, rowActionSpec{key: "restore", label: locales.LibraryRestore(), icon: icons.RotateCcw,
+				onClick: func() { s.restore([]string{id}) }})
+			s.rowAction(c, e, rowActionSpec{key: "delete", label: locales.LibraryDeleteForever(), icon: icons.CircleX, destructive: true,
+				onClick: func() { s.openConfirm(confirmDeleteForever, []string{id}) }})
 			return
 		}
 		favorite := locales.LibraryFavorite()
 		if e.IsFavorite {
 			favorite = locales.LibraryUnfavorite()
 		}
-		s.rowAction(c, e, rowActionSpec{key: "favorite", label: favorite, icon: icons.Star, active: e.IsFavorite, star: e.IsFavorite, toggle: true})
+		s.rowAction(c, e, rowActionSpec{key: "favorite", label: favorite, icon: icons.Star, active: e.IsFavorite, star: e.IsFavorite, toggle: true,
+			onClick: func() { s.toggleFavorite(id) }})
 		s.moreAction(c, e)
 	})
 }
@@ -443,6 +442,7 @@ type rowActionSpec struct {
 	active      bool // aria-pressed 为真：bg-primary/15 text-primary
 	toggle      bool // 带 aria-pressed（收藏钮：真或假都有这个属性）
 	star        bool // 图标画成实心的琥珀色星星（fill-amber-400 text-amber-400）
+	onClick     func()
 }
 
 // rowAction 是一枚 28px 的图标钮：inline-flex h-7 w-7 rounded-lg transition-colors，
@@ -452,7 +452,7 @@ func (s *Screen) rowAction(c ui.C, e services.LibraryEntry, spec rowActionSpec) 
 	t := l.T
 	ac := c.Key(spec.key)
 	id := ui.ID(ac)
-	s.cardGroups.Add(e.ID, id)
+	s.rowHit(c.Canvas(), e, id, true)
 	radius := l.Rem(0.75)
 	box := ui.Row(ac).Size(l.Rem(1.75), l.Rem(1.75)).Shrink(0).Items(ui.Center).Justify(ui.Center).
 		HitWith(id, spec.label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Hint: spec.label, Selected: spec.toggle && spec.active})
@@ -481,18 +481,19 @@ func (s *Screen) rowAction(c ui.C, e services.LibraryEntry, spec rowActionSpec) 
 		}
 		l.Icon(ac.Key("icon"), spec.icon, l.Rem(1), fg)
 	})
-	if box.Clicked() {
-		s.Guard.Report(spec.label, errRowActionPending)
+	if box.Clicked() && spec.onClick != nil {
+		spec.onClick()
 	}
 }
 
 // moreAction 是「更多操作」钮：inline-flex h-7 w-7 rounded-lg hover:bg-accent（没有过渡、文字色是前景色）。
+// 点击在按钮的左下角打开条目菜单（带「编辑标签」）：取上一帧登记的外框，鼠标与键盘点击都一样。
 func (s *Screen) moreAction(c ui.C, e services.LibraryEntry) {
 	l := s.Look
 	t := l.T
 	mc := c.Key("more")
 	id := ui.ID(mc)
-	s.cardGroups.Add(e.ID, id)
+	s.rowHit(c.Canvas(), e, id, true)
 	radius := l.Rem(0.75)
 	label := locales.LibraryMoreActions()
 	box := ui.Row(mc).Size(l.Rem(1.75), l.Rem(1.75)).Shrink(0).Items(ui.Center).Justify(ui.Center).
@@ -500,6 +501,7 @@ func (s *Screen) moreAction(c ui.C, e services.LibraryEntry) {
 	l.TabStop(box)
 	hovered := box.State().Hovered
 	box.Draw(func(d *ui.DrawContext) {
+		s.menu.noteRect(id, d.Rect)
 		if d.State.FocusVisible {
 			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), radius)
 		}
@@ -510,6 +512,7 @@ func (s *Screen) moreAction(c ui.C, e services.LibraryEntry) {
 		l.Icon(mc.Key("icon"), icons.Ellipsis, l.Rem(1), t.Foreground)
 	})
 	if box.Clicked() {
-		s.Guard.Report(label, errRowActionPending)
+		r := s.menu.rects[id]
+		s.openEntryMenu(gfx.Point{X: r.X, Y: r.Y + r.Height}, e, true)
 	}
 }

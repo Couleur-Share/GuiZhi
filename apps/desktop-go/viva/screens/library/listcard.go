@@ -75,8 +75,8 @@ func (s *Screen) entryCard(c ui.C, v ListView, e services.LibraryEntry, query st
 	radius := l.Rem(0.75) // rounded-xl：本应用的 Tailwind 只改了 lg/md/sm，xl 保持默认的 0.75rem
 
 	typeID := ui.ID(c.Key("type"))
-	s.cardGroups.Add(e.ID, id)
-	s.cardGroups.Add(e.ID, typeID)
+	s.rowHit(canvas, e, id, false)
+	s.rowHit(canvas, e, typeID, false)
 	hovered := s.cardGroups.Hovered(canvas) == e.ID
 
 	box := ui.Row(c).FillWidth().Shrink(0).Items(ui.Start).Gap(l.Space(2)).

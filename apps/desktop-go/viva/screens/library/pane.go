@@ -147,6 +147,7 @@ func (s *Screen) Workspace(c ui.C) {
 	s.loadPane()
 	s.wsShown = true
 	s.cardGroups.Begin()
+	s.settleBulk()
 	v := s.Store.View()
 	s.noteEntriesChanged(v.List)
 	if s.pane.view == ViewList {

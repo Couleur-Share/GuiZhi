@@ -19,8 +19,11 @@ import (
 //   - ↓ ↑ 选下一条 / 上一条（没有选中时 ↓ 选第一条、↑ 选最后一条；到头不循环），Home / End 选第一条 / 最后一条，
 //     都 preventDefault；选中项变了之后，卡片列表用 scrollToIndex 把它滚进视野（cardReveal），表格由 tableReveal 处理；
 //   - 空格切换选中条目的多选勾选（preventDefault）；焦点在 button、a、[role=menuitem] 上时让给它们（它们自己的空格是点击）；
-//   - Enter 打开选中条目（只在表格视图、焦点不在按钮链接上；随 M2-4 的详情浮层接）、Delete 删除多选或当前条目
-//     （回收站里是彻底删除要确认；随 M2-3 的批量与删除接），这两个键现在原样放行。
+//   - Enter 打开选中条目（只在表格视图、焦点不在按钮链接上；随 M2-4 的详情浮层接），现在原样放行；
+//   - Delete 删除多选，没有多选就删当前条目（回收站里是彻底删除，要确认；其余范围移到回收站并给撤销窗口），
+//     preventDefault；不看焦点在不在按钮上，没有可删的条目就放行；
+//   - Esc 退出多选：这一条属于批量条（ItemBulkBar 的 window 监听，条挂载即有选中项时才有），不看修饰键与焦点，也不拦截按键——
+//     菜单、浮层与对话框自己的 Esc 照常运行，两件事都会发生。
 //
 // 浮层里的按键：渲染层的菜单与下拉用 document 监听处理方向键，但不 stopPropagation，列表的窗口监听照样收到
 // （读数：排序下拉或右键菜单打开时按 ↓，选中行照样往下走，探针 E1、E2）。这里同样照做；只是浮层有自己的按键处理，
@@ -32,6 +35,14 @@ func (s *Screen) ListKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 	if !s.wsActive || e.Release {
 		return gfx.EventResult{}
 	}
+	v := s.Store.View()
+	if e.Key == gfx.KeyEscape {
+		if len(v.List.Selection) == 0 {
+			return gfx.EventResult{}
+		}
+		s.Store.ClearSelection()
+		return gfx.EventResult{Repaint: true}
+	}
 	if e.Modifiers&(gfx.ModifierControl|gfx.ModifierAlt|gfx.ModifierMeta) != 0 {
 		return gfx.EventResult{}
 	}
@@ -39,7 +50,7 @@ func (s *Screen) ListKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 	if focus.Editable() {
 		return gfx.EventResult{}
 	}
-	list := s.Store.View().List
+	list := v.List
 	if len(list.Entries) == 0 {
 		return gfx.EventResult{}
 	}
@@ -57,6 +68,10 @@ func (s *Screen) ListKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 			return gfx.EventResult{}
 		}
 		s.Store.ToggleSelection(list.SelectedID)
+	case gfx.KeyDelete:
+		if !s.deleteKey(v) {
+			return gfx.EventResult{}
+		}
 	default:
 		return gfx.EventResult{}
 	}

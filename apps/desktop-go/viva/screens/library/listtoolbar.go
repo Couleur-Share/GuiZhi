@@ -1,8 +1,6 @@
 package library
 
 import (
-	"errors"
-
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -122,7 +120,7 @@ func (s *Screen) listToolbar(c ui.C, v View) {
 }
 
 // emptyTrashButton 是回收站里的「清空回收站」：inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-xs
-// text-destructive transition-colors hover:bg-destructive/10。确认框与实际清空随 M2-3 迁入（台账 B-040）。
+// text-destructive transition-colors hover:bg-destructive/10。点击打开确认框，确认后才清空（渲染层 onRequestEmptyTrash）。
 func (s *Screen) emptyTrashButton(c ui.C) {
 	l := s.Look
 	t := l.T
@@ -132,7 +130,7 @@ func (s *Screen) emptyTrashButton(c ui.C) {
 	}
 	b := l.Button(c.Key("empty-trash"), kit.ButtonSpec{Label: locales.LibraryEmptyTrash(), Icon: icons.Trash2, IconSize: l.Rem(0.875)}, style)
 	if b.Clicked() {
-		s.Guard.Report(locales.LibraryActionEmptyTrash(), errBatchPending)
+		s.openConfirm(confirmEmptyTrash, nil)
 	}
 }
 
@@ -280,6 +278,3 @@ func paintToggleThumb(d *ui.DrawContext, color tokens.Color, frac, innerRadius f
 	right := own + (innerRadius-own)*frac
 	kit.PaintRoundedCorners(d, thumb, color, left, right, right, left)
 }
-
-// errBatchPending 是批量类操作迁入之前的失败原因（台账 B-040）：用户点了就要有交代，不能一声不响。
-var errBatchPending = errors.New("该操作尚未迁入原生界面，将随批量操作一起迁入")

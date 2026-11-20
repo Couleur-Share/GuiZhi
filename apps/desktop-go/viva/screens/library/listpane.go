@@ -1,7 +1,6 @@
 package library
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/vivaui/viva/ui"
@@ -14,18 +13,23 @@ import (
 // itemList 是列表栏里的内容（渲染层 components/library/ItemList）：flex h-full min-h-0 flex-col，
 // 从上到下依次是工具条、「本页 / 全部符合筛选」一行、滚动的条目区与分页条。
 //
-// 多选时顶部的工具条换成批量条、批量结果栏与右键菜单随批量操作一起迁入（M2-3）。
+// 多选时顶部的工具条换成批量条；批量结果条在它下面；条目右键菜单与确认框是浮层，声明在最后。
+// 卡片视图没有标签选择浮层（详情栏里的标签行自带 + 入口），切过来时丢掉表格视图留下的那一个。
 func (s *Screen) itemList(c ui.C, v View) {
+	s.bulk.picker.pop.Close()
 	ui.Column(c.Key("item-list")).FillWidth().Grow(1).MinHeight(0).Children(func() {
-		s.listToolbar(c, v)
+		s.selectionBar(c, v, false)
+		s.batchStrip(c, v)
 		s.selectRow(c, v)
 		s.listBody(c, v)
 		s.pager(c, v.List, false)
+		s.entryMenuView(c, v)
+		s.itemConfirmView(c, v)
 	})
 }
 
 // selectRow 是工具条下面的一行：两枚 ghost 小按钮「本页」与「全部符合筛选」（flex px-2）。
-// 「全部符合筛选」要冻结整个筛选结果再批量处理，随批量操作迁入（M2-3，台账 B-038）。
+// 「全部符合筛选」冻结整个筛选结果并全选，之后的批量操作都作用于这一组（selectAllMatching）。
 func (s *Screen) selectRow(c ui.C, v View) {
 	l := s.Look
 	ui.Row(c.Key("select-row")).FillWidth().Shrink(0).PadSides(0, l.Space(2), 0, l.Space(2)).Children(func() {
@@ -89,15 +93,6 @@ func (s *Screen) cardRows(c ui.C, v View, view kit.ScrollView) {
 		Row:   func(i int) ui.Box { return s.entryRow(c, list, list.Entries[i], query) },
 	})
 }
-
-// selectAllMatching 冻结整个筛选结果并全选（渲染层 library-workflow.store 的 selectAllMatching）。
-// 它属于批量操作的一部分，随 M2-3 一起迁入；在那之前点击只给出说明（台账 B-038）。
-func (s *Screen) selectAllMatching() {
-	s.Guard.Report(locales.LibraryActionSelectAllMatching(), errSelectAllPending)
-}
-
-// errSelectAllPending 是「全部符合筛选」在批量操作迁入之前的失败原因：用户点了就要有交代，不能一声不响。
-var errSelectAllPending = errors.New("批量选择尚未迁入原生界面，请先用「本页」")
 
 // searchActive 报告搜索词是否非空（去掉首尾空白之后）：搜索中排序由相关度接管。
 func searchActive(list ListView) bool { return strings.TrimSpace(list.Search) != "" }

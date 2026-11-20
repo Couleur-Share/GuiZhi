@@ -123,7 +123,8 @@ func (s *Screen) setColumnWidth(id columnID, width float32, commit bool) {
 }
 
 // tableWorkspace 是列表视图的工作区：app-wallpaper-section flex h-full min-h-0 flex-1 flex-col overflow-hidden，
-// 里面是工具条、可滚动的表格区与分页条。多选时工具条换成批量条，随批量操作迁入（M2-3）。
+// 里面是工具条、批量结果条、可滚动的表格区与分页条；多选时工具条换成批量条（图标带文字）。
+// 条目菜单、标签选择浮层与确认框是浮层，声明在最后。
 func (s *Screen) tableWorkspace(c ui.C, v View) {
 	l := s.Look
 	t := l.T
@@ -131,9 +132,13 @@ func (s *Screen) tableWorkspace(c ui.C, v View) {
 	ui.Column(c.Key("table-workspace")).FillWidth().Grow(1).MinHeight(0).Clip().
 		Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: t.UiSectionBg}) }).
 		Children(func() {
-			s.listToolbar(c, v)
+			s.selectionBar(c, v, true)
+			s.batchStrip(c, v)
 			s.tableArea(c, v)
 			s.pager(c, v.List, true)
+			s.entryMenuView(c, v)
+			s.tagPickerView(c, v)
+			s.itemConfirmView(c, v)
 		})
 }
 
