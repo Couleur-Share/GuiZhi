@@ -5,30 +5,16 @@ package notes
 // 写回方向（formatForumReplyBlock、upsertForumSummarySection、replaceForumRepliesSection）随媒体动作迁入（台账 B-060），本包不含。
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-// 小节标题。
-const (
-	ForumSummaryHeading = "## 讨论总结"
-	ForumBodyHeading    = "## 正文"
-	ForumRepliesHeading = "## 讨论"
-)
-
+// 小节标题与逐楼回复的匹配式（含中文的存储格式标记）集中在 markers.go；这里只留与中文无关的摘要清理。
 var (
-	reRepliesHeading = regexp.MustCompile(`^##` + sp + `*讨论(?:（(?:楼主` + sp + `*)?\d+` + sp + `*条(?:` + sp + `*·` + sp + `*原帖共` + sp + `*\d+` + sp + `*条)?）)?$`)
-	reSummaryHeading = regexp.MustCompile(`^##` + sp + `*讨论总结$`)
-	reBodyHeading    = regexp.MustCompile(`^##` + sp + `*正文$`)
-	reReplyHeadBold  = regexp.MustCompile(`^\*\*(\d+)` + sp + `*楼` + sp + `*·` + sp + `*(.+?)\*\*$`)
-	reReplyHeadH3    = regexp.MustCompile(`^###` + sp + `*(\d+)` + sp + `*楼` + sp + `*·` + sp + `*(.+)$`)
-	reReplyToLine    = regexp.MustCompile(`^>` + sp + `*回复` + sp + `*@(.+?)(?:（(\d+)` + sp + `*楼）)?：(.*)$`)
-	reSnippetBr      = regexp.MustCompile(`(?i)<br` + sp + `*/?>`)
-	reSnippetP       = regexp.MustCompile(`(?i)</?p>`)
-	reSnippetWS      = regexp.MustCompile(sp + `+`)
-	reBoldFloor      = regexp.MustCompile(`(?m)^\*\*\d+` + sp + `*楼`)
+	reSnippetBr = regexp.MustCompile(`(?i)<br` + sp + `*/?>`)
+	reSnippetP  = regexp.MustCompile(`(?i)</?p>`)
+	reSnippetWS = regexp.MustCompile(sp + `+`)
 )
 
 // ForumSections 是论坛条目正文按小节切出的三段（均不含小节标题；没有的小节为空串）。
@@ -227,7 +213,7 @@ func FilterForumReplies(replies []ForumReply, query string) []ForumReply {
 		if r.ReplyTo != nil {
 			rtAuthor, rtSnippet = r.ReplyTo.Author, r.ReplyTo.Snippet
 		}
-		text := strings.ToLower(strings.Join([]string{strconv.Itoa(r.Floor), fmt.Sprintf("%d 楼", r.Floor), r.Author, r.Content, rtAuthor, rtSnippet}, "\n"))
+		text := strings.ToLower(strings.Join([]string{strconv.Itoa(r.Floor), floorLabel(r.Floor), r.Author, r.Content, rtAuthor, rtSnippet}, "\n"))
 		if strings.Contains(text, needle) {
 			out = append(out, r)
 		}

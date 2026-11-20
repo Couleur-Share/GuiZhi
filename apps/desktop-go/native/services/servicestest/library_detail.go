@@ -2,6 +2,7 @@ package servicestest
 
 import (
 	"context"
+	"errors"
 	"slices"
 
 	"guizhi-mygo-shell/native/services"
@@ -17,10 +18,10 @@ type DetailBody struct {
 	Content, Summary, Transcript, SourceURI string
 }
 
-// 与真实处理器同文的失败原因。
-const (
-	draftGoneReason     = "条目不存在或已移到回收站"
-	draftConflictReason = "该内容已在其他操作中修改，请选择要保留的版本"
+// 与真实处理器同文的失败原因。经 errors.New 构造：它们是诊断文本、不是界面文案，native 的中日韩字面量守卫对这类调用放行。
+var (
+	draftGoneReason     = errors.New("条目不存在或已移到回收站").Error()
+	draftConflictReason = errors.New("该内容已在其他操作中修改，请选择要保留的版本").Error()
 )
 
 // detailState 是条目详情的内部状态；零值可用。
@@ -33,6 +34,8 @@ type detailState struct {
 	getGate, saveGate chan struct{}
 	// draftFailure 非空时 SaveDraft 返回业务失败（OK 为假、Error 为它），不写任何东西。
 	draftFailure string
+	// diarization 是媒体能力里「支持区分说话人」（SetDiarization）；默认假，与没配置转写引擎时的真实处理器一致。
+	diarization bool
 }
 
 // SeedDetail 设定一条的正文、摘要、文字稿与来源（条目本身要另外用 SeedEntries 放进条目全集）。
@@ -239,4 +242,21 @@ func (f *Library) SourceVersions(ctx context.Context, id string) ([]services.Lib
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.detail.versions[id]), nil
+}
+
+// SetDiarization 设定 MediaCapabilities 回复里「支持区分说话人」的值。
+func (f *Library) SetDiarization(on bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.detail.diarization = on
+}
+
+// MediaCapabilities 实现 services.Library：按 SetDiarization 的值回复。
+func (f *Library) MediaCapabilities(ctx context.Context) (services.LibraryMediaCapabilities, error) {
+	if err := f.begin("MediaCapabilities", "MediaCapabilities"); err != nil {
+		return services.LibraryMediaCapabilities{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return services.LibraryMediaCapabilities{Diarization: f.detail.diarization}, nil
 }

@@ -59,6 +59,15 @@ type DetailView struct {
 	Saving    bool
 	Unsaved   bool
 	SaveError string
+	// JustSaved 是保存刚结束的短暂「已保存」提示（渲染层 ItemDetailHeader 的 justSaved；规则见 store_detail_extras.go）。
+	// 头部还要求没有未落盘的编辑（自动保存关着时）、没有保存中与失败才画出来。
+	JustSaved bool
+	// Revisions 是「更新的来源版本」背后的数据（SourceCaptureRevisions）；CanDiarize 是转写路由支持区分说话人
+	// （useTranscriptActions 的 canDiarize）；两者都在读到条目之后读取，换条目重置。
+	Revisions  RevisionsView
+	CanDiarize bool
+	// MarkingReviewedID 是正在标记为已复核的条目 ID（ReviewRequiredNotice 的 isMarking；空表示没有）。
+	MarkingReviewedID string
 }
 
 // patchSet 是按条目分桶、按首次写入顺序遍历的待保存改动（渲染层 pendingPatches 这个 Map：遍历顺序就是写入顺序，
@@ -112,6 +121,10 @@ type detailState struct {
 	flush   *flushRun
 	// stop 取消自动保存的定时器；没有排定时为 nil。
 	stop func()
+	// saved、savedGen、savedStop 是「已保存」提示的观察记录、定时器代号与取消函数（store_detail_extras.go）。
+	saved     savedTrack
+	savedGen  int
+	savedStop func()
 }
 
 func newDetailState() detailState {
@@ -268,6 +281,8 @@ func (s *Store) commitSelectLocked(id string) {
 	s.view.List.SelectedID = id
 	d := &s.view.Detail
 	d.Item, d.Loading, d.LoadError = nil, id != "", ""
+	d.Revisions, d.CanDiarize = RevisionsView{}, false
+	s.resetSavedLocked()
 }
 
 // clearDetailLocked 清掉选中与详情，并让在途的详情读取作废（筛选与搜索把选中项挤出列表时）。mu 由调用方持有。
@@ -276,6 +291,8 @@ func (s *Store) clearDetailLocked() {
 	s.view.List.SelectedID = ""
 	d := &s.view.Detail
 	d.Item, d.Loading, d.LoadError = nil, false, ""
+	d.Revisions, d.CanDiarize = RevisionsView{}, false
+	s.resetSavedLocked()
 }
 
 // loadDetail 读取详情；序号变了就丢弃结果，失败记下原因（渲染层 selectItem 的读取部分）。
@@ -294,6 +311,8 @@ func (s *Store) loadDetail(ctx context.Context, id string, seq int) bool {
 	default:
 		merged := s.mergeServerItemLocked(item)
 		s.view.Detail.Item, s.view.Detail.Loading = &merged, false
+		// 头部挂载：已保存提示的观察记录是干净的（换条目时重置过），此刻的保存状态也是干净的——换条目之前先落盘
+		// （selectFlow 的 flush），所以不会有在途的保存，不需要在这里记观察起点。
 	}
 	s.mu.Unlock()
 	if err != nil {
@@ -301,6 +320,9 @@ func (s *Store) loadDetail(ctx context.Context, id string, seq int) bool {
 	}
 	if current {
 		s.wake()
+	}
+	if current && err == nil {
+		s.Spawn(func() { s.afterDetailLoaded(ctx, id, seq) })
 	}
 	return current && err == nil
 }
@@ -341,6 +363,7 @@ func (s *Store) UpdateSelected(ctx context.Context, patch services.LibraryDraftF
 	pending, _ := s.detail.pending.get(cur.ID)
 	s.detail.pending.put(cur.ID, overlayFields(pending, patch.Clone()))
 	s.scheduleSaveLocked(ctx)
+	s.syncSavedLocked()
 	s.mu.Unlock()
 	s.wake()
 }
@@ -410,6 +433,7 @@ func (s *Store) drainPending(ctx context.Context) bool {
 	}
 	s.mu.Lock()
 	s.view.Detail.Unsaved = false
+	s.syncSavedLocked()
 	s.mu.Unlock()
 	s.wake()
 	return true
@@ -426,6 +450,7 @@ func (s *Store) persistPatch(ctx context.Context, id string) bool {
 	}
 	s.detail.saving[id] = patch
 	s.view.Detail.Saving, s.view.Detail.SaveError = true, ""
+	s.syncSavedLocked()
 	base := s.detail.bases[id].Clone()
 	s.mu.Unlock()
 	s.wake()
@@ -439,6 +464,7 @@ func (s *Store) persistPatch(ctx context.Context, id string) bool {
 	}
 	s.view.Detail.Saving = false
 	s.view.Detail.Unsaved = s.detail.pending.len() > 0
+	s.syncSavedLocked()
 	s.mu.Unlock()
 	s.wake()
 	if err != nil {
@@ -458,17 +484,19 @@ func (s *Store) saveDraft(ctx context.Context, id string, patch, base services.L
 			s.view.Detail.Conflict = &DraftConflict{ItemID: id, Server: *res.Item, Fields: slices.Clone(res.Conflicts)}
 			s.mu.Unlock()
 		}
-		reason := res.Error
-		if reason == "" {
-			reason = "条目不存在或已被删除"
+		if res.Error != "" {
+			err = errors.New(res.Error)
+		} else {
+			// 渲染层同一处（knowledge.store.ts 的 saveDraft）抛的就是这句中文原文，它没有翻译，所以照搬、不进 i18n。
+			err = errors.New("条目不存在或已被删除")
 		}
-		err = errors.New(reason)
 	}
 	if err != nil {
 		s.mu.Lock()
 		latest, _ := s.detail.pending.get(id)
 		s.detail.pending.put(id, overlayFields(patch, latest)) // 退回待保存；落盘期间输入的更晚的字段以新的为准
 		s.view.Detail.SaveError = err.Error()
+		s.syncSavedLocked()
 		s.mu.Unlock()
 		return err
 	}
@@ -573,6 +601,7 @@ func (s *Store) ResolveSaveConflict(ctx context.Context, choice ConflictChoice) 
 		merged := s.mergeServerItemLocked(item)
 		d.Item = &merged
 	}
+	s.syncSavedLocked()
 	s.mu.Unlock()
 	s.wake()
 	return s.FlushPendingSave(ctx)

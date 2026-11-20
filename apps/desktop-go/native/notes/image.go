@@ -8,9 +8,6 @@ import (
 	"strings"
 )
 
-// OCRSectionHeading 是「图中文字」小节的标题（ocr-request.ts 的 OCR_SECTION_HEADING）。
-const OCRSectionHeading = "## 图中文字"
-
 var (
 	// reImageOnly 对应「整段只由图片引用构成（可能连着几张）」。
 	reImageOnly   = regexp.MustCompile(`^(?:!\[[^\]]*\]\([^)]+\)` + sp + `*)+$`)

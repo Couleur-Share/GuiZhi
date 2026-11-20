@@ -113,4 +113,6 @@ type Library interface {
 	SaveDraft(ctx context.Context, in LibraryDraftInput) (LibraryDraftResult, error)
 	// SourceVersions 列出一条的历次采集留下的来源版本，新的在前，最多 20 个（knowledge:selection source-versions）。
 	SourceVersions(ctx context.Context, id string) ([]LibrarySourceVersion, error)
+	// MediaCapabilities 读语音转写路由的可选能力（media:capabilities）；详情据此决定摆不摆「区分说话人」。
+	MediaCapabilities(ctx context.Context) (LibraryMediaCapabilities, error)
 }

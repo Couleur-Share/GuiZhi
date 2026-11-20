@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 
@@ -185,5 +187,24 @@ func TestLibraryAdapterReviewPatchAgainstRealHandlers(t *testing.T) {
 	entry, _, err = svc.UpdateEntry(ctx, id, services.LibraryEntryPatch{ReviewStatus: services.StringPtr(services.LibraryReviewNeedsReview), ReviewReasons: []string{"采用了旧版本"}})
 	if err != nil || entry.ReviewStatus != services.LibraryReviewNeedsReview || !slices.Equal(entry.ReviewReasons, []string{"采用了旧版本"}) {
 		t.Fatalf("改回待复核：%+v %v", entry, err)
+	}
+}
+
+// 媒体能力经真实处理器往返：没配置转写引擎时不支持区分说话人；回复里的 true 能解码成 Diarization。
+func TestLibraryAdapterMediaCapabilitiesAgainstRealHandler(t *testing.T) {
+	ctx := t.Context()
+	e := newMediaEnv(t, false)
+	b := &Bridge{handlers: map[string]handler{}, sends: map[string]func([]json.RawMessage){}, seen: map[string]int{}, missing: map[string]int{}}
+	e.l.registerMedia(b)
+	svc := libraryAdapter{b: b}
+	caps, err := svc.MediaCapabilities(ctx)
+	if err != nil || caps.Diarization {
+		t.Fatalf("没配置转写引擎：%+v err=%v", caps, err)
+	}
+	b.handlers[chMediaCapabilities] = func(context.Context, []json.RawMessage) (any, error) {
+		return map[string]any{"diarization": true}, nil
+	}
+	if caps, err = svc.MediaCapabilities(ctx); err != nil || !caps.Diarization {
+		t.Fatalf("回复 true 应解码：%+v err=%v", caps, err)
 	}
 }

@@ -434,3 +434,34 @@ func TestGuardGoAndBackground(t *testing.T) {
 }
 
 var _ ui.C // 保持 ui 导入：openToasts 的视图签名
+
+// Queued 给没有窗口的测试读排队中的提示：按入队顺序给出类型、标题与折叠的详情；关闭操作不算；窗口领走之后就不在队里了。
+func TestNotifierQueuedReportsPendingToasts(t *testing.T) {
+	n := NewNotifier(nil)
+	if got := n.Queued(); len(got) != 0 {
+		t.Fatalf("新通道应为空：%+v", got)
+	}
+	n.Success("已保存")
+	id := n.Error("保存失败", "磁盘满")
+	n.Warning("提醒", WithDetail("细节"))
+	n.Dismiss(id)
+	want := []QueuedToast{
+		{Kind: ToastSuccess, Message: "已保存"},
+		{Kind: ToastError, Message: "保存失败", Detail: "磁盘满"},
+		{Kind: ToastWarning, Message: "提醒", Detail: "细节"},
+	}
+	got := n.Queued()
+	if len(got) != len(want) {
+		t.Fatalf("应有 %d 条（关闭不算）：%+v", len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("第 %d 条：%+v，期望 %+v", i, got[i], want[i])
+		}
+	}
+	h := openToasts(t, still(), n)
+	h.frames(2)
+	if got := n.Queued(); len(got) != 0 {
+		t.Errorf("窗口领走之后队列应空：%+v", got)
+	}
+}

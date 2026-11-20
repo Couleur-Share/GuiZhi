@@ -20,6 +20,15 @@ import (
 //   - fmt.Errorf / errors.New / log.* / panic 的参数：诊断信息，仓库约定日志与错误用中文（见 AGENTS.md）；
 //   - 生成文件（*_gen.go）与测试文件（*_test.go）。
 // 要给用户看的错误原因，应当在界面层用 locales 的文案包一层，再把诊断信息放进可复制的详情。
+//
+// 例外只有 cjkLiteralExemptFiles 里列的整份文件：写进数据的存储格式标记（不是界面文案，又不能翻译）。
+
+// cjkLiteralExemptFiles 是整份文件放行的例外（相对 native/、用斜杠分隔），值是放行的理由。
+// 只给「写进条目数据的存储格式标记」这类不是界面文案、又不能随界面语言翻译的字符串，并且要求集中在一份文件里，
+// 这样同一目录下其他文件出现中文字面量仍然会被拦。每加一项都要在 viva-parity-ledger.md 的变更记录里说明。
+var cjkLiteralExemptFiles = map[string]string{
+	"notes/markers.go": "笔记正文的存储格式标记：小节标题、元数据块字段名与认它们的匹配式（与 packages/shared 的 TS 一致），与界面语言无关",
+}
 
 // isCJKRune 判断是否中日韩文字或全角标点。
 func isCJKRune(r rune) bool {
@@ -148,6 +157,9 @@ func TestNoCJKLiteralsInNativeUI(t *testing.T) {
 			return nil
 		}
 		scanned++
+		if _, exempt := cjkLiteralExemptFiles[filepath.ToSlash(path)]; exempt {
+			return nil
+		}
 		v, err := cjkLiteralViolations(path, nil)
 		if err != nil {
 			return err
@@ -164,5 +176,30 @@ func TestNoCJKLiteralsInNativeUI(t *testing.T) {
 	}
 	for _, v := range violations {
 		t.Errorf("界面文案不能写在 Go 代码里，请放进 i18n 目录（native/i18n-src 或渲染层目录）再用 locales 的函数：%s", v)
+	}
+}
+
+// TestCJKExemptFilesStayNarrow 守住放行名单：每一项必须写明理由，文件必须存在且真的含中日韩字面量
+// （否则是过期的放行，删掉）；名单本身只允许是 notes/markers.go 这一类集中存放的标记文件。
+func TestCJKExemptFilesStayNarrow(t *testing.T) {
+	for path, reason := range cjkLiteralExemptFiles {
+		if strings.TrimSpace(reason) == "" {
+			t.Errorf("%s：放行必须写明理由", path)
+		}
+		if strings.Contains(path, "..") || strings.HasPrefix(path, "/") || strings.HasSuffix(path, "/") || !strings.HasSuffix(path, ".go") {
+			t.Errorf("%s：放行项必须是相对 native/ 的单个 .go 文件", path)
+			continue
+		}
+		v, err := cjkLiteralViolations(filepath.FromSlash(path), nil)
+		if err != nil {
+			t.Errorf("%s：读取失败（文件挪走了？）：%v", path, err)
+			continue
+		}
+		if len(v) == 0 {
+			t.Errorf("%s：文件里已经没有中日韩字面量，这条放行过期了，请从 cjkLiteralExemptFiles 删掉", path)
+		}
+	}
+	if len(cjkLiteralExemptFiles) != 1 {
+		t.Errorf("放行名单现有 %d 项；新增整份文件放行要先在台账里说明理由，再同步改这里的期望", len(cjkLiteralExemptFiles))
 	}
 }

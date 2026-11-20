@@ -90,3 +90,37 @@ func TestInputPadLandsOnChromeBaseline(t *testing.T) {
 		}
 	}
 }
+
+// TestInputShiftYMovesTheBaseline 核对 ShiftY：整数逻辑像素的位移让输入内容的基线正好挪同样多的设备像素行（缩放 1），
+// 框顶带小数时也一样；位移为 0 时与不设一致（上面的测试已钉在 Chromium 的行上）。
+func TestInputShiftYMovesTheBaseline(t *testing.T) {
+	look := NewLook(DefaultSpec())
+	black := tokens.RGBA(0, 0, 0, 1)
+	type box struct{ size, height float32 }
+	boxes := []box{{14, 36}, {12.25, 31.5}, {15.75, 40.5}}
+	shifts := []float32{0, 3, -2}
+	fracs := []float32{0, 0.5}
+	const cellInputW = 140
+	n := len(boxes) * len(shifts) * len(fracs)
+	fields := make([]ui.Field, n)
+	for i := range fields {
+		fields[i].SetText("HHHH")
+	}
+	at := func(i int) (b box, shift, frac float32) {
+		return boxes[i/(len(shifts)*len(fracs))], shifts[i/len(fracs)%len(shifts)], fracs[i%len(fracs)]
+	}
+	img := renderCells(t, n, cellInputW, func(c ui.C, i int) {
+		b, shift, frac := at(i)
+		ui.Column(c).Width(cellInputW).PadTop(20 + frac).PadLeft(10).Children(func() {
+			look.Input(c, &fields[i], "测试", "", InputSpec{Size: b.size, Weight: WeightNormal, Color: black, Height: b.height, ShiftY: shift}).Width(100)
+		})
+	})
+	for i := range fields {
+		b, shift, frac := at(i)
+		got := lastInkRow(img, i*cellInputW, 0, cellInputW, cellH) + 1
+		want := ChromeInputBaselineY(WeightNormal, float64(b.size), float64(20+frac), float64(b.height)) + int(shift)
+		if got != want {
+			t.Errorf("字号 %v 框高 %v 框顶小数 %v 位移 %v：基线行 %d，期望 %d", b.size, b.height, frac, shift, got, want)
+		}
+	}
+}

@@ -110,6 +110,38 @@ func detectForumPlatform(raw string) string {
 	return ""
 }
 
+// DetectVideoPlatform 是 detectVideoPlatform 的导出：认不出返回 ""。详情据此判断在线视频能不能转写。
+func DetectVideoPlatform(raw string) string { return detectVideoPlatform(raw) }
+
+// DetectForumPlatform 是 detectForumPlatform 的导出：认不出返回 ""。详情据此判断论坛讨论能不能刷新。
+func DetectForumPlatform(raw string) string { return detectForumPlatform(raw) }
+
+// sourceCommentsDomains 是能采集来源评论的平台与域名：platform-capture.ts 的 PLATFORM_DOMAINS 里抖音与小红书两项。
+var sourceCommentsDomains = []struct {
+	platform string
+	domains  []string
+}{
+	{"xiaohongshu", []string{"xiaohongshu.com", "xhslink.com", "xhslink.cn"}},
+	{"douyin", []string{"douyin.com", "iesdouyin.com"}},
+}
+
+// DetectSourceCommentsPlatform 对应 detectSourceCommentsPlatform：独立来源评论只对抖音与小红书开放，
+// 且必须是 https 链接、域名是平台域名或其子域；认不出返回 ""。
+// 重复实现的登记见文件头（B-018）：与 main 包 detectPlatformCapturePlatform 的这两项判定一致。
+func DetectSourceCommentsPlatform(raw string) string {
+	u, err := whatwg.Parse(raw)
+	if err != nil || u.Protocol() != "https:" {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, p := range sourceCommentsDomains {
+		if isHostOrSubdomain(host, p.domains...) {
+			return p.platform
+		}
+	}
+	return ""
+}
+
 // ResolveSourcePlatform 判定条目（任务）的来源平台，对应 resolveSourcePlatform：
 // 文件来源是 local；网址来源按域名与路径归到具体平台，认不出的是 web；手工粘贴的文本没有来源（ok 为假）；
 // 解析不出来的网址也不算网页（旧版迁移带进来的 source_uri 什么都可能是）。

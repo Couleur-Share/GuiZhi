@@ -22,7 +22,7 @@ type VideoMeta struct {
 // hasLabelAfterQuote 对应 /^>\s*平台[:：]/。
 func hasLabelAfterQuote(line string) bool {
 	rest := strings.TrimLeftFunc(line[1:], jsSpace)
-	return strings.HasPrefix(rest, "平台:") || strings.HasPrefix(rest, "平台：")
+	return strings.HasPrefix(rest, labelPlatform+":") || strings.HasPrefix(rest, labelPlatform+colonFull)
 }
 
 // stripQuoteMarker 对应 line.replace(/^>\s?/, "").trim()。
@@ -46,8 +46,8 @@ func matchLabel(text, label string) (string, bool) {
 	rest := text[len(label):]
 	if strings.HasPrefix(rest, ":") {
 		rest = rest[1:]
-	} else if strings.HasPrefix(rest, "：") {
-		rest = rest[len("："):]
+	} else if strings.HasPrefix(rest, colonFull) {
+		rest = rest[len(colonFull):]
 	} else {
 		return "", false
 	}
@@ -70,29 +70,29 @@ func ParseVideoMeta(content string) *VideoMeta {
 	end := 0
 	for end < len(lines) && strings.HasPrefix(lines[end], ">") {
 		text := stripQuoteMarker(lines[end])
-		if v, ok := matchLabel(text, "原标题"); ok {
+		if v, ok := matchLabel(text, labelOriginalTitle); ok {
 			meta.OriginalTitle = jsTrim(v)
-		} else if v, ok := matchLabel(text, "简介"); ok {
+		} else if v, ok := matchLabel(text, labelDescription); ok {
 			// 简介整行取值，不参与 · 拆分（内容本身可能含 · 字符）
 			meta.Description = jsTrim(v)
-		} else if v, ok := matchLabel(text, "文字稿来源"); ok {
+		} else if v, ok := matchLabel(text, labelTranscriptSource); ok {
 			meta.TranscriptSource = jsTrim(v)
 		} else {
 			// 首行形如「平台：X · 作者：Y · 时长：Z」，字段间以 · 分隔
 			for _, part := range strings.Split(text, "·") {
 				part = jsTrim(part)
-				for _, key := range []string{"平台", "作者", "时长"} {
+				for _, key := range []string{labelPlatform, labelAuthor, labelDuration} {
 					v, ok := matchLabel(part, key)
 					if !ok {
 						continue
 					}
 					v = jsTrim(v)
 					switch key {
-					case "平台":
+					case labelPlatform:
 						meta.Platform = v
-					case "作者":
+					case labelAuthor:
 						meta.Author = v
-					case "时长":
+					case labelDuration:
 						meta.Duration = v
 					}
 					break

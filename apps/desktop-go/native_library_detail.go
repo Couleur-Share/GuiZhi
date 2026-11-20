@@ -43,3 +43,8 @@ func (a libraryAdapter) SourceVersions(ctx context.Context, id string) ([]servic
 	}
 	return reply.Versions, nil
 }
+
+// MediaCapabilities 对应 media:capabilities：语音转写路由的可选能力（{ diarization: boolean }）。
+func (a libraryAdapter) MediaCapabilities(ctx context.Context) (services.LibraryMediaCapabilities, error) {
+	return callAs[services.LibraryMediaCapabilities](ctx, a.b, "media:capabilities")
+}

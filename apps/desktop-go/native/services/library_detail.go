@@ -134,6 +134,12 @@ type LibrarySourceVersion struct {
 	CapturedAt int64  `json:"capturedAt"`
 }
 
+// LibraryMediaCapabilities 是 media:capabilities 的回复：当前「语音转写」路由支持哪些可选能力。
+type LibraryMediaCapabilities struct {
+	// Diarization 是否支持区分说话人（只有内置本地引擎支持）；不支持时详情不摆这个入口。
+	Diarization bool `json:"diarization"`
+}
+
 // JSLower 是 JS 的 String.prototype.toLowerCase：完整的 Unicode 映射、词尾 Σ。
 // 标签名的比较与键（合并、乐观回显）都以它为准，与渲染层行为一致。
 func JSLower(s string) string { return cases.Lower(language.Und).String(s) }

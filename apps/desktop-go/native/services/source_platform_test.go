@@ -49,3 +49,47 @@ func TestResolveSourcePlatform(t *testing.T) {
 		})
 	}
 }
+
+// 独立来源评论只对抖音与小红书的 https 链接开放：http、仿冒域名、其余登录态平台（Linux.do、NodeSeek）、解析不出来的都是空。
+func TestDetectSourceCommentsPlatform(t *testing.T) {
+	cases := []struct{ raw, want string }{
+		{"https://www.xiaohongshu.com/explore/1", "xiaohongshu"},
+		{"https://edith.xiaohongshu.com/a", "xiaohongshu"},
+		{"https://xhslink.com/abc", "xiaohongshu"},
+		{"https://xhslink.cn/a", "xiaohongshu"},
+		{"https://www.douyin.com/video/1", "douyin"},
+		{"https://v.douyin.com/abc/", "douyin"},
+		{"https://www.iesdouyin.com/share/video/1", "douyin"}, // 子域也算，与 JS 的 isHostOrSubdomain 一致
+		{"https://WWW.DOUYIN.COM/video/1", "douyin"},
+		{"https://www.douyin.com:8443/video/1", "douyin"},
+		{"http://www.douyin.com/video/1", ""},
+		{"https://evildouyin.com/", ""},
+		{"https://douyin.com.evil.com/", ""},
+		{"https://linux.do/t/1", ""},
+		{"https://www.nodeseek.com/post-1-1", ""},
+		{"https://example.com/", ""},
+		{"not a url", ""},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := DetectSourceCommentsPlatform(c.raw); got != c.want {
+			t.Errorf("DetectSourceCommentsPlatform(%q) = %q，期望 %q", c.raw, got, c.want)
+		}
+	}
+}
+
+// 导出的两个判定与内部同名函数是同一份逻辑：认得的给平台名，认不出是空。
+func TestExportedPlatformDetectors(t *testing.T) {
+	if got := DetectVideoPlatform("https://www.bilibili.com/video/BV1xx"); got != "bilibili" {
+		t.Errorf("DetectVideoPlatform = %q", got)
+	}
+	if got := DetectVideoPlatform("https://example.com/video/1"); got != "" {
+		t.Errorf("DetectVideoPlatform(非视频站) = %q", got)
+	}
+	if got := DetectForumPlatform("https://linux.do/t/topic/12345"); got != "linuxdo" {
+		t.Errorf("DetectForumPlatform = %q", got)
+	}
+	if got := DetectForumPlatform("https://linux.do/about"); got != "" {
+		t.Errorf("DetectForumPlatform(非帖子) = %q", got)
+	}
+}

@@ -185,6 +185,27 @@ func (n *Notifier) Dismiss(id string) {
 // Len 返回窗口线程上现有的提示条数（含正在退场、尚未卸载的），测试用。
 func (n *Notifier) Len() int { return len(n.toasts) }
 
+// QueuedToast 是还在排队、尚未被窗口线程领走的一条提示（Queued 的元素）。
+type QueuedToast struct {
+	Kind    ToastKind
+	Message string
+	Detail  string
+}
+
+// Queued 返回排队中（尚未被窗口线程领走）的提示，按入队顺序；关闭操作不算。没有窗口驱动帧的测试用它核对
+// 一次操作到底弹了什么提示（类型、标题与折叠的详情），不用起窗口。任意 goroutine 可调用。
+func (n *Notifier) Queued() []QueuedToast {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	var out []QueuedToast
+	for _, op := range n.queue {
+		if !op.close {
+			out = append(out, QueuedToast{Kind: op.kind, Message: op.message, Detail: op.spec.detail})
+		}
+	}
+	return out
+}
+
 // copyText 把文字写进剪贴板。
 func (n *Notifier) copyText(text string) error {
 	if n.Clipboard != nil {
