@@ -146,6 +146,20 @@ func TestRowWindowEpochDropsMeasurement(t *testing.T) {
 	if w.Measured() != 0 {
 		t.Fatalf("字号档变了，实测高度应全部作废，还剩 %d 个", w.Measured())
 	}
+
+	// 其他会改变折行的输入（界面语言，台账 B-049）：Variant 一变，已量过的行高同样全部作废。
+	w.h[0], w.h[1] = 70, 80
+	spec.Epoch = RowEpoch{RootPx: 18, Variant: 1}
+	w.align(spec)
+	if w.Measured() != 0 {
+		t.Fatalf("Variant 变了（例如界面语言），实测高度应全部作废，还剩 %d 个", w.Measured())
+	}
+	// 没变就留着：不能因为同一个 Epoch 反复声明就丢掉量过的高度。
+	w.h[0] = 70
+	w.align(spec)
+	if w.Measured() != 1 {
+		t.Fatalf("Epoch 没变，实测高度不该被丢，剩 %d 个", w.Measured())
+	}
 }
 
 func TestFitKeepsPrefixAndClearsGrowth(t *testing.T) {
