@@ -312,6 +312,16 @@ func TestTagEditsEchoOptimisticallyThenAdoptTheServerTags(t *testing.T) {
 	}
 }
 
+// 按小写认名字，已有标签的名字本身带大写时也一样：「go」「GO」都沿用已有的「Go」（保留它的 ID、颜色与大小写），不生成占位。
+func TestReconcileOptimisticTagsIgnoresCaseOnBothSides(t *testing.T) {
+	existing := []services.LibraryTag{{ID: "t9", Name: "Go", ColorKey: "green"}}
+	for i, tag := range reconcileOptimisticTags(existing, []string{"go", "GO"}) {
+		if tag.ID != "t9" || tag.Name != "Go" || tag.ColorKey != "green" {
+			t.Fatalf("第 %d 个应沿用已有的 Go：%+v", i, tag)
+		}
+	}
+}
+
 // 防抖窗口里连加两个标签，第一个不能被第二个的补丁覆盖。
 func TestTwoQuickTagEditsKeepBoth(t *testing.T) {
 	h := detailHarness(t)

@@ -207,11 +207,21 @@ func (s *Store) needsFlushLocked() bool {
 
 // ---- 选中并读取详情 ----
 
-// selectItem 选中一条并读取它的详情（渲染层 selectItem）。空串取消选中。
+// selectItem 选中一条并读取它的详情（渲染层 selectItem）。空串取消选中。不阻塞：落盘与读取都放到后台。
 //
 // 先把上一条的编辑落盘：没有要落盘的就当场选中；有的话放到后台，落盘失败就不动选中（改动仍在待保存队列里，失败原因在详情头部）。
 // 序号让「选中之后又选了别的」「选中之后筛选变了」的旧请求作废。
-func (s *Store) selectItem(ctx context.Context, id string) {
+func (s *Store) selectItem(ctx context.Context, id string) { s.selectFlow(ctx, id, false) }
+
+// SelectItemWait 与 selectItem 相同，但阻塞到落盘与读取都落定，返回是否成功（渲染层 `await selectItem(id)` 的布尔结果）：
+// 上一条的草稿落不了盘、被后来的选中或筛选改动取代、条目读不出来，都返回 false；取消选中（空串）与读到了返回 true。
+// 连续整理据此决定能不能继续（B-052）。会阻塞，不能在界面线程调用。
+func (s *Store) SelectItemWait(ctx context.Context, id string) bool {
+	return s.selectFlow(ctx, id, true)
+}
+
+// selectFlow 是 selectItem 与 SelectItemWait 共用的流程；wait 为假时返回值没有意义（恒为 true）。
+func (s *Store) selectFlow(ctx context.Context, id string, wait bool) bool {
 	s.mu.Lock()
 	s.detail.seq++
 	seq := s.detail.seq
@@ -219,28 +229,38 @@ func (s *Store) selectItem(ctx context.Context, id string) {
 		s.commitSelectLocked(id)
 		s.mu.Unlock()
 		s.wake()
-		if id != "" {
-			s.Spawn(func() { s.loadDetail(ctx, id, seq) })
+		if id == "" {
+			return true
 		}
-		return
+		if wait {
+			return s.loadDetail(ctx, id, seq)
+		}
+		s.Spawn(func() { s.loadDetail(ctx, id, seq) })
+		return true
 	}
 	s.mu.Unlock()
-	s.Spawn(func() {
+	run := func() bool {
 		if !s.FlushPendingSave(ctx) {
-			return
+			return false
 		}
 		s.mu.Lock()
 		if seq != s.detail.seq {
 			s.mu.Unlock()
-			return
+			return false
 		}
 		s.commitSelectLocked(id)
 		s.mu.Unlock()
 		s.wake()
-		if id != "" {
-			s.loadDetail(ctx, id, seq)
+		if id == "" {
+			return true
 		}
-	})
+		return s.loadDetail(ctx, id, seq)
+	}
+	if wait {
+		return run()
+	}
+	s.Spawn(func() { run() })
+	return true
 }
 
 // commitSelectLocked 落定选中项并把详情置为读取中（没有选中时不读取）。mu 由调用方持有。
@@ -259,7 +279,8 @@ func (s *Store) clearDetailLocked() {
 }
 
 // loadDetail 读取详情；序号变了就丢弃结果，失败记下原因（渲染层 selectItem 的读取部分）。
-func (s *Store) loadDetail(ctx context.Context, id string, seq int) {
+// 返回读到了并且没有被取代（渲染层：被取代、读取失败都是 false）。
+func (s *Store) loadDetail(ctx context.Context, id string, seq int) bool {
 	item, found, err := s.svc.GetItem(ctx, id)
 	if err == nil && !found {
 		err = errors.New("条目不存在或已被删除")
@@ -281,6 +302,7 @@ func (s *Store) loadDetail(ctx context.Context, id string, seq int) {
 	if current {
 		s.wake()
 	}
+	return current && err == nil
 }
 
 // ClearTitleFocus 消费「新建后把光标放进标题」的请求（渲染层 clearTitleFocus）。

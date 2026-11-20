@@ -168,17 +168,18 @@ func (s *Store) runChunk(ctx context.Context, runID string, chunk []string, cmd 
 //   - 批后选择只留失败的条目（筛选没变的话），再刷新列表与计数；选中的条目若已离开当前视图就取消选中；
 //   - 整批的异常（不是单条失败）走变更失败通道，状态条仍反映已经核对的部分。
 func (s *Store) execute(ctx context.Context, ids []string, cmd services.LibraryBatchCommand, retry bool) bool {
-	s.mu.Lock()
-	if s.view.Batch.Busy {
-		s.mu.Unlock()
+	if !s.tryBusy() {
 		return false
 	}
-	s.view.Batch.Busy = true
-	s.mu.Unlock()
-	s.wake()
+	defer s.clearBusy()
 
 	var outcome []services.LibraryBatchResult
 	ok := s.guard.Run(locales.LibraryActionBatch(), func() error {
+		// 批量改的是库里的数据，详情里还没落盘的编辑要先落盘（渲染层 execute 开头的 flushPendingSave）：落不了就整批不做，
+		// 否则批量与随后的草稿保存会各改各的（例如批量移到回收站之后详情的草稿又把条目写了回来）。
+		if !s.FlushPendingSave(ctx) {
+			return errBatchDraftNotSaved
+		}
 		targets := uniqueIDs(ids)
 		single := len(targets) == 1 && !retry && (cmd.Kind == services.LibraryBatchTrash || cmd.Kind == services.LibraryBatchDelete)
 
@@ -241,16 +242,14 @@ func (s *Store) execute(ctx context.Context, ids []string, cmd services.LibraryB
 		s.wake()
 		return nil
 	})
-
-	s.mu.Lock()
-	s.view.Batch.Busy = false
-	s.mu.Unlock()
-	s.wake()
 	return ok && allOK(outcome)
 }
 
+// errBatchDraftNotSaved 是批量开头的草稿落不了盘的失败原因（渲染层写死的中文；原始的保存失败原因在详情头部）。
+var errBatchDraftNotSaved = errors.New("请先处理草稿保存错误")
+
 // afterBatch 处理批后的选中项：删除、移到回收站、恢复成功之后条目已离开当前视图，重新选中只会得到「读取失败」，所以取消选中；
-// 其余情形重新选中它（详情随 M2-4 迁入时在这里重读）。
+// 其余情形重新选中它（SelectItem 重读详情，渲染层 selectItem(selected)）。
 func (s *Store) afterBatch(targets []string, cmd services.LibraryBatchCommand, outcome []services.LibraryBatchResult) {
 	selected := s.View().List.SelectedID
 	if selected == "" || !slices.Contains(targets, selected) {

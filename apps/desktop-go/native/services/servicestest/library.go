@@ -58,7 +58,7 @@ func (f *Library) SetCounts(counts services.LibraryCounts) {
 // FailOn 让某个方法（"Counts"、"List"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
 // "Tags"、"UpdateTag"、"DeleteTag"、"Freeze"、"ExecuteBatch"、"UpdateEntry"、"SupplementWechat"、"AiHandoff"、"ExportAiHandoff"、
 // "GetItem"、"SaveDraft"、"SourceVersions"）
-// 返回 err；err 为 nil 取消注入。
+// 返回 err；err 为 nil 取消注入。写成 "方法:参数"（如 "GetItem:b"）时只让针对那个参数的调用失败，优先于整个方法的注入。
 func (f *Library) FailOn(method string, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -114,6 +114,9 @@ func (f *Library) begin(call, method string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, call)
+	if err, ok := f.failures[call]; ok { // 「方法:参数」只让这一个目标失败（如 FailOn("GetItem:b", …)）
+		return err
+	}
 	return f.failures[method]
 }
 

@@ -49,6 +49,8 @@ type View struct {
 	Batch BatchState
 	// Detail 是右侧详情背后的状态（store_detail.go）。
 	Detail DetailView
+	// Review 是连续整理的顺序与进度（store_review.go）。
+	Review ReviewState
 }
 
 // DeletionUndoWindow 是删除合集、标签后的撤销窗口，与撤销提示条的停留时长一致（渲染层 DELETION_UNDO_WINDOW_MS）。
