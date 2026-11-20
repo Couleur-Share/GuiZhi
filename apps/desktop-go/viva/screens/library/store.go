@@ -10,6 +10,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/locales"
 )
 
 // Filters 是知识库的筛选（渲染层 knowledge.store 的 scope 加三个分面）。
@@ -44,6 +45,8 @@ type View struct {
 	CountsError, CollectionsError, TagsError string
 	// List 是条目列表的状态（store_list.go）。
 	List ListView
+	// Batch 是批量状态条背后的状态（store_batch.go）。
+	Batch BatchState
 }
 
 // DeletionUndoWindow 是删除合集、标签后的撤销窗口，与撤销提示条的停留时长一致（渲染层 DELETION_UNDO_WINDOW_MS）。
@@ -77,6 +80,16 @@ type Store struct {
 	// 尚未提交的删除；退出窗口前统一提交，避免关窗口把「已删除」的行又带回来。
 	pendingCommits map[int]func()
 	nextCommit     int
+
+	// OnEvidenceCleared 在彻底删除并选了「同时清除问答证据」之后，带着真正删掉的条目 ID 调用（渲染层 clearCachedConversationEvidence）。
+	// 问答随 M3 迁入，在此之前为 nil（台账 B-053）。
+	OnEvidenceCleared func(ids []string)
+
+	// batchRun 是当前批次的回执键；newID 生成它（测试注入固定值）。
+	batchRun string
+	newID    func() string
+	// pendingFlags 是在途的收藏、置顶翻转（键为 字段+条目 ID）：连点两次要以在途的值为准，不能都发同一个值。
+	pendingFlags map[string]bool
 }
 
 // NewStore 创建一个侧栏状态。svc 不能为空。
@@ -94,6 +107,8 @@ func NewStore(svc services.Library, guard kit.Guard, invalidate func()) *Store {
 		list:           listState{cursors: map[int]string{1: ""}},
 		pending:        map[pendingKey]struct{}{},
 		pendingCommits: map[int]func(){},
+		newID:          randomID,
+		pendingFlags:   map[string]bool{},
 	}
 }
 
@@ -116,9 +131,13 @@ func (s *Store) wake() {
 // 同一刻列表回到第一页、丢掉全部分页游标、清掉选中与多选，并让旧筛选在途的读取作废（台账 B-033 的 (2)(3)）。
 func (s *Store) update(ctx context.Context, mutate func(*Filters)) {
 	s.mu.Lock()
-	next := s.view.Filters
+	prev := s.view.Filters
+	next := prev
 	mutate(&next)
 	s.view.Filters = next
+	if len(s.view.List.Selection) > 0 && next != prev {
+		s.view.Batch.Notice = locales.LibraryWorkflowSelectionCleared()
+	}
 	s.resetPaging()
 	s.resetSelection()
 	s.list.seq++

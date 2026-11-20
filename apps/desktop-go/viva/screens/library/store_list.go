@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/locales"
 )
 
 // 条目列表的状态（渲染层 knowledge.store 的列表部分）：条目、总数、分页、排序、搜索、选中与多选。
@@ -162,6 +163,9 @@ func (s *Store) RefreshAll(ctx context.Context) {
 // 结果出来之后，右侧详情若还停在一条不在结果里的条目上，就清掉它（否则会让人以为那是命中项）。
 func (s *Store) SetSearch(ctx context.Context, query string) {
 	s.mu.Lock()
+	if len(s.view.List.Selection) > 0 && s.view.List.Search != query {
+		s.view.Batch.Notice = locales.LibraryWorkflowSelectionCleared() // 搜索词变了，原来的跨页选择随之清空
+	}
 	s.view.List.Search = query
 	s.resetPaging()
 	s.view.List.Selection, s.view.List.Anchor = nil, ""

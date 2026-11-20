@@ -35,6 +35,12 @@ type BatchCall struct {
 	Command services.LibraryBatchCommand
 }
 
+// UpdateCall 是收到的一次条目更新（UpdateEntry）。
+type UpdateCall struct {
+	ID    string
+	Patch services.LibraryEntryPatch
+}
+
 // ExportCall 是收到的一次另存交接稿。
 type ExportCall struct{ Title, Text string }
 
@@ -51,6 +57,7 @@ type opsState struct {
 	receipts   map[string]receipt // runID + "\x00" + id
 	itemFails  map[string]string  // id → 批量里这一条的注入失败
 	updates    []string           // UpdateEntry 的调用记录：id
+	updateCall []UpdateCall       // 同上，带补丁
 	cleared    []string           // 带「清证据」彻底删除了的 ID
 	supplement [][]string
 	handoffs   map[string][2]services.LibraryHandoff // id → [完整版, 精简版]
@@ -60,6 +67,8 @@ type opsState struct {
 	exportSet  bool
 	freezes    []services.LibraryListQuery
 	nextTag    int
+	// freezeGate、batchGate、updateGate 让下一次 Freeze、ExecuteBatch、UpdateEntry 卡住（HoldFreeze、HoldBatch、HoldUpdate）。
+	freezeGate, batchGate, updateGate chan struct{}
 }
 
 // SetNow 设定写操作用的「现在」（毫秒），让对照与断言不依赖真实时钟。
@@ -74,6 +83,46 @@ func (f *Library) nowMs() int64 {
 		return f.ops.now
 	}
 	return defaultNow
+}
+
+// HoldFreeze 让下一次 Freeze 卡住，直到返回的函数被调用（只卡一次）：用来在冻结期间改筛选，验证晚到的冻结不会当成新筛选的选择。
+func (f *Library) HoldFreeze() (release func()) {
+	gate := make(chan struct{})
+	f.mu.Lock()
+	f.ops.freezeGate = gate
+	f.mu.Unlock()
+	return func() { close(gate) }
+}
+
+// HoldBatch 让下一次 ExecuteBatch 卡住（在改任何条目之前），直到返回的函数被调用（只卡一次）：用来观察「批量进行中」的状态。
+func (f *Library) HoldBatch() (release func()) {
+	gate := make(chan struct{})
+	f.mu.Lock()
+	f.ops.batchGate = gate
+	f.mu.Unlock()
+	return func() { close(gate) }
+}
+
+// HoldUpdate 让下一次 UpdateEntry 卡住（在改条目之前），直到返回的函数被调用（只卡一次）：用来验证连点收藏、置顶时以在途的值为准。
+func (f *Library) HoldUpdate() (release func()) {
+	gate := make(chan struct{})
+	f.mu.Lock()
+	f.ops.updateGate = gate
+	f.mu.Unlock()
+	return func() { close(gate) }
+}
+
+// waitGate 等 gate 被放行；gate 为 nil 时立即返回。上下文取消时返回它的错误。
+func waitGate(ctx context.Context, gate chan struct{}) error {
+	if gate == nil {
+		return nil
+	}
+	select {
+	case <-gate:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // FailBatchItem 让批量里 id 这一条失败（原因 reason）；reason 为空取消注入。其余条目照常执行。
@@ -102,6 +151,13 @@ func (f *Library) Updates() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.ops.updates)
+}
+
+// UpdateCalls 返回 UpdateEntry 收到的更新（带补丁），按发生顺序。
+func (f *Library) UpdateCalls() []UpdateCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.ops.updateCall)
 }
 
 // ClearedEvidence 返回带「清证据」彻底删除了的条目 ID。
@@ -236,8 +292,15 @@ func (f *Library) Freeze(ctx context.Context, q services.LibraryListQuery) ([]st
 		return nil, err
 	}
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.ops.freezes = append(f.ops.freezes, q)
+	gate := f.ops.freezeGate
+	f.ops.freezeGate = nil
+	f.mu.Unlock()
+	if err := waitGate(ctx, gate); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	hits := orderedHits(f.entries, q)
 	ids := make([]string, 0, len(hits))
 	for _, e := range hits {
@@ -257,8 +320,15 @@ func (f *Library) ExecuteBatch(ctx context.Context, runID string, ids []string, 
 		return nil, err
 	}
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.ops.batches = append(f.ops.batches, BatchCall{RunID: runID, IDs: slices.Clone(ids), Command: cmd})
+	gate := f.ops.batchGate
+	f.ops.batchGate = nil
+	f.mu.Unlock()
+	if err := waitGate(ctx, gate); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.ops.receipts == nil {
 		f.ops.receipts = map[string]receipt{}
 	}
@@ -350,8 +420,16 @@ func (f *Library) UpdateEntry(ctx context.Context, id string, patch services.Lib
 		return services.LibraryEntry{}, false, err
 	}
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.ops.updates = append(f.ops.updates, id)
+	f.ops.updateCall = append(f.ops.updateCall, UpdateCall{ID: id, Patch: patch})
+	gate := f.ops.updateGate
+	f.ops.updateGate = nil
+	f.mu.Unlock()
+	if err := waitGate(ctx, gate); err != nil {
+		return services.LibraryEntry{}, false, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	entries := slices.Clone(f.entries)
 	i := f.indexOf(entries, id)
 	if i < 0 {
