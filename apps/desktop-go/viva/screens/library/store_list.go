@@ -41,6 +41,10 @@ type ListView struct {
 	SelectedID string
 	Selection  []string
 	Anchor     string
+	// selected 是 Selection 的成员索引：成员判断（IsSelected）每帧每个可见行都要问，不能随选中数线性增长
+	// （「全部符合筛选」可以选中上万条，台账 B-056）。只由 setSelection 与 Selection 一起整体换新，换出去之后不再改动；
+	// 所以 ListView 按值复制时共用同一张表是安全的。选中为空时是 nil。
+	selected map[string]struct{}
 }
 
 // initialList 是列表的初值：第一页、每页 20 条、按更新时间新的在前（渲染层 knowledge.store 的初始状态）。
@@ -58,8 +62,28 @@ func (s *Store) facetQuery() services.LibraryFacetQuery {
 // searchTerm 是发给后端的搜索词：去掉首尾空白。
 func (l ListView) searchTerm() string { return strings.TrimSpace(l.Search) }
 
-// IsSelected 报告条目是否在多选集合里。
-func (l ListView) IsSelected(id string) bool { return slices.Contains(l.Selection, id) }
+// IsSelected 报告条目是否在多选集合里。有索引时按集合查（与选中数无关）；没有索引（直接构造的视图）退回线性查找。
+func (l ListView) IsSelected(id string) bool {
+	if l.selected != nil {
+		_, ok := l.selected[id]
+		return ok
+	}
+	return slices.Contains(l.Selection, id)
+}
+
+// setSelection 整体换掉多选集合与 Shift 范围选择的起点，成员索引一起重建。多选集合的每一次变化都经这里：
+// 直接给 Selection 赋值会让索引过期（store_list_test 的 TestSelectionIndexFollowsEveryMutation 逐个入口核对）。
+// ids 此后归 ListView 所有、不能再被修改（每次变化都是新切片）。
+func (l *ListView) setSelection(ids []string, anchor string) {
+	l.Selection, l.Anchor, l.selected = ids, anchor, nil
+	if len(ids) == 0 {
+		return
+	}
+	l.selected = make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		l.selected[id] = struct{}{}
+	}
+}
 
 // listState 是 Store 里不进快照的列表内部状态。
 type listState struct {
@@ -77,7 +101,8 @@ func (s *Store) resetPaging() {
 
 // resetSelection 清空选中与多选（渲染层 updateFilters 的重置）。mu 由调用方持有。
 func (s *Store) resetSelection() {
-	s.view.List.SelectedID, s.view.List.Selection, s.view.List.Anchor = "", nil, ""
+	s.view.List.SelectedID = ""
+	s.view.List.setSelection(nil, "")
 }
 
 // listQuery 按当前状态拼出这一页的查询。mu 由调用方持有。
@@ -168,7 +193,7 @@ func (s *Store) SetSearch(ctx context.Context, query string) {
 	}
 	s.view.List.Search = query
 	s.resetPaging()
-	s.view.List.Selection, s.view.List.Anchor = nil, ""
+	s.view.List.setSelection(nil, "")
 	s.list.seq++ // 旧搜索词的在途读取作废
 	s.view.List.Loading = true
 	s.mu.Unlock()
@@ -278,11 +303,10 @@ func (s *Store) ToggleSelection(id string) {
 	s.mu.Lock()
 	l := &s.view.List
 	if i := slices.Index(l.Selection, id); i >= 0 {
-		l.Selection = slices.Delete(slices.Clone(l.Selection), i, i+1)
+		l.setSelection(slices.Delete(slices.Clone(l.Selection), i, i+1), id)
 	} else {
-		l.Selection = append(slices.Clone(l.Selection), id)
+		l.setSelection(append(slices.Clone(l.Selection), id), id)
 	}
-	l.Anchor = id
 	s.mu.Unlock()
 	s.wake()
 }
@@ -304,14 +328,14 @@ func (s *Store) RangeSelectTo(id string) {
 	}
 	from, to := index(anchor), index(id)
 	if anchor == "" || from < 0 || to < 0 {
-		l.Selection, l.Anchor = []string{id}, id
+		l.setSelection([]string{id}, id)
 	} else {
 		from, to = min(from, to), max(from, to)
 		ids := make([]string, 0, to-from+1)
 		for _, e := range l.Entries[from : to+1] {
 			ids = append(ids, e.ID)
 		}
-		l.Selection, l.Anchor = ids, anchor
+		l.setSelection(ids, anchor)
 	}
 	s.mu.Unlock()
 	s.wake()
@@ -320,11 +344,11 @@ func (s *Store) RangeSelectTo(id string) {
 // SetSelection 整体设定多选集合，起点取最后一个（渲染层 setSelection）。
 func (s *Store) SetSelection(ids []string) {
 	s.mu.Lock()
-	s.view.List.Selection = slices.Clone(ids)
-	s.view.List.Anchor = ""
+	anchor := ""
 	if len(ids) > 0 {
-		s.view.List.Anchor = ids[len(ids)-1]
+		anchor = ids[len(ids)-1]
 	}
+	s.view.List.setSelection(slices.Clone(ids), anchor)
 	s.mu.Unlock()
 	s.wake()
 }
@@ -377,7 +401,7 @@ func (s *Store) TogglePageSelection() {
 // ClearSelection 清空多选。
 func (s *Store) ClearSelection() {
 	s.mu.Lock()
-	s.view.List.Selection, s.view.List.Anchor = nil, ""
+	s.view.List.setSelection(nil, "")
 	s.mu.Unlock()
 	s.wake()
 }

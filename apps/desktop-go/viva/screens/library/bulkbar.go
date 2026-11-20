@@ -44,7 +44,9 @@ func (s *Screen) bulkBar(c ui.C, v View, wide bool) {
 	l := s.Look
 	t := l.T
 	canvas := c.Canvas()
-	ids := selection(v)
+	// 每帧都要重画的只有选中数与「本页有没有选中的公众号条目」，都与选中数无关：「全部符合筛选」可以选中上万条，
+	// 逐帧复制选择、或让选中的每一条去翻一遍本页，每帧要几毫秒（台账 B-056）。要交给动作的 ID 列表在点击时才取（selection(v)）。
+	count := len(v.List.Selection)
 	trash := v.Filters.Scope == services.LibraryScopeTrash
 	padX := l.Space(3)
 	if wide {
@@ -52,13 +54,11 @@ func (s *Screen) bulkBar(c ui.C, v View, wide bool) {
 	}
 
 	// 微信公众号来源：只看本页上的条目（渲染层的 entries 就是当前页）。
-	var wechat []string
-	for _, id := range ids {
-		for _, e := range v.List.Entries {
-			if e.ID == id && e.Platform == "wechat" {
-				wechat = append(wechat, id)
-				break
-			}
+	hasWechat := false
+	for _, e := range v.List.Entries {
+		if e.Platform == "wechat" && v.List.IsSelected(e.ID) {
+			hasWechat = true
+			break
 		}
 	}
 
@@ -79,15 +79,15 @@ func (s *Screen) bulkBar(c ui.C, v View, wide bool) {
 		}
 
 		// min-w-0 flex-1 truncate text-xs font-medium text-foreground
-		l.Text(c.Key("count"), locales.LibrarySelectedCount(len(ids)), kit.TextXS, kit.WeightMedium, t.Foreground, kit.Ellipsis()).
+		l.Text(c.Key("count"), locales.LibrarySelectedCount(count), kit.TextXS, kit.WeightMedium, t.Foreground, kit.Ellipsis()).
 			Grow(1).Shrink(1).MinWidth(0)
 
 		if trash {
 			if s.bulkAction(c, wide, bulkActionSpec{key: "restore", label: locales.LibraryRestore(), icon: icons.RotateCcw}).clicked {
-				s.restore(ids)
+				s.restore(selection(v))
 			}
 			if s.bulkAction(c, wide, bulkActionSpec{key: "delete-forever", label: locales.LibraryDeleteForever(), icon: icons.CircleX, destructive: true}).clicked {
-				s.openConfirm(confirmDeleteForever, ids)
+				s.openConfirm(confirmDeleteForever, selection(v))
 			}
 		} else {
 			// 菜单与浮层开在点击的光标处（渲染层取 event.clientX / clientY），键盘点击是原点。
@@ -98,23 +98,41 @@ func (s *Screen) bulkBar(c ui.C, v View, wide bool) {
 				s.bulk.bulkTag.show(s.pointerAnchor(canvas, r.id))
 			}
 			if s.bulkAction(c, wide, bulkActionSpec{key: "favorite", label: locales.LibraryBulkFavorite(), icon: icons.Star}).clicked {
-				s.bulkUpdate(ids, services.LibraryEntryPatch{IsFavorite: services.BoolPtr(true)})
+				s.bulkUpdate(selection(v), services.LibraryEntryPatch{IsFavorite: services.BoolPtr(true)})
 			}
 			if s.bulkAction(c, wide, bulkActionSpec{key: "archive", label: locales.LibraryArchive(), icon: icons.Archive}).clicked {
-				s.setStatus(ids, "archived")
+				s.setStatus(selection(v), "archived")
 			}
 			if s.bulkAction(c, wide, bulkActionSpec{key: "trash", label: locales.LibraryMoveToTrash(), icon: icons.Trash2, destructive: true}).clicked {
-				s.trashWithUndo(ids)
+				s.trashWithUndo(selection(v))
 			}
 		}
-		if !trash && len(wechat) > 0 {
+		if !trash && hasWechat {
 			if s.bulkAction(c, wide, bulkActionSpec{key: "wechat", label: locales.LibraryBulkSupplementWechat(), icon: icons.RotateCcw}).clicked {
-				s.supplementWechat(wechat)
+				s.supplementWechat(wechatSelected(v))
 			}
 		}
 	})
 	s.moveMenuView(c, v)
 	s.bulkTagView(c, v)
+}
+
+// wechatSelected 是选中的条目里、本页上的微信公众号来源的 ID，按选入顺序（渲染层 selectionIds.filter 的结果）。
+// 点击补采时才取：O(选中数 + 本页条数)，不在每帧里算。
+func wechatSelected(v View) []string {
+	onPage := map[string]struct{}{}
+	for _, e := range v.List.Entries {
+		if e.Platform == "wechat" {
+			onPage[e.ID] = struct{}{}
+		}
+	}
+	var out []string
+	for _, id := range v.List.Selection {
+		if _, ok := onPage[id]; ok {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // bulkActionSpec 描述批量条里的一枚动作。

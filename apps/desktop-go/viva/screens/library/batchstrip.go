@@ -4,6 +4,7 @@ import (
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
+	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
@@ -88,20 +89,35 @@ func (s *Screen) batchDetails(c ui.C, b BatchState) {
 	if !open {
 		return
 	}
-	l.ScrollAreaView(c.Key("results"), [4]float32{}, func(kit.ScrollView) {
-		for _, r := range b.Results {
-			outcome := locales.CommonSuccess()
-			if !r.OK {
-				outcome = r.Error
-			}
-			// 渲染层是 <li>{row.id}：{outcome}</li>：三个相邻的文字节点（编号、全角冒号、结果），采集到的文字行也是三段。
-			// 这里三段并排：编号与冒号一行排完，结果占余下的宽度（过长的失败原因在结果自己的盒里折行）。
-			key := c.Key("result-" + r.ID)
-			ui.Row(key).FillWidth().Items(ui.Start).Children(func() {
-				l.Text(key.Key("id"), r.ID, kit.TextXS, kit.WeightNormal, t.Foreground)
-				l.Text(key.Key("sep"), locales.NativeLibraryResultSeparator(), kit.TextXS, kit.WeightNormal, t.Foreground)
-				l.Text(key.Key("outcome"), outcome, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped()).Grow(1).Shrink(1).MinWidth(0)
-			})
-		}
+	// 渲染层把全部结果整表渲染；这里只声明视口里的行与上下各几行（kit.RowWindow，台账 B-056）：一次「全部符合筛选」的批量
+	// 可以有上万条结果，整表声明时每帧要几百毫秒。行高大多是一行（成功与短的失败原因），过长的失败原因折成多行，所以用变高模式：
+	// 没量过的行按已量行高的平均估计，全是单行时估计与实测一致。
+	l.ScrollAreaView(c.Key("results"), [4]float32{}, func(view kit.ScrollView) {
+		w := &s.bulk.results
+		w.Seed = l.Rem(kit.TextXS.Line)
+		w.Rows(c, kit.RowsSpec{
+			Name: "results-rows", N: len(b.Results), View: view,
+			Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang())},
+			Key:   func(i int) string { return b.Results[i].ID },
+			Row:   func(i int) ui.Box { return s.resultRow(c, b.Results[i]) },
+		})
 	}).FillWidth().MaxHeight(l.Rem(9))
+}
+
+// resultRow 是逐条结果的一行：返回它的最外层盒子（窗口化的行列在绘制时读它布局后的高度）。
+func (s *Screen) resultRow(c ui.C, r services.LibraryBatchResult) ui.Box {
+	l := s.Look
+	t := l.T
+	outcome := locales.CommonSuccess()
+	if !r.OK {
+		outcome = r.Error
+	}
+	// 渲染层是 <li>{row.id}：{outcome}</li>：三个相邻的文字节点（编号、全角冒号、结果），采集到的文字行也是三段。
+	// 这里三段并排：编号与冒号一行排完，结果占余下的宽度（过长的失败原因在结果自己的盒里折行）。
+	key := c.Key("result-" + r.ID)
+	return ui.Row(key).FillWidth().Items(ui.Start).Children(func() {
+		l.Text(key.Key("id"), r.ID, kit.TextXS, kit.WeightNormal, t.Foreground)
+		l.Text(key.Key("sep"), locales.NativeLibraryResultSeparator(), kit.TextXS, kit.WeightNormal, t.Foreground)
+		l.Text(key.Key("outcome"), outcome, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped()).Grow(1).Shrink(1).MinWidth(0)
+	})
 }

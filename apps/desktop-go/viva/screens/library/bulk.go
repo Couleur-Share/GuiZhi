@@ -67,6 +67,8 @@ type bulkState struct {
 	picker tagPicker
 	// details 是结果条里「逐条结果」是否展开（<details> 的 open 状态）；条收起再出现时回到折叠。
 	details bool
+	// results 是展开后逐条结果清单的行窗口（台账 B-056）：只声明视口附近的行。
+	results kit.RowWindow
 }
 
 // selection 是此刻多选集合的副本：动作在后台执行，期间选择可能变。
