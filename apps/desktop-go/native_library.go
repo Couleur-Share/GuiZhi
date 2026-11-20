@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 
 	"guizhi-mygo-shell/native/services"
 )
@@ -66,4 +67,132 @@ func (a libraryAdapter) UpdateTag(ctx context.Context, id string, patch services
 
 func (a libraryAdapter) DeleteTag(ctx context.Context, id string) (bool, error) {
 	return callAs[bool](ctx, a.b, "tag:delete", id)
+}
+
+// ---- 条目操作（M2-3）：批量、收藏与标签、补采、AI 交接稿 ----
+
+// selectionReply 是 knowledge:selection 的回复（freeze 与 execute 共用一个形状）。
+type selectionReply struct {
+	OK      bool                          `json:"ok"`
+	Error   string                        `json:"error"`
+	IDs     []string                      `json:"ids"`
+	Results []services.LibraryBatchResult `json:"results"`
+}
+
+// Freeze 对应 library-workflow.store 的冻结：回复缺 ids 视为失败，原因取处理器给的。
+// 处理器出错时一定带原因，这里的兜底文案（渲染层各调用点各有一句）实际走不到。
+func (a libraryAdapter) Freeze(ctx context.Context, q services.LibraryListQuery) ([]string, error) {
+	reply, err := callAs[selectionReply](ctx, a.b, "knowledge:selection", map[string]any{"action": "freeze", "query": q})
+	if err != nil {
+		return nil, err
+	}
+	if !reply.OK || reply.IDs == nil {
+		if reply.Error != "" {
+			return nil, errors.New(reply.Error)
+		}
+		return nil, errors.New("冻结选择失败")
+	}
+	return reply.IDs, nil
+}
+
+func (a libraryAdapter) ExecuteBatch(ctx context.Context, runID string, ids []string, cmd services.LibraryBatchCommand) ([]services.LibraryBatchResult, error) {
+	input := map[string]any{"action": "execute", "ids": ids, "command": cmd}
+	if runID != "" {
+		input["runId"] = runID
+	}
+	reply, err := callAs[selectionReply](ctx, a.b, "knowledge:selection", input)
+	if err != nil {
+		return nil, err
+	}
+	if !reply.OK || reply.Results == nil {
+		if reply.Error != "" {
+			return nil, errors.New(reply.Error)
+		}
+		return nil, errors.New("批量操作未返回结果")
+	}
+	return reply.Results, nil
+}
+
+func (a libraryAdapter) UpdateEntry(ctx context.Context, id string, patch services.LibraryEntryPatch) (services.LibraryEntry, bool, error) {
+	entry, err := callAs[*services.LibraryEntry](ctx, a.b, "knowledge:update", id, patch)
+	if err != nil || entry == nil {
+		return services.LibraryEntry{}, false, err
+	}
+	return *entry, true, nil
+}
+
+// webReply 是 web:* 处理器的回复壳（preload 的 WebResponse）。
+type webReply struct {
+	OK    bool   `json:"ok"`
+	Error string `json:"error"`
+}
+
+func (a libraryAdapter) SupplementWechat(ctx context.Context, ids []string) error {
+	reply, err := callAs[webReply](ctx, a.b, "web:snapshot-enqueue", ids)
+	if err != nil {
+		return err
+	}
+	if !reply.OK {
+		return errors.New(reply.Error)
+	}
+	return nil
+}
+
+// AiHandoff 对应 use-ai-handoff.ts 的 build：按 id 重新取完整条目（列表里没有正文与文字稿），再按条目整理。
+func (a libraryAdapter) AiHandoff(ctx context.Context, id string, full bool) (services.LibraryHandoff, error) {
+	item, err := callAs[*struct {
+		Title        string `json:"title"`
+		Content      string `json:"content"`
+		Transcript   string `json:"transcript"`
+		Summary      string `json:"summary"`
+		ItemType     string `json:"itemType"`
+		SourceURI    string `json:"sourceUri"`
+		CollectionID string `json:"collectionId"`
+		CreatedAt    int64  `json:"createdAt"`
+		Tags         []struct {
+			Name string `json:"name"`
+		} `json:"tags"`
+	}](ctx, a.b, "knowledge:get", id)
+	if err != nil {
+		return services.LibraryHandoff{}, err
+	}
+	if item == nil {
+		return services.LibraryHandoff{}, services.ErrLibraryItemMissing
+	}
+	if jsTrim(item.Content) == "" && jsTrim(item.Transcript) == "" {
+		return services.LibraryHandoff{}, services.ErrHandoffEmpty
+	}
+	h := aiHandoffItem{
+		Title: item.Title, Content: item.Content, Transcript: item.Transcript, Summary: item.Summary,
+		ItemType: item.ItemType, SourceURI: item.SourceURI, CreatedAtMs: item.CreatedAt,
+	}
+	for _, t := range item.Tags {
+		h.Tags = append(h.Tags, t.Name)
+	}
+	if item.CollectionID != "" {
+		// 合集名取不到（合集读取失败）时按「没有合集」处理：交接稿少一行归属，不因此拒绝复制。
+		if collections, err := a.Collections(ctx); err == nil {
+			for _, c := range collections {
+				if c.ID == item.CollectionID {
+					h.Collection = c.Name
+					break
+				}
+			}
+		}
+	}
+	doc := buildAiHandoff(h, full)
+	return services.LibraryHandoff{Title: item.Title, Text: doc.Text, CharCount: doc.CharCount, OmittedChars: doc.OmittedChars}, nil
+}
+
+func (a libraryAdapter) ExportAiHandoff(ctx context.Context, title, text string) (services.LibraryExportResult, error) {
+	reply, err := callAs[struct {
+		Success  bool   `json:"success"`
+		Canceled bool   `json:"canceled"`
+		FilePath string `json:"filePath"`
+		Error    string `json:"error"`
+	}](ctx, a.b, "export:aiHandoff", map[string]any{"title": title, "text": text})
+	if err != nil {
+		return services.LibraryExportResult{}, err
+	}
+	return services.LibraryExportResult{Success: reply.Success, Canceled: reply.Canceled, FilePath: reply.FilePath, Error: reply.Error}, nil
 }

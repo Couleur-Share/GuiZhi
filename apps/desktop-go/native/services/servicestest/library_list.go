@@ -177,6 +177,29 @@ func decodeCursor(cursor, fp string) (int, error) {
 	return next, nil
 }
 
+// orderedHits 是查询的全部命中，按列表的顺序排好（List 与 Freeze 共用）：无搜索时按排序字段，搜索时保持全集里的先后（相关度）。
+func orderedHits(all []services.LibraryEntry, q services.LibraryListQuery) []services.LibraryEntry {
+	var hits []services.LibraryEntry
+	for _, e := range all {
+		if matches(e, q) {
+			hits = append(hits, e)
+		}
+	}
+	if strings.TrimSpace(q.Search) == "" {
+		sortBy, order := q.SortBy, q.SortOrder
+		slices.SortStableFunc(hits, func(a, b services.LibraryEntry) int {
+			switch {
+			case less(a, b, sortBy, order):
+				return -1
+			case less(b, a, sortBy, order):
+				return 1
+			}
+			return 0
+		})
+	}
+	return hits
+}
+
 // List 实现 services.Library。
 func (f *Library) List(ctx context.Context, q services.LibraryListQuery) (services.LibraryPage, error) {
 	f.mu.Lock()
@@ -210,24 +233,7 @@ func (f *Library) List(ctx context.Context, q services.LibraryListQuery) (servic
 		limit = defaultListLimit
 	}
 
-	var hits []services.LibraryEntry
-	for _, e := range all {
-		if matches(e, q) {
-			hits = append(hits, e)
-		}
-	}
-	if strings.TrimSpace(q.Search) == "" {
-		sortBy, order := q.SortBy, q.SortOrder
-		slices.SortStableFunc(hits, func(a, b services.LibraryEntry) int {
-			switch {
-			case less(a, b, sortBy, order):
-				return -1
-			case less(b, a, sortBy, order):
-				return 1
-			}
-			return 0
-		})
-	}
+	hits := orderedHits(all, q)
 
 	page := services.LibraryPage{Total: len(hits), Entries: []services.LibraryEntry{}}
 	if start < len(hits) {

@@ -89,4 +89,20 @@ type Library interface {
 	UpdateTag(ctx context.Context, id string, patch LibraryTagPatch) error
 	// DeleteTag 摘掉标签，条目保留（tag:delete）；removed 为假表示标签已不存在。
 	DeleteTag(ctx context.Context, id string) (removed bool, err error)
+
+	// Freeze 按筛选条件冻结整个结果的 ID（knowledge:selection freeze）：不分页、不限条数，含回收站范围，顺序与列表一致。
+	Freeze(ctx context.Context, q LibraryListQuery) ([]string, error)
+	// ExecuteBatch 对一批条目逐条执行同一个命令（knowledge:selection execute），每条独立记账。
+	// runID 相同的重试复用已提交的结果、不会重做；返回的结果与 ids 一一对应。处理器整体报错时返回 error。
+	ExecuteBatch(ctx context.Context, runID string, ids []string, cmd LibraryBatchCommand) ([]LibraryBatchResult, error)
+	// UpdateEntry 改单条的收藏、置顶、标签（knowledge:update）；found 为假表示条目已不存在。
+	// 返回的条目带这些字段的新值与更新时间，没有摘要。
+	UpdateEntry(ctx context.Context, id string, patch LibraryEntryPatch) (entry LibraryEntry, found bool, err error)
+	// SupplementWechat 把公众号文章加入补采队列（web:snapshot-enqueue）；一次最多 50 篇，调用方分批。
+	SupplementWechat(ctx context.Context, ids []string) error
+	// AiHandoff 取一条的 AI 交接稿（knowledge:get 加整理）；full 为假时是只要总结的精简版。
+	// 条目不存在返回 ErrLibraryItemMissing，既没有正文也没有文字稿返回 ErrHandoffEmpty。
+	AiHandoff(ctx context.Context, id string, full bool) (LibraryHandoff, error)
+	// ExportAiHandoff 让用户另存交接稿（export:aiHandoff，弹出保存对话框）；用户取消时 Canceled 为真。
+	ExportAiHandoff(ctx context.Context, title, text string) (LibraryExportResult, error)
 }
