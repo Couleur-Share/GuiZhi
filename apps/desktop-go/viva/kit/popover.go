@@ -68,6 +68,9 @@ type PopoverSpec struct {
 	// Persistent 让弹层只在点外面与 Esc 时收起：焦点离开、窗口缩放都不关，也不把面板夹回视口
 	//（ColumnConfigMenu 没有 onBlur 与 resize 监听，位置是展开那一刻的 top/right）。
 	Persistent bool
+	// StayOnBlur 让弹层不因焦点离开、窗口缩放而关闭，但仍夹回视口（与 Persistent 不同：Persistent 连夹回也不做）。
+	// 渲染层的标签浮层（BulkTagPopover、TagPickerPopover）只在点外面与 Esc 时收起，没有 onBlur 与 resize 监听，位置夹进视口。
+	StayOnBlur bool
 	// Trigger 是触发钮上一帧的外框：点它只关闭，不再往下传（否则收起会被传给触发钮、再展开一次）。
 	Trigger gfx.Rect
 	// Content 声明面板里的内容（一个竖排，宽度撑满面板的内容区）。
@@ -84,13 +87,13 @@ func (l *Look) Popover(c ui.C, st *PopoverState, spec PopoverSpec) (closed, byKe
 	// 窗口尺寸变了：关闭（closeOnResize）。
 	if st.viewport == nil {
 		st.viewport = &gfx.Point{X: bounds.Width, Y: bounds.Height}
-	} else if !spec.Persistent && (st.viewport.X != bounds.Width || st.viewport.Y != bounds.Height) {
+	} else if !spec.Persistent && !spec.StayOnBlur && (st.viewport.X != bounds.Width || st.viewport.Y != bounds.Height) {
 		st.Close()
 		return true, false
 	}
 	// 焦点曾在组里、现在不在了：关闭（onBlur 里 relatedTarget 既不在面板也不在触发钮）。
 	in := st.Group.Focused(canvas) != ""
-	if !spec.Persistent && st.inside && !in {
+	if !spec.Persistent && !spec.StayOnBlur && st.inside && !in {
 		st.Close()
 		return true, false
 	}

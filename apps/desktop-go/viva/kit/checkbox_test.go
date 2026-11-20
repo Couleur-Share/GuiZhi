@@ -1,6 +1,7 @@
 package kit
 
 import (
+	"math"
 	"testing"
 
 	"github.com/vivaui/viva/gfx"
@@ -37,5 +38,55 @@ func TestCheckboxValueIsWrittenBeforeTheCallReturns(t *testing.T) {
 	}
 	if got, _ := h.node(gfx.RoleCheckbox, "选择本行"); got.Checked {
 		t.Error("可访问节点应跟着取消勾选")
+	}
+}
+
+// disabled 的复选框（渲染层 disabled：label 上 opacity-50，点击直接返回，<input> 禁用）：点不动、整体淡到 50%、
+// 节点标成禁用；启用时照常翻转。
+func TestCheckboxDisabledIsInertAndFaded(t *testing.T) {
+	var on, disabled bool
+	h := openPage(t, still(), 400, 200, func(l *Look, c ui.C) {
+		ui.Column(c).Fill().Pad(24).Children(func() {
+			l.Checkbox(c.Key("cb"), &on, CheckboxSpec{Label: "同时清除", Disabled: disabled})
+		})
+	})
+	alpha := func() float32 {
+		a, _ := textAlpha(h, "同时清除")
+		return a
+	}
+	n, ok := h.node(gfx.RoleCheckbox, "同时清除")
+	if !ok {
+		t.Fatal("没有找到复选框")
+	}
+	if n.Disabled || alpha() < 0.999 {
+		t.Fatalf("启用时不应禁用也不应变淡：disabled=%v 文字不透明度 %.3f", n.Disabled, alpha())
+	}
+	h.clickAt(n.Bounds.X+8, n.Bounds.Y+8)
+	if !on {
+		t.Fatal("启用时点一下应当勾选")
+	}
+	disabled = true
+	h.frames(3)
+	n, _ = h.node(gfx.RoleCheckbox, "同时清除")
+	if !n.Disabled {
+		t.Error("禁用时节点应标成禁用")
+	}
+	if a := alpha(); math.Abs(float64(a-0.5)) > 0.01 {
+		t.Errorf("禁用时文字不透明度 %.3f，期望 0.5（opacity-50）", a)
+	}
+	h.clickAt(n.Bounds.X+8, n.Bounds.Y+8) // 点方框
+	if !on {
+		t.Error("禁用时点方框不应改变值")
+	}
+	label, _ := confirmTextBounds(h, "同时清除")
+	h.clickAt(label.X+4, label.Y+4) // 点文字（label 的点击）
+	if !on {
+		t.Error("禁用时点文字不应改变值")
+	}
+	disabled = false
+	h.frames(3)
+	h.clickAt(label.X+4, label.Y+4)
+	if on {
+		t.Error("恢复启用后点文字应翻转（取消勾选）")
 	}
 }

@@ -14,6 +14,11 @@ type ConfirmSpec struct {
 	Title string // 可为空：无标题时可访问名取确认按钮的文字
 	// Message 是说明文字，居中、可折行。
 	Message string
+	// Body 非空时代替 Message 声明说明区：渲染层的 message 可以是任意节点（彻底删除的确认框里是两段话加一个复选框，
+	// 外层 `space-y-3 text-left`）。Body 在一个撑满宽度、子项间距 12px、左对齐的竖排里声明；这个竖排仍是 mb-6 的说明区。
+	Body func(c ui.C)
+	// Description 是对话框的可访问描述（aria-describedby 指向的说明区的文字）；空则取 Message。给了 Body 时应当给它。
+	Description string
 	// ConfirmText、CancelText 缺省时与渲染层一样是英文的 "Confirm"、"Cancel"；调用方应当总是传已本地化的文字。
 	ConfirmText, CancelText string
 	// Destructive 为真时顶部多一个红色警示圈，确认钮是红色（渲染层 variant="destructive"）。
@@ -73,6 +78,10 @@ func (l *Look) ConfirmDialog(c ui.C, st *ConfirmState, spec ConfirmSpec) Confirm
 	if name == "" {
 		name = confirmText
 	}
+	description := spec.Description
+	if description == "" {
+		description = spec.Message
+	}
 	// ui.Key 只作用于紧接着的一次声明：每个键取出来就立刻交给 ui.ID 或节点，不要先存起来再用。
 	// 两枚按钮的 ID 在面板里面取（身份挂在面板的作用域下，Box.Shortcut 才认得「焦点在面板里」）；
 	// 面板的 Draw 在整棵树声明完之后才执行，那时 cancelID 已经有值。
@@ -102,7 +111,7 @@ func (l *Look) ConfirmDialog(c ui.C, st *ConfirmState, spec ConfirmSpec) Confirm
 				l.PaintSurface(d, surface)
 				// 面板是不透明的：按在面板边距或说明文字上不能落到下面的遮罩（那会关闭对话框）。
 				d.Canvas.Block(d.Rect)
-				d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, name, gfx.HitOptions{Description: spec.Message})
+				d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, name, gfx.HitOptions{Description: description})
 			}).
 			DrawOver(func(d *ui.DrawContext) {
 				d.Canvas.PopFocusScope()
@@ -119,7 +128,12 @@ func (l *Look) ConfirmDialog(c ui.C, st *ConfirmState, spec ConfirmSpec) Confirm
 			if spec.Title != "" {
 				l.Heading(c.Key("title"), 3, spec.Title, TextLG, WeightSemibold, t.Foreground, Centered(), Wrapped()).MarginBottom(l.Space(2))
 			}
-			l.Text(c.Key("message"), spec.Message, TextSM, WeightNormal, t.MutedForeground, Centered(), Wrapped()).MarginBottom(l.Space(6))
+			if spec.Body != nil {
+				// 说明区里是一个 space-y-3 text-left 的块：段落靠左，不再居中。
+				ui.Column(c.Key("message")).FillWidth().Gap(l.Space(3)).MarginBottom(l.Space(6)).Children(func() { spec.Body(c.Key("body")) })
+			} else {
+				l.Text(c.Key("message"), spec.Message, TextSM, WeightNormal, t.MutedForeground, Centered(), Wrapped()).MarginBottom(l.Space(6))
+			}
 			ui.Row(c.Key("buttons")).FillWidth().Gap(l.Space(3)).Children(func() {
 				cancelID, confirmID = ui.ID(c.Key("cancel")), ui.ID(c.Key("confirm"))
 				if l.dialogButton(c.Key("cancel-button"), cancelID, cancelText, l.cancelButtonStyle(), spec.Loading, false, 0.5).Clicked() {

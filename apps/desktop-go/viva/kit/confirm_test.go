@@ -348,3 +348,90 @@ func TestSpinnerTurnsOnlyWhenMotionAllowed(t *testing.T) {
 		}
 	})
 }
+
+// confirmTextBounds 是当前帧里某段文字的外框；没有则 ok 为假。
+func confirmTextBounds(h *harness, value string) (gfx.Rect, bool) {
+	for _, tx := range h.session.Snapshot().Texts {
+		if tx.Value == value {
+			return tx.Bounds, true
+		}
+	}
+	return gfx.Rect{}, false
+}
+
+// 说明区可以换成任意内容（彻底删除的确认框：两段话加一个复选框，靠左、子项间距 12、下边距 24）：
+// Message 不再声明，对话框的可访问描述取 Description，复选框翻转的是调用方的值。
+func TestConfirmBodyReplacesTheMessage(t *testing.T) {
+	const first, second, option = "第一段说明", "第二段说明", "同时清除相关证据"
+	var open, cleared bool
+	var st ConfirmState
+	h := openPage(t, still(), 800, 600, func(l *Look, c ui.C) {
+		openC := c.Key("open")
+		if ui.Row(openC).Size(120, 40).HitWith(ui.ID(openC), "打开", gfx.HitOptions{Role: gfx.RoleButton}).Clicked() {
+			open = true
+		}
+		l.ConfirmDialog(c, &st, ConfirmSpec{
+			Open: open, Title: confirmTitle, Message: confirmMessage,
+			Description: first + " " + second + " " + option,
+			Body: func(c ui.C) {
+				l.Text(c.Key("p1"), first, TextSM, WeightNormal, l.T.MutedForeground, Wrapped())
+				l.Text(c.Key("p2"), second, TextSM, WeightNormal, l.T.MutedForeground, Wrapped())
+				l.Checkbox(c.Key("cb"), &cleared, CheckboxSpec{Label: option})
+			},
+			ConfirmText: confirmOK, CancelText: confirmCancel, Destructive: true,
+		})
+	})
+	openConfirm(h)
+	if _, ok := confirmTextBounds(h, confirmMessage); ok {
+		t.Error("给了 Body 时不应再画 Message")
+	}
+	panel, ok := h.node(gfx.RoleGroup, confirmTitle)
+	if !ok {
+		t.Fatal("没有找到对话框面板")
+	}
+	if want := first + " " + second + " " + option; panel.Description != want {
+		t.Errorf("面板描述 %q，期望 %q", panel.Description, want)
+	}
+	p1, ok1 := confirmTextBounds(h, first)
+	p2, ok2 := confirmTextBounds(h, second)
+	if !ok1 || !ok2 {
+		t.Fatalf("两段话都应当画出来：%v %v", ok1, ok2)
+	}
+	// 靠左（text-left）：从面板内容区左缘起（1px 边框加 p-6），而不是居中。
+	for name, b := range map[string]gfx.Rect{first: p1, second: p2} {
+		if math.Abs(float64(b.X-(panel.Bounds.X+25))) > 0.01 {
+			t.Errorf("%q 左缘 %g，期望贴着内容区左缘 %g", name, b.X, panel.Bounds.X+25)
+		}
+	}
+	// space-y-3：两段话之间隔 12。
+	if gap := p2.Y - (p1.Y + p1.Height); math.Abs(float64(gap-12)) > 0.01 {
+		t.Errorf("两段话之间隔 %g，期望 12（space-y-3）", gap)
+	}
+	box, ok := h.node(gfx.RoleCheckbox, option)
+	if !ok {
+		t.Fatal("没有找到复选框")
+	}
+	// 复选框行（行高 20，方框 16 居中）与上一段隔 12。
+	if gap := (box.Bounds.Y - 2) - (p2.Y + p2.Height); math.Abs(float64(gap-12)) > 0.01 {
+		t.Errorf("复选框行与上一段之间隔 %g，期望 12", gap)
+	}
+	// 说明区下边距 mb-6：按钮行顶上留 24。
+	cancel, _ := h.node(gfx.RoleButton, confirmCancel)
+	if gap := cancel.Bounds.Y - (box.Bounds.Y + 16 + 2); math.Abs(float64(gap-24)) > 0.01 {
+		t.Errorf("说明区到按钮行 %g，期望 24（mb-6）", gap)
+	}
+	h.clickAt(box.Bounds.X+8, box.Bounds.Y+8)
+	if !cleared {
+		t.Error("点复选框应翻转调用方的值")
+	}
+}
+
+// 没有 Body 时描述仍取 Message；给了 Description 时描述取它（Body 的文字不在 Message 里）。
+func TestConfirmDescriptionDefaultsToTheMessage(t *testing.T) {
+	h, _ := openConfirmPage(t, still(), nil)
+	openConfirm(h)
+	panel, _ := h.node(gfx.RoleGroup, confirmTitle)
+	if panel.Description != confirmMessage {
+		t.Errorf("没有给 Description 时面板描述 %q，期望取 Message", panel.Description)
+	}
+}

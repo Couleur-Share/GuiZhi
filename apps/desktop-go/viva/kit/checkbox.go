@@ -19,7 +19,8 @@ import (
 // 可访问的 checkbox 都在它身上；后声明的命中区优先）。点 label 的其余部分翻转同一个 *checked——这样方框的悬停只由方框自己决定，
 // 与渲染层一致。
 //
-// 渲染层的 indeterminate 与 disabled 还没有使用方，随用到它们的界面一起补。
+// disabled：label 上 opacity-50 cursor-not-allowed，点击直接返回，<input> 禁用（不取键盘焦点）。
+// 渲染层的 indeterminate 还没有使用方，随用到它的界面一起补。
 
 // CheckboxSpec 描述一个复选框。
 type CheckboxSpec struct {
@@ -27,6 +28,8 @@ type CheckboxSpec struct {
 	Label string
 	// Name 是没有文字标签时的可访问名（渲染层的 ariaLabel）。
 	Name string
+	// Disabled 让复选框整体变淡到 50%、点不动、没有键盘停靠点（渲染层 disabled）。
+	Disabled bool
 }
 
 // checkMark 是对勾：viewBox 12，M2 6 L5 9 L10 3，笔画 2（渲染层 Checkbox 里的内联 SVG）。
@@ -49,43 +52,57 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 	var box ui.Box
 	// label 的点击要在声明方框之前读出来：方框按这一刻的 *checked 声明，翻转之后才不会被它盖回去。
 	labelID := ui.ID(c)
-	if c.Canvas().Clicked(labelID) {
+	if !spec.Disabled && c.Canvas().Clicked(labelID) {
 		*checked = !*checked
 	}
-	ui.Row(c).Items(ui.Center).Gap(l.Space(2)).
-		HitWith(labelID, "", gfx.HitOptions{SkipFocus: true, Cursor: gfx.PointerCursorHand}).
-		Children(func() {
-			// 悬停与选中的过渡挂在专用的动画 ID 上：CheckboxBase 的命中 ID 由 *checked 的地址决定，取不到。
-			anim := ui.ID(c.Key("anim"))
-			side, markSide, radius := l.Rem(1), l.Rem(0.75), l.Rem(0.25)
-			name := spec.Label
-			if name == "" {
-				name = spec.Name
-			}
+	cursor := gfx.PointerCursorHand
+	if spec.Disabled {
+		cursor = gfx.PointerCursorNotAllowed
+	}
+	row := ui.Row(c).Items(ui.Center).Gap(l.Space(2)).
+		HitWith(labelID, "", gfx.HitOptions{SkipFocus: true, Cursor: cursor, Disabled: spec.Disabled})
+	if spec.Disabled {
+		row = row.Opacity(0.5)
+	}
+	row.Children(func() {
+		// 悬停与选中的过渡挂在专用的动画 ID 上：CheckboxBase 的命中 ID 由 *checked 的地址决定，取不到。
+		anim := ui.ID(c.Key("anim"))
+		side, markSide, radius := l.Rem(1), l.Rem(0.75), l.Rem(0.25)
+		name := spec.Label
+		if name == "" {
+			name = spec.Name
+		}
+		if spec.Disabled {
+			// 禁用的方框不走 CheckboxBase：它的命中区没有地方写 Disabled，可访问树里就不会是「禁用」
+			// （渲染层的 <input disabled> 在 ARIA 快照里是 checkbox [disabled]）。没有键盘停靠点，也点不动。
+			box = ui.Row(c.Key("box")).Size(side, side).Shrink(0).Items(ui.Center).Justify(ui.Center).
+				HitWith(ui.ID(c.Key("box-off")), name, gfx.HitOptions{Role: gfx.RoleCheckbox, Checked: *checked, Disabled: true})
+		} else {
 			box = ui.CheckboxBase(c.Key("box"), checked, name).Size(side, side).Shrink(0).HitOutset(0, 0, 0, 0).
 				Items(ui.Center).Justify(ui.Center)
 			l.noteStop(box)
-			canvas := c.Canvas()
-			hover := l.hoverTo(canvas, anim, 0, box.State().Hovered, DurationBase)
-			active := l.hoverTo(canvas, anim, 1, *checked, DurationBase)
-			box.Draw(func(d *ui.DrawContext) {
-				// 未选中的悬停边框先混，再按选中进度混向 primary：选中后悬停不再变化，取消选中时回到悬停色，与 CSS 过渡的终点一致。
-				border := MixToken(MixToken(t.Border, t.Primary.WithAlpha(0.5), hover), t.Primary, active)
-				bg := MixToken(t.Background, t.Primary, active)
-				if d.State.FocusVisible {
-					l.PaintRing(d, 2, l.ringColor(), radius)
-				}
-				l.PaintSurface(d, Surface{Bg: bg, Border: border, BorderW: 1, Radius: radius})
-			}).Children(func() {
-				// 对勾 h-3 w-3，居中；不透明度随选中进度（transition-opacity duration-base）。
-				// 未选中时也要声明（全透明、不画任何图元）：渲染层那枚 SVG 一直在，只是 opacity-0；对照按外框与数量比，
-				// 看不见的图标只是不比墨迹（compare_icons.go 的 invisibleReactIcons）。
-				l.Icon(c.Key("mark"), checkMark, markSide, t.PrimaryForeground.WithAlpha(t.PrimaryForeground.A*active))
-			})
-			if spec.Label != "" {
-				l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)
+		}
+		canvas := c.Canvas()
+		hover := l.hoverTo(canvas, anim, 0, box.State().Hovered, DurationBase)
+		active := l.hoverTo(canvas, anim, 1, *checked, DurationBase)
+		box.Draw(func(d *ui.DrawContext) {
+			// 未选中的悬停边框先混，再按选中进度混向 primary：选中后悬停不再变化，取消选中时回到悬停色，与 CSS 过渡的终点一致。
+			border := MixToken(MixToken(t.Border, t.Primary.WithAlpha(0.5), hover), t.Primary, active)
+			bg := MixToken(t.Background, t.Primary, active)
+			if d.State.FocusVisible {
+				l.PaintRing(d, 2, l.ringColor(), radius)
 			}
+			l.PaintSurface(d, Surface{Bg: bg, Border: border, BorderW: 1, Radius: radius})
+		}).Children(func() {
+			// 对勾 h-3 w-3，居中；不透明度随选中进度（transition-opacity duration-base）。
+			// 未选中时也要声明（全透明、不画任何图元）：渲染层那枚 SVG 一直在，只是 opacity-0；对照按外框与数量比，
+			// 看不见的图标只是不比墨迹（compare_icons.go 的 invisibleReactIcons）。
+			l.Icon(c.Key("mark"), checkMark, markSide, t.PrimaryForeground.WithAlpha(t.PrimaryForeground.A*active))
 		})
+		if spec.Label != "" {
+			l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)
+		}
+	})
 	// 方框翻转的值要在返回前就落到 *checked 上：ui.CheckboxBase 只在第一次问 Clicked / Changed 或本页结束时才写入，
 	// 调用方在同一帧里拿 *checked 与调用前比较（表格的行选择框、表头的全选框）会一直看到旧值，点击就丢了。
 	// 悬停与选中的过渡目标在上面已按旧值算过，所以画面的时间线不变：点击这一帧还是旧状态，下一帧才是新状态。
