@@ -35,6 +35,9 @@ type detailUI struct {
 	focusReading bool
 	// viewerWait 是图片查看岛加载期间的转圈：延迟登场（detailviewer.go）。
 	viewerWait kit.Delayed
+	// viewportW 是最近一帧的窗口宽度（逻辑像素）：岛的响应式断点按窗口宽度而不是阅读区宽度判定（reader.Theme.ViewportWidth），
+	// 页面事件的回调里没有 ui.C，图片查看岛打开时用这里记下的值。
+	viewportW float32
 	// focusRect 与 exitSize 是上一帧专注工作区的位置与大小、「退出专注」浮钮自然的大小（窗口坐标）：阅读岛盖住同层的东西，
 	// 岛在场时浮钮要抬到更高的一层（exitFocusButton），那一层的范围要在声明时就知道。
 	focusRect gfx.Rect

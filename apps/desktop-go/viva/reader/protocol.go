@@ -67,14 +67,20 @@ type Theme struct {
 	// BasePx 是根字号（px），设置里的 14 / 16 / 18 三档。
 	BasePx float64 `json:"basePx"`
 	Motion Motion  `json:"motion"`
+	// ViewportWidth 是窗口宽度（逻辑像素）：渲染层的响应式样式（sm / md / lg / xl / 2xl）按窗口宽度判定，岛的视口只有阅读区那么宽，
+	// 页面据此写 <html data-win-ge>，样式表里的 min-width 断点改按它判定（页面一侧见 reader/breakpoints.ts）。0 表示不给，页面取自身宽度。
+	ViewportWidth float64 `json:"viewportWidth,omitempty"`
 }
 
 // Validate 检查外观输入：数值有限、根字号在页面接受的范围内、动效档位已知。页面对坏值同样会丢弃，宿主先拦下才能给出原因。
 func (t Theme) Validate() error {
-	for _, v := range []float64{t.Hue, t.Saturation, t.BasePx} {
+	for _, v := range []float64{t.Hue, t.Saturation, t.BasePx, t.ViewportWidth} {
 		if math.IsNaN(v) || math.IsInf(v, 0) {
 			return errors.New("reader: 外观数值不是有限数")
 		}
+	}
+	if t.ViewportWidth != 0 && (t.ViewportWidth < 100 || t.ViewportWidth > 20000) {
+		return fmt.Errorf("reader: 窗口宽度 %v 超出 100–20000", t.ViewportWidth)
 	}
 	if t.BasePx < 8 || t.BasePx > 40 {
 		return fmt.Errorf("reader: 根字号 %v 超出 8–40", t.BasePx)

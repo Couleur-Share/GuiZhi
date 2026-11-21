@@ -469,10 +469,10 @@ func TestViewerServesItsPageAssetsAndMedia(t *testing.T) {
 func TestParseViewerEvent(t *testing.T) {
 	t.Parallel()
 	good := map[string]ViewerEvent{
-		`{"t":"ready","v":1}`:             {Kind: ViewerEventReady, Version: 1},
-		`{"t":"close"}`:                   {Kind: ViewerEventClose},
+		`{"t":"ready","v":1}`:           {Kind: ViewerEventReady, Version: 1},
+		`{"t":"close"}`:                 {Kind: ViewerEventClose},
 		`{"t":"error","message":"出错了"}`: {Kind: ViewerEventError, Message: "出错了"},
-		`{"t":"error","message":""}`:      {Kind: ViewerEventError},
+		`{"t":"error","message":""}`:    {Kind: ViewerEventError},
 	}
 	for text, want := range good {
 		got, err := ParseViewerEvent(text)

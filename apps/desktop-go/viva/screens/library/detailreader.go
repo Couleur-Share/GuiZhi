@@ -95,7 +95,7 @@ func (s *Screen) readerViewOf(item services.LibraryItem, caps ItemCaps, active R
 }
 
 // readerTheme 是页面的外观输入：与 <html> 上的主题类、色相、饱和度、根字号、动效档位一一对应（页面用同一份样式表算令牌）。
-func readerTheme(l *kit.Look) reader.Theme {
+func readerTheme(l *kit.Look, viewportWidth float32) reader.Theme {
 	motion := reader.MotionOff
 	switch l.Spec.Motion {
 	case kit.MotionLevelStandard:
@@ -103,7 +103,7 @@ func readerTheme(l *kit.Look) reader.Theme {
 	case kit.MotionLevelReduced:
 		motion = reader.MotionReduced
 	}
-	return reader.Theme{Dark: l.Dark, Hue: l.Spec.Hue, Saturation: l.Spec.Saturation, BasePx: float64(l.RootPx), Motion: motion}
+	return reader.Theme{Dark: l.Dark, Hue: l.Spec.Hue, Saturation: l.Spec.Saturation, BasePx: float64(l.RootPx), Motion: motion, ViewportWidth: float64(viewportWidth)}
 }
 
 // readerLang 是页面的界面语言（设置里的「语言」）。
@@ -129,12 +129,13 @@ func (p *panelState) readerFind(kind reader.ViewKind) (query string, index int) 
 }
 
 // readerRequest 把界面状态整理成这一帧阅读区的期望。
-func (s *Screen) readerRequest(item services.LibraryItem, caps ItemCaps, active ReadingTab) reader.Request {
+func (s *Screen) readerRequest(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab) reader.Request {
 	p := &s.detail.panel
 	view := s.readerViewOf(item, caps, active)
+	s.detail.viewportW = s.Look.ViewportWidth(c)
 	req := reader.Request{
 		ItemID: item.ID, Tab: reader.Tab(active), View: view, CatalogOpen: p.catalogOpen,
-		Theme: readerTheme(s.Look), Lang: readerLang(),
+		Theme: readerTheme(s.Look, s.detail.viewportW), Lang: readerLang(),
 	}
 	if view.Kind == reader.ViewNone {
 		return req
@@ -172,7 +173,7 @@ func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, ac
 	if host == nil {
 		return
 	}
-	req := s.readerRequest(item, caps, active)
+	req := s.readerRequest(c, item, caps, active)
 	failure := host.Failure(req)
 	col.Draw(func(d *ui.DrawContext) {
 		if failure == nil {

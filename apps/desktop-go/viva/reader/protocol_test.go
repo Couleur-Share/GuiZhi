@@ -271,13 +271,17 @@ func TestThemeValidate(t *testing.T) {
 		t.Errorf("上界应当通过：%v", err)
 	}
 	for name, th := range map[string]Theme{
-		"字号太小":   {BasePx: 7.9, Motion: MotionStandard},
-		"字号太大":   {BasePx: 40.1, Motion: MotionStandard},
-		"色相 NaN": {Hue: math.NaN(), BasePx: 16, Motion: MotionStandard},
-		"饱和度无穷":  {Saturation: math.Inf(1), BasePx: 16, Motion: MotionStandard},
-		"字号无穷":   {BasePx: math.Inf(-1), Motion: MotionStandard},
-		"动效未知":   {BasePx: 16, Motion: "fast"},
-		"动效为空":   {BasePx: 16},
+		"字号太小":     {BasePx: 7.9, Motion: MotionStandard},
+		"字号太大":     {BasePx: 40.1, Motion: MotionStandard},
+		"色相 NaN":   {Hue: math.NaN(), BasePx: 16, Motion: MotionStandard},
+		"饱和度无穷":    {Saturation: math.Inf(1), BasePx: 16, Motion: MotionStandard},
+		"字号无穷":     {BasePx: math.Inf(-1), Motion: MotionStandard},
+		"动效未知":     {BasePx: 16, Motion: "fast"},
+		"动效为空":     {BasePx: 16},
+		"窗口太窄":     {BasePx: 16, Motion: MotionStandard, ViewportWidth: 99},
+		"窗口太宽":     {BasePx: 16, Motion: MotionStandard, ViewportWidth: 20001},
+		"窗口宽度 NaN": {BasePx: 16, Motion: MotionStandard, ViewportWidth: math.NaN()},
+		"窗口宽度无穷":   {BasePx: 16, Motion: MotionStandard, ViewportWidth: math.Inf(1)},
 	} {
 		if th.Validate() == nil {
 			t.Errorf("%s：应当不通过", name)
@@ -287,6 +291,29 @@ func TestThemeValidate(t *testing.T) {
 		if err := (Theme{BasePx: 16, Motion: m}).Validate(); err != nil {
 			t.Errorf("动效 %s：%v", m, err)
 		}
+	}
+	// 窗口宽度：0 表示不给，100 与 20000 是两个边界。
+	for _, w := range []float64{0, 100, 800, 1280, 20000} {
+		if err := (Theme{BasePx: 16, Motion: MotionStandard, ViewportWidth: w}).Validate(); err != nil {
+			t.Errorf("窗口宽度 %v 应当通过：%v", w, err)
+		}
+	}
+}
+
+func TestThemeJSONCarriesTheWindowWidthOnlyWhenGiven(t *testing.T) {
+	without, err := json.Marshal(Theme{BasePx: 16, Motion: MotionStandard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(without), "viewportWidth") {
+		t.Errorf("没给窗口宽度时不该出现这个字段（页面据此取自身宽度）：%s", without)
+	}
+	with, err := json.Marshal(Theme{BasePx: 16, Motion: MotionStandard, ViewportWidth: 1280})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(with), `"viewportWidth":1280`) {
+		t.Errorf("给了窗口宽度要带上：%s", with)
 	}
 }
 

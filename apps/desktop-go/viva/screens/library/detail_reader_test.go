@@ -250,9 +250,13 @@ func TestOpeningAnItemOpensOneIslandAndSendsTheViewAndTheTheme(t *testing.T) {
 	}
 	init := p.last(t, "init")
 	theme := init["theme"].(map[string]any)
-	want := readerTheme(rr.look)
+	want := readerTheme(rr.look, 1280)
 	if theme["dark"] != want.Dark || theme["hue"] != want.Hue || theme["saturation"] != want.Saturation || theme["basePx"] != want.BasePx {
 		t.Errorf("外观与界面不一致：%v 应为 %+v", theme, want)
+	}
+	// 响应式断点按窗口宽度判定：岛只有阅读区那么宽（592 px 量过），页面却要按窗口宽度（1280）算 sm / xl 这些断点。
+	if theme["viewportWidth"] != float64(1280) {
+		t.Errorf("外观要带窗口宽度 1280，不是阅读区宽度：%v", theme["viewportWidth"])
 	}
 	if init["lang"] != "zh" {
 		t.Errorf("界面语言应是中文：%v", init["lang"])
@@ -876,5 +880,28 @@ func TestTocPreferenceRoundTripAndLimit(t *testing.T) {
 	var flags map[string]bool
 	if err := json.Unmarshal(raw, &flags); err != nil || len(flags) > maxCatalogFlags {
 		t.Fatalf("超过上限要裁掉：%d 项 %v", len(flags), err)
+	}
+}
+
+func TestWindowResizeSendsANewThemeWithTheNewWindowWidth(t *testing.T) {
+	t.Parallel()
+	rr := newReaderRig(t)
+	rr.openCard(detailNoteID)
+	p := rr.ready()
+	if len(p.messages(t, "theme")) != 0 {
+		t.Fatal("什么都没变时不该发 theme")
+	}
+	rr.look.Viewport = 900 // 窗口变窄（页面宽度不变，断点依据变了）
+	rr.frames(2)
+	themes := p.messages(t, "theme")
+	if len(themes) != 1 {
+		t.Fatalf("窗口宽度变了要发一条 theme：%d 条", len(themes))
+	}
+	if themes[0]["theme"].(map[string]any)["viewportWidth"] != float64(900) {
+		t.Errorf("theme 要带新的窗口宽度：%v", themes[0])
+	}
+	rr.frames(5)
+	if len(p.messages(t, "theme")) != 1 {
+		t.Error("同一个宽度不该重复发")
 	}
 }

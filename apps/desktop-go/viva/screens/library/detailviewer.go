@@ -41,7 +41,7 @@ func (s *Screen) showViewer(images []reader.Image, index int) {
 	if s.readerHost == nil {
 		return
 	}
-	s.readerHost.Viewer().Show(images, index, readerTheme(s.Look), readerLang())
+	s.readerHost.Viewer().Show(images, index, readerTheme(s.Look, s.detail.viewportW), readerLang())
 }
 
 // viewerLayer 声明查看器的整窗浮层：每帧都要调（没有要显示的就只复位转圈的计时）。

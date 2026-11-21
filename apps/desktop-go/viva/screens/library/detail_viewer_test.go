@@ -84,6 +84,10 @@ func TestLightboxEventOpensTheViewerIslandWithTheImagesAndTheCurrentLook(t *test
 	if theme["basePx"] != float64(16) || init["lang"] != "zh" {
 		t.Errorf("外观与语言取界面当前的值：%v %v", theme, init["lang"])
 	}
+	// 灯箱事件的回调里没有 ui.C，窗口宽度取最近一帧记下的值。
+	if theme["viewportWidth"] != float64(1280) {
+		t.Errorf("查看岛的外观要带窗口宽度：%v", theme["viewportWidth"])
+	}
 	if len(vp.places) == 0 {
 		t.Fatal("握手之后应把查看岛摆上")
 	}
