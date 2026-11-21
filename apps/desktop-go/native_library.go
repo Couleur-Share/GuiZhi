@@ -12,7 +12,12 @@ import (
 )
 
 // libraryAdapter 把知识库侧栏用到的处理器接成 services.Library。
-type libraryAdapter struct{ b *Bridge }
+//
+// hub 是推送分发（进度订阅用，见 native_library_media.go）；为空时没有推送，只影响 SubscribeMediaProgress。
+type libraryAdapter struct {
+	b   *Bridge
+	hub *pushHub
+}
 
 var _ services.Library = libraryAdapter{}
 

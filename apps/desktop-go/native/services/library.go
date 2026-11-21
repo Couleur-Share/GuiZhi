@@ -134,4 +134,17 @@ type Library interface {
 	RecognizeImageText(ctx context.Context, assetFileName string) (string, error)
 	// UpdateItemFields 局部更新条目的摘要或正文并返回更新后的完整条目（knowledge:update）；found 为假表示条目不存在。
 	UpdateItemFields(ctx context.Context, id string, patch LibraryItemFieldsPatch) (item LibraryItem, found bool, err error)
+
+	// TranscribeMedia 转写音视频条目（media:transcribe）：含排版、总结与 AI 标题，结果写回条目。
+	// diarize 为真时区分说话人（仅内置本地引擎）。业务失败与未配置在 LibraryMediaActionResult 里，error 只表示调用本身失败。
+	TranscribeMedia(ctx context.Context, itemID string, diarize bool) (LibraryMediaActionResult, error)
+	// FormatTranscript 对已有文字稿做 AI 排版（media:formatTranscript）；allowLong 为真表示用户已确认超长稿的代价。
+	FormatTranscript(ctx context.Context, itemID string, allowLong bool) (LibraryMediaActionResult, error)
+	// SummarizeMedia 生成音视频总结或论坛讨论总结并写入正文（media:summarize）。
+	SummarizeMedia(ctx context.Context, itemID string) (LibraryMediaActionResult, error)
+	// RefreshForumDiscussion 重新抓取支持站点的论坛讨论并替换正文里的讨论小节（media:refreshForumDiscussion）。
+	RefreshForumDiscussion(ctx context.Context, itemID string) (LibraryMediaActionResult, error)
+	// SubscribeMediaProgress 订阅转写与排版的进度推送（media:transcribeProgress、media:formatProgress）。
+	// 回调可能在任意 goroutine 触发；某一路传 nil 表示不关心。返回取消函数，可重复调用，取消后不再回调。
+	SubscribeMediaProgress(onTranscribe func(LibraryTranscribeProgress), onFormat func(LibraryTranscriptFormatProgress)) (unsubscribe func())
 }

@@ -221,7 +221,7 @@ func (a logAdapter) AppError(scope, action, message string) {
 func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 	return services.Services{
 		Imports:      importsAdapter{b: b, hub: hub},
-		Library:      libraryAdapter{b: b},
+		Library:      libraryAdapter{b: b, hub: hub},
 		Log:          logAdapter{b: b},
 		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
 	}
