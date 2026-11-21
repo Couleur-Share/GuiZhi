@@ -362,7 +362,7 @@ describe("阅读岛页面：交给宿主处理的交互", () => {
     const images = container.querySelectorAll("img");
     expect(images).toHaveLength(2);
     // 页面里的 local-image:// 被改写成岛自己的路径
-    expect(images[1].getAttribute("src")).toBe("/media/local-image/b.png");
+    expect(images[1].getAttribute("src")).toBe("./media/local-image/b.png");
     fireEvent.click(images[1]);
     expect(events("lightbox")).toEqual([
       {

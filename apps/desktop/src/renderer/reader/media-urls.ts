@@ -1,11 +1,14 @@
 /**
- * 把页面里的 local-image:// / local-video:// 改写成岛自己的 scheme 下的路径（宿主在 /media/<scheme>/<名称> 提供，并做路径与扩展名校验）。
+ * 把页面里的 local-image:// / local-video:// 改写成岛自己的 scheme 下的路径（宿主在 media/<scheme>/<名称> 提供，并做路径与扩展名校验）。
  *
  * 做法与 Go 壳里旧渲染层的 shim/media-urls.ts 一致（它改写到 http://<scheme>.localhost/）：复用的阅读组件不改，
  * 在页面里统一拦截 1) 元素的 src / poster 属性与 IDL 属性、2) setAttribute、3) 经 innerHTML 等带入的节点（MutationObserver）。
  * 规则函数单独导出，便于单测；installMediaRewrite 才碰 DOM。
  *
- * 路径是相对的（/media/…），随页面地址解析成 <scheme>://<host>/media/…，这样本文件不需要知道岛的 scheme 名。
+ * 路径是相对文档的（./media/…），随页面地址 <scheme>://<host>/index.html 解析成 <scheme>://<host>/media/…，这样本文件不需要知道岛的 scheme 名与主机段。
+ * 不能写成根相对的 /media/…：Viva 把地址的第一段当主机段（页面是 doc），宿主只收到主机段之后的路径，
+ * 根相对的 /media/local-image/a.png 会被拆成主机 media 加路径 local-image/a.png，宿主按 media/ 前缀找不到、图片全部加载失败
+ * （readersmoke 在真 WebView2 里抓到，台账 R-15；无头与 jsdom 测试看不到这一层）。
  */
 
 const SCHEMES = ["local-image", "local-video"] as const;
@@ -23,7 +26,7 @@ export function rewriteMediaUrl(value: string): string {
       /* 非法百分号序列：按原文编码 */
     }
     const segments = name.split(/[\\/]+/).filter(Boolean);
-    return `/media/${scheme}/${segments.map(encodeURIComponent).join("/")}`;
+    return `./media/${scheme}/${segments.map(encodeURIComponent).join("/")}`;
   }
   return value;
 }

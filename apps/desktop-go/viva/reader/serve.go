@@ -27,6 +27,8 @@ const htmlTag = `<html lang="zh-CN">`
 var defaultTheme = Theme{Hue: 210, Saturation: 35, BasePx: 16, Motion: MotionStandard}
 
 // serve 是 island.Config.Serve：按路径提供页面文件与本地媒体。路径不含主机名与查询串，没有前导斜杠（兼容有的情形）。
+// Viva 把页面地址的第一段当主机段（页面是 doc/index.html，主机段 doc），宿主只收到主机段之后的路径：
+// 所以页面里的媒体地址必须相对文档（./media/…，解析成 doc/media/…，这里收到 media/…），写成根相对的 /media/… 就会被拆成主机 media。
 func (h *Host) serve(p string) (mime string, data []byte, ok bool) {
 	p = strings.TrimPrefix(p, "/")
 	switch {

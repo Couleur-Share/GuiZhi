@@ -118,28 +118,28 @@ describe("阅读岛协议：宿主消息的解析", () => {
 describe("阅读岛里的本地媒体地址改写", () => {
   it("local-image / local-video 改成岛自己的 /media 路径", () => {
     expect(rewriteMediaUrl("local-image://abc-1.png")).toBe(
-      "/media/local-image/abc-1.png",
+      "./media/local-image/abc-1.png",
     );
     expect(rewriteMediaUrl("local-video://clip.mp4")).toBe(
-      "/media/local-video/clip.mp4",
+      "./media/local-video/clip.mp4",
     );
   });
 
   it("名称按解码再编码规整：中文与已编码写法得到同一个结果", () => {
     expect(rewriteMediaUrl("local-image://图 1.png")).toBe(
-      "/media/local-image/%E5%9B%BE%201.png",
+      "./media/local-image/%E5%9B%BE%201.png",
     );
     expect(rewriteMediaUrl("local-image://%E5%9B%BE%201.png")).toBe(
-      "/media/local-image/%E5%9B%BE%201.png",
+      "./media/local-image/%E5%9B%BE%201.png",
     );
   });
 
   it("多余的分隔符被折叠，非法百分号序列不抛错", () => {
     expect(rewriteMediaUrl("local-image://a//b\\c.png")).toBe(
-      "/media/local-image/a/b/c.png",
+      "./media/local-image/a/b/c.png",
     );
     expect(rewriteMediaUrl("local-image://100%.png")).toBe(
-      "/media/local-image/100%25.png",
+      "./media/local-image/100%25.png",
     );
   });
 
@@ -147,7 +147,7 @@ describe("阅读岛里的本地媒体地址改写", () => {
     for (const value of [
       "https://example.com/a.png",
       "data:image/png;base64,AAAA",
-      "/media/local-image/x.png",
+      "./media/local-image/x.png",
       "",
       "local-image:/x.png",
     ]) {

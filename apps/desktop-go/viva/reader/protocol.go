@@ -5,7 +5,7 @@
 //   - 协议（protocol.go）：宿主 → 页面的消息怎么编码，页面 → 宿主的事件怎么校验。页面渲染的是不可信内容
 //     （台账 A-018），所以页面发来的一切都按不可信输入处理：长度上限、字段类型、取值白名单，校验不过的整条丢弃。
 //   - 宿主（host.go）：岛的按需开关、状态同步（只发变了的）、事件分派。窗口线程独占，没有锁。
-//   - 资源（serve.go）：页面文件与本地媒体（local-image:// 改写后的 /media/…，路径与扩展名由调用方提供的 Media 校验）。
+//   - 资源（serve.go）：页面文件与本地媒体（local-image:// 改写后的 ./media/…，路径与扩展名由调用方提供的 Media 校验）。
 //
 // Package reader hosts the reading-area island: a WebView2 page that renders article Markdown, forum floors and image
 // galleries with the renderer's own components. The page is untrusted (ledger A-018): everything it sends is validated.
