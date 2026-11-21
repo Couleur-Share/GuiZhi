@@ -53,6 +53,8 @@ type detailUI struct {
 	// notice 是头部上方三块通知条的折叠状态（detailnotice.go）。
 	notice noticeUI
 	modal  detailModal
+	// tools 是文章工具侧栏的界面状态（detailtools.go）。
+	tools toolsUI
 }
 
 // FocusReading 报告是否处于专注阅读模式：外壳据此隐去二级侧栏（渲染层 App 的 `!(isFocusReadingMode && appModule === "library")`）。
@@ -74,6 +76,7 @@ func (s *Screen) toggleFocusReading() { s.SetFocusReading(!s.detail.focusReading
 func (s *Screen) remountDetail() {
 	s.detail.panel = panelState{}
 	s.detail.notice = noticeUI{}
+	s.detail.tools = toolsUI{} // 工具侧栏随 ItemDetail 重新挂载：toolsItemId 回到 null
 	s.detail.titleItem = ""
 	s.detail.edit.leave() // 编辑态随内容面板卸载而结束（草稿还在，再进来时恢复）
 }
@@ -197,10 +200,13 @@ func (s *Screen) itemDetailBody(c ui.C, v View, item services.LibraryItem, onClo
 	}
 	caps := s.derivedOf(item).caps
 	s.syncNotices(item.ID)
+	s.syncTools(v.Detail.Tools, item.ID)
+	col = col.Draw(func(d *ui.DrawContext) { s.detail.tools.area = d.Rect })
 	col.Children(func() {
 		s.conflictNotice(c, v, item)
 		s.revisionsNotice(c, v, item)
 		s.detailHeader(c, v, item, caps, trashed, onClose)
 		s.contentPanel(c, v, item, caps)
+		s.toolsPanel(c, v, item, caps, s.detail.panel.live)
 	})
 }

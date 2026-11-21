@@ -8,6 +8,8 @@ type FocusInfo struct {
 	Held  bool     // 有控件持有键盘焦点
 	Role  gfx.Role // 它的角色；命中区找不到（例如被滚出了视野）为 0
 	Layer uint16   // 它所在的层：0 是页面层，菜单、下拉与对话框的层更高
+	// Scope 是它所属的焦点作用域（PushFocusScope 声明的那一个）；零值表示没有声明过。文章工具侧栏据此判断「焦点在不在侧栏里」。
+	Scope gfx.ID
 }
 
 // FocusOf 读 canvas 上此刻持有键盘焦点的命中区（上一次绘制留下的）。窗口线程、两次绘制之间调用。
@@ -21,7 +23,7 @@ func FocusOf(canvas *gfx.Canvas) FocusInfo {
 	}
 	for _, h := range canvas.Hits() {
 		if h.ID == id {
-			return FocusInfo{Held: true, Role: h.Role, Layer: h.Layer}
+			return FocusInfo{Held: true, Role: h.Role, Layer: h.Layer, Scope: h.Scope}
 		}
 	}
 	return FocusInfo{Held: true}

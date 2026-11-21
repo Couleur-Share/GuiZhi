@@ -49,6 +49,7 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 		p.findOpen = false // 渲染层 effect：查找入口没了就关掉查找条
 	}
 	live := s.readerLive(item, caps, active)
+	p.live = live
 	ui.Column(c.Key("content")).FillWidth().Grow(1).MinHeight(0).Children(func() {
 		ui.Column(c.Key("panel")).FillWidth().Grow(1).MinHeight(0).Clip().
 			Draw(func(d *ui.DrawContext) {

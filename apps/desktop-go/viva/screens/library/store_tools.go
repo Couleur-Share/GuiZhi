@@ -43,7 +43,9 @@ type VersionsView struct {
 
 // ToolsView 是文章工具侧栏背后的状态；ItemID 是它属于哪一条。
 type ToolsView struct {
-	ItemID   string
+	ItemID string
+	// Mount 是这一代挂载的序号：它变了就是渲染层里整个工具侧栏重新挂载（换条目、采用版本后重新读取），界面里随挂载而生的状态要清空。
+	Mount    int
 	Comments CommentsView
 	Versions VersionsView
 	// HandoffBusy 是一次「复制给 AI」或「另存为」在途（AiHandoffButton 的 isBusy）：两枚按钮都禁用。
@@ -87,7 +89,7 @@ func (s *Store) initTools(ctx context.Context, id string, seq int) {
 	gen := s.detail.tools.gen
 	supported := item.DeletedAt == 0 && services.DetectSourceCommentsPlatform(item.SourceURI) != ""
 	web := item.DeletedAt == 0 && item.ItemType == services.LibraryTypeWebpage
-	s.view.Detail.Tools = ToolsView{ItemID: id, Comments: CommentsView{Supported: supported}}
+	s.view.Detail.Tools = ToolsView{ItemID: id, Mount: gen, Comments: CommentsView{Supported: supported}}
 	s.mu.Unlock()
 	s.wake()
 	if web {

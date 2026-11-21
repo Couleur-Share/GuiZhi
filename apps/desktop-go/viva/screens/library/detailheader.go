@@ -505,5 +505,5 @@ func (s *Screen) liveActions(c ui.C, v View, item services.LibraryItem, caps Ite
 	if favBox.Clicked() {
 		s.toggleFavorite(item.ID)
 	}
-	s.detailMore(c, item, caps)
+	s.detailMore(c, v, item, caps)
 }

@@ -90,7 +90,6 @@ func (s *Screen) bulkTagView(c ui.C, v View) {
 // tagPickerView 声明单条标签选择浮层：宽 272，当前标签、输入加「添加」、选择已有标签、AI 建议四段。
 // 每个改动都立刻写回条目（onChange），浮层不关；下一帧条目带着新标签回来，浮层里的内容随之更新。
 func (s *Screen) tagPickerView(c ui.C, v View) {
-	l := s.Look
 	p := &s.bulk.picker
 	if !p.pop.Open {
 		return
@@ -106,13 +105,32 @@ func (s *Screen) tagPickerView(c ui.C, v View) {
 		return
 	}
 	id := entry.ID
-	names := make([]string, 0, len(entry.Tags))
-	for _, tag := range entry.Tags {
+	s.tagPickerPanel(c, "tag-picker", &p.pop, &p.draft, tagPickerData{
+		tags: entry.Tags, all: v.Tags, apply: func(names []string) { s.setItemTags(id, names) },
+	})
+}
+
+// tagPickerData 是单条标签选择浮层要的内容与去向：列表右键里的「编辑标签」与详情标签行的 + 共用同一块面板（渲染层 TagPickerPopover），
+// 只是标签从哪来、改动写到哪去不同。
+type tagPickerData struct {
+	tags  []services.LibraryTag // 条目现有的标签
+	all   []services.LibraryTag // 全部标签（选择已有标签一段在其中去掉现有的）
+	apply func(names []string)  // 把改后的标签名写回条目
+	// trigger 是触发钮的外框：点它只收起（详情的 + 钮）；列表右键菜单打开的没有触发钮，零值。
+	trigger gfx.Rect
+}
+
+// tagPickerPanel 声明单条标签选择浮层的面板（key 是它在 c 下的键）：宽 272，当前标签、输入加「添加」、选择已有标签、AI 建议四段。
+// 每个改动都立刻写回条目（apply），浮层不关；下一帧条目带着新标签回来，浮层里的内容随之更新。
+func (s *Screen) tagPickerPanel(c ui.C, key string, pop *kit.PopoverState, draft *ui.Field, d tagPickerData) {
+	l := s.Look
+	names := make([]string, 0, len(d.tags))
+	for _, tag := range d.tags {
 		names = append(names, tag.Name)
 	}
 	// 已有标签里去掉这条已经带着的（按名称）。
 	var unused []services.LibraryTag
-	for _, tag := range v.Tags {
+	for _, tag := range d.all {
 		if !containsString(names, tag.Name) {
 			unused = append(unused, tag)
 		}
@@ -128,25 +146,25 @@ func (s *Screen) tagPickerView(c ui.C, v View) {
 				return
 			}
 		}
-		s.setItemTags(id, append(append([]string(nil), names...), name))
+		d.apply(append(append([]string(nil), names...), name))
 	}
-	l.Popover(c.Key("tag-picker"), &p.pop, kit.PopoverSpec{
+	l.Popover(c.Key(key), pop, kit.PopoverSpec{
 		Name: locales.LibraryEditTags(), Width: tagPickerWidth, Margin: tagViewportGap, Pad: l.Space(3),
-		Radius: l.Rem(0.75), Shadows: kit.ShadowXL, StayOnBlur: true,
+		Radius: l.Rem(0.75), Shadows: kit.ShadowXL, StayOnBlur: true, Trigger: d.trigger,
 		Content: func() {
-			if len(entry.Tags) > 0 {
+			if len(d.tags) > 0 {
 				// mb-2.5 flex flex-wrap gap-1
 				ui.Flow(c.Key("current")).FillWidth().Gap(l.Space(1)).LineGap(l.Space(1)).MarginBottom(l.Space(2.5)).Children(func() {
-					for _, tag := range entry.Tags {
+					for _, tag := range d.tags {
 						if s.pickerChip(c.Key("chip-"+tag.ID), tag) {
-							s.setItemTags(id, without(names, tag.Name))
+							d.apply(without(names, tag.Name))
 						}
 					}
 				})
 			}
-			if s.tagInputRow(c, &p.draft) {
-				addTag(p.draft.Text())
-				p.draft.SetText("")
+			if s.tagInputRow(c, draft) {
+				addTag(draft.Text())
+				draft.SetText("")
 			}
 			s.tagChoices(c, unused, func(tag services.LibraryTag) { addTag(tag.Name) })
 			s.aiTagSuggest(c)

@@ -25,7 +25,9 @@ type panelState struct {
 	canFind, findFocused bool
 	panelW               float32
 	// panelRect 是上一帧面板的位置与大小（窗口坐标）：阅读岛盖住同层的东西，查找条抬到更高的层时要按它定位（detailreader.go）。
-	panelRect  gfx.Rect
+	panelRect gfx.Rect
+	// live 是这一帧阅读区有没有岛在场（readerLive）：工具侧栏盖在阅读区上，岛在场时也要抬到更高的一层（detailtools.go）。
+	live       bool
 	find       ui.Field
 	findQuery  string
 	findActive int

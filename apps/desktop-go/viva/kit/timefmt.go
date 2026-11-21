@@ -73,6 +73,19 @@ func FormatDateTime(ms int64, loc *time.Location, locale DateLocale) string {
 	return fmt.Sprintf("%d/%d/%d, %s", int(t.Month()), t.Day(), t.Year(), t.Format("3:04:05 PM"))
 }
 
+// FormatDate 对应渲染层 Date.prototype.toLocaleDateString()（不带参数）：只有日期，用于评论的发布日期。
+// zh：2026/11/16；en：11/16/2026。
+func FormatDate(ms int64, loc *time.Location, locale DateLocale) string {
+	if loc == nil {
+		loc = time.Local
+	}
+	t := time.UnixMilli(ms).In(loc)
+	if locale.zh() {
+		return fmt.Sprintf("%d/%d/%d", t.Year(), int(t.Month()), t.Day())
+	}
+	return fmt.Sprintf("%d/%d/%d", int(t.Month()), t.Day(), t.Year())
+}
+
 func sameDay(a, b time.Time) bool {
 	ay, am, ad := a.Date()
 	by, bm, bd := b.Date()

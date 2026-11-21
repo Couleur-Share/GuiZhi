@@ -34,7 +34,7 @@ type SelectSpec struct {
 	Label   string // 可访问名（aria-label）
 	Value   string // 当前值
 	Options []SelectOption
-	Width   float32 // 触发器容器宽度（调用方按 Tailwind 的 w-40 等换算成像素）
+	Width   float32 // 触发器容器宽度（调用方按 Tailwind 的 w-40 等换算成像素）；负数撑满容器（w-full）
 	// MenuMinWidth 是面板最小宽度（px）；0 取 180。窄触发器（如分页每页条数）需要调小。
 	MenuMinWidth float32
 	// AlignEnd 让面板与触发器右边缘对齐；贴右侧边缘的控件用它才不会越界。

@@ -13,11 +13,12 @@ import (
 //   - Ctrl/Meta+S：立即保存（ItemDetail 挂载期间，任何焦点，preventDefault）；
 //   - Ctrl/Meta+F：打开查找条（工具栏摆着查找入口期间，任何焦点，preventDefault）；
 //   - Alt+Z：切换专注阅读（知识库工作区挂载期间，任何焦点；按住 Ctrl / Meta 时不动，Shift 照常）；
-//   - Esc：焦点在查找框里时关闭查找条且不再往外传（stopPropagation）；否则专注阅读模式下退出专注（焦点在浮层里时那一层自己处理）；
+//   - Esc：焦点在查找框里时关闭查找条且不再往外传（stopPropagation）；焦点在文章工具侧栏里时收起侧栏且不再往外传；
+//     否则专注阅读模式下退出专注（焦点在浮层里时那一层自己处理）；
 //   - Enter / Shift+Enter：查找框里下一个 / 上一个命中；
 //   - Alt+← / Alt+→：详情浮层里的连续整理（上一条 / 下一条），焦点在输入框、文本域、可编辑区里时不动。
 //
-// 这些监听互相独立（渲染层各自 addEventListener），所以除了「查找框里的 Esc」会拦下按键，其余都只做自己那一件事、不拦截 Esc。
+// 这些监听互相独立（渲染层各自 addEventListener），所以除了「查找框与工具侧栏里的 Esc」会拦下按键，其余都只做自己那一件事、不拦截 Esc。
 //
 // 键经两条路进来（Viva 的窗口把它们分开）：带修饰键的可打印字符（Ctrl+S、Ctrl+F、Alt+Z）走 Config.OnShortcut（detailShortcut），
 // 具名键（Esc、Enter、方向键）走 Config.OnKey（detailKey）。两条路都只在知识库工作区挂载时才有作用。
@@ -73,6 +74,9 @@ func (s *Screen) detailKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 	case e.Key == gfx.KeyEscape:
 		if p.findOpen && p.findFocused {
 			p.findOpen = false
+			return gfx.EventResult{Handled: true, Repaint: true}
+		}
+		if s.toolsEscape(focus) {
 			return gfx.EventResult{Handled: true, Repaint: true}
 		}
 		if s.detail.focusReading && !focus.Floating() {

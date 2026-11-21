@@ -19,6 +19,8 @@ type inlineSpec struct {
 	Disabled                       bool
 	// Popup 为真时它是 aria-haspopup="menu" 的触发钮（可访问树里是 combobox），Open 是菜单此刻开着。
 	Popup, Open bool
+	// Disclosure 为真时它是展开收起钮（aria-expanded，仍是按钮），Open 是它此刻展开着。不要与 Popup 同设。
+	Disclosure bool
 
 	Fg, FgHover         tokens.Color
 	Bg, BgHover         tokens.Color
@@ -48,7 +50,7 @@ func (s *Screen) inlineButton(c ui.C, spec inlineSpec, body func(fg tokens.Color
 	case role == 0:
 		role = gfx.RoleButton
 	}
-	opts := gfx.HitOptions{Role: role, Disabled: spec.Disabled, Hint: spec.Hint, Description: spec.Description, Expandable: spec.Popup, Expanded: spec.Popup && spec.Open}
+	opts := gfx.HitOptions{Role: role, Disabled: spec.Disabled, Hint: spec.Hint, Description: spec.Description, Expandable: spec.Popup || spec.Disclosure, Expanded: (spec.Popup || spec.Disclosure) && spec.Open}
 	if spec.Popup {
 		opts.Value = spec.Value
 	}

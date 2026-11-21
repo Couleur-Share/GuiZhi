@@ -1053,14 +1053,11 @@ func TestEveryUnmigratedEntryNamesItsMilestone(t *testing.T) {
 			r.openCard(detailForumID)
 			r.click(gfx.RoleButton, locales.LibraryForumRepliesSection())
 		}, gfx.RoleButton, locales.LibraryForumDiscussionRefresh(), "M2-6"},
-		{"文章工具", func(r *rig) {
+		{"AI 摘要入口", func(r *rig) {
 			r.openCard(detailNoteID)
 			r.clickInDetail(gfx.RoleCombobox, locales.LibraryMoreActions())
-		}, gfx.RoleMenuItem, locales.ArticleReaderTools(), "M2-6"},
-		{"采集评论", func(r *rig) {
-			r.pick(shellDouyinID)
-			r.clickInDetail(gfx.RoleCombobox, locales.LibraryMoreActions())
-		}, gfx.RoleMenuItem, locales.LibraryCollectSourceComments(), "M2-6"},
+			r.click(gfx.RoleMenuItem, locales.ArticleReaderTools())
+		}, gfx.RoleButton, locales.LibraryAiSummaryGenerate(), "M2-6c"},
 		{"AI 排版文字稿", func(r *rig) {
 			r.openCard(detailVideoID)
 			r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())

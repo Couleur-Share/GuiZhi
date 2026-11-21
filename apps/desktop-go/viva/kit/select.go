@@ -27,8 +27,13 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 	pad := l.Rem(0.75)
 	chevron := l.Rem(1)
 	gap := l.Rem(0.5)
-	box := ui.Row(c).
-		Size(width, l.Rem(2.5)).
+	box := ui.Row(c).Height(l.Rem(2.5))
+	if width < 0 { // 负宽度表示撑满容器（w-full）
+		box = box.FillWidth()
+	} else {
+		box = box.Width(width)
+	}
+	box = box.
 		Radius(l.Rem(0.75)).
 		Background(l.Col(t.Muted)).
 		Items(ui.Center).
