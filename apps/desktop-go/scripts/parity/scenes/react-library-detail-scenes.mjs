@@ -223,6 +223,48 @@ const pickFirstVersion = async (win) => {
   await win.waitForTimeout(300);
 };
 
+/**
+ * 文字稿与长稿确认框（M2-6d，台账 B-067）：config.detail.transcript 只隐去读者工具条挂载点里的控件、不隐去阅读区内容——文字稿面板是 Viva 的原生面板，
+ * 要参与对照（M2-4 时 Viva 的文字稿页是留白，当时的 detail-video-transcript 随阅读区一起隐去，现在同样改用这个口径）。
+ * 条目取夹具 transcripts 块：EmptyItem 有转写条件（本地视频资产）但没有文字稿，BodyItem 带多段文字稿，LongItem 的文字稿超过长稿门槛（50000 字）。
+ * 三条都在 800×600 与大字号档的首屏之外，用方向键选。Viva 一侧见 viva/parity/scenes/library_detail.go。
+ */
+const TRANSCRIPT = { detail: { transcript: true } };
+const TRANSCRIPT_LABELS = {
+  zh: { tab: "文字稿", format: "AI 排版" },
+  en: { tab: "Transcript", format: "AI formatting" },
+};
+const transcriptLabel = (key) => TRANSCRIPT_LABELS[parityLanguage()][key];
+const TRANSCRIPT_IDS = LIBRARY_DETAIL_FIXTURE.transcripts;
+/** 夹具条目在列表（data 变体）里的下标：条目 ID 是 item-NNN，列表按 ID 顺序。 */
+const itemIndex = (id) => Number(id.slice("item-".length)) - 1;
+/** 方向键选到夹具里的某条，再切到文字稿页签（页签名带字数，按前缀点；名字随界面语言）。 */
+const openTranscript = (id) => chain(selectByKeys(itemIndex(id) + 1), async (win) => clickTab(transcriptLabel("tab"))(win));
+/** Ctrl+F 打开查找条（焦点落在输入框）并输入夹具里的查找词：命中词高亮、查找条上出现命中计数（采集器把 caret-color 设成透明，参照图里没有插入符）。 */
+const findInTranscript = async (win) => {
+  await win.keyboard.press("Control+f");
+  await win.waitForTimeout(300);
+  await win.keyboard.type(TRANSCRIPT_IDS.findQuery);
+  await win.waitForTimeout(300);
+  // 查找条是 absolute z-20 的浮层，渲染层 DOM 里排在阅读区之前；Viva 的绝对定位元素画在流内元素之后、没有 z-index，绘制序就是读屏与文字序
+  // （同台账 C-013 的成因），查找条里的文字在文字序里排到文字稿之后。把查找条的容器移到面板末尾（z-index 不变，画面一样），两侧文字序才一致；
+  // 移动会让输入框失焦，再聚焦回去（键盘模态下 :focus-visible 成立，聚焦环与移动之前相同）。截图之后不再有渲染，不会碰到 React 的对账。
+  await win.evaluate(() => {
+    const input = document.activeElement;
+    const bar = input?.closest(".absolute.z-20");
+    if (!bar || !bar.parentElement) throw new Error("找不到查找条的容器");
+    bar.parentElement.appendChild(bar);
+    input.focus();
+  });
+  await win.waitForTimeout(200);
+};
+/** 点工具栏里的「AI 排版」，等长稿确认框（alertdialog）出现。 */
+const openLongFormat = async (win) => {
+  await clickCenter(win, toolbarButton(win, transcriptLabel("format")));
+  await win.getByRole("alertdialog").waitFor({ state: "visible" });
+  await win.waitForTimeout(300);
+};
+
 export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-empty": listScene({ detail: {} }),
   "app.window.library.detail-loading": listScene({ detail: { get: "hold" } }, clickCardOnly(NOTE)),
@@ -233,7 +275,8 @@ export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-long-title": listScene({ detail: {} }, selectCard(LONG_TITLE)),
   "app.window.library.detail-webpage": listScene({ detail: {} }, selectCard(WEBPAGE)),
   "app.window.library.detail-video": listScene({ detail: {} }, selectCard(VIDEO)),
-  "app.window.library.detail-video-transcript": listScene({ detail: {} }, chain(selectCard(VIDEO), clickTab(LABEL.transcript))),
+  // 文字稿页签（M2-6d 起文字稿面板参与对照：config.detail.transcript，口径见 TRANSCRIPT）。
+  "app.window.library.detail-video-transcript": listScene(TRANSCRIPT, chain(selectCard(VIDEO), clickTab(transcriptLabel("tab")))),
   "app.window.library.detail-forum": listScene({ detail: {} }, selectByKeys(FORUM_INDEX + 1)),
   "app.window.library.detail-forum-replies": listScene({ detail: {} }, chain(selectByKeys(FORUM_INDEX + 1), clickTab(LABEL.replies, true))),
   "app.window.library.detail-image": listScene({ detail: {} }, selectByKeys(IMAGE_INDEX + 1)),
@@ -296,4 +339,9 @@ export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-tools-ocr": listScene(TOOLS_OCR, chain(selectByKeys(IMAGE_INDEX + 1), openTools)),
   "app.window.library.detail-tools-ocr-done": listScene(TOOLS_OCR_DONE, chain(selectByKeys(IMAGE_INDEX + 1), openTools)),
   "app.window.library.detail-tools-tag-suggest": listScene(TOOLS_TAG_SUGGEST, chain(selectCard(NOTE), openTools, clickInTools("addTag"), generateTagSuggestions), { keepFocus: true }),
+  // M2-6d：文字稿页签——空态（提示 + 主色「生成文字稿」钮）、正文排版、页内查找（命中高亮与计数）、长稿「AI 排版」的确认框。
+  "app.window.library.detail-transcript-empty": listScene(TRANSCRIPT, openTranscript(TRANSCRIPT_IDS.emptyItem)),
+  "app.window.library.detail-transcript-body": listScene(TRANSCRIPT, openTranscript(TRANSCRIPT_IDS.bodyItem)),
+  "app.window.library.detail-transcript-find": listScene(TRANSCRIPT, chain(openTranscript(TRANSCRIPT_IDS.bodyItem), findInTranscript), { keepFocus: true }),
+  "app.window.library.detail-transcript-long-confirm": listScene(TRANSCRIPT, chain(openTranscript(TRANSCRIPT_IDS.longItem), openLongFormat), { keepFocus: true }),
 };

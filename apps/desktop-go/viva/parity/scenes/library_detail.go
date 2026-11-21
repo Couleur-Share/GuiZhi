@@ -133,6 +133,71 @@ func detailClickTab(name string, exact bool) libraryEnvStep {
 	}
 }
 
+// detailClickTabNamed 同 detailClickTab（按名字前缀点标签），名字在步骤执行时才取：文字稿标签的名字随界面语言（英文变体里是 Transcript），
+// 场景在 init 里登记，那时界面语言还是默认的中文（理由同 detailOpenSummary）。
+func detailClickTabNamed(name func() string) libraryEnvStep {
+	return func(s *headless.Session, look *kit.Look, e *libraryEnv) error {
+		return detailClickTab(name(), false)(s, look, e)
+	}
+}
+
+// detailOpenTranscript 用方向键选到条目 id 在列表里的那一张（见 detailItemIndex），再切到文字稿页签（对应 React 一侧的 openTranscript）。
+func detailOpenTranscript(id string) libraryEnvStep {
+	return listChain(listKeys("down", detailItemIndex(id)+1), detailClickTabNamed(locales.LibraryTranscript))
+}
+
+// detailItemIndex 是夹具条目 ID（item-NNN）在列表（data 变体）里的下标：列表按 ID 顺序，item-001 是第 0 张。
+func detailItemIndex(id string) int {
+	n := 0
+	for _, r := range strings.TrimPrefix(id, "item-") {
+		n = n*10 + int(r-'0')
+	}
+	return n - 1
+}
+
+// detailFindType 按 Ctrl+F 打开查找条（焦点落进输入框）、输入 query，再把插入符停在熄灭的相位（对应 React 一侧的 findInTranscript）。
+// 插入符从最后一次输入的那一帧开始计时，起点取输入之前的虚拟时间（台账 G-028，理由同 detailKeysCaretDark）。
+func detailFindType(query string) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		if err := s.Keys("ctrl+f"); err != nil {
+			return err
+		}
+		if err := s.Rest(); err != nil {
+			return err
+		}
+		since := s.Now()
+		if err := s.Type(query); err != nil {
+			return err
+		}
+		if err := s.Rest(); err != nil {
+			return err
+		}
+		return parity.ParkCaretDark(s, since)
+	}
+}
+
+// detailOpenLongFormat 点工具栏里的「AI 排版」（坐标取整，对应 React 一侧的 clickCenter），等长稿确认框打开。
+func detailOpenLongFormat(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+	n, ok := s.AccessByRole(gfx.RoleButton, locales.LibraryTranscriptFormat())
+	if !ok {
+		return fmt.Errorf("找不到 %s「%s」", gfx.RoleButton, locales.LibraryTranscriptFormat())
+	}
+	if err := s.Click(snap(n.Bounds.X+n.Bounds.Width/2), snap(n.Bounds.Y+n.Bounds.Height/2)); err != nil {
+		return err
+	}
+	if err := s.Rest(); err != nil {
+		return err
+	}
+	opened, err := waitRolePrefix(s, gfx.RoleGroup, locales.LibraryTranscriptFormat(), 100)
+	if err != nil {
+		return err
+	}
+	if !opened {
+		return fmt.Errorf("等不到长稿确认框「%s」打开", locales.LibraryTranscriptFormat())
+	}
+	return s.Rest()
+}
+
 // detailOpenHeaderMenu 点详情头部里会弹出菜单的钮（取整，见 snap）：同名的钮还有侧栏与列表里的，详情头部在最右边，取最靠右的那个。
 func detailOpenHeaderMenu(role gfx.Role, name string) libraryEnvStep {
 	return detailOpenHeaderMenuNamed(role, func() string { return name })
@@ -375,6 +440,9 @@ func init() {
 	table := libraryOptions{variant: "data", list: true, view: "list", detail: true}
 	toolbar := detail
 	toolbar.readerToolbar = true
+	// 文字稿场景（M2-6d 起 React 一侧不再隐去阅读区内容，config.detail.transcript）：文字稿整份都画，才拼得齐渲染层整段文字节点（Screen.FullTranscript）。
+	transcripts := detail
+	transcripts.fullTranscript = true
 
 	reg := func(id string, opt libraryOptions, steps libraryEnvStep, mode parkMode, waivers ...parity.Waiver) {
 		registry[id] = libraryEnvScene(id, opt, steps, mode, waivers...)
@@ -414,7 +482,30 @@ func init() {
 	reg("app.window.library.detail-long-title", detail, listClickCard(detailLongTitle), parkAll, cards...)
 	reg("app.window.library.detail-webpage", detail, listClickCard(detailWebpage), parkAll, cards...)
 	reg("app.window.library.detail-video", detail, listClickCard(detailVideo), parkAll, transcript...)
-	reg("app.window.library.detail-video-transcript", detail, listChain(listClickCard(detailVideo), detailClickTab("文字稿", false)), parkAll, transcript...)
+	reg("app.window.library.detail-video-transcript", transcripts, listChain(listClickCard(detailVideo), detailClickTabNamed(locales.LibraryTranscript)), parkAll,
+		slices.Concat(transcript, transcriptLatinWaivers())...)
+	// M2-6d 文字稿页签：空态、正文、页内查找（查找条的占位符 / 输入框同 detail-find）、长稿「AI 排版」的确认框（见下面的遮罩登记）。
+	tr := cfg.Transcripts
+	reg("app.window.library.detail-transcript-empty", transcripts, detailOpenTranscript(tr.EmptyItem), parkAll,
+		slices.Concat(enTranscriptTabWaivers(), enTranscriptEmptyWaivers(), cards)...)
+	tabCount, findCount := transcriptCountWaivers(cfg.Details[tr.BodyItem].Transcript, tr.FindQuery)
+	reg("app.window.library.detail-transcript-body", transcripts, detailOpenTranscript(tr.BodyItem), parkAll,
+		slices.Concat([]parity.Waiver{tabCount}, enTranscriptTabWaivers(), enTranscriptCountWaivers(transcriptBodyChars()), cards)...)
+	reg("app.window.library.detail-transcript-find", transcripts, listChain(detailOpenTranscript(tr.BodyItem), detailFindType(tr.FindQuery)), parkKeepFocus,
+		slices.Concat([]parity.Waiver{tabCount, findCount, findInputWaiver(tr.FindQuery), findNavIconWaiver()}, cards)...)
+	// 确认框里的文字是浮层文字（A-009，范围见 overlayInkWaiver）。
+	reg("app.window.library.detail-transcript-long-confirm", transcripts, listChain(detailOpenTranscript(tr.LongItem), detailOpenLongFormat), parkKeepFocus, overlay...)
+	// 长稿确认框是 ConfirmDialog：遮罩背后的页面模糊（A-007，backdrop-blur-sm 是 4），遮罩之上是名为标题的对话框面板；
+	// 打开之前的页面是文字稿页签，指针停到窗口角落（采集 React 时同样，对话框一打开背后就没有悬停）。
+	longConfirm := confirmBackdrop("")
+	longConfirm.PanelNameFn = locales.LibraryTranscriptFormat
+	longConfirm.BaseSteps = func(s *headless.Session, look *kit.Look) error {
+		if err := detailOpenTranscript(tr.LongItem)(s, look, nil); err != nil {
+			return err
+		}
+		return parity.ParkPointer(s)
+	}
+	registry["app.window.library.detail-transcript-long-confirm"] = withBackdrop(registry["app.window.library.detail-transcript-long-confirm"], longConfirm)
 	reg("app.window.library.detail-forum", detail, listKeys("down", detailForumIndex+1), parkAll, cards...)
 	reg("app.window.library.detail-forum-replies", detail, listChain(listKeys("down", detailForumIndex+1), detailClickTab("讨论", true)), parkAll, cards...)
 	reg("app.window.library.detail-image", detail, listKeys("down", detailImageIndex+1), parkAll, image...)

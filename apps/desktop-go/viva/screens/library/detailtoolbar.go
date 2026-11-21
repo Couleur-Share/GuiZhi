@@ -326,7 +326,7 @@ func (s *Screen) findBar(c ui.C, active ReadingTab, lifted bool) {
 		return row.Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1)).
 			PadSides(0, l.Space(1)+1, 0, l.Space(1)+1). // p-1 加 border 的 1px；竖向的 24px 子项在 32px 里居中，与 22px 内容盒里溢出居中同位
 			Draw(func(d *ui.DrawContext) {
-				l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
+				l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.95), Backdrop: t.Background, Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowLG})
 			})
 	}
 	body := func() {

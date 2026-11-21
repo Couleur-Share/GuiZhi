@@ -2,6 +2,7 @@ package scenes
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,6 +27,8 @@ func TestEnglishDetailWaiverSubjectsMatchCatalog(t *testing.T) {
 		{"采用来源版本的钮", enRevisionAdopt, locales.LibrarySourceRevisionAdopt()},
 		{"保留我的修改并保存", enConflictKeepMine, locales.LibraryDraftConflictKeepMine()},
 		{"退出专注", enExitFocusShort, locales.LibraryExitFocusReadingShort()},
+		{"生成文字稿", enGenerateTranscript, locales.LibraryTranscribeGenerate()},
+		{"正文场景的字数", strconv.Itoa(transcriptBodyChars()) + " chars", locales.LibraryTranscriptLength(transcriptBodyChars())},
 	}
 	for _, c := range cases {
 		if c.got != c.want {
@@ -141,7 +144,9 @@ func TestEnglishDetailWaiversOnlyOnTheirScenes(t *testing.T) {
 		ws     []parity.Waiver
 		scenes []string
 	}{
-		{"文字稿页签", enTranscriptTabWaivers(), []string{prefix + "detail-video", prefix + "detail-video-transcript"}},
+		{"文字稿页签", enTranscriptTabWaivers(), []string{prefix + "detail-video", prefix + "detail-video-transcript", prefix + "detail-transcript-empty", prefix + "detail-transcript-body"}},
+		{"文字稿空态", enTranscriptEmptyWaivers(), []string{prefix + "detail-transcript-empty"}},
+		{"文字稿字数", enTranscriptCountWaivers(transcriptBodyChars()), []string{prefix + "detail-transcript-body"}},
 		{"图中文字页签", enRecognizedTabWaivers(), []string{prefix + "detail-image", prefix + "detail-image-text"}},
 		{"待复核条", enImportReviewWaivers(), []string{prefix + "detail-review", prefix + "detail-review-open"}},
 		{"来源版本折叠区", enRevisionsWaivers(), []string{prefix + "detail-revisions-open"}},

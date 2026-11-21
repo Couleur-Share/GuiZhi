@@ -32,6 +32,7 @@ const (
 	mediaFindID   = "x-media-find"   // 三行短文字稿（页内查找高亮与计数）
 	mediaParaID   = "x-media-para"   // 有空行、连续空格、超长行的文字稿（保留版式）
 	mediaLocalID  = "x-media-local"  // 本地视频、没有文字稿
+	mediaWrapID   = "x-media-wrap"   // 60 行文字稿，第 40 行里有一处折成好几行的长命中（查找定位取整个命中的中心）
 	mediaBili     = "https://www.bilibili.com/video/BV1media"
 )
 
@@ -66,6 +67,7 @@ func mediaExtras() []shellExtra {
 	return []shellExtra{
 		{video(mediaLongID, "长稿视频"), body(mediaLongTranscript())},
 		{video(mediaScrollID, "长文字稿视频"), body(mediaScrollTranscript())},
+		{video(mediaWrapID, "折行命中视频"), body(mediaWrapTranscript())},
 		{video(mediaFindID, "查找用视频"), body("命运石之门里的命运\n第二行也有命运\nAbc abc ABC")},
 		{video(mediaParaID, "版式用视频"), body("第一段。\n\n第二段  含两个空格。\n" + strings.Repeat("长", 100))},
 		{video(mediaLocalID, "本地视频"), servicestest.DetailBody{Content: "local-video://clip_01.mp4"}},
@@ -801,6 +803,44 @@ func TestTranscriptFindScrollsTheActiveMatchToTheCenter(t *testing.T) {
 	r.click(gfx.RoleButton, locales.LibraryPanelFindPrevMatch())
 	if r.screen.detail.panel.tx.top != 0 || !r.hasText(scrollLine(1)) {
 		t.Errorf("回到第一处命中应滚回顶部（top=%.1f）", r.screen.detail.panel.tx.top)
+	}
+}
+
+// mediaWrapQuery 够长（120 个字，文字稿栏最宽 48rem、每行不到 50 个字），命中一定折成三行以上。
+var mediaWrapQuery = strings.Repeat("长", 120)
+
+// mediaWrapTranscript 是 60 行，第 40 行里的 mediaWrapQuery 折成多行。
+func mediaWrapTranscript() string {
+	lines := make([]string, 60)
+	for i := range lines {
+		lines[i] = scrollLine(i + 1)
+	}
+	lines[39] = "第40段，" + mediaWrapQuery
+	return strings.Join(lines, "\n")
+}
+
+// 命中折成多行时，滚到视口正中的是整个命中（所有行的并集）的中心，而不是它第一行的中心：
+// 渲染层 scrollElementIntoContainer 取 <mark> 的 getBoundingClientRect，跨行的内联元素外框是各行的并集。
+func TestTranscriptFindCentersAWrappedMatchAsAWhole(t *testing.T) {
+	t.Parallel()
+	r := mediaRig(t)
+	r.openTranscript(mediaWrapID)
+	r.keys("ctrl+f")
+	r.typeText(mediaWrapQuery)
+	if !r.hasText(locales.LibraryPanelFindMatchIndex(1, 1)) {
+		t.Fatal("夹具失效：应有一处命中")
+	}
+	marks := r.markedBounds()
+	if len(marks) < 3 {
+		t.Fatalf("夹具失效：命中应折成至少三行，实际 %d 片", len(marks))
+	}
+	top, bottom := marks[0].Y, marks[0].Y+marks[0].Height
+	for _, m := range marks[1:] {
+		top, bottom = min(top, m.Y), max(bottom, m.Y+m.Height)
+	}
+	vp := r.screen.detail.panel.tx.vp
+	if mid, center := (top+bottom)/2, vp.Y+vp.Height/2; mid < center-r.look.Rem(0.5) || mid > center+r.look.Rem(0.5) {
+		t.Errorf("折行命中的整体应在视口正中（%.1f）附近，实际 %.1f（%d 片，%.1f–%.1f）", center, mid, len(marks), top, bottom)
 	}
 }
 

@@ -58,6 +58,10 @@ type Surface struct {
 	// Clip 非零时，只画落在它里面的部分（逻辑像素，按设备像素吸附）。
 	// 用来画只有一侧有圆角的盒子（rounded-l-lg）：按整个盒子画圆角矩形，再裁到这一侧。
 	Clip gfx.Rect
+	// Backdrop 非零时，在阴影之后、Bg 之前先垫一块不透明的底色：backdrop-blur 的替身（台账 A-007，同 Toast 的 paintToastSurface）。
+	// 渲染层的 `bg-background/95 backdrop-blur-sm` 把背后的内容糊掉，只剩 5% 的糊影；Viva 没有模糊原语，直接叠 95% 的底色会让背后的文字
+	// 以 5% 的清晰字形透出来。垫一块页面底色后背后的内容不再透出，与「糊掉」在像素上只差几个灰阶；阴影在垫层之外，不受影响。
+	Backdrop tokens.Color
 }
 
 // PaintSurface 在 d.Rect 上画出表面：阴影、背景（铺满边框盒）、边框环，都以吸附后的矩形为准。
@@ -78,6 +82,9 @@ func (l *Look) PaintSurface(d *ui.DrawContext, s Surface) {
 	}
 	if !s.Shadow.IsZero() {
 		l.paintShadow(d, outer, s.Radius, s.Shadow)
+	}
+	if s.Backdrop.A > 0 {
+		d.Canvas.Rounded(outer, s.Radius, d.Fade(l.Col(s.Backdrop)))
 	}
 	if s.Bg.A > 0 {
 		d.Canvas.Rounded(outer, s.Radius, d.Fade(l.Col(s.Bg)))

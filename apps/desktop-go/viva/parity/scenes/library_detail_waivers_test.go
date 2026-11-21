@@ -21,11 +21,12 @@ const (
 // detailInkWaivers 是本文件登记的全部放过项（含查找条占位符那条 compositedInkWaiver）。
 func detailInkWaivers() []parity.Waiver {
 	out := slices.Concat(imageTabIconWaivers(), middleDotWaivers(), overlayThinGlyphWaivers())
-	return append(out, compositedInkWaiver("「在当前页查找…」"))
+	tabCount, findCount := transcriptCountWaivers(transcriptBodyText(), libraryDetailFixture().Transcripts.FindQuery)
+	return append(out, compositedInkWaiver("「在当前页查找…」"), tabCount, findCount, findInputWaiver(libraryDetailFixture().Transcripts.FindQuery), findNavIconWaiver())
 }
 
 func TestDetailInkWaiversAreDirectedBoundedAndPointToTheLedger(t *testing.T) {
-	ledgers := map[string]bool{"A-003": true, "A-009": true, "G-016": true}
+	ledgers := map[string]bool{"A-003": true, "A-007": true, "A-009": true, "G-016": true}
 	for _, w := range detailInkWaivers() {
 		if w.Layer != parity.LayerL2 || w.Kind != "ink-mass" {
 			t.Errorf("登记 %q 不是 L2 的墨迹总量：%+v", w.Subject, w)
@@ -162,6 +163,7 @@ func TestOverlayThinGlyphWaiversCoverOnlyTheDarkOverlay(t *testing.T) {
 // TestDetailInkWaiversOnlyOnTheirScenes：每条登记只出现在出现它的场景里。
 func TestDetailInkWaiversOnlyOnTheirScenes(t *testing.T) {
 	const prefix = "app.window.library."
+	tabCount, findCount := transcriptCountWaivers(transcriptBodyText(), libraryDetailFixture().Transcripts.FindQuery)
 	groups := []struct {
 		name   string
 		ws     []parity.Waiver
@@ -171,6 +173,10 @@ func TestDetailInkWaiversOnlyOnTheirScenes(t *testing.T) {
 		{"间隔点", middleDotWaivers(), []string{prefix + "detail-revisions-open"}},
 		{"整理导航条的斜线与首位数字", overlayThinGlyphWaivers(), []string{prefix + "table-detail-modal"}},
 		{"查找条占位符", []parity.Waiver{compositedInkWaiver("「在当前页查找…」")}, []string{prefix + "detail-find"}},
+		{"文字稿页签字数", []parity.Waiver{tabCount}, []string{prefix + "detail-transcript-body", prefix + "detail-transcript-find"}},
+		{"文字稿查找条计数", []parity.Waiver{findCount}, []string{prefix + "detail-transcript-find"}},
+		{"文字稿查找条的箭头", []parity.Waiver{findNavIconWaiver()}, []string{prefix + "detail-transcript-find"}},
+		{"文字稿查找框里的查找词", []parity.Waiver{findInputWaiver(libraryDetailFixture().Transcripts.FindQuery)}, []string{prefix + "detail-transcript-find"}},
 	}
 	for _, g := range groups {
 		for _, id := range IDs() {
@@ -184,6 +190,51 @@ func TestDetailInkWaiversOnlyOnTheirScenes(t *testing.T) {
 					t.Errorf("%s：场景 %s 登记了 = %v，期望 %v（%q）", g.name, id, got, want, w.Subject)
 				}
 			}
+		}
+	}
+}
+
+// TestTranscriptCountWaiversNameTheirOwnText：两条计数登记的 Subject 跟夹具走（页签字数、查找条「1 / 匹配数」），
+// 区间有方向与上下限；别的计数（长稿的字数、别的位置）不被放过。
+func TestTranscriptCountWaiversNameTheirOwnText(t *testing.T) {
+	tab, find := transcriptCountWaivers(transcriptBodyText(), libraryDetailFixture().Transcripts.FindQuery)
+	if tab.Subject != "「263 字」" || find.Subject != "「1 / 3」" {
+		t.Fatalf("Subject 与夹具不符：%q、%q", tab.Subject, find.Subject)
+	}
+	other := parity.Issue{Layer: parity.LayerL2, Kind: "ink-mass", Subject: "「1 / 4」", Delta: 0.3, Dir: 1}
+	if find.MatchesIn(other, darkTierMedium) {
+		t.Errorf("查找条计数登记放过了别的计数")
+	}
+}
+
+// TestFindBarWaiversCoverOnlyTheirTier：箭头只在 800×600、Viva 偏少、[0.16, 0.22]；查找词只在大字号档、Viva 偏多、[0.2, 0.3]；
+// 方向相反、区间之外、别的窗口大小或字号档都照常判定。
+func TestFindBarWaiversCoverOnlyTheirTier(t *testing.T) {
+	icon := func(subject string, delta float64, dir int8) parity.Issue {
+		return parity.Issue{Layer: parity.LayerL2, Kind: "ink-mass", Subject: subject, Delta: delta, Dir: dir}
+	}
+	const arrow = "图标 [712.00 235.00 14.00 14.00]"
+	nav, input := findNavIconWaiver(), findInputWaiver(libraryDetailFixture().Transcripts.FindQuery)
+	for _, c := range []struct {
+		name    string
+		w       parity.Waiver
+		is      parity.Issue
+		variant string
+		want    bool
+	}{
+		{"箭头：实测 0.169", nav, icon(arrow, 0.169, -1), "light-royal-blue-medium-800x600", true},
+		{"箭头：实测 0.211", nav, icon(arrow, 0.211, -1), "light-royal-blue-medium-800x600", true},
+		{"箭头：偏多不放过", nav, icon(arrow, 0.2, 1), "light-royal-blue-medium-800x600", false},
+		{"箭头：偏少过半不放过", nav, icon(arrow, 0.5, -1), "light-royal-blue-medium-800x600", false},
+		{"箭头：别的窗口大小不放过", nav, icon(arrow, 0.2, -1), "light-royal-blue-medium-1280x800", false},
+		{"箭头：别的边长不放过", nav, icon("图标 [712.00 235.00 12.00 12.00]", 0.2, -1), "light-royal-blue-medium-800x600", false},
+		{"查找词：实测 0.256", input, icon("「本地优先」", 0.256, 1), "light-royal-blue-large-1280x800", true},
+		{"查找词：中档字号不放过", input, icon("「本地优先」", 0.256, 1), "light-royal-blue-medium-1280x800", false},
+		{"查找词：偏少不放过", input, icon("「本地优先」", 0.256, -1), "light-royal-blue-large-1280x800", false},
+		{"查找词：别的词不放过", input, icon("「查找」", 0.256, 1), "light-royal-blue-large-1280x800", false},
+	} {
+		if got := c.w.MatchesIn(c.is, c.variant); got != c.want {
+			t.Errorf("%s：放过 = %v，期望 %v", c.name, got, c.want)
 		}
 	}
 }

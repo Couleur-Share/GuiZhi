@@ -44,6 +44,8 @@ type libraryOptions struct {
 	// hideToolbar 为 true 时内容面板的工具栏不画（Screen.HideToolbar；React 一侧 config.detail.hideToolbar 加 display: none）：
 	// 文章工具侧栏的场景用，理由见 Screen.HideToolbar（台账 C-013）。
 	hideToolbar bool
+	// fullTranscript 为 true 时文字稿的文字块整份都画（Screen.FullTranscript）：文字稿场景（M2-6d）用，React 一侧 config.detail.transcript 不隐去阅读区内容。
+	fullTranscript bool
 	// readerToolbar 为 true 时工具栏里画读者工具条（原文 / AI 阅读、目录、编辑，Screen.ReaderToolbar）；React 一侧
 	// config.detail.toolbar 只隐去阅读区内容、保留工具条（HIDE_READER_CONTENT_CSS，台账 B-065）。其余场景两侧都隐去工具条。
 	readerToolbar bool
@@ -170,6 +172,8 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			ReaderToolbar: opt.readerToolbar,
 			// 文章工具侧栏的场景把内容面板的工具栏隐去（React 一侧 config.detail.hideToolbar），理由见 Screen.HideToolbar（台账 C-013）。
 			HideToolbar: opt.hideToolbar,
+			// 文字稿场景（M2-6d）：长稿整份都画，视口之外的行记为 Hidden，才拼得齐渲染层整段文字节点（Screen.FullTranscript）。
+			FullTranscript: opt.fullTranscript,
 		}
 		workspace := blankWorkspace
 		if opt.list {

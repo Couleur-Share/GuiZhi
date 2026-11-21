@@ -39,6 +39,12 @@ export const LIBRARY_DETAIL_FIXTURE = JSON.parse(
   fs.readFileSync(path.join(import.meta.dirname, "../../../viva/parity/testdata/library-detail-fixture.json"), "utf8"),
 );
 
+// 长稿（M2-6d）：夹具里只写 longUnit 与 longCount，这里展开成 longItem 的文字稿（换行相连、末尾不留换行），与 Go 一侧 LoadLibraryDetailFixture 同一规则。
+{
+  const { longItem, longUnit, longCount } = LIBRARY_DETAIL_FIXTURE.transcripts;
+  LIBRARY_DETAIL_FIXTURE.details[longItem].transcript = Array.from({ length: longCount }, () => longUnit).join("\n");
+}
+
 const CONFIG_KEY = "__parity.library";
 const SMART_VIEWS_KEY = "guizhi-library-smart-views-v1";
 const UI_STORAGE_KEY = "ui-storage";
@@ -455,7 +461,9 @@ export async function enterLibrary(session, options = {}) {
   }, !!config.list);
   // showReader：阅读岛对照工具（tools/probe-reader-island.mjs）要看阅读区本身，不隐去；其余场景不传，行为不变。
   if (!(config.detail && config.showReader)) {
-    const readerCss = (config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : ""); // toolbar：只隐去阅读区内容，保留读者工具条（B-065）；hideToolbar：连工具栏一起隐去（C-013）
+    // toolbar：只隐去阅读区内容，保留读者工具条（B-065）；hideToolbar：连工具栏一起隐去（C-013）；
+    // transcript：文字稿场景（M2-6d）里文字稿面板是 Viva 的原生面板、要参与对照，只隐去读者工具条挂载点里的控件、不隐去阅读区内容。
+    const readerCss = (config.detail?.transcript ? HIDE_READER_TOOLBAR_CSS : config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : "");
     await page.addStyleTag({ content: config.detail ? readerCss : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
   }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，

@@ -2,6 +2,7 @@ package scenes
 
 import (
 	"slices"
+	"strconv"
 
 	"guizhi-mygo-shell/viva/parity"
 )
@@ -13,15 +14,16 @@ import (
 
 // 英文界面里被登记的文字（Subject 的片段）。
 const (
-	enTabTranscript    = "Transcript"                           // library.transcript：视频条目的页签
-	enTabTranscriptLen = "49 chars"                             // library.transcriptLength：页签上的字数（夹具里文字稿 49 字）
-	enTabRecognized    = "Text in image"                        // library.recognizedSection：图片条目的页签
-	enImportIncomplete = "Captured content needs review"        // article.reader.importIncomplete：待复核条的标题
-	enRevisionAdopt    = "Use this version's text in the draft" // library.sourceRevisionAdopt：采用来源版本正文的钮
-	enRevisionsHint    = "Newly captured content is kept here"  // library.sourceRevisionsHint 的开头
-	enConflictNotice   = "This content was changed elsewhere."  // library.draftConflict 的第一句
-	enConflictKeepMine = "Keep my changes and save"             // library.draftConflictKeepMine：冲突条上的钮
-	enExitFocusShort   = "Exit focus"                           // library.exitFocusReadingShort：专注阅读的悬浮钮
+	enTabTranscript      = "Transcript"                           // library.transcript：视频条目的页签
+	enTabTranscriptLen   = "49 chars"                             // library.transcriptLength：页签上的字数（夹具里文字稿 49 字）
+	enTabRecognized      = "Text in image"                        // library.recognizedSection：图片条目的页签
+	enImportIncomplete   = "Captured content needs review"        // article.reader.importIncomplete：待复核条的标题
+	enRevisionAdopt      = "Use this version's text in the draft" // library.sourceRevisionAdopt：采用来源版本正文的钮
+	enRevisionsHint      = "Newly captured content is kept here"  // library.sourceRevisionsHint 的开头
+	enConflictNotice     = "This content was changed elsewhere."  // library.draftConflict 的第一句
+	enConflictKeepMine   = "Keep my changes and save"             // library.draftConflictKeepMine：冲突条上的钮
+	enExitFocusShort     = "Exit focus"                           // library.exitFocusReadingShort：专注阅读的悬浮钮
+	enGenerateTranscript = "Generate transcript"                  // library.transcribeGenerate：文字稿空态里的主色钮（M2-6d）
 )
 
 // 两条字偶距登记的说明（A-014 与 A-026 的英文延伸，成因同 library_bulk_waivers.go）。
@@ -39,6 +41,26 @@ func enTranscriptTabWaivers() []parity.Waiver {
 		englishKerning(kerning600Ledger, "box", "button 「"+enTabTranscript+" ", kerningWidthCap, noteKern600),
 		englishKerning(kerning600Ledger, "ink", "「"+enTabTranscript+"」", kerningInkCap, noteKern600),
 		englishKerning(kerning600Ledger, "ink", "「"+enTabTranscriptLen+"」", kerningInkCap, noteKern600),
+	}
+}
+
+// enTranscriptEmptyWaivers：文字稿空态（M2-6d）里的两处 500 字重文字——只有页签（没有字数时钮的外框以「Transcript」收尾，
+// 不是 enTranscriptTabWaivers 里「Transcript 」打头的那一条）与主色钮「Generate transcript」，Viva 偏窄。
+// 读数：页签钮宽差 1.68px、「Transcript」文字宽差 1.68px（同 enTranscriptTabWaivers）；「Generate transcript」钮宽差 1.38px、文字宽差 1.38px
+// （React 126.84、Viva 125.47）。
+func enTranscriptEmptyWaivers() []parity.Waiver {
+	return []parity.Waiver{
+		englishKerning(kerning600Ledger, "box", "button 「"+enTabTranscript+"」", kerningWidthCap, noteKern600),
+		englishKerning(kerning600Ledger, "text-width", "「"+enGenerateTranscript+"」", kerningWidthCap, noteKern600),
+		englishKerning(kerning600Ledger, "box", "button 「"+enGenerateTranscript+"」", kerningWidthCap, noteKern600),
+	}
+}
+
+// enTranscriptCountWaivers：文字稿正文场景（M2-6d）页签上的字数「N chars」（500 字重页签里的第二段，墨迹左移 2 像素）。
+// 页签本身那几条是 enTranscriptTabWaivers，只有字数的 Subject 随文字稿长度而不同。
+func enTranscriptCountWaivers(n int) []parity.Waiver {
+	return []parity.Waiver{
+		englishKerning(kerning600Ledger, "ink", "「"+strconv.Itoa(n)+" chars」", kerningInkCap, noteKern600),
 	}
 }
 
@@ -94,5 +116,6 @@ func englishDetailWaivers() []parity.Waiver {
 	return slices.Concat(
 		enTranscriptTabWaivers(), enRecognizedTabWaivers(), enImportReviewWaivers(),
 		enRevisionsWaivers(), enConflictWaivers(), enFocusWaivers(),
+		enTranscriptEmptyWaivers(), enTranscriptCountWaivers(transcriptBodyChars()),
 	)
 }

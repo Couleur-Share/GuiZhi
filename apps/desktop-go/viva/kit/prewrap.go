@@ -25,9 +25,10 @@ import (
 type PreWrapView struct {
 	// Window 回报此刻看得见的竖向范围（窗口坐标的上沿与下沿）；nil 表示全部都画。
 	Window func() (lo, hi float32)
-	// Layout 在每次绘制时回报这一帧的版面：文字块的矩形（窗口坐标，已含滚动）、命中数，以及第 i 处命中所在行的上沿（窗口坐标）。
-	// 调用方据此更新查找条的计数、把当前命中滚进视口（渲染层 useMarkFindNavigation）。matchTop 只在回调期间有效。
-	Layout func(rect gfx.Rect, matches int, matchTop func(i int) float32)
+	// Layout 在每次绘制时回报这一帧的版面：文字块的矩形（窗口坐标，已含滚动）、命中数，以及第 i 处命中的竖向中心（窗口坐标）。
+	// 命中折行时取整个 <mark> 外框的中心（渲染层 scrollElementIntoContainer 取 getBoundingClientRect，跨两行的命中是两行的并集），
+	// 不是第一行的中心。调用方据此更新查找条的计数、把当前命中滚进视口（渲染层 useMarkFindNavigation）。matchCenter 只在回调期间有效。
+	Layout func(rect gfx.Rect, matches int, matchCenter func(i int) float32)
 }
 
 // preKey 是整份排版结果的缓存键。
@@ -37,11 +38,13 @@ type preKey struct {
 	pad                 float32
 }
 
-// preResult 是一次排版的结果：rows 是每个视觉行要画的文字片段，boxes 是每行要铺的底色，marks 是各处命中的起点所在的行号。
+// preResult 是一次排版的结果：rows 是每个视觉行要画的文字片段，boxes 是每行要铺的底色，marks 是各处命中的起点所在的行号，
+// markEnds 是对应命中的末尾所在的行号（折行的命中跨几行）。
 type preResult struct {
-	rows  [][]markFrag
-	boxes [][]markBox
-	marks []int
+	rows     [][]markFrag
+	boxes    [][]markBox
+	marks    []int
+	markEnds []int
 }
 
 // preCache 记最近一次的排版结果（只留一份：文字稿面板同一时刻只有一份文字）。
@@ -84,7 +87,12 @@ func (b *markBuilder) buildPreWrap(text, query string, width float32) *preResult
 				// 命中的起点：这一片带着左内边距（延续到下一行的片段没有）。
 				if f.marked && f.pl > 0 {
 					res.marks = append(res.marks, base+i)
+					res.markEnds = append(res.markEnds, base+i)
 				}
+			}
+			// 以命中片段开头、没有左内边距的行，是上一处命中折行延续下来的：把那处命中的末行推到这一行。
+			if len(row) > 0 && row[0].marked && row[0].pl == 0 && len(res.markEnds) > 0 {
+				res.markEnds[len(res.markEnds)-1] = base + i
 			}
 		}
 		res.rows = append(res.rows, laid.lines...)
@@ -139,7 +147,9 @@ func (l *Look) TextPreWrap(c ui.C, s, query string, size, line, weight float32, 
 	return ui.CustomLayout(c, layout).FillWidth().Draw(func(d *ui.DrawContext) {
 		res := layout.resultAt(d.Rect.Width)
 		if view.Layout != nil {
-			view.Layout(d.Rect, len(res.marks), func(i int) float32 { return d.Rect.Y + float32(res.marks[i])*line })
+			view.Layout(d.Rect, len(res.marks), func(i int) float32 {
+				return d.Rect.Y + float32(res.marks[i]+res.markEnds[i]+1)*line/2
+			})
 		}
 		first, last := 0, len(res.rows)-1
 		if view.Window != nil {

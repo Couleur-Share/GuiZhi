@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"guizhi-mygo-shell/native/services"
 )
@@ -100,6 +101,17 @@ type LibraryDetailFixture struct {
 		Comments          []services.LibrarySourceComment        `json:"comments"`
 		Web               map[string]services.LibraryWebVersions `json:"web"`
 	} `json:"tools"`
+	// Transcripts 是文字稿与长稿确认框（M2-6d）的数据：EmptyItem 是有转写条件（本地视频资产）但还没有文字稿的视频，BodyItem 是带多段文字稿的在线视频
+	// （段间空行、段内折行），FindQuery 是查找场景里输入的词（在 BodyItem 的文字稿里命中多次）；LongItem 的文字稿由 LongUnit 重复 LongCount 次、
+	// 以换行相连得到（超过 50000 字的长稿门槛，写成常量展开而不是把五万字放进夹具文件；两侧加载时同样展开，见 LoadLibraryDetailFixture）。
+	Transcripts struct {
+		EmptyItem string `json:"emptyItem"`
+		BodyItem  string `json:"bodyItem"`
+		FindQuery string `json:"findQuery"`
+		LongItem  string `json:"longItem"`
+		LongUnit  string `json:"longUnit"`
+		LongCount int    `json:"longCount"`
+	} `json:"transcripts"`
 	// Conflict 是保存冲突场景的两个标题：另一入口已改成的标题，与用户在标题框里改成的标题。
 	Conflict struct {
 		SavedTitle string `json:"savedTitle"`
@@ -117,6 +129,12 @@ func LoadLibraryDetailFixture() (LibraryDetailFixture, error) {
 	var f LibraryDetailFixture
 	if err := json.Unmarshal(libraryDetailFixtureJSON, &f); err != nil {
 		return LibraryDetailFixture{}, fmt.Errorf("解码知识库详情夹具失败：%w", err)
+	}
+	// 长稿：把 LongUnit 重复 LongCount 次（换行相连、末尾不留换行：渲染层对文字稿 trim）放进 LongItem 的文字稿。
+	if t := f.Transcripts; t.LongItem != "" && t.LongCount > 0 {
+		d := f.Details[t.LongItem]
+		d.Transcript = strings.TrimSuffix(strings.Repeat(t.LongUnit+"\n", t.LongCount), "\n")
+		f.Details[t.LongItem] = d
 	}
 	return f, nil
 }

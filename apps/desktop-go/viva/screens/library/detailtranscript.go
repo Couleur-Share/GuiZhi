@@ -128,12 +128,16 @@ func (s *Screen) transcriptPane(c ui.C, v View, item services.LibraryItem, caps 
 				}
 				// mx-auto max-w-[48rem] whitespace-pre-wrap text-base leading-8 text-foreground/90
 				ui.Column(c.Key("body")).FillWidth().MaxWidth(l.Rem(48)).Self(ui.Center).Children(func() {
-					l.TextPreWrap(c.Key("text"), caps.Transcript, p.findQuery, l.Rem(1), l.Rem(2), kit.WeightNormal, t.Foreground.WithAlpha(0.9), kit.PreWrapView{
+					pre := kit.PreWrapView{
 						Window: func() (float32, float32) { return tx.vp.Y, tx.vp.Y + tx.vp.Height },
-						Layout: func(rect gfx.Rect, matches int, matchTop func(i int) float32) {
-							s.transcriptLayout(c, view, item.ID, caps.Transcript, l.Rem(2), matches, matchTop)
+						Layout: func(rect gfx.Rect, matches int, matchCenter func(i int) float32) {
+							s.transcriptLayout(c, view, item.ID, caps.Transcript, matches, matchCenter)
 						},
-					})
+					}
+					if s.FullTranscript {
+						pre.Window = nil // 对照场景：整份都画（见 Screen.FullTranscript）
+					}
+					l.TextPreWrap(c.Key("text"), caps.Transcript, p.findQuery, l.Rem(1), l.Rem(2), kit.WeightNormal, t.Foreground.WithAlpha(0.9), pre)
 				})
 			}).Grow(1).FillWidth().MinHeight(0)
 		})
@@ -190,7 +194,7 @@ func (s *Screen) transcriptEmpty(c ui.C, v View, caps ItemCaps) {
 
 // transcriptLayout 是文字块每次绘制时的回报：命中数交给查找条（p.findCount，变了就再出一帧让条上的数字跟上），
 // 当前命中在需要时滚到视口正中。
-func (s *Screen) transcriptLayout(c ui.C, view kit.ScrollView, itemID, text string, line float32, matches int, matchTop func(i int) float32) {
+func (s *Screen) transcriptLayout(c ui.C, view kit.ScrollView, itemID, text string, matches int, matchCenter func(i int) float32) {
 	p := &s.detail.panel
 	tx := &p.tx
 	if matches != p.findCount {
@@ -210,8 +214,7 @@ func (s *Screen) transcriptLayout(c ui.C, view kit.ScrollView, itemID, text stri
 		return
 	}
 	i := ((p.findActive % matches) + matches) % matches
-	center := matchTop(i) + line/2
-	delta := center - (tx.vp.Y + tx.vp.Height/2)
+	delta := matchCenter(i) - (tx.vp.Y + tx.vp.Height/2)
 	if math.Abs(float64(delta)) < 0.5 {
 		return
 	}

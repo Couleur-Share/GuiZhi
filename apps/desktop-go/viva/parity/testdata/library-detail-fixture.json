@@ -36,6 +36,12 @@
       "transcript": "",
       "sourceUri": ""
     },
+    "item-011": {
+      "content": "播客：产品经理的第一性原理",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
     "item-012": {
       "content": "## 讨论总结\n\n三位回复者一致认为：WAL 模式下备份必须带上 -wal 文件，或改用 VACUUM INTO。\n\n## 正文\n\n用 sqlite3 .backup 备份 WAL 模式的库时，只拷贝主文件会丢掉最近的写入。\n\n## 讨论（3 条）\n\n### 1 楼 · alice\n\n只拷主文件确实会丢数据，我踩过这个坑。\n\n### 2 楼 · bob\n\n> 回复 @alice（1 楼）：只拷主文件确实会丢数据\n\n用 VACUUM INTO 最省心。\n\n### 3 楼 · carol\n\n补充一点：checkpoint 之后再拷也可以。",
       "summary": "",
@@ -48,6 +54,12 @@
       "transcript": "",
       "sourceUri": ""
     },
+    "item-015": {
+      "content": "[视频](local-video://rust-ownership.mp4)",
+      "summary": "",
+      "transcript": "",
+      "sourceUri": ""
+    },
     "item-017": {
       "content": "容器查询让组件按自身宽度而不是视口宽度响应。",
       "summary": "",
@@ -55,6 +67,12 @@
       "sourceUri": "https://example.com/css/container-queries",
       "reviewStatus": "needs_review",
       "reviewReasons": ["正文过短，可能没有抓取完整", "缺少发布时间"]
+    },
+    "item-020": {
+      "content": "[视频](local-video://latte-art.mp4)",
+      "summary": "",
+      "transcript": "各位好，欢迎来到本期节目。今天我们聊聊离线可用、多设备同步和长期保存，这几件事靠的是同一个思路：数据先存在你自己的设备上，网络只是锦上添花的能力，而不是前提。\n\n第一个原则是快。读写都发生在本地，没有网络往返，界面不会因为服务器慢而卡住。\n第二个原则是离线可用。飞机上、地铁里，本地优先的应用照样能整理笔记、搜索资料。\n\n第三个原则是协作。多台设备之间靠合并同步，而不是谁最后保存谁覆盖，这是本地优先和传统云服务最大的不同。\n\n最后是长期保存。文件格式公开，数据在你手里，即使服务商关门，本地优先的应用也还能继续打开你的资料。",
+      "sourceUri": ""
     },
     "item-042": {
       "content": "未写完的草稿。",
@@ -164,6 +182,14 @@
         ]
       }
     }
+  },
+  "transcripts": {
+    "emptyItem": "item-015",
+    "bodyItem": "item-020",
+    "findQuery": "本地优先",
+    "longItem": "item-011",
+    "longUnit": "长稿测试段落：数据留在本机，同步靠合并而不靠覆盖，所以离线时也能放心地编辑。",
+    "longCount": 1300
   },
   "conflict": {
     "savedTitle": "学习笔记：Go 并发模式（另一入口已改）",
