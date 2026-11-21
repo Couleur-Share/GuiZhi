@@ -19,6 +19,16 @@ const (
 	ForumRepliesHeading = "## 讨论"
 )
 
+// 阅读来源改写（reading-source.ts 的 replaceReadingSource）认的小节标题名（不含「## 」前缀）与全角括号：
+// 那里的小节标题匹配式要按 JS 多行模式的语义手写（reading_source.go），不能用上面的 RE2 匹配式。
+const (
+	forumSummaryTitle = "讨论总结"
+	forumBodyTitle    = "正文"
+	forumTalkTitle    = "讨论"
+	parenOpenFull     = "（"
+	parenCloseFull    = "）"
+)
+
 // OCRSectionHeading 是图片条目「图中文字」小节的标题（ocr-request.ts 的 OCR_SECTION_HEADING）。
 const OCRSectionHeading = "## 图中文字"
 
