@@ -355,6 +355,7 @@ func (r *Root) Close() {
 	}
 	if r.library != nil {
 		r.library.Store.FlushRemovals()
+		r.library.Store.Close() // 取消转写与排版的进度订阅
 	}
 	if r.stopImports != nil {
 		r.stopImports()

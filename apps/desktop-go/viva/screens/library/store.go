@@ -104,6 +104,9 @@ type Store struct {
 	newID    func() string
 	// pendingFlags 是在途的收藏、置顶翻转（键为 字段+条目 ID）：连点两次要以在途的值为准，不能都发同一个值。
 	pendingFlags map[string]bool
+
+	// mediaStop 取消转写与排版的进度订阅（store_media.go）；nil 表示没有订阅。Load 时订阅一次（重复 Load 不重复订阅），Close 时取消。
+	mediaStop func()
 }
 
 // NewStore 创建一个侧栏状态。svc 不能为空。
@@ -248,12 +251,14 @@ func (s *Store) RefreshCounts(ctx context.Context) {
 	s.wake()
 }
 
-// Load 是知识库工作区挂载时的读取（渲染层 LibraryWorkspace 的挂载 effect）：计数、合集、标签各在后台读一遍。
+// Load 是知识库工作区挂载时的读取（渲染层 LibraryWorkspace 的挂载 effect）：计数、合集、标签各在后台读一遍；
+// 同时订阅转写与排版的进度推送（只订阅一次，Close 取消）。
 func (s *Store) Load(ctx context.Context) {
 	s.mu.Lock()
 	s.bg = ctx
 	s.view.List.Loading = true // 第一帧就是加载态，不是「暂无条目」
 	s.mu.Unlock()
+	s.subscribeMedia()
 	s.Spawn(func() { s.RefreshAll(ctx) })
 	s.Spawn(func() { s.FetchCollections(ctx) })
 	s.Spawn(func() { s.FetchTags(ctx) })

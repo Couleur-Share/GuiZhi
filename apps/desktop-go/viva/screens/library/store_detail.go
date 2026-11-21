@@ -68,6 +68,8 @@ type DetailView struct {
 	CanDiarize bool
 	// Tools 是文章工具侧栏背后的状态（来源评论、网页来源版本、交接稿忙标记，store_tools.go），读到条目之后挂载，换条目重置。
 	Tools ToolsView
+	// Media 是转写、文字稿排版、总结与刷新论坛讨论的状态（use-media-actions.ts 的 hook 状态，store_media.go），换条目重置。
+	Media MediaView
 	// MarkingReviewedID 是正在标记为已复核的条目 ID（ReviewRequiredNotice 的 isMarking；空表示没有）。
 	MarkingReviewedID string
 }
@@ -129,6 +131,8 @@ type detailState struct {
 	savedStop func()
 	// tools 是文章工具侧栏的内部状态（挂载代号与在途标记，store_tools.go）。
 	tools toolsState
+	// media 是媒体动作的内部状态（切条目代号，store_media.go）。
+	media mediaState
 }
 
 func newDetailState() detailState {
@@ -287,6 +291,7 @@ func (s *Store) commitSelectLocked(id string) {
 	d.Item, d.Loading, d.LoadError = nil, id != "", ""
 	d.Revisions, d.CanDiarize = RevisionsView{}, false
 	s.resetToolsLocked()
+	s.resetMediaLocked()
 	s.resetSavedLocked()
 }
 
@@ -298,6 +303,7 @@ func (s *Store) clearDetailLocked() {
 	d.Item, d.Loading, d.LoadError = nil, false, ""
 	d.Revisions, d.CanDiarize = RevisionsView{}, false
 	s.resetToolsLocked()
+	s.resetMediaLocked()
 	s.resetSavedLocked()
 }
 

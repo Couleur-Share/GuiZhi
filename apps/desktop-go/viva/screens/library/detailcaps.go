@@ -76,12 +76,7 @@ func deriveCaps(item services.LibraryItem) ItemCaps {
 	}
 	c.SummaryLabel = summaryLabel(isForum, item.ItemType == services.LibraryTypeAudio, c.HasSummary)
 
-	if isForum && item.SourceURI != "" {
-		switch services.DetectForumPlatform(item.SourceURI) {
-		case "linuxdo", "appinn", "twolibra":
-			c.RefreshAvailable = true
-		}
-	}
+	c.RefreshAvailable = canRefreshForum(item)
 	c.CommentsSupported = !trashed && services.DetectSourceCommentsPlatform(item.SourceURI) != ""
 	if p, ok := services.ResolveSourcePlatform("url", item.SourceURI); ok && p == "wechat" {
 		c.IsWechat = true
@@ -90,6 +85,19 @@ func deriveCaps(item services.LibraryItem) ItemCaps {
 	c.IsBlankNote = blank && !trashed
 	c.AskAvailable = !blank
 	return c
+}
+
+// canRefreshForum 报告能不能刷新论坛讨论：论坛条目，且来源是支持刷新的站点（Linux.do、小众软件论坛、2libra；
+// 渲染层 useForumDiscussionRefreshAction 的 available）。deriveCaps 的 RefreshAvailable 与 Store.RefreshForumDiscussion 的前置判断共用它。
+func canRefreshForum(item services.LibraryItem) bool {
+	if item.ItemType != services.LibraryTypeForum || item.SourceURI == "" {
+		return false
+	}
+	switch services.DetectForumPlatform(item.SourceURI) {
+	case "linuxdo", "appinn", "twolibra":
+		return true
+	}
+	return false
 }
 
 // summaryLabel 是总结按钮的文字（渲染层 useMediaSummaryAction 的 label）。

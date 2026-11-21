@@ -57,6 +57,7 @@ func newHarness(t *testing.T) *harness {
 	})
 	h.store.After = h.clock.After
 	h.store.Spawn = func(fn func()) { fn() } // 默认同步；并发用例自己改回 goroutine
+	t.Cleanup(h.store.Close)                 // 取消 Load 时订阅的媒体进度推送
 	return h
 }
 
