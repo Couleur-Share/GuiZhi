@@ -44,6 +44,10 @@ type Screen struct {
 	// ReaderToolbar 为真时即使没有接阅读岛宿主，工具栏里也画读者工具条（原文 / AI 阅读 / 目录 / 编辑）：对照场景专用，
 	// 用来单独比较这一组控件而不拉起 WebView。生产里接了宿主（SetReader）就总是画。
 	ReaderToolbar bool
+	// HideToolbar 为真时内容面板的工具栏（标签页与查找、读者工具条）不画：对照场景专用，口径与采集端 HIDE_TOOLBAR_CSS（display: none）一致。
+	// 用在文章工具侧栏的场景里：渲染层的侧栏在 DOM 里排在内容面板之前，Viva 没有 z-index、绘制序就是读屏与 Tab 序，
+	// 侧栏只能声明在内容之后，工具栏里的文字因此在两侧的文字序里前后颠倒，后面整段面板文字会错位一格比不上（台账 C-013）。生产里恒为假。
+	HideToolbar bool
 
 	// Loc 与 Locale 决定表格里时间的写法（今天写时分，其余写日期）；空表示本地时区与中文。
 	Loc    *time.Location

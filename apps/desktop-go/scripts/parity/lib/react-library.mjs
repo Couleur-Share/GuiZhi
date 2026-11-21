@@ -84,6 +84,14 @@ const HIDE_READER_TOOLBAR_CSS = `
 [data-testid="article-toolbar"] > .ml-auto > div:first-child > * { display: none !important; }
 `;
 const HIDE_READER_CSS = HIDE_READER_CONTENT_CSS + HIDE_READER_TOOLBAR_CSS;
+/**
+ * 文章工具侧栏的场景（config.detail.hideToolbar）再把内容面板的整条工具栏隐去（display: none，不占位）：侧栏在渲染层 DOM 里排在内容面板之前，
+ * Viva 没有 z-index、绘制序就是读屏与文字序，侧栏只能声明在内容之后，工具栏里的文字在两侧的文字序里前后颠倒，会让整段侧栏文字错位一格比不上
+ * （台账 C-013）。Viva 一侧对应 Screen.HideToolbar。
+ */
+const HIDE_TOOLBAR_CSS = `
+[data-testid="article-toolbar"] { display: none !important; }
+`;
 
 /**
  * 页面初始化脚本（在页内运行，不能引用外层变量）：读配置，按配置替换 window.api 的合集、标签与计数接口。
@@ -213,16 +221,20 @@ function pageInit({ fixture, detail, configKey }) {
   // 条目详情（M2-4）：详情字段取详情夹具，叠在列表条目上；保存的正文改动写回 bodies。没有夹具条目的字段取空。
   const detailCfg = config.detail ?? null;
   const bodies = detailCfg ? JSON.parse(JSON.stringify(detail.details)) : {};
+  // 文章工具侧栏（M2-6b）：config.detail.tools 是 "base"（只给网页的来源版本）、"comments"（再给来源评论）或 "comments-empty"（评论读到是空的）。
+  // 评论场景把 commentsItem 的来源链接换成平台来源（夹具里没有一条详情带小红书或抖音链接）。
+  const tools = detailCfg?.tools ?? "";
   const fullItem = (id) => {
     const e = entries.find((x) => x.id === id);
     if (!e) return null;
     const body = bodies[id] ?? {};
+    const commentsHere = tools.startsWith("comments") && id === detail.tools.commentsItem;
     return {
       ...JSON.parse(JSON.stringify(e)),
       content: body.content ?? "",
       summary: body.summary ?? "",
       transcript: body.transcript ?? "",
-      sourceUri: body.sourceUri ? body.sourceUri : null,
+      sourceUri: commentsHere ? detail.tools.commentsSourceUri : (body.sourceUri ? body.sourceUri : null),
       reviewStatus: body.reviewStatus ?? e.reviewStatus ?? "clear",
       reviewReasons: body.reviewReasons ?? e.reviewReasons ?? [],
       metadata: {},
@@ -317,6 +329,23 @@ function pageInit({ fixture, detail, configKey }) {
     }
     // 转写能力：详情场景里固定为「不支持区分说话人」（与 Go 一侧的假实现默认值一致），不依赖真实引擎配置。
     if (detailCfg && api.media) Object.assign(api.media, { capabilities: () => Promise.resolve({ diarization: false }) });
+    // 文章工具（M2-6b）：来源评论与网页的来源版本取详情夹具（形状与 IPC 一致），与 Go 一侧的假服务同源。
+    if (tools) {
+      const clone = (v) => JSON.parse(JSON.stringify(v));
+      if (api.platformCapture) {
+        Object.assign(api.platformCapture, {
+          listComments: (id) => Promise.resolve(tools === "comments" && id === detail.tools.commentsItem ? clone(detail.tools.comments) : []),
+        });
+      }
+      if (api.webCapture) {
+        Object.assign(api.webCapture, {
+          versions: (id) => {
+            const web = detail.tools.web[id];
+            return Promise.resolve(web ? { ok: true, data: clone(web) } : { ok: false, error: "条目不存在" });
+          },
+        });
+      }
+    }
   };
 
   if (window.api) {
@@ -392,7 +421,7 @@ export async function enterLibrary(session, options = {}) {
   }, !!config.list);
   // showReader：阅读岛对照工具（tools/probe-reader-island.mjs）要看阅读区本身，不隐去；其余场景不传，行为不变。
   if (!(config.detail && config.showReader)) {
-    const readerCss = config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS; // toolbar：只隐去阅读区内容，保留读者工具条（B-065）
+    const readerCss = (config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : ""); // toolbar：只隐去阅读区内容，保留读者工具条（B-065）；hideToolbar：连工具栏一起隐去（C-013）
     await page.addStyleTag({ content: config.detail ? readerCss : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
   }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，

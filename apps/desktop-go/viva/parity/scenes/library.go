@@ -38,6 +38,12 @@ type libraryOptions struct {
 	detail bool
 	// detailVersions 为 true 时详情夹具里的来源版本放进服务（React 一侧 config.detail.versions）。
 	detailVersions bool
+	// tools 是文章工具侧栏（M2-6b）的数据，只在 detail 时有意义：空表示不放；toolsBase 放网页的来源版本；toolsComments 再放来源评论
+	// （并把评论条目的来源链接换成平台来源）；toolsCommentsEmpty 只换来源链接，评论读到是空的。React 一侧 config.detail.tools 同值。
+	tools toolsMode
+	// hideToolbar 为 true 时内容面板的工具栏不画（Screen.HideToolbar；React 一侧 config.detail.hideToolbar 加 display: none）：
+	// 文章工具侧栏的场景用，理由见 Screen.HideToolbar（台账 C-013）。
+	hideToolbar bool
 	// readerToolbar 为 true 时工具栏里画读者工具条（原文 / AI 阅读、目录、编辑，Screen.ReaderToolbar）；React 一侧
 	// config.detail.toolbar 只隐去阅读区内容、保留工具条（HIDE_READER_CONTENT_CSS，台账 B-065）。其余场景两侧都隐去工具条。
 	readerToolbar bool
@@ -162,6 +168,8 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			HideDetail: !opt.detail,
 			// 读者工具条：只有 B-065 的场景开（其余场景 React 一侧连同阅读区一起隐去，Viva 一侧对应空的挂载点）。
 			ReaderToolbar: opt.readerToolbar,
+			// 文章工具侧栏的场景把内容面板的工具栏隐去（React 一侧 config.detail.hideToolbar），理由见 Screen.HideToolbar（台账 C-013）。
+			HideToolbar: opt.hideToolbar,
 		}
 		workspace := blankWorkspace
 		if opt.list {

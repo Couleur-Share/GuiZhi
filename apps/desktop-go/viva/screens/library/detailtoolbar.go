@@ -57,7 +57,9 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 				l.PaintSurface(d, kit.Surface{Bg: t.UiPanelBg, Shadow: t.UiPanelShadow})
 			}).
 			Children(func() {
-				s.panelToolbar(c.Key("toolbar"), item, caps, active, showFind)
+				if !s.HideToolbar {
+					s.panelToolbar(c.Key("toolbar"), item, caps, active, showFind)
+				}
 				s.reviewNotice(c, v, item, caps.Trashed)
 				if p.findOpen && showFind {
 					s.findBar(c.Key("find"), active, live)

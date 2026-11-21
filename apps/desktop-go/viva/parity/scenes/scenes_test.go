@@ -30,6 +30,20 @@ var knownRed = map[string]redPin{
 	// G-027：L1 角色映射里没有 region 与 ListMarker（映射表有哈希守卫，扩展待追认）
 	"app.window.library.detail-review":      {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 2},
 	"app.window.library.detail-review-open": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 3},
+	// G-027（M2-6b 延伸）：工具侧栏是带名字的 region，信息栏是 dl/dt/dd（DescriptionList、term、definition），评论卡片是 article 与 time——
+	// 都没有映射规则；Viva 把侧栏表达成 group，于是多一个 extra-node。这些场景的 L2、L3 全部通过，只因 L1 未通过。
+	"app.window.library.detail-tools-note":             {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-note-picker":      {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-note-handoff":     {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-webpage":          {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-webpage-open":     {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-webpage-selected": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-comments":         {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-comments-open":    {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 7},
+	"app.window.library.detail-tools-comments-empty":   {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	// B-071：工具侧栏在 Viva 里排在内容面板之后，渲染层里在它之前——留着内容面板的工具栏时，工具栏与侧栏文字的先后错开，
+	// L1 文字顺序整段错位（其余场景把工具栏隐去，见 C-013）；这个场景专门钉住这个差别。
+	"app.window.library.detail-tools-note-toolbar": {Ledger: "B-071", Kinds: []string{"L1/extra-node", "L1/missing-node", "L1/text", "L1/unmapped-role", "L2/alignment"}, Max: 23},
 }
 
 func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {

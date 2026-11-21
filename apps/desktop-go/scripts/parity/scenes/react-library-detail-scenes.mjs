@@ -9,6 +9,7 @@
  */
 import { CARD_ANCHOR, applyFacets, card, chain, listScene, pressKeys } from "./react-library-list-scenes.mjs";
 import { LIBRARY_DETAIL_FIXTURE, navLabel } from "../lib/react-library.mjs";
+import { parityLanguage } from "../lib/react-state.mjs";
 
 
 /** 场景要点的卡片标题（取自列表夹具 data 变体）。都是标题开头不重复的纯文字，Viva 一侧同名。 */
@@ -145,6 +146,67 @@ const focusToolbar = (name) => async (win) => {
 
 const CONFLICT_TITLE = LIBRARY_DETAIL_FIXTURE.conflict.mineTitle;
 
+/**
+ * 文章工具侧栏（M2-6b）：config.detail.tools 决定放哪些数据（lib/react-library.mjs）：base 只给网页的来源版本，comments 再给来源评论
+ * （评论条目的来源链接换成小红书），comments-empty 评论读到是空的。Viva 一侧见 viva/parity/scenes/library_tools.go。
+ * hideToolbar 连内容面板的工具栏一起隐去：侧栏在 DOM 里排在内容面板之前、Viva 里只能排在之后，工具栏文字的前后之别会让整段侧栏文字错位比不上
+ * （台账 C-013）；detail-tools-note-toolbar 留着工具栏，专门钉住这个差别。
+ */
+const TOOLS = { detail: { tools: "base", hideToolbar: true } };
+const TOOLS_WITH_TOOLBAR = { detail: { tools: "base" } };
+const TOOLS_COMMENTS = { detail: { tools: "comments", hideToolbar: true } };
+const TOOLS_COMMENTS_EMPTY = { detail: { tools: "comments-empty", hideToolbar: true } };
+
+/** 侧栏里要点的钮与菜单项的可访问名，按 PARITY_LANG 取中文或英文（渲染层 i18n 目录 zh.json / en.json）；名字写错时 getByRole 等不到元素、采集超时，不会悄悄点错。 */
+const TOOL_LABELS = {
+  zh: {
+    moreActions: "更多操作", tools: "文章信息与工具", addTag: "添加标签", handoffMore: "更多 AI 导出方式", versions: "原文版本",
+    comments: "来源评论", collectComments: "采集评论",
+  },
+  en: {
+    moreActions: "More actions", tools: "Article information and tools", addTag: "Add tag", handoffMore: "More AI export options",
+    versions: "Source versions", comments: "Source comments", collectComments: "Collect comments",
+  },
+};
+const toolLabel = (key) => TOOL_LABELS[parityLanguage()][key];
+
+/** 工具侧栏（aside，role=region，名字「文章信息与工具」）；关着时 hidden，不在可访问树里。 */
+const toolsPanel = (win) => win.getByRole("region", { name: toolLabel("tools"), exact: true });
+
+/** 点盒子中心（坐标取整，理由同 snapped）。 */
+const clickCenter = async (win, locator) => {
+  const box = await locator.boundingBox();
+  await win.mouse.click(snapped(box.x + box.width / 2), snapped(box.y + box.height / 2));
+};
+
+/**
+ * 从头部「更多操作」菜单点开工具侧栏，等侧栏出现（打开时焦点落到收起钮上）。item 是点的菜单项：缺省是「文章信息与工具」；
+ * 评论入口（「采集评论」「查看来源评论」）点开的同样是工具侧栏，并把评论卡片展开。Viva 一侧对应 toolsOpenVia。
+ */
+const openToolsVia = (item = "tools") => async (win) => {
+  await openHeaderMenu(toolLabel("moreActions"))(win);
+  await clickCenter(win, win.getByRole("menuitem", { name: toolLabel(item), exact: true }));
+  await toolsPanel(win).waitFor({ state: "visible" });
+  await win.waitForTimeout(300);
+};
+const openTools = openToolsVia();
+
+/** 点侧栏里的钮：按整名；prefix 为真时按名字前缀（展开钮的名字带数量、版本钮带提示）。 */
+const clickInTools = (key, { prefix = false } = {}) => async (win) => {
+  const name = toolLabel(key);
+  await clickCenter(win, toolsPanel(win).getByRole("button", prefix ? { name: new RegExp(`^${name}`) } : { name, exact: true }));
+  await win.waitForTimeout(300);
+};
+
+/** 展开原文版本下拉（渲染层 Select 的触发钮是带 aria-haspopup 的 button），选第一项（最新的版本）。 */
+const pickFirstVersion = async (win) => {
+  await clickCenter(win, toolsPanel(win).getByRole("button", { name: toolLabel("versions"), exact: true }));
+  await win.getByRole("option").first().waitFor({ state: "visible" });
+  await win.waitForTimeout(250);
+  await clickCenter(win, win.getByRole("option").first());
+  await win.waitForTimeout(300);
+};
+
 export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-empty": listScene({ detail: {} }),
   "app.window.library.detail-loading": listScene({ detail: { get: "hold" } }, clickCardOnly(NOTE)),
@@ -197,4 +259,19 @@ export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-toolbar-blank": listScene(TOOLBAR, selectByKeys(BLANK_INDEX + 1)),
   "app.window.library.detail-toolbar-hover": listScene(TOOLBAR, chain(selectCard(NOTE), hoverToolbar(LABEL.editOriginal)), { keepPointer: true }),
   "app.window.library.detail-toolbar-focus": listScene(TOOLBAR, chain(selectCard(NOTE), focusToolbar(LABEL.toc)), { keepFocus: true }),
+  // 文章工具侧栏（M2-6b）：从「更多操作」菜单打开；标签浮层、AI 交接菜单、网页的来源版本（展开、选一版比较）、来源评论卡片与带评论入口的更多菜单。
+  "app.window.library.detail-tools-note": listScene(TOOLS, chain(selectCard(NOTE), openTools)),
+  "app.window.library.detail-tools-note-toolbar": listScene(TOOLS_WITH_TOOLBAR, chain(selectCard(NOTE), openTools)),
+  "app.window.library.detail-tools-note-picker": listScene(TOOLS, chain(selectCard(NOTE), openTools, clickInTools("addTag")), { keepFocus: true }),
+  "app.window.library.detail-tools-note-handoff": listScene(TOOLS, chain(selectCard(NOTE), openTools, clickInTools("handoffMore")), { keepFocus: true }),
+  "app.window.library.detail-tools-webpage": listScene(TOOLS, chain(selectCard(WEBPAGE), openTools)),
+  "app.window.library.detail-tools-webpage-open": listScene(TOOLS, chain(selectCard(WEBPAGE), openTools, clickInTools("versions", { prefix: true }))),
+  "app.window.library.detail-tools-webpage-selected": listScene(TOOLS, chain(
+    selectCard(WEBPAGE), openTools, clickInTools("versions", { prefix: true }), pickFirstVersion,
+  )),
+  "app.window.library.detail-tools-comments": listScene(TOOLS_COMMENTS, chain(selectCard(NOTE), openTools)),
+  "app.window.library.detail-tools-comments-open": listScene(TOOLS_COMMENTS, chain(selectCard(NOTE), openTools, clickInTools("comments", { prefix: true }))),
+  // 评论读到是空的时卡片在展开之前不显示（渲染层 SourceCommentsCard），入口只有头部「更多操作」菜单里的「采集评论」。
+  "app.window.library.detail-tools-comments-empty": listScene(TOOLS_COMMENTS_EMPTY, chain(selectCard(NOTE), openToolsVia("collectComments"))),
+  "app.window.library.detail-tools-comments-menu": listScene(TOOLS_COMMENTS, chain(selectCard(NOTE), openHeaderMenu(LABEL.moreActions)), { keepFocus: true }),
 };

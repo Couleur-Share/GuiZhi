@@ -63,7 +63,9 @@ func seedLibraryDetail(svc *servicestest.Library, entries []services.LibraryEntr
 		if !ok {
 			continue
 		}
-		svc.SeedDetail(out[i].ID, servicestest.DetailBody{Content: d.Content, Summary: d.Summary, Transcript: d.Transcript, SourceURI: d.SourceURI})
+		svc.SeedDetail(out[i].ID, servicestest.DetailBody{
+			Content: d.Content, Summary: d.Summary, Transcript: d.Transcript, SourceURI: opt.tools.sourceURI(fix, out[i].ID, d.SourceURI),
+		})
 		if d.ReviewStatus != "" {
 			out[i].ReviewStatus = d.ReviewStatus
 			out[i].ReviewReasons = slices.Clone(d.ReviewReasons)
@@ -74,6 +76,7 @@ func seedLibraryDetail(svc *servicestest.Library, entries []services.LibraryEntr
 			svc.SeedSourceVersions(id, versions)
 		}
 	}
+	opt.tools.seed(svc, fix)
 	if opt.failGet {
 		svc.FailOn("GetItem", errors.New(fix.Failures.Get))
 	}
@@ -131,16 +134,22 @@ func detailClickTab(name string, exact bool) libraryEnvStep {
 
 // detailOpenHeaderMenu 点详情头部里会弹出菜单的钮（取整，见 snap）：同名的钮还有侧栏与列表里的，详情头部在最右边，取最靠右的那个。
 func detailOpenHeaderMenu(role gfx.Role, name string) libraryEnvStep {
+	return detailOpenHeaderMenuNamed(role, func() string { return name })
+}
+
+// detailOpenHeaderMenuNamed 同 detailOpenHeaderMenu，名字在步骤执行时才取（英文变体要等界面语言设定之后才取名，理由同 detailOpenSummary）。
+func detailOpenHeaderMenuNamed(role gfx.Role, name func() string) libraryEnvStep {
 	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		want := name()
 		var pick gfx.Rect
 		found := false
 		for _, n := range s.Access() {
-			if n.Role == role && n.Label == name && (!found || n.Bounds.X > pick.X) {
+			if n.Role == role && n.Label == want && (!found || n.Bounds.X > pick.X) {
 				pick, found = n.Bounds, true
 			}
 		}
 		if !found {
-			return fmt.Errorf("找不到 %s「%s」", role, name)
+			return fmt.Errorf("找不到 %s「%s」", role, want)
 		}
 		if err := s.Click(snap(pick.X+pick.Width/2), snap(pick.Y+pick.Height/2)); err != nil {
 			return err

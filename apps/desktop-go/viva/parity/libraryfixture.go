@@ -80,6 +80,14 @@ type LibraryDetailFixture struct {
 	Details map[string]LibraryDetail `json:"details"`
 	// SourceVersions 按条目 ID 给出来源版本（新的在前）。
 	SourceVersions map[string][]services.LibrarySourceVersion `json:"sourceVersions"`
+	// Tools 是文章工具侧栏（M2-6b）的数据：评论只给 CommentsItem 这一条（场景里它的来源链接换成 CommentsSourceURI，才算平台来源），
+	// 网页的来源版本与比较基线按条目 ID。形状与 IPC 一致（两侧同源：React 一侧页内接口原样返回）。
+	Tools struct {
+		CommentsItem      string                                 `json:"commentsItem"`
+		CommentsSourceURI string                                 `json:"commentsSourceUri"`
+		Comments          []services.LibrarySourceComment        `json:"comments"`
+		Web               map[string]services.LibraryWebVersions `json:"web"`
+	} `json:"tools"`
 	// Conflict 是保存冲突场景的两个标题：另一入口已改成的标题，与用户在标题框里改成的标题。
 	Conflict struct {
 		SavedTitle string `json:"savedTitle"`

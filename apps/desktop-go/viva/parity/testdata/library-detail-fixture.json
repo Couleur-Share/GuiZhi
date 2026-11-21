@@ -83,6 +83,80 @@
       }
     ]
   },
+  "tools": {
+    "commentsItem": "item-001",
+    "commentsSourceUri": "https://www.xiaohongshu.com/explore/65a1b2c3d4e5f60718293a4b",
+    "comments": [
+      {
+        "id": "cm-1",
+        "itemId": "item-001",
+        "platform": "xiaohongshu",
+        "externalId": "e-1",
+        "authorName": "小满",
+        "content": "这篇讲得很清楚，已经收藏了。\n想问下 worker pool 部分有没有更完整的例子？",
+        "likeCount": 128,
+        "publishedAt": 1794700000000,
+        "capturedAt": 1794790000000
+      },
+      {
+        "id": "cm-2",
+        "itemId": "item-001",
+        "platform": "xiaohongshu",
+        "externalId": "e-2",
+        "authorName": "",
+        "content": "第一次有人把 channel 的所有权讲成这样，学到了。",
+        "likeCount": 36,
+        "publishedAt": null,
+        "capturedAt": 1794790000000
+      },
+      {
+        "id": "cm-3",
+        "itemId": "item-001",
+        "platform": "xiaohongshu",
+        "externalId": "e-3",
+        "authorName": "Alex",
+        "content": "fan-in / fan-out 那一节如果配上取消与超时的写法就更完整了，生产里最容易踩的就是 goroutine 泄漏。",
+        "likeCount": 0,
+        "publishedAt": 1794600000000,
+        "capturedAt": 1794790000000
+      }
+    ],
+    "web": {
+      "item-003": {
+        "title": "如何构建本地优先的个人知识库",
+        "content": "本地优先的软件把数据放在用户自己的设备上，同步只是附加能力。\n\n本文拆解知识库的存储、索引与同步三层。",
+        "contentHash": "hash-item-003",
+        "summaryStale": true,
+        "pendingVersion": true,
+        "versions": [
+          {
+            "id": "wv-2",
+            "itemId": "item-003",
+            "sourceUrl": "https://example.com/blog/local-first-knowledge-base",
+            "title": "如何构建本地优先的个人知识库（更新）",
+            "markdown": "本地优先的软件把数据放在用户自己的设备上，同步只是附加能力。\n\n本文拆解知识库的存储、索引、同步与冲突解决四层。\n\n新增：CRDT 与最后写入者胜出的取舍。",
+            "contentHash": "hash-wv-2",
+            "capturedAt": 1794700000000,
+            "engineVersion": "web-capture-1.4",
+            "complete": true,
+            "kind": "remote"
+          },
+          {
+            "id": "wv-1",
+            "itemId": "item-003",
+            "sourceUrl": "https://example.com/blog/local-first-knowledge-base",
+            "title": "如何构建本地优先的个人知识库",
+            "markdown": "本地优先的软件把数据放在用户自己的设备上。",
+            "contentHash": "hash-wv-1",
+            "capturedAt": 1794600000000,
+            "engineVersion": "",
+            "complete": false,
+            "kind": "local"
+          }
+        ]
+      }
+    }
+  },
   "conflict": {
     "savedTitle": "学习笔记：Go 并发模式（另一入口已改）",
     "mineTitle": "我的新标题"
