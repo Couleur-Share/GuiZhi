@@ -34,6 +34,8 @@ type Library struct {
 	ops opsState
 	// 条目详情（见 library_detail.go）：正文、来源版本、草稿保存记录与闸门。
 	detail detailState
+	// 文章工具侧栏（见 library_tools.go）：来源评论与网页来源版本。
+	tools toolsState
 }
 
 var _ services.Library = (*Library)(nil)
@@ -57,7 +59,7 @@ func (f *Library) SetCounts(counts services.LibraryCounts) {
 
 // FailOn 让某个方法（"Counts"、"List"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
 // "Tags"、"UpdateTag"、"DeleteTag"、"Freeze"、"ExecuteBatch"、"UpdateEntry"、"SupplementWechat"、"AiHandoff"、"ExportAiHandoff"、
-// "GetItem"、"SaveDraft"、"SourceVersions"、"MediaCapabilities"）
+// "GetItem"、"SaveDraft"、"SourceVersions"、"MediaCapabilities"、"SourceComments"、"RefreshSourceComments"、"WebVersions"、"AdoptWebVersion"）
 // 返回 err；err 为 nil 取消注入。写成 "方法:参数"（如 "GetItem:b"）时只让针对那个参数的调用失败，优先于整个方法的注入。
 func (f *Library) FailOn(method string, err error) {
 	f.mu.Lock()

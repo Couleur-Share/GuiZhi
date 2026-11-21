@@ -32,7 +32,11 @@ func (l *Library) sourceCommentsList(ctx context.Context, itemID string) ([]any,
 	for _, r := range rows.Values {
 		o := newObj()
 		for i, k := range []string{"id", "itemId", "platform", "externalId", "authorName", "content", "likeCount", "publishedAt", "capturedAt"} {
-			o.set(k, r[i])
+			v := r[i]
+			if n, ok := v.(int64); ok {
+				v = float64(n) // 整数列在驱动里是 int64，jsObj 只认 float64：不转换点赞数与两个时间会在序列化时被整个丢掉
+			}
+			o.set(k, v)
 		}
 		out = append(out, o)
 	}

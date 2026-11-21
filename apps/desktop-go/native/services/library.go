@@ -115,4 +115,14 @@ type Library interface {
 	SourceVersions(ctx context.Context, id string) ([]LibrarySourceVersion, error)
 	// MediaCapabilities 读语音转写路由的可选能力（media:capabilities）；详情据此决定摆不摆「区分说话人」。
 	MediaCapabilities(ctx context.Context) (LibraryMediaCapabilities, error)
+
+	// SourceComments 读一条已落库的来源评论（platformCapture:listComments），按点赞数降序；没有为空。
+	SourceComments(ctx context.Context, itemID string) ([]LibrarySourceComment, error)
+	// RefreshSourceComments 重新采集一条的来源评论并返回采集后的全部评论（platformCapture:refreshComments）；
+	// limit 只能是 LibraryCommentLimits 里的档位，条目没有平台来源时失败。
+	RefreshSourceComments(ctx context.Context, itemID string, limit int) ([]LibrarySourceComment, error)
+	// WebVersions 读网页条目的原文版本与比较基线（web:versions）；业务上的失败（条目不存在……）作为 error 返回。
+	WebVersions(ctx context.Context, itemID string) (LibraryWebVersions, error)
+	// AdoptWebVersion 把某个完整的原文版本采用为正文（web:adopt）；基线与服务端不同时失败，什么也不写。
+	AdoptWebVersion(ctx context.Context, in LibraryAdoptWebVersionInput) error
 }
