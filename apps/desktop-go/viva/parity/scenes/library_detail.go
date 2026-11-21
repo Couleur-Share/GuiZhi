@@ -64,7 +64,8 @@ func seedLibraryDetail(svc *servicestest.Library, entries []services.LibraryEntr
 			continue
 		}
 		svc.SeedDetail(out[i].ID, servicestest.DetailBody{
-			Content: d.Content, Summary: d.Summary, Transcript: d.Transcript, SourceURI: opt.tools.sourceURI(fix, out[i].ID, d.SourceURI),
+			Content: opt.tools.content(fix, out[i].ID, d.Content), Summary: opt.tools.summary(fix, out[i].ID, d.Summary),
+			Transcript: d.Transcript, SourceURI: opt.tools.sourceURI(fix, out[i].ID, d.SourceURI),
 		})
 		if d.ReviewStatus != "" {
 			out[i].ReviewStatus = d.ReviewStatus

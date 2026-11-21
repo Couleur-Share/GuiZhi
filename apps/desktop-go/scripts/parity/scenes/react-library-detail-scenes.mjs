@@ -156,16 +156,22 @@ const TOOLS = { detail: { tools: "base", hideToolbar: true } };
 const TOOLS_WITH_TOOLBAR = { detail: { tools: "base" } };
 const TOOLS_COMMENTS = { detail: { tools: "comments", hideToolbar: true } };
 const TOOLS_COMMENTS_EMPTY = { detail: { tools: "comments-empty", hideToolbar: true } };
+// M2-6c：AI 摘要（笔记带一份 Markdown 摘要）、图中文字入口（图片条目带 local-image 引用，有无「图中文字」小节）、标签建议（模型回夹具里的候选）。
+const TOOLS_SUMMARY = { detail: { tools: "summary", hideToolbar: true } };
+const TOOLS_OCR = { detail: { tools: "ocr", hideToolbar: true } };
+const TOOLS_OCR_DONE = { detail: { tools: "ocr-done", hideToolbar: true } };
+const TOOLS_TAG_SUGGEST = { detail: { tools: "tag-suggest", hideToolbar: true } };
 
 /** 侧栏里要点的钮与菜单项的可访问名，按 PARITY_LANG 取中文或英文（渲染层 i18n 目录 zh.json / en.json）；名字写错时 getByRole 等不到元素、采集超时，不会悄悄点错。 */
 const TOOL_LABELS = {
   zh: {
     moreActions: "更多操作", tools: "文章信息与工具", addTag: "添加标签", handoffMore: "更多 AI 导出方式", versions: "原文版本",
-    comments: "来源评论", collectComments: "采集评论",
+    comments: "来源评论", collectComments: "采集评论", summaryExpand: "展开 AI 摘要", tagsGenerate: "生成",
   },
   en: {
     moreActions: "More actions", tools: "Article information and tools", addTag: "Add tag", handoffMore: "More AI export options",
-    versions: "Source versions", comments: "Source comments", collectComments: "Collect comments",
+    versions: "Source versions", comments: "Source comments", collectComments: "Collect comments", summaryExpand: "Expand AI summary",
+    tagsGenerate: "Generate",
   },
 };
 const toolLabel = (key) => TOOL_LABELS[parityLanguage()][key];
@@ -195,6 +201,16 @@ const openTools = openToolsVia();
 const clickInTools = (key, { prefix = false } = {}) => async (win) => {
   const name = toolLabel(key);
   await clickCenter(win, toolsPanel(win).getByRole("button", prefix ? { name: new RegExp(`^${name}`) } : { name, exact: true }));
+  await win.waitForTimeout(300);
+};
+
+/**
+ * 点标签选择浮层里的「生成」（AI 建议标签）：浮层是挂在 body 下的门户，不在侧栏里。模型请求由页内替身同步回，
+ * 等候选虚线芯片出现（它们是浮层里「选择已有标签」之外多出的 button，名字是候选标签加号图标——取夹具第一个候选的文字等）。
+ */
+const generateTagSuggestions = async (win) => {
+  await clickCenter(win, win.getByRole("dialog").getByRole("button", { name: toolLabel("tagsGenerate"), exact: true }));
+  await win.getByRole("dialog").getByRole("button", { name: LIBRARY_DETAIL_FIXTURE.tools.ai.tagSuggestions[0], exact: true }).waitFor({ state: "visible" });
   await win.waitForTimeout(300);
 };
 
@@ -274,4 +290,10 @@ export const LIBRARY_DETAIL_SCENES = {
   // 评论读到是空的时卡片在展开之前不显示（渲染层 SourceCommentsCard），入口只有头部「更多操作」菜单里的「采集评论」。
   "app.window.library.detail-tools-comments-empty": listScene(TOOLS_COMMENTS_EMPTY, chain(selectCard(NOTE), openToolsVia("collectComments"))),
   "app.window.library.detail-tools-comments-menu": listScene(TOOLS_COMMENTS, chain(selectCard(NOTE), openHeaderMenu(LABEL.moreActions)), { keepFocus: true }),
+  // M2-6c：AI 摘要卡片（默认折叠、点开展开 Markdown 摘要）、图片条目的图中文字入口（未识别 / 已有「图中文字」小节）、标签浮层里的 AI 建议标签。
+  "app.window.library.detail-tools-summary-collapsed": listScene(TOOLS_SUMMARY, chain(selectCard(NOTE), openTools)),
+  "app.window.library.detail-tools-summary-expanded": listScene(TOOLS_SUMMARY, chain(selectCard(NOTE), openTools, clickInTools("summaryExpand"))),
+  "app.window.library.detail-tools-ocr": listScene(TOOLS_OCR, chain(selectByKeys(IMAGE_INDEX + 1), openTools)),
+  "app.window.library.detail-tools-ocr-done": listScene(TOOLS_OCR_DONE, chain(selectByKeys(IMAGE_INDEX + 1), openTools)),
+  "app.window.library.detail-tools-tag-suggest": listScene(TOOLS_TAG_SUGGEST, chain(selectCard(NOTE), openTools, clickInTools("addTag"), generateTagSuggestions), { keepFocus: true }),
 };

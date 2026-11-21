@@ -41,6 +41,13 @@ var knownRed = map[string]redPin{
 	"app.window.library.detail-tools-comments":         {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
 	"app.window.library.detail-tools-comments-open":    {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 7},
 	"app.window.library.detail-tools-comments-empty":   {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	// G-027（M2-6c 延伸）：AI 摘要展开后的 Markdown 正文多出 strong、ListMarker、code 三个未映射角色，其余同上；
+	// 其余场景（摘要折叠、OCR 两态、标签建议）与评论一样只有 region / DescriptionList / term / definition 与 extra-node。
+	"app.window.library.detail-tools-summary-collapsed": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-summary-expanded":  {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 8},
+	"app.window.library.detail-tools-ocr":               {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-ocr-done":          {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	"app.window.library.detail-tools-tag-suggest":       {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
 	// B-071：工具侧栏在 Viva 里排在内容面板之后，渲染层里在它之前——留着内容面板的工具栏时，工具栏与侧栏文字的先后错开，
 	// L1 文字顺序整段错位（其余场景把工具栏隐去，见 C-013）；这个场景专门钉住这个差别。
 	"app.window.library.detail-tools-note-toolbar": {Ledger: "B-071", Kinds: []string{"L1/extra-node", "L1/missing-node", "L1/text", "L1/unmapped-role", "L2/alignment"}, Max: 23},

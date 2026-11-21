@@ -82,7 +82,19 @@ type LibraryDetailFixture struct {
 	SourceVersions map[string][]services.LibrarySourceVersion `json:"sourceVersions"`
 	// Tools 是文章工具侧栏（M2-6b）的数据：评论只给 CommentsItem 这一条（场景里它的来源链接换成 CommentsSourceURI，才算平台来源），
 	// 网页的来源版本与比较基线按条目 ID。形状与 IPC 一致（两侧同源：React 一侧页内接口原样返回）。
+	//
+	// AI 是 M2-6c 的数据：SummaryItem 在 AI 摘要场景里带 Summary（Markdown 摘要）；OcrItem 是图片条目，OCR 场景里正文换成带 local-image 引用的
+	// OcrContent（没有「图中文字」小节）或 OcrDoneContent（已有该小节）；TagSuggestions 是标签建议场景里模型回的候选
+	// （React 一侧经 ai:httpRequest 的页内替身返回、Viva 一侧 SeedTagSuggestions，同一份）。
 	Tools struct {
+		AI struct {
+			SummaryItem    string   `json:"summaryItem"`
+			Summary        string   `json:"summary"`
+			OcrItem        string   `json:"ocrItem"`
+			OcrContent     string   `json:"ocrContent"`
+			OcrDoneContent string   `json:"ocrDoneContent"`
+			TagSuggestions []string `json:"tagSuggestions"`
+		} `json:"ai"`
 		CommentsItem      string                                 `json:"commentsItem"`
 		CommentsSourceURI string                                 `json:"commentsSourceUri"`
 		Comments          []services.LibrarySourceComment        `json:"comments"`

@@ -226,7 +226,7 @@ function pageInit({ fixture, detail, configKey }) {
       bodies[id] = { ...(bodies[id] ?? {}), content: text };
     }
   }
-  // 文章工具侧栏（M2-6b）：config.detail.tools 是 "base"（只给网页的来源版本）、"comments"（再给来源评论）或 "comments-empty"（评论读到是空的）。
+  // 文章工具侧栏（M2-6b）：config.detail.tools 是 "base"（只给网页的来源版本）、"comments"（再给来源评论）或 "comments-empty"（评论读到是空的）；M2-6c 另有 "summary"（摘要条目带 Markdown 摘要）、"ocr" / "ocr-done"（图片条目正文带 local-image 引用，后者已有「图中文字」小节）、"tag-suggest"（模拟 AI 配置与建议标签）。
   // 评论场景把 commentsItem 的来源链接换成平台来源（夹具里没有一条详情带小红书或抖音链接）。
   const tools = detailCfg?.tools ?? "";
   const fullItem = (id) => {
@@ -234,10 +234,15 @@ function pageInit({ fixture, detail, configKey }) {
     if (!e) return null;
     const body = bodies[id] ?? {};
     const commentsHere = tools.startsWith("comments") && id === detail.tools.commentsItem;
+    // M2-6c：摘要场景里摘要条目带一份摘要；OCR 场景里图片条目的正文换成带 local-image 引用的（夹具自带的是 asset://，不是识别入口认的协议）。
+    const ai = detail.tools.ai;
+    const ocrHere = id === ai.ocrItem;
+    const content = tools === "ocr" && ocrHere ? ai.ocrContent : tools === "ocr-done" && ocrHere ? ai.ocrDoneContent : (body.content ?? "");
+    const summary = tools === "summary" && id === ai.summaryItem ? ai.summary : (body.summary ?? "");
     return {
       ...JSON.parse(JSON.stringify(e)),
-      content: body.content ?? "",
-      summary: body.summary ?? "",
+      content,
+      summary,
       transcript: body.transcript ?? "",
       sourceUri: commentsHere ? detail.tools.commentsSourceUri : (body.sourceUri ? body.sourceUri : null),
       reviewStatus: body.reviewStatus ?? e.reviewStatus ?? "clear",
@@ -348,6 +353,30 @@ function pageInit({ fixture, detail, configKey }) {
             const web = detail.tools.web[id];
             return Promise.resolve(web ? { ok: true, data: clone(web) } : { ok: false, error: "条目不存在" });
           },
+        });
+      }
+    }
+    // 标签建议（M2-6c）：渲染层经设置里的模型配置与 ai:httpRequest 请求模型。settings:get 在真实读取之上补一份可用的单模型配置
+    // （AI 配置不在库里、对照环境里没有），ai:httpRequest（api.ai.request）回一条固定的对话补全，正文是夹具里的候选标签
+    // （与 Go 一侧的 SeedTagSuggestions 同一份）。只在标签建议场景里替换，别的场景的设置与请求照旧。
+    if (tools === "tag-suggest") {
+      if (api.settings) {
+        const real = api.settings.get.bind(api.settings);
+        Object.assign(api.settings, {
+          get: async () => ({
+            ...(await real()),
+            aiProvider: "parity", aiApiProtocol: "openai", aiApiKey: "parity-key", aiApiUrl: "https://parity.invalid/v1", aiModel: "parity-model",
+          }),
+        });
+      }
+      if (api.ai) {
+        const reply = JSON.stringify({
+          choices: [{ message: { role: "assistant", content: detail.tools.ai.tagSuggestions.join("，") }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        });
+        Object.assign(api.ai, {
+          request: () => Promise.resolve({ ok: true, status: 200, statusText: "OK", headers: {}, body: reply }),
+          recordUsage: () => Promise.resolve(),
         });
       }
     }

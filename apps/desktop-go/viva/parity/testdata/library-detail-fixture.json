@@ -84,6 +84,14 @@
     ]
   },
   "tools": {
+    "ai": {
+      "summaryItem": "item-001",
+      "summary": "## 核心要点\n\nGo 并发的做法是**用通信来共享内存**，而不是用共享内存来通信。\n\n- **worker pool**：固定数量的 goroutine 从同一个 channel 取任务\n- **pipeline**：阶段之间用 channel 串联，每个阶段只做一件事\n- **fan-in / fan-out**：分发任务，再把结果汇总到一个 channel\n\n### 落地建议\n\n先画出数据所有权，再决定 channel 的方向；用 `context` 控制取消与超时，避免 goroutine 泄漏。",
+      "ocrItem": "item-009",
+      "ocrContent": "![桌面](local-image://desk.png)\n\n极简桌面布置",
+      "ocrDoneContent": "![桌面](local-image://desk.png)\n\n极简桌面布置\n\n## 图中文字\n\n专注 · 留白 · 秩序",
+      "tagSuggestions": ["并发", "channel", "工作池", "管道模式"]
+    },
     "commentsItem": "item-001",
     "commentsSourceUri": "https://www.xiaohongshu.com/explore/65a1b2c3d4e5f60718293a4b",
     "comments": [

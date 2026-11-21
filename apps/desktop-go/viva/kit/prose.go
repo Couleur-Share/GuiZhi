@@ -52,6 +52,10 @@ const (
 	proseBlockRadius = 0.5
 )
 
+// layoutUnit 把长度截断到 1/64 px（Chromium 的 LayoutUnit）：渲染层里 1.6 倍行高的 16px 文字一行是 25.59375 而不是 25.6，
+// 一屏正文累计下来差零点几像素，会让行盒顶的取整在某些行上差一行（行盒顶先取整、再加基线行）。
+func layoutUnit(v float32) float32 { return float32(math.Floor(float64(v)*64+1e-4)) / 64 }
+
 // proseHeadingEm 是各级标题的字号倍数。
 func proseHeadingEm(level int) float32 {
 	switch level {
@@ -78,7 +82,8 @@ type proseNode struct {
 	top, bottom float32
 	kids        []*proseNode
 	size, line  float32
-	marker      string
+	marker      string      // 有序列表的记号文字
+	bullet      proseBullet // 无序列表的记号图形
 	inh         proseInherit
 }
 
@@ -156,8 +161,8 @@ func (p *proseBuilder) build(blocks []MdBlock, inh proseInherit, depth int) []*p
 		case MdList:
 			n.bottom = proseListBottom * p.base
 			for k, item := range b.Items {
-				li := &proseNode{item: true, inh: inh, size: p.base, bottom: proseItemBottom * p.base}
-				li.marker = proseMarker(b, k, depth)
+				li := &proseNode{item: true, inh: inh, size: p.base, bottom: layoutUnit(proseItemBottom * p.base)}
+				li.marker, li.bullet = proseMarker(b, k, depth)
 				li.kids = p.build(item, inh, depth+1)
 				li.collapse()
 				n.kids = append(n.kids, li)
@@ -171,24 +176,52 @@ func (p *proseBuilder) build(blocks []MdBlock, inh proseInherit, depth int) []*p
 		case MdRule:
 			n.top, n.bottom = p.base, p.base
 		}
+		n.line, n.top, n.bottom = layoutUnit(n.line), layoutUnit(n.top), layoutUnit(n.bottom)
 		n.collapse()
 		nodes = append(nodes, n)
 	}
 	return nodes
 }
 
-// proseMarker 是列表项的记号：无序按嵌套深度轮换圆点、空心圆、方块，有序是十进制加句点。
-func proseMarker(list *MdBlock, index, depth int) string {
+// proseBullet 是无序列表记号的形状（Chromium 把 disc / circle / square 画成图形，不是文字）。
+type proseBullet uint8
+
+const (
+	bulletNone   proseBullet = iota // 有序列表：记号是文字
+	bulletDisc                      // 实心圆
+	bulletCircle                    // 空心圆
+	bulletSquare                    // 实心方块
+)
+
+// proseMarker 是列表项的记号：无序按嵌套深度轮换圆点、空心圆、方块（返回图形），有序是十进制加句点（返回文字）。
+func proseMarker(list *MdBlock, index, depth int) (string, proseBullet) {
 	if list.Ordered {
-		return strconv.Itoa(list.Start+index) + "."
+		return strconv.Itoa(list.Start+index) + ".", bulletNone
 	}
 	switch depth % 3 {
 	case 0:
-		return "\u2022"
+		return "", bulletDisc
 	case 1:
-		return "\u25e6"
+		return "", bulletCircle
 	}
-	return "\u25aa"
+	return "", bulletSquare
+}
+
+// bulletGeom 按 Chromium 的 ListMarker::RelativeSymbolMarkerRect 给出记号相对列表项左上角的位置与边长（逻辑 px，未取整）。
+// ascent、descent 与行内半行距的取整同 ChromeBaselineRow（正文字体）：记号顶 = 行盒顶 + floor(半行距) + 3*(A - A*2/3)/2，
+// 边长 = (A*2/3 + 1)/2（整数除法）；水平方向记号盒右缘距内容左缘 0.5em+3、盒宽 = 边长+2、图形在盒内右移 1px
+// （对 14 / 16 / 18px 的 React 渲染逐像素校准）。
+func bulletGeom(size, line, scale float32) (dx, dy, side float32) {
+	sc := float64(scale)
+	f := faceOfWeight(WeightNormal)
+	a := int(roundHalfUp(f.ascent * float64(size) * sc))
+	d := int(roundHalfUp(f.descent * float64(size) * sc))
+	half := int(math.Floor((float64(line)*sc - float64(a+d)) / 2))
+	sideDev := (a*2/3 + 1) / 2
+	dy = float32(half+3*(a-a*2/3)/2) / scale
+	side = float32(sideDev) / scale
+	dx = -(size*0.5 + side + 4)
+	return dx, dy, side
 }
 
 func (p *proseBuilder) renderKids(c ui.C, kids []*proseNode) {
@@ -226,7 +259,11 @@ func (p *proseBuilder) render(c ui.C, n *proseNode) ui.Box {
 // 记号文字带一个尾随空格）。
 func (p *proseBuilder) renderItem(c ui.C, n *proseNode) ui.Box {
 	l := p.l
-	line := proseLineHeight * n.size
+	line := layoutUnit(proseLineHeight * n.size)
+	if n.bullet != bulletNone {
+		return ui.Column(c).FillWidth().Draw(func(d *ui.DrawContext) { p.paintBullet(d, n, line) }).
+			Children(func() { p.renderKids(c, n.kids) })
+	}
 	markerW := c.Canvas().TextWidthWeight(n.marker+" ", n.size, WeightNormal)
 	return ui.Column(c).FillWidth().Children(func() {
 		ui.Row(c.Key("marker")).Absolute().Left(-markerW).Top(0).Width(markerW).Children(func() {
@@ -234,6 +271,29 @@ func (p *proseBuilder) renderItem(c ui.C, n *proseNode) ui.Box {
 		})
 		p.renderKids(c, n.kids)
 	})
+}
+
+// paintBullet 把无序记号画成图形：位置按 bulletGeom 落到整数物理像素（Chromium 对记号矩形取整），
+// 实心圆 / 方块填充，空心圆描 1px 边。
+func (p *proseBuilder) paintBullet(d *ui.DrawContext, n *proseNode, line float32) {
+	l := p.l
+	scale := d.Canvas.PixelScale()
+	dx, dy, side := bulletGeom(n.size, line, scale)
+	r := gfx.Rect{
+		X:      snapEdge(d.Rect.X+dx, scale),
+		Y:      snapEdge(d.Rect.Y+dy, scale),
+		Width:  side,
+		Height: side,
+	}
+	col := d.Fade(l.Col(n.inh.color))
+	switch n.bullet {
+	case bulletDisc:
+		d.Canvas.Rounded(r, side/2, col)
+	case bulletCircle:
+		d.Canvas.RoundedOutline(r, side/2, 1/scale, col)
+	default:
+		d.Canvas.Rounded(r, 0, col)
+	}
 }
 
 func (p *proseBuilder) renderText(c ui.C, n *proseNode) ui.Box {
@@ -555,14 +615,6 @@ func (b *proseText) MeasureHeight(ctx *ui.LayoutContext) float32 {
 }
 func (b *proseText) PlaceHeight(*ui.LayoutContext, ui.Rect) {}
 
-// monoChromeRow 是 font-mono 文字（字号 size）在行高 line 的行盒里的基线行（设备像素，按 monoBaselineShift 同一套取整）。
-func monoChromeRow(size, line, scale float32) float32 {
-	sc := float64(scale)
-	a := roundHalfUp(chromeMonoFace.ascent * float64(size) * sc)
-	d := roundHalfUp(chromeMonoFace.descent * float64(size) * sc)
-	return float32(math.Floor((float64(line)*sc-(a+d))/2) + a)
-}
-
 // draw 画每一行的每一截：先铺行内代码的底色，再画字，再画下划线与删除线。
 // 同一行里字号、字重、字体不同的几截要落在同一条基线上：基线行取段落基准字体的 ChromeBaselineRow，
 // 每一截再按自己的字体算出与它的差（Viva 一侧的落笔位置由 BaselineShift 换成渲染层的基线）。
@@ -599,7 +651,8 @@ func (b *proseText) draw(d *ui.DrawContext) {
 			mono := fragMono(r, f.text)
 			var y float32
 			if mono {
-				y = top + (parentRow-monoChromeRow(r.size, b.line, scale))/scale
+				// 行内代码与前后文字共用一条基线（渲染层里同一行的行内盒按基线对齐），不是各自行盒的基线行
+				y = top + (parentRow-float32(VivaBaselineRow(VivaLabelRows(b.line, scale), float64(r.size*scale))))/scale
 			} else {
 				own := float32(ChromeBaselineRow(r.weight, float64(r.size*scale), float64(b.line*scale)))
 				y = top + (parentRow-own)/scale + BaselineShift(r.weight, r.size, b.line, scale)

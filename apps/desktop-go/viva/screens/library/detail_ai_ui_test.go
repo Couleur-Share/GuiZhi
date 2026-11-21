@@ -109,7 +109,7 @@ func TestSummaryCardGeneratesAndAutoExpands(t *testing.T) {
 		t.Fatalf("写回成功后应自动展开（展开钮的名字是「收起」）；画面文字 %q", r.session.Texts())
 	}
 	text := r.screenText()
-	for _, want := range []string{"要点", "并发", "goroutine", "sync.Mutex", "x := 1", "\u2022"} {
+	for _, want := range []string{"要点", "并发", "goroutine", "sync.Mutex", "x := 1"} { // 无序列表的圆点是图形（与渲染层一致，不是文字），所以不在画面文字里
 		if !strings.Contains(text, want) {
 			t.Errorf("展开的摘要里应有「%s」；画面文字 %q", want, text)
 		}
