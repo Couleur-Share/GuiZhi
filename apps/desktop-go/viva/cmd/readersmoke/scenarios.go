@@ -54,6 +54,7 @@ func (s *smoke) drive(want map[string]bool, env map[string]any) []*result {
 		{"replies", scReplies},
 		{"editor", scEditor},
 		{"viewer", scViewer},
+		{"snapshot", scSnapshot},
 	}
 	var results []*result
 	for _, sc := range all {

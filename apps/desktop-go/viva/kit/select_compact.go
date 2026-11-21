@@ -28,6 +28,8 @@ type SelectTriggerStyle struct {
 	FontPx, LinePx float32
 	// Transition 是悬停底色的过渡档位（transition-colors 没写时长，取 DurationDefault）。
 	Transition DurationName
+	// TextStart 让文字靠左（triggerClassName 里写了 text-left，如网页快照的宽度下拉）；缺省居中（<button> 的默认对齐，分页条的每页条数）。
+	TextStart bool
 }
 
 // selectTriggerCompact 画 SelectTriggerStyle 描述的触发按钮；可访问语义与默认触发器相同（带弹层的下拉触发器）。
@@ -54,7 +56,11 @@ func (l *Look) selectTriggerCompact(c ui.C, label, value string, muted bool, st 
 	}).Children(func() {
 		// 文字所在的 span 是 flex-1，而 triggerClassName 里没有 text-left：<button> 默认居中对齐，
 		// 内容比 span 窄时（「20」）文字落在 span 正中，不是靠左。
-		l.TextPx(c, value, st.FontPx, st.LinePx, WeightNormal, fg, Ellipsis(), Centered()).Grow(1).Shrink(1).MinWidth(0)
+		opts := []TextOpt{Ellipsis()}
+		if !st.TextStart {
+			opts = append(opts, Centered())
+		}
+		l.TextPx(c, value, st.FontPx, st.LinePx, WeightNormal, fg, opts...).Grow(1).Shrink(1).MinWidth(0)
 		l.RotatingChevron(c, id, l.Rem(1), open, t.MutedForeground, DurationBase)
 	})
 }

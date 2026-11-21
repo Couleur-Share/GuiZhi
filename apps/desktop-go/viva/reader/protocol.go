@@ -222,6 +222,11 @@ func (v View) marshalSnapshot() ([]byte, error) {
 	if !utf8.ValidString(v.SnapshotDoc) {
 		return nil, errors.New("reader: 网页快照文档不是合法的 UTF-8")
 	}
+	// 适配到岛里的 srcdoc（本地图片地址与文档自带的 <meta> 策略，见 snapshot_adapt.go）；适配后的文档略长，上限按适配后的算。
+	doc := AdaptSnapshotDocument(v.SnapshotDoc)
+	if len(doc) > MaxSnapshotDocBytes {
+		return nil, fmt.Errorf("reader: 网页快照文档 %d 字节超过上限 %d", len(doc), MaxSnapshotDocBytes)
+	}
 	if _, ok := boundedText(&v.SnapshotInstanceID, 1, maxSnapshotIDBytes); !ok {
 		return nil, errors.New("reader: 网页快照的实例标识不合规")
 	}
@@ -248,7 +253,7 @@ func (v View) marshalSnapshot() ([]byte, error) {
 		VersionID  string        `json:"versionId"`
 		Width      SnapshotWidth `json:"width"`
 		Assets     []string      `json:"assets"`
-	}{v.Kind, v.SnapshotDoc, v.SnapshotInstanceID, v.SnapshotVersionID, v.SnapshotWidth.normalized(), assets})
+	}{v.Kind, doc, v.SnapshotInstanceID, v.SnapshotVersionID, v.SnapshotWidth.normalized(), assets})
 }
 
 // MarshalJSON 按页面 parseView 期望的形状编码：每种只带它的字段，content 为空串时仍然要带（页面据此判断形状）。

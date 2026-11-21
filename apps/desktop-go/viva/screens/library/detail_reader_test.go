@@ -185,26 +185,26 @@ func TestReaderViewFollowsTheRendererBranches(t *testing.T) {
 		{"配图页签是画廊", note, ItemCaps{}, false, TabImages, reader.ViewGallery, ""},
 		{"图片条目的识别页签是 Markdown", image, ItemCaps{}, false, TabRecognized, reader.ViewMarkdown, ""},
 		{"文字稿页签留给文字稿面板", note, ItemCaps{}, false, TabTranscript, reader.ViewNone, ""},
-		{"公众号的网页快照留给快照面板", note, wechat, true, TabBody, reader.ViewNone, ""},
+		{"公众号的网页快照还没读到文档时是标准排版", note, wechat, true, TabBody, reader.ViewOriginal, "body"},
 		{"公众号不在快照里时仍是原文", note, wechat, false, TabBody, reader.ViewOriginal, "body"},
 		{"没有这个页签的条目留白", note, ItemCaps{}, false, TabRecognized, reader.ViewNone, ""},
 		{"没有讨论的条目讨论页签留白", note, ItemCaps{}, false, TabReplies, reader.ViewNone, ""},
 	} {
-		got := readerViewFor(c.item, c.caps, c.snapshot, c.tab)
+		got := readerViewFor(c.item, c.caps, snapshotPane{view: c.snapshot}, c.tab)
 		if got.Kind != c.kind || got.SourceKind != c.source {
 			t.Errorf("%s：kind=%q source=%q，应为 %q / %q", c.name, got.Kind, got.SourceKind, c.kind, c.source)
 		}
 	}
-	if got := readerViewFor(forum, ItemCaps{}, false, TabReplies); !strings.Contains(got.Content, "用 VACUUM INTO。") || strings.Contains(got.Content, "大家认为") {
+	if got := readerViewFor(forum, ItemCaps{}, snapshotPane{}, TabReplies); !strings.Contains(got.Content, "用 VACUUM INTO。") || strings.Contains(got.Content, "大家认为") {
 		t.Errorf("楼层讨论只该带讨论段：%q", got.Content)
 	}
-	if got := readerViewFor(forum, ItemCaps{}, false, TabSummary); !strings.Contains(got.Content, "VACUUM INTO") || strings.Contains(got.Content, "如何备份") {
+	if got := readerViewFor(forum, ItemCaps{}, snapshotPane{}, TabSummary); !strings.Contains(got.Content, "VACUUM INTO") || strings.Contains(got.Content, "如何备份") {
 		t.Errorf("总结页签只该带总结段：%q", got.Content)
 	}
-	if got := readerViewFor(image, ItemCaps{}, false, TabBody); got.Content != "文案段落" {
+	if got := readerViewFor(image, ItemCaps{}, snapshotPane{}, TabBody); got.Content != "文案段落" {
 		t.Errorf("图片条目的正文页签读文案：%q", got.Content)
 	}
-	if got := readerViewFor(image, ItemCaps{}, false, TabRecognized); !strings.Contains(got.Content, "识别出的字") || got.Tab != reader.TabRecognized {
+	if got := readerViewFor(image, ItemCaps{}, snapshotPane{}, TabRecognized); !strings.Contains(got.Content, "识别出的字") || got.Tab != reader.TabRecognized {
 		t.Errorf("识别页签读「图中文字」段：%+v", got)
 	}
 }

@@ -13,6 +13,9 @@ import (
 
 const snapshotDoc = `<!doctype html><html><body><h2>章节</h2><p>正文 <a href="https://example.com">链接</a></p><img src="local-image://a.png"></body></html>`
 
+// adaptedSnapshotDoc 是 snapshotDoc 发给页面时的样子：本地图片地址已换成岛里的相对路径（snapshot_adapt.go）。
+const adaptedSnapshotDoc = `<!doctype html><html><body><h2>章节</h2><p>正文 <a href="https://example.com">链接</a></p><img src="./media/local-image/a.png"></body></html>`
+
 func snapshotView() View {
 	return View{
 		Kind: ViewSnapshot, SnapshotDoc: snapshotDoc, SnapshotInstanceID: "inst-1", SnapshotVersionID: "ver-1",
@@ -38,7 +41,7 @@ func TestSnapshotViewMarshalShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]any{
-		"kind": "snapshot", "document": snapshotDoc, "instanceId": "inst-1", "versionId": "ver-1", "width": "fluid",
+		"kind": "snapshot", "document": adaptedSnapshotDoc, "instanceId": "inst-1", "versionId": "ver-1", "width": "fluid",
 		"assets": []any{"local-image://a.png", "local-image://b.png"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -139,7 +142,7 @@ func TestSnapshotViewIsSentOnceWithEveryField(t *testing.T) {
 	}
 	m := p.msg(t, 1)
 	view := m["view"].(map[string]any)
-	if m["seq"] != float64(1) || view["kind"] != "snapshot" || view["document"] != snapshotDoc ||
+	if m["seq"] != float64(1) || view["kind"] != "snapshot" || view["document"] != adaptedSnapshotDoc ||
 		view["instanceId"] != "inst-1" || view["versionId"] != "ver-1" || view["width"] != "fluid" {
 		t.Errorf("view = %v", m)
 	}

@@ -163,7 +163,7 @@ func (v *Viewer) open() bool {
 		Scheme: viewerScheme,
 		Entry:  "viewer.html",
 		Serve:  v.serve,
-		CSP:    readerCSP,
+		CSP:    viewerCSP,
 		OnMessage: func(text string) {
 			if gen == v.gen {
 				v.onMessage(text)

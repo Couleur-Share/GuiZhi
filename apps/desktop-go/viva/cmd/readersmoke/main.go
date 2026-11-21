@@ -178,6 +178,7 @@ func newSmoke(out string) (*smoke, error) {
 	s := &smoke{out: out, web: &vapp.WebHost{}, spec: kit.DefaultSpec(), start: time.Now(), theme: gfx.DarkTheme()}
 	s.bg = gfx.Color{Red: 0.1, Green: 0.1, Blue: 0.12, Alpha: 1}
 	s.media = func(scheme, name string) (string, []byte, bool) {
+		s.record("media", scheme+"/"+name) // 记下页面真的向宿主要过哪些媒体（snapshot 场景用它证明本地图片的请求到了宿主）
 		if scheme != "local-image" || strings.ContainsAny(name, `/\:`) {
 			return "", nil, false
 		}

@@ -84,11 +84,12 @@ func (s *Store) subscribeMedia() {
 	s.mediaStop = stop
 }
 
-// Close 取消进度订阅（应用退出时由根调用）；可重复调用，之后再 Load 会重新订阅。
+// Close 取消进度订阅并停掉网页快照的补采轮询（应用退出时由根调用）；可重复调用，之后再 Load 会重新订阅。
 func (s *Store) Close() {
 	s.mu.Lock()
 	stop := s.mediaStop
 	s.mediaStop = nil
+	s.stopSnapshotLocked()
 	s.mu.Unlock()
 	if stop != nil {
 		stop()

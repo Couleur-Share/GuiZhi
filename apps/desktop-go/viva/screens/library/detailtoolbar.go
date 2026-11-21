@@ -41,6 +41,7 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 	t := l.T
 	p := &s.detail.panel
 	s.syncPanel(item, caps)
+	s.syncSnapshot(v, item, caps)
 	active := p.activeTab(caps)
 	s.syncEdit(item, active)
 	s.persistPanel(item, active)
@@ -141,8 +142,10 @@ func (s *Screen) tabGroup(c ui.C, item services.LibraryItem, caps ItemCaps, acti
 			}
 		}
 		if wechatPreview {
-			// 公众号网页快照的工具条挂载点（flex min-w-0 items-center）：内容随 M2-5，这里是空的。
-			ui.Row(c.Key("snapshot-toolbar")).Items(ui.Center).MinWidth(0)
+			// 公众号网页快照的工具条挂载点（flex min-w-0 items-center），内容见 detailsnapshot.go。
+			ui.Row(c.Key("snapshot-toolbar")).Items(ui.Center).MinWidth(0).Children(func() {
+				s.snapshotToolbar(c.Key("snapshot"), item)
+			})
 			return
 		}
 		tab := func(key string, tab ReadingTab, label string, icon gfx.Icon, suffix string) {

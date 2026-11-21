@@ -20,6 +20,8 @@ type panelState struct {
 	tab          ReadingTab
 	isPreview    bool
 	snapshotView bool
+	// snap 是公众号网页快照面板的界面状态（排版模式、宽度档、目录开合、「更多」菜单与这一帧的读取结果，detailsnapshot.go）。
+	snap snapshotUI
 
 	findOpen bool
 	// canFind 是这一帧工具栏摆不摆查找入口（窗口键盘钩子的 Ctrl+F 据此判断），findFocused 是查找框此刻有没有键盘焦点（钩子的 Enter / Esc 据此判断），panelW 是上一帧面板宽。

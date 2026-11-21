@@ -50,8 +50,8 @@ func TestOpenedPageConfigIsLockedDown(t *testing.T) {
 			t.Errorf("CSP 缺少 %q", must)
 		}
 	}
-	// 只放宽图片：脚本、连接与媒体不许出现远程来源。
-	for _, bad := range []string{"script-src 'self' ", "connect-src 'self' ", "media-src 'self' https", "unsafe-eval", "script-src 'unsafe-inline'"} {
+	// 只放宽图片：脚本、连接与媒体不许出现远程来源（脚本里自有 scheme 之外只有快照桥接脚本的那一个哈希，见 snapshot_adapt_test.go）。
+	for _, bad := range []string{"script-src 'self' http", "script-src 'self' data", "script-src 'self' blob", "connect-src 'self' ", "media-src 'self' https", "unsafe-eval", "script-src 'unsafe-inline'"} {
 		if strings.Contains(cfg.CSP, bad) {
 			t.Errorf("CSP 不该含 %q", bad)
 		}

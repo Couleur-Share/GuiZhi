@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReaderBridge } from "../../../src/renderer/reader/bridge";
 import { initReaderI18n } from "../../../src/renderer/reader/i18n";
@@ -11,6 +11,8 @@ import {
   type ReaderTheme,
   type SnapshotWidth,
 } from "../../../src/renderer/reader/protocol";
+import { restoreLocalImageUrl } from "../../../src/renderer/reader/media-urls";
+import { inlineLocalImages, localImageRefs } from "../../../src/renderer/reader/snapshot-images";
 import { ReaderApp } from "../../../src/renderer/reader/ReaderApp";
 import { safeSnapshotLink } from "../../../src/renderer/reader/SnapshotIslandView";
 
@@ -449,6 +451,29 @@ describe("阅读岛页面：网页快照的图片", () => {
     ]);
   });
 
+  it("桥接脚本回报宿主改写后的岛内地址：还原成清单里的写法再找序号", () => {
+    const { frame, events } = mount();
+    // 宿主把文档里的 local-image://b.png 改写成 ./media/local-image/b.png（viva/reader 的 AdaptSnapshotDocument）。
+    fromFrame(frame, "image", "./media/local-image/b.png");
+    expect(events("lightbox")).toEqual([
+      { t: "lightbox", seq: 1, images: [{ src: ASSETS[0] }, { src: ASSETS[1] }], index: 1 },
+    ]);
+  });
+
+  it("岛内地址的百分号编码要解码；清单外的岛内地址、越权路径都不打开", () => {
+    expect(restoreLocalImageUrl("./media/local-image/a%20b.png")).toBe("local-image://a b.png");
+    expect(restoreLocalImageUrl("./media/local-image/sub/%E5%9B%BE.png")).toBe("local-image://sub/图.png");
+    expect(restoreLocalImageUrl("./media/local-image/%E0%A4%A.png")).toBe("local-image://%E0%A4%A.png");
+    expect(restoreLocalImageUrl("local-image://a.png")).toBe("local-image://a.png");
+    expect(restoreLocalImageUrl("https://example.com/a.png")).toBe("https://example.com/a.png");
+    expect(restoreLocalImageUrl("./media/local-video/a.mp4")).toBe("./media/local-video/a.mp4");
+    const { frame, events } = mount();
+    for (const value of ["./media/local-image/missing.png", "./media/local-image/../a.png", "./media/local-image/"]) {
+      fromFrame(frame, "image", value);
+    }
+    expect(events("lightbox")).toEqual([]);
+  });
+
   it("不在清单里的地址、远程地址、非字符串都不打开", () => {
     const { frame, events } = mount();
     for (const value of ["local-image://missing.png", "https://example.com/a.png", "", 3, null, ASSETS]) {
@@ -592,5 +617,121 @@ describe("阅读岛页面：网页快照的渲染完成回执", () => {
       expect.objectContaining({ id: INSTANCE, type: "find", value: expect.objectContaining({ query: "词", index: 1 }) }),
       "*",
     );
+  });
+});
+
+// ---- 本地图片：页面读出来内联成 data: 地址（不透明来源的沙箱 iframe 够不到岛的自有地址，见 snapshot-images.ts） ----
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+function imageResponse(type = "image/png", bytes: Uint8Array = PNG, ok = true) {
+  return { ok, blob: async () => new Blob([bytes as BlobPart], { type }) } as Response;
+}
+function dataUrlOf(type: string, bytes: Uint8Array = PNG, index = 0) {
+  return `data:${type};base64,${btoa(String.fromCharCode(...bytes))}#${index}`;
+}
+const IMAGE_DOC =
+  '<html><body><img src="./media/local-image/a.png"><img src="./media/local-image/a.png"><img src="./media/local-image/b%20c.png"></body></html>';
+
+describe("snapshot-images", () => {
+  it("找出文档里的岛内本地图片地址：去重、保持出现顺序，名称到引号括号空白为止", () => {
+    expect(localImageRefs(IMAGE_DOC)).toEqual(["./media/local-image/a.png", "./media/local-image/b%20c.png"]);
+    expect(localImageRefs('<div style="background:url(./media/local-image/x.png)"></div>')).toEqual([
+      "./media/local-image/x.png",
+    ]);
+    expect(localImageRefs("<p>没有图片</p><img src='https://example.com/a.png'>")).toEqual([]);
+  });
+
+  it("读到的图片内联成 data: 地址；清单原始写法按 data: 地址索引", async () => {
+    const fetchImage = vi.fn(async () => imageResponse());
+    const { doc, originals } = await inlineLocalImages(IMAGE_DOC, localImageRefs(IMAGE_DOC), { fetch: fetchImage });
+    const a = dataUrlOf("image/png", PNG, 0);
+    const b = dataUrlOf("image/png", PNG, 1); // 字节相同的两张图各有各的地址
+    expect(doc).toBe(`<html><body><img src="${a}"><img src="${a}"><img src="${b}"></body></html>`);
+    expect(fetchImage).toHaveBeenCalledTimes(2); // 同一个引用只读一次
+    expect(originals.get(a)).toBe("local-image://a.png");
+    expect(originals.get(b)).toBe("local-image://b c.png");
+  });
+
+  it("单张失败（状态码、非图片、网络错误）只让这一张保持原样", async () => {
+    const doc = '<img src="./media/local-image/ok.png"><img src="./media/local-image/404.png"><img src="./media/local-image/page.png"><img src="./media/local-image/boom.png">';
+    const fetchImage = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("404.png")) return imageResponse("image/png", PNG, false);
+      if (url.endsWith("page.png")) return imageResponse("text/html");
+      if (url.endsWith("boom.png")) throw new Error("network");
+      return imageResponse();
+    });
+    const result = await inlineLocalImages(doc, localImageRefs(doc), { fetch: fetchImage as typeof fetch });
+    expect(result.doc).toBe(
+      `<img src="${dataUrlOf("image/png", PNG, 0)}"><img src="./media/local-image/404.png"><img src="./media/local-image/page.png"><img src="./media/local-image/boom.png">`,
+    );
+  });
+
+  it("超出总字节预算的图片保持原样（不让一篇文章撑爆内存）", async () => {
+    const doc = '<img src="./media/local-image/a.png"><img src="./media/local-image/b.png">';
+    const fetchImage = vi.fn(async () => imageResponse());
+    const result = await inlineLocalImages(doc, localImageRefs(doc), { fetch: fetchImage, maxBytes: PNG.length });
+    const inlined = [...result.doc.matchAll(/data:image\/png/g)].length;
+    expect(inlined).toBe(1);
+    expect(result.doc).toContain("./media/local-image/");
+  });
+
+  it("被中止时抛出 AbortError，调用方丢弃", async () => {
+    const abort = new AbortController();
+    const fetchImage = vi.fn(async () => {
+      abort.abort();
+      return imageResponse();
+    });
+    await expect(
+      inlineLocalImages(IMAGE_DOC, localImageRefs(IMAGE_DOC), { fetch: fetchImage, signal: abort.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+});
+
+describe("阅读岛页面：网页快照的本地图片", () => {
+  it("没有本地图片的文档同步交给 iframe（行为不变）", () => {
+    const { frame, events } = mount();
+    expect(frame.getAttribute("srcdoc")).toBe(DOC);
+    expect(frame.style.visibility).toBe("");
+    act(() => void frame.dispatchEvent(new Event("load")));
+    expect(events("rendered")).toEqual([{ t: "rendered", seq: 1 }]);
+  });
+
+  it("有本地图片的文档先读图：读完前 iframe 不可见、空白占位的加载不算渲染完成；读完交出内联后的文档", async () => {
+    let release: (value: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((resolve) => (release = resolve))));
+    const doc = '<html><body><img src="./media/local-image/a.png"></body></html>';
+    const { frame, events } = mount(snapshotView({ document: doc, assets: ["local-image://a.png"] }));
+    expect(frame.getAttribute("srcdoc")).toBe("");
+    expect(frame.style.visibility).toBe("hidden");
+    act(() => void frame.dispatchEvent(new Event("load"))); // 空白占位的加载
+    expect(events("rendered")).toEqual([]);
+
+    await act(async () => release(imageResponse()));
+    await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain(dataUrlOf("image/png", PNG, 0)));
+    expect(frame.style.visibility).toBe("");
+    act(() => void frame.dispatchEvent(new Event("load")));
+    expect(events("rendered")).toEqual([{ t: "rendered", seq: 1 }]);
+  });
+
+  it("点击内联后的图片：桥接脚本回报的是 data: 地址，换回清单里的写法找到序号", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => imageResponse()));
+    const doc = '<html><body><img src="./media/local-image/b.png"></body></html>';
+    const { frame, events } = mount(snapshotView({ document: doc }));
+    await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain("data:image/png"));
+    fromFrame(frame, "image", dataUrlOf("image/png", PNG, 0));
+    expect(events("lightbox")).toEqual([
+      { t: "lightbox", seq: 1, images: [{ src: ASSETS[0] }, { src: ASSETS[1] }], index: 1 },
+    ]);
+  });
+
+  it("读图失败的图片保持相对地址，点它仍按清单写法找到序号", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => imageResponse("image/png", PNG, false)));
+    const doc = '<html><body><img src="./media/local-image/b.png"></body></html>';
+    const { frame, events } = mount(snapshotView({ document: doc }));
+    await waitFor(() => expect(frame.style.visibility).toBe(""));
+    expect(frame.getAttribute("srcdoc")).toBe(doc);
+    fromFrame(frame, "image", "./media/local-image/b.png");
+    expect(events("lightbox")).toHaveLength(1);
   });
 });

@@ -14,7 +14,8 @@ import (
 
 // 网页条目的来源版本（渲染层 WebSourceVersions）：每次重新采集到的原文都留一个版本，面板里可以和当前正文并排比较，
 // 并把某个版本采用为正文。头部是一枚展开钮，下面是版本面板（展开着或读取失败才有）。
-// 网页快照窗格（版本带快照时的整页预览，台账 B-066）随 M2-5b 迁入；「围绕此版本提问」属于问答（M3）。
+// 网页快照窗格（版本带快照时的整页预览，台账 B-066）：原生只有一座阅读岛，所以版本面板里是「查看网页快照」按钮，
+// 点了把阅读区切到这个版本的快照（detailsnapshot.go）；「围绕此版本提问」属于问答（M3）。
 
 // versionsUI 是来源版本的界面状态：展开与否、选中的版本（空串是没选）与它的下拉；
 // paneW 是并排两栏里一栏上一帧的宽度（等宽原文按它折行，见 versionPane）；
@@ -145,6 +146,12 @@ func (s *Screen) versionsPanel(c ui.C, item services.LibraryItem, vv VersionsVie
 				return
 			}
 			s.versionGrid(c.Key("grid"), vv, *selected, vu)
+			if selected.HasSnapshot() && s.derivedOf(item).caps.IsWechat {
+				// 渲染层把快照窗格嵌在版本面板里；原生只有一座阅读岛，所以这里是切换阅读区去看这个版本的快照（收起工具侧栏）。
+				if s.versionButton(c.Key("snapshot"), locales.LibrarySnapshotViewOriginal(), false) {
+					s.showVersionSnapshot(selected.ID)
+				}
+			}
 			if selected.HasSnapshot() && item.DeletedAt == 0 {
 				ask := locales.ArticleAskAskVersion()
 				if s.versionButton(c.Key("ask"), ask, false) {

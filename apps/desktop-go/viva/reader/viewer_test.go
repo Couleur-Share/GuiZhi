@@ -96,7 +96,7 @@ func TestViewerOpensLazilyAndStaysUnplacedUntilTheHandshake(t *testing.T) {
 	}
 	r.frame()
 	p := r.page()
-	if p.cfg.Scheme != viewerScheme || p.cfg.Entry != "viewer.html" || p.cfg.CSP != readerCSP {
+	if p.cfg.Scheme != viewerScheme || p.cfg.Entry != "viewer.html" || p.cfg.CSP != viewerCSP {
 		t.Errorf("岛的配置不对：scheme %q entry %q", p.cfg.Scheme, p.cfg.Entry)
 	}
 	if len(p.places) != 0 || r.viewer.Ready() {

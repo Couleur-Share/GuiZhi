@@ -19844,6 +19844,18 @@ func (msgs Messages) NativeLibraryReasonSeparator() string {
 	return Catalog.Format(msgs.locale, "native_library_reasonSeparator", nil)
 }
 
+// NativeLibrarySnapshotTaskEnded says "任务已结束或无法取消"
+// in the language the app shows.
+func NativeLibrarySnapshotTaskEnded() string {
+	return In(i18n.Locale()).NativeLibrarySnapshotTaskEnded()
+}
+
+// NativeLibrarySnapshotTaskEnded says "任务已结束或无法取消"
+// in the language of msgs.
+func (msgs Messages) NativeLibrarySnapshotTaskEnded() string {
+	return Catalog.Format(msgs.locale, "native_library_snapshotTaskEnded", nil)
+}
+
 // NativeLanguageNameZh says "简体中文"
 // in the language the app shows.
 func NativeLanguageNameZh() string { return In(i18n.Locale()).NativeLanguageNameZh() }

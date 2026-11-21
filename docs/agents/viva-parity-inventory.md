@@ -82,7 +82,7 @@
 | layout | 28 | 0 |
 | library | 327 | 61 |
 | migration | 12 | 0 |
-| reader | 3 | 0 |
+| reader | 4 | 0 |
 | settings | 637 | 77 |
 | setup | 9 | 6 |
 | stores | 0 | 38 |
@@ -105,8 +105,8 @@
 | db | 28 | 239 | 0 |
 | stores | 31 | 158 | 25 |
 | services | 26 | 129 | 0 |
+| (目录:components) | 6 | 128 | 98 |
 | shared | 14 | 127 | 0 |
-| (目录:components) | 5 | 84 | 54 |
 | settings | 9 | 73 | 56 |
 | imports | 6 | 62 | 36 |
 | library | 15 | 58 | 32 |
@@ -123,7 +123,7 @@
 | (目录:stores) | 1 | 2 | 0 |
 | (目录:knowledge-ai) | 1 | 1 | 0 |
 | (目录:lint) | 1 | 0 | 0 |
-| **合计** | 161 | 1083 | 267 |
+| **合计** | 162 | 1127 | 311 |
 
 含 skip/todo/only 标记的用例：0；`it.each` 参数化用例按 1 条计（实际展开数更多）。
 <!-- parity:tests:end -->

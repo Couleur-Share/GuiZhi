@@ -8,7 +8,8 @@
     "library": {
       "notMigrated": "「{{action}}」的原生界面还没有做，计划在 {{milestone}} 完成（台账 {{ledger}}）",
       "resultSeparator": "：",
-      "reasonSeparator": "；"
+      "reasonSeparator": "；",
+      "snapshotTaskEnded": "任务已结束或无法取消"
     },
     "languageName": {
       "zh": "简体中文",

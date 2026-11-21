@@ -70,6 +70,8 @@ type DetailView struct {
 	Tools ToolsView
 	// Media 是转写、文字稿排版、总结与刷新论坛讨论的状态（use-media-actions.ts 的 hook 状态，store_media.go），换条目重置。
 	Media MediaView
+	// Snapshot 是公众号网页快照面板背后的状态（读取、补采、store_snapshot.go），由界面进入快照视图时发起读取，换条目重置。
+	Snapshot SnapshotView
 	// MarkingReviewedID 是正在标记为已复核的条目 ID（ReviewRequiredNotice 的 isMarking；空表示没有）。
 	MarkingReviewedID string
 }
@@ -133,6 +135,8 @@ type detailState struct {
 	tools toolsState
 	// media 是媒体动作的内部状态（切条目代号，store_media.go）。
 	media mediaState
+	// snapshot 是网页快照的内部状态（挂载代号、读取序号与补采轮询，store_snapshot.go）。
+	snapshot snapshotState
 }
 
 func newDetailState() detailState {
@@ -292,6 +296,7 @@ func (s *Store) commitSelectLocked(id string) {
 	d.Revisions, d.CanDiarize = RevisionsView{}, false
 	s.resetToolsLocked()
 	s.resetMediaLocked()
+	s.resetSnapshotLocked()
 	s.resetSavedLocked()
 }
 
@@ -304,6 +309,7 @@ func (s *Store) clearDetailLocked() {
 	d.Revisions, d.CanDiarize = RevisionsView{}, false
 	s.resetToolsLocked()
 	s.resetMediaLocked()
+	s.resetSnapshotLocked()
 	s.resetSavedLocked()
 }
 

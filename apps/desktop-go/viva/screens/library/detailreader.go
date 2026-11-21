@@ -29,7 +29,8 @@ import (
 
 // readerViewFor 决定阅读区此刻显示什么：渲染层 ContentPanel 里 data-article-reader 内的分支，先后一致。
 //
-//	公众号网页快照（isWechatPreview）→ 快照面板（B-066，未做，留白）
+//	公众号网页快照（isWechatPreview）→ 快照面板（B-066，detailsnapshot.go）：读到了原文快照且没切到标准排版 → 快照视图（ViewSnapshot），
+//	  其余（读取中、读取失败、没有快照、标准排版）→ 标准排版（WebSnapshotPane 的 children：正文的 Markdown，这里是主题阅读的「原文」视图）
 //	主题阅读可用（正文 / 讨论总结，不在快照里）→ ReconstructionReader 的「原文」
 //	文字稿标签 → 文字稿面板（原生，不走岛：detailtranscript.go，B-067；contentPanel 在进 readerArea 之前就分流了，这里只留位置对应）
 //	配图标签 → 图片画廊
@@ -39,11 +40,19 @@ import (
 // 其余（回收站与预览态的 Markdown 预览、旧的非主题编辑器）在渲染层里只有主题阅读不可用、又不属于上面各标签时才会走到，
 // 而正文与总结之外的标签都已被上面接住，所以不会出现（台账 C-012）。
 // 编辑态在这些分支之前：readerViewOf 先看 editorView，岛里显示编辑器（detailedit.go），不经 readerViewFor。
-func readerViewFor(item services.LibraryItem, caps ItemCaps, snapshotView bool, active ReadingTab) reader.View {
+func readerViewFor(item services.LibraryItem, caps ItemCaps, pane snapshotPane, active ReadingTab) reader.View {
 	none := reader.View{Kind: reader.ViewNone}
+	snapshotView := pane.view
 	switch {
 	case caps.IsWechat && snapshotView:
-		return none
+		if pane.doc != nil {
+			return snapshotReaderView(pane)
+		}
+		text, ok := readingSourceText(item, sourceBody)
+		if !ok {
+			return none
+		}
+		return reader.View{Kind: reader.ViewOriginal, Content: text, SourceKind: sourceBody}
 	case !snapshotView && (active == TabBody || active == TabSummary):
 		kind := sourceBody
 		if active == TabSummary {
@@ -72,11 +81,11 @@ func readerViewFor(item services.LibraryItem, caps ItemCaps, snapshotView bool, 
 
 // readerViewKey 是 readerViewFor 的输入：同一份输入重算只会得到同样的视图，所以每帧只在输入变了才重新切分正文。
 type readerViewKey struct {
-	content      string
-	itemType     string
-	wechat       bool
-	snapshotView bool
-	active       ReadingTab
+	content  string
+	itemType string
+	wechat   bool
+	pane     snapshotPane
+	active   ReadingTab
 }
 
 // readerViewCache 缓存最近一次的视图：正文可以很大，每帧重切一遍（甚至重复比较）不划算。
@@ -93,9 +102,9 @@ func (s *Screen) readerViewOf(item services.LibraryItem, caps ItemCaps, active R
 		return v
 	}
 	p := &s.detail.panel
-	key := readerViewKey{content: item.Content, itemType: item.ItemType, wechat: caps.IsWechat, snapshotView: p.snapshotView, active: active}
+	key := readerViewKey{content: item.Content, itemType: item.ItemType, wechat: caps.IsWechat, pane: p.snapshotPane(), active: active}
 	if !p.viewCache.ok || p.viewCache.key != key {
-		p.viewCache = readerViewCache{key: key, view: readerViewFor(item, caps, p.snapshotView, active), ok: true}
+		p.viewCache = readerViewCache{key: key, view: readerViewFor(item, caps, key.pane, active), ok: true}
 	}
 	return p.viewCache.view
 }
@@ -126,7 +135,7 @@ func (p *panelState) readerFind(kind reader.ViewKind) (query string, index int) 
 	switch kind {
 	case reader.ViewReplies:
 		return p.findQuery, p.findActive
-	case reader.ViewOriginal, reader.ViewMarkdown:
+	case reader.ViewOriginal, reader.ViewMarkdown, reader.ViewSnapshot:
 		if p.findOpen {
 			return p.findQuery, p.findActive
 		}
@@ -146,9 +155,12 @@ func (s *Screen) readerRequest(c ui.C, item services.LibraryItem, caps ItemCaps,
 	if view.Kind == reader.ViewNone {
 		return req
 	}
-	if view.Kind == reader.ViewOriginal {
+	switch view.Kind {
+	case reader.ViewOriginal:
 		s.syncToc(item.ID, view.SourceKind)
 		req.TocOpen = p.tocOpen
+	case reader.ViewSnapshot:
+		req.TocOpen = p.snap.tocOpen // 工具条的「目录」钮与页面里目录的开合共用这一份
 	}
 	req.FindQuery, req.FindIndex = p.readerFind(view.Kind)
 	if p.restoreTop != nil && p.restoreTab == active {
@@ -176,7 +188,11 @@ func (s *Screen) SetReader(host *reader.Host) {
 func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab) {
 	col := ui.Column(c.Key("reader")).FillWidth().Grow(1).MinHeight(0)
 	host := s.readerHost
+	notices := s.snapshotPaneOn(caps)
 	if host == nil {
+		if notices { // 没有岛时阅读区留白，但快照的状态与通知条是原生的，照样显示
+			col.Children(func() { s.snapshotNotices(c, item) })
+		}
 		return
 	}
 	req := s.readerRequest(c, item, caps, active)
@@ -196,6 +212,14 @@ func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, ac
 	if msg := s.editError(item, active); msg != "" {
 		col.Children(func() {
 			s.editBanner(c, msg)
+			ui.Column(c.Key("reader-island")).FillWidth().Grow(1).MinHeight(0).Draw(paint).Children(body)
+		})
+		return
+	}
+	// 网页快照页的通知条（读取中、失败、没有快照、已编辑、缺失资源）在岛的上面，渲染层 WebSnapshotPane 里同序；这一页上岛总是让到条的下面一格。
+	if notices {
+		col.Children(func() {
+			s.snapshotNotices(c, item)
 			ui.Column(c.Key("reader-island")).FillWidth().Grow(1).MinHeight(0).Draw(paint).Children(body)
 		})
 		return
@@ -224,9 +248,8 @@ func (e readerEvents) Catalog(open bool) { e.s.detail.panel.catalogOpen = open }
 
 func (e readerEvents) Toc(open bool) { e.s.setTocOpen(open) }
 
-// SnapshotState 接收网页快照页面的版面状态。库详情还没有网页快照视图（readerViewFor 不产出 ViewSnapshot），
-// 所以此刻不会有人调它；接线（工具栏「目录」钮的显隐与 aria-expanded）在 M2-5b 的下一步做。
-func (e readerEvents) SnapshotState(wideRail, tocOpen bool) {}
+// SnapshotState 接收网页快照页面的版面状态：目录是否常驻侧栏（工具条的「目录」钮只在没有常驻时才摆）与目录浮层的开合（钮的 aria-expanded）。
+func (e readerEvents) SnapshotState(wideRail, tocOpen bool) { e.s.setSnapshotLayout(wideRail, tocOpen) }
 
 // Link 用系统浏览器打开页面里的链接（宿主已校验为 http/https）。
 func (e readerEvents) Link(url string) { e.s.openSource(url) }

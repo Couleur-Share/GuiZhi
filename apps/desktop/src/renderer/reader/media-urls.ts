@@ -31,6 +31,28 @@ export function rewriteMediaUrl(value: string): string {
   return value;
 }
 
+const LOCAL_IMAGE_DIR = "./media/local-image/";
+
+/**
+ * rewriteMediaUrl 的逆：网页快照文档由宿主在发给页面之前把 `local-image://<名称>` 改写成 `./media/local-image/<名称>`（viva/reader 的 AdaptSnapshotDocument），
+ * 快照里的桥接脚本点图时回报的是改写后的地址；页面要用它在快照的图片清单（`local-image://<名称>`）里找序号，所以这里还原成原始写法。
+ * 不是岛里的本地图片地址时原样返回（图片清单里的原始写法本身也能用）。
+ */
+export function restoreLocalImageUrl(value: string): string {
+  if (!value.startsWith(LOCAL_IMAGE_DIR)) return value;
+  const segments = value
+    .slice(LOCAL_IMAGE_DIR.length)
+    .split("/")
+    .map((segment) => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    });
+  return `local-image://${segments.join("/")}`;
+}
+
 const ATTRS = ["src", "poster"];
 const SELECTOR = ATTRS.map((attr) => `[${attr}^="local-"]`).join(",");
 

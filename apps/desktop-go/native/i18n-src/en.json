@@ -8,7 +8,8 @@
     "library": {
       "notMigrated": "“{{action}}” is not available in the native UI yet; planned for {{milestone}} (ledger {{ledger}})",
       "resultSeparator": "：",
-      "reasonSeparator": "；"
+      "reasonSeparator": "；",
+      "snapshotTaskEnded": "The task has already ended or cannot be canceled"
     },
     "languageName": {
       "zh": "简体中文",

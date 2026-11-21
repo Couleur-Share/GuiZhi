@@ -15179,6 +15179,14 @@ func NativeLibraryReasonSeparator() string {
 	return "；"
 }
 
+// NativeLibrarySnapshotTaskEnded 是 native.library.snapshotTaskEnded：任务已结束或无法取消
+func NativeLibrarySnapshotTaskEnded() string {
+	if useEn() {
+		return "The task has already ended or cannot be canceled"
+	}
+	return "任务已结束或无法取消"
+}
+
 // NativeLanguageNameZh 是 native.languageName.zh：简体中文
 func NativeLanguageNameZh() string {
 	if useEn() {
