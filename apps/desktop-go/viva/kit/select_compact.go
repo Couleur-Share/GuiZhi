@@ -31,7 +31,7 @@ type SelectTriggerStyle struct {
 }
 
 // selectTriggerCompact 画 SelectTriggerStyle 描述的触发按钮；可访问语义与默认触发器相同（带弹层的下拉触发器）。
-func (l *Look) selectTriggerCompact(c ui.C, label, value string, st SelectTriggerStyle, open bool) ui.Box {
+func (l *Look) selectTriggerCompact(c ui.C, label, value string, muted bool, st SelectTriggerStyle, open bool) ui.Box {
 	t := l.T
 	id := ui.ID(c)
 	// border-box：边框占在盒内，文字区的左右留白是边框加内边距。
@@ -42,6 +42,10 @@ func (l *Look) selectTriggerCompact(c ui.C, label, value string, st SelectTrigge
 	l.noteStop(box)
 	hover := l.hoverTo(c.Canvas(), id, 0, box.State().Hovered, st.Transition)
 	bg := MixToken(st.Bg, st.BgHover, hover)
+	fg := t.Foreground
+	if muted { // 没有选中项：显示的是占位文字，text-muted-foreground
+		fg = t.MutedForeground
+	}
 	return box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
 			l.PaintRingBand(d, 2, t.Primary.WithAlpha(0.5), st.Radius)
@@ -50,7 +54,7 @@ func (l *Look) selectTriggerCompact(c ui.C, label, value string, st SelectTrigge
 	}).Children(func() {
 		// 文字所在的 span 是 flex-1，而 triggerClassName 里没有 text-left：<button> 默认居中对齐，
 		// 内容比 span 窄时（「20」）文字落在 span 正中，不是靠左。
-		l.TextPx(c, value, st.FontPx, st.LinePx, WeightNormal, t.Foreground, Ellipsis(), Centered()).Grow(1).Shrink(1).MinWidth(0)
+		l.TextPx(c, value, st.FontPx, st.LinePx, WeightNormal, fg, Ellipsis(), Centered()).Grow(1).Shrink(1).MinWidth(0)
 		l.RotatingChevron(c, id, l.Rem(1), open, t.MutedForeground, DurationBase)
 	})
 }

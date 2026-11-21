@@ -20,7 +20,7 @@ const slotChevron uint8 = 1
 //
 // 对外的可访问语义是带弹层的下拉触发器（combobox，展开状态与当前值）：渲染层是
 // button[aria-haspopup=listbox][aria-expanded]，L1 的角色映射把两者归为同一类。
-func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bool) ui.Box {
+func (l *Look) SelectTrigger(c ui.C, label, value string, muted bool, width float32, open bool) ui.Box {
 	t := l.T
 	id := ui.ID(c)
 	ring := l.Col(t.Primary.WithAlpha(0.3))
@@ -47,8 +47,12 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, width float32, open bo
 	if open {
 		box = box.Ring(2, ring)
 	}
+	fg := t.Foreground
+	if muted { // 没有选中项：显示的是占位文字，text-muted-foreground
+		fg = t.MutedForeground
+	}
 	return box.Children(func() {
-		l.Text(c, value, TextSM, WeightNormal, t.Foreground, Ellipsis()).Grow(1).Shrink(1)
+		l.Text(c, value, TextSM, WeightNormal, fg, Ellipsis()).Grow(1).Shrink(1)
 		l.RotatingChevron(c, id, chevron, open, l.T.MutedForeground, DurationBase)
 	})
 }

@@ -41,6 +41,9 @@ type SelectSpec struct {
 	AlignEnd bool
 	// Trigger 非空时触发按钮用这一套样式（渲染层的 triggerClassName 覆盖），此时 Width 不起作用：按钮按内容收缩。
 	Trigger *SelectTriggerStyle
+	// Placeholder 是没有选中任何选项时触发按钮上显示的文字（渲染层 placeholder ?? t('common.select')），用弱化色；
+	// 空表示什么也不显示（沿用老行为）。
+	Placeholder string
 }
 
 // Select 是带弹层的下拉（渲染层 Select）：触发按钮加一块选项面板。返回这一帧选中的值与是否发生了选择。
@@ -48,18 +51,21 @@ type SelectSpec struct {
 // 面板是浮层：点触发器展开/收起，点面板外或按 Esc 关闭，选中后关闭并把值交给调用方；
 // 点面板外的这一下继续交给下面的控件（与网页的 mousedown 外部点击一致），点触发器则只收起。
 func (l *Look) Select(c ui.C, st *SelectState, spec SelectSpec) (picked string, changed bool) {
-	display := ""
+	display, muted := "", false
 	for _, o := range spec.Options {
 		if o.Value == spec.Value {
 			display = o.Label
 			break
 		}
 	}
+	if display == "" && spec.Placeholder != "" {
+		display, muted = spec.Placeholder, true
+	}
 	var trigger ui.Box
 	if spec.Trigger != nil {
-		trigger = l.selectTriggerCompact(c, spec.Label, display, *spec.Trigger, st.Open)
+		trigger = l.selectTriggerCompact(c, spec.Label, display, muted, *spec.Trigger, st.Open)
 	} else {
-		trigger = l.SelectTrigger(c, spec.Label, display, spec.Width, st.Open)
+		trigger = l.SelectTrigger(c, spec.Label, display, muted, spec.Width, st.Open)
 	}
 	trigger = trigger.DrawOver(func(d *ui.DrawContext) { st.anchor = d.Rect })
 	if trigger.Clicked() {
