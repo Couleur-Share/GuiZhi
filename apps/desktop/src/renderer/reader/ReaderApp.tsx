@@ -156,7 +156,8 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
     document.addEventListener("auxclick", onLink, true);
     document.addEventListener("contextmenu", onContextMenu);
     document.addEventListener("keydown", onKeyDown, true);
-    // 自定义 scheme 的页面不是安全上下文，navigator.clipboard 本来就不可用；换成「交宿主复制」的实现，
+    // 页面里的 navigator.clipboard.writeText 换成「交宿主复制」：不依赖页面焦点与用户手势，写入失败由宿主如实提示；
+    // 代价是没有回执——这里立即 resolve，代码块复制钮的「已复制」勾先于写入结果出现（台账 B-069）。
     // 代码块的复制按钮等照常调用 navigator.clipboard.writeText。
     const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
     Object.defineProperty(navigator, "clipboard", {

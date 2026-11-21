@@ -211,7 +211,7 @@ func (e readerEvents) Toc(open bool) { e.s.setTocOpen(open) }
 func (e readerEvents) Link(url string) { e.s.openSource(url) }
 
 // Copy 把页面里复制的文本（代码块的复制钮）写进系统剪贴板。渲染层的复制失败是静默的；岛里页面已经先显示了「已复制」，
-// 所以写入失败要在这里如实提示，不能让用户以为成功了（台账 A-029）。
+// 所以写入失败要在这里如实提示，不能让用户以为成功了（有意的增强，见台账「有意的增强」；页面里的勾先于写入结果出现是残余偏差，台账 B-069）。
 func (e readerEvents) Copy(text string) {
 	s := e.s
 	if s.Guard.Notify == nil {
