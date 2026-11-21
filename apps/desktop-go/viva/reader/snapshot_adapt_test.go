@@ -136,3 +136,24 @@ func TestReaderCSPPinsExactlyTheBridgeHash(t *testing.T) {
 		t.Error("阅读岛与查看岛的策略除了桥接脚本的哈希之外应完全相同")
 	}
 }
+
+// 引用在 `&`（HTML 实体的起点）处截止：实体之后的 `/../` 不算名称里的 `..` 段，前面的图片地址照常改写。
+func TestAdaptSnapshotDocumentStopsAReferenceAtAnEntityBoundary(t *testing.T) {
+	in := `<img src="local-image://a.png&amp;/../x">`
+	want := `<img src="./media/local-image/a.png&amp;/../x">`
+	if got := AdaptSnapshotDocument(in); got != want {
+		t.Errorf("引用应在 & 处截止：\n 实际 %s\n 期望 %s", got, want)
+	}
+}
+
+// 文档大小上限按适配后的算：原文刚好不超限、改写本地图片地址后变长超限的文档要被拒绝。
+func TestSnapshotViewMarshalLimitIsCheckedAfterAdaptation(t *testing.T) {
+	refs := strings.Repeat(`<img src="local-image://a.png">`, 3)
+	doc := refs + strings.Repeat("x", MaxSnapshotDocBytes-len(refs))
+	if len(doc) != MaxSnapshotDocBytes || len(AdaptSnapshotDocument(doc)) <= MaxSnapshotDocBytes {
+		t.Fatalf("前提不成立：原文 %d 字节，适配后 %d 字节", len(doc), len(AdaptSnapshotDocument(doc)))
+	}
+	if _, err := (View{Kind: ViewSnapshot, SnapshotDoc: doc, SnapshotInstanceID: "i"}).MarshalJSON(); err == nil {
+		t.Fatal("适配后超过上限的文档应被拒绝")
+	}
+}

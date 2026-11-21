@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"strings"
@@ -516,4 +517,64 @@ func TestSnapshotExportIsNotReentrantWhileTheDialogIsOpen(t *testing.T) {
 	})
 	h.store.ExportWebSnapshotHTML(h.ctx, "a", "v2")
 	waitFor(t, "第二次导出", func() bool { return len(h.svc.SnapshotExports()) == 2 })
+}
+
+// 同一代里先发起的读取更晚返回（乱序）：旧结果不能盖掉新结果（按序号作废，不止按代号）。
+func TestSnapshotOlderReadReturningLastIsDropped(t *testing.T) {
+	h := snapshotHarness(t)
+	var q spawnQueue
+	h.store.Spawn = q.Spawn
+	h.store.LoadWebSnapshot(h.ctx, "a", "")
+	h.store.LoadWebSnapshot(h.ctx, "a", "v1")
+	if len(q.queued) != 2 {
+		t.Fatalf("应有两个待执行的读取：%d", len(q.queued))
+	}
+	q.queued[1]() // 新的先到
+	q.queued[0]() // 旧的后到
+	if s := h.snapshot(); s.View == nil || s.View.Version.ID != "v1" || s.VersionID != "v1" || s.Loading {
+		t.Fatalf("后到的旧结果不能盖掉新的：%+v", s)
+	}
+}
+
+// 补采服务的替身：入队不返回任务；状态读取多返回一条与本次无关的未结束任务（服务可能返回比请求更多的状态）。
+type snapshotOddLibrary struct {
+	services.Library
+	noTasks bool
+}
+
+func (l snapshotOddLibrary) SupplementWechatTasks(ctx context.Context, itemIDs []string) ([]string, error) {
+	if l.noTasks {
+		return nil, nil
+	}
+	return l.Library.SupplementWechatTasks(ctx, itemIDs)
+}
+
+func (l snapshotOddLibrary) ImportTaskStatuses(ctx context.Context, ids []string) ([]services.LibraryImportTaskStatus, error) {
+	all, err := l.Library.ImportTaskStatuses(ctx, ids)
+	return append(all, services.LibraryImportTaskStatus{ID: "unrelated", Status: services.ImportStatusProcessing}), err
+}
+
+// 入队成功却没有任务可等：当作失败放下忙标记并提示，不排轮询（否则忙标记永远不放下）。
+func TestSnapshotSupplementWithoutAnyTaskIsAFailure(t *testing.T) {
+	h := supplementHarness(t)
+	h.store.svc = snapshotOddLibrary{Library: h.store.svc, noTasks: true}
+	h.store.SupplementWechatSnapshot(h.ctx, "a")
+	if s := h.snapshot(); s.SupplementBusy || s.SupplementTasks != nil || h.clock.Pending() != 0 {
+		t.Fatalf("没有任务可等：%+v pending=%d", s, h.clock.Pending())
+	}
+	if toast := onlyToast(t, h); toast.Kind != kit.ToastError {
+		t.Fatalf("提示 %+v", toast)
+	}
+}
+
+// 轮询只看本次入队的任务：状态里混着别的未结束任务，不能让这次补采一直等下去。
+func TestSnapshotSupplementPollIgnoresUnrelatedTasks(t *testing.T) {
+	h := supplementHarness(t)
+	h.store.svc = snapshotOddLibrary{Library: h.store.svc}
+	h.store.SupplementWechatSnapshot(h.ctx, "a")
+	h.svc.SeedImportStatuses(services.LibraryImportTaskStatus{ID: "t1", Status: services.ImportStatusCompleted, RefreshOfItemID: "a"})
+	h.pollTick()
+	if h.snapshot().SupplementBusy || h.clock.Pending() != 0 {
+		t.Fatalf("无关任务不该拖住这次补采：%+v pending=%d", h.snapshot(), h.clock.Pending())
+	}
 }

@@ -22,6 +22,7 @@ import (
 // 量四个动作：稳态帧、悬停一步（指针在头部两枚按钮之间来回）、键盘切换一步（↓ 选下一条，详情随之重取与重排）、
 // 标题里敲一个字（输入 + 出帧；防抖保存的计时由测试时钟接管，读数里不含保存的往返）。
 // 另一组带着页内查找条打开（Ctrl+F），看工具栏下多一行输入的成本。
+// 公众号快照一组（M2-5b）：公众号条目切到「网页快照」视图（快照工具栏、已编辑与新版本提示条、缺失资源与警告条），看原生外壳的稳态成本。
 // 文字稿一组（M2-6d）：视频条目挂约 5 万字文字稿，切到「文字稿」页签并开着查找高亮（上千处命中），看长稿 pre-wrap 排版的稳态成本。
 //
 // 无头会话的 Frame() 只记录绘制命令、不栅格化，所以量的是界面线程的出帧成本（布局 + 记录）；栅格化加回读另量一次作为上界。
@@ -38,6 +39,7 @@ func TestDetailFrameBudget(t *testing.T) {
 		measureDetailToolsFrames(t, "detail_10000_entries_tools_summary_expanded", frameBudgetSummary)
 	})
 	t.Run("detail_10000_entries_transcript_50k", func(t *testing.T) { measureDetailTranscriptFrames(t, "detail_10000_entries_transcript_50k") })
+	t.Run("detail_10000_entries_snapshot", func(t *testing.T) { measureDetailSnapshotFrames(t, "detail_10000_entries_snapshot") })
 }
 
 // frameBudgetTranscript 造一份约 5 万字的文字稿：一千多个短段落，每段都含查找词「命运」，开启页内查找之后满屏高亮（M2-6d 的长稿成本）。
@@ -145,6 +147,104 @@ func measureDetailTranscriptFrames(t *testing.T, name string) {
 		t.Fatalf("滚轮帧失败：%v", err)
 	}
 	t.Logf("%s 滚轮一步（滚轮+出帧）：%s", name, scroll)
+
+	raster, err := frametime.Measure(30, func(int) error {
+		_, err := r.session.Image()
+		return err
+	})
+	if err != nil {
+		t.Fatalf("栅格化失败：%v", err)
+	}
+	t.Logf("%s 栅格化+回读（Image，上界）：%s", name, raster)
+}
+
+// measureDetailSnapshotFrames 在 1 万条的库里选中一条公众号文章（置顶的条目改成网页类型、来源是公众号链接），点「网页快照」进入快照视图，
+// 视图带「已编辑」「有新来源版本」与缺失资源 / 警告通知条，工具栏里有「目录」钮、宽度下拉与「更多」。
+// 量稳态帧、悬停一步（「目录」钮与「更多」之间）、Go 堆增量与栅格化上界（M2-5b）。阅读区里的快照 iframe 是阅读岛的内容，无头会话里画不出来，不在读数里。
+func measureDetailSnapshotFrames(t *testing.T, name string) {
+	heapBefore := frametime.HeapInUse()
+	const wechatID = "item-000050" // 置顶的条目排在第一页；改成网页类型当作公众号文章
+	all := servicestest.GenerateEntries(10000)
+	if all[50].ID != wechatID {
+		t.Fatalf("夹具失效：第 51 条是 %s", all[50].ID)
+	}
+	all[50].ItemType = services.LibraryTypeWebpage
+	view := wsView("v2")
+	view.Edited, view.Pending = true, true
+	view.Version.Snapshot.Warnings = []string{"帧耗时读数警告：部分样式未能内联"}
+	view.Version.Snapshot.Failures = []services.LibraryWebSnapshotFailure{{URL: "https://mmbiz.qpic.cn/a.png", Reason: "图片 404"}}
+	r := wsRig(t, func(r *rig) {
+		r.svc.SeedEntries(all)
+		r.svc.SeedDetail(wechatID, servicestest.DetailBody{Content: "公众号正文", SourceURI: "https://mp.weixin.qq.com/s/frame-budget"})
+		r.svc.SeedSnapshot(wechatID, "", view)
+	})
+	entries := r.view().List.Entries
+	idx := slices.IndexFunc(entries, func(e services.LibraryEntry) bool { return e.ID == wechatID })
+	if idx < 0 {
+		t.Fatalf("第一页里找不到公众号条目 %s（夹具失效）", wechatID)
+	}
+	card, ok := r.cardOf(entries[idx])
+	if !ok {
+		t.Fatal("找不到公众号卡片（夹具失效）")
+	}
+	cx, cy := centerOf(card)
+	r.clickAt(cx, cy)
+	r.frames(4)
+	if d := r.view().Detail; d.Item == nil || d.Item.ID != wechatID {
+		t.Fatalf("点卡片之后详情应是 %s：%+v", wechatID, d.Item)
+	}
+	r.click(gfx.RoleButton, locales.ArticleAskViewSnapshot())
+	r.frames(4)
+	// 无头会话没有岛，页面不会回报版面状态：目录不常驻侧栏，工具栏里要有「目录」钮。
+	r.screen.ReportSnapshotLayout(false, false)
+	r.frames(2)
+	sn := r.screen.detail.panel.snap
+	if sn.view == nil || sn.loading || sn.err != "" {
+		t.Fatalf("快照应已读到：%+v", sn)
+	}
+	// 已编辑的快照默认进标准排版；点「查看网页快照」切到原文快照，工具栏才有宽度下拉与「目录」钮。
+	if sn.simple {
+		r.click(gfx.RoleButton, locales.LibrarySnapshotViewOriginal())
+		r.frames(3)
+	}
+	if !r.screen.detail.panel.snap.original() {
+		t.Fatal("应是原文快照，读数无效")
+	}
+	text := r.screenText()
+	for _, want := range []string{"帧耗时读数警告", "图片 404", locales.LibrarySnapshotPendingVersion()} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("画面上应有通知条「%s」，读数无效；画面文字 %q", want, r.session.Texts())
+		}
+	}
+	toc := r.mustNode(gfx.RoleButton, locales.LibraryCatalog())
+	more := r.mustNode(gfx.RoleCombobox, locales.CommonMore())
+	if !r.has(gfx.RoleCombobox, locales.LibrarySnapshotWidth()) {
+		t.Fatal("原文快照的工具栏应有宽度下拉，读数无效")
+	}
+	t.Logf("%s 打开快照视图后 Go 堆增量（含无头会话）：%d KiB", name, (int64(frametime.HeapInUse())-int64(heapBefore))/1024)
+
+	idle, err := frametime.Measure(300, func(int) error { return r.session.Frame() })
+	if err != nil {
+		t.Fatalf("稳态帧失败：%v", err)
+	}
+	t.Logf("%s 稳态帧（布局+记录）：%s", name, idle)
+
+	ax, ay := centerOf(toc)
+	bx, by := centerOf(more)
+	hover, err := frametime.Measure(200, func(i int) error {
+		x, y := ax, ay
+		if i%2 == 1 {
+			x, y = bx, by
+		}
+		if err := r.session.Move(x, y); err != nil {
+			return err
+		}
+		return r.session.Frame()
+	})
+	if err != nil {
+		t.Fatalf("悬停帧失败：%v", err)
+	}
+	t.Logf("%s 悬停一步（移动指针+出帧）：%s", name, hover)
 
 	raster, err := frametime.Measure(30, func(int) error {
 		_, err := r.session.Image()
