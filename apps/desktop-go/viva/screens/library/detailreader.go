@@ -36,8 +36,9 @@ import (
 //	论坛条目 → 讨论标签的楼层讨论（正文与总结在主题阅读里）
 //	图片条目 → 「图中文字」标签的 Markdown
 //
-// 其余（回收站与预览态的 Markdown 预览、编辑器）在渲染层里只有主题阅读不可用、又不属于上面各标签时才会走到，
-// 而正文与总结之外的标签都已被上面接住，所以不会出现；编辑器本身归 M2-6（B-060）。
+// 其余（回收站与预览态的 Markdown 预览、旧的非主题编辑器）在渲染层里只有主题阅读不可用、又不属于上面各标签时才会走到，
+// 而正文与总结之外的标签都已被上面接住，所以不会出现（台账 C-012）。
+// 编辑态在这些分支之前：readerViewOf 先看 editorView，岛里显示编辑器（detailedit.go），不经 readerViewFor。
 func readerViewFor(item services.LibraryItem, caps ItemCaps, snapshotView bool, active ReadingTab) reader.View {
 	none := reader.View{Kind: reader.ViewNone}
 	switch {
@@ -87,6 +88,10 @@ type readerViewCache struct {
 }
 
 func (s *Screen) readerViewOf(item services.LibraryItem, caps ItemCaps, active ReadingTab) reader.View {
+	// 编辑态在先（渲染层 mode.editing 的分支排在预览之前）：岛里是编辑器，文档是草稿；草稿每次改动都变，不进切分缓存。
+	if v, ok := s.editorView(item, active); ok {
+		return v
+	}
 	p := &s.detail.panel
 	key := readerViewKey{content: item.Content, itemType: item.ItemType, wechat: caps.IsWechat, snapshotView: p.snapshotView, active: active}
 	if !p.viewCache.ok || p.viewCache.key != key {
@@ -176,15 +181,26 @@ func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, ac
 	}
 	req := s.readerRequest(c, item, caps, active)
 	failure := host.Failure(req)
-	col.Draw(func(d *ui.DrawContext) {
+	paint := func(d *ui.DrawContext) {
 		if failure == nil {
 			host.Frame(d.Canvas, d.Rect, req)
 		}
-	}).Children(func() {
+	}
+	body := func() {
 		if failure != nil && s.Look.LoadErrorState(c.Key("reader-error"), failure.Error()) {
 			host.Retry()
 		}
-	})
+	}
+	// 完成编辑失败的红字条在岛的上面（渲染层 ReconstructionReader 里 error 段落在编辑区之前）：有红字条时岛让到它下面的那一格，
+	// 没有时仍是整格——平时的节点结构不变。
+	if msg := s.editError(item, active); msg != "" {
+		col.Children(func() {
+			s.editBanner(c, msg)
+			ui.Column(c.Key("reader-island")).FillWidth().Grow(1).MinHeight(0).Draw(paint).Children(body)
+		})
+		return
+	}
+	col.Draw(paint).Children(body)
 }
 
 // 页面事件的接收者：全部在界面线程、且都已被宿主校验过（viva/reader）。

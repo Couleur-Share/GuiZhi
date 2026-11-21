@@ -23,6 +23,37 @@ func (s *Screen) readerButtonStyle(height float32) kit.ButtonStyle {
 	}
 }
 
+// themeButtonStyle 是渲染层 themeButton 的样式：inline-flex min-h-7 items-center justify-center gap-1 rounded-lg border border-border px-2.5 py-1
+// text-xs hover:bg-accent disabled:pointer-events-none disabled:opacity-50；没有 transition-*，状态直接切换。
+// 高度是 min-h-7（28px）：一行 text-xs 加 py-1 与边框不到 28px，所以恒为 28。
+func (s *Screen) themeButtonStyle() kit.ButtonStyle {
+	l := s.Look
+	t := l.T
+	return kit.ButtonStyle{
+		Height: l.Rem(1.75), PadX: l.Space(2.5), Radius: l.Rem(0.75), Gap: l.Space(1), Text: kit.TextXS,
+		Fg: t.Foreground, Border: t.Border, BorderW: 1, BgHover: t.Accent,
+		Transition: kit.DurationNone, Surface: t.UiPanelBg,
+	}
+}
+
+// editActions 是编辑态下读者工具条的内容（渲染层 mode.editing 的分支）：「正在编辑原文」与「完成编辑」；保存期间钮禁用、文字换成「正在保存…」。
+func (s *Screen) editActions(c ui.C, item services.LibraryItem, active ReadingTab, kind string) {
+	l := s.Look
+	t := l.T
+	saving := s.detail.edit.saveKey == draftKey(item.ID, kind)
+	// px-2 text-xs text-muted-foreground
+	ui.Row(c.Key("editing")).Items(ui.Center).PadSides(0, l.Space(2), 0, l.Space(2)).Children(func() {
+		l.Text(c.Key("editing-text"), locales.ThemedReadingReaderEditing(), kit.TextXS, kit.WeightNormal, t.MutedForeground)
+	})
+	label := locales.ThemedReadingReaderFinishEditing()
+	if saving {
+		label = locales.ThemedReadingReaderSaving()
+	}
+	if l.Button(c.Key("finish-edit"), kit.ButtonSpec{Label: label, Disabled: saving, Center: true}, s.themeButtonStyle()).Clicked() {
+		s.finishEdit(item, active)
+	}
+}
+
 // readerToolbar 是工具栏最前面的读者工具条（渲染层 ReconstructionReader 的 actions，经门户放进 setReaderToolbar 的容器）：
 //
 //	flex shrink-0 items-center gap-1.5
@@ -30,17 +61,19 @@ func (s *Screen) readerButtonStyle(height float32) kit.ButtonStyle {
 //	  分隔线（mx-1 h-4 w-px bg-border/70）
 //	  目录（只在原文版本里；展开时 bg-muted）、编辑（回收站里没有）
 //
-// 「AI 阅读」与「编辑」的功能不在本里程碑：点了弹失败提示并写明归属（台账 B-064、B-060），不假装成功。
+// 编辑态下整组换成「正在编辑原文」与「完成编辑」（editActions）。「AI 阅读」的功能不在本里程碑：点了弹失败提示并写明归属（台账 B-064），不假装成功。
 func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab) {
 	l := s.Look
 	t := l.T
-	kind := sourceBody
-	if active == TabSummary {
-		kind = sourceSummary
-	}
+	kind := sourceKindOfActive(active)
 	s.syncToc(item.ID, kind)
 	tocOpen := s.detail.panel.tocOpen
+	editing := s.editing(item, active)
 	ui.Row(c).Items(ui.Center).Gap(l.Space(1.5)).Shrink(0).Children(func() {
+		if editing {
+			s.editActions(c, item, active, kind)
+			return
+		}
 		ui.Row(c.Key("version")).Items(ui.Center).Gap(l.Space(0.5)).PadSides(l.Space(0.5)+1, l.Space(0.5)+1, l.Space(0.5)+1, l.Space(0.5)+1).
 			Draw(func(d *ui.DrawContext) {
 				l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.4), Border: t.Border.WithAlpha(0.6), BorderW: 1, Radius: l.Rem(0.75)})
@@ -68,7 +101,7 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 				name = locales.ThemedReadingReaderEditSummary()
 			}
 			if l.Button(c.Key("edit"), kit.ButtonSpec{Label: locales.ThemedReadingReaderEdit(), Name: name}, s.readerButtonStyle(l.Rem(2))).Clicked() {
-				s.notMigrated(name, "M2-6", "B-060")
+				s.startEdit(item, active)
 			}
 		}
 	})

@@ -823,10 +823,6 @@ func TestUnmigratedReaderActionsFailLoudlyWithTheirMilestone(t *testing.T) {
 	if text := rr.toastText(); !strings.Contains(text, "M3") || !strings.Contains(text, "B-064") {
 		t.Fatalf("AI 阅读未迁移：应写明里程碑与台账编号：\n%s", text)
 	}
-	rr.click(gfx.RoleButton, locales.ThemedReadingReaderEditOriginal())
-	if text := rr.toastText(); !strings.Contains(text, "M2-6") || !strings.Contains(text, "B-060") {
-		t.Fatalf("编辑未迁移：应写明里程碑与台账编号：\n%s", text)
-	}
 }
 
 // ---- 请求的组装 ----

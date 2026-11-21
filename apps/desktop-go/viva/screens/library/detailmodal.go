@@ -57,6 +57,7 @@ func (s *Screen) settleDetailModal() {
 	}
 	if m.closeReq.Swap(false) {
 		m.open = false
+		s.remountDetail() // 浮层里的详情卸载：内容面板、通知条与编辑态都回到初始（草稿保留），再打开时按阅读记忆恢复
 	}
 }
 

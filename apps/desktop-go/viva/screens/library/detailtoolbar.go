@@ -41,6 +41,7 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 	p := &s.detail.panel
 	s.syncPanel(item, caps)
 	active := p.activeTab(caps)
+	s.syncEdit(item, active)
 	s.persistPanel(item, active)
 	showFind := p.showFindBar(active, caps)
 	p.canFind = showFind

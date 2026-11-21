@@ -144,10 +144,15 @@ func (s *Screen) syncPanel(item services.LibraryItem, caps ItemCaps) {
 		p.catalogOpen = defaultCatalogOpen(replyCount)
 	}
 	// 阅读位置：对实际显示的标签恢复（渲染层 useLayoutEffect 用 memory.scrollTopByTab[activeTab]，记忆里的标签这条不能用时也照样取回正文的位置）。
-	if active := p.activeTab(caps); remembered {
+	active := p.activeTab(caps)
+	if remembered {
 		if top, ok := mem.ScrollTopByTab[active]; ok {
 			p.restoreTop, p.restoreTab = &top, active
 		}
+	}
+	// 空白笔记没有可阅读的内容：打开时直接进编辑态（渲染层 startBlankNoteEditing，只在切到该条目时判断一次，输入第一个字后不会被切回阅读态）。
+	if item.ItemType == services.LibraryTypeNote && !caps.Trashed && jsTrim(item.Content) == "" {
+		s.startEdit(item, active)
 	}
 }
 

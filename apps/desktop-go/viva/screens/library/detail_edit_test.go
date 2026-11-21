@@ -1,6 +1,7 @@
 package library
 
 import (
+	"strings"
 	"testing"
 
 	"guizhi-mygo-shell/viva/reader"
@@ -18,8 +19,8 @@ func TestRecordDraftUpdatesOnlyAnExistingDraftOfTheRightSource(t *testing.T) {
 	}
 
 	s.recordDraft("a", reader.TabBody, "新")
-	if got := e.drafts["a:body"]; got != (editDraft{text: "新", baseline: "正文基线"}) {
-		t.Errorf("正文草稿只换全文、基线不动：%+v", got)
+	if got := e.drafts["a:body"]; got != (editDraft{text: "新", baseline: "正文基线", touched: true}) {
+		t.Errorf("正文草稿换全文并记为改过、基线不动：%+v", got)
 	}
 	if got := e.drafts["a:summary"]; got != (editDraft{text: "总结", baseline: "总结基线"}) {
 		t.Errorf("别的来源的草稿不受影响：%+v", got)
@@ -60,6 +61,36 @@ func TestDraftKeyIsItemAndSource(t *testing.T) {
 	for _, tab := range []reader.Tab{reader.TabReplies, reader.TabImages, reader.TabRecognized, reader.TabTranscript, ""} {
 		if _, ok := sourceKindOfTab(tab); ok {
 			t.Errorf("%q 不是原文来源", tab)
+		}
+	}
+	for tab, want := range map[ReadingTab]string{TabSummary: sourceSummary, TabBody: sourceBody, TabReplies: sourceBody, TabTranscript: sourceBody} {
+		if got := sourceKindOfActive(tab); got != want {
+			t.Errorf("标签 %q 的来源：%q，期望 %q（只有讨论总结标签是 summary，其余都当正文）", tab, got, want)
+		}
+	}
+}
+
+// 只在字节数超过上限时才逐个数码元（每个字节至多对应一个码元）；增补平面的字符占两个码元，所以 4 字节的表情算 2 个。
+func TestUTF16ExceedsCountsCodeUnitsLikeTheRenderer(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		s     string
+		limit int
+		n     int
+		over  bool
+	}{
+		{"", 10, 0, false},
+		{"abc", 10, 0, false},
+		{"abc", 3, 0, false},
+		{"中文", 10, 0, false}, // 6 字节没超过上限 10：码元数更不可能超过
+		{"中文", 5, 2, false},  // 6 字节超过上限 5，数出来 2 个码元：没超
+		{"😀", 3, 2, false},   // 4 字节、一个增补平面字符 = 2 个码元
+		{strings.Repeat("😀", 4), 7, 8, true},
+		{strings.Repeat("😀", 4), 8, 8, false},
+		{strings.Repeat("a", 20), 10, 20, true},
+	} {
+		if n, over := utf16Exceeds(c.s, c.limit); n != c.n || over != c.over {
+			t.Errorf("utf16Exceeds(%q, %d) = %d, %v，期望 %d, %v", c.s, c.limit, n, over, c.n, c.over)
 		}
 	}
 }

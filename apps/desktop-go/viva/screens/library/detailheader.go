@@ -69,8 +69,8 @@ func (s *Screen) detailHeader(c ui.C, v View, item services.LibraryItem, caps It
 // detailTitle 是标题框（渲染层 textarea[data-testid=item-title-input]）：
 // block w-full resize-none border-none bg-transparent rounded-sm pt-0.5 text-[1.375rem] font-semibold leading-snug。
 //
-// 渲染层的标题框随内容增高、超过三行再滚动，Enter 把光标交给正文编辑器；这里是单行输入：长标题横向滚动，
-// Enter 暂不转移焦点（台账 B-062 与 B-060，编辑器随 M2-6）。回收站条目只读：输入被丢掉，文字退回原值。
+// 渲染层的标题框随内容增高、超过三行再滚动；这里是单行输入：长标题横向滚动，不折行也不增高（台账 B-062）。
+// Enter 把光标交给正文编辑器（编辑态下岛里的 .cm-content）。回收站条目只读：输入被丢掉，文字退回原值。
 func (s *Screen) detailTitle(c ui.C, v View, item services.LibraryItem, trashed bool) {
 	l := s.Look
 	t := l.T
@@ -95,6 +95,9 @@ func (s *Screen) detailTitle(c ui.C, v View, item services.LibraryItem, trashed 
 	if focus {
 		box = box.AutoFocus()
 		s.Store.ClearTitleFocus()
+	}
+	if box.Submitted() {
+		s.focusEditor()
 	}
 	switch {
 	case box.Changed() && !trashed:

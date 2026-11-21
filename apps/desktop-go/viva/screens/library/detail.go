@@ -75,6 +75,7 @@ func (s *Screen) remountDetail() {
 	s.detail.panel = panelState{}
 	s.detail.notice = noticeUI{}
 	s.detail.titleItem = ""
+	s.detail.edit.leave() // 编辑态随内容面板卸载而结束（草稿还在，再进来时恢复）
 }
 
 // detailColumn 是卡片视图里的详情栏：min-w-0 flex-1 app-wallpaper-section。
@@ -155,6 +156,9 @@ func (s *Screen) itemDetail(c ui.C, v View, onClose func()) {
 	t := l.T
 	s.detailShown = true
 	det := v.Detail
+	if det.LoadError != "" || det.Loading || det.Item == nil || det.Item.ID != v.List.SelectedID {
+		s.detail.edit.leave() // 内容面板不在树里：编辑态随它结束（草稿保留）
+	}
 	switch {
 	case det.LoadError != "":
 		if l.LoadErrorState(c.Key("load-error"), det.LoadError) {
