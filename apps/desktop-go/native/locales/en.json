@@ -1893,6 +1893,7 @@
   "commandPalette_noResults": "No matching results",
   "native_island_starting": "Opening the reading view…",
   "native_island_webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working.",
+  "native_island_viewerAction": "Open the image viewer",
   "native_library_notMigrated": "“{action}” is not available in the native UI yet; planned for {milestone} (ledger {ledger})",
   "native_library_resultSeparator": "：",
   "native_library_reasonSeparator": "；",

@@ -135,11 +135,12 @@ const TABS: ReadonlySet<string> = new Set([
   "replies",
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseTheme(value: unknown): ReaderTheme | null {
+/** 解析外观输入；形状不对（含根字号越界）返回 null。图片查看页的协议同样用它。 */
+export function parseTheme(value: unknown): ReaderTheme | null {
   if (!isRecord(value)) return null;
   const { dark, hue, saturation, basePx, motion } = value;
   if (
@@ -157,7 +158,7 @@ function parseTheme(value: unknown): ReaderTheme | null {
   return { dark, hue, saturation, basePx, motion };
 }
 
-function parseLang(value: unknown): ReaderLang {
+export function parseLang(value: unknown): ReaderLang {
   return value === "en" ? "en" : "zh";
 }
 

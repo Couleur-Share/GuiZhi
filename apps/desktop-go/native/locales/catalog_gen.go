@@ -19802,6 +19802,16 @@ func (msgs Messages) NativeIslandWebview2Missing() string {
 	return Catalog.Format(msgs.locale, "native_island_webview2Missing", nil)
 }
 
+// NativeIslandViewerAction says "打开图片查看器"
+// in the language the app shows.
+func NativeIslandViewerAction() string { return In(i18n.Locale()).NativeIslandViewerAction() }
+
+// NativeIslandViewerAction says "打开图片查看器"
+// in the language of msgs.
+func (msgs Messages) NativeIslandViewerAction() string {
+	return Catalog.Format(msgs.locale, "native_island_viewerAction", nil)
+}
+
 // NativeLibraryNotMigrated says "「{action}」的原生界面还没有做，计划在 {milestone} 完成（台账 {ledger}）"
 // in the language the app shows.
 func NativeLibraryNotMigrated(action any, milestone any, ledger any) string {

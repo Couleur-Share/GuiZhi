@@ -15147,6 +15147,14 @@ func NativeIslandWebview2Missing() string {
 	return "这台电脑缺少 WebView2 运行时，阅读视图暂时无法显示；其余功能不受影响。"
 }
 
+// NativeIslandViewerAction 是 native.island.viewerAction：打开图片查看器
+func NativeIslandViewerAction() string {
+	if useEn() {
+		return "Open the image viewer"
+	}
+	return "打开图片查看器"
+}
+
 // NativeLibraryNotMigrated 是 native.library.notMigrated：「{{action}}」的原生界面还没有做，计划在 {{milestone}} 完成（台账 {{ledger}}）
 func NativeLibraryNotMigrated(action, milestone, ledger any) string {
 	if useEn() {

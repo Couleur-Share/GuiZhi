@@ -21,15 +21,25 @@ declare global {
   }
 }
 
-/** 页面与宿主之间的通道；测试与对照工具注入假桥，页面代码不直接碰 window.viva。 */
-export interface ReaderBridge {
+/**
+ * 页面与宿主之间的通道（In 是宿主发来的消息，Out 是页面发给宿主的事件）；测试与对照工具注入假桥，页面代码不直接碰 window.viva。
+ * 阅读页与图片查看页各用一份协议，通道的收发逻辑共用。
+ */
+export interface Channel<In, Out> {
   /** 给宿主发一个事件；没有桥（普通浏览器里打开页面）时静默丢弃。 */
-  send(event: PageEvent): void;
+  send(event: Out): void;
   /** 订阅宿主消息；返回取消订阅的函数。同一时刻只有一个订阅者（桥只有一个 onmessage 槽）。 */
-  listen(handler: (message: HostMessage) => void): () => void;
+  listen(handler: (message: In) => void): () => void;
 }
 
-export function createBridge(win: Window = window): ReaderBridge {
+/** 阅读页的通道。 */
+export type ReaderBridge = Channel<HostMessage, PageEvent>;
+
+/** 按 parse 解析宿主消息的通道；parse 对形状不对的文本返回 null。 */
+export function createChannel<In, Out>(
+  parse: (text: string) => In | null,
+  win: Window = window,
+): Channel<In, Out> {
   return {
     send(event) {
       win.viva?.postMessage(JSON.stringify(event));
@@ -41,7 +51,7 @@ export function createBridge(win: Window = window): ReaderBridge {
         // 真桥给 { data }；字符串形状只为兼容别的投递方（islandprobe 的页面同样两种都收）。
         const text = typeof event === "string" ? event : event?.data;
         if (typeof text !== "string") return;
-        const message = parseHostMessage(text);
+        const message = parse(text);
         // 形状不对的消息直接丢掉：宿主是可信的，所以这只会出现在版本不一致或测试里。
         if (message) handler(message);
       };
@@ -51,4 +61,8 @@ export function createBridge(win: Window = window): ReaderBridge {
       };
     },
   };
+}
+
+export function createBridge(win: Window = window): ReaderBridge {
+  return createChannel<HostMessage, PageEvent>(parseHostMessage, win);
 }

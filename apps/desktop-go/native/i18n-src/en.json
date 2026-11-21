@@ -2,7 +2,8 @@
   "native": {
     "island": {
       "starting": "Opening the reading view…",
-      "webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working."
+      "webview2Missing": "The WebView2 runtime is missing on this computer, so the reading view cannot be shown for now; everything else keeps working.",
+      "viewerAction": "Open the image viewer"
     },
     "library": {
       "notMigrated": "“{{action}}” is not available in the native UI yet; planned for {{milestone}} (ledger {{ledger}})",
