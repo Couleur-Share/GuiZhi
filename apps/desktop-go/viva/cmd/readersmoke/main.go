@@ -192,6 +192,7 @@ func newSmoke(out string) (*smoke, error) {
 		Diag:   func(err error) { s.record("diag", err.Error()) },
 	})
 	s.host.SetHandler(handler{s})
+	s.host.Viewer().SetHandler(viewerHandler{s})
 	return s, nil
 }
 
@@ -298,6 +299,12 @@ func (s *smoke) view(c ui.C) {
 			d.Canvas.Fill(s.tree.rect, s.tree.col)
 		}
 	})
+	if v := s.host.Viewer(); v.Active() {
+		// 与知识库的整窗浮层（screens/library/detailviewer.go）同一层、同一套次序：遮罩先画，岛握手之后原生视图盖住它。
+		ui.Overlay(c.Key("viewer"), ui.OverlaySpec{Band: kit.BandViewer, Bounds: c.Bounds()}).
+			Draw(func(d *ui.DrawContext) { d.Canvas.Fill(d.Rect, gfx.Color{Alpha: 0.88}) }).
+			DrawOver(func(d *ui.DrawContext) { v.Frame(d.Canvas, d.Rect) })
+	}
 	if f := s.float; f != nil {
 		ui.Overlay(c.Key("float"), ui.OverlaySpec{Band: f.band, Bounds: f.rect}).Draw(func(d *ui.DrawContext) {
 			d.Canvas.Fill(d.Rect, f.col)
@@ -378,6 +385,12 @@ func (h handler) Key(key string, ctrl, alt, shift bool) {
 func (h handler) FindReset()       { h.s.record("findReset", nil) }
 func (h handler) Failed(err error) { h.s.record("failed", err.Error()) }
 
+// viewerHandler 接收图片查看岛的结局。
+type viewerHandler struct{ s *smoke }
+
+func (h viewerHandler) Closed()          { h.s.record("viewer:closed", nil) }
+func (h viewerHandler) Failed(err error) { h.s.record("viewer:failed", err.Error()) }
+
 // ---- 开岛：与 reader.IslandOpener 同一套，多记一份页面的加载进度，并让探针脚本的消息不进宿主 ----
 
 type smokeOpener struct{ s *smoke }
@@ -408,7 +421,7 @@ func (o smokeOpener) Open(cfg island.Config, closed func()) (reader.Page, error)
 		return nil, err
 	}
 	s.isl = isl
-	page := &smokePage{s: s, isl: isl, closed: closed}
+	page := &smokePage{s: s, isl: isl, entry: cfg.Entry, closed: closed}
 	s.group.Track(page)
 	return page, nil
 }
@@ -416,11 +429,16 @@ func (o smokeOpener) Open(cfg island.Config, closed func()) (reader.Page, error)
 type smokePage struct {
 	s      *smoke
 	isl    *island.Island
+	entry  string
 	closed func()
 	once   sync.Once
 }
 
 func (p *smokePage) Post(text string) { p.isl.View().PostMessage(text) }
+func (p *smokePage) Focus() {
+	p.s.record("focus", p.entry)
+	p.isl.View().Focus()
+}
 func (p *smokePage) Place(surface reader.Surface, bounds gfx.Rect) {
 	surface.NativeView(p.isl.View().ID(), bounds)
 }

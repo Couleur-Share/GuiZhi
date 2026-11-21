@@ -46,6 +46,12 @@ const (
 	BandOverIslandInModal         = bandSelectDismiss
 )
 
+// BandViewer 是图片查看器（整窗浮层，渲染层的 ImageLightbox）用的层号：渲染层里它的 z-index 与 Modal、Select 同为 9999 但后进 DOM，
+// 所以盖在它们之上，又在 Toast 与 ConfirmDialog（99999）、Tooltip（100000）之下。原生视图（查看岛）只在声明它的这一层上「开洞」，
+// 所以它与 Select 的面板共用第 5 层（打开查看器时不会有 Select 面板；有也被它盖住，与渲染层一致），
+// 6…9 层的提示、确认与悬停说明仍然盖得住它。
+const BandViewer = bandSelectPanel
+
 // OverlayLayerMin 是浮层的最低层号：画在这一层及以上的文字属于浮层（对照工具据此区分浮层文字，见台账 A-009）。
 const OverlayLayerMin = uint16(bandModal)
 

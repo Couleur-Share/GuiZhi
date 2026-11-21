@@ -142,7 +142,13 @@ func (s *Screen) listWidths() (width, hi float32) {
 
 // Workspace 是知识库模块的工作区（渲染层 components/library/LibraryWorkspace）：
 // 卡片视图是窄列表栏加常驻详情栏，列表视图是全宽表格；专注阅读模式下只有详情栏（detail.go）。
+// 图片查看器的整窗浮层（detailviewer.go）跟着工作区：工作区没画出来，查看器随之结束（渲染层里它随组件卸载）。
 func (s *Screen) Workspace(c ui.C) {
+	s.workspaceBody(c)
+	s.viewerLayer(c)
+}
+
+func (s *Screen) workspaceBody(c ui.C) {
 	s.ensureMounted()
 	s.loadPane()
 	s.wsShown = true

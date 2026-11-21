@@ -161,6 +161,7 @@ func (s *Screen) SetReader(host *reader.Host) {
 	s.readerHost = host
 	if host != nil {
 		host.SetHandler(readerEvents{s})
+		host.Viewer().SetHandler(viewerEvents{s})
 	}
 }
 
@@ -220,10 +221,8 @@ func (e readerEvents) Copy(text string) {
 	}
 }
 
-// Lightbox 打开图片查看器：原生查看器还没有做（B-068）。
-func (e readerEvents) Lightbox(images []reader.Image, index int) {
-	e.s.notMigrated(locales.LibraryImagesSection(), "M2-5", "B-068")
-}
+// Lightbox 打开图片查看器：另开一个盖满窗口的岛（detailviewer.go）。
+func (e readerEvents) Lightbox(images []reader.Image, index int) { e.s.showViewer(images, index) }
 
 // Toast 是页面要给用户看的警告（页面里的组件调用 showToast("…", "warning")）。
 func (e readerEvents) Toast(text string) {

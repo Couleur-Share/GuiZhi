@@ -229,7 +229,20 @@ func (l *Look) pushModalScope(canvas *gfx.Canvas) func() {
 // 已经不在 Modal 的绘制作用域里，Modal 的焦点陷阱会把它挡在外面（输入框拿不到焦点、按钮点不到）。
 // 用于详情浮层里抬到原生视图之上的控件（查找条）；Modal 还没有开过（作用域为零）时什么都不做。
 func (l *Look) WithinModal(st *ModalState, box ui.Box) ui.Box {
+	return l.WithinModalHooks(st, box, nil, nil)
+}
+
+// WithinModalHooks 是 WithinModal 再带上调用方自己的 Draw / DrawOver 钩子（盒子上每种钩子只有一个，后设的会顶掉先设的，
+// 所以要自己画东西的浮层不能先 WithinModal 再设钩子）：draw 在进入作用域之后、over 在退出作用域之前运行，两者都可为空。
+// Modal 还没有开过（作用域为零）时钩子照样挂上，只是不进作用域。
+func (l *Look) WithinModalHooks(st *ModalState, box ui.Box, draw, over func(d *ui.DrawContext)) ui.Box {
 	if st.scope.IsZero() {
+		if draw != nil {
+			box = box.Draw(draw)
+		}
+		if over != nil {
+			box = box.DrawOver(over)
+		}
 		return box
 	}
 	var pop func()
@@ -237,8 +250,16 @@ func (l *Look) WithinModal(st *ModalState, box ui.Box) ui.Box {
 		Draw(func(d *ui.DrawContext) {
 			d.Canvas.PushFocusScope(st.scope)
 			pop = d.Canvas.PopFocusScope
+			if draw != nil {
+				draw(d)
+			}
 		}).
-		DrawOver(func(d *ui.DrawContext) { pop() })
+		DrawOver(func(d *ui.DrawContext) {
+			if over != nil {
+				over(d)
+			}
+			pop()
+		})
 }
 
 // modalPresence 开启面板的入场：淡入 + 从 96% 放大 + 自下 16px 滑入（180 ms，ease-enter）；入场播完之后改用退场的

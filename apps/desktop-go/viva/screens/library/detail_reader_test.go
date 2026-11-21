@@ -24,15 +24,17 @@ import (
 // 不拉起 WebView2，所以这些测试不覆盖真实页面里的渲染与交互（台账 R-15）。
 
 type fakeReaderPage struct {
-	cfg    island.Config
-	posts  []string
-	places []gfx.Rect
-	closes int
-	closed func()
+	cfg     island.Config
+	posts   []string
+	places  []gfx.Rect
+	closes  int
+	focuses int
+	closed  func()
 }
 
 func (p *fakeReaderPage) Post(text string)                   { p.posts = append(p.posts, text) }
 func (p *fakeReaderPage) Place(_ reader.Surface, b gfx.Rect) { p.places = append(p.places, b) }
+func (p *fakeReaderPage) Focus()                             { p.focuses++ }
 func (p *fakeReaderPage) Close()                             { p.closes++ }
 
 // messages 是已发给页面的、种类为 kind 的消息（按发送顺序，解成通用对象）。
@@ -556,7 +558,7 @@ func TestCopyFromThePageReachesTheClipboardAndReportsFailure(t *testing.T) {
 	}
 }
 
-func TestToastAndLightboxFromThePage(t *testing.T) {
+func TestToastFromThePage(t *testing.T) {
 	t.Parallel()
 	rr := newReaderRig(t)
 	rr.openCard(detailNoteID)
@@ -565,11 +567,6 @@ func TestToastAndLightboxFromThePage(t *testing.T) {
 	rr.frames(2)
 	if !strings.Contains(rr.screenText(), "图片加载失败") {
 		t.Fatalf("页面要求的警告应显示出来：\n%s", rr.screenText())
-	}
-	rr.event(p, map[string]any{"t": "lightbox", "index": 0, "images": []map[string]any{{"src": "local-image://a.png", "alt": "图"}}})
-	rr.frames(2)
-	if text := rr.toastText(); !strings.Contains(text, "B-068") {
-		t.Fatalf("灯箱还没做：应弹失败提示并写明台账编号：\n%s", text)
 	}
 }
 
@@ -692,6 +689,80 @@ func TestFindBarStaysInTheTreeWhenNothingIsShownInTheIsland(t *testing.T) {
 	rr.typeText("x")
 	if layer, ok := rr.textLayer(locales.LibraryPanelFindEmptyShort()); !ok || layer != 0 {
 		t.Fatalf("岛里没有内容（文字稿页签）时没有原生视图，查找条留在页面层：%d %v", layer, ok)
+	}
+}
+
+// ---- 「退出专注」浮钮抬到岛之上 ----
+
+// exitPill 是专注阅读右下角的「退出专注」浮钮：头部那枚 32x32 的图标钮与它同名，靠宽度分开。
+func (r *rig) exitPill() app.AccessNode {
+	r.t.Helper()
+	name := locales.LibraryExitFocusReading()
+	for _, n := range r.session.Access() {
+		if n.Role == gfx.RoleButton && n.Label == name && n.Bounds.Width > 40 {
+			return n
+		}
+	}
+	r.t.Fatalf("找不到右下角的「%s」浮钮", name)
+	return app.AccessNode{}
+}
+
+// 专注阅读窄窗口里浮钮落在岛上：岛在场时它抬到更高的一层，位置与页面层里一致；点它仍退出专注。
+func TestExitFocusButtonIsLiftedAboveTheIslandAndStaysWhereItWas(t *testing.T) {
+	t.Parallel()
+	short := locales.LibraryExitFocusReadingShort()
+	plain := detailRig(t)
+	plain.openCard(detailNoteID)
+	plain.keys("alt+z")
+	plain.frames(3)
+	inTree := plain.exitPill()
+	if layer, ok := plain.textLayer(short); !ok || layer != 0 {
+		t.Fatalf("没有岛时浮钮画在页面层：%d %v", layer, ok)
+	}
+
+	rr := newReaderRig(t)
+	rr.openCard(detailNoteID)
+	rr.ready()
+	rr.keys("alt+z")
+	rr.frames(4)
+	if !rr.screen.readerHost.Open() {
+		t.Fatal("夹具失效：专注阅读里岛应还开着")
+	}
+	lifted := rr.exitPill()
+	if layer, ok := rr.textLayer(short); !ok || layer != uint16(kit.BandOverIsland) {
+		t.Fatalf("岛在场时浮钮要抬到第 %d 层：%d %v", kit.BandOverIsland, layer, ok)
+	}
+	for _, d := range []struct {
+		name      string
+		got, want float32
+	}{
+		{"X", lifted.Bounds.X, inTree.Bounds.X}, {"Y", lifted.Bounds.Y, inTree.Bounds.Y},
+		{"宽", lifted.Bounds.Width, inTree.Bounds.Width}, {"高", lifted.Bounds.Height, inTree.Bounds.Height},
+	} {
+		if diff := d.got - d.want; diff > 1 || diff < -1 {
+			t.Errorf("抬起来的浮钮的%s应与页面层里一致：%.1f 对 %.1f", d.name, d.got, d.want)
+		}
+	}
+	x, y := centerOf(lifted)
+	rr.clickAt(x, y)
+	if rr.screen.FocusReading() {
+		t.Fatal("点抬起来的浮钮应退出专注阅读")
+	}
+	if _, ok := rr.textLayer(short); ok {
+		t.Fatal("退出专注之后浮钮应消失")
+	}
+}
+
+// 岛里没有内容（没有选中条目、文字稿页签）时没有原生视图，浮钮留在页面层，一帧也不抬。
+func TestExitFocusButtonStaysInTheTreeWhenNothingIsShownInTheIsland(t *testing.T) {
+	t.Parallel()
+	rr := newReaderRig(t)
+	rr.pick(detailVideoID)
+	rr.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
+	rr.keys("alt+z")
+	rr.frames(4)
+	if layer, ok := rr.textLayer(locales.LibraryExitFocusReadingShort()); !ok || layer != 0 {
+		t.Fatalf("岛里没有内容时浮钮留在页面层：%d %v", layer, ok)
 	}
 }
 

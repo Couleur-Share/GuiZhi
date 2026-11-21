@@ -33,6 +33,12 @@ type detailUI struct {
 
 	// focusReading 是专注阅读模式（渲染层 ui.store 的 isFocusReadingMode：不持久化，离开知识库即退出）。
 	focusReading bool
+	// viewerWait 是图片查看岛加载期间的转圈：延迟登场（detailviewer.go）。
+	viewerWait kit.Delayed
+	// focusRect 与 exitSize 是上一帧专注工作区的位置与大小、「退出专注」浮钮自然的大小（窗口坐标）：阅读岛盖住同层的东西，
+	// 岛在场时浮钮要抬到更高的一层（exitFocusButton），那一层的范围要在声明时就知道。
+	focusRect gfx.Rect
+	exitSize  gfx.Size
 
 	// panel 是内容面板的界面状态（detailpanel.go）；modal 是表格视图的详情浮层（detailmodal.go）。
 	panel panelState
@@ -83,6 +89,7 @@ func (s *Screen) focusWorkspace(c ui.C, v View) {
 	t := l.T
 	ui.Row(c.Key("focus")).FillWidth().Grow(1).MinHeight(0).Clip().Draw(func(d *ui.DrawContext) {
 		l.PaintSurface(d, kit.Surface{Bg: t.UiSectionBg})
+		s.detail.focusRect = d.Rect
 	}).Children(func() {
 		ui.Column(c.Key("focus-detail")).Grow(1).MinWidth(0).FillHeight().Children(func() {
 			s.itemDetail(c, v, nil)
@@ -101,10 +108,34 @@ func (s *Screen) exitFocusButton(c ui.C) {
 		Fg: t.Foreground, Bg: t.Background.WithAlpha(0.95), BgHover: t.Accent,
 		Border: t.Border, BorderW: 1, Shadows: kit.ShadowLG, Transition: kit.DurationDefault,
 	}
-	box := l.Button(c.Key("exit-focus"), kit.ButtonSpec{
+	spec := kit.ButtonSpec{
 		Label: locales.LibraryExitFocusReadingShort(), Icon: icons.Minimize2, IconSize: l.Rem(1),
 		Name: locales.LibraryExitFocusReading(), Hint: locales.LibraryExitFocusReading(),
-	}, style).Absolute().Bottom(l.Space(5)).Right(l.Space(5))
+	}
+	// 记下浮钮自然的大小；变了就再出一帧，让抬起来的那一层按新的大小摆。
+	measure := func(d *ui.DrawContext) {
+		if size := (gfx.Size{Width: d.Rect.Width, Height: d.Rect.Height}); size != s.detail.exitSize {
+			s.detail.exitSize = size
+			d.Canvas.RequestFrame()
+		}
+	}
+	area, size := s.detail.focusRect, s.detail.exitSize
+	if s.readerHost != nil && s.readerHost.Open() && area.Width > 0 && size.Width > 0 {
+		// 阅读岛是原生视图，同层里画在它之后的东西都被盖住（台账 R-15 实测）；浮钮在专注阅读窄窗口里会落在岛上，
+		// 所以岛在场时把它抬到更高的一层（见 kit.BandOverIsland），位置与页面层里一致：工作区右下角内缩 right-5 bottom-5。
+		bounds := gfx.Rect{
+			X: area.X + area.Width - l.Space(5) - size.Width, Y: area.Y + area.Height - l.Space(5) - size.Height,
+			Width: size.Width, Height: size.Height,
+		}
+		ui.Overlay(c.Key("exit-focus-lift"), ui.OverlaySpec{Band: kit.BandOverIsland, Bounds: bounds}).Children(func() {
+			box := l.Button(c.Key("exit-focus"), spec, style).Absolute().Left(0).Top(0).DrawOver(measure)
+			if box.Clicked() {
+				s.SetFocusReading(false)
+			}
+		})
+		return
+	}
+	box := l.Button(c.Key("exit-focus"), spec, style).Absolute().Bottom(l.Space(5)).Right(l.Space(5)).DrawOver(measure)
 	if box.Clicked() {
 		s.SetFocusReading(false)
 	}
