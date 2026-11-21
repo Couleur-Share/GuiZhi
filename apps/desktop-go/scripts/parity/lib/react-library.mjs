@@ -221,6 +221,11 @@ function pageInit({ fixture, detail, configKey }) {
   // 条目详情（M2-4）：详情字段取详情夹具，叠在列表条目上；保存的正文改动写回 bodies。没有夹具条目的字段取空。
   const detailCfg = config.detail ?? null;
   const bodies = detailCfg ? JSON.parse(JSON.stringify(detail.details)) : {};
+  if (detailCfg?.contentOverrides) {
+    for (const [id, text] of Object.entries(detailCfg.contentOverrides)) {
+      bodies[id] = { ...(bodies[id] ?? {}), content: text };
+    }
+  }
   // 文章工具侧栏（M2-6b）：config.detail.tools 是 "base"（只给网页的来源版本）、"comments"（再给来源评论）或 "comments-empty"（评论读到是空的）。
   // 评论场景把 commentsItem 的来源链接换成平台来源（夹具里没有一条详情带小红书或抖音链接）。
   const tools = detailCfg?.tools ?? "";

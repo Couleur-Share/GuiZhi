@@ -90,9 +90,46 @@ const selectAllInEditor = async (win) => {
   await win.keyboard.press("Control+A");
   await win.waitForTimeout(200);
 };
+// G-032 补充的三类步骤：目录浮层、查找标记、滚动（M2-6b 收口）。
+const clickToc = async (win) => {
+  const btn = win.getByTestId("article-toolbar").getByRole("button", { name: "目录", exact: true });
+  if ((await btn.getAttribute("aria-expanded")) !== "true") {
+    await btn.click();
+  }
+  await win.waitForTimeout(300);
+};
+const findInReader = (query) => async (win) => {
+  await win.keyboard.press("Control+f");
+  await win.waitForTimeout(200);
+  await win.keyboard.type(query);
+  await win.locator("[data-article-reader] mark").first().waitFor({ state: "visible", timeout: 5000 });
+  // 查找条属于外层外壳（已在 detail-find 整窗场景里对照），它悬浮压在阅读区右上角；
+  // 截阅读区内部像素前把它隐去，只比对阅读区里的 <mark> 高亮本身。
+  await win.evaluate(() => {
+    const input = document.querySelector('input[placeholder*="查找"], input[placeholder*="Find"]');
+    const bar = input?.closest("div.absolute");
+    if (bar) bar.style.visibility = "hidden";
+  });
+  await win.waitForTimeout(200);
+};
+const LONG_MARKDOWN = Array.from({ length: 24 }, (_, i) => `## 第 ${i + 1} 节：本地优先架构\n\n本地优先的个人知识库把数据保存在用户自己的设备上，离线可读写，同步只是附加能力。这是第 ${i + 1} 段用于验证滚动位置与内容对等的长文段落。`).join("\n\n");
+const scrollReaderTo = (top) => async (win) => {
+  const actual = await win.evaluate((target) => {
+    const root = document.querySelector("[data-article-reader]");
+    const scroller = root?.querySelector(".overflow-y-auto, .overflow-auto") ?? root;
+    if (!scroller) return -1;
+    scroller.scrollTop = target;
+    return scroller.scrollTop;
+  }, top);
+  if (actual < top - 1) throw new Error(`React 阅读区未能滚动到 ${top}（实际 ${actual}）`);
+  await win.waitForTimeout(250);
+};
 const SCENARIOS = [
   { id: "web-original", itemId: "item-003", tab: "body", steps: [clickCard("如何构建本地优先的个人知识库")], view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
+  { id: "web-find-mark", itemId: "item-003", tab: "body", steps: [clickCard("如何构建本地优先的个人知识库"), findInReader("同步")], find: { query: "同步", index: 0 }, view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
+  { id: "web-scrolled", itemId: "item-003", tab: "body", detailCfg: { contentOverrides: { "item-003": LONG_MARKDOWN } }, steps: [clickCard("如何构建本地优先的个人知识库"), scrollReaderTo(240)], restoreTop: 240, view: () => ({ kind: "original", content: LONG_MARKDOWN, sourceKind: "body" }) },
   { id: "note-original", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式")], view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
+  { id: "note-toc-open", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickToc], tocOpen: true, view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
   { id: "note-editing", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickEditOriginal], view: (d) => ({ kind: "editor", content: d.content, sourceKind: "body" }) },
   // 聚焦态：活动行底色、光标、聚焦时的外框；岛一侧用宿主的 focus 消息（Host.FocusEditor 的页面一半）。
   { id: "note-editing-focus", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickEditOriginal, focusEditorAtStart], focusEditor: true, view: (d) => ({ kind: "editor", content: d.content, sourceKind: "body" }) },
@@ -248,7 +285,7 @@ try {
     const variant = parseVariantKey(key, matrix);
     const applied = await applyVariant(session, variant, matrix);
     for (const scenario of SCENARIOS) {
-      await enterLibrary(session, { variant: "data", detail: {}, showReader: true, list: { fault: "", failMessage: "probe" } });
+      await enterLibrary(session, { variant: "data", detail: scenario.detailCfg ?? {}, showReader: true, list: { fault: "", failMessage: "probe" } });
       for (const step of scenario.steps) await step(win, session);
       await win.waitForFunction(() => !!document.querySelector("[data-article-reader]"));
       await settle(win, { quietMs: 250 });
@@ -286,9 +323,20 @@ try {
     await send({ t: "init", v: 1, theme, lang: "zh" });
     await send({
       t: "view", seq: 1, itemId: scenario.itemId, tab: scenario.tab, view: scenario.view(detail(scenario.itemId)),
-      restoreTop: null, catalogOpen: false, tocOpen: false,
+      restoreTop: scenario.restoreTop ?? null, catalogOpen: false, tocOpen: scenario.tocOpen ?? false,
     });
     await win.waitForFunction(() => window.__out.some((e) => e.t === "rendered" && e.seq === 1), null, { timeout: 15000 });
+    if (scenario.find) {
+      await send({ t: "find", query: scenario.find.query, index: scenario.find.index });
+      await win.locator("[data-article-reader] mark").first().waitFor({ state: "visible", timeout: 5000 });
+    }
+    if (scenario.restoreTop != null) {
+      await win.waitForFunction((target) => {
+        const root = document.querySelector("[data-article-reader]");
+        const scroller = root?.querySelector(".overflow-y-auto, .overflow-auto") ?? root;
+        return scroller && scroller.scrollTop >= target - 1;
+      }, scenario.restoreTop, { timeout: 5000 });
+    }
     if (scenario.focusEditor) {
       await send({ t: "focus" });
       await win.waitForFunction(() => document.activeElement?.classList.contains("cm-content"), null, { timeout: 5000 });
