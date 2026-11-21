@@ -329,7 +329,73 @@ describe("阅读岛页面：交给宿主处理的交互", () => {
     expect(container.querySelector("pre")).not.toBeNull();
     fireEvent.click(getByLabelText("复制代码"));
     await waitFor(() => expect(events("copy")).toHaveLength(1));
-    expect(events("copy")[0]).toEqual({ t: "copy", seq: 9, text: "console.log(1)" });
+    expect(events("copy")[0]).toEqual({ t: "copy", seq: 9, id: 1, text: "console.log(1)" });
+  });
+
+  // 台账 B-069：渲染层 CodeBlock 在 writeText 成功之后才亮「已复制」勾，失败静默；岛里同样等宿主的回执。
+  it("复制的勾等宿主回执：回执成功才出现，失败或没回执都不出现", async () => {
+    const { post, events, getByLabelText, queryByLabelText } = mount();
+    post(
+      view({
+        seq: 9,
+        view: { kind: "original", content: "```js\nconsole.log(1)\n```", sourceKind: "body" },
+      }),
+    );
+    const copiedLabel = () => queryByLabelText("已复制");
+    fireEvent.click(getByLabelText("复制代码"));
+    await waitFor(() => expect(events("copy")).toHaveLength(1));
+    // 没回执之前不亮勾。
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(copiedLabel()).toBeNull();
+    // 回执 id 对不上（旧页面或伪造）：不当成这次的结果。
+    post({ t: "copyResult", id: 99, ok: true });
+    expect(copiedLabel()).toBeNull();
+    post({ t: "copyResult", id: 1, ok: true });
+    await waitFor(() => expect(copiedLabel()).not.toBeNull());
+  });
+
+  it("宿主回执写入失败：勾不出现，且同一个回执不能再用一次", async () => {
+    const { post, events, getByLabelText, queryByLabelText } = mount();
+    post(
+      view({
+        seq: 9,
+        view: { kind: "original", content: "```js\nconsole.log(1)\n```", sourceKind: "body" },
+      }),
+    );
+    fireEvent.click(getByLabelText("复制代码"));
+    await waitFor(() => expect(events("copy")).toHaveLength(1));
+    post({ t: "copyResult", id: 1, ok: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queryByLabelText("已复制")).toBeNull();
+    // 同一个 id 的第二个回执（成功）已经没有等它的 Promise，不会补亮勾。
+    post({ t: "copyResult", id: 1, ok: true });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(queryByLabelText("已复制")).toBeNull();
+  });
+
+  it("每次复制的 id 递增，回执各找各的", async () => {
+    const { post, events, getByLabelText } = mount();
+    post(
+      view({
+        seq: 9,
+        view: { kind: "original", content: "```js\nconsole.log(1)\n```", sourceKind: "body" },
+      }),
+    );
+    fireEvent.click(getByLabelText("复制代码"));
+    await waitFor(() => expect(events("copy")).toHaveLength(1));
+    post({ t: "copyResult", id: 1, ok: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.click(getByLabelText("复制代码"));
+    await waitFor(() => expect(events("copy")).toHaveLength(2));
+    expect(events("copy").map((event) => event.id)).toEqual([1, 2]);
   });
 
   it("只转发 Ctrl/Alt 组合的白名单快捷键；页面右键菜单被抑制", () => {

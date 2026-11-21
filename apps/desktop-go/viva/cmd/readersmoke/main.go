@@ -158,12 +158,13 @@ type smoke struct {
 	log  []event
 
 	// 窗口线程独占：
-	isl    *island.Island
-	shown  bool
-	req    reader.Request
-	bounds *gfx.Rect
-	float  *floatSpec
-	tree   *floatSpec // 同层（页面层）里、岛之后画的色块
+	copyErr error // 非空时宿主的 Copy 返回它（测复制回执的失败路径）
+	isl     *island.Island
+	shown   bool
+	req     reader.Request
+	bounds  *gfx.Rect
+	float   *floatSpec
+	tree    *floatSpec // 同层（页面层）里、岛之后画的色块
 }
 
 func newSmoke(out string) (*smoke, error) {
@@ -370,7 +371,10 @@ func (h handler) Scroll(id string, tab reader.Tab, top float64) {
 func (h handler) Catalog(open bool) { h.s.record("catalog", open) }
 func (h handler) Toc(open bool)     { h.s.record("toc", open) }
 func (h handler) Link(url string)   { h.s.record("link", url) }
-func (h handler) Copy(text string)  { h.s.record("copy", text) }
+func (h handler) Copy(text string) error {
+	h.s.record("copy", text)
+	return h.s.copyErr
+}
 func (h handler) Lightbox(images []reader.Image, index int) {
 	first := ""
 	if len(images) > 0 {

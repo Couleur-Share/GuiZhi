@@ -549,16 +549,23 @@ func TestCopyFromThePageReachesTheClipboardAndReportsFailure(t *testing.T) {
 	rr := newReaderRig(t)
 	rr.openCard(detailNoteID)
 	p := rr.ready()
-	rr.event(p, map[string]any{"t": "copy", "text": "fmt.Println(1)"})
+	rr.event(p, map[string]any{"t": "copy", "id": 1, "text": "fmt.Println(1)"})
 	rr.frames(2)
 	if len(rr.copied) != 1 || rr.copied[0] != "fmt.Println(1)" {
 		t.Fatalf("代码块的复制应写进剪贴板：%q", rr.copied)
 	}
+	// 台账 B-069：写成功了要回执 ok，页面才亮「已复制」勾。
+	if got := p.last(rr.t, "copyResult"); got["id"] != float64(1) || got["ok"] != true {
+		t.Fatalf("成功的复制要回 ok 回执：%v", got)
+	}
 	rr.notifier.Clipboard = func(string) error { return errors.New("剪贴板被别的程序占用") }
-	rr.event(p, map[string]any{"t": "copy", "text": "x"})
+	rr.event(p, map[string]any{"t": "copy", "id": 2, "text": "x"})
 	rr.frames(2)
 	if text := strings.ReplaceAll(rr.toastText(), "\n", ""); !strings.Contains(text, locales.LibraryCopyCode()) || !strings.Contains(text, "剪贴板被别的程序占用") {
 		t.Fatalf("剪贴板写入失败要如实提示并带原因：\n%s", text)
+	}
+	if got := p.last(rr.t, "copyResult"); got["id"] != float64(2) || got["ok"] != false {
+		t.Fatalf("失败的复制要回 not-ok 回执（页面不亮勾）：%v", got)
 	}
 }
 

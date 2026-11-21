@@ -1,5 +1,6 @@
 /**
- * 阅读岛的消息协议（v1）：Go 宿主（apps/desktop-go/viva/reader）与岛内页面之间只传文本，内容是 JSON。
+ * 阅读岛的消息协议（v2）：Go 宿主（apps/desktop-go/viva/reader）与岛内页面之间只传文本，内容是 JSON。
+ * v2 相对 v1：复制带回执（copy 带 id，宿主回 copyResult）。
  *
  * 方向与信任：
  * - 宿主 → 页面（HostMessage）：宿主是可信的，但页面仍按形状校验，坏消息直接丢弃，不能让 React 渲染崩掉。
@@ -9,7 +10,7 @@
  * Reader island protocol v1: JSON text between the Go host and the page.
  */
 
-export const READER_PROTOCOL = 1;
+export const READER_PROTOCOL = 2;
 
 export type ReaderLang = "zh" | "en";
 
@@ -94,12 +95,20 @@ export interface HostUi {
   tocOpen: boolean;
 }
 
+/** 复制的回执：宿主写完系统剪贴板后告诉页面成败（对应 copy 事件的 id），页面据此让 writeText 成功或失败（台账 B-069）。 */
+export interface HostCopyResult {
+  t: "copyResult";
+  id: number;
+  ok: boolean;
+}
+
 export type HostMessage =
   | HostInit
   | HostView
   | HostFind
   | HostTheme
-  | HostUi;
+  | HostUi
+  | HostCopyResult;
 
 export interface LightboxImageRef {
   src: string;
@@ -114,7 +123,7 @@ export type PageEvent =
   | { t: "catalog"; seq: number; open: boolean }
   | { t: "toc"; seq: number; open: boolean }
   | { t: "link"; seq: number; url: string }
-  | { t: "copy"; seq: number; text: string }
+  | { t: "copy"; seq: number; id: number; text: string }
   | { t: "lightbox"; seq: number; images: LightboxImageRef[]; index: number }
   | { t: "toast"; seq: number; kind: "warning"; text: string }
   | {
@@ -268,6 +277,11 @@ export function parseHostMessage(text: string): HostMessage | null {
         catalogOpen: raw.catalogOpen === true,
         tocOpen: raw.tocOpen === true,
       };
+    case "copyResult":
+      if (typeof raw.id !== "number" || !Number.isSafeInteger(raw.id) || typeof raw.ok !== "boolean") {
+        return null;
+      }
+      return { t: "copyResult", id: raw.id, ok: raw.ok };
     default:
       return null;
   }

@@ -113,6 +113,29 @@ describe("阅读岛协议：宿主消息的解析", () => {
       parseHostMessage(JSON.stringify({ t: "ui", catalogOpen: 1, tocOpen: true })),
     ).toEqual({ t: "ui", catalogOpen: false, tocOpen: true });
   });
+
+  it("copyResult 要整数 id 与布尔 ok，其余丢弃", () => {
+    expect(parseHostMessage(JSON.stringify({ t: "copyResult", id: 3, ok: true }))).toEqual({
+      t: "copyResult",
+      id: 3,
+      ok: true,
+    });
+    expect(parseHostMessage(JSON.stringify({ t: "copyResult", id: 3, ok: false }))).toEqual({
+      t: "copyResult",
+      id: 3,
+      ok: false,
+    });
+    for (const bad of [
+      { t: "copyResult", id: 3 },
+      { t: "copyResult", id: 3, ok: "true" },
+      { t: "copyResult", id: 1.5, ok: true },
+      { t: "copyResult", id: "3", ok: true },
+      { t: "copyResult", ok: true },
+      { t: "copyResult", id: 1e300, ok: true },
+    ]) {
+      expect(parseHostMessage(JSON.stringify(bad))).toBeNull();
+    }
+  });
 });
 
 describe("阅读岛里的本地媒体地址改写", () => {

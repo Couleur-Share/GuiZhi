@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -499,6 +500,32 @@ func scEvents(s *smoke, r *result) {
 	} else {
 		r.check("复制：宿主收到 copy", false, nil)
 	}
+	// 复制回执（台账 B-069）：宿主写成功，页面的 writeText 才 resolve；宿主写失败，Promise 拒绝（代码块的「已复制」勾不出现）。
+	copyOutcome := func(label string) (string, bool) {
+		mark := s.mark()
+		s.onUI(func() {
+			if s.isl != nil {
+				s.isl.View().Eval(`navigator.clipboard.writeText("` + label + `").then(` +
+					`()=>window.viva.postMessage(JSON.stringify({t:"smoke",name:"copy-outcome",data:"resolved"})),` +
+					`()=>window.viva.postMessage(JSON.stringify({t:"smoke",name:"copy-outcome",data:"rejected"})))`)
+			}
+		})
+		e, ok := s.waitEvent(mark, "smoke:copy-outcome", 3*time.Second, nil)
+		got, _ := e.Data.(string)
+		return got, ok
+	}
+	if got, ok := copyOutcome("receipt-ok"); ok {
+		r.check("复制回执：宿主写成功 → 页面的 writeText resolve", got == "resolved", got)
+	} else {
+		r.check("复制回执：页面收到回执（成功）", false, nil)
+	}
+	s.onUI(func() { s.copyErr = errors.New("冒烟：剪贴板写入失败") })
+	if got, ok := copyOutcome("receipt-fail"); ok {
+		r.check("复制回执：宿主写失败 → 页面的 writeText reject", got == "rejected", got)
+	} else {
+		r.check("复制回执：页面收到回执（失败）", false, nil)
+	}
+	s.onUI(func() { s.copyErr = nil })
 	if e, ok := fire(`document.querySelector('img[src*="smoke-a"]').click()`, "lightbox", nil); ok {
 		m, _ := e.Data.(map[string]any)
 		first, _ := m["first"].(string)

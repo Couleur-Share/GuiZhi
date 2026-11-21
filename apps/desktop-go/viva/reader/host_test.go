@@ -273,7 +273,7 @@ func TestEventsDispatchToHandler(t *testing.T) {
 		{"catalog", map[string]any{"t": "catalog", "seq": 1, "open": true}, "catalog:true"},
 		{"toc", map[string]any{"t": "toc", "seq": 1, "open": true}, "toc:true"},
 		{"link", map[string]any{"t": "link", "seq": 1, "url": "https://example.com/a?b=1"}, "link:https://example.com/a?b=1"},
-		{"copy", map[string]any{"t": "copy", "seq": 1, "text": "代码\n第二行"}, "copy:代码\n第二行"},
+		{"copy", map[string]any{"t": "copy", "seq": 1, "id": 1, "text": "代码\n第二行"}, "copy:代码\n第二行"},
 		{"lightbox", map[string]any{"t": "lightbox", "seq": 1, "index": 1,
 			"images": []any{map[string]any{"src": "local-image://a.png"}, map[string]any{"src": "local-image://b 1.png", "alt": "图"}}},
 			"lightbox:1:local-image://a.png|,local-image://b 1.png|图"},
@@ -292,6 +292,69 @@ func TestEventsDispatchToHandler(t *testing.T) {
 	}
 	if len(r.diags) != 0 {
 		t.Errorf("正常事件不该有诊断：%v", r.diags)
+	}
+}
+
+// lastPost 返回页面最近收到的一条消息；没有就失败。
+func lastPost(t *testing.T, p *fakePage) map[string]any {
+	t.Helper()
+	if len(p.posts) == 0 {
+		t.Fatal("页面没有收到任何消息")
+	}
+	return p.msg(t, len(p.posts)-1)
+}
+
+// 台账 B-069：复制要给页面回执，页面的 writeText 据此成功或拒绝，「已复制」勾才不会先于写入结果出现。
+func TestCopyGetsAReceiptWithTheCopyId(t *testing.T) {
+	r := newRig(t)
+	p := r.ready()
+	before := len(p.posts)
+	p.send(r.host, map[string]any{"t": "copy", "seq": 1, "id": 41, "text": "代码"})
+	r.wantCalls("copy:代码")
+	if len(p.posts) != before+1 {
+		t.Fatalf("应当恰好回一条消息：%d → %d", before, len(p.posts))
+	}
+	got := lastPost(t, p)
+	if got["t"] != "copyResult" || got["id"] != float64(41) || got["ok"] != true {
+		t.Errorf("成功的回执不对：%v", got)
+	}
+}
+
+func TestCopyFailureIsReportedBackAsNotOk(t *testing.T) {
+	r := newRig(t)
+	r.handler.copyErr = errors.New("剪贴板被占用")
+	p := r.ready()
+	p.send(r.host, map[string]any{"t": "copy", "seq": 1, "id": 42, "text": "代码"})
+	r.wantCalls("copy:代码")
+	got := lastPost(t, p)
+	if got["t"] != "copyResult" || got["id"] != float64(42) || got["ok"] != false {
+		t.Errorf("失败的回执不对：%v", got)
+	}
+	if body := p.posts[len(p.posts)-1]; strings.Contains(body, "剪贴板被占用") {
+		t.Errorf("回执不能带错误原因（原因由界面向用户说明）：%s", body)
+	}
+}
+
+func TestCopyWithoutHandlerIsAnsweredNotOk(t *testing.T) {
+	r := newRig(t)
+	r.host.SetHandler(nil)
+	p := r.ready()
+	p.send(r.host, map[string]any{"t": "copy", "seq": 1, "id": 43, "text": "x"})
+	got := lastPost(t, p)
+	if got["t"] != "copyResult" || got["ok"] != false {
+		t.Errorf("没有接收者时要回失败：%v", got)
+	}
+}
+
+func TestStaleOrBadCopyGetsNoReceipt(t *testing.T) {
+	r := newRig(t)
+	p := r.ready()
+	before := len(p.posts)
+	p.send(r.host, map[string]any{"t": "copy", "seq": 0, "id": 1, "text": "旧内容"}) // 序号不是当前内容的：丢弃
+	p.cfg.OnMessage(`{"t":"copy","seq":1,"text":"没有编号"}`)                         // 不合规：丢弃
+	r.wantCalls()
+	if len(p.posts) != before {
+		t.Errorf("被丢弃的复制不该有回执：%d → %d", before, len(p.posts))
 	}
 }
 
@@ -355,12 +418,12 @@ func TestEventsBeforeReadyAndBeforeFirstViewAreIgnored(t *testing.T) {
 	r := newRig(t)
 	r.frame()
 	p := r.page()
-	p.send(r.host, map[string]any{"t": "copy", "seq": 0, "text": "偷偷复制"})
+	p.send(r.host, map[string]any{"t": "copy", "seq": 0, "id": 1, "text": "偷偷复制"})
 	p.send(r.host, map[string]any{"t": "link", "seq": 0, "url": "https://example.com"})
 	r.wantCalls()
 	p.send(r.host, map[string]any{"t": "ready", "v": ProtocolVersion})
 	// 握手之后、第一份内容之前不存在（flush 立刻发出了 view），序号 0 的事件也不是任何已发内容的。
-	p.send(r.host, map[string]any{"t": "copy", "seq": 0, "text": "序号 0"})
+	p.send(r.host, map[string]any{"t": "copy", "seq": 0, "id": 1, "text": "序号 0"})
 	r.wantCalls()
 }
 
@@ -368,7 +431,7 @@ func TestEventBeforeAnyViewWasSentIsIgnored(t *testing.T) {
 	r := newRig(t)
 	r.frame()
 	r.host.ready = true // 白盒：握手完成但还没发过任何 view（防御分支）
-	r.page().send(r.host, map[string]any{"t": "copy", "seq": 0, "text": "x"})
+	r.page().send(r.host, map[string]any{"t": "copy", "seq": 0, "id": 1, "text": "x"})
 	r.page().send(r.host, map[string]any{"t": "scroll", "seq": 0, "top": 1})
 	r.wantCalls()
 }
@@ -593,7 +656,7 @@ func TestCloseIsIdempotentAndResetsState(t *testing.T) {
 		t.Errorf("closes=%d open=%v", p.closes, r.host.Open())
 	}
 	// 关闭后迟到的页面消息被丢弃。
-	p.send(r.host, map[string]any{"t": "copy", "seq": 1, "text": "迟到"})
+	p.send(r.host, map[string]any{"t": "copy", "seq": 1, "id": 1, "text": "迟到"})
 	r.wantCalls()
 }
 
@@ -620,7 +683,7 @@ func TestExternalCloseResetsAndTheNextFrameReopens(t *testing.T) {
 		t.Errorf("序号单调递增，不因重开回到 1：%v", second.msg(t, 1))
 	}
 	// 旧页面迟到的事件到不了 Handler（它已经被销毁，OnMessage 是旧闭包但宿主已经指向新页面）。
-	first.send(r.host, map[string]any{"t": "copy", "seq": 1, "text": "旧页面"})
+	first.send(r.host, map[string]any{"t": "copy", "seq": 1, "id": 1, "text": "旧页面"})
 	r.wantCalls()
 }
 

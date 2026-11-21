@@ -2,6 +2,7 @@ package library
 
 import (
 	"encoding/json"
+	"errors"
 	"sort"
 	"strings"
 
@@ -210,16 +211,19 @@ func (e readerEvents) Toc(open bool) { e.s.setTocOpen(open) }
 // Link 用系统浏览器打开页面里的链接（宿主已校验为 http/https）。
 func (e readerEvents) Link(url string) { e.s.openSource(url) }
 
-// Copy 把页面里复制的文本（代码块的复制钮）写进系统剪贴板。渲染层的复制失败是静默的；岛里页面已经先显示了「已复制」，
-// 所以写入失败要在这里如实提示，不能让用户以为成功了（有意的增强，见台账「有意的增强」；页面里的勾先于写入结果出现是残余偏差，台账 B-069）。
-func (e readerEvents) Copy(text string) {
+// Copy 把页面里复制的文本（代码块的复制钮）写进系统剪贴板，并把成败告诉宿主，宿主再回执给页面（页面的「已复制」勾只在成功后出现，
+// 与渲染层 writeText 成功之后才亮一致，台账 B-069）。渲染层的复制失败是静默的；这里仍弹带原因的失败提示并记日志——
+// 用户操作失败必须可理解（AGENTS.md），见台账「有意的增强」。
+func (e readerEvents) Copy(text string) error {
 	s := e.s
 	if s.Guard.Notify == nil {
-		return
+		return errors.New("library: 没有剪贴板服务")
 	}
 	if err := s.Guard.Notify.CopyText(text); err != nil {
 		s.Guard.Report(locales.LibraryCopyCode(), err)
+		return err
 	}
+	return nil
 }
 
 // Lightbox 打开图片查看器：另开一个盖满窗口的岛（detailviewer.go）。

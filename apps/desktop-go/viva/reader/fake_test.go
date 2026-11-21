@@ -87,8 +87,11 @@ type fakeSurface struct {
 func (s *fakeSurface) NativeView(id gfx.NativeViewID, _ gfx.Rect) { s.views = append(s.views, id) }
 func (s *fakeSurface) RequestFrameIn(d time.Duration)             { s.wakes = append(s.wakes, d) }
 
-// recHandler 把每个回调记成一行文字，测试直接比较。
-type recHandler struct{ calls []string }
+// recHandler 把每个回调记成一行文字，测试直接比较。copyErr 非空时 Copy 返回它（测复制回执的失败路径）。
+type recHandler struct {
+	calls   []string
+	copyErr error
+}
 
 func (r *recHandler) rec(format string, args ...any) {
 	r.calls = append(r.calls, fmt.Sprintf(format, args...))
@@ -100,7 +103,10 @@ func (r *recHandler) Scroll(id string, tab Tab, top float64) {
 func (r *recHandler) Catalog(open bool) { r.rec("catalog:%v", open) }
 func (r *recHandler) Toc(open bool)     { r.rec("toc:%v", open) }
 func (r *recHandler) Link(url string)   { r.rec("link:%s", url) }
-func (r *recHandler) Copy(text string)  { r.rec("copy:%s", text) }
+func (r *recHandler) Copy(text string) error {
+	r.rec("copy:%s", text)
+	return r.copyErr
+}
 func (r *recHandler) Lightbox(images []Image, index int) {
 	names := make([]string, 0, len(images))
 	for _, image := range images {

@@ -22,7 +22,8 @@ import (
 )
 
 // ProtocolVersion 与 apps/desktop/src/renderer/reader/protocol.ts 的 READER_PROTOCOL 一致：页面 ready 时带上它，对不上就拒绝。
-const ProtocolVersion = 1
+// v2：复制带回执（copy 带 id，宿主回 copyResult）。
+const ProtocolVersion = 2
 
 // 页面事件的各项上限。超过上限的整条丢弃（页面不会正常超过它们）。
 const (
@@ -201,6 +202,12 @@ type (
 		CatalogOpen bool   `json:"catalogOpen"`
 		TocOpen     bool   `json:"tocOpen"`
 	}
+	// copyResultMessage 是复制的回执：宿主写完系统剪贴板后告诉页面成败（页面的 writeText 据此成功或拒绝，台账 B-069）。
+	copyResultMessage struct {
+		T  string `json:"t"`
+		ID uint64 `json:"id"`
+		OK bool   `json:"ok"`
+	}
 )
 
 func encodeMessage(message any) (string, error) {
@@ -247,8 +254,10 @@ type Event struct {
 	Open    bool
 	URL     string
 	Text    string
-	Images  []Image
-	Index   int
+	// ID 是复制的编号（页面每次复制递增，回执 copyResult 带回它）；只有 copy 事件有。
+	ID     uint64
+	Images []Image
+	Index  int
 	// Key 是小写的按键名（白名单内），Ctrl、Alt、Shift 是修饰键。
 	Key              string
 	Ctrl, Alt, Shift bool
@@ -268,6 +277,7 @@ type rawEvent struct {
 	T       string     `json:"t"`
 	V       *float64   `json:"v"`
 	Seq     *float64   `json:"seq"`
+	ID      *float64   `json:"id"`
 	Count   *float64   `json:"count"`
 	Top     *float64   `json:"top"`
 	Open    *bool      `json:"open"`
@@ -351,6 +361,11 @@ func ParseEvent(text string) (Event, error) {
 			return Event{}, fmt.Errorf("%w：copy 的文本不合规", ErrBadEvent)
 		}
 		ev.Text = copied
+		id, ok := wholeNumber(raw.ID, 1, 1<<53-1)
+		if !ok {
+			return Event{}, fmt.Errorf("%w：copy 缺少编号", ErrBadEvent)
+		}
+		ev.ID = uint64(id)
 	case EventLightbox:
 		return parseLightbox(ev, raw)
 	case EventToast:

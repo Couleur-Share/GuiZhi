@@ -80,6 +80,11 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   });
   const seqRef = useRef(0);
   seqRef.current = state?.seq ?? 0;
+  // 等宿主回执的复制：id → writeText 返回的 Promise 的两端（台账 B-069）。
+  const copyIdRef = useRef(0);
+  const pendingCopies = useRef(
+    new Map<number, { resolve: () => void; reject: (reason: Error) => void }>(),
+  );
 
   const setUi = useCallback((patch: Partial<UiState>) => {
     setUiState((previous) => ({ ...previous, ...patch }));
@@ -109,6 +114,15 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
               tocOpen: message.tocOpen,
             });
             break;
+          case "copyResult": {
+            const entry = pendingCopies.current.get(message.id);
+            if (!entry) break;
+            pendingCopies.current.delete(message.id);
+            // 渲染层 writeText 失败时 Promise 拒绝（CodeBlock 的 catch 静默）：宿主写入失败同样拒绝，勾不出现。
+            if (message.ok) entry.resolve();
+            else entry.reject(new Error("clipboard write failed"));
+            break;
+          }
         }
       }),
     [bridge],
@@ -156,16 +170,19 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
     document.addEventListener("auxclick", onLink, true);
     document.addEventListener("contextmenu", onContextMenu);
     document.addEventListener("keydown", onKeyDown, true);
-    // 页面里的 navigator.clipboard.writeText 换成「交宿主复制」：不依赖页面焦点与用户手势，写入失败由宿主如实提示；
-    // 代价是没有回执——这里立即 resolve，代码块复制钮的「已复制」勾先于写入结果出现（台账 B-069）。
+    // 页面里的 navigator.clipboard.writeText 换成「交宿主复制」：不依赖页面焦点与用户手势，写入失败由宿主如实提示。
+    // 宿主写完回 copyResult，Promise 据此成功或拒绝，所以代码块复制钮的「已复制」勾只在写入成功之后出现（与渲染层一致，台账 B-069）。
     // 代码块的复制按钮等照常调用 navigator.clipboard.writeText。
     const previousClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const copies = pendingCopies.current;
     Object.defineProperty(navigator, "clipboard", {
       value: {
-        writeText: (text: string): Promise<void> => {
-          bridge.send({ t: "copy", seq: seqRef.current, text });
-          return Promise.resolve();
-        },
+        writeText: (text: string): Promise<void> =>
+          new Promise<void>((resolve, reject) => {
+            const id = ++copyIdRef.current;
+            copies.set(id, { resolve, reject });
+            bridge.send({ t: "copy", seq: seqRef.current, id, text });
+          }),
       },
       configurable: true,
     });
@@ -183,6 +200,7 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
       document.removeEventListener("contextmenu", onContextMenu);
       document.removeEventListener("keydown", onKeyDown, true);
       setLightboxOpener(null);
+      copies.clear();
       if (previousClipboard) Object.defineProperty(navigator, "clipboard", previousClipboard);
       else Reflect.deleteProperty(navigator, "clipboard");
     };

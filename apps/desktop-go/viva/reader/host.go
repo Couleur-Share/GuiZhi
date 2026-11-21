@@ -51,8 +51,9 @@ type Handler interface {
 	Toc(open bool)
 	// Link 是要用系统浏览器打开的链接（已校验为 http/https）。
 	Link(url string)
-	// Copy 是要写进剪贴板的文本。
-	Copy(text string)
+	// Copy 是要写进剪贴板的文本；返回写入是否成功，宿主据此给页面回执（页面的 writeText 成功或拒绝，台账 B-069）。
+	// 失败原因由实现自己向用户说明，这里只需要一个 error。
+	Copy(text string) error
 	// Lightbox 是要打开的图片查看器。
 	Lightbox(images []Image, index int)
 	// Toast 是页面要给用户看的警告。
@@ -494,8 +495,13 @@ func (h *Host) dispatch(ev Event) {
 			handler.Link(link)
 		}
 	case EventCopy:
+		var err error = errors.New("reader: 没有事件接收者")
 		if handler != nil {
-			handler.Copy(ev.Text)
+			err = handler.Copy(ev.Text)
+		}
+		// 回执：页面等它才亮「已复制」勾（渲染层 writeText 成功之后才亮）。接收者在处理期间可能把页面关了，那就没有人等回执。
+		if h.page != nil {
+			h.post(copyResultMessage{T: "copyResult", ID: ev.ID, OK: err == nil})
 		}
 	case EventLightbox:
 		if handler != nil {
