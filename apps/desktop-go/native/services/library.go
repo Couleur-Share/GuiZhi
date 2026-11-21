@@ -126,6 +126,19 @@ type Library interface {
 	// AdoptWebVersion 把某个完整的原文版本采用为正文（web:adopt）；基线与服务端不同时失败，什么也不写。
 	AdoptWebVersion(ctx context.Context, in LibraryAdoptWebVersionInput) error
 
+	// WebSnapshot 读公众号条目的网页快照（web:snapshot）；versionID 为空取默认版本（比较基线，否则最新带快照的版本）。
+	// 快照损坏等业务状态放在返回值的 Error 里；条目或指定版本不存在作为 error 返回。
+	WebSnapshot(ctx context.Context, itemID, versionID string) (LibraryWebSnapshotView, error)
+	// ExportWebSnapshotHTML 把某个版本的快照导出为 HTML 目录（web:snapshot-export，弹出目录选择框）；用户取消时 Canceled 为真。
+	ExportWebSnapshotHTML(ctx context.Context, itemID, versionID string) (LibraryWebSnapshotExportResult, error)
+	// SupplementWechatTasks 把公众号文章加入补采队列并返回新建的导入任务 ID（web:snapshot-enqueue），供调用方跟踪进度；
+	// 一次 1 到 50 篇、按 ID 去重。与 SupplementWechat 走同一个频道，只是多返回任务 ID。
+	SupplementWechatTasks(ctx context.Context, ids []string) ([]string, error)
+	// ImportTaskStatuses 读一批导入任务此刻的状态（import:list）；已不存在的任务（被清理）不在结果里，返回次序不保证。
+	ImportTaskStatuses(ctx context.Context, taskIDs []string) ([]LibraryImportTaskStatus, error)
+	// CancelImportTask 取消一个排队或处理中的导入任务（import:cancel）；canceled 为假表示任务已结束或无法取消。
+	CancelImportTask(ctx context.Context, taskID string) (canceled bool, err error)
+
 	// GenerateSummary 为条目生成 AI 摘要（aiflow.GenerateSummary）；未配置返回 ErrAINotConfigured。
 	GenerateSummary(ctx context.Context, title, content string) (LibrarySummaryResult, error)
 	// SuggestTags 为条目生成 AI 建议标签（aiflow.SuggestTags）；未配置返回 ErrAINotConfigured。

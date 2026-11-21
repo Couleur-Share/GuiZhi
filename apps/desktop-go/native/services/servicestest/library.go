@@ -40,6 +40,8 @@ type Library struct {
 	ai aiState
 	// M2-6d 媒体动作与进度订阅（见 library_media.go）。
 	media mediaState
+	// M2-5b 公众号网页快照、导出与补采进度（见 library_snapshot.go）。
+	snapshot snapshotState
 }
 
 var _ services.Library = (*Library)(nil)
@@ -64,6 +66,7 @@ func (f *Library) SetCounts(counts services.LibraryCounts) {
 // FailOn 让某个方法（"Counts"、"List"、"Collections"、"CreateCollection"、"UpdateCollection"、"DeleteCollection"、
 // "Tags"、"UpdateTag"、"DeleteTag"、"Freeze"、"ExecuteBatch"、"UpdateEntry"、"SupplementWechat"、"AiHandoff"、"ExportAiHandoff"、
 // "GetItem"、"SaveDraft"、"SourceVersions"、"MediaCapabilities"、"SourceComments"、"RefreshSourceComments"、"WebVersions"、"AdoptWebVersion"、
+// "WebSnapshot"、"ExportWebSnapshotHTML"、"SupplementWechatTasks"、"ImportTaskStatuses"、"CancelImportTask"、
 // "TranscribeMedia"、"FormatTranscript"、"SummarizeMedia"、"RefreshForumDiscussion"）
 // 返回 err；err 为 nil 取消注入。写成 "方法:参数"（如 "GetItem:b"）时只让针对那个参数的调用失败，优先于整个方法的注入。
 func (f *Library) FailOn(method string, err error) {

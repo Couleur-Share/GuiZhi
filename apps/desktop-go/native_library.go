@@ -126,21 +126,10 @@ func (a libraryAdapter) UpdateEntry(ctx context.Context, id string, patch servic
 	return *entry, true, nil
 }
 
-// webReply 是 web:* 处理器的回复壳（preload 的 WebResponse）。
-type webReply struct {
-	OK    bool   `json:"ok"`
-	Error string `json:"error"`
-}
-
+// SupplementWechat 只关心入队是否成功；要跟踪任务进度用 SupplementWechatTasks（同一个频道，见 native_library_snapshot.go）。
 func (a libraryAdapter) SupplementWechat(ctx context.Context, ids []string) error {
-	reply, err := callAs[webReply](ctx, a.b, "web:snapshot-enqueue", ids)
-	if err != nil {
-		return err
-	}
-	if !reply.OK {
-		return errors.New(reply.Error)
-	}
-	return nil
+	_, err := a.SupplementWechatTasks(ctx, ids)
+	return err
 }
 
 // AiHandoff 对应 use-ai-handoff.ts 的 build：按 id 重新取完整条目（列表里没有正文与文字稿），再按条目整理。
