@@ -104,3 +104,67 @@ func TestButtonDisclosureExposesExpandedNotPressed(t *testing.T) {
 		t.Fatalf("再点一下应收起：open=%v expanded=%v selected=%v", open, expanded, selected)
 	}
 }
+
+// nearColor 判断两个颜色逐通道相差不超过 tol（半透明混色有取整误差）。
+func nearColor(a, b color.RGBA, tol int) bool {
+	d := func(x, y uint8) int {
+		if x > y {
+			return int(x - y)
+		}
+		return int(y - x)
+	}
+	return d(a.R, b.R) <= tol && d(a.G, b.G) <= tol && d(a.B, b.B) <= tol && d(a.A, b.A) <= tol
+}
+
+// 半透明底色（悬停过渡中的 ghost 钮、带透明度的底色）同样要空心环：里面是底色混在页面底色上，不能混在环色上。
+func TestButtonFocusRingIsHollowOnASemiTransparentBackground(t *testing.T) {
+	_, box, at := buttonRingPage(t, tokens.RGBA(0, 128, 0, 0.6))
+	page := at(2, 2)
+	mix := func(bg, under uint8) uint8 { return uint8(0.6*float64(bg) + 0.4*float64(under) + 0.5) }
+	want := color.RGBA{R: mix(0, page.R), G: mix(128, page.G), B: mix(0, page.B), A: 255}
+	if got := at(int(box.X)+3, int(box.Y+box.Height/2)); !nearColor(got, want, 2) {
+		t.Fatalf("半透明底色的按钮里面应是底色混在页面底色上 %v，实际 %v（环被画成了实心、环色透了上来）", want, got)
+	}
+}
+
+// 三种按钮的可访问状态与按下态外观：切换钮（aria-pressed）报「按下」；展开收起钮（aria-expanded）报「展开」，收起时也标明可展开；
+// 普通按钮两样都没有。On 时（切换钮与展开钮）按钮底色照 BgOn 画，Off 与普通按钮不画。
+func TestButtonStatesAndOnAppearanceByKind(t *testing.T) {
+	green := color.RGBA{G: 128, A: 255}
+	for _, c := range []struct {
+		name                                 string
+		spec                                 ButtonSpec
+		selected, expanded, expandable, onBg bool
+	}{
+		{"切换钮按下", ButtonSpec{Label: "钮", Toggle: true, On: true}, true, false, false, true},
+		{"切换钮弹起", ButtonSpec{Label: "钮", Toggle: true}, false, false, false, false},
+		{"展开钮展开", ButtonSpec{Label: "钮", Disclosure: true, On: true}, false, true, true, true},
+		{"展开钮收起", ButtonSpec{Label: "钮", Disclosure: true}, false, false, true, false},
+		{"普通按钮", ButtonSpec{Label: "钮"}, false, false, false, false},
+		{"普通按钮带 On 也不画按下态", ButtonSpec{Label: "钮", On: true}, false, false, false, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := openPage(t, still(), 200, 100, func(l *Look, cc ui.C) {
+				style := ButtonStyle{Height: 28, PadX: 12, Radius: 4, Text: TextXS, Fg: l.T.Foreground, BgOn: tokens.RGBA(0, 128, 0, 1)}
+				ui.Row(cc.Key("row")).PadSides(30, 30, 30, 30).Children(func() {
+					l.Button(cc.Key("b"), c.spec, style)
+				})
+			})
+			n, ok := h.node(gfx.RoleButton, "钮")
+			if !ok {
+				t.Fatal("找不到按钮「钮」")
+			}
+			if n.Selected != c.selected || n.Expanded != c.expanded || n.Expandable != c.expandable {
+				t.Fatalf("可访问状态应为 selected=%v expanded=%v expandable=%v，实际 %v %v %v", c.selected, c.expanded, c.expandable, n.Selected, n.Expanded, n.Expandable)
+			}
+			img, err := h.session.Image()
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := img.RGBAAt(int(n.Bounds.X)+3, int(n.Bounds.Y+n.Bounds.Height/2))
+			if (got == green) != c.onBg {
+				t.Fatalf("按钮里面的颜色 %v：画了 BgOn（绿）应为 %v", got, c.onBg)
+			}
+		})
+	}
+}

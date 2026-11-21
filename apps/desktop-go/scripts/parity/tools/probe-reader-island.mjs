@@ -73,9 +73,30 @@ const clickTab = (name) => async (win) => {
   await win.getByTestId("article-toolbar").getByRole("button", { name, exact: true }).click();
   await win.waitForTimeout(300);
 };
+// 点读者工具条里的「编辑原文」并等懒加载的 CodeMirror 挂好（M2-6a：编辑态阅读区，C-012 的外观对照）。
+const clickEditOriginal = async (win) => {
+  await win.getByTestId("article-toolbar").getByRole("button", { name: "编辑原文", exact: true }).click();
+  await win.locator('[data-testid="markdown-editor"] .cm-editor').waitFor({ state: "visible" });
+  await win.waitForTimeout(300);
+};
+// 点进编辑器、光标移到文首：和岛里宿主发 focus 之后的状态一致（聚焦后光标在文首）。
+const focusEditorAtStart = async (win) => {
+  await win.locator('[data-testid="markdown-editor"] .cm-content').click();
+  await win.keyboard.press("Control+Home");
+  await win.waitForTimeout(200);
+};
+// 全选：选区底色（渲染层编辑器主题的选区色）只有选中了文字才看得见；岛一侧在聚焦之后发同一个 Ctrl+A。
+const selectAllInEditor = async (win) => {
+  await win.keyboard.press("Control+A");
+  await win.waitForTimeout(200);
+};
 const SCENARIOS = [
   { id: "web-original", itemId: "item-003", tab: "body", steps: [clickCard("如何构建本地优先的个人知识库")], view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
   { id: "note-original", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式")], view: (d) => ({ kind: "original", content: d.content, sourceKind: "body" }) },
+  { id: "note-editing", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickEditOriginal], view: (d) => ({ kind: "editor", content: d.content, sourceKind: "body" }) },
+  // 聚焦态：活动行底色、光标、聚焦时的外框；岛一侧用宿主的 focus 消息（Host.FocusEditor 的页面一半）。
+  { id: "note-editing-focus", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickEditOriginal, focusEditorAtStart], focusEditor: true, view: (d) => ({ kind: "editor", content: d.content, sourceKind: "body" }) },
+  { id: "note-editing-select", itemId: "item-001", tab: "body", steps: [clickCard("学习笔记：Go 并发模式"), clickEditOriginal, focusEditorAtStart, selectAllInEditor], focusEditor: true, selectAll: true, view: (d) => ({ kind: "editor", content: d.content, sourceKind: "body" }) },
   { id: "forum-replies", itemId: "item-012", tab: "replies", steps: [keysTo(12), clickTab("讨论")], view: (d) => ({ kind: "replies", content: afterHeading(d.content, "## 讨论") }) },
   { id: "image-recognized", itemId: "item-009", tab: "recognized", steps: [keysTo(9), clickTab("图中文字")], view: (d) => ({ kind: "markdown", content: fromHeading(d.content, "## 图中文字"), tab: "recognized" }) },
 ].filter((s) => !ONLY || ONLY.includes(s.id));
@@ -109,7 +130,10 @@ function collectInPage(props) {
     const own = Array.from(el.childNodes).filter((n) => n.nodeType === 3).map((n) => n.nodeValue.replace(/\s+/g, " ").trim()).filter(Boolean).join("|");
     const style = {};
     for (const p of props) style[p] = cs.getPropertyValue(p);
-    nodes.push({ at, tag: el.tagName.toLowerCase(), cls: el.getAttribute("class") || "", attrs, own, rect: [round(r.x - rr.x), round(r.y - rr.y), round(r.width), round(r.height)], style });
+    // position:fixed 的 top 相对视口（CodeMirror 的 .cm-announced 是 fixed、top:-10000px）：根在视口里的位置两侧不同
+    // （React 里阅读区在窗口中部、岛里在 0,0），按根相对量会凭空差一个根的偏移，所以这类节点的 y 按视口量；x 仍按根相对（left:auto 取静态位置，跟着阅读区走）。
+    const ry = cs.position === "fixed" ? r.y : r.y - rr.y;
+    nodes.push({ at, tag: el.tagName.toLowerCase(), cls: el.getAttribute("class") || "", attrs, own, rect: [round(r.x - rr.x), round(ry), round(r.width), round(r.height)], style });
     // display:none 的子树看不见、不占位：不进逐节点比较（两侧对不齐的隐藏窗格不该冲掉可见内容的比较），单独记下来；
     // 可见子节点的序号只数可见的。
     let visibleIndex = 0;
@@ -195,7 +219,8 @@ const STUB = `<script>window.__out=[];window.viva={postMessage(t){window.__out.p
 function startServer() {
   const server = http.createServer((req, res) => {
     const name = decodeURIComponent((req.url || "/").split("?")[0]).replace(/^\//, "") || "index.html";
-    if (name.includes("..") || name.includes("/") || name.includes("\\")) { res.writeHead(404).end(); return; }
+    // 只放行根目录与 chunks/ 一层（编辑器是懒加载的分块，见 viva/reader/assets/chunks）。
+    if (name.includes("..") || name.includes("\\") || !/^(chunks\/)?[^/]+$/.test(name)) { res.writeHead(404).end(); return; }
     const file = path.join(ASSETS, name);
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404).end(); return; }
     const ext = path.extname(name);
@@ -264,6 +289,11 @@ try {
       restoreTop: null, catalogOpen: false, tocOpen: false,
     });
     await win.waitForFunction(() => window.__out.some((e) => e.t === "rendered" && e.seq === 1), null, { timeout: 15000 });
+    if (scenario.focusEditor) {
+      await send({ t: "focus" });
+      await win.waitForFunction(() => document.activeElement?.classList.contains("cm-content"), null, { timeout: 5000 });
+    }
+    if (scenario.selectAll) await selectAllInEditor(win);
     await settle(win, { quietMs: 250 });
     const island = await win.evaluate(collectInPage, STYLE_PROPS);
     if (!island) throw new Error(`${key} ${scenario.id}：岛里没有 [data-article-reader]`);

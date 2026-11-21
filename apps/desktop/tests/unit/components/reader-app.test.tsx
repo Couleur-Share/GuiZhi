@@ -25,11 +25,17 @@ interface FakeEditorProps {
   showLineNumbers: boolean;
   placeholderText?: string;
 }
-const fakeEditor = vi.hoisted(() => ({ props: null as FakeEditorProps | null, mounts: 0 }));
+// gate 非空时假编辑器像还没解析完的懒加载分块一样挂起（React.lazy 在模块里只冷一次，第一个用到编辑器的用例之后都是热的）。
+const fakeEditor = vi.hoisted(() => ({
+  props: null as FakeEditorProps | null,
+  mounts: 0,
+  gate: null as Promise<void> | null,
+}));
 vi.mock("../../../src/renderer/components/library/MarkdownEditor", async () => {
   const React = await import("react");
   return {
     MarkdownEditor: (props: FakeEditorProps) => {
+      if (fakeEditor.gate !== null) throw fakeEditor.gate;
       fakeEditor.props = props;
       React.useEffect(() => {
         fakeEditor.mounts += 1;
@@ -482,6 +488,7 @@ describe("阅读岛页面：编辑态", () => {
   afterEach(() => {
     fakeEditor.props = null;
     fakeEditor.mounts = 0;
+    fakeEditor.gate = null;
   });
 
   it("按 ReconstructionReader 编辑态的 DOM 链画出编辑器；挂好之后才带 seq 报 rendered", async () => {
@@ -604,6 +611,26 @@ describe("阅读岛页面：编辑态", () => {
     (document.activeElement as HTMLElement).blur();
     post({ t: "focus" }); // 已经挂好：直接聚焦
     expect(document.activeElement).toBe(container.querySelector(".cm-content"));
+  });
+
+  it("focus：分块还没解析完就到的请求先记下，编辑器挂好之后才兑现（真实的冷启动）", async () => {
+    let open!: () => void;
+    fakeEditor.gate = new Promise<void>((resolve) => {
+      open = () => {
+        fakeEditor.gate = null;
+        resolve();
+      };
+    });
+    const { post, container, events } = mount();
+    post(editorView());
+    post({ t: "focus" });
+    expect(container.querySelector(".cm-content")).toBeNull(); // 分块还没到，聚焦无从谈起
+    expect(events("rendered")).toHaveLength(0);
+    open();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(container.querySelector(".cm-content"));
+    });
+    expect(events("rendered")).toHaveLength(1);
   });
 
   it("focus：不是编辑视图时忽略，也不留到以后进编辑态时才兑现", async () => {

@@ -418,6 +418,35 @@ func TestEditIsKeptForItsOwnDraftAfterTheViewMovedOn(t *testing.T) {
 	r.wantCalls()
 }
 
+// 换到另一个条目的编辑器之后，迟到的旧改动同样不能改写此刻页面里那份文档的记录：
+// 与上一个用例的区别是当前视图也是编辑视图，只能靠序号区分。
+func TestLateEditDoesNotRewriteTheRecordOfAnotherEditor(t *testing.T) {
+	r, p := editorRig(t)
+	r.req.ItemID = "item-2"
+	r.req.View = View{Kind: ViewEditor, Content: "另一篇", SourceKind: "body"}
+	r.frame() // seq 2
+	p.send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "上一篇的最后一笔"})
+	r.wantCalls("edit:item-1/body/上一篇的最后一笔")
+	if r.host.sent.view.Content != "另一篇" {
+		t.Errorf("迟到的改动不能改写页面当前那份文档的记录：%q", r.host.sent.view.Content)
+	}
+	posts := len(p.posts)
+	r.frame()
+	if len(p.posts) != posts {
+		t.Errorf("页面里的文档没有变，下一帧不该再发消息：%v", p.kinds(t)[posts:])
+	}
+}
+
+// 迟到的改动记在它自己的标签名下：同一条目换了标签（正文 → 总结）之后到达的旧标签的改动，仍是旧标签那份草稿的最后一笔。
+func TestLateEditIsKeptUnderItsOwnTab(t *testing.T) {
+	r, p := editorRig(t)
+	r.req.Tab = TabSummary
+	r.req.View = View{Kind: ViewEditor, Content: "总结的草稿", SourceKind: "summary"}
+	r.frame() // seq 2
+	p.send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "正文的最后一笔"})
+	r.wantCalls("edit:item-1/body/正文的最后一笔")
+}
+
 func TestEditBeforeHandshakeOrWithoutHandlerIsHarmless(t *testing.T) {
 	r := newRig(t)
 	r.req.View = View{Kind: ViewEditor, Content: "x", SourceKind: "body"}
