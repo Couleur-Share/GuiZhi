@@ -31,7 +31,7 @@ import (
 //
 //	公众号网页快照（isWechatPreview）→ 快照面板（B-066，未做，留白）
 //	主题阅读可用（正文 / 讨论总结，不在快照里）→ ReconstructionReader 的「原文」
-//	文字稿标签 → 文字稿面板（B-067，未做，留白）
+//	文字稿标签 → 文字稿面板（原生，不走岛：detailtranscript.go，B-067；contentPanel 在进 readerArea 之前就分流了，这里只留位置对应）
 //	配图标签 → 图片画廊
 //	论坛条目 → 讨论标签的楼层讨论（正文与总结在主题阅读里）
 //	图片条目 → 「图中文字」标签的 Markdown

@@ -56,6 +56,7 @@ type noKernCache struct {
 	lines      map[noKernKey][]string
 	marked     map[markKey]*markResult // 带命中词高亮的文字（marktext.go）的排版结果
 	models     map[modelKey]*markModel // 同上：（原文，命中词）→ 命中模型，没有命中为 nil
+	pre        preCache                // 保留换行的文字（prewrap.go，文字稿）最近一次的排版结果
 }
 
 // noKern 返回当前字体代的缓存；字体换代后先清空。
@@ -65,6 +66,7 @@ func (l *Look) noKern(canvas *gfx.Canvas) *noKernCache {
 		cache.advance, cache.lines, cache.generation = make(map[advanceKey]float32, 256), make(map[noKernKey][]string, 64), generation
 		cache.marked = make(map[markKey]*markResult, 16)
 		cache.models = make(map[modelKey]*markModel, 16)
+		cache.pre = preCache{}
 	}
 	return cache
 }

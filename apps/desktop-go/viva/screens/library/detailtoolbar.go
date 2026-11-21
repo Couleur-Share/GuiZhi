@@ -18,7 +18,8 @@ import (
 //	  relative flex min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-panel
 //	    工具栏（标签页 + 工具）、复核提醒、查找条（绝对定位）、阅读区
 //
-// 阅读区由岛里的页面渲染（detailreader.go；没接宿主时留白）；工具栏上需要 AI、转写、总结、讨论刷新的动作画出来但未接线（台账 B-060）。
+// 阅读区由岛里的页面渲染（detailreader.go；没接宿主时留白），文字稿标签是原生面板（detailtranscript.go，台账 B-067）；
+// 工具栏上的转写、AI 排版、总结、讨论刷新接到 Store（M2-6d），长稿排版要先过确认框（longFormatDialog）。
 
 // catalogAutoOpenMin 是渲染层 ForumFloorCatalog 的 CATALOG_AUTO_OPEN_MIN：讨论条数不少于它时，楼层目录默认展开。
 const catalogAutoOpenMin = 20
@@ -50,6 +51,9 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 	}
 	live := s.readerLive(item, caps, active)
 	p.live = live
+	if active != TabTranscript {
+		s.leaveTranscript() // 离开文字稿页：补写还没写进记忆的位置，下次进来从头开始
+	}
 	ui.Column(c.Key("content")).FillWidth().Grow(1).MinHeight(0).Children(func() {
 		ui.Column(c.Key("panel")).FillWidth().Grow(1).MinHeight(0).Clip().
 			Draw(func(d *ui.DrawContext) {
@@ -58,7 +62,7 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 			}).
 			Children(func() {
 				if !s.HideToolbar {
-					s.panelToolbar(c.Key("toolbar"), item, caps, active, showFind)
+					s.panelToolbar(c.Key("toolbar"), v, item, caps, active, showFind)
 				}
 				s.reviewNotice(c, v, item, caps.Trashed)
 				if p.findOpen && showFind {
@@ -66,14 +70,40 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 				} else {
 					p.findFocused = false
 				}
-				// min-h-0 flex-1（data-article-reader）：阅读区。
-				s.readerArea(c, item, caps, active)
+				// min-h-0 flex-1（data-article-reader）：阅读区。文字稿是原生面板，不走阅读岛（公众号网页快照在它之前，渲染层同序）。
+				if active == TabTranscript && !(caps.IsWechat && p.snapshotView) {
+					s.transcriptPane(c, v, item, caps)
+				} else {
+					s.readerArea(c, item, caps, active)
+				}
 			})
+		s.longFormatDialog(c, v)
 	})
 }
 
+// longFormatDialog 是长稿排版确认框（渲染层 ContentPanel 末尾的 ConfirmDialog）：Store 发现文字稿很长时只设 PendingLongFormat，
+// 等用户确认几十次串行请求的代价；确认才开始排版，取消、Esc、点遮罩都放弃。每一帧都要经过 ConfirmDialog（关着的那一帧它负责复位）。
+func (s *Screen) longFormatDialog(c ui.C, v View) {
+	var spec kit.ConfirmSpec
+	if pending := v.Detail.Media.PendingLongFormat; pending != nil {
+		spec = kit.ConfirmSpec{
+			Open:        true,
+			Title:       locales.LibraryTranscriptFormat(),
+			Message:     locales.LibraryTranscriptFormatLongConfirm(pending.Chars, pending.Chunks),
+			ConfirmText: locales.CommonConfirm(),
+			CancelText:  locales.CommonCancel(),
+		}
+	}
+	switch s.Look.ConfirmDialog(c.Key("long-format"), &s.detail.panel.longFormat, spec) {
+	case kit.ConfirmAccepted:
+		s.Store.ConfirmLongFormat(s.Ctx)
+	case kit.ConfirmDismissed:
+		s.Store.CancelLongFormat()
+	}
+}
+
 // panelToolbar 是工具栏：flex min-h-12 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-y border-border/50 px-6 py-1.5。
-func (s *Screen) panelToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab, showFind bool) {
+func (s *Screen) panelToolbar(c ui.C, v View, item services.LibraryItem, caps ItemCaps, active ReadingTab, showFind bool) {
 	l := s.Look
 	t := l.T
 	pad := l.Space(1.5) + 1 // py-1.5 加上 border-y 的 1px
@@ -88,7 +118,7 @@ func (s *Screen) panelToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, 
 		Children(func() {
 			ui.Flow(c.Key("line")).FillWidth().Items(ui.Center).Justify(ui.End).Gap(l.Space(3)).LineGap(l.Space(1)).Children(func() {
 				s.tabGroup(c.Key("tabs"), item, caps, active)
-				s.toolGroup(c.Key("tools"), item, caps, active, showFind)
+				s.toolGroup(c.Key("tools"), item, v.Detail, caps, active, showFind)
 			})
 		})
 }
@@ -169,9 +199,14 @@ func (s *Screen) panelTab(c ui.C, label string, icon gfx.Icon, on bool, suffix s
 // 主题阅读可用时（themedAvailable）工具栏最前面是读者工具条的挂载点（渲染层 setReaderToolbar 的容器，原文 / AI 阅读 / 目录 / 编辑由阅读区
 // 经门户放进来，见 detailreadertoolbar.go）：没有接阅读岛（也没开 ReaderToolbar）时它是空的，但仍占一个弹性子项（相邻的 gap 照算）；
 // 这时不摆「显示原文 / Markdown 渲染」（台账 B-059）。
-func (s *Screen) toolGroup(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab, showFind bool) {
+//
+// 媒体动作（渲染层 ContentPanel 的 discussionRefreshAction、summaryAction、transcriptActions）接到 Store，忙与禁用按渲染层互锁：
+// 转写与区分说话人共用一个忙标记（RunningAction，只有发起的那一枚转圈，两枚都禁用）；AI 排版转圈时转写钮禁用、转写时排版钮禁用；
+// 总结与刷新讨论互相禁用。Store 自己也挡重入，界面的禁用只是让用户看见「现在不能点」。
+func (s *Screen) toolGroup(c ui.C, item services.LibraryItem, det DetailView, caps ItemCaps, active ReadingTab, showFind bool) {
 	l := s.Look
 	p := &s.detail.panel
+	media := det.Media
 	themed := p.themedAvailable(active)
 	ui.Flow(c).Items(ui.Center).Gap(l.Space(1)).LineGap(l.Space(1)).Shrink(1).MinWidth(0).Children(func() {
 		if themed {
@@ -189,13 +224,14 @@ func (s *Screen) toolGroup(c ui.C, item services.LibraryItem, caps ItemCaps, act
 		}
 		if active != TabTranscript {
 			if !caps.Trashed && active == TabReplies && caps.RefreshAvailable {
-				if s.textToolButton(c.Key("refresh"), locales.LibraryForumDiscussionRefresh(), icons.RefreshCw, false) {
-					s.notMigrated(locales.LibraryForumDiscussionRefresh(), "M2-6", "B-060")
+				// 转圈的是刷新讨论自己；总结在途时它只是禁用。
+				if s.textToolButton(c.Key("refresh"), locales.LibraryForumDiscussionRefresh(), icons.RefreshCw, media.RefreshingDiscussion, media.Summarizing) {
+					s.Store.RefreshForumDiscussion(s.Ctx)
 				}
 			}
 			if !caps.Trashed && caps.SummaryAvailable {
-				if s.toolButton(c.Key("summary"), caps.SummaryLabel, icons.ScrollText, false, false) {
-					s.notMigrated(caps.SummaryLabel, "M2-6", "B-060")
+				if s.toolButton(c.Key("summary"), caps.SummaryLabel, icons.ScrollText, media.Summarizing, media.RefreshingDiscussion) {
+					s.Store.SummarizeMedia(s.Ctx)
 				}
 			}
 			if !caps.Trashed && !themed {
@@ -203,35 +239,37 @@ func (s *Screen) toolGroup(c ui.C, item services.LibraryItem, caps ItemCaps, act
 				if p.isPreview {
 					label = locales.LibraryShowSource()
 				}
-				if s.textToolButton(c.Key("preview"), label, gfx.Icon{}, false) {
+				if s.textToolButton(c.Key("preview"), label, gfx.Icon{}, false, false) {
 					p.isPreview = !p.isPreview
 				}
 			}
 			return
 		}
+		transcribing := media.RunningAction != ""
 		if caps.Transcript != "" {
+			// 排版在途且有逐块进度时，钮的名字就是进度（渲染层 label）；转写在途时禁用。
 			label := locales.LibraryTranscriptFormat()
-			if s.toolButton(c.Key("format"), label, icons.Sparkles, false, false) {
-				s.notMigrated(label, "M2-6", "B-060")
+			if media.FormatProgress != nil {
+				label = formatProgressText(media.FormatProgress)
+			}
+			if s.toolButton(c.Key("format"), label, icons.Sparkles, media.Formatting, transcribing) {
+				s.Store.FormatTranscript(s.Ctx)
 			}
 		}
 		if caps.CanTranscribe && caps.Transcript != "" {
-			if s.detailCanDiarize() {
+			if det.CanDiarize {
 				label := locales.LibraryTranscribeDiarize()
-				if s.toolButton(c.Key("diarize"), label, icons.Users, false, false) {
-					s.notMigrated(label, "M2-6", "B-060")
+				if s.toolButton(c.Key("diarize"), label, icons.Users, media.RunningAction == MediaActionDiarize, transcribing) {
+					s.Store.Transcribe(s.Ctx, true)
 				}
 			}
 			label := locales.LibraryTranscribeRegenerate()
-			if s.toolButton(c.Key("regenerate"), label, icons.RotateCcw, false, false) {
-				s.notMigrated(label, "M2-6", "B-060")
+			if s.toolButton(c.Key("regenerate"), label, icons.RotateCcw, media.RunningAction == MediaActionTranscribe, transcribing) {
+				s.Store.Transcribe(s.Ctx, false)
 			}
 		}
 	})
 }
-
-// detailCanDiarize 是转写路由支持区分说话人（渲染层 useTranscriptActions 的 canDiarize）。
-func (s *Screen) detailCanDiarize() bool { return s.Store.View().Detail.CanDiarize }
 
 // toolButton 是工具栏的图标钮（渲染层 ToolButton）：inline-flex h-8 w-8 shrink-0 rounded-lg text-muted-foreground
 // hover:bg-accent/60 hover:text-foreground，图标 h-3.5 w-3.5；忙或禁用时整枚淡出（disabled:opacity-50）且不响应。
@@ -252,10 +290,10 @@ func (s *Screen) toolButton(c ui.C, label string, icon gfx.Icon, busy, disabled 
 
 // textToolButton 是工具栏的小号文字钮（刷新讨论、显示原文 / Markdown 渲染）：inline-flex h-6 shrink-0 items-center gap-1
 // rounded-md border border-border/70 px-2 text-[11px] text-muted-foreground hover:border-border hover:bg-accent/60 hover:text-foreground。
-func (s *Screen) textToolButton(c ui.C, label string, icon gfx.Icon, busy bool) bool {
+func (s *Screen) textToolButton(c ui.C, label string, icon gfx.Icon, busy, disabled bool) bool {
 	l := s.Look
 	t := l.T
-	spec := kit.ButtonSpec{Label: label, Disabled: busy, Busy: busy, BusySize: l.Rem(0.875)}
+	spec := kit.ButtonSpec{Label: label, Disabled: busy || disabled, Busy: busy, BusySize: l.Rem(0.875)}
 	if !busy {
 		spec.Icon, spec.IconSize = icon, l.Rem(0.875)
 	}

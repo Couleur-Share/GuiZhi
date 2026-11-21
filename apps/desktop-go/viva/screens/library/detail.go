@@ -74,6 +74,7 @@ func (s *Screen) toggleFocusReading() { s.SetFocusReading(!s.detail.focusReading
 // remountDetail 重置详情栏里随挂载而生的界面状态：专注阅读与普通布局里 ItemDetail 在渲染树的不同位置，切换就是卸载重挂，
 // 面板的标签（由阅读记忆恢复）、预览开关、查找条与通知条的折叠都回到初始。
 func (s *Screen) remountDetail() {
+	s.leaveTranscript()
 	s.detail.panel = panelState{}
 	s.detail.notice = noticeUI{}
 	s.detail.tools = toolsUI{} // 工具侧栏随 ItemDetail 重新挂载：toolsItemId 回到 null

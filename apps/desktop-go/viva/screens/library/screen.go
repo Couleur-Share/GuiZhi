@@ -129,6 +129,7 @@ func (s *Screen) EndFrame() {
 		s.resetBulk() // 工作区卸载：菜单、浮层与确认框都是它的组件状态，随之丢掉
 		// 卸载（切换模块）前保存未落盘内容（渲染层 LibraryWorkspace 的卸载 effect：flushPendingSave，不等结果）。
 		s.Store.Spawn(func() { s.Store.FlushPendingSave(s.Ctx) })
+		s.leaveTranscript()   // 文字稿里还没写进记忆的阅读位置先写掉
 		s.detail = detailUI{} // 详情栏、专注阅读（离开知识库即退出）与详情浮层同理
 	}
 	if s.readerHost != nil {

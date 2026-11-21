@@ -1038,7 +1038,7 @@ func TestWechatSnapshotToggleGoesBackAndForth(t *testing.T) {
 	}
 }
 
-// 还没迁入的入口点一下都弹失败提示，详情里写明归属的里程碑与台账编号（台账 B-060）：一个入口一条。
+// 还没迁入的入口点一下都弹失败提示，详情里写明归属的里程碑与台账编号（台账 B-060）：一个入口一条（现只剩 M3 的提问）。
 func TestEveryUnmigratedEntryNamesItsMilestone(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -1048,24 +1048,7 @@ func TestEveryUnmigratedEntryNamesItsMilestone(t *testing.T) {
 		label     string
 		milestone string
 	}{
-		{"总结", func(r *rig) { r.openCard(detailVideoID) }, gfx.RoleButton, locales.LibraryMediaSummaryGenerateVideo(), "M2-6"},
-		{"刷新讨论", func(r *rig) {
-			r.openCard(detailForumID)
-			r.click(gfx.RoleButton, locales.LibraryForumRepliesSection())
-		}, gfx.RoleButton, locales.LibraryForumDiscussionRefresh(), "M2-6"},
-		{"AI 排版文字稿", func(r *rig) {
-			r.openCard(detailVideoID)
-			r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
-		}, gfx.RoleButton, locales.LibraryTranscriptFormat(), "M2-6"},
-		{"重新转写", func(r *rig) {
-			r.openCard(detailVideoID)
-			r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
-		}, gfx.RoleButton, locales.LibraryTranscribeRegenerate(), "M2-6"},
-		{"区分说话人转写", func(r *rig) {
-			r.openCard(detailVideoID)
-			r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
-			r.setDetail(func(d *DetailView) { d.CanDiarize = true })
-		}, gfx.RoleButton, locales.LibraryTranscribeDiarize(), "M2-6"},
+		// 媒体动作（总结、刷新讨论、AI 排版、转写、区分说话人）已在 M2-6d 接线，不再在这里（见 detail_media_ui_test.go）。
 		{"提问", func(r *rig) { r.openCard(detailNoteID) }, gfx.RoleButton, locales.ArticleAskTitle(), "M3"},
 	}
 	for _, c := range cases {

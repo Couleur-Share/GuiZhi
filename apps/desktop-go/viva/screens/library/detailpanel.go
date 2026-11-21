@@ -6,12 +6,13 @@ import (
 
 	"guizhi-mygo-shell/native/notes"
 	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/kit"
 )
 
 // 内容面板（渲染层 components/library/ContentPanel）：标签页与工具栏、评审提示、查找条，下面是阅读区。
 //
-// 阅读区（Markdown 预览、楼层讨论、网页快照、图库、主题阅读、文字稿、编辑器）归 M2-5 与 M2-6，这里是留白（台账 B-059）；
-// 工具栏上的动作（总结、刷新讨论、AI 排版、重新转写……）画出来但未接线：点击弹一条说明归属里程碑的失败提示（台账 B-060）。
+// 阅读区（Markdown 预览、楼层讨论、网页快照、图库、主题阅读、编辑器）由岛里的页面渲染（detailreader.go），文字稿是原生面板
+// （detailtranscript.go，台账 B-067）；工具栏上的媒体动作（总结、刷新讨论、AI 排版、转写、区分说话人）接到 Store（detailtoolbar.go，M2-6d）。
 
 // panelState 是内容面板的界面状态（渲染层 ContentPanel 的 useState；随条目切换重置，对应渲染层的 viewItemId 判断）。
 type panelState struct {
@@ -50,6 +51,10 @@ type panelState struct {
 	// （渲染层两个 useEffect 的依赖：变了才写）。
 	persisted        string
 	repliesPersisted string
+
+	// tx 是文字稿面板的界面状态（滚动记忆、查找滚动；detailtranscript.go），longFormat 是长稿排版确认框的焦点状态（detailtoolbar.go）。
+	tx         transcriptState
+	longFormat kit.ConfirmState
 }
 
 // activeTab 是此刻实际显示的标签：记忆里的标签这条没有时回正文（渲染层 activeTab）。
@@ -119,6 +124,10 @@ func (s *Screen) syncPanel(item services.LibraryItem, caps ItemCaps) {
 	p := &s.detail.panel
 	if p.itemID == item.ID {
 		return
+	}
+	s.flushTranscriptScroll(true) // 离开上一条：文字稿里还没写进记忆的位置先写掉（渲染层 effect 的清理函数 flush）
+	if p.tx.stop != nil {
+		p.tx.stop()
 	}
 	*p = panelState{itemID: item.ID}
 	p.isPreview = s.editorPreview() && jsTrim(item.Content) != ""
