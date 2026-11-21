@@ -17,12 +17,14 @@ import (
 // 网页快照窗格（版本带快照时的整页预览，台账 B-066）随 M2-5b 迁入；「围绕此版本提问」属于问答（M3）。
 
 // versionsUI 是来源版本的界面状态：展开与否、选中的版本（空串是没选）与它的下拉；
-// paneW 是并排两栏里一栏上一帧的宽度（等宽原文按它折行，见 versionPane）。
+// paneW 是并排两栏里一栏上一帧的宽度（等宽原文按它折行，见 versionPane）；
+// chipW 是展开钮里文字盒子上一帧的宽度（放不下时文字按它折行，见 versionsChip）。
 type versionsUI struct {
 	open     bool
 	selected string
 	sel      kit.SelectState
 	paneW    float32
+	chipW    float32
 }
 
 const (
@@ -49,18 +51,25 @@ func (s *Screen) toolsVersions(c ui.C, v View, item services.LibraryItem) {
 
 // versionsChip 是展开钮：动作按钮的外观（ACTION_CHIP），展开着时边框、底与字都是 primary；
 // 文字是「原文版本（N）」，有待比较的新版本接「 · 有新版本可比较」，摘要过期再接「· 摘要需重新整理」（译文自带前导圆点，不加空格）；末尾 ChevronDown，展开时转 180°。
+//
+// 它是 inline-flex 的按钮：外框不超过容器宽度（max-w-full），里面三项（图标、文字、图标）各自 flex-shrink: 1，文字项的基准尺寸是不折行的整行宽度。
+// 英文的整行（两项状态都有时约 450px）比面板宽，三项就按基准尺寸成比例收窄（两枚图标各收窄约四分之一），文字在收窄后的盒子里折成两行、
+// 每行居中（button 的 text-align: center），超出 28px 的行高上下各一点（居中对齐，不裁剪）。
 func (s *Screen) versionsChip(c ui.C, vv VersionsView, vu *versionsUI) {
 	l := s.Look
 	t := l.T
-	label := locales.WebCaptureVersionsCount(len(vv.Versions))
+	// 渲染层是三个相邻的文本节点（计数、「 · 有新版本可比较」、「· 摘要需重新整理」），文字行也按节点各记一条，所以分三段画（kit.TextFlowCentered）。
+	runs := []string{locales.WebCaptureVersionsCount(len(vv.Versions))}
 	if vv.Baseline != nil && vv.Baseline.PendingVersion {
-		label += " · " + locales.WebCaptureVersionReady()
+		runs = append(runs, " · "+locales.WebCaptureVersionReady())
 	}
 	if vv.Baseline != nil && vv.Baseline.SummaryStale {
-		label += locales.WebCaptureSummaryStale()
+		runs = append(runs, locales.WebCaptureSummaryStale())
 	}
+	label := strings.Join(runs, "")
+	whole := c.Canvas().TextWidthWeight(label, l.Rem(kit.TextXS.Size), kit.WeightNormal) // 文字项的基准尺寸：不折行的整行宽度
 	spec := inlineSpec{
-		Name: label, Disclosure: true, Open: vu.open, Gap: l.Space(1.5),
+		Name: label, Disclosure: true, Open: vu.open, Gap: l.Space(1.5), MaxFill: true,
 		Height: l.Rem(1.75), PadX: l.Space(2.5) + 1, Radius: l.Rem(0.75),
 		Fg: t.MutedForeground, FgHover: t.Primary, BgHover: t.Primary.WithAlpha(0.05),
 		Border: t.Border.WithAlpha(0.7), BorderHover: t.Primary.WithAlpha(0.5), BorderW: 1,
@@ -70,10 +79,24 @@ func (s *Screen) versionsChip(c ui.C, vv VersionsView, vu *versionsUI) {
 		spec.FgHover, spec.BgHover, spec.BorderHover = tokens.Color{}, tokens.Color{}, tokens.Color{}
 	}
 	box := s.inlineButton(c, spec, func(fg tokens.Color) {
-		l.Icon(c.Key("icon"), icons.History, l.Rem(0.875), fg)
-		l.Text(c.Key("label"), label, kit.TextXS, kit.WeightNormal, fg)
+		l.Icon(c.Key("icon"), icons.History, l.Rem(0.875), fg).Shrink(1)
+		ui.Column(c.Key("label")).Width(whole).Shrink(1).MinWidth(0).Items(ui.Center).
+			Draw(func(d *ui.DrawContext) {
+				if w := d.Rect.Width; w > 0 && abs32(w-vu.chipW) > 0.01 {
+					vu.chipW = w
+					d.Canvas.RequestFrame()
+				}
+			}).
+			Children(func() {
+				// 盒子不比整行窄就不折行（避免量宽的浮点误差把最后一个词挤到下一行）；首帧还没量到宽度，也按一行排。
+				wrapW := vu.chipW
+				if wrapW >= whole-0.01 {
+					wrapW = 0
+				}
+				l.TextFlowCentered(c.Key("flow"), kit.TextXS, kit.WeightNormal, fg, wrapW, runs...)
+			})
 		chevronID := ui.ID(c.Key("chevron-id")) // 键只作用于紧接着的一次声明：先取 ID，再声明图标
-		l.RotatingChevron(c.Key("chevron"), chevronID, l.Rem(0.875), vu.open, fg, kit.DurationDefault)
+		l.RotatingChevron(c.Key("chevron"), chevronID, l.Rem(0.875), vu.open, fg, kit.DurationDefault).Shrink(1)
 	}).Self(ui.Start)
 	if box.Clicked() {
 		vu.open = !vu.open
@@ -114,7 +137,7 @@ func (s *Screen) versionsPanel(c ui.C, item services.LibraryItem, vv VersionsVie
 				options[i] = kit.SelectOption{Value: version.ID, Label: s.versionLabel(version)}
 			}
 			if picked, changed := l.Select(c.Key("versions"), &vu.sel, kit.SelectSpec{
-				Label: locales.WebCaptureVersions(), Value: vu.selected, Options: options, Width: -1,
+				Label: locales.WebCaptureVersions(), Value: vu.selected, Options: options, Width: -1, Placeholder: locales.CommonSelect(),
 			}); changed {
 				vu.selected = picked
 			}
@@ -167,8 +190,9 @@ func (s *Screen) versionGrid(c ui.C, vv VersionsView, version services.LibraryWe
 		current = vv.Baseline.Content
 	}
 	panes := func(wide bool) {
-		s.versionPane(c.Key("current"), locales.WebCaptureCurrentContent(), current, wide, vu)
-		s.versionPane(c.Key("selected"), locales.WebCaptureSelectedVersion()+version.Title, version.Markdown, wide, vu)
+		// 标题是两个相邻的文本节点（「所选版本 ·」与版本标题）：后一段接在前一段之后排、放不下再换行（kit.TextFlow）。
+		s.versionPane(c.Key("current"), []string{locales.WebCaptureCurrentContent()}, current, wide, vu)
+		s.versionPane(c.Key("selected"), []string{locales.WebCaptureSelectedVersion(), version.Title}, version.Markdown, wide, vu)
 	}
 	if s.detail.viewportW >= versionGridBreakpoint {
 		ui.Row(c).FillWidth().Gap(l.Space(3)).Children(func() { panes(true) })
@@ -179,7 +203,7 @@ func (s *Screen) versionGrid(c ui.C, vv VersionsView, version services.LibraryWe
 
 // versionPane 是一栏：标题（text-xs font-medium）与等宽原文（pre：max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs）。
 // 原文的折行按渲染层的规则自己做（kit.WrapMono），宽度取上一帧量到的栏宽；长到超过最高处就竖向滚动，滚动条占去的宽度要重新折。
-func (s *Screen) versionPane(c ui.C, title, text string, wide bool, vu *versionsUI) {
+func (s *Screen) versionPane(c ui.C, title []string, text string, wide bool, vu *versionsUI) {
 	l := s.Look
 	t := l.T
 	col := ui.Column(c)
@@ -194,7 +218,7 @@ func (s *Screen) versionPane(c ui.C, title, text string, wide bool, vu *versions
 			d.Canvas.RequestFrame()
 		}
 	}).Children(func() {
-		l.Text(c.Key("title"), title, kit.TextXS, kit.WeightMedium, t.Foreground, kit.Wrapped())
+		l.TextFlow(c.Key("title"), kit.TextXS, kit.WeightMedium, t.Foreground, vu.paneW, title...)
 		const size, line float32 = 12, 16
 		maxH := l.Rem(versionPaneMaxHeightRem)
 		lines := kit.WrapMono(text, vu.paneW, size)
@@ -202,9 +226,9 @@ func (s *Screen) versionPane(c ui.C, title, text string, wide bool, vu *versions
 		if scrolls {
 			lines = kit.WrapMono(text, vu.paneW-8, size)
 		}
-		joined := strings.Join(lines, "\n")
 		pre := func() {
-			ui.Text(c.Key("pre"), joined).Mono().MaxLines(0).FontSize(size).LineHeight(line).Color(l.Col(t.Foreground)).FillWidth()
+			// 每行已按渲染层的度量折好，一行一个 Label 画（汉字行用界面字体，见 kit.MonoParagraph）
+			l.MonoParagraph(c.Key("pre"), lines, size, line, t.Foreground)
 		}
 		if scrolls {
 			l.ScrollArea(c.Key("pre-scroll"), [4]float32{}, pre).Height(maxH)

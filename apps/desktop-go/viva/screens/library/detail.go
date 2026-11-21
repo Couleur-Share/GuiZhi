@@ -158,6 +158,8 @@ func (s *Screen) itemDetail(c ui.C, v View, onClose func()) {
 	l := s.Look
 	t := l.T
 	s.detailShown = true
+	// 窗口宽度每帧都记：工具侧栏里版本比较的左右两栏按窗口宽度（lg 断点）判定，不能只靠阅读区请求顺带写（网页条目没有阅读区视图）。
+	s.detail.viewportW = l.ViewportWidth(c)
 	det := v.Detail
 	if det.LoadError != "" || det.Loading || det.Item == nil || det.Item.ID != v.List.SelectedID {
 		s.detail.edit.leave() // 内容面板不在树里：编辑态随它结束（草稿保留）

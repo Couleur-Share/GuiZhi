@@ -37,6 +37,8 @@ type inlineSpec struct {
 	DisabledOpacity float32
 	// Rect 非空时，每一帧写回这枚的外框（菜单的锚点与 Keep 用）。
 	Rect *gfx.Rect
+	// MaxFill 为真时外框不超过容器的宽度（max-w-full）：内容放不下时由里面的子项自己收窄（见 versionsChip）。
+	MaxFill bool
 }
 
 // inlineButton 声明一枚自画内容的按钮，返回外层盒（调用方用 Clicked 取点击）。
@@ -63,6 +65,9 @@ func (s *Screen) inlineButton(c ui.C, spec inlineSpec, body func(fg tokens.Color
 	}
 	if spec.Width > 0 {
 		row = row.Width(spec.Width).Justify(ui.Center)
+	}
+	if spec.MaxFill {
+		row = row.MaxWidthPercent(100)
 	}
 	box := row.HitWith(id, spec.Name, opts)
 	if !spec.Disabled {

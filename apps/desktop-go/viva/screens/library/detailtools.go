@@ -145,6 +145,8 @@ func (s *Screen) toolsShell(panel ui.Box, c ui.C) ui.Box {
 	scope := tools.scope
 	return panel.Pad(1).
 		Draw(func(d *ui.DrawContext) {
+			// 不声明 ReturnFocus：渲染层 effect 清理里的 previous.focus() 拿到的是 body——ContextMenu 在选中菜单项时被摘掉，
+			// 焦点已落到 body——所以关闭后焦点哪里也不在；照原样（见 TestToolsPanelLeavesNoFocusWhenItCloses）。
 			d.Canvas.PushFocusScope(scope)
 			l.PaintSurface(d, kit.Surface{Bg: t.Background, Border: t.Border, BorderW: 1, Radius: l.Rem(0.75), Shadows: kit.ShadowXL})
 			d.Canvas.Block(d.Rect)

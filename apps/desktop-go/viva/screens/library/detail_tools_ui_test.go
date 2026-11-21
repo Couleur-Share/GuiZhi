@@ -2,6 +2,7 @@ package library
 
 import (
 	"errors"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -229,6 +230,32 @@ func TestToolsPanelClosesFromTheButtonAndEscapeOnlyWhileTheFocusIsInside(t *test
 	f.keys("escape")
 	if f.screen.FocusReading() {
 		t.Fatal("下一个 Esc 应退出专注阅读")
+	}
+}
+
+// 关闭侧栏后焦点哪里也不在：渲染层 effect 清理里的 previous.focus() 拿到的是 body（ContextMenu 在选中菜单项时被摘掉，焦点已落到 body），
+// 收起钮与 Esc 两条路都一样。这是照原样复刻，不是为键盘用户设计的去向（候选改进见台账 C-014）。
+func TestToolsPanelLeavesNoFocusWhenItCloses(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"Esc", "收起钮"} {
+		r := shellRig(t)
+		r.openTools(detailNoteID)
+		if !r.focusedIs(gfx.RoleButton, locales.ArticleReaderCloseTools()) {
+			t.Fatal("夹具失效：打开时焦点应在收起钮上")
+		}
+		if name == "Esc" {
+			r.keys("escape")
+		} else {
+			r.click(gfx.RoleButton, locales.ArticleReaderCloseTools())
+		}
+		if r.toolsShown() {
+			t.Fatalf("%s：应已收起", name)
+		}
+		for _, n := range r.session.Access() {
+			if n.Focused {
+				t.Errorf("%s：关闭后不该有控件拿着焦点，实际 %v「%s」", name, n.Role, n.Label)
+			}
+		}
 	}
 }
 
@@ -637,7 +664,8 @@ func TestVersionsSectionComparesAndAdopts(t *testing.T) {
 	}
 	r.click(gfx.RoleCombobox, locales.WebCaptureVersions())
 	r.click(gfx.RoleOption, goodLabel)
-	for _, text := range []string{locales.WebCaptureCurrentContent(), locales.WebCaptureSelectedVersion() + "新版标题"} {
+	// 右栏标题是两个相邻的文本节点（「所选版本 ·」与版本标题，kit.TextFlow 各画一个 Label）。
+	for _, text := range []string{locales.WebCaptureCurrentContent(), locales.WebCaptureSelectedVersion(), "新版标题"} {
 		if !r.hasTextIn(panel, text) {
 			t.Errorf("两栏标题应有「%s」；画面文字 %q", text, r.session.Texts())
 		}
@@ -689,6 +717,67 @@ func TestVersionsSectionIsForWebpagesOnly(t *testing.T) {
 	}
 }
 
+// 展开钮是 inline-flex、max-w-full 的按钮：英文里整行（待比较与摘要过期两项状态都有时约 450px）比面板宽，外框就收在面板的内容区之内，
+// 文字折成两行、每行各自居中（渲染层读数：第一行 290.8px、第二行 154.1px，中心线都在 1056.0）；中文放得下，仍是一行、不折。
+// 修之前英文的外框 398px 超出面板、文字被裁掉半截。语言是进程内的全局状态，不并行。
+func TestVersionsChipWrapsInsideThePanelInEnglishAndStaysOneLineInChinese(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		lang  locales.Lang
+		lines int
+	}{{"英文", locales.En, 2}, {"中文", locales.Zh, 1}} {
+		t.Run(c.name, func(t *testing.T) {
+			langAtStart(t, c.lang)
+			r := shellRig(t, func(r *rig) { r.svc.SeedWebVersions(detailReviewID, reviewVersions()) })
+			r.openTools(detailReviewID)
+			r.frames(4) // 文字盒的宽度要出一帧才量得到，再按它折行
+			panel := r.panelRect()
+			chip, ok := r.nodeIn(panel, gfx.RoleButton, versionsChipName())
+			if !ok {
+				t.Fatalf("应有展开钮「%s」；画面文字 %q", versionsChipName(), r.session.Texts())
+			}
+			const panelPad = 16 // 侧栏内边距 p-4
+			if right, limit := chip.Bounds.X+chip.Bounds.Width, panel.X+panel.Width-panelPad; right > limit+0.5 {
+				t.Errorf("展开钮右缘 %.2f 超出面板内容区右缘 %.2f（max-w-full）", right, limit)
+			}
+			if want := r.look.Rem(1.75); math.Abs(float64(chip.Bounds.Height-want)) > 0.01 {
+				t.Errorf("展开钮高 %.2f，期望 h-7 = %.2f（折成两行也不撑高，文字上下溢出）", chip.Bounds.Height, want)
+			}
+			// 展开钮里的文字：中心落在外框（上下各放宽一行的一半，折行后两行都比 28px 的框高）里的 Label，按行归并。
+			type span struct{ left, right float32 }
+			rows := map[float32]*span{}
+			var ys []float32
+			for _, tx := range r.session.Snapshot().Texts {
+				mid := gfx.Point{X: tx.Bounds.X + tx.Bounds.Width/2, Y: tx.Bounds.Y + tx.Bounds.Height/2}
+				if mid.X < chip.Bounds.X || mid.X > chip.Bounds.X+chip.Bounds.Width || mid.Y < chip.Bounds.Y-8 || mid.Y > chip.Bounds.Y+chip.Bounds.Height+8 {
+					continue
+				}
+				s, seen := rows[tx.Bounds.Y]
+				if !seen {
+					s = &span{left: tx.Bounds.X, right: tx.Bounds.X + tx.Bounds.Width}
+					rows[tx.Bounds.Y] = s
+					ys = append(ys, tx.Bounds.Y)
+				}
+				s.left, s.right = min(s.left, tx.Bounds.X), max(s.right, tx.Bounds.X+tx.Bounds.Width)
+			}
+			if len(ys) != c.lines {
+				t.Fatalf("展开钮里的文字应是 %d 行，实际 %d 行（%v）；画面文字 %q", c.lines, len(ys), ys, r.session.Texts())
+			}
+			if c.lines == 1 {
+				return
+			}
+			slices.Sort(ys)
+			if gap, want := ys[1]-ys[0], r.look.Rem(kit.TextXS.Line); math.Abs(float64(gap-want)) > 0.01 {
+				t.Errorf("两行相隔 %.2f，期望一个行高 %.2f", gap, want)
+			}
+			mid0, mid1 := (rows[ys[0]].left+rows[ys[0]].right)/2, (rows[ys[1]].left+rows[ys[1]].right)/2
+			if math.Abs(float64(mid0-mid1)) > 0.05 {
+				t.Errorf("两行的中心线应对齐：第一行 %.2f，第二行 %.2f（text-align: center）", mid0, mid1)
+			}
+		})
+	}
+}
+
 // 窗口够宽（1024）时两栏并排，窄了上下叠放。
 func TestVersionPanesSitSideBySideOnlyOnAWideWindow(t *testing.T) {
 	t.Parallel()
@@ -702,7 +791,7 @@ func TestVersionPanesSitSideBySideOnlyOnAWideWindow(t *testing.T) {
 		switch n.Value {
 		case locales.WebCaptureCurrentContent():
 			cur = n.Bounds
-		case locales.WebCaptureSelectedVersion() + "新版标题":
+		case locales.WebCaptureSelectedVersion(): // 右栏标题的第一段（后一段是版本标题，接在它后面）
 			sel = n.Bounds
 		}
 	}
