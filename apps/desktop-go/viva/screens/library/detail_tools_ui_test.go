@@ -2,6 +2,7 @@ package library
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -801,5 +802,81 @@ func TestVersionPanesSitSideBySideOnlyOnAWideWindow(t *testing.T) {
 	wide := r.screen.detail.viewportW >= 1024
 	if sideBySide := cur.Y == sel.Y; wide != sideBySide {
 		t.Fatalf("窗口宽 %.0f：并排=%v，应=%v（当前 %+v 所选 %+v）", r.screen.detail.viewportW, sideBySide, wide, cur, sel)
+	}
+}
+
+// ---- 字号档 ----
+
+// textNamed 是画面上值恰好等于 value 的第一段文字（要它的字号与行高，Snapshot().Texts 里才有）。
+func textNamed(t *testing.T, r *rig, value string) gfx.Text {
+	t.Helper()
+	for _, tx := range r.session.Snapshot().Texts {
+		if tx.Value == value {
+			return tx
+		}
+	}
+	t.Fatalf("画面上找不到文字「%s」；画面文字 %q", value, r.session.Texts())
+	return gfx.Text{}
+}
+
+func near(got, want float32) bool { return math.Abs(float64(got-want)) <= 0.01 }
+
+// 评论正文是 text-xs leading-relaxed（0.75rem、行高 1.625 倍）、作者与赞数是 text-[11px]：前者随字号档（根字号 14、16、18）缩放，
+// 后者是 px 字面量、不缩放。修之前正文写死 12px 与 19.5px，T2 的小、大字号档上行距、字宽与墨迹位置都对不上渲染层，中档读不出来。
+func TestCommentBodyScalesWithTheFontTierButTheMetaLineDoesNot(t *testing.T) {
+	t.Parallel()
+	for _, root := range []float32{14, 16, 18} {
+		t.Run(fmt.Sprintf("根字号%.0f", root), func(t *testing.T) {
+			t.Parallel()
+			r := shellRig(t, func(r *rig) {
+				r.look.RootPx = root
+				r.svc.SeedCapture(shellDouyinID, []services.LibrarySourceComment{
+					{ID: "k1", ItemID: shellDouyinID, Platform: "douyin", ExternalID: "e1", AuthorName: "张三", Content: "单行评论正文", LikeCount: 9},
+				})
+			})
+			r.pick(shellDouyinID)
+			r.clickInDetail(gfx.RoleCombobox, locales.LibraryMoreActions())
+			r.click(gfx.RoleMenuItem, locales.LibraryCollectSourceComments())
+			r.clickIn(r.panelRect(), gfx.RoleButton, locales.LibraryCollectSourceComments())
+
+			body := textNamed(t, r, "单行评论正文")
+			if want := r.look.Rem(0.75); !near(body.Style.Size, want) {
+				t.Errorf("评论正文字号 %.2f，期望 0.75rem = %.2f", body.Style.Size, want)
+			}
+			if want := r.look.Rem(0.75) * 1.625; !near(body.Bounds.Height, want) {
+				t.Errorf("评论正文行高 %.2f，期望 1.625 倍 = %.2f", body.Bounds.Height, want)
+			}
+			author := textNamed(t, r, "张三")
+			if !near(author.Style.Size, 11) || !near(author.Bounds.Height, 16.5) {
+				t.Errorf("作者行是 text-[11px]、行高 16.5，不随字号档变：字号 %.2f、行高 %.2f", author.Style.Size, author.Bounds.Height)
+			}
+		})
+	}
+}
+
+// 版本窗格里的原文是 font-mono text-xs（0.75rem、行高 1rem）：随字号档缩放。修之前写死 12px 与 16px（同上）。
+func TestVersionPaneTextScalesWithTheFontTier(t *testing.T) {
+	t.Parallel()
+	for _, root := range []float32{14, 16, 18} {
+		t.Run(fmt.Sprintf("根字号%.0f", root), func(t *testing.T) {
+			t.Parallel()
+			r := shellRig(t, func(r *rig) {
+				r.look.RootPx = root
+				r.svc.SeedWebVersions(detailReviewID, reviewVersions())
+			})
+			r.openTools(detailReviewID)
+			r.clickIn(r.panelRect(), gfx.RoleButton, versionsChipName())
+			r.click(gfx.RoleCombobox, locales.WebCaptureVersions())
+			r.click(gfx.RoleOption, kit.FormatDateTime(1_700_000_000_000, r.screen.loc(), r.screen.Locale)+" · engine-2")
+			for _, line := range []string{"网页正文。", "新版正文"} {
+				tx := textNamed(t, r, line)
+				if want := r.look.Rem(0.75); !near(tx.Style.Size, want) {
+					t.Errorf("「%s」字号 %.2f，期望 0.75rem = %.2f", line, tx.Style.Size, want)
+				}
+				if want := r.look.Rem(1); !near(tx.Bounds.Height, want) {
+					t.Errorf("「%s」行高 %.2f，期望 1rem = %.2f", line, tx.Bounds.Height, want)
+				}
+			}
+		})
 	}
 }

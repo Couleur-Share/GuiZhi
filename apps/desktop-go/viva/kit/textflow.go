@@ -49,7 +49,7 @@ func (l *Look) textFlow(c ui.C, size, line, weight float32, color tokens.Color, 
 		off := 0 // 本行在拼起来的整段文字里的起点（字节）；WrapText 的各行首尾相接，正好铺满整段
 		for i, row := range rows {
 			end := off + len(row)
-			ui.Row(c.Key("row"+strconv.Itoa(i))).Height(line).Items(ui.Start).Children(func() {
+			ui.Row(c.Key("row" + strconv.Itoa(i))).Height(line).Items(ui.Start).Children(func() {
 				start := 0
 				for k, run := range runs {
 					lo, hi := max(off, start), min(end, start+len(run))

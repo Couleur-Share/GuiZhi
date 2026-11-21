@@ -207,6 +207,7 @@ func (s *Screen) commentArticle(c ui.C, comment services.LibrarySourceComment, f
 					l.TextPx(c.Key("time"), kit.FormatDate(*comment.PublishedAt, s.loc(), s.Locale), 11, 16.5, kit.WeightNormal, t.MutedForeground)
 				}
 			})
-			l.TextPx(c.Key("content"), comment.Content, 12, 19.5, kit.WeightNormal, t.Foreground.WithAlpha(0.85), kit.Wrapped()).MarginTop(l.Space(1))
+			// text-xs leading-relaxed：0.75rem、行高 1.625 倍，随字号档缩放（作者、赞数与时间那一行是 text-[11px]，px 字面量不缩放）。
+			l.TextPx(c.Key("content"), comment.Content, l.Rem(0.75), l.Rem(0.75)*1.625, kit.WeightNormal, t.Foreground.WithAlpha(0.85), kit.Wrapped()).MarginTop(l.Space(1))
 		})
 }

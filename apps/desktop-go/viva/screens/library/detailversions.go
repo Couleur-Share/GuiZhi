@@ -219,7 +219,7 @@ func (s *Screen) versionPane(c ui.C, title []string, text string, wide bool, vu 
 		}
 	}).Children(func() {
 		l.TextFlow(c.Key("title"), kit.TextXS, kit.WeightMedium, t.Foreground, vu.paneW, title...)
-		const size, line float32 = 12, 16
+		size, line := l.Rem(0.75), l.Rem(1) // text-xs：0.75rem、行高 1rem，随字号档缩放
 		maxH := l.Rem(versionPaneMaxHeightRem)
 		lines := kit.WrapMono(text, vu.paneW, size)
 		scrolls := float32(len(lines))*line > maxH+0.01
