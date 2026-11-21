@@ -73,6 +73,9 @@ type ButtonSpec struct {
 	Grow float32
 	// Toggle 表示它是切换钮（aria-pressed），On 是它此刻的按下状态。
 	Toggle, On bool
+	// Disclosure 表示它是展开收起钮（aria-expanded，不是 aria-pressed）：On 是它此刻展开着；按下态的外观与 Toggle 一样按
+	// BgOn/FgOn/WeightOn 画，可访问状态取「展开」而不是「按下」（读者工具条的「目录」）。不要与 Toggle 同设。
+	Disclosure bool
 	Disabled   bool
 	// Busy 在文字前放一枚转圈（disabled 常与它同用）。
 	Busy bool
@@ -149,7 +152,8 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 	if spec.Center {
 		row = row.Justify(ui.Center)
 	}
-	opts := gfx.HitOptions{Role: gfx.RoleButton, Disabled: spec.Disabled, Selected: spec.Toggle && spec.On, Description: spec.Description, Hint: spec.Hint, Autofocus: spec.Autofocus}
+	opts := gfx.HitOptions{Role: gfx.RoleButton, Disabled: spec.Disabled, Selected: spec.Toggle && spec.On, Description: spec.Description, Hint: spec.Hint, Autofocus: spec.Autofocus,
+		Expandable: spec.Disclosure, Expanded: spec.Disclosure && spec.On}
 	if !spec.Disabled {
 		opts.Cursor = gfx.PointerCursorHand
 	}
@@ -161,7 +165,7 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 	// 过渡进度在声明时取一次：文字与图标的颜色要在声明里定下，不能等到绘制。
 	p := l.hoverTo(c.Canvas(), id, 0, hovered, st.Transition)
 	on := float32(0)
-	if spec.Toggle {
+	if spec.Toggle || spec.Disclosure {
 		on = l.hoverTo(c.Canvas(), id, 1, spec.On, st.Transition)
 	}
 	opacity := float32(1)
@@ -185,7 +189,7 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 		suffixFg = disabledInk(spec.SuffixColor, bgNow, opacity, st.Surface)
 	}
 	weight := st.Weight
-	if spec.Toggle && spec.On && st.WeightOn != 0 {
+	if (spec.Toggle || spec.Disclosure) && spec.On && st.WeightOn != 0 {
 		weight = st.WeightOn
 	}
 	// 变换居中的按钮：图标的落笔偏移由按钮自己的外框算出（绘制时才知道外框），图标子元素在它之后绘制时读取。
@@ -207,7 +211,13 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 			if ring == (tokens.Color{}) {
 				ring = l.ringColor()
 			}
-			l.PaintRing(d, 2, ring, st.Radius)
+			// box-shadow 的环只出现在边框盒外侧：底色不透明时画实心环、靠随后的底色盖住内部；
+			// 底色透明或半透明（ghost 钮、悬停过渡中）时改画空心环，环里才不会透出环色。
+			if bgNow.A < 1 {
+				l.PaintRingBand(d, 2, ring, st.Radius)
+			} else {
+				l.PaintRing(d, 2, ring, st.Radius)
+			}
 		}
 		surface := Surface{Bg: bg, Radius: st.Radius, Shadow: st.Shadow, Shadows: st.Shadows}
 		if st.BorderW > 0 && !st.Dashed {

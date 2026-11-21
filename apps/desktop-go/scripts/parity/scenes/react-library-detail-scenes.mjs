@@ -27,6 +27,7 @@ const TRASHED = "回收站：误删的草稿"; // item-042：回收站里的笔�
 /** 交互步骤要点的按钮名（渲染层 i18n 的中文界面）；英文变体只用不需要交互的静止场景（台账 G-017）。 */
 const LABEL = {
   trash: "回收站", collection: "学习笔记", moreActions: "更多操作", transcript: "文字稿", replies: "讨论", recognized: "图中文字",
+  toc: "目录", editOriginal: "编辑原文",
 };
 /** 点一张卡片左内边距处，等详情头部出现与读取落定。 */
 const selectCard = (title) => async (win) => {
@@ -111,6 +112,37 @@ const openTableModal = (row) => async (win) => {
   await win.waitForTimeout(500); // 浮层的入场过渡
 };
 
+/**
+ * 读者工具条（台账 B-065）：config.detail.toolbar 让采集只隐去阅读区内容、保留工具栏最前面的读者工具条
+ * （lib/react-library.mjs 的 HIDE_READER_CONTENT_CSS）。Viva 一侧对应 Screen.ReaderToolbar（viva/parity/scenes/library_detail.go 的 readerToolbar 选项）。
+ */
+const TOOLBAR = { detail: { toolbar: true } };
+
+/** 读者工具条里的按钮（工具栏最前面的挂载点）。 */
+const toolbarButton = (win, name) => win.getByTestId("article-toolbar").getByRole("button", { name, exact: true });
+
+/** 点读者工具条里的按钮，等状态落定。 */
+const clickToolbar = (name) => async (win) => {
+  await toolbarButton(win, name).click();
+  await win.waitForTimeout(250);
+};
+
+/** 把指针停在读者工具条里按钮的中心（悬停态：场景用 keepPointer 保留；坐标取整，理由同 snapped）。 */
+const hoverToolbar = (name) => async (win) => {
+  const box = await toolbarButton(win, name).boundingBox();
+  await win.mouse.move(snapped(box.x + box.width / 2), snapped(box.y + box.height / 2));
+  await win.waitForTimeout(150);
+};
+
+/** 键盘聚焦读者工具条里的按钮：先按一次 Tab 让页面进入键盘模态，再程序聚焦（此时 :focus-visible 成立；做法同行聚焦 focusRow）。 */
+const focusToolbar = (name) => async (win) => {
+  await win.keyboard.press("Tab");
+  await toolbarButton(win, name).focus();
+  await win.keyboard.press("Tab");
+  await toolbarButton(win, name).focus();
+  await win.waitForTimeout(150);
+};
+
 const CONFLICT_TITLE = LIBRARY_DETAIL_FIXTURE.conflict.mineTitle;
 
 export const LIBRARY_DETAIL_SCENES = {
@@ -155,4 +187,14 @@ export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-saved": listScene({ detail: {} }, chain(selectCard(NOTE), retitle(CONFLICT_TITLE))),
   "app.window.library.detail-save-failed": listScene({ detail: { save: "fail" } }, chain(selectCard(NOTE), retitle(CONFLICT_TITLE))),
   "app.window.library.table-detail-modal": listScene({ detail: {} }, openTableModal(0)),
+  // 读者工具条（B-065）：原文 / AI 阅读、目录、编辑；论坛的默认标签是讨论总结（编辑钮的可访问名换成「编辑讨论总结」）；回收站里没有编辑；
+  // 目录展开（bg-muted）、编辑态（正在编辑原文 + 完成编辑）、空白笔记自动进编辑、悬停与键盘聚焦。
+  "app.window.library.detail-toolbar-note": listScene(TOOLBAR, selectCard(NOTE)),
+  "app.window.library.detail-toolbar-forum": listScene(TOOLBAR, selectByKeys(FORUM_INDEX + 1)),
+  "app.window.library.detail-toolbar-trashed": listScene(TOOLBAR, chain(applyFacets(LABEL.trash), selectCard(TRASHED))),
+  "app.window.library.detail-toolbar-toc": listScene(TOOLBAR, chain(selectCard(NOTE), clickToolbar(LABEL.toc))),
+  "app.window.library.detail-toolbar-editing": listScene(TOOLBAR, chain(selectCard(NOTE), clickToolbar(LABEL.editOriginal))),
+  "app.window.library.detail-toolbar-blank": listScene(TOOLBAR, selectByKeys(BLANK_INDEX + 1)),
+  "app.window.library.detail-toolbar-hover": listScene(TOOLBAR, chain(selectCard(NOTE), hoverToolbar(LABEL.editOriginal)), { keepPointer: true }),
+  "app.window.library.detail-toolbar-focus": listScene(TOOLBAR, chain(selectCard(NOTE), focusToolbar(LABEL.toc)), { keepFocus: true }),
 };

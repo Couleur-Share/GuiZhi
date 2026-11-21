@@ -74,11 +74,16 @@ div.relative.min-h-0.flex-1.overflow-hidden > aside + div div.min-w-0.flex-1.app
  * 目录、编辑原文 / 完成编辑与「正在编辑原文」提示——是阅读区的一部分，同样隐去（display:none，容器自己照常占一个弹性子项，相邻的 gap 照算）；
  * Viva 一侧对应一个空的挂载点（viva/screens/library/detailtoolbar.go 的 reader-toolbar）。
  * 同样是采集端的口径（页内样式），不是渲染层源码的改动；详情浮层（挂在 body 下的门户）里的阅读区同样适用。
+ * 两条规则拆成两个常量：读者工具条的对照场景（config.detail.toolbar，台账 B-065）只要第一条——Viva 一侧开着 Screen.ReaderToolbar，
+ * 工具条与阅读区内容的对照口径分开：阅读区内容仍隐去（Viva 的阅读岛在无头会话里画不出来），工具条照常显示。
  */
-const HIDE_READER_CSS = `
+const HIDE_READER_CONTENT_CSS = `
 [data-article-reader] > * { visibility: hidden !important; }
+`;
+const HIDE_READER_TOOLBAR_CSS = `
 [data-testid="article-toolbar"] > .ml-auto > div:first-child > * { display: none !important; }
 `;
+const HIDE_READER_CSS = HIDE_READER_CONTENT_CSS + HIDE_READER_TOOLBAR_CSS;
 
 /**
  * 页面初始化脚本（在页内运行，不能引用外层变量）：读配置，按配置替换 window.api 的合集、标签与计数接口。
@@ -387,7 +392,8 @@ export async function enterLibrary(session, options = {}) {
   }, !!config.list);
   // showReader：阅读岛对照工具（tools/probe-reader-island.mjs）要看阅读区本身，不隐去；其余场景不传，行为不变。
   if (!(config.detail && config.showReader)) {
-    await page.addStyleTag({ content: config.detail ? HIDE_READER_CSS : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
+    const readerCss = config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS; // toolbar：只隐去阅读区内容，保留读者工具条（B-065）
+    await page.addStyleTag({ content: config.detail ? readerCss : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
   }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，
   // 需要点侧栏行的场景自己用 openCompactSidebar / closeCompactSidebar 开关。

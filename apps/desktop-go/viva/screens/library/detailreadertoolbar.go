@@ -1,6 +1,7 @@
 package library
 
 import (
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
@@ -76,6 +77,8 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 		}
 		ui.Row(c.Key("version")).Items(ui.Center).Gap(l.Space(0.5)).PadSides(l.Space(0.5)+1, l.Space(0.5)+1, l.Space(0.5)+1, l.Space(0.5)+1).
 			Draw(func(d *ui.DrawContext) {
+				// role="group" aria-label="阅读版本"：可访问树里这一组两个版本钮的容器。
+				d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, locales.ThemedReadingReaderVersion(), gfx.HitOptions{})
 				l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.4), Border: t.Border.WithAlpha(0.6), BorderW: 1, Radius: l.Rem(0.75)})
 			}).
 			Children(func() {
@@ -92,7 +95,8 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 		})
 		toc := s.readerButtonStyle(l.Rem(2))
 		toc.BgOn, toc.FgOn = t.Muted, t.Foreground
-		if l.Button(c.Key("toc"), kit.ButtonSpec{Label: locales.LibraryCatalog(), Toggle: true, On: tocOpen}, toc).Clicked() {
+		// 目录钮是 aria-expanded（不是 aria-pressed）：展开时 bg-muted，可访问状态取「展开」。
+		if l.Button(c.Key("toc"), kit.ButtonSpec{Label: locales.LibraryCatalog(), Disclosure: true, On: tocOpen}, toc).Clicked() {
 			s.setTocOpen(!tocOpen)
 		}
 		if !caps.Trashed {

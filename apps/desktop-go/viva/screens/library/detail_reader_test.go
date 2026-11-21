@@ -444,6 +444,31 @@ func TestTocFlagIsRestoredWhenTheItemIsReopened(t *testing.T) {
 	}
 }
 
+// 读者工具条的可访问结构与渲染层一致（台账 B-065）：「阅读版本」组里是原文（按下）与 AI 阅读两个钮；
+// 目录钮是展开收起钮，可访问状态取「展开」，不取「按下」。
+func TestReaderToolbarAccessibleStructureMatchesTheRenderer(t *testing.T) {
+	t.Parallel()
+	rr := newReaderRig(t)
+	rr.openCard(detailNoteID)
+	rr.ready()
+	if !rr.has(gfx.RoleGroup, locales.ThemedReadingReaderVersion()) {
+		t.Fatalf("读者工具条里应有「%s」分组", locales.ThemedReadingReaderVersion())
+	}
+	if n := rr.mustNode(gfx.RoleButton, locales.ThemedReadingReaderOriginal()); !n.Selected {
+		t.Error("原文是选中的版本，应是按下状态")
+	}
+	if n := rr.mustNode(gfx.RoleButton, locales.ThemedReadingReaderAi()); n.Selected {
+		t.Error("AI 阅读没有选中")
+	}
+	if n := rr.mustNode(gfx.RoleButton, locales.LibraryCatalog()); n.Expanded || n.Selected {
+		t.Fatalf("目录收起时不该有展开或按下状态：expanded=%v selected=%v", n.Expanded, n.Selected)
+	}
+	rr.click(gfx.RoleButton, locales.LibraryCatalog())
+	if n := rr.mustNode(gfx.RoleButton, locales.LibraryCatalog()); !n.Expanded || n.Selected {
+		t.Fatalf("目录展开后应是展开状态、不是按下状态：expanded=%v selected=%v", n.Expanded, n.Selected)
+	}
+}
+
 func TestScrollEventsAreRememberedForTheTabTheyBelongTo(t *testing.T) {
 	t.Parallel()
 	rr := newReaderRig(t)

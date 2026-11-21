@@ -175,6 +175,43 @@ func detailKeysCaretDark(chord string) libraryEnvStep {
 	}
 }
 
+// detailToolbarClick 点读者工具条里可访问名为 name() 的按钮，等画面落定（对应 React 一侧的 clickToolbar，台账 B-065）。
+// name 在步骤执行时才取值（理由同 detailOpenSummary：英文变体要等界面语言设定之后才取名）。
+func detailToolbarClick(name func() string) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		if err := parity.ClickRole(s, gfx.RoleButton, name()); err != nil {
+			return err
+		}
+		return s.Rest()
+	}
+}
+
+// detailToolbarHover 把指针停在读者工具条里按钮的中心（坐标取整，对应 React 一侧的 hoverToolbar；悬停态，场景用 parkNone 保留）。
+func detailToolbarHover(name func() string) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		n, ok := s.AccessByRole(gfx.RoleButton, name())
+		if !ok {
+			return fmt.Errorf("找不到 %s「%s」", gfx.RoleButton, name())
+		}
+		if err := s.Move(snap(n.Bounds.X+n.Bounds.Width/2), snap(n.Bounds.Y+n.Bounds.Height/2)); err != nil {
+			return err
+		}
+		return s.Rest()
+	}
+}
+
+// detailToolbarFocus 键盘聚焦读者工具条里可访问名为 name() 的按钮（对应 React 一侧的 focusToolbar：键盘模态下的聚焦环；场景用 parkKeepFocus）。
+// 无头会话没有程序聚焦：从头按 Tab 会先走遍侧栏与列表的每一行，列表被聚焦行带着滚到底，整张图与渲染层不同。
+// 所以先点一下工具条里已选中的「原文」钮（点它什么也不改，只让焦点落在工具条里），再按 Tab 走到目标钮；终态与渲染层一致。
+func detailToolbarFocus(name func() string) libraryEnvStep {
+	return func(s *headless.Session, _ *kit.Look, _ *libraryEnv) error {
+		if err := parity.ClickRole(s, gfx.RoleButton, locales.ThemedReadingReaderOriginal()); err != nil {
+			return err
+		}
+		return focusByTab(gfx.RoleButton, name())(s)
+	}
+}
+
 // detailRetitle 把标题框的内容换成 text（对应 React 一侧的 fill：聚焦、整体替换），再让待存的改动落盘
 // （React 一侧等防抖 800 ms 到点；这里的计时器是空的，由步骤直接触发那次保存）。保存在后台，卡住的保存不会卡住会话。
 func detailRetitle(text string) libraryEnvStep {
@@ -326,6 +363,8 @@ func init() {
 	failSave := detail
 	failSave.failSave = true
 	table := libraryOptions{variant: "data", list: true, view: "list", detail: true}
+	toolbar := detail
+	toolbar.readerToolbar = true
 
 	reg := func(id string, opt libraryOptions, steps libraryEnvStep, mode parkMode, waivers ...parity.Waiver) {
 		registry[id] = libraryEnvScene(id, opt, steps, mode, waivers...)
@@ -391,6 +430,16 @@ func init() {
 	reg("app.window.library.detail-saving", holdSave, listChain(selectNote, detailHoldSave, detailRetitle(mine), detailWaitText(locales.LibrarySaving)), parkAll, cards...)
 	reg("app.window.library.detail-saved", detail, listChain(selectNote, detailRetitle(mine)), parkAll, cards...)
 	reg("app.window.library.detail-save-failed", failSave, listChain(selectNote, detailRetitle(mine)), parkAll, cards...)
+	// 读者工具条（B-065）：React 一侧只隐去阅读区内容、保留工具条（config.detail.toolbar），Viva 一侧开 Screen.ReaderToolbar。
+	// 回收站条目头部被禁用的「未归合集」chip 仍带 opacity-60（同 detail-trashed）。
+	reg("app.window.library.detail-toolbar-note", toolbar, selectNote, parkAll, cards...)
+	reg("app.window.library.detail-toolbar-forum", toolbar, listKeys("down", detailForumIndex+1), parkAll, cards...)
+	reg("app.window.library.detail-toolbar-trashed", toolbar, listChain(facetLabel(locales.LibraryScopeTrash), listClickCard(detailTrashed)), parkAll, trashed...)
+	reg("app.window.library.detail-toolbar-toc", toolbar, listChain(selectNote, detailToolbarClick(locales.LibraryCatalog)), parkAll, cards...)
+	reg("app.window.library.detail-toolbar-editing", toolbar, listChain(selectNote, detailToolbarClick(locales.ThemedReadingReaderEditOriginal)), parkAll, cards...)
+	reg("app.window.library.detail-toolbar-blank", toolbar, listKeys("down", detailBlankIndex+1), parkAll, cards...)
+	reg("app.window.library.detail-toolbar-hover", toolbar, listChain(selectNote, detailToolbarHover(locales.ThemedReadingReaderEditOriginal)), parkNone, cards...)
+	reg("app.window.library.detail-toolbar-focus", toolbar, listChain(selectNote, detailToolbarFocus(locales.LibraryCatalog)), parkKeepFocus, cards...)
 	reg("app.window.library.table-detail-modal", table, detailOpenTableModal(0), parkAll, tableOverlay...)
 	// 全屏 Modal：遮罩背后的页面模糊（A-007，backdrop-blur-md 是 12），渲染层背景留在可访问树里、Viva 的模态把它拿掉（A-015，补回比对）。
 	modal := modalBackdrop(locales.CommonDialog())

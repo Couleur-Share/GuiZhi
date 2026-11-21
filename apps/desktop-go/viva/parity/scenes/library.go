@@ -38,6 +38,9 @@ type libraryOptions struct {
 	detail bool
 	// detailVersions 为 true 时详情夹具里的来源版本放进服务（React 一侧 config.detail.versions）。
 	detailVersions bool
+	// readerToolbar 为 true 时工具栏里画读者工具条（原文 / AI 阅读、目录、编辑，Screen.ReaderToolbar）；React 一侧
+	// config.detail.toolbar 只隐去阅读区内容、保留工具条（HIDE_READER_CONTENT_CSS，台账 B-065）。其余场景两侧都隐去工具条。
+	readerToolbar bool
 	// failGet、failSave 让详情读取、草稿保存失败（原因取详情夹具的 failures；React 一侧 config.detail.get、save 为 fail）。
 	failGet, failSave bool
 	// holdDetail 为 true 时，场景里的 detailHoldGet、detailHoldSave 会让之后的第一次详情读取（草稿保存）卡在服务里不返回：
@@ -157,6 +160,8 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			NewID:  func() string { next++; return fmt.Sprintf("parity-view-%d", next) },
 			// M2-4 之前的场景比的是列表栏、侧栏与批量条：详情栏内容隐去（React 一侧用 HIDE_DETAIL_CSS），详情场景（detail）才画真的。
 			HideDetail: !opt.detail,
+			// 读者工具条：只有 B-065 的场景开（其余场景 React 一侧连同阅读区一起隐去，Viva 一侧对应空的挂载点）。
+			ReaderToolbar: opt.readerToolbar,
 		}
 		workspace := blankWorkspace
 		if opt.list {
