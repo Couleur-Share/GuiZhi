@@ -2,6 +2,7 @@ package notes
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -32,6 +33,27 @@ func LocalAssetRef(content, protocol string) (string, bool) {
 		return "", false
 	}
 	return m[1], true
+}
+
+// isSafeAssetFileName 对应 packages/shared/utils/media-refs.ts 的 isSafeAssetFileName。
+func isSafeAssetFileName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.HasPrefix(name, ".")
+}
+
+// ExtractLocalAssetRefs 按出现顺序提取并去重某一协议的安全资产文件名（extractLocalAssetRefs）。
+func ExtractLocalAssetRefs(content, protocol string) []string {
+	re := assetRefPatterns[protocol]
+	if content == "" || re == nil {
+		return nil
+	}
+	var refs []string
+	for _, m := range re.FindAllStringSubmatch(content, -1) {
+		name := m[1]
+		if isSafeAssetFileName(name) && !slices.Contains(refs, name) {
+			refs = append(refs, name)
+		}
+	}
+	return refs
 }
 
 // HasMediaSummarySection 报告内容里有没有「## 视频总结」或「## 音频总结」小节标题行（hasMediaSummarySection）：

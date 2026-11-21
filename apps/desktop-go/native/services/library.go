@@ -125,4 +125,13 @@ type Library interface {
 	WebVersions(ctx context.Context, itemID string) (LibraryWebVersions, error)
 	// AdoptWebVersion 把某个完整的原文版本采用为正文（web:adopt）；基线与服务端不同时失败，什么也不写。
 	AdoptWebVersion(ctx context.Context, in LibraryAdoptWebVersionInput) error
+
+	// GenerateSummary 为条目生成 AI 摘要（aiflow.GenerateSummary）；未配置返回 ErrAINotConfigured。
+	GenerateSummary(ctx context.Context, title, content string) (LibrarySummaryResult, error)
+	// SuggestTags 为条目生成 AI 建议标签（aiflow.SuggestTags）；未配置返回 ErrAINotConfigured。
+	SuggestTags(ctx context.Context, title, content string) ([]string, error)
+	// RecognizeImageText 识别单张本地配图中的文字（ocr 路由 + image:readBase64 + ai:httpRequest）；未配置返回 ErrAINotConfigured。
+	RecognizeImageText(ctx context.Context, assetFileName string) (string, error)
+	// UpdateItemFields 局部更新条目的摘要或正文并返回更新后的完整条目（knowledge:update）；found 为假表示条目不存在。
+	UpdateItemFields(ctx context.Context, id string, patch LibraryItemFieldsPatch) (item LibraryItem, found bool, err error)
 }

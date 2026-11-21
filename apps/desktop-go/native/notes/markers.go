@@ -29,8 +29,12 @@ const (
 	parenCloseFull    = "）"
 )
 
-// OCRSectionHeading 是图片条目「图中文字」小节的标题（ocr-request.ts 的 OCR_SECTION_HEADING）。
-const OCRSectionHeading = "## 图中文字"
+// OCRSectionHeading 是图片条目「图中文字」小节的标题（ocr-request.ts 的 OCR_SECTION_HEADING）；
+// ocrImagePrefix 是多图条目 OCR 小节里每张图的小标题前缀（AiOcrCard.tsx 的 `### 图 ${index + 1}`）。
+const (
+	OCRSectionHeading = "## 图中文字"
+	ocrImagePrefix    = "### 图 "
+)
 
 // 音视频条目的总结小节标题（media-summary.ts）。
 const (

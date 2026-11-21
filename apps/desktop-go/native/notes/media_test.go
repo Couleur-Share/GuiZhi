@@ -1,6 +1,9 @@
 package notes
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // 资产引用：取第一个、文件名到第一个字符集外的字符为止；协议不对、没有、协议名未知都是没有。
 func TestLocalAssetRef(t *testing.T) {
@@ -49,5 +52,37 @@ func TestHasMediaSummarySection(t *testing.T) {
 		if got := HasMediaSummarySection(c.content); got != c.want {
 			t.Errorf("HasMediaSummarySection(%q) = %v，期望 %v", c.content, got, c.want)
 		}
+	}
+}
+
+func TestExtractLocalAssetRefs(t *testing.T) {
+	content := "![a](local-image://a.png)\n![dup](local-image://a.png)\n![](local-image://..)\n![](local-image://.hidden.png)\n![b](local-image://b-2.jpg)"
+	if got, want := ExtractLocalAssetRefs(content, LocalImage), []string{"a.png", "b-2.jpg"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("ExtractLocalAssetRefs = %v，期望 %v", got, want)
+	}
+	if got := ExtractLocalAssetRefs("", LocalImage); got != nil {
+		t.Fatalf("空串应返回 nil：%v", got)
+	}
+}
+
+func TestBuildOcrSectionBodyAndApplyOcrTextToContent(t *testing.T) {
+	if got := BuildOcrSectionBody([]string{"单图文字"}); got != "单图文字" {
+		t.Fatalf("单图 = %q", got)
+	}
+	if got := BuildOcrSectionBody([]string{""}); got != "" {
+		t.Fatalf("单图空 = %q", got)
+	}
+	if got, want := BuildOcrSectionBody([]string{"第一张", "", "第三张"}), "### 图 1\n\n第一张\n\n### 图 3\n\n第三张"; got != want {
+		t.Fatalf("多图 = %q，期望 %q", got, want)
+	}
+	if got := BuildOcrSectionBody([]string{"", ""}); got != "" {
+		t.Fatalf("全空 = %q", got)
+	}
+
+	if got, want := ApplyOcrTextToContent("文案  \n ", "新字"), "文案\n\n## 图中文字\n\n新字"; got != want {
+		t.Fatalf("追加 = %q，期望 %q", got, want)
+	}
+	if got, want := ApplyOcrTextToContent("文案\n\n## 图中文字\n\n旧字", "新字"), "文案\n\n## 图中文字\n\n新字"; got != want {
+		t.Fatalf("替换 = %q，期望 %q", got, want)
 	}
 }

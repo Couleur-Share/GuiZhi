@@ -36,6 +36,8 @@ type Library struct {
 	detail detailState
 	// 文章工具侧栏（见 library_tools.go）：来源评论与网页来源版本。
 	tools toolsState
+	// M2-6c AI 摘要、标签建议与图片 OCR（见 library_ai.go）。
+	ai aiState
 }
 
 var _ services.Library = (*Library)(nil)
