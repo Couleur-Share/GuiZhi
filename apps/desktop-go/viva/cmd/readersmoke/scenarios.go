@@ -52,6 +52,7 @@ func (s *smoke) drive(want map[string]bool, env map[string]any) []*result {
 		{"reopen", scReopen},
 		{"gallery", scGallery},
 		{"replies", scReplies},
+		{"editor", scEditor},
 		{"viewer", scViewer},
 	}
 	var results []*result

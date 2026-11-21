@@ -383,7 +383,16 @@ func (h handler) Lightbox(images []reader.Image, index int) {
 	h.s.record("lightbox", map[string]any{"count": len(images), "index": index, "first": first})
 }
 func (h handler) Edit(id string, tab reader.Tab, text string) {
-	h.s.record("edit", map[string]any{"item": id, "tab": string(tab), "text": text})
+	data := map[string]any{"item": id, "tab": string(tab), "bytes": len(text)}
+	if len(text) <= 4096 {
+		data["text"] = text // 大文档只记字节数，免得报告膨胀
+	}
+	h.s.record("edit", data)
+	// 与界面（screens/library/detailedit.go）一样：草稿随页面里的文档更新。宿主按期望里的草稿与「已发给页面的」比较，
+	// 草稿不跟着走，下一帧就会把旧内容再发回去、把用户刚输入的字冲掉。窗口线程上调用，s.req 归它独占。
+	if q := &h.s.req; q.View.Kind == reader.ViewEditor && q.ItemID == id && q.Tab == tab {
+		q.View.Content = text
+	}
 }
 func (h handler) Toast(text string) { h.s.record("toast", text) }
 func (h handler) Key(key string, ctrl, alt, shift bool) {
