@@ -27,6 +27,96 @@ func TestDetailFrameBudget(t *testing.T) {
 	}
 	t.Run("detail_10000_entries", func(t *testing.T) { measureDetailFrames(t, "detail_10000_entries", false) })
 	t.Run("detail_10000_entries_find", func(t *testing.T) { measureDetailFrames(t, "detail_10000_entries_find", true) })
+	t.Run("detail_10000_entries_tools", func(t *testing.T) { measureDetailToolsFrames(t, "detail_10000_entries_tools") })
+}
+
+// measureDetailToolsFrames 在 1 万条的库里选中第一条并打开文章工具侧栏，量稳态帧、悬停一步、滚轮一步与栅格化上界（M2-6b）。
+func measureDetailToolsFrames(t *testing.T, name string) {
+	heapBefore := frametime.HeapInUse()
+	r := wsRig(t, func(r *rig) { r.svc.SeedEntries(servicestest.GenerateEntries(10000)) })
+	entries := r.view().List.Entries
+	if len(entries) < 3 {
+		t.Fatalf("夹具应读到一页条目，实际 %d 条", len(entries))
+	}
+	card, ok := r.cardOf(entries[0])
+	if !ok {
+		t.Fatal("找不到第一张卡片（夹具失效）")
+	}
+	cx, cy := centerOf(card)
+	r.clickAt(cx, cy)
+	r.frames(4)
+	r.clickInDetail(gfx.RoleCombobox, locales.LibraryMoreActions())
+	r.click(gfx.RoleMenuItem, locales.ArticleReaderTools())
+	r.frames(4)
+	panel := r.panelRect()
+	if panel.Width == 0 {
+		t.Fatal("打开文章工具侧栏后未找到面板，读数无效")
+	}
+	t.Logf("%s 打开工具侧栏后 Go 堆增量（含无头会话）：%d KiB", name, (int64(frametime.HeapInUse())-int64(heapBefore))/1024)
+
+	idle, err := frametime.Measure(300, func(int) error { return r.session.Frame() })
+	if err != nil {
+		t.Fatalf("稳态帧失败：%v", err)
+	}
+	t.Logf("%s 稳态帧（布局+记录）：%s", name, idle)
+
+	closeBtn, ok := r.nodeIn(panel, gfx.RoleButton, locales.ArticleReaderCloseTools())
+	if !ok {
+		t.Fatal("侧栏内找不到关闭钮")
+	}
+	copyBtn, ok := r.nodeIn(panel, gfx.RoleButton, locales.LibraryAiSummaryGenerate())
+	if !ok {
+		t.Fatal("侧栏内找不到「AI 摘要」钮")
+	}
+	ax, ay := centerOf(closeBtn)
+	bx, by := centerOf(copyBtn)
+	hover, err := frametime.Measure(200, func(i int) error {
+		x, y := ax, ay
+		if i%2 == 1 {
+			x, y = bx, by
+		}
+		if err := r.session.Move(x, y); err != nil {
+			return err
+		}
+		return r.session.Frame()
+	})
+	if err != nil {
+		t.Fatalf("悬停帧失败：%v", err)
+	}
+	t.Logf("%s 悬停一步（移动指针+出帧）：%s", name, hover)
+
+	// 滚动一步：侧栏打开时在左侧卡片列表上滚轮来回，先核对无障碍指纹确实变了。
+	before := frametime.Fingerprint(r.session.Access())
+	if err := r.session.Scroll(gfx.ScrollEvent{X: cx, Y: 400, DeltaY: 400, Precise: true}); err != nil {
+		t.Fatalf("预检滚轮失败：%v", err)
+	}
+	r.frames(2)
+	if frametime.Fingerprint(r.session.Access()) == before {
+		t.Fatal("滚轮之后列表画面无变化，滚动读数无效")
+	}
+	scroll, err := frametime.Measure(60, func(i int) error {
+		dy := float32(120)
+		if i%2 == 1 {
+			dy = -120
+		}
+		if err := r.session.Scroll(gfx.ScrollEvent{X: cx, Y: 400, DeltaY: dy, Precise: true}); err != nil {
+			return err
+		}
+		return r.session.Frame()
+	})
+	if err != nil {
+		t.Fatalf("滚轮帧失败：%v", err)
+	}
+	t.Logf("%s 滚轮一步（滚轮+出帧）：%s", name, scroll)
+
+	raster, err := frametime.Measure(30, func(int) error {
+		_, err := r.session.Image()
+		return err
+	})
+	if err != nil {
+		t.Fatalf("栅格化失败：%v", err)
+	}
+	t.Logf("%s 栅格化+回读（Image，上界）：%s", name, raster)
 }
 
 // measureDetailFrames 在 1 万条的库里选中第一条，再逐项量帧；find 为真时先打开页内查找条。

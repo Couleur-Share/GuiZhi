@@ -775,11 +775,20 @@ func TestVersionsChipWrapsInsideThePanelInEnglishAndStaysOneLineInChinese(t *tes
 			if math.Abs(float64(mid0-mid1)) > 0.05 {
 				t.Errorf("两行的中心线应对齐：第一行 %.2f，第二行 %.2f（text-align: center）", mid0, mid1)
 			}
+			// 英文折行时，图标与文字三项按基准尺寸一起收窄（Shrink(1)）：若左右图标不收窄（Shrink(0)），文字盒会比现在窄约 7.5px。
+			padX := r.look.Space(2.5) + 1
+			gap := r.look.Space(1.5)
+			iconFull := r.look.Rem(0.875)
+			unshrunkLabelMax := chip.Bounds.Width - 2*padX - 2*gap - 2*iconFull
+			if got := r.screen.detail.tools.versions.chipW; got <= unshrunkLabelMax+5 {
+				t.Errorf("英文折行时左右两枚图标应一起收窄：文字盒宽 %.2f，未明显超过图标不收窄时的上限 %.2f", got, unshrunkLabelMax)
+			}
 		})
 	}
 }
 
-// 窗口够宽（1024）时两栏并排，窄了上下叠放。
+// 窗口够宽（默认 1280 >= 1024）时两栏必须并排，窄窗口（800 < 1024）时必须上下叠放：
+// 按真实视口宽度断言，不读内部 viewportW（防止每帧不记 viewportW 时测试自洽逃逸）。
 func TestVersionPanesSitSideBySideOnlyOnAWideWindow(t *testing.T) {
 	t.Parallel()
 	r := shellRig(t, func(r *rig) { r.svc.SeedWebVersions(detailReviewID, reviewVersions()) })
@@ -787,21 +796,49 @@ func TestVersionPanesSitSideBySideOnlyOnAWideWindow(t *testing.T) {
 	r.clickIn(r.panelRect(), gfx.RoleButton, versionsChipName())
 	r.click(gfx.RoleCombobox, locales.WebCaptureVersions())
 	r.click(gfx.RoleOption, kit.FormatDateTime(1_700_000_000_000, r.screen.loc(), r.screen.Locale)+" · engine-2")
-	var cur, sel gfx.Rect
-	for _, n := range r.session.Snapshot().Texts {
-		switch n.Value {
-		case locales.WebCaptureCurrentContent():
-			cur = n.Bounds
-		case locales.WebCaptureSelectedVersion(): // 右栏标题的第一段（后一段是版本标题，接在它后面）
-			sel = n.Bounds
+	readTitles := func() (cur, sel gfx.Rect) {
+		for _, n := range r.session.Snapshot().Texts {
+			switch n.Value {
+			case locales.WebCaptureCurrentContent():
+				cur = n.Bounds
+			case locales.WebCaptureSelectedVersion(): // 右栏标题的第一段（后一段是版本标题，接在它后面）
+				sel = n.Bounds
+			}
 		}
+		if cur.Width == 0 || sel.Width == 0 {
+			t.Fatalf("两栏标题应都画出来了：%+v %+v", cur, sel)
+		}
+		return cur, sel
 	}
-	if cur.Width == 0 || sel.Width == 0 {
-		t.Fatalf("两栏标题应都画出来了：%+v %+v", cur, sel)
+	cur, sel := readTitles()
+	if cur.Y != sel.Y {
+		t.Fatalf("默认宽窗口（>=1024）下两栏应并排，实际当前 %+v 所选 %+v", cur, sel)
 	}
-	wide := r.screen.detail.viewportW >= 1024
-	if sideBySide := cur.Y == sel.Y; wide != sideBySide {
-		t.Fatalf("窗口宽 %.0f：并排=%v，应=%v（当前 %+v 所选 %+v）", r.screen.detail.viewportW, sideBySide, wide, cur, sel)
+	r.look.Viewport = 800
+	r.session.Resize(800, 600)
+	r.frames(4)
+	cur, sel = readTitles()
+	if cur.Y == sel.Y {
+		t.Fatalf("窄窗口（800<1024）下两栏应上下叠放，实际仍在同行：当前 %+v 所选 %+v", cur, sel)
+	}
+}
+
+// 所选版本带网页快照且条目不在回收站时，显示「围绕此版本提问」钮，点击弹带 M3 与 B-060 的失败提示。
+func TestVersionAskButtonShowsNotMigratedToast(t *testing.T) {
+	t.Parallel()
+	versions := reviewVersions()
+	versions.Versions[0].Snapshot = []byte(`{"html":"<p>ok</p>"}`)
+	r := shellRig(t, func(r *rig) { r.svc.SeedWebVersions(detailReviewID, versions) })
+	r.openTools(detailReviewID)
+	r.clickIn(r.panelRect(), gfx.RoleButton, versionsChipName())
+	r.click(gfx.RoleCombobox, locales.WebCaptureVersions())
+	r.click(gfx.RoleOption, kit.FormatDateTime(1_700_000_000_000, r.screen.loc(), r.screen.Locale)+" · engine-2")
+	r.clickIn(r.panelRect(), gfx.RoleButton, locales.ArticleAskAskVersion())
+	text := r.toastText()
+	for _, want := range []string{locales.ArticleAskAskVersion(), "M3", "B-060"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("点击「围绕此版本提问」应弹失败提示并写明「%s」：%q", want, text)
+		}
 	}
 }
 

@@ -68,3 +68,30 @@ func TestSelectWithoutPlaceholderShowsNothingWhenNothingIsSelected(t *testing.T)
 		t.Fatalf("没有占位文字时取值 = %q（找到=%v），期望空", node.Value, ok)
 	}
 }
+
+// 紧凑型触发器（SelectSpec.Trigger 非空）没选中任何选项时，占位文字同样用弱化前景色。
+func TestCompactSelectShowsItsPlaceholderInMutedColor(t *testing.T) {
+	var st SelectState
+	h := openPage(t, still(), 400, 200, func(l *Look, c ui.C) {
+		ui.Column(c).Fill().Pad(24).Children(func() {
+			l.Select(c, &st, SelectSpec{
+				Label: "数量", Value: "", Placeholder: "选择",
+				Options: []SelectOption{{"20", "20 条"}},
+				Trigger: &SelectTriggerStyle{Height: 28, PadX: 8, Radius: 6, FontPx: 12, LinePx: 16, Bg: l.T.Background, Border: l.T.Border, BorderW: 1},
+			})
+		})
+	})
+	var found bool
+	for _, text := range h.session.Snapshot().Texts {
+		if text.Value != "选择" {
+			continue
+		}
+		found = true
+		if want := h.look.Col(h.look.T.MutedForeground); text.Style.Color != want {
+			t.Errorf("紧凑型下拉占位文字的颜色 = %+v，期望弱化前景色 %+v", text.Style.Color, want)
+		}
+	}
+	if !found {
+		t.Fatal("紧凑型下拉没有画出占位文字「选择」")
+	}
+}
