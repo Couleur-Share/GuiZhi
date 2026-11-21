@@ -370,7 +370,10 @@ func (h handler) Scroll(id string, tab reader.Tab, top float64) {
 }
 func (h handler) Catalog(open bool) { h.s.record("catalog", open) }
 func (h handler) Toc(open bool)     { h.s.record("toc", open) }
-func (h handler) Link(url string)   { h.s.record("link", url) }
+func (h handler) SnapshotState(wideRail, tocOpen bool) {
+	h.s.record("snapshotState", map[string]any{"wideRail": wideRail, "tocOpen": tocOpen})
+}
+func (h handler) Link(url string) { h.s.record("link", url) }
 func (h handler) Copy(text string) error {
 	h.s.record("copy", text)
 	return h.s.copyErr

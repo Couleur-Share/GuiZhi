@@ -102,7 +102,10 @@ func (r *recHandler) Scroll(id string, tab Tab, top float64) {
 }
 func (r *recHandler) Catalog(open bool) { r.rec("catalog:%v", open) }
 func (r *recHandler) Toc(open bool)     { r.rec("toc:%v", open) }
-func (r *recHandler) Link(url string)   { r.rec("link:%s", url) }
+func (r *recHandler) SnapshotState(wideRail, tocOpen bool) {
+	r.rec("snapshotState:%v/%v", wideRail, tocOpen)
+}
+func (r *recHandler) Link(url string) { r.rec("link:%s", url) }
 func (r *recHandler) Copy(text string) error {
 	r.rec("copy:%s", text)
 	return r.copyErr

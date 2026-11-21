@@ -621,6 +621,12 @@ func TestKeysForwardedByThePageReachTheWindowShortcuts(t *testing.T) {
 	if !rr.screen.FocusReading() {
 		t.Fatal("页面转交的 Alt+Z 应进专注阅读")
 	}
+	// 网页快照的 iframe 里按 Esc：页面转交 escape，退出专注阅读。
+	rr.event(p, map[string]any{"t": "key", "key": "escape"})
+	rr.frames(3)
+	if rr.screen.FocusReading() {
+		t.Fatal("页面转交的 Esc 应退出专注阅读")
+	}
 	rr.event(p, map[string]any{"t": "key", "key": "s", "ctrl": true})
 	rr.frames(3)
 }

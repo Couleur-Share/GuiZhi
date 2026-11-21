@@ -2,6 +2,8 @@
  * 阅读岛的消息协议（v2）：Go 宿主（apps/desktop-go/viva/reader）与岛内页面之间只传文本，内容是 JSON。
  * v2 相对 v1：复制带回执（copy 带 id，宿主回 copyResult）；编辑态（editor 视图：页面把文档的每次改动用 edit 事件交宿主，
  * 宿主用 focus 把焦点交给编辑器）。
+ * v3 相对 v2：网页快照视图（snapshot 视图：整页 HTML 放进沙箱 iframe；页面用 snapshotState 上报目录是否常驻窄轨与开合；
+ * 宿主用 ui 消息里的 snapshotWidth 增量改宽度；转发键增加 escape）。
  *
  * 方向与信任：
  * - 宿主 → 页面（HostMessage）：宿主是可信的，但页面仍按形状校验，坏消息直接丢弃，不能让 React 渲染崩掉。
@@ -11,7 +13,7 @@
  * Reader island protocol v1: JSON text between the Go host and the page.
  */
 
-export const READER_PROTOCOL = 2;
+export const READER_PROTOCOL = 3;
 
 export type ReaderLang = "zh" | "en";
 
@@ -46,7 +48,8 @@ export type ReaderTab =
  * - markdown：纯 Markdown 预览（图片条目的识别文字标签等）；
  * - replies：论坛讨论（楼层卡片列表 + 楼层目录）；
  * - gallery：图片条目的配图画廊；
- * - editor：主题阅读「原文」的编辑态（ReconstructionReader 里的 MarkdownEditor，content 是草稿，文档由编辑器持有）。
+ * - editor：主题阅读「原文」的编辑态（ReconstructionReader 里的 MarkdownEditor，content 是草稿，文档由编辑器持有）；
+ * - snapshot：公众号网页快照（WebSnapshotPane 的 original 分支：沙箱 iframe 的 srcDoc + 目录浮层）。
  */
 export type ReaderView =
   | { kind: "none" }
@@ -54,7 +57,22 @@ export type ReaderView =
   | { kind: "editor"; content: string; sourceKind: "body" | "summary" }
   | { kind: "markdown"; content: string; tab: ReaderTab }
   | { kind: "replies"; content: string }
-  | { kind: "gallery"; content: string };
+  | { kind: "gallery"; content: string }
+  | {
+      kind: "snapshot";
+      /** 整页 HTML（已净化，带 instanceId 标识与桥接脚本），只能放进沙箱 iframe 的 srcDoc。 */
+      document: string;
+      /** 这次读取的实例标识：iframe 的消息按它过滤，换版本或重新读取后旧消息作废。 */
+      instanceId: string;
+      /** 来源版本；空串表示当前版本（阅读位置按「条目 + 版本」记忆）。 */
+      versionId: string;
+      width: SnapshotWidth;
+      /** 快照里的本地图片（local-image://…），点图时按它找序号交给图片查看岛。 */
+      assets: string[];
+    };
+
+/** 网页快照的宽度档：original 固定 390 px，fluid 取舒适阅读宽度，wide 铺满。 */
+export type SnapshotWidth = "original" | "fluid" | "wide";
 
 export interface HostInit {
   t: "init";
@@ -96,6 +114,8 @@ export interface HostUi {
   t: "ui";
   catalogOpen: boolean;
   tocOpen: boolean;
+  /** 只在网页快照视图下带：宽度变化不重发整页文档（iframe 一重载，阅读位置与查找高亮全丢）。 */
+  snapshotWidth?: SnapshotWidth;
 }
 
 /** 复制的回执：宿主写完系统剪贴板后告诉页面成败（对应 copy 事件的 id），页面据此让 writeText 成功或失败（台账 B-069）。 */
@@ -131,6 +151,8 @@ export type PageEvent =
   | { t: "scroll"; seq: number; top: number }
   | { t: "catalog"; seq: number; open: boolean }
   | { t: "toc"; seq: number; open: boolean }
+  /** 网页快照的版面状态：目录是否因窗口够宽而常驻窄轨（原生工具栏据此决定要不要显示「目录」钮）与目录开合。 */
+  | { t: "snapshotState"; seq: number; wideRail: boolean; open: boolean }
   | { t: "link"; seq: number; url: string }
   | { t: "copy"; seq: number; id: number; text: string }
   /** 编辑器里文档的当前全文（每次改动一条，不合并：宿主按它记草稿，「完成编辑」时用的就是最后一条）。 */
@@ -186,6 +208,10 @@ export function parseLang(value: unknown): ReaderLang {
   return value === "en" ? "en" : "zh";
 }
 
+export function isSnapshotWidth(value: unknown): value is SnapshotWidth {
+  return value === "original" || value === "fluid" || value === "wide";
+}
+
 function parseView(value: unknown): ReaderView | null {
   if (!isRecord(value)) return null;
   switch (value.kind) {
@@ -221,6 +247,26 @@ function parseView(value: unknown): ReaderView | null {
     case "gallery":
       if (typeof value.content === "string") {
         return { kind: value.kind, content: value.content };
+      }
+      return null;
+    case "snapshot":
+      if (
+        typeof value.document === "string" &&
+        typeof value.instanceId === "string" &&
+        value.instanceId !== "" &&
+        typeof value.versionId === "string" &&
+        isSnapshotWidth(value.width) &&
+        Array.isArray(value.assets) &&
+        value.assets.every((asset) => typeof asset === "string" && asset.startsWith("local-image://"))
+      ) {
+        return {
+          kind: "snapshot",
+          document: value.document,
+          instanceId: value.instanceId,
+          versionId: value.versionId,
+          width: value.width,
+          assets: value.assets as string[],
+        };
       }
       return null;
     default:
@@ -288,6 +334,7 @@ export function parseHostMessage(text: string): HostMessage | null {
         t: "ui",
         catalogOpen: raw.catalogOpen === true,
         tocOpen: raw.tocOpen === true,
+        ...(isSnapshotWidth(raw.snapshotWidth) ? { snapshotWidth: raw.snapshotWidth } : {}),
       };
     case "copyResult":
       if (typeof raw.id !== "number" || !Number.isSafeInteger(raw.id) || typeof raw.ok !== "boolean") {

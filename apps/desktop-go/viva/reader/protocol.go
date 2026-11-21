@@ -17,13 +17,15 @@ import (
 	"fmt"
 	"math"
 	"net/url"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
 
 // ProtocolVersion 与 apps/desktop/src/renderer/reader/protocol.ts 的 READER_PROTOCOL 一致：页面 ready 时带上它，对不上就拒绝。
 // v2：复制带回执（copy 带 id，宿主回 copyResult）；编辑态（editor 视图、页面的 edit 事件、宿主的 focus 消息）。
-const ProtocolVersion = 2
+// v3：网页快照视图（snapshot 视图、页面的 snapshotState 事件、宿主 ui 消息里的 snapshotWidth、转发键增加 escape）。
+const ProtocolVersion = 3
 
 // 页面事件的各项上限。超过上限的整条丢弃（页面不会正常超过它们）；编辑事件另有一档（见 MaxEditBytes）。
 const (
@@ -49,6 +51,14 @@ const (
 	maxErrorBytes     = 2 << 10
 	maxCount          = 1 << 30
 	maxScrollTop      = 1 << 30
+)
+
+// 网页快照视图的上限（宿主 → 页面，宿主是可信方，但超限仍整条拒绝：消息过大会拖垮页面，也说明上游出了问题）。
+const (
+	// MaxSnapshotDocBytes 是快照整页 HTML 的最大字节数。公众号文章的净化后 HTML 通常在几百 KB 到数 MB，
+	// 16 MiB 之内；JSON 编码最坏（全是控制字符）约 6 倍，仍在 WebView2 单条消息能承受的范围内。
+	MaxSnapshotDocBytes = 16 << 20
+	maxSnapshotIDBytes  = 256
 )
 
 // Lang 是页面的界面语言。
@@ -138,14 +148,107 @@ const (
 	// ViewEditor 是主题阅读「原文」的编辑态：整个阅读区是一个 CodeMirror Markdown 编辑器（渲染层 ReconstructionReader 的 MarkdownEditor），
 	// Content 是草稿；文档由页面里的编辑器持有，每次改动经 edit 事件交回宿主（台账 C-012：编辑器用岛，不用 Viva 自带的代码编辑器）。
 	ViewEditor ViewKind = "editor"
+	// ViewSnapshot 是公众号网页快照：整页 HTML 放进沙箱 iframe（srcDoc）里显示，外加目录浮层（渲染层 WebSnapshotPane 的 original 分支）。
+	// 文档与 iframe 的消息都不可信，页面一侧沿用 WebSnapshotPane 的沙箱与来源校验（台账 A-018）。
+	ViewSnapshot ViewKind = "snapshot"
 )
 
+// SnapshotWidth 是网页快照在阅读区里的宽度档（渲染层 wechat-reader-width 的三档）：
+// original 固定 390 px（手机网页宽度），fluid 取舒适阅读宽度，wide 铺满。空值按 fluid 处理。
+type SnapshotWidth string
+
+const (
+	SnapshotWidthOriginal SnapshotWidth = "original"
+	SnapshotWidthFluid    SnapshotWidth = "fluid"
+	SnapshotWidthWide     SnapshotWidth = "wide"
+)
+
+// normalized 把空值规整成 fluid；未知取值原样返回（由 validate 拒绝）。
+func (w SnapshotWidth) normalized() SnapshotWidth {
+	if w == "" {
+		return SnapshotWidthFluid
+	}
+	return w
+}
+
+func (w SnapshotWidth) validate() error {
+	switch w.normalized() {
+	case SnapshotWidthOriginal, SnapshotWidthFluid, SnapshotWidthWide:
+		return nil
+	}
+	return fmt.Errorf("reader: 网页快照宽度 %q 未知", string(w))
+}
+
 // View 是阅读区的内容。Tab 只用于 ViewMarkdown，SourceKind（"body" 或 "summary"）只用于 ViewOriginal 与 ViewEditor。
+// Snapshot* 只用于 ViewSnapshot：SnapshotDoc 是整页 HTML（srcDoc），SnapshotInstanceID 是这次读取的实例标识（iframe 消息按它过滤），
+// SnapshotVersionID 是来源版本（阅读位置按「条目 + 版本」记忆，空表示当前版本），SnapshotAssets 是快照里的本地图片（local-image://…，
+// 点图时页面按它找序号交给图片查看岛）。含切片，所以 View 不可直接比较，比较用 sameContent。
 type View struct {
 	Kind       ViewKind
 	Content    string
 	SourceKind string
 	Tab        Tab
+
+	SnapshotDoc        string
+	SnapshotInstanceID string
+	SnapshotVersionID  string
+	SnapshotWidth      SnapshotWidth
+	SnapshotAssets     []string
+}
+
+// sameContent 报告两个视图要页面显示的东西是否相同。SnapshotWidth 不算：宽度变化走 ui 消息增量同步，
+// 不能因为它重发整页 HTML（iframe 一重载，阅读位置与查找高亮全丢）。
+func (v View) sameContent(o View) bool {
+	return v.Kind == o.Kind && v.Content == o.Content && v.SourceKind == o.SourceKind && v.Tab == o.Tab &&
+		v.SnapshotDoc == o.SnapshotDoc && v.SnapshotInstanceID == o.SnapshotInstanceID &&
+		v.SnapshotVersionID == o.SnapshotVersionID && slices.Equal(v.SnapshotAssets, o.SnapshotAssets)
+}
+
+// clone 复制切片字段：宿主记下的「已发给页面的视图」不能与调用方每帧重建的 Request 共用底层数组。
+func (v View) clone() View {
+	v.SnapshotAssets = slices.Clone(v.SnapshotAssets)
+	return v
+}
+
+// marshalSnapshot 编码快照视图并校验各字段：文档非空且不超限、标识长度合规、宽度已知、图片都是本地图片且不超过查看器的上限。
+// 错误文字只描述哪里不对，不含文档内容。
+func (v View) marshalSnapshot() ([]byte, error) {
+	if v.SnapshotDoc == "" {
+		return nil, errors.New("reader: 网页快照文档为空")
+	}
+	if len(v.SnapshotDoc) > MaxSnapshotDocBytes {
+		return nil, fmt.Errorf("reader: 网页快照文档 %d 字节超过上限 %d", len(v.SnapshotDoc), MaxSnapshotDocBytes)
+	}
+	if !utf8.ValidString(v.SnapshotDoc) {
+		return nil, errors.New("reader: 网页快照文档不是合法的 UTF-8")
+	}
+	if _, ok := boundedText(&v.SnapshotInstanceID, 1, maxSnapshotIDBytes); !ok {
+		return nil, errors.New("reader: 网页快照的实例标识不合规")
+	}
+	if _, ok := boundedText(&v.SnapshotVersionID, 0, maxSnapshotIDBytes); !ok {
+		return nil, errors.New("reader: 网页快照的版本标识不合规")
+	}
+	if err := v.SnapshotWidth.validate(); err != nil {
+		return nil, err
+	}
+	if len(v.SnapshotAssets) > MaxLightboxImages {
+		return nil, fmt.Errorf("reader: 网页快照的图片数 %d 超过上限 %d", len(v.SnapshotAssets), MaxLightboxImages)
+	}
+	assets := make([]string, 0, len(v.SnapshotAssets))
+	for _, asset := range v.SnapshotAssets {
+		if _, ok := boundedText(&asset, len("local-image://")+1, maxImageSrcBytes); !ok || !strings.HasPrefix(asset, "local-image://") {
+			return nil, errors.New("reader: 网页快照的图片地址不是本地图片")
+		}
+		assets = append(assets, asset)
+	}
+	return json.Marshal(struct {
+		Kind       ViewKind      `json:"kind"`
+		Document   string        `json:"document"`
+		InstanceID string        `json:"instanceId"`
+		VersionID  string        `json:"versionId"`
+		Width      SnapshotWidth `json:"width"`
+		Assets     []string      `json:"assets"`
+	}{v.Kind, v.SnapshotDoc, v.SnapshotInstanceID, v.SnapshotVersionID, v.SnapshotWidth.normalized(), assets})
 }
 
 // MarshalJSON 按页面 parseView 期望的形状编码：每种只带它的字段，content 为空串时仍然要带（页面据此判断形状）。
@@ -176,6 +279,8 @@ func (v View) MarshalJSON() ([]byte, error) {
 			Kind    ViewKind `json:"kind"`
 			Content string   `json:"content"`
 		}{v.Kind, v.Content})
+	case ViewSnapshot:
+		return v.marshalSnapshot()
 	}
 	return nil, fmt.Errorf("reader: 未知的视图种类 %q", v.Kind)
 }
@@ -212,6 +317,8 @@ type (
 		T           string `json:"t"`
 		CatalogOpen bool   `json:"catalogOpen"`
 		TocOpen     bool   `json:"tocOpen"`
+		// SnapshotWidth 只在网页快照视图下带：宽度变化不重发整页文档，走这条增量消息。
+		SnapshotWidth SnapshotWidth `json:"snapshotWidth,omitempty"`
 	}
 	// copyResultMessage 是复制的回执：宿主写完系统剪贴板后告诉页面成败（页面的 writeText 据此成功或拒绝，台账 B-069）。
 	copyResultMessage struct {
@@ -237,20 +344,22 @@ func encodeMessage(message any) (string, error) {
 type EventKind string
 
 const (
-	EventReady     EventKind = "ready"
-	EventRendered  EventKind = "rendered"
-	EventMatches   EventKind = "matches"
-	EventScroll    EventKind = "scroll"
-	EventCatalog   EventKind = "catalog"
-	EventToc       EventKind = "toc"
-	EventLink      EventKind = "link"
-	EventCopy      EventKind = "copy"
-	EventEdit      EventKind = "edit"
-	EventLightbox  EventKind = "lightbox"
-	EventToast     EventKind = "toast"
-	EventKey       EventKind = "key"
-	EventFindReset EventKind = "findReset"
-	EventError     EventKind = "error"
+	EventReady    EventKind = "ready"
+	EventRendered EventKind = "rendered"
+	EventMatches  EventKind = "matches"
+	EventScroll   EventKind = "scroll"
+	EventCatalog  EventKind = "catalog"
+	EventToc      EventKind = "toc"
+	// EventSnapshotState 是网页快照页面的版面状态：目录是否因窗口够宽而常驻侧栏（宿主据此决定原生工具栏要不要显示「目录」钮）与目录开合。
+	EventSnapshotState EventKind = "snapshotState"
+	EventLink          EventKind = "link"
+	EventCopy          EventKind = "copy"
+	EventEdit          EventKind = "edit"
+	EventLightbox      EventKind = "lightbox"
+	EventToast         EventKind = "toast"
+	EventKey           EventKind = "key"
+	EventFindReset     EventKind = "findReset"
+	EventError         EventKind = "error"
 )
 
 // Image 是查看器里的一张图。Src 一定是 local-image://<名称>（校验保证）。
@@ -268,7 +377,9 @@ type Event struct {
 	Count   int
 	Top     float64
 	Open    bool
-	URL     string
+	// WideRail 只有 snapshotState 事件有：目录是否常驻在正文侧边的窄轨上（窗口够宽时）。
+	WideRail bool
+	URL      string
 	// Text 是 copy 复制的文本、toast 的提示文字、edit 编辑器里的文档全文。
 	Text string
 	// ID 是复制的编号（页面每次复制递增，回执 copyResult 带回它）；只有 copy 事件有。
@@ -298,34 +409,36 @@ type rawImage struct {
 
 // rawEvent 用指针字段区分「没给」与「零值」：类型不对（比如 seq 是字符串）Unmarshal 就报错，整条丢弃。
 type rawEvent struct {
-	T       string     `json:"t"`
-	V       *float64   `json:"v"`
-	Seq     *float64   `json:"seq"`
-	ID      *float64   `json:"id"`
-	Count   *float64   `json:"count"`
-	Top     *float64   `json:"top"`
-	Open    *bool      `json:"open"`
-	URL     *string    `json:"url"`
-	Text    *string    `json:"text"`
-	Kind    *string    `json:"kind"`
-	Images  []rawImage `json:"images"`
-	Index   *float64   `json:"index"`
-	Key     *string    `json:"key"`
-	Ctrl    *bool      `json:"ctrl"`
-	Alt     *bool      `json:"alt"`
-	Shift   *bool      `json:"shift"`
-	Message *string    `json:"message"`
+	T        string     `json:"t"`
+	V        *float64   `json:"v"`
+	Seq      *float64   `json:"seq"`
+	ID       *float64   `json:"id"`
+	Count    *float64   `json:"count"`
+	Top      *float64   `json:"top"`
+	Open     *bool      `json:"open"`
+	WideRail *bool      `json:"wideRail"`
+	URL      *string    `json:"url"`
+	Text     *string    `json:"text"`
+	Kind     *string    `json:"kind"`
+	Images   []rawImage `json:"images"`
+	Index    *float64   `json:"index"`
+	Key      *string    `json:"key"`
+	Ctrl     *bool      `json:"ctrl"`
+	Alt      *bool      `json:"alt"`
+	Shift    *bool      `json:"shift"`
+	Message  *string    `json:"message"`
 }
 
 // knownEvents 是认得的事件种类：先于其余校验排除未知种类，之后错误文字里可以放心带上种类名（它一定是下列之一）。
 var knownEvents = map[EventKind]bool{
 	EventReady: true, EventRendered: true, EventMatches: true, EventScroll: true, EventCatalog: true, EventToc: true,
 	EventLink: true, EventCopy: true, EventEdit: true, EventLightbox: true, EventToast: true, EventKey: true, EventFindReset: true,
-	EventError: true,
+	EventError: true, EventSnapshotState: true,
 }
 
-// forwardedKeys 是页面可以转交宿主的按键：与页面 ReaderApp 里的 FORWARDED_KEYS 一致。
-var forwardedKeys = map[string]bool{"f": true, "s": true, "z": true, "arrowleft": true, "arrowright": true}
+// forwardedKeys 是页面可以转交宿主的按键：与页面 ReaderApp 里的 FORWARDED_KEYS 一致，外加 escape——
+// 网页快照的 iframe 里按 Esc（退出专注阅读）时，窗口收不到按键，页面转交（SnapshotIslandView）。
+var forwardedKeys = map[string]bool{"f": true, "s": true, "z": true, "arrowleft": true, "arrowright": true, "escape": true}
 
 // ParseEvent 校验并解析页面经 window.viva.postMessage 发来的一条文本。校验不过返回 ErrBadEvent，调用方丢弃并（脱敏地）记日志。
 func ParseEvent(text string) (Event, error) {
@@ -378,6 +491,11 @@ func ParseEvent(text string) (Event, error) {
 			return Event{}, fmt.Errorf("%w：%s 缺少开合状态", ErrBadEvent, raw.T)
 		}
 		ev.Open = *raw.Open
+	case EventSnapshotState:
+		if raw.Open == nil || raw.WideRail == nil {
+			return Event{}, fmt.Errorf("%w：snapshotState 缺少版面状态", ErrBadEvent)
+		}
+		ev.Open, ev.WideRail = *raw.Open, *raw.WideRail
 	case EventLink:
 		link, ok := boundedText(raw.URL, 1, MaxLinkBytes)
 		if !ok {

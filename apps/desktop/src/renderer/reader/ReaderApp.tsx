@@ -27,11 +27,13 @@ import { SnapshotToc } from "../components/library/SnapshotToc";
 import { useMarkFindNavigation } from "../components/library/use-mark-find";
 import type { ReaderBridge } from "./bridge";
 import { setLightboxOpener } from "./lightbox-shim";
+import { SnapshotIslandView } from "./SnapshotIslandView";
 import {
   READER_PROTOCOL,
   type HostView,
   type ReaderLang,
   type ReaderTheme,
+  type SnapshotWidth,
 } from "./protocol";
 import { applyTheme } from "./theme";
 
@@ -74,6 +76,8 @@ interface FindState {
 interface UiState {
   catalogOpen: boolean;
   tocOpen: boolean;
+  /** 网页快照的宽度档：随 view 消息初始化，之后由宿主的 ui 消息增量改（不重载 iframe）。 */
+  snapshotWidth: SnapshotWidth;
 }
 
 interface ViewProps {
@@ -98,6 +102,7 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   const [ui, setUiState] = useState<UiState>({
     catalogOpen: false,
     tocOpen: false,
+    snapshotWidth: "fluid",
   });
   const seqRef = useRef(0);
   seqRef.current = state?.seq ?? 0;
@@ -129,16 +134,18 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
             setUiState({
               catalogOpen: message.catalogOpen,
               tocOpen: message.tocOpen,
+              snapshotWidth: message.view.kind === "snapshot" ? message.view.width : "fluid",
             });
             break;
           case "find":
             setFind({ query: message.query, index: message.index });
             break;
           case "ui":
-            setUiState({
+            setUiState((previous) => ({
               catalogOpen: message.catalogOpen,
               tocOpen: message.tocOpen,
-            });
+              snapshotWidth: message.snapshotWidth ?? previous.snapshotWidth,
+            }));
             break;
           case "copyResult": {
             const entry = pendingCopies.current.get(message.id);
@@ -276,6 +283,16 @@ function ViewBody(props: ViewProps) {
       return <RepliesView {...props} />;
     case "gallery":
       return <GalleryView {...props} />;
+    case "snapshot":
+      return (
+        <SnapshotIslandView
+          bridge={props.bridge}
+          state={props.state}
+          find={props.find}
+          ui={props.ui}
+          setUi={props.setUi}
+        />
+      );
   }
 }
 

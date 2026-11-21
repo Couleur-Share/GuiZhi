@@ -224,6 +224,10 @@ func (e readerEvents) Catalog(open bool) { e.s.detail.panel.catalogOpen = open }
 
 func (e readerEvents) Toc(open bool) { e.s.setTocOpen(open) }
 
+// SnapshotState 接收网页快照页面的版面状态。库详情还没有网页快照视图（readerViewFor 不产出 ViewSnapshot），
+// 所以此刻不会有人调它；接线（工具栏「目录」钮的显隐与 aria-expanded）在 M2-5b 的下一步做。
+func (e readerEvents) SnapshotState(wideRail, tocOpen bool) {}
+
 // Link 用系统浏览器打开页面里的链接（宿主已校验为 http/https）。
 func (e readerEvents) Link(url string) { e.s.openSource(url) }
 
@@ -279,6 +283,9 @@ func (e readerEvents) Key(key string, ctrl, alt, shift bool) {
 			}
 			s.Store.Spawn(func() { s.Store.ReviewNavigate(s.Ctx, dir) })
 		}
+	case "escape":
+		// 网页快照的 iframe 里按 Esc：与窗口收到 Esc 时退出专注阅读同一件事（渲染层 WebSnapshotPane 的 escape → setFocusReadingMode(false)）。
+		s.SetFocusReading(false)
 	default:
 		s.detailShortcut(gfx.KeyEvent{Text: key, Modifiers: mod})
 	}

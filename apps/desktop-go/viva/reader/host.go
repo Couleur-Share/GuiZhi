@@ -49,6 +49,9 @@ type Handler interface {
 	// Catalog 与 Toc 是页面里目录浮层、楼层目录的开合。
 	Catalog(open bool)
 	Toc(open bool)
+	// SnapshotState 是网页快照页面的版面状态：wideRail 为真表示目录常驻在正文侧边的窄轨上（原生工具栏不必显示「目录」钮），
+	// tocOpen 是目录当前是否展开（工具栏钮的 aria-expanded）。页面每次版面或开合变化时上报，也会在换内容后重报一次。
+	SnapshotState(wideRail, tocOpen bool)
 	// Link 是要用系统浏览器打开的链接（已校验为 http/https）。
 	Link(url string)
 	// Copy 是要写进剪贴板的文本；返回写入是否成功，宿主据此给页面回执（页面的 writeText 成功或拒绝，台账 B-069）。
@@ -96,7 +99,8 @@ type Request struct {
 	// 渲染层只在切换条目时恢复阅读位置，切标签页不恢复，所以调用方只在条目刚打开时给出）。
 	RestoreTop  *float64
 	CatalogOpen bool
-	TocOpen     bool
+	// TocOpen 是目录浮层的开合：原文视图的标题目录，网页快照视图的文章目录（原生工具栏的「目录」钮切换它）。
+	TocOpen bool
 	// FindQuery 与 FindIndex 是页内查找：词为空表示没有在查找；Index 是当前命中的序号（从 0 起）。
 	FindQuery string
 	FindIndex int
@@ -372,7 +376,7 @@ func (h *Host) flush() {
 		h.sent.themeSet, h.sent.theme, h.sent.lang = true, req.Theme, req.Lang
 	}
 	key := viewKey{req.ItemID, req.Tab, req.View.Kind}
-	if !h.sent.viewSet || h.sent.key != key || h.sent.view != req.View {
+	if !h.sent.viewSet || h.sent.key != key || !h.sent.view.sameContent(req.View) {
 		opening := !h.sent.viewSet || h.sent.key != key
 		var restore *float64
 		if opening {
@@ -385,7 +389,7 @@ func (h *Host) flush() {
 		}
 		h.seq = seq
 		h.remember(viewContext{seq: seq, itemID: req.ItemID, tab: req.Tab, kind: req.View.Kind})
-		h.sent.viewSet, h.sent.key, h.sent.view = true, key, req.View
+		h.sent.viewSet, h.sent.key, h.sent.view = true, key, req.View.clone()
 		h.sent.catalogOpen, h.sent.tocOpen = req.CatalogOpen, req.TocOpen
 		h.rendered = false
 	}
@@ -398,11 +402,24 @@ func (h *Host) flush() {
 		}
 		h.sent.findSet, h.sent.findQuery, h.sent.findIndex = true, req.FindQuery, req.FindIndex
 	}
-	if h.sent.catalogOpen != req.CatalogOpen || h.sent.tocOpen != req.TocOpen {
-		if !h.post(uiMessage{T: "ui", CatalogOpen: req.CatalogOpen, TocOpen: req.TocOpen}) {
+	// 目录开合与（网页快照的）宽度都是增量：只发 ui 消息，不重发整页内容。
+	widthChanged := req.View.Kind == ViewSnapshot && h.sent.view.SnapshotWidth.normalized() != req.View.SnapshotWidth.normalized()
+	if h.sent.catalogOpen != req.CatalogOpen || h.sent.tocOpen != req.TocOpen || widthChanged {
+		ui := uiMessage{T: "ui", CatalogOpen: req.CatalogOpen, TocOpen: req.TocOpen}
+		if req.View.Kind == ViewSnapshot {
+			if err := req.View.SnapshotWidth.validate(); err != nil {
+				h.fail(viewKey{req.ItemID, req.Tab, req.View.Kind}, err)
+				return
+			}
+			ui.SnapshotWidth = req.View.SnapshotWidth.normalized()
+		}
+		if !h.post(ui) {
 			return
 		}
 		h.sent.catalogOpen, h.sent.tocOpen = req.CatalogOpen, req.TocOpen
+		if req.View.Kind == ViewSnapshot {
+			h.sent.view.SnapshotWidth = req.View.SnapshotWidth
+		}
 	}
 }
 
@@ -519,6 +536,14 @@ func (h *Host) dispatch(ev Event) {
 		h.sent.tocOpen = ev.Open
 		if handler != nil {
 			handler.Toc(ev.Open)
+		}
+	case EventSnapshotState:
+		if !h.sent.viewSet || h.sent.view.Kind != ViewSnapshot {
+			return // 不是网页快照视图：这个事件不该出现，丢弃
+		}
+		h.sent.tocOpen = ev.Open
+		if handler != nil {
+			handler.SnapshotState(ev.WideRail, ev.Open)
 		}
 	case EventLink:
 		link, ok := SafeLink(ev.URL)
