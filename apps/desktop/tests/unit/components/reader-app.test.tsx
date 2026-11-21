@@ -17,6 +17,36 @@ vi.mock("../../../src/renderer/components/library/ImageLightbox", async () =>
   import("../../../src/renderer/reader/lightbox-shim"),
 );
 
+// CodeMirror 在 jsdom 里没有版面，行为靠真窗口冒烟验证；这里换成只暴露 props 与 DOM 骨架（data-testid、.cm-editor、.cm-content）的假编辑器。
+interface FakeEditorProps {
+  docId: string;
+  value: string;
+  onChange: (value: string) => void;
+  showLineNumbers: boolean;
+  placeholderText?: string;
+}
+const fakeEditor = vi.hoisted(() => ({ props: null as FakeEditorProps | null, mounts: 0 }));
+vi.mock("../../../src/renderer/components/library/MarkdownEditor", async () => {
+  const React = await import("react");
+  return {
+    MarkdownEditor: (props: FakeEditorProps) => {
+      fakeEditor.props = props;
+      React.useEffect(() => {
+        fakeEditor.mounts += 1;
+      }, []);
+      return React.createElement(
+        "div",
+        { "data-testid": "markdown-editor" },
+        React.createElement(
+          "div",
+          { className: "cm-editor" },
+          React.createElement("div", { className: "cm-content", tabIndex: 0, contentEditable: true }),
+        ),
+      );
+    },
+  };
+});
+
 // jsdom 没有 scrollIntoView（目录浮层把当前章节滚进视野时要用）。
 if (!Element.prototype.scrollIntoView) {
   Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -442,6 +472,150 @@ describe("阅读岛页面：交给宿主处理的交互", () => {
       },
     ]);
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+});
+
+describe("阅读岛页面：编辑态", () => {
+  const editorView = (patch: Partial<HostView> = {}, content = "# 草稿\n\n正文") =>
+    view({ view: { kind: "editor", content, sourceKind: "body" }, ...patch });
+
+  afterEach(() => {
+    fakeEditor.props = null;
+    fakeEditor.mounts = 0;
+  });
+
+  it("按 ReconstructionReader 编辑态的 DOM 链画出编辑器；挂好之后才带 seq 报 rendered", async () => {
+    const { post, container, events } = mount();
+    post(editorView({ seq: 4 }));
+    // 懒加载的分块没解析完：先是「正在加载编辑器…」，还不能报 rendered。
+    expect(container.textContent).toContain("正在加载编辑器…");
+    expect(events("rendered")).toHaveLength(0);
+    await waitFor(() => expect(events("rendered")).toEqual([{ t: "rendered", seq: 4 }]));
+    const reader = container.querySelector("[data-article-reader]");
+    expect(reader?.getAttribute("data-article-editing")).toBe("true");
+    expect(JSON.parse(reader?.getAttribute("data-article-target") ?? "{}")).toEqual({
+      itemId: "a",
+      view: "body",
+      sourceKind: "body",
+    });
+    expect(
+      container.querySelector(
+        "[data-article-reader] > [data-testid='reconstruction-reader'] > .relative.min-h-0.flex-1 > .h-full [data-testid='markdown-editor']",
+      ),
+    ).not.toBeNull();
+    expect(fakeEditor.props).toMatchObject({
+      docId: "a:body",
+      value: "# 草稿\n\n正文",
+      showLineNumbers: false,
+      placeholderText: "编辑 Markdown 内容…",
+    });
+  });
+
+  it("总结的编辑态：docId 与 data-article-target 取总结的来源", async () => {
+    const { post, container } = mount();
+    post(
+      view({ tab: "summary", view: { kind: "editor", content: "总结", sourceKind: "summary" } }),
+    );
+    await waitFor(() => expect(fakeEditor.props).not.toBeNull());
+    expect(fakeEditor.props?.docId).toBe("a:summary");
+    const reader = container.querySelector("[data-article-reader]");
+    expect(JSON.parse(reader?.getAttribute("data-article-target") ?? "{}")).toMatchObject({
+      view: "summary",
+      sourceKind: "summary",
+    });
+  });
+
+  it("英文界面的占位文字取英文语言包", async () => {
+    const { post } = mount();
+    post({ t: "theme", theme: LIGHT, lang: "en" });
+    post(editorView());
+    await waitFor(() => expect(fakeEditor.props).not.toBeNull());
+    expect(fakeEditor.props?.placeholderText).toBe("Edit Markdown…");
+    post({ t: "theme", theme: LIGHT, lang: "zh" });
+  });
+
+  it("编辑器的每次改动都带当前序号交给宿主，不合并", async () => {
+    const { post, events } = mount();
+    post(editorView({ seq: 6 }));
+    await waitFor(() => expect(fakeEditor.props).not.toBeNull());
+    act(() => fakeEditor.props?.onChange("甲"));
+    act(() => fakeEditor.props?.onChange("甲乙"));
+    act(() => fakeEditor.props?.onChange(""));
+    expect(events("edit")).toEqual([
+      { t: "edit", seq: 6, text: "甲" },
+      { t: "edit", seq: 6, text: "甲乙" },
+      { t: "edit", seq: 6, text: "" },
+    ]);
+  });
+
+  it("宿主换了序号与内容：改动用新序号，编辑器拿到新内容，并为新序号再报一次 rendered", async () => {
+    const { post, events } = mount();
+    post(editorView({ seq: 1 }, "旧"));
+    await waitFor(() => expect(events("rendered")).toHaveLength(1));
+    post(editorView({ seq: 2 }, "新"));
+    await waitFor(() => expect(events("rendered")).toEqual([
+      { t: "rendered", seq: 1 },
+      { t: "rendered", seq: 2 },
+    ]));
+    expect(fakeEditor.props?.value).toBe("新");
+    act(() => fakeEditor.props?.onChange("新增"));
+    expect(events("edit")).toEqual([{ t: "edit", seq: 2, text: "新增" }]);
+    // 同一个编辑视图的内容更新不重建编辑器（渲染层的编辑器跨内容更新常驻）。
+    expect(fakeEditor.mounts).toBe(1);
+  });
+
+  it("只转交查找、保存与 Alt+Z；撤销与 Alt+方向键留给编辑器，不拦也不转", async () => {
+    const { post, events } = mount();
+    post(editorView({ seq: 3 }));
+    await waitFor(() => expect(fakeEditor.props).not.toBeNull());
+    const press = (init: KeyboardEventInit) => fireEvent.keyDown(document.body, init);
+    expect(press({ key: "f", ctrlKey: true })).toBe(false); // 转交（拦下）
+    expect(press({ key: "s", ctrlKey: true })).toBe(false);
+    expect(press({ key: "z", altKey: true })).toBe(false);
+    expect(press({ key: "z", ctrlKey: true })).toBe(true); // 编辑器的撤销：不拦
+    expect(press({ key: "ArrowLeft", altKey: true })).toBe(true);
+    expect(press({ key: "ArrowRight", altKey: true })).toBe(true);
+    expect(press({ key: "z", ctrlKey: true, altKey: true })).toBe(true);
+    expect(press({ key: "f", altKey: true })).toBe(true);
+    expect(events("key").map((event) => `${event.key}/${event.ctrl}/${event.alt}`)).toEqual([
+      "f/true/false",
+      "s/true/false",
+      "z/false/true",
+    ]);
+  });
+
+  it("离开编辑视图后，转交恢复成整组白名单", async () => {
+    const { post, events } = mount();
+    post(editorView({ seq: 3 }));
+    await waitFor(() => expect(fakeEditor.props).not.toBeNull());
+    post(view({ seq: 4 }));
+    fireEvent.keyDown(document.body, { key: "z", ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: "ArrowRight", altKey: true });
+    expect(events("key").map((event) => `${event.key}/${event.seq}`)).toEqual(["z/4", "arrowright/4"]);
+  });
+
+  it("focus：编辑器挂好之后聚焦内容区；先到的请求在挂好之后兑现", async () => {
+    const { post, container } = mount();
+    post(editorView());
+    post({ t: "focus" }); // 懒加载的编辑器还没挂好
+    await waitFor(() => {
+      expect(document.activeElement).toBe(container.querySelector(".cm-content"));
+    });
+    (document.activeElement as HTMLElement).blur();
+    post({ t: "focus" }); // 已经挂好：直接聚焦
+    expect(document.activeElement).toBe(container.querySelector(".cm-content"));
+  });
+
+  it("focus：不是编辑视图时忽略，也不留到以后进编辑态时才兑现", async () => {
+    const { post, container } = mount();
+    post(view());
+    post({ t: "focus" });
+    post(editorView({ seq: 2 }));
+    await waitFor(() => expect(container.querySelector(".cm-content")).not.toBeNull());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(document.activeElement).not.toBe(container.querySelector(".cm-content"));
   });
 });
 

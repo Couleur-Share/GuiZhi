@@ -96,6 +96,32 @@ describe("阅读岛协议：宿主消息的解析", () => {
     ).toMatchObject({ view: { kind: "none" } });
   });
 
+  it("editor 分支同 original：要字符串 content 与 body / summary 来源", () => {
+    const base = { t: "view", seq: 2, itemId: "a", tab: "summary", restoreTop: null };
+    expect(
+      parseHostMessage(
+        JSON.stringify({ ...base, view: { kind: "editor", content: "草稿", sourceKind: "summary" } }),
+      ),
+    ).toMatchObject({ view: { kind: "editor", content: "草稿", sourceKind: "summary" } });
+    expect(
+      parseHostMessage(
+        JSON.stringify({ ...base, view: { kind: "editor", content: "", sourceKind: "body" } }),
+      ),
+    ).toMatchObject({ view: { kind: "editor", content: "", sourceKind: "body" } });
+    for (const bad of [
+      { kind: "editor", content: "草稿" },
+      { kind: "editor", content: "草稿", sourceKind: "replies" },
+      { kind: "editor", content: 1, sourceKind: "body" },
+      { kind: "editor", sourceKind: "body" },
+    ]) {
+      expect(parseHostMessage(JSON.stringify({ ...base, view: bad }))).toBeNull();
+    }
+  });
+
+  it("focus 没有字段", () => {
+    expect(parseHostMessage(JSON.stringify({ t: "focus" }))).toEqual({ t: "focus" });
+  });
+
   it("find 的序号取整，非数字丢弃；未知类型与坏 JSON 丢弃", () => {
     expect(
       parseHostMessage(JSON.stringify({ t: "find", query: "词", index: 2.9 })),

@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -47,6 +49,23 @@ const SCROLL_REPORT_MS = 200;
 /** 需要转交宿主的窗口级快捷键（渲染层在 window 上监听它们，岛有键盘焦点时宿主收不到）。 */
 const FORWARDED_KEYS = new Set(["f", "s", "z", "arrowleft", "arrowright"]);
 
+/**
+ * 编辑器里转交的按键：只有查找（Ctrl+F）、保存（Ctrl+S）、专注阅读（Alt+Z）。
+ * 其余的属于 CodeMirror：Ctrl+Z 是它的撤销，Alt+←/→ 是它的按句法移动光标——渲染层的窗口监听在可编辑区里也不动它们（use-item-keyboard.ts），
+ * 而岛里的转交挂在捕获阶段，不收窄就会抢在编辑器之前把它们吞掉。
+ */
+function editorForwardsKey(event: KeyboardEvent, key: string): boolean {
+  if (event.ctrlKey && !event.altKey) return key === "f" || key === "s";
+  return event.altKey && !event.ctrlKey && key === "z";
+}
+
+/** 编辑器（含 CodeMirror 及其语法与历史扩展）只在第一次进编辑态时才加载：普通阅读不付这份内存与解析的代价。 */
+const MarkdownEditor = lazy(() =>
+  import("../components/library/MarkdownEditor").then((m) => ({
+    default: m.MarkdownEditor,
+  })),
+);
+
 interface FindState {
   query: string;
   index: number;
@@ -65,6 +84,8 @@ interface ViewProps {
   setUi: (patch: Partial<UiState>) => void;
   /** 本地改查找状态（楼层跳转需要立刻清掉过滤词，不能等宿主绕一圈）。 */
   setFind: (next: FindState) => void;
+  /** 宿主要求把焦点交给编辑器的次数（只有编辑视图用）。 */
+  focusTick: number;
 }
 
 export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
@@ -80,6 +101,11 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   });
   const seqRef = useRef(0);
   seqRef.current = state?.seq ?? 0;
+  // 编辑视图里转交的快捷键要收窄（editorForwardsKey）；监听器装一次，所以用 ref 读最新值。
+  const editingRef = useRef(false);
+  editingRef.current = state?.view.kind === "editor";
+  // 宿主要求把焦点交给编辑器的次数（focus 消息）；EditorView 只响应挂载之后新增的请求。
+  const [focusTick, setFocusTick] = useState(0);
   // 等宿主回执的复制：id → writeText 返回的 Promise 的两端（台账 B-069）。
   const copyIdRef = useRef(0);
   const pendingCopies = useRef(
@@ -123,6 +149,9 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
             else entry.reject(new Error("clipboard write failed"));
             break;
           }
+          case "focus":
+            setFocusTick((tick) => tick + 1);
+            break;
         }
       }),
     [bridge],
@@ -156,6 +185,7 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
     const onKeyDown = (event: KeyboardEvent): void => {
       const key = event.key.toLowerCase();
       if ((!event.ctrlKey && !event.altKey) || !FORWARDED_KEYS.has(key)) return;
+      if (editingRef.current && !editorForwardsKey(event, key)) return;
       event.preventDefault();
       bridge.send({
         t: "key",
@@ -207,7 +237,7 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   }, [bridge]);
 
   if (!state) return <div className="h-full" />;
-  const props: ViewProps = { bridge, state, find, ui, setUi, setFind };
+  const props: ViewProps = { bridge, state, find, ui, setUi, setFind, focusTick };
   // 渲染层按条目与标签换分支（key={item.id}）：换了条目或标签就重建，滚动回到顶部；同一条的内容更新只换内容。
   const key = `${state.itemId}:${state.tab}:${state.view.kind}`;
   return (
@@ -219,12 +249,16 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
 
 /**
  * 渲染层 ContentPanel 在 data-article-reader 上写的两个属性（问答据此找到选中的文字属于哪一块正文，article-reader-target.ts）：
- * 岛里不编辑，editing 恒为 "false"；target 的取值同 ContentPanel（图片标签算正文；源码类型取原文的来源，其余是正文）。
+ * editing 在编辑视图里为 "true"（渲染层 themed.editing），其余为 "false"；
+ * target 的取值同 ContentPanel（图片标签算正文；源码类型取原文的来源，其余是正文）。
  */
-function articleAttrs(state: HostView): { "data-article-editing": "false"; "data-article-target": string } {
-  const sourceKind = state.view.kind === "original" ? state.view.sourceKind : "body";
+function articleAttrs(state: HostView): { "data-article-editing": "true" | "false"; "data-article-target": string } {
+  const sourceKind = state.view.kind === "original" || state.view.kind === "editor" ? state.view.sourceKind : "body";
   const view = state.tab === "images" ? "body" : state.tab;
-  return { "data-article-editing": "false", "data-article-target": JSON.stringify({ itemId: state.itemId, view, sourceKind }) };
+  return {
+    "data-article-editing": state.view.kind === "editor" ? "true" : "false",
+    "data-article-target": JSON.stringify({ itemId: state.itemId, view, sourceKind }),
+  };
 }
 
 function ViewBody(props: ViewProps) {
@@ -234,6 +268,8 @@ function ViewBody(props: ViewProps) {
       return <div className="min-h-0 flex-1" data-article-reader {...articleAttrs(props.state)} />;
     case "original":
       return <OriginalView {...props} />;
+    case "editor":
+      return <EditorView {...props} />;
     case "markdown":
       return <MarkdownView {...props} />;
     case "replies":
@@ -416,6 +452,81 @@ function OriginalView(props: ViewProps) {
             }
             onTop={() => scrollRef.current?.scrollTo({ top: 0 })}
           />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 编辑态：ReconstructionReader 里 mode.editing 的画法（懒加载的 MarkdownEditor，包装 div 的类名与层级同它）。
+ * 文档由编辑器持有；每次改动把全文交给宿主（edit，不合并：宿主的草稿因此从不落后于页面，「完成编辑」不需要再向页面要一次）。
+ * 渲染层的 onChange 同样每次改动回调一次；和渲染层一样不显示行号、不记滚动位置、不做查找高亮。
+ */
+function EditorView(props: ViewProps) {
+  const { bridge, state, focusTick } = props;
+  const { t } = useTranslation();
+  const view = state.view as Extract<HostView["view"], { kind: "editor" }>;
+  const seqRef = useRef(state.seq);
+  seqRef.current = state.seq;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const wantFocus = useRef(false);
+  const handledTick = useRef(focusTick);
+
+  const onChange = useCallback(
+    (text: string) => bridge.send({ t: "edit", seq: seqRef.current, text }),
+    [bridge],
+  );
+  // 渲染层标题框里按 Enter 的做法：直接找编辑器的内容区并聚焦；没有就什么也不做。
+  const tryFocus = useCallback((): boolean => {
+    const content = rootRef.current?.querySelector<HTMLElement>('[data-testid="markdown-editor"] .cm-content');
+    if (!content) return false;
+    content.focus();
+    return true;
+  }, []);
+
+  // 宿主的焦点请求：编辑器（懒加载的分块）还没挂好就记下来，挂好之后兑现。
+  useEffect(() => {
+    if (focusTick === handledTick.current) return;
+    handledTick.current = focusTick;
+    wantFocus.current = !tryFocus();
+  }, [focusTick, tryFocus]);
+
+  // 编辑器挂好之后才算渲染完成（rendered 之前 CodeMirror 的 DOM 还不存在）；每份内容（序号）各报一次。
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let reported = false;
+    const check = (): void => {
+      if (reported || !root.querySelector(".cm-editor")) return;
+      reported = true;
+      observer.disconnect();
+      bridge.send({ t: "rendered", seq: state.seq });
+      if (wantFocus.current) wantFocus.current = !tryFocus();
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(root, { childList: true, subtree: true });
+    check();
+    return () => observer.disconnect();
+  }, [bridge, state.seq, tryFocus]);
+
+  return (
+    <div className="min-h-0 flex-1" data-article-reader {...articleAttrs(state)}>
+      <div className="relative flex h-full min-h-0 flex-col" data-testid="reconstruction-reader">
+        <div ref={rootRef} className="relative min-h-0 flex-1">
+          <div className="h-full">
+            <Suspense
+              fallback={<p className="p-4">{t("themedReading.readerLoadingEditor", "正在加载编辑器…")}</p>}
+            >
+              <MarkdownEditor
+                docId={`${state.itemId}:${view.sourceKind}`}
+                value={view.content}
+                onChange={onChange}
+                showLineNumbers={false}
+                placeholderText={t("themedReading.readerEditPlaceholder", "编辑 Markdown 内容…")}
+              />
+            </Suspense>
+          </div>
         </div>
       </div>
     </div>

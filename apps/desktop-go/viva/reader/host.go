@@ -54,6 +54,9 @@ type Handler interface {
 	// Copy 是要写进剪贴板的文本；返回写入是否成功，宿主据此给页面回执（页面的 writeText 成功或拒绝，台账 B-069）。
 	// 失败原因由实现自己向用户说明，这里只需要一个 error。
 	Copy(text string) error
+	// Edit 是编辑器里文档的当前全文（每次改动一条，不合并）。itemID 与 tab 是改动所属的内容（与 Scroll 同理：
+	// 换内容之前页面的最后一次改动，到达时界面可能已经在看别的条目，它仍然属于原来的草稿）。
+	Edit(itemID string, tab Tab, text string)
 	// Lightbox 是要打开的图片查看器。
 	Lightbox(images []Image, index int)
 	// Toast 是页面要给用户看的警告。
@@ -113,6 +116,7 @@ type viewContext struct {
 	seq    uint64
 	itemID string
 	tab    Tab
+	kind   ViewKind
 }
 
 const maxViewContexts = 16
@@ -222,6 +226,16 @@ func (h *Host) Focus() {
 	if h.page != nil && h.ready {
 		h.page.Focus()
 	}
+}
+
+// FocusEditor 把键盘焦点交给编辑态里的编辑器（标题框里按 Enter：渲染层 ItemDetailHeader 直接聚焦 `.cm-content`）。
+// 岛没开、没握手或页面里此刻不是编辑视图时什么也不做并返回 false；编辑器还在加载时页面会记下请求，挂好之后聚焦。
+func (h *Host) FocusEditor() bool {
+	if h.page == nil || !h.ready || !h.sent.viewSet || h.sent.view.Kind != ViewEditor {
+		return false
+	}
+	h.page.Focus()
+	return h.post(focusMessage{T: "focus"})
 }
 
 // Failure 返回 req 这份内容的岛为什么不可用（打不开、握手超时、协议不符）；没有失败或失败属于别的内容时为 nil。
@@ -370,7 +384,7 @@ func (h *Host) flush() {
 			return
 		}
 		h.seq = seq
-		h.remember(viewContext{seq: seq, itemID: req.ItemID, tab: req.Tab})
+		h.remember(viewContext{seq: seq, itemID: req.ItemID, tab: req.Tab, kind: req.View.Kind})
 		h.sent.viewSet, h.sent.key, h.sent.view = true, key, req.View
 		h.sent.catalogOpen, h.sent.tocOpen = req.CatalogOpen, req.TocOpen
 		h.rendered = false
@@ -423,6 +437,12 @@ func (h *Host) onMessage(text string) {
 	}
 	ev, err := ParseEvent(text)
 	if err != nil {
+		if errors.Is(err, ErrEditTooLarge) && h.ready && h.sent.viewSet && h.sent.view.Kind == ViewEditor {
+			// 页面里的文档没能同步到宿主：不能让草稿悄悄落后于页面（「完成编辑」会存旧内容），按页面失败处理，
+			// 界面画出失败原因与重试；重试以宿主已有的草稿重开编辑器。fail 自带诊断。
+			h.fail(viewKey{h.req.ItemID, h.req.Tab, h.req.View.Kind}, err)
+			return
+		}
 		h.diag(err)
 		return
 	}
@@ -437,6 +457,21 @@ func (h *Host) onMessage(text string) {
 		// 阅读位置按它所属的内容记：换内容之前页面补报的那一次，到达时可能已经是下一份内容的序号之后。
 		if ctx, ok := h.context(ev.Seq); ok && h.handler != nil {
 			h.handler.Scroll(ctx.itemID, ctx.tab, ev.Top)
+		}
+		return
+	}
+	if ev.Kind == EventEdit {
+		// 改动按它所属的编辑视图记（同阅读位置）：属于旧内容的迟到改动仍然是旧草稿的最后一笔，丢掉就少存了字。
+		ctx, ok := h.context(ev.Seq)
+		if !ok || ctx.kind != ViewEditor {
+			return
+		}
+		if ev.Seq == h.seq && h.sent.viewSet && h.sent.view.Kind == ViewEditor {
+			// 页面里的文档此刻就是这份：期望里的草稿与它一致时，下一帧不必把整篇再发回去。
+			h.sent.view.Content = ev.Text
+		}
+		if h.handler != nil {
+			h.handler.Edit(ctx.itemID, ctx.tab, ev.Text)
 		}
 		return
 	}

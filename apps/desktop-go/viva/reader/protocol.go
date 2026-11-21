@@ -22,13 +22,21 @@ import (
 )
 
 // ProtocolVersion 与 apps/desktop/src/renderer/reader/protocol.ts 的 READER_PROTOCOL 一致：页面 ready 时带上它，对不上就拒绝。
-// v2：复制带回执（copy 带 id，宿主回 copyResult）。
+// v2：复制带回执（copy 带 id，宿主回 copyResult）；编辑态（editor 视图、页面的 edit 事件、宿主的 focus 消息）。
 const ProtocolVersion = 2
 
-// 页面事件的各项上限。超过上限的整条丢弃（页面不会正常超过它们）。
+// 页面事件的各项上限。超过上限的整条丢弃（页面不会正常超过它们）；编辑事件另有一档（见 MaxEditBytes）。
 const (
 	// MaxEventBytes 是一条页面事件的最大字节数（JSON 文本）。代码块复制可以很长，所以放宽到 4 MiB。
 	MaxEventBytes = 4 << 20
+	// MaxEditBytes 是一条编辑事件（edit）的最大字节数：事件带着文档全文，文档可以比普通事件大得多。
+	// 超出它的编辑事件不能悄悄丢掉（草稿会落后于页面里的文档，「完成编辑」就会存旧内容），宿主把它按页面失败处理（ErrEditTooLarge）。
+	MaxEditBytes = 64 << 20
+	// MaxEditTextBytes 是编辑事件里文档全文的最大字节数（UTF-8）。界面一侧用 MaxEditChars 在进入编辑态时拦下超限的文档：
+	// 8 Mi 个 UTF-16 码元的文档，JSON 编码后最坏 6 字节每码元（控制字符的 \u00XX 转义），仍在 MaxEditBytes 之内。
+	MaxEditTextBytes = 24 << 20
+	// MaxEditChars 是能进编辑态的文档的最大长度（UTF-16 码元，渲染层的字符串长度口径；台账 B-070）。
+	MaxEditChars = 8 << 20
 	// MaxCopyBytes 是一次复制的最大文本长度。
 	MaxCopyBytes = 2 << 20
 	// MaxLinkBytes 是一个链接的最大长度。
@@ -127,9 +135,12 @@ const (
 	ViewReplies ViewKind = "replies"
 	// ViewGallery 是图片条目的配图画廊。
 	ViewGallery ViewKind = "gallery"
+	// ViewEditor 是主题阅读「原文」的编辑态：整个阅读区是一个 CodeMirror Markdown 编辑器（渲染层 ReconstructionReader 的 MarkdownEditor），
+	// Content 是草稿；文档由页面里的编辑器持有，每次改动经 edit 事件交回宿主（台账 C-012：编辑器用岛，不用 Viva 自带的代码编辑器）。
+	ViewEditor ViewKind = "editor"
 )
 
-// View 是阅读区的内容。Tab 只用于 ViewMarkdown，SourceKind（"body" 或 "summary"）只用于 ViewOriginal。
+// View 是阅读区的内容。Tab 只用于 ViewMarkdown，SourceKind（"body" 或 "summary"）只用于 ViewOriginal 与 ViewEditor。
 type View struct {
 	Kind       ViewKind
 	Content    string
@@ -142,7 +153,7 @@ func (v View) MarshalJSON() ([]byte, error) {
 	switch v.Kind {
 	case ViewNone:
 		return []byte(`{"kind":"none"}`), nil
-	case ViewOriginal:
+	case ViewOriginal, ViewEditor:
 		if v.SourceKind != "body" && v.SourceKind != "summary" {
 			return nil, fmt.Errorf("reader: 原文的来源 %q 只能是 body 或 summary", v.SourceKind)
 		}
@@ -208,6 +219,10 @@ type (
 		ID uint64 `json:"id"`
 		OK bool   `json:"ok"`
 	}
+	// focusMessage 要求页面把键盘焦点交给编辑器（标题框里按 Enter）；当前不是编辑视图时页面忽略。
+	focusMessage struct {
+		T string `json:"t"`
+	}
 )
 
 func encodeMessage(message any) (string, error) {
@@ -230,6 +245,7 @@ const (
 	EventToc       EventKind = "toc"
 	EventLink      EventKind = "link"
 	EventCopy      EventKind = "copy"
+	EventEdit      EventKind = "edit"
 	EventLightbox  EventKind = "lightbox"
 	EventToast     EventKind = "toast"
 	EventKey       EventKind = "key"
@@ -253,7 +269,8 @@ type Event struct {
 	Top     float64
 	Open    bool
 	URL     string
-	Text    string
+	// Text 是 copy 复制的文本、toast 的提示文字、edit 编辑器里的文档全文。
+	Text string
 	// ID 是复制的编号（页面每次复制递增，回执 copyResult 带回它）；只有 copy 事件有。
 	ID     uint64
 	Images []Image
@@ -266,6 +283,13 @@ type Event struct {
 
 // ErrBadEvent 是页面事件校验失败。错误文字只描述哪里不对，不含页面给的内容（那是不可信的，也可能很长）。
 var ErrBadEvent = errors.New("reader: 页面事件不合规")
+
+// ErrEditTooLarge 是编辑事件超过 MaxEditBytes 或 MaxEditTextBytes：与 ErrBadEvent 同时成立（errors.Is 都为真），
+// 区别在于它代表「页面里的文档没能同步到宿主」，宿主据此把页面按失败处理，而不是当作一条无关紧要的坏事件丢掉。
+var ErrEditTooLarge = errors.New("reader: 编辑内容超过宿主能接收的上限")
+
+// editEventPrefix 是页面编码的编辑事件的开头（JSON.stringify 按插入顺序写字段，t 在最前）：只有它放宽到 MaxEditBytes。
+const editEventPrefix = `{"t":"edit",`
 
 type rawImage struct {
 	Src *string `json:"src"`
@@ -296,7 +320,8 @@ type rawEvent struct {
 // knownEvents 是认得的事件种类：先于其余校验排除未知种类，之后错误文字里可以放心带上种类名（它一定是下列之一）。
 var knownEvents = map[EventKind]bool{
 	EventReady: true, EventRendered: true, EventMatches: true, EventScroll: true, EventCatalog: true, EventToc: true,
-	EventLink: true, EventCopy: true, EventLightbox: true, EventToast: true, EventKey: true, EventFindReset: true, EventError: true,
+	EventLink: true, EventCopy: true, EventEdit: true, EventLightbox: true, EventToast: true, EventKey: true, EventFindReset: true,
+	EventError: true,
 }
 
 // forwardedKeys 是页面可以转交宿主的按键：与页面 ReaderApp 里的 FORWARDED_KEYS 一致。
@@ -304,7 +329,11 @@ var forwardedKeys = map[string]bool{"f": true, "s": true, "z": true, "arrowleft"
 
 // ParseEvent 校验并解析页面经 window.viva.postMessage 发来的一条文本。校验不过返回 ErrBadEvent，调用方丢弃并（脱敏地）记日志。
 func ParseEvent(text string) (Event, error) {
-	if len(text) > MaxEventBytes {
+	if strings.HasPrefix(text, editEventPrefix) {
+		if len(text) > MaxEditBytes {
+			return Event{}, fmt.Errorf("%w（%w）：编辑事件长度 %d 超过上限", ErrBadEvent, ErrEditTooLarge, len(text))
+		}
+	} else if len(text) > MaxEventBytes {
 		return Event{}, fmt.Errorf("%w：消息长度 %d 超过上限", ErrBadEvent, len(text))
 	}
 	if !utf8.ValidString(text) {
@@ -366,6 +395,15 @@ func ParseEvent(text string) (Event, error) {
 			return Event{}, fmt.Errorf("%w：copy 缺少编号", ErrBadEvent)
 		}
 		ev.ID = uint64(id)
+	case EventEdit:
+		if raw.Text != nil && len(*raw.Text) > MaxEditTextBytes {
+			return Event{}, fmt.Errorf("%w（%w）：edit 的文档全文长度 %d 超过上限", ErrBadEvent, ErrEditTooLarge, len(*raw.Text))
+		}
+		doc, ok := boundedText(raw.Text, 0, MaxEditTextBytes)
+		if !ok {
+			return Event{}, fmt.Errorf("%w：edit 的文档全文不合规", ErrBadEvent)
+		}
+		ev.Text = doc
 	case EventLightbox:
 		return parseLightbox(ev, raw)
 	case EventToast:

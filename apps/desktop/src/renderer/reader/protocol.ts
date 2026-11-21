@@ -1,6 +1,7 @@
 /**
  * 阅读岛的消息协议（v2）：Go 宿主（apps/desktop-go/viva/reader）与岛内页面之间只传文本，内容是 JSON。
- * v2 相对 v1：复制带回执（copy 带 id，宿主回 copyResult）。
+ * v2 相对 v1：复制带回执（copy 带 id，宿主回 copyResult）；编辑态（editor 视图：页面把文档的每次改动用 edit 事件交宿主，
+ * 宿主用 focus 把焦点交给编辑器）。
  *
  * 方向与信任：
  * - 宿主 → 页面（HostMessage）：宿主是可信的，但页面仍按形状校验，坏消息直接丢弃，不能让 React 渲染崩掉。
@@ -44,11 +45,13 @@ export type ReaderTab =
  * - original：主题阅读的「原文」（ReconstructionReader 里的 MarkdownPreview，带目录浮层与标题位置跟踪）；
  * - markdown：纯 Markdown 预览（图片条目的识别文字标签等）；
  * - replies：论坛讨论（楼层卡片列表 + 楼层目录）；
- * - gallery：图片条目的配图画廊。
+ * - gallery：图片条目的配图画廊；
+ * - editor：主题阅读「原文」的编辑态（ReconstructionReader 里的 MarkdownEditor，content 是草稿，文档由编辑器持有）。
  */
 export type ReaderView =
   | { kind: "none" }
   | { kind: "original"; content: string; sourceKind: "body" | "summary" }
+  | { kind: "editor"; content: string; sourceKind: "body" | "summary" }
   | { kind: "markdown"; content: string; tab: ReaderTab }
   | { kind: "replies"; content: string }
   | { kind: "gallery"; content: string };
@@ -102,13 +105,19 @@ export interface HostCopyResult {
   ok: boolean;
 }
 
+/** 把键盘焦点交给编辑器（标题框里按 Enter：渲染层 ItemDetailHeader 的 `.cm-content.focus()`）；当前不是编辑视图时忽略。 */
+export interface HostFocus {
+  t: "focus";
+}
+
 export type HostMessage =
   | HostInit
   | HostView
   | HostFind
   | HostTheme
   | HostUi
-  | HostCopyResult;
+  | HostCopyResult
+  | HostFocus;
 
 export interface LightboxImageRef {
   src: string;
@@ -124,6 +133,8 @@ export type PageEvent =
   | { t: "toc"; seq: number; open: boolean }
   | { t: "link"; seq: number; url: string }
   | { t: "copy"; seq: number; id: number; text: string }
+  /** 编辑器里文档的当前全文（每次改动一条，不合并：宿主按它记草稿，「完成编辑」时用的就是最后一条）。 */
+  | { t: "edit"; seq: number; text: string }
   | { t: "lightbox"; seq: number; images: LightboxImageRef[]; index: number }
   | { t: "toast"; seq: number; kind: "warning"; text: string }
   | {
@@ -181,12 +192,13 @@ function parseView(value: unknown): ReaderView | null {
     case "none":
       return { kind: "none" };
     case "original":
+    case "editor":
       if (
         typeof value.content === "string" &&
         (value.sourceKind === "body" || value.sourceKind === "summary")
       ) {
         return {
-          kind: "original",
+          kind: value.kind,
           content: value.content,
           sourceKind: value.sourceKind,
         };
@@ -282,6 +294,8 @@ export function parseHostMessage(text: string): HostMessage | null {
         return null;
       }
       return { t: "copyResult", id: raw.id, ok: raw.ok };
+    case "focus":
+      return { t: "focus" };
     default:
       return null;
   }

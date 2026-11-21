@@ -46,8 +46,10 @@ type detailUI struct {
 	// derived 是只由正文等少数字段决定的派生值缓存（能力、来源 chip、字数，detailderived.go）。
 	derived contentDerived
 
-	// panel 是内容面板的界面状态（detailpanel.go）；modal 是表格视图的详情浮层（detailmodal.go）。
+	// panel 是内容面板的界面状态（detailpanel.go）；modal 是表格视图的详情浮层（detailmodal.go）；
+	// edit 是阅读区编辑态的草稿与保存状态（detailedit.go，草稿跨条目保留，所以不放进 panel）。
 	panel panelState
+	edit  editState
 	// notice 是头部上方三块通知条的折叠状态（detailnotice.go）。
 	notice noticeUI
 	modal  detailModal

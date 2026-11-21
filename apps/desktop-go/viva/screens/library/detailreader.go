@@ -226,6 +226,11 @@ func (e readerEvents) Copy(text string) error {
 	return nil
 }
 
+// Edit 记编辑器里文档的当前全文（detailedit.go）：改动所属的条目与标签由宿主按序号找回，所以换条目前的最后一笔仍记在原来那份草稿名下。
+func (e readerEvents) Edit(itemID string, tab reader.Tab, text string) {
+	e.s.recordDraft(itemID, tab, text)
+}
+
 // Lightbox 打开图片查看器：另开一个盖满窗口的岛（detailviewer.go）。
 func (e readerEvents) Lightbox(images []reader.Image, index int) { e.s.showViewer(images, index) }
 

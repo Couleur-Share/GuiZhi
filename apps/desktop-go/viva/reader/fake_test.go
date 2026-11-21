@@ -107,6 +107,7 @@ func (r *recHandler) Copy(text string) error {
 	r.rec("copy:%s", text)
 	return r.copyErr
 }
+func (r *recHandler) Edit(id string, tab Tab, text string) { r.rec("edit:%s/%s/%s", id, tab, text) }
 func (r *recHandler) Lightbox(images []Image, index int) {
 	names := make([]string, 0, len(images))
 	for _, image := range images {

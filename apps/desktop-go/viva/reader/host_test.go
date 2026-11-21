@@ -358,6 +358,146 @@ func TestStaleOrBadCopyGetsNoReceipt(t *testing.T) {
 	}
 }
 
+// editorRig 是已握手、阅读区在编辑视图的一套宿主。
+func editorRig(t *testing.T) (*rig, *fakePage) {
+	t.Helper()
+	r := newRig(t)
+	r.req.View = View{Kind: ViewEditor, Content: "# 草稿", SourceKind: "body"}
+	return r, r.ready()
+}
+
+func TestEditorViewIsPostedWithItsDraftAndSource(t *testing.T) {
+	r, p := editorRig(t)
+	if got := p.kinds(t); !reflect.DeepEqual(got, []string{"init", "view"}) {
+		t.Fatalf("消息序列不对：%v", got)
+	}
+	view, _ := p.msg(t, 1)["view"].(map[string]any)
+	if view["kind"] != "editor" || view["content"] != "# 草稿" || view["sourceKind"] != "body" {
+		t.Errorf("编辑视图的编码不对：%v", view)
+	}
+	r.wantCalls()
+}
+
+func TestEditEventsReachTheHandlerAndTheEchoIsNotSentBack(t *testing.T) {
+	r, p := editorRig(t)
+	posts := len(p.posts)
+	p.send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "甲"})
+	r.wantCalls("edit:item-1/body/甲")
+	// 界面把草稿记成页面给的那份：下一帧的期望与页面里的文档一致，不必把整篇再发回去。
+	r.req.View.Content = "甲"
+	r.frame()
+	p.send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "甲乙"})
+	r.wantCalls("edit:item-1/body/甲乙")
+	r.req.View.Content = "甲乙"
+	r.frame()
+	if len(p.posts) != posts {
+		t.Errorf("页面自己的改动不该被回发：%v", p.kinds(t)[posts:])
+	}
+	// 界面改了草稿（和页面里的不同）：照常重发，页面把文档换成它。
+	r.req.View.Content = "甲乙\n"
+	r.frame()
+	if got := p.kinds(t)[posts:]; !reflect.DeepEqual(got, []string{"view"}) {
+		t.Errorf("草稿被界面改过要重发：%v", got)
+	}
+}
+
+func TestEditIsKeptForItsOwnDraftAfterTheViewMovedOn(t *testing.T) {
+	r, p := editorRig(t)
+	r.req.ItemID = "item-2"
+	r.req.View = View{Kind: ViewOriginal, Content: "别的条目", SourceKind: "body"}
+	r.frame() // seq 2
+	// 换内容之前页面的最后一笔改动，到达时界面已经在别的条目：仍记在原来那份草稿名下，不能丢（丢了就少存了字）。
+	p.send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "最后一笔"})
+	r.wantCalls("edit:item-1/body/最后一笔")
+	if r.host.sent.view.Content != "别的条目" {
+		t.Errorf("迟到的改动不能改写页面当前内容的记录：%q", r.host.sent.view.Content)
+	}
+	// 属于非编辑视图的序号、没发过的序号：丢弃。
+	p.send(r.host, map[string]any{"t": "edit", "seq": 2, "text": "冒充"})
+	p.send(r.host, map[string]any{"t": "edit", "seq": 99, "text": "伪造"})
+	r.wantCalls()
+}
+
+func TestEditBeforeHandshakeOrWithoutHandlerIsHarmless(t *testing.T) {
+	r := newRig(t)
+	r.req.View = View{Kind: ViewEditor, Content: "x", SourceKind: "body"}
+	r.frame()
+	r.page().send(r.host, map[string]any{"t": "edit", "seq": 0, "text": "偷偷改"})
+	r.wantCalls()
+	r.page().send(r.host, map[string]any{"t": "ready", "v": ProtocolVersion})
+	r.host.SetHandler(nil)
+	r.page().send(r.host, map[string]any{"t": "edit", "seq": 1, "text": "没人接"})
+	if r.host.sent.view.Content != "没人接" {
+		t.Errorf("没有接收者时也要记下页面里的文档：%q", r.host.sent.view.Content)
+	}
+}
+
+func TestOversizeEditFailsTheEditorInsteadOfFallingBehindSilently(t *testing.T) {
+	r, p := editorRig(t)
+	secret := "SECRET-DOC-TEXT"
+	p.cfg.OnMessage(`{"t":"edit","seq":1,"text":"` + secret + strings.Repeat("a", MaxEditTextBytes) + `"}`)
+	if !strings.HasPrefix(strings.Join(r.handler.take(), "\n"), "failed:") {
+		t.Fatalf("超限的编辑要让宿主按页面失败处理")
+	}
+	if r.host.Open() {
+		t.Error("失败要关掉页面")
+	}
+	err := r.host.Failure(r.req)
+	if !errors.Is(err, ErrEditTooLarge) {
+		t.Fatalf("失败原因要认得出是编辑过大：%v", err)
+	}
+	if len(r.diags) != 1 || strings.Contains(r.diags[0], secret) || len(r.diags[0]) > 300 {
+		t.Errorf("诊断一条、不带文档内容：%v", r.diags)
+	}
+	// 重试以宿主已有的草稿重开编辑器。
+	r.host.Retry()
+	r.frame()
+	if r.opener.opens != 2 {
+		t.Errorf("重试应当重新打开页面：打开了 %d 次", r.opener.opens)
+	}
+}
+
+func TestOversizeEditOutsideTheEditorOnlyLeavesADiagnostic(t *testing.T) {
+	r := newRig(t)
+	p := r.ready() // 原文视图
+	p.cfg.OnMessage(`{"t":"edit","seq":1,"text":"` + strings.Repeat("a", MaxEditTextBytes+1) + `"}`)
+	r.wantCalls()
+	if !r.host.Open() || r.host.Failure(r.req) != nil {
+		t.Error("不在编辑视图时，过大的编辑事件只是一条诊断")
+	}
+	if len(r.diags) != 1 {
+		t.Errorf("诊断数 %d，期望 1", len(r.diags))
+	}
+}
+
+func TestFocusEditorOnlyReachesALiveEditor(t *testing.T) {
+	r := newRig(t)
+	if r.host.FocusEditor() {
+		t.Error("岛没开：不能聚焦")
+	}
+	r.req.View = View{Kind: ViewEditor, Content: "x", SourceKind: "body"}
+	r.frame()
+	if r.host.FocusEditor() {
+		t.Error("还没握手：不能聚焦")
+	}
+	p := r.page()
+	p.send(r.host, map[string]any{"t": "ready", "v": ProtocolVersion})
+	posts := len(p.posts)
+	if !r.host.FocusEditor() {
+		t.Fatal("编辑器在显示：应当聚焦")
+	}
+	if p.focuses != 1 || len(p.posts) != posts+1 || lastPost(t, p)["t"] != "focus" {
+		t.Errorf("要先把焦点交给 WebView，再发 focus：focuses=%d 消息 %v", p.focuses, p.kinds(t)[posts:])
+	}
+	// 回到原文视图：同一个页面，但已经不是编辑器。
+	r.req.View = View{Kind: ViewOriginal, Content: "x", SourceKind: "body"}
+	r.frame()
+	posts, focuses := len(p.posts), p.focuses
+	if r.host.FocusEditor() || p.focuses != focuses || len(p.posts) != posts {
+		t.Error("不是编辑视图：什么也不做")
+	}
+}
+
 func TestRenderedResetsWhenContentChanges(t *testing.T) {
 	r := newRig(t)
 	p := r.ready()

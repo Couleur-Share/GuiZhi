@@ -33,6 +33,8 @@ func TestParseEventAcceptsEveryKind(t *testing.T) {
 		{"link", `{"t":"link","seq":4,"url":"https://example.com"}`, Event{Kind: EventLink, Seq: 4, URL: "https://example.com"}},
 		{"copy 空串", `{"t":"copy","seq":4,"id":7,"text":""}`, Event{Kind: EventCopy, Seq: 4, ID: 7}},
 		{"copy", `{"t":"copy","seq":4,"id":7,"text":"a\nb"}`, Event{Kind: EventCopy, Seq: 4, ID: 7, Text: "a\nb"}},
+		{"edit 空文档", `{"t":"edit","seq":4,"text":""}`, Event{Kind: EventEdit, Seq: 4}},
+		{"edit", `{"t":"edit","seq":4,"text":"# 标题\n\n正文\t\"引号\""}`, Event{Kind: EventEdit, Seq: 4, Text: "# 标题\n\n正文\t\"引号\""}},
 		{"toast", `{"t":"toast","seq":4,"kind":"warning","text":"x"}`, Event{Kind: EventToast, Seq: 4, Text: "x"}},
 		{"key 无修饰键", `{"t":"key","seq":4,"key":"arrowleft"}`, Event{Kind: EventKey, Seq: 4, Key: "arrowleft"}},
 		{"key 全修饰键", `{"t":"key","seq":4,"key":"z","ctrl":true,"alt":true,"shift":true}`,
@@ -86,6 +88,10 @@ func TestParseEventRejects(t *testing.T) {
 		{"copy 编号是字符串", `{"t":"copy","seq":1,"id":"1","text":"x"}`},
 		{"copy 编号超出安全整数", `{"t":"copy","seq":1,"id":9007199254740993,"text":"x"}`},
 		{"copy 超长", `{"t":"copy","seq":1,"id":1,"text":"` + long(MaxCopyBytes+1) + `"}`},
+		{"edit 没有文档", `{"t":"edit","seq":1}`},
+		{"edit 没有序号", `{"t":"edit","text":"x"}`},
+		{"edit 文档是数字", `{"t":"edit","seq":1,"text":1}`},
+		{"edit 非法 UTF-8", "{\"t\":\"edit\",\"seq\":1,\"text\":\"\xff\xfe\"}"},
 		{"toast 不是 warning", `{"t":"toast","seq":1,"kind":"error","text":"x"}`},
 		{"toast 没有 kind", `{"t":"toast","seq":1,"text":"x"}`},
 		{"toast 空文字", `{"t":"toast","seq":1,"kind":"warning","text":""}`},
@@ -151,6 +157,43 @@ func TestParseEventLimitsAreInclusive(t *testing.T) {
 	}
 }
 
+// 编辑事件带整篇文档，上限比普通事件高得多；超出上限不是「一条坏事件」，宿主要能认出它（ErrEditTooLarge）而不是悄悄丢掉。
+func TestEditEventHasItsOwnLimitsAndOversizeIsRecognisable(t *testing.T) {
+	doc := func(n int) string { return `{"t":"edit","seq":1,"text":"` + strings.Repeat("a", n) + `"}` }
+	// 比普通事件上限大的编辑事件放行；同样大小的复制不行。
+	if ev := mustEvent(t, doc(MaxEventBytes+1)); len(ev.Text) != MaxEventBytes+1 {
+		t.Errorf("超过普通上限的编辑事件应当放行：%d", len(ev.Text))
+	}
+	if _, err := ParseEvent(`{"t":"copy","seq":1,"id":1,"text":"` + strings.Repeat("a", MaxEventBytes+1) + `"}`); !errors.Is(err, ErrBadEvent) || errors.Is(err, ErrEditTooLarge) {
+		t.Errorf("同样大小的复制应当按普通坏事件拒绝：%v", err)
+	}
+	if ev := mustEvent(t, doc(MaxEditTextBytes)); len(ev.Text) != MaxEditTextBytes {
+		t.Errorf("全文恰好是上限时放行：%d", len(ev.Text))
+	}
+	// 全文超过上限：既是坏事件，又认得出是编辑过大。
+	for name, text := range map[string]string{
+		"全文超限": doc(MaxEditTextBytes + 1),
+		"整条超限": `{"t":"edit","seq":1,"text":"` + strings.Repeat(`\u0001`, MaxEditBytes/6+1) + `"}`,
+	} {
+		_, err := ParseEvent(text)
+		if !errors.Is(err, ErrBadEvent) || !errors.Is(err, ErrEditTooLarge) {
+			t.Errorf("%s：应当同时是 ErrBadEvent 与 ErrEditTooLarge：%v", name, err)
+		}
+		if err != nil && len(err.Error()) > 200 {
+			t.Errorf("%s：错误文字不能带页面内容：%d 字节", name, len(err.Error()))
+		}
+	}
+	// 放宽只认页面的紧凑编码（t 在最前、冒号后没有空格）；别的写法仍按普通上限。
+	spaced := `{"t": "edit","seq":1,"text":"` + strings.Repeat("a", MaxEventBytes) + `"}`
+	if _, err := ParseEvent(spaced); !errors.Is(err, ErrBadEvent) || errors.Is(err, ErrEditTooLarge) {
+		t.Errorf("非紧凑编码不享受编辑上限：%v", err)
+	}
+	// 控制字符转义后每个码元 6 字节：MaxEditChars 个码元的文档最坏的 JSON 长度仍在上限内（常量之间的关系，改动时会提醒）。
+	if MaxEditChars*6+64 > MaxEditBytes || MaxEditChars*3 > MaxEditTextBytes {
+		t.Errorf("MaxEditChars 与编辑事件的两个字节上限不自洽：%d %d %d", MaxEditChars, MaxEditBytes, MaxEditTextBytes)
+	}
+}
+
 func TestParseEventClampsScrollTop(t *testing.T) {
 	if ev := mustEvent(t, `{"t":"scroll","seq":1,"top":-50}`); ev.Top != 0 {
 		t.Errorf("负位置夹到 0：%v", ev.Top)
@@ -191,6 +234,8 @@ func TestViewMarshalShapes(t *testing.T) {
 		{"none", View{Kind: ViewNone}, `{"kind":"none"}`},
 		{"original body", View{Kind: ViewOriginal, Content: "a<b>&", SourceKind: "body"}, `{"kind":"original","content":"a<b>&","sourceKind":"body"}`},
 		{"original summary 空内容", View{Kind: ViewOriginal, SourceKind: "summary"}, `{"kind":"original","content":"","sourceKind":"summary"}`},
+		{"editor body", View{Kind: ViewEditor, Content: "草稿\n\"x\"", SourceKind: "body"}, `{"kind":"editor","content":"草稿\n\"x\"","sourceKind":"body"}`},
+		{"editor summary 空草稿", View{Kind: ViewEditor, SourceKind: "summary"}, `{"kind":"editor","content":"","sourceKind":"summary"}`},
 		{"markdown", View{Kind: ViewMarkdown, Content: "x", Tab: TabRecognized}, `{"kind":"markdown","content":"x","tab":"recognized"}`},
 		{"replies", View{Kind: ViewReplies, Content: "{}"}, `{"kind":"replies","content":"{}"}`},
 		{"gallery", View{Kind: ViewGallery, Content: "![a](local-image://a.png)"}, `{"kind":"gallery","content":"![a](local-image://a.png)"}`},
@@ -218,6 +263,8 @@ func TestViewMarshalRejectsMalformedViews(t *testing.T) {
 		"空种类":           {},
 		"原文缺来源":         {Kind: ViewOriginal, Content: "x"},
 		"原文来源未知":        {Kind: ViewOriginal, Content: "x", SourceKind: "other"},
+		"编辑器缺来源":        {Kind: ViewEditor, Content: "x"},
+		"编辑器来源未知":       {Kind: ViewEditor, Content: "x", SourceKind: "replies"},
 		"markdown 缺标签":  {Kind: ViewMarkdown, Content: "x"},
 		"markdown 标签未知": {Kind: ViewMarkdown, Content: "x", Tab: "other"},
 	} {

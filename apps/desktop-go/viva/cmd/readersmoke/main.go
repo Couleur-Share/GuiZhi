@@ -382,6 +382,9 @@ func (h handler) Lightbox(images []reader.Image, index int) {
 	}
 	h.s.record("lightbox", map[string]any{"count": len(images), "index": index, "first": first})
 }
+func (h handler) Edit(id string, tab reader.Tab, text string) {
+	h.s.record("edit", map[string]any{"item": id, "tab": string(tab), "text": text})
+}
 func (h handler) Toast(text string) { h.s.record("toast", text) }
 func (h handler) Key(key string, ctrl, alt, shift bool) {
 	h.s.record("key", map[string]any{"key": key, "ctrl": ctrl, "alt": alt, "shift": shift})
