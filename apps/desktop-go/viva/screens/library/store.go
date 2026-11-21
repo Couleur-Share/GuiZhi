@@ -95,6 +95,10 @@ type Store struct {
 	// 问答随 M3 迁入，在此之前为 nil（台账 B-054）。
 	OnEvidenceCleared func(ids []string)
 
+	// OnOpenSettingsAI 在 AI 功能（摘要、图中文字识别、标签建议）发现尚未配置模型时调用，跳转设置页的 AI 分区
+	// （渲染层 requestSettingsSection("ai")）。可能在后台 goroutine 里被调用，实现要自行切回界面线程；nil 表示不跳转。
+	OnOpenSettingsAI func()
+
 	// batchRun 是当前批次的回执键；newID 生成它（测试注入固定值）。
 	batchRun string
 	newID    func() string

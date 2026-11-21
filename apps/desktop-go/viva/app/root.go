@@ -135,6 +135,13 @@ func (r *Root) mountLibrary(invalidate func()) {
 	store := libraryscreen.NewStore(svc, r.guard, invalidate)
 	// 自动保存开关每次现读：设置在别处改了，下一次编辑就按新值排（或不排）防抖保存。
 	store.AutoSave = func() bool { return r.store.Values().UI.AutoSave }
+	// AI 功能未配置时跳设置页的 AI 分区：回调来自后台 goroutine，窗口状态只能在界面线程上改，所以经 runOnUI 排队。
+	store.OnOpenSettingsAI = func() {
+		r.runOnUI(func() {
+			r.settings.Active = settingsscreen.SectionAI
+			r.win.Page = shell.PageSettings
+		})
+	}
 	r.library = &libraryscreen.Screen{
 		Store: store, Ctx: r.ctx, Guard: r.guard, Prefs: r.opts.Services.Prefs, Now: r.opts.Services.Now,
 		OpenExternal: r.opts.Services.OpenExternal, Imports: r.opts.Services.Imports,

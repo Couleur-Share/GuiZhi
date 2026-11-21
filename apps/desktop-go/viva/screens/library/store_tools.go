@@ -50,6 +50,12 @@ type ToolsView struct {
 	Versions VersionsView
 	// HandoffBusy 是一次「复制给 AI」或「另存为」在途（AiHandoffButton 的 isBusy）：两枚按钮都禁用。
 	HandoffBusy bool
+	// SummaryGenerating 是 AI 摘要生成（含写回）在途（AiSummaryCard 的 isGenerating）；SummaryExpandSeq 每成功写回一次加一，
+	// 卡片据此展开摘要（渲染层 setIsExpanded(true)）：它是「请展开」的事件序号，不是展开状态本身（展开状态属于 Screen）。
+	SummaryGenerating bool
+	SummaryExpandSeq  int
+	// OcrRunning 是图中文字识别（含写回）在途（AiOcrCard 的 isRunning）。
+	OcrRunning bool
 }
 
 // toolsState 是工具侧栏的内部状态（detailState 里的一份）。
@@ -60,6 +66,8 @@ type toolsState struct {
 	capturing bool
 	// adopting 是采用版本在途：挡住重复点击（渲染层靠按钮在采用期间整面板重新挂载来挡）。
 	adopting bool
+	// summarizing、ocrRunning 是摘要生成、图中文字识别在途：挡住重复触发（store_ai.go；渲染层是 isGenerating / isRunning 的早退）。
+	summarizing, ocrRunning bool
 }
 
 // resetToolsLocked 让上一代作废并清空快照（换条目、清详情）。mu 由调用方持有。
