@@ -118,6 +118,7 @@ func (s *Store) resetSavedLocked() {
 // afterDetailLoaded 在读到条目之后读它的附属状态：来源版本与转写能力（渲染层这两处各在组件挂载时读一次）。
 // 序号变了（又选了别的）就丢弃。
 func (s *Store) afterDetailLoaded(ctx context.Context, id string, seq int) {
+	s.initTools(ctx, id, seq) // 工具侧栏的评论与版本各自后台读取，不排在来源版本之后
 	s.loadRevisions(ctx, id, seq)
 	s.loadMediaCapabilities(ctx, seq)
 }
