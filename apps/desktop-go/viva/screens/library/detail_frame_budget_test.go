@@ -2,6 +2,7 @@ package library
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/vivaui/viva/gfx"
@@ -27,11 +28,18 @@ func TestDetailFrameBudget(t *testing.T) {
 	}
 	t.Run("detail_10000_entries", func(t *testing.T) { measureDetailFrames(t, "detail_10000_entries", false) })
 	t.Run("detail_10000_entries_find", func(t *testing.T) { measureDetailFrames(t, "detail_10000_entries_find", true) })
-	t.Run("detail_10000_entries_tools", func(t *testing.T) { measureDetailToolsFrames(t, "detail_10000_entries_tools") })
+	t.Run("detail_10000_entries_tools", func(t *testing.T) { measureDetailToolsFrames(t, "detail_10000_entries_tools", "") })
+	t.Run("detail_10000_entries_tools_summary_expanded", func(t *testing.T) {
+		measureDetailToolsFrames(t, "detail_10000_entries_tools_summary_expanded", frameBudgetSummary)
+	})
 }
 
+// frameBudgetSummary 是展开态 AI 摘要读数用的摘要：含标题、段落（粗体、行内代码、链接）、无序列表与结论小节，覆盖 Markdown 排版的各类块（M2-6c）。
+const frameBudgetSummary = "## 核心要点\n\n本文介绍 **本地优先** 知识库的设计，重点是 `SQLite` 的 WAL 模式与备份策略；同时讨论了 [同步方案](https://example.com/sync) 的取舍。\n\n- **并发**：goroutine 与 channel 的使用边界\n- 同步：`sync.Mutex` 与 `sync.RWMutex` 的选择\n- 备份：使用 `VACUUM INTO` 生成一致性快照\n\n### 结论\n\n优先保证数据可恢复，再考虑性能优化。"
+
 // measureDetailToolsFrames 在 1 万条的库里选中第一条并打开文章工具侧栏，量稳态帧、悬停一步、滚轮一步与栅格化上界（M2-6b）。
-func measureDetailToolsFrames(t *testing.T, name string) {
+// summary 非空时先给第一条写入这份摘要，打开侧栏后展开 AI 摘要卡片再量（M2-6c：Markdown 排版的帧成本）。
+func measureDetailToolsFrames(t *testing.T, name, summary string) {
 	heapBefore := frametime.HeapInUse()
 	r := wsRig(t, func(r *rig) { r.svc.SeedEntries(servicestest.GenerateEntries(10000)) })
 	entries := r.view().List.Entries
@@ -42,6 +50,9 @@ func measureDetailToolsFrames(t *testing.T, name string) {
 	if !ok {
 		t.Fatal("找不到第一张卡片（夹具失效）")
 	}
+	if summary != "" {
+		r.svc.SeedDetail(entries[0].ID, servicestest.DetailBody{Content: "正文", Summary: summary})
+	}
 	cx, cy := centerOf(card)
 	r.clickAt(cx, cy)
 	r.frames(4)
@@ -51,6 +62,17 @@ func measureDetailToolsFrames(t *testing.T, name string) {
 	panel := r.panelRect()
 	if panel.Width == 0 {
 		t.Fatal("打开文章工具侧栏后未找到面板，读数无效")
+	}
+	toggleName := locales.LibraryAiSummaryGenerate()
+	if summary != "" {
+		// 展开摘要卡片：核对 Markdown 真的排出来了（标题与列表文字在画面上），否则读到的是折叠态。
+		r.click(gfx.RoleButton, locales.LibraryAiSummaryExpand())
+		r.frames(4)
+		if !r.has(gfx.RoleButton, locales.LibraryAiSummaryCollapse()) || !strings.Contains(r.screenText(), "核心要点") || !strings.Contains(r.screenText(), "sync.Mutex") {
+			t.Fatalf("展开摘要卡片之后应排出 Markdown 内容，读数无效；画面文字 %q", r.session.Texts())
+		}
+		toggleName = locales.LibraryAiSummaryCollapse()
+		panel = r.panelRect()
 	}
 	t.Logf("%s 打开工具侧栏后 Go 堆增量（含无头会话）：%d KiB", name, (int64(frametime.HeapInUse())-int64(heapBefore))/1024)
 
@@ -64,9 +86,9 @@ func measureDetailToolsFrames(t *testing.T, name string) {
 	if !ok {
 		t.Fatal("侧栏内找不到关闭钮")
 	}
-	copyBtn, ok := r.nodeIn(panel, gfx.RoleButton, locales.LibraryAiSummaryGenerate())
+	copyBtn, ok := r.nodeIn(panel, gfx.RoleButton, toggleName)
 	if !ok {
-		t.Fatal("侧栏内找不到「AI 摘要」钮")
+		t.Fatalf("侧栏内找不到「%s」钮", toggleName)
 	}
 	ax, ay := centerOf(closeBtn)
 	bx, by := centerOf(copyBtn)
