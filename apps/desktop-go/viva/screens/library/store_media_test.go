@@ -433,6 +433,51 @@ func TestMediaActionsSwitchingItemOnlyUpdatesTheRow(t *testing.T) {
 	})
 }
 
+// 离开又回到同一条：旧请求属于上一次挂载（代号已变），回来时详情是新取的，不该被旧请求写回的版本换掉，
+// 也不该放下新一次挂载的忙标记；列表行照样跟上。
+func TestMediaActionsLeavingAndReturningToTheSameItemIgnoresTheOldRequest(t *testing.T) {
+	forEachMediaAction(t, func(t *testing.T, h *harness, a mediaAction) {
+		a.seed(h, okResult(a.id, a.itemType), nil)
+		q := &spawnQueue{}
+		h.store.Spawn = q.Spawn
+		a.start(h)
+		syncSpawn(h)
+		h.open("other")
+		h.open(a.id)
+		before := h.detail().Item
+		if before == nil || before.ID != a.id || before.Title == "新标题" {
+			t.Fatalf("前提不成立：回到这一条之后详情应是新取的原版：%+v", before)
+		}
+		h.store.mu.Lock() // 新一次挂载自己有一次同类动作在途
+		a.mark(&h.store.view.Detail.Media)
+		h.store.mu.Unlock()
+
+		q.Run()
+		d := h.detail()
+		if d.Item.Title != before.Title || d.Item.Content != before.Content || d.Item.UpdatedAt != before.UpdatedAt {
+			t.Fatalf("旧请求写回的版本不该换掉新取的详情：%+v → %+v", before, d.Item)
+		}
+		if !a.busy(d.Media) {
+			t.Fatalf("旧请求落定不该放下新一次挂载的忙标记：%+v", d.Media)
+		}
+		if row := listRow(h, a.id); row.UpdatedAt != 5000 || row.Title != "新标题" {
+			t.Fatalf("列表行仍应跟上：%+v", row)
+		}
+		if len(h.queuedToasts()) != 0 {
+			t.Fatalf("过期的成功不该弹提示：%+v", h.queuedToasts())
+		}
+	})
+}
+
+// 长稿门槛与切块大小要和渲染层 packages/shared/constants/transcript.ts 一致（那边是 50_000 与 1600）：
+// 其余测试都用常量本身造夹具，常量被改了它们会跟着变，所以这里把数值钉死。
+func TestTranscriptFormatConstantsMatchTheSharedConstants(t *testing.T) {
+	if transcriptFormatLongChars != 50_000 || transcriptFormatChunkChars != 1600 {
+		t.Fatalf("长稿门槛应是 50000、切块应是 1600（packages/shared/constants/transcript.ts），实际 %d、%d",
+			transcriptFormatLongChars, transcriptFormatChunkChars)
+	}
+}
+
 // 过期的失败只留日志：不弹提示；过期的未配置模型只静默（不提示、不跳设置页、不留日志）。
 func TestMediaActionsStaleFailureOnlyLogs(t *testing.T) {
 	stale := func(t *testing.T, a mediaAction, res services.LibraryMediaActionResult, err error) (*harness, *atomic.Int32) {

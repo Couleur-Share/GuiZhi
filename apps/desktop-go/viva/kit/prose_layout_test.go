@@ -127,21 +127,21 @@ func TestProseContainersCollapseMarginsWithTheirEdgeChildren(t *testing.T) {
 // 小节标题的判定：段落里恰好一个纯粗体（可后跟普通文字），没有别的行内元素。
 func TestProseLeadParagraphClassification(t *testing.T) {
 	cases := map[string]bool{
-		"**标题**":                      true,
-		"**标题** 后面跟着文字":                true,
-		"文字在前 **标题**":                  true,
-		"**标题**  \n下一行":                true,
-		"**甲** 夹着 **乙**":              false,
-		"普通文字":                        false,
-		"***标题***":                    false,
-		"~~**标题**~~":                  false,
-		"**`标题`**":                    false,
-		"[**标题**](https://example.com)": false,
-		"**标题** *斜体*":                  false,
-		"**标题** ~~删除~~":                false,
-		"**标题** `代码`":                  false,
+		"**标题**":                         true,
+		"**标题** 后面跟着文字":                  true,
+		"文字在前 **标题**":                    true,
+		"**标题**  \n下一行":                  true,
+		"**甲** 夹着 **乙**":                 false,
+		"普通文字":                           false,
+		"***标题***":                       false,
+		"~~**标题**~~":                     false,
+		"**`标题`**":                       false,
+		"[**标题**](https://example.com)":  false,
+		"**标题** *斜体*":                    false,
+		"**标题** ~~删除~~":                  false,
+		"**标题** `代码`":                    false,
 		"**标题** [链接](https://a.example)": false,
-		"*斜体*":                        false,
+		"*斜体*":                           false,
 	}
 	for src, want := range cases {
 		blocks := ParseMarkdown(src)

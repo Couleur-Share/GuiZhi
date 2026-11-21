@@ -806,6 +806,69 @@ func TestTranscriptFindScrollsTheActiveMatchToTheCenter(t *testing.T) {
 	}
 }
 
+// 查找词在别的页签里输入，切到文字稿页签的第一帧就带着命中：滚动区这时还没量到视口，不能拿零高度去算正中，
+// 要等量到之后再滚（渲染层 effect 在容器挂载之后才跑）。
+func TestTranscriptFindTypedElsewhereCentersTheMatchOnFirstOpen(t *testing.T) {
+	t.Parallel()
+	r := mediaRig(t)
+	r.pick(mediaScrollID)
+	r.keys("ctrl+f")
+	r.typeText("另一个目标")
+	if got := r.screen.detail.panel.tab; got == TabTranscript {
+		t.Fatalf("前提不成立：查找词应是在文字稿以外的页签里输入的：%q", got)
+	}
+	r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
+	r.frames(6)
+	if !r.hasText(locales.LibraryPanelFindMatchIndex(1, 1)) {
+		t.Fatal("夹具失效：切到文字稿之后应有一处命中")
+	}
+	marks := r.markedBounds()
+	if len(marks) != 1 {
+		t.Fatalf("命中应已滚进视口：%d 处标记", len(marks))
+	}
+	vp := r.screen.detail.panel.tx.vp
+	if mid, center := marks[0].Y+marks[0].Height/2, vp.Y+vp.Height/2; mid < center-r.look.Rem(1) || mid > center+r.look.Rem(1) {
+		t.Errorf("命中应在视口正中（%.1f）附近，实际 %.1f", center, mid)
+	}
+}
+
+// 文字稿变了（比如排版写回了新版本）而查找词与命中序号没变：当前命中的位置变了，要重新滚到正中
+// （渲染层 effect 依赖 contentKey）；没变的文字稿不会反复把用户手动滚走的位置拉回来。
+func TestTranscriptFindRecentersWhenTheTranscriptChanges(t *testing.T) {
+	t.Parallel()
+	r := mediaRig(t)
+	r.openTranscript(mediaScrollID)
+	r.keys("ctrl+f")
+	r.typeText("目标")
+	r.click(gfx.RoleButton, locales.LibraryPanelFindNextMatch())
+	if len(r.markedBounds()) != 1 {
+		t.Fatal("夹具失效：第二处命中应已滚进视口")
+	}
+	// 用户手动滚开：没有文字变化时不会被拉回。
+	r.wheelTranscript(-100)
+	scrolled := r.screen.detail.panel.tx.top
+	r.frames(3)
+	if got := r.screen.detail.panel.tx.top; got != scrolled {
+		t.Fatalf("文字没变时不该把手动滚走的位置拉回：%.1f → %.1f", scrolled, got)
+	}
+
+	longer := strings.Repeat("前置的一行\n", 20) + mediaScrollTranscript()
+	r.svc.SeedFormatTranscript(mediaOK(mediaScrollID, "video", "视频", longer, mediaBili), nil)
+	r.click(gfx.RoleButton, locales.LibraryTranscriptFormat())
+	r.frames(4)
+	if r.screen.detail.panel.findCount != 2 {
+		t.Fatalf("夹具失效：新版文字稿里仍有两处命中（%d）", r.screen.detail.panel.findCount)
+	}
+	marks := r.markedBounds()
+	if len(marks) != 1 {
+		t.Fatalf("换了文字稿之后当前命中应重新滚进视口：%d 处标记", len(marks))
+	}
+	vp := r.screen.detail.panel.tx.vp
+	if mid, center := marks[0].Y+marks[0].Height/2, vp.Y+vp.Height/2; mid < center-r.look.Rem(1) || mid > center+r.look.Rem(1) {
+		t.Errorf("当前命中应在视口正中（%.1f）附近，实际 %.1f", center, mid)
+	}
+}
+
 // mediaWrapQuery 够长（120 个字，文字稿栏最宽 48rem、每行不到 50 个字），命中一定折成三行以上。
 var mediaWrapQuery = strings.Repeat("长", 120)
 

@@ -1,12 +1,16 @@
 package library
 
 import (
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/vivaui/viva/gfx"
 
+	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/viva/internal/frametime"
 	"guizhi-mygo-shell/viva/locales"
@@ -18,6 +22,7 @@ import (
 // 量四个动作：稳态帧、悬停一步（指针在头部两枚按钮之间来回）、键盘切换一步（↓ 选下一条，详情随之重取与重排）、
 // 标题里敲一个字（输入 + 出帧；防抖保存的计时由测试时钟接管，读数里不含保存的往返）。
 // 另一组带着页内查找条打开（Ctrl+F），看工具栏下多一行输入的成本。
+// 文字稿一组（M2-6d）：视频条目挂约 5 万字文字稿，切到「文字稿」页签并开着查找高亮（上千处命中），看长稿 pre-wrap 排版的稳态成本。
 //
 // 无头会话的 Frame() 只记录绘制命令、不栅格化，所以量的是界面线程的出帧成本（布局 + 记录）；栅格化加回读另量一次作为上界。
 // 耗时与机器有关，默认跳过：VIVA_FRAME_BUDGET=1 go test ./viva/screens/library -run TestDetailFrameBudget -v -count=1。
@@ -32,6 +37,123 @@ func TestDetailFrameBudget(t *testing.T) {
 	t.Run("detail_10000_entries_tools_summary_expanded", func(t *testing.T) {
 		measureDetailToolsFrames(t, "detail_10000_entries_tools_summary_expanded", frameBudgetSummary)
 	})
+	t.Run("detail_10000_entries_transcript_50k", func(t *testing.T) { measureDetailTranscriptFrames(t, "detail_10000_entries_transcript_50k") })
+}
+
+// frameBudgetTranscript 造一份约 5 万字的文字稿：一千多个短段落，每段都含查找词「命运」，开启页内查找之后满屏高亮（M2-6d 的长稿成本）。
+func frameBudgetTranscript() string {
+	var b strings.Builder
+	for i := 0; utf8.RuneCountInString(b.String()) < 50_000; i++ {
+		fmt.Fprintf(&b, "第%04d段：这是一段用于帧耗时读数的文字稿内容，提到了命运石之门，也提到了其他普通的话。\n", i)
+	}
+	return b.String()
+}
+
+// measureDetailTranscriptFrames 在 1 万条的库里选中一条在线视频（挂约 5 万字的文字稿），切到「文字稿」页签并开着页内查找高亮，
+// 量稳态帧、悬停一步（工具栏两枚钮之间）、滚轮一步（文字稿正文）、Go 堆增量与栅格化上界（M2-6d：几千行的 pre-wrap 排版，只画看得见的行）。
+func measureDetailTranscriptFrames(t *testing.T, name string) {
+	heapBefore := frametime.HeapInUse()
+	const videoID = "item-000050" // GenerateEntries 里每 50 条置顶一次、置顶的排在第一页；第 51 条恰好是视频（active、不在回收站）
+	transcript := frameBudgetTranscript()
+	r := wsRig(t, func(r *rig) {
+		r.svc.SeedEntries(servicestest.GenerateEntries(10000))
+		r.svc.SeedDetail(videoID, servicestest.DetailBody{Content: "视频", Transcript: transcript, SourceURI: mediaBili})
+	})
+	entries := r.view().List.Entries
+	idx := slices.IndexFunc(entries, func(e services.LibraryEntry) bool { return e.ID == videoID })
+	if idx < 0 {
+		t.Fatalf("第一页里找不到视频条目 %s（夹具失效）", videoID)
+	}
+	card, ok := r.cardOf(entries[idx])
+	if !ok {
+		t.Fatal("找不到视频卡片（夹具失效）")
+	}
+	cx, cy := centerOf(card)
+	r.clickAt(cx, cy)
+	r.frames(4)
+	if d := r.view().Detail; d.Item == nil || d.Item.ID != videoID || len(d.Item.Transcript) < 50_000 {
+		t.Fatalf("点卡片之后详情应是带长文字稿的 %s：%+v", videoID, d.Item)
+	}
+	r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())
+	r.frames(4)
+	if got := r.screen.detail.panel.tab; got != TabTranscript {
+		t.Fatalf("应已切到文字稿页签，实际 %q", got)
+	}
+	r.keys("ctrl+f")
+	r.typeText("命运")
+	r.frames(4)
+	if n := r.screen.detail.panel.findCount; n < 1000 {
+		t.Fatalf("查找高亮应命中上千处（实际 %d），读数无效", n)
+	}
+	if len(r.markedBounds()) == 0 {
+		t.Fatal("画面上应有高亮的命中词，读数无效")
+	}
+	t.Logf("%s 文字稿 %d 字（UTF-8 %d KiB）、命中 %d 处；打开后 Go 堆增量（含无头会话）：%d KiB", name,
+		utf8.RuneCountInString(transcript), len(transcript)/1024, r.screen.detail.panel.findCount,
+		(int64(frametime.HeapInUse())-int64(heapBefore))/1024)
+
+	idle, err := frametime.Measure(300, func(int) error { return r.session.Frame() })
+	if err != nil {
+		t.Fatalf("稳态帧失败：%v", err)
+	}
+	t.Logf("%s 稳态帧（布局+记录）：%s", name, idle)
+
+	format, ok1 := r.detailNode(gfx.RoleButton, locales.LibraryTranscriptFormat())
+	regen, ok2 := r.detailNode(gfx.RoleButton, locales.LibraryTranscribeRegenerate())
+	if !ok1 || !ok2 {
+		t.Fatalf("工具栏里找不到「%s」或「%s」钮（%v、%v）", locales.LibraryTranscriptFormat(), locales.LibraryTranscribeRegenerate(), ok1, ok2)
+	}
+	ax, ay := centerOf(format)
+	bx, by := centerOf(regen)
+	hover, err := frametime.Measure(200, func(i int) error {
+		x, y := ax, ay
+		if i%2 == 1 {
+			x, y = bx, by
+		}
+		if err := r.session.Move(x, y); err != nil {
+			return err
+		}
+		return r.session.Frame()
+	})
+	if err != nil {
+		t.Fatalf("悬停帧失败：%v", err)
+	}
+	t.Logf("%s 悬停一步（移动指针+出帧）：%s", name, hover)
+
+	// 滚轮一步：在文字稿正文上来回滚；先核对滚动量和画面上的文字确实变了。
+	vp := r.screen.detail.panel.tx.vp
+	wx, wy := vp.X+vp.Width/2, vp.Y+vp.Height/2
+	topBefore, textBefore := r.screen.detail.panel.tx.top, r.screenText()
+	if err := r.session.Scroll(gfx.ScrollEvent{X: wx, Y: wy, DeltaY: 400, Precise: true}); err != nil {
+		t.Fatalf("预检滚轮失败：%v", err)
+	}
+	r.frames(2)
+	if r.screen.detail.panel.tx.top == topBefore || r.screenText() == textBefore {
+		t.Fatalf("滚轮之后文字稿没有滚动（top %.1f → %.1f），滚动读数无效", topBefore, r.screen.detail.panel.tx.top)
+	}
+	scroll, err := frametime.Measure(60, func(i int) error {
+		dy := float32(120)
+		if i%2 == 1 {
+			dy = -120
+		}
+		if err := r.session.Scroll(gfx.ScrollEvent{X: wx, Y: wy, DeltaY: dy, Precise: true}); err != nil {
+			return err
+		}
+		return r.session.Frame()
+	})
+	if err != nil {
+		t.Fatalf("滚轮帧失败：%v", err)
+	}
+	t.Logf("%s 滚轮一步（滚轮+出帧）：%s", name, scroll)
+
+	raster, err := frametime.Measure(30, func(int) error {
+		_, err := r.session.Image()
+		return err
+	})
+	if err != nil {
+		t.Fatalf("栅格化失败：%v", err)
+	}
+	t.Logf("%s 栅格化+回读（Image，上界）：%s", name, raster)
 }
 
 // frameBudgetSummary 是展开态 AI 摘要读数用的摘要：含标题、段落（粗体、行内代码、链接）、无序列表与结论小节，覆盖 Markdown 排版的各类块（M2-6c）。
