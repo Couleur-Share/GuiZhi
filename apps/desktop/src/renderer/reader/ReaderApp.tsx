@@ -198,11 +198,21 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   );
 }
 
+/**
+ * 渲染层 ContentPanel 在 data-article-reader 上写的两个属性（问答据此找到选中的文字属于哪一块正文，article-reader-target.ts）：
+ * 岛里不编辑，editing 恒为 "false"；target 的取值同 ContentPanel（图片标签算正文；源码类型取原文的来源，其余是正文）。
+ */
+function articleAttrs(state: HostView): { "data-article-editing": "false"; "data-article-target": string } {
+  const sourceKind = state.view.kind === "original" ? state.view.sourceKind : "body";
+  const view = state.tab === "images" ? "body" : state.tab;
+  return { "data-article-editing": "false", "data-article-target": JSON.stringify({ itemId: state.itemId, view, sourceKind }) };
+}
+
 function ViewBody(props: ViewProps) {
   const { view } = props.state;
   switch (view.kind) {
     case "none":
-      return <div className="min-h-0 flex-1" data-article-reader />;
+      return <div className="min-h-0 flex-1" data-article-reader {...articleAttrs(props.state)} />;
     case "original":
       return <OriginalView {...props} />;
     case "markdown":
@@ -357,7 +367,7 @@ function OriginalView(props: ViewProps) {
   );
 
   return (
-    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader>
+    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader {...articleAttrs(state)}>
       <div
         className="relative flex h-full min-h-0 flex-col"
         data-testid="reconstruction-reader"
@@ -415,7 +425,7 @@ function MarkdownView(props: ViewProps) {
     contentKey: `${state.itemId}:${state.tab}:${view.content.length}`,
   });
   return (
-    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader>
+    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader {...articleAttrs(state)}>
       <div className="h-full">
         <div className="h-full" aria-hidden={false}>
           <MarkdownPreview
@@ -497,7 +507,7 @@ function RepliesView(props: ViewProps) {
   );
 
   return (
-    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader>
+    <div className="min-h-0 flex-1" onScrollCapture={onScroll} data-article-reader {...articleAttrs(state)}>
       <div className="h-full">
         <div className="h-full" aria-hidden={false}>
           <ForumDiscussionView
@@ -532,7 +542,7 @@ function GalleryView(props: ViewProps) {
   const view = props.state.view as Extract<HostView["view"], { kind: "gallery" }>;
   useRendered(props);
   return (
-    <div className="min-h-0 flex-1" data-article-reader>
+    <div className="min-h-0 flex-1" data-article-reader {...articleAttrs(props.state)}>
       <ImageGallery content={view.content} />
     </div>
   );

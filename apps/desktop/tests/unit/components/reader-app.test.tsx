@@ -453,3 +453,39 @@ describe("阅读岛页面：图片相关视图", () => {
     expect(events("rendered").at(-1)).toEqual({ t: "rendered", seq: 8 });
   });
 });
+
+describe("阅读岛页面：阅读区根节点的标记", () => {
+  // 渲染层 ContentPanel 在阅读区根节点（data-article-reader 所在元素）上写 data-article-editing 与 data-article-target，
+  // 「问答」取选区引用时据此认出这是哪一条的哪个视图；岛里没有编辑态，editing 恒为 false。
+  const root = (container: HTMLElement) => container.querySelector("[data-article-reader]") as HTMLElement;
+  const target = (container: HTMLElement) => JSON.parse(root(container).getAttribute("data-article-target") ?? "null");
+
+  it("原文：目标取条目、标签与来源种类", () => {
+    const { post, container } = mount();
+    post(view({ itemId: "item-9", tab: "summary", view: { kind: "original", content: "总结", sourceKind: "summary" } }));
+    expect(root(container).getAttribute("data-article-editing")).toBe("false");
+    expect(target(container)).toEqual({ itemId: "item-9", view: "summary", sourceKind: "summary" });
+    post(view({ seq: 2, itemId: "item-9", tab: "body", view: { kind: "original", content: "正文", sourceKind: "body" } }));
+    expect(target(container)).toEqual({ itemId: "item-9", view: "body", sourceKind: "body" });
+  });
+
+  it("论坛讨论、识别文字：来源种类取 body；图库（images 标签）对应 body 视图", () => {
+    const { post, container } = mount();
+    post(view({ itemId: "f1", tab: "replies", view: { kind: "replies", content: FORUM } }));
+    expect(root(container).getAttribute("data-article-editing")).toBe("false");
+    expect(target(container)).toEqual({ itemId: "f1", view: "replies", sourceKind: "body" });
+    post(view({ seq: 2, itemId: "p1", tab: "recognized", view: { kind: "markdown", content: "识别出的文字", tab: "recognized" } }));
+    expect(target(container)).toEqual({ itemId: "p1", view: "recognized", sourceKind: "body" });
+    post(view({ seq: 3, itemId: "p1", tab: "images", view: { kind: "gallery", content: "![图](local-image://p.png)" } }));
+    expect(root(container).getAttribute("data-article-editing")).toBe("false");
+    expect(target(container)).toEqual({ itemId: "p1", view: "body", sourceKind: "body" });
+  });
+
+  it("换条目后目标跟着换（不残留上一条的）", () => {
+    const { post, container } = mount();
+    post(view({ itemId: "a" }));
+    expect(target(container).itemId).toBe("a");
+    post(view({ seq: 2, itemId: "b" }));
+    expect(target(container).itemId).toBe("b");
+  });
+});

@@ -25,6 +25,8 @@ export interface ReaderTheme {
   basePx: number;
   /** 设置里的动效偏好与系统「减少动态效果」合并后的实际档位。 */
   motion: ReaderMotion;
+  /** 窗口宽度（逻辑像素）：响应式断点按它判定，不按岛自己的宽度（breakpoints.ts）；缺省取页面自身宽度。 */
+  viewportWidth?: number;
 }
 
 /** 内容面板的标签页（与渲染层 ReadingPanelTab 同一套取值）。 */
@@ -142,7 +144,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 /** 解析外观输入；形状不对（含根字号越界）返回 null。图片查看页的协议同样用它。 */
 export function parseTheme(value: unknown): ReaderTheme | null {
   if (!isRecord(value)) return null;
-  const { dark, hue, saturation, basePx, motion } = value;
+  const { dark, hue, saturation, basePx, motion, viewportWidth } = value;
   if (
     typeof dark !== "boolean" ||
     typeof hue !== "number" ||
@@ -155,7 +157,9 @@ export function parseTheme(value: unknown): ReaderTheme | null {
   if (![hue, saturation, basePx].every(Number.isFinite)) return null;
   // 根字号只认设置里的范围，防止坏值把整页字号弄成 0 或巨大。
   if (basePx < 8 || basePx > 40) return null;
-  return { dark, hue, saturation, basePx, motion };
+  if (viewportWidth === undefined) return { dark, hue, saturation, basePx, motion };
+  if (typeof viewportWidth !== "number" || !Number.isFinite(viewportWidth) || viewportWidth < 100 || viewportWidth > 20000) return null;
+  return { dark, hue, saturation, basePx, motion, viewportWidth };
 }
 
 export function parseLang(value: unknown): ReaderLang {

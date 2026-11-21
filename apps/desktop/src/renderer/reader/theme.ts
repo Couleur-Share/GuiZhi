@@ -1,3 +1,4 @@
+import { windowBreakpointTokens } from "./breakpoints";
 import type { ReaderLang, ReaderTheme } from "./protocol";
 
 /**
@@ -14,5 +15,7 @@ export function applyTheme(
   root.style.setProperty("--theme-saturation", String(theme.saturation));
   root.style.setProperty("--base-font-size", `${theme.basePx}px`);
   root.dataset.motion = theme.motion;
+  // 窗口宽度断点（样式表里的 min-width 媒体查询在构建时改成了以它为条件，见 breakpoints.ts）；宿主没给就用页面自己的宽度。
+  root.dataset.winGe = windowBreakpointTokens(theme.viewportWidth ?? window.innerWidth);
   root.lang = lang === "en" ? "en" : "zh-CN";
 }
