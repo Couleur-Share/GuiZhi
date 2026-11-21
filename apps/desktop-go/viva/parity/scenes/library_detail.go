@@ -65,7 +65,7 @@ func seedLibraryDetail(svc *servicestest.Library, entries []services.LibraryEntr
 		}
 		svc.SeedDetail(out[i].ID, servicestest.DetailBody{
 			Content: opt.tools.content(fix, out[i].ID, d.Content), Summary: opt.tools.summary(fix, out[i].ID, d.Summary),
-			Transcript: d.Transcript, SourceURI: opt.tools.sourceURI(fix, out[i].ID, d.SourceURI),
+			Transcript: d.Transcript, SourceURI: opt.snapshotSourceURI(fix, out[i].ID, opt.tools.sourceURI(fix, out[i].ID, d.SourceURI)),
 		})
 		if d.ReviewStatus != "" {
 			out[i].ReviewStatus = d.ReviewStatus
@@ -78,6 +78,7 @@ func seedLibraryDetail(svc *servicestest.Library, entries []services.LibraryEntr
 		}
 	}
 	opt.tools.seed(svc, fix)
+	opt.seedSnapshot(svc, fix)
 	if opt.failGet {
 		svc.FailOn("GetItem", errors.New(fix.Failures.Get))
 	}

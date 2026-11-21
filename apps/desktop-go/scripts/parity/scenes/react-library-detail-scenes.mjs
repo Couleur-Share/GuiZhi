@@ -265,6 +265,27 @@ const openLongFormat = async (win) => {
   await win.waitForTimeout(300);
 };
 
+/**
+ * 公众号网页快照（M2-5b，台账 B-066）：config.detail.snapshot 让夹具里的网页条目（SNAPSHOT_IDS.item，item-003）的来源换成公众号文章，
+ * web:snapshot 按模式回完整快照（toolbar）、没有快照（missing）、读取失败（error）或「改过 + 新版本 + 缺失资源」（warnings），
+ * 采集隐去的只有面板里最后那一块——岛的内容（lib/react-library.mjs 的 HIDE_SNAPSHOT_BODY_CSS）：标签栏里的快照工具条与各类通知条都是 Viva 的原生界面，完整参与对照。
+ * 先点卡片选中条目，再点标签栏里的「网页快照」（点完它变成「返回阅读」），等读取落定。Viva 一侧见 viva/parity/scenes/library_detail.go。
+ */
+const SNAPSHOT = (mode) => ({ detail: { snapshot: mode } });
+const SNAPSHOT_LABELS = {
+  zh: { tab: "网页快照", loading: "正在读取网页快照…" },
+  en: { tab: "Web snapshot", loading: "Loading web snapshot…" },
+};
+const snapshotLabel = (key) => SNAPSHOT_LABELS[parityLanguage()][key];
+/** 点开「网页快照」页，等读取结束（「正在读取…」消失）与面板落定。 */
+const openSnapshot = async (win) => {
+  await selectCard(WEBPAGE)(win);
+  await clickTab(snapshotLabel("tab"), true)(win);
+  await win.getByTestId("web-snapshot-pane").waitFor({ state: "visible" });
+  await win.getByText(snapshotLabel("loading"), { exact: true }).waitFor({ state: "detached" });
+  await win.waitForTimeout(500);
+};
+
 export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-empty": listScene({ detail: {} }),
   "app.window.library.detail-loading": listScene({ detail: { get: "hold" } }, clickCardOnly(NOTE)),
@@ -344,4 +365,9 @@ export const LIBRARY_DETAIL_SCENES = {
   "app.window.library.detail-transcript-body": listScene(TRANSCRIPT, openTranscript(TRANSCRIPT_IDS.bodyItem)),
   "app.window.library.detail-transcript-find": listScene(TRANSCRIPT, chain(openTranscript(TRANSCRIPT_IDS.bodyItem), findInTranscript), { keepFocus: true }),
   "app.window.library.detail-transcript-long-confirm": listScene(TRANSCRIPT, chain(openTranscript(TRANSCRIPT_IDS.longItem), openLongFormat), { keepFocus: true }),
+  // M2-5b：公众号网页快照——原生工具条（模式文字、宽度下拉、「更多」）与通知条（没有快照、读取失败、已编辑 / 新版本 / 缺失资源）。
+  "app.window.library.detail-snapshot-toolbar": listScene(SNAPSHOT("toolbar"), openSnapshot),
+  "app.window.library.detail-snapshot-missing": listScene(SNAPSHOT("missing"), openSnapshot),
+  "app.window.library.detail-snapshot-error": listScene(SNAPSHOT("error"), openSnapshot),
+  "app.window.library.detail-snapshot-warnings": listScene(SNAPSHOT("warnings"), openSnapshot),
 };

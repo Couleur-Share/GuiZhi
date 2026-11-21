@@ -54,6 +54,9 @@ type snapshotUI struct {
 	err     string
 	busy    bool
 
+	// noticeW 是读取失败与没有快照两条通知块（文字加行内按钮，snapshotInlineNotice）上一帧的内容宽度。
+	noticeW float32
+
 	// 宽度下拉与「更多」菜单；menuRect 是「更多」钮上一帧的外框（菜单的锚点与 Keep）。
 	sel      kit.SelectState
 	menu     anchoredMenu
@@ -198,6 +201,10 @@ func (s *Screen) setSnapshotLayout(wideRail, tocOpen bool) {
 	sn.wideRail, sn.tocOpen = wideRail, tocOpen
 }
 
+// ReportSnapshotLayout 代岛里的页面回报网页快照的版面状态（同 SnapshotState）：对照环境的无头会话没有岛，页面不会自己回报，
+// 由场景按页面里 use-snapshot-reader 的同一条公式算出来交给它（viva/parity/scenes/library_snapshot.go）。
+func (s *Screen) ReportSnapshotLayout(wideRail, tocOpen bool) { s.setSnapshotLayout(wideRail, tocOpen) }
+
 // showVersionSnapshot 让阅读区切到某个来源版本的网页快照（版本面板里的「查看网页快照」；渲染层是把窗格嵌在版本面板里，
 // 原生只有一座岛，所以改成切换阅读区）。工具侧栏收起，让用户看到切换的结果。
 func (s *Screen) showVersionSnapshot(versionID string) {
@@ -308,7 +315,7 @@ func (s *Screen) snapshotMoreButton(c ui.C) {
 	box := s.inlineButton(c, inlineSpec{
 		Name: label, Value: label, Popup: true, Open: sn.menu.open,
 		Fg: t.Foreground, BgHover: t.Accent, Border: t.Border, BorderW: 1,
-		Radius: l.Rem(0.75), Height: l.Rem(1.875), PadX: l.Space(3), Rect: &sn.menuRect,
+		Radius: l.Rem(0.75), Height: l.Rem(1.875), PadX: l.Space(3) + 1, Rect: &sn.menuRect, // px-3 加 1px 边框（inlineSpec 的内边距已含边框）
 	}, func(fg tokens.Color) {
 		l.Text(c.Key("text"), label, kit.TextXS, kit.WeightNormal, fg)
 	})
@@ -382,25 +389,21 @@ func (s *Screen) snapshotNotices(c ui.C, item services.LibraryItem) {
 		})
 	}
 	if sn.err != "" {
-		ui.Row(c.Key("error")).FillWidth().Shrink(0).Items(ui.Center).Gap(l.Space(2)).Pad(l.Space(3)).Draw(func(d *ui.DrawContext) {
-			d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleStatus, "", gfx.HitOptions{Live: gfx.LiveAssertive})
-		}).Children(func() {
-			l.Text(c.Key("error-text"), sn.err, kit.TextSM, kit.WeightNormal, t.Destructive, kit.Wrapped()).Shrink(1).MinWidth(0)
-			if s.snapshotButton(c.Key("retry"), locales.LibrarySnapshotRetryLoad(), false) {
-				s.Store.LoadWebSnapshot(s.Ctx, item.ID, sn.version)
-			}
-		})
+		// <div class="p-3 text-sm text-destructive" role="alert">：文字之后紧跟「重试读取」，按钮的文字继承红色。
+		if s.snapshotInlineNotice(c, "error", sn.err, t.Destructive, 0, locales.LibrarySnapshotRetryLoad(), false, true) {
+			s.Store.LoadWebSnapshot(s.Ctx, item.ID, sn.version)
+		}
 	}
 	if sn.view == nil && sn.err == "" {
 		line("loading", l.Space(3), l.Space(3), locales.LibrarySnapshotLoading(), kit.TextSM, t.MutedForeground)
 	}
 	if sn.view != nil && sn.meta() == nil {
-		ui.Row(c.Key("missing")).FillWidth().Shrink(0).Items(ui.Center).Gap(l.Space(2)).Pad(l.Space(3)).Children(func() {
-			l.Text(c.Key("missing-text"), locales.LibrarySnapshotMissing(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).Shrink(1).MinWidth(0)
-			if item.DeletedAt == 0 && s.snapshotButton(c.Key("supplement"), locales.LibrarySnapshotSupplement(), sn.busy) {
-				s.Store.SupplementWechatSnapshot(s.Ctx, item.ID)
-			}
-		})
+		// <p class="p-3 text-sm text-muted-foreground">：补采钮（ml-2）紧跟文字，按钮的文字继承弱化色；回收站里的条目不摆补采钮。
+		if item.DeletedAt != 0 {
+			line("missing", l.Space(3), l.Space(3), locales.LibrarySnapshotMissing(), kit.TextSM, t.MutedForeground)
+		} else if s.snapshotInlineNotice(c, "missing", locales.LibrarySnapshotMissing(), t.MutedForeground, l.Space(2), locales.LibrarySnapshotSupplement(), sn.busy, false) {
+			s.Store.SupplementWechatSnapshot(s.Ctx, item.ID)
+		}
 	}
 	if sn.view != nil && sn.view.Edited {
 		hint := locales.LibrarySnapshotEditedHint()

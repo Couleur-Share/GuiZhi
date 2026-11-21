@@ -112,6 +112,20 @@ type LibraryDetailFixture struct {
 		LongUnit  string `json:"longUnit"`
 		LongCount int    `json:"longCount"`
 	} `json:"transcripts"`
+	// Snapshots 是公众号网页快照（M2-5b）的数据：Item 是场景里换成公众号来源（SourceURI）的条目，其余字段拼成 web:snapshot 的几种回复
+	// （SnapshotView）。Error 是读取失败的原因，Warnings 与 Failures 是「缺失资源 / 警告」通知条的原因（Failures 的原因排在警告之后）。
+	// React 采集器（lib/react-library.mjs）在页内按同样的规则拼同一份。
+	Snapshots struct {
+		Item       string                               `json:"item"`
+		SourceURI  string                               `json:"sourceUri"`
+		InstanceID string                               `json:"instanceId"`
+		VersionID  string                               `json:"versionId"`
+		CapturedAt int64                                `json:"capturedAt"`
+		Document   string                               `json:"document"`
+		Error      string                               `json:"error"`
+		Warnings   []string                             `json:"warnings"`
+		Failures   []services.LibraryWebSnapshotFailure `json:"failures"`
+	} `json:"snapshots"`
 	// Conflict 是保存冲突场景的两个标题：另一入口已改成的标题，与用户在标题框里改成的标题。
 	Conflict struct {
 		SavedTitle string `json:"savedTitle"`
@@ -137,4 +151,33 @@ func LoadLibraryDetailFixture() (LibraryDetailFixture, error) {
 		f.Details[t.LongItem] = d
 	}
 	return f, nil
+}
+
+// SnapshotView 是网页快照场景里 web:snapshot 的回复（mode 与 React 采集器 config.detail.snapshot 同名）：
+//   - "toolbar"：读到了完整的原文快照（整页文档、没有缺失、没改过正文）；
+//   - "missing"：条目还没有保存过快照（没有版本与文档）；
+//   - "warnings"：正文在采集之后改过、有新的来源版本，快照里有缺失的资源与警告。
+//
+// "error" 不是一份视图而是读取失败（假服务的 WebSnapshot 报错，原因取 Snapshots.Error），不走这里。
+func (f LibraryDetailFixture) SnapshotView(mode string) services.LibraryWebSnapshotView {
+	s := f.Snapshots
+	meta := &services.LibraryWebSnapshotMeta{
+		Assets: []services.LibraryWebSnapshotAsset{}, Failures: []services.LibraryWebSnapshotFailure{}, Warnings: []string{},
+	}
+	view := services.LibraryWebSnapshotView{
+		InstanceID: s.InstanceID, Document: s.Document,
+		Version: &services.LibraryWebSnapshotVersion{ID: s.VersionID, CapturedAt: s.CapturedAt, Snapshot: meta},
+	}
+	switch mode {
+	case "toolbar":
+	case "missing":
+		view.InstanceID, view.Document, view.Version = "", "", nil
+	case "warnings":
+		view.Edited, view.Pending = true, true
+		meta.Failures = append(meta.Failures, s.Failures...)
+		meta.Warnings = append(meta.Warnings, s.Warnings...)
+	default:
+		panic("网页快照夹具没有这种回复：" + mode)
+	}
+	return view
 }

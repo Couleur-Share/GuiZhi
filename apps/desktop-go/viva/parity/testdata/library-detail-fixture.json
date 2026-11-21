@@ -191,6 +191,20 @@
     "longUnit": "长稿测试段落：数据留在本机，同步靠合并而不靠覆盖，所以离线时也能放心地编辑。",
     "longCount": 1300
   },
+  "snapshots": {
+    "item": "item-003",
+    "sourceUri": "https://mp.weixin.qq.com/s/guizhi-local-first",
+    "instanceId": "parity-snapshot-instance",
+    "versionId": "snap-v1",
+    "capturedAt": 1794700000000,
+    "document": "<!doctype html><html><body><h1>如何构建本地优先的个人知识库</h1><p>本地优先的软件把数据放在用户自己的设备上。</p></body></html>",
+    "error": "快照校验失败：图片 a1b2c3.png 的 SHA-256 与清单不一致，文件可能已损坏",
+    "warnings": ["部分图片受防盗链限制，已使用占位图"],
+    "failures": [
+      { "url": "https://mmbiz.qpic.cn/mmbiz_png/guizhi/0", "reason": "图片下载失败：服务器返回 403" },
+      { "url": "https://mmbiz.qpic.cn/mmbiz_png/guizhi/1", "reason": "图片超过 10 MB 大小上限，已跳过" }
+    ]
+  },
   "conflict": {
     "savedTitle": "学习笔记：Go 并发模式（另一入口已改）",
     "mineTitle": "我的新标题"

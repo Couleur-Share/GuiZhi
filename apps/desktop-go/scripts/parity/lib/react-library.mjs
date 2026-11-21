@@ -91,6 +91,15 @@ const HIDE_READER_TOOLBAR_CSS = `
 `;
 const HIDE_READER_CSS = HIDE_READER_CONTENT_CSS + HIDE_READER_TOOLBAR_CSS;
 /**
+ * 公众号网页快照的场景（M2-5b，config.detail.snapshot）：快照面板（WebSnapshotPane）里的原生部分——标签栏里的工具条、读取失败 / 没有快照 / 已编辑 / 新版本 / 缺失资源的通知条——
+ * 是 Viva 的原生界面、要参与对照，只隐去面板里最后那一块：原文快照的 iframe 区（relative min-h-0 flex-1，连同它的底色与目录）或标准排版的正文（min-h-0 flex-1）——
+ * 那是阅读岛的内容，Viva 的阅读岛在无头会话里画不出来。读者工具条挂载点里的控件照旧隐去（HIDE_READER_TOOLBAR_CSS）。
+ * 同样是采集端的口径（页内样式），不是渲染层源码的改动。
+ */
+const HIDE_SNAPSHOT_BODY_CSS = `
+[data-testid="web-snapshot-pane"] > .min-h-0.flex-1 { visibility: hidden !important; }
+`;
+/**
  * 文章工具侧栏的场景（config.detail.hideToolbar）再把内容面板的整条工具栏隐去（display: none，不占位）：侧栏在渲染层 DOM 里排在内容面板之前，
  * Viva 没有 z-index、绘制序就是读屏与文字序，侧栏只能声明在内容之后，工具栏里的文字在两侧的文字序里前后颠倒，会让整段侧栏文字错位一格比不上
  * （台账 C-013）。Viva 一侧对应 Screen.HideToolbar。
@@ -250,7 +259,8 @@ function pageInit({ fixture, detail, configKey }) {
       content,
       summary,
       transcript: body.transcript ?? "",
-      sourceUri: commentsHere ? detail.tools.commentsSourceUri : (body.sourceUri ? body.sourceUri : null),
+      // 网页快照场景（M2-5b）：快照条目的来源链接换成公众号文章（夹具里没有一条详情带公众号链接）。
+      sourceUri: commentsHere ? detail.tools.commentsSourceUri : (detailCfg?.snapshot && id === detail.snapshots.item) ? detail.snapshots.sourceUri : (body.sourceUri ? body.sourceUri : null),
       reviewStatus: body.reviewStatus ?? e.reviewStatus ?? "clear",
       reviewReasons: body.reviewReasons ?? e.reviewReasons ?? [],
       metadata: {},
@@ -362,6 +372,27 @@ function pageInit({ fixture, detail, configKey }) {
         });
       }
     }
+    // 公众号网页快照（M2-5b）：web:snapshot 按 config.detail.snapshot 回四种结果之一，与 Go 一侧 LibraryDetailFixture.SnapshotView 同一份规则：
+    // toolbar（完整的原文快照）、missing（没有保存过快照）、warnings（正文改过、有新版本、快照有缺失资源与警告）、error（读取失败）。
+    if (detailCfg?.snapshot && api.webCapture) {
+      const s = detail.snapshots;
+      const mode = detailCfg.snapshot;
+      Object.assign(api.webCapture, {
+        snapshot: () => {
+          if (mode === "error") return Promise.resolve({ ok: false, error: s.error });
+          const meta = { assets: [], failures: [], warnings: [] };
+          const data = { instanceId: s.instanceId, document: s.document, edited: false, pending: false, version: { id: s.versionId, capturedAt: s.capturedAt, snapshot: meta } };
+          if (mode === "missing") Object.assign(data, { instanceId: "", document: "", version: null });
+          if (mode === "warnings") {
+            data.edited = true;
+            data.pending = true;
+            meta.failures = s.failures.map((f) => ({ ...f }));
+            meta.warnings = [...s.warnings];
+          }
+          return Promise.resolve({ ok: true, data });
+        },
+      });
+    }
     // 标签建议（M2-6c）：渲染层经设置里的模型配置与 ai:httpRequest 请求模型。settings:get 在真实读取之上补一份可用的单模型配置
     // （AI 配置不在库里、对照环境里没有），ai:httpRequest（api.ai.request）回一条固定的对话补全，正文是夹具里的候选标签
     // （与 Go 一侧的 SeedTagSuggestions 同一份）。只在标签建议场景里替换，别的场景的设置与请求照旧。
@@ -463,7 +494,8 @@ export async function enterLibrary(session, options = {}) {
   if (!(config.detail && config.showReader)) {
     // toolbar：只隐去阅读区内容，保留读者工具条（B-065）；hideToolbar：连工具栏一起隐去（C-013）；
     // transcript：文字稿场景（M2-6d）里文字稿面板是 Viva 的原生面板、要参与对照，只隐去读者工具条挂载点里的控件、不隐去阅读区内容。
-    const readerCss = (config.detail?.transcript ? HIDE_READER_TOOLBAR_CSS : config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : "");
+    // snapshot：网页快照场景（M2-5b）里快照面板的工具条与通知条是 Viva 的原生界面、要参与对照，只隐去面板里最后那一块（岛的内容，HIDE_SNAPSHOT_BODY_CSS）与读者工具条挂载点里的控件。
+    const readerCss = (config.detail?.snapshot ? HIDE_SNAPSHOT_BODY_CSS + HIDE_READER_TOOLBAR_CSS : config.detail?.transcript ? HIDE_READER_TOOLBAR_CSS : config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : "");
     await page.addStyleTag({ content: config.detail ? readerCss : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
   }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，

@@ -44,6 +44,10 @@ type libraryOptions struct {
 	// hideToolbar 为 true 时内容面板的工具栏不画（Screen.HideToolbar；React 一侧 config.detail.hideToolbar 加 display: none）：
 	// 文章工具侧栏的场景用，理由见 Screen.HideToolbar（台账 C-013）。
 	hideToolbar bool
+	// snapshot 是公众号网页快照场景（M2-5b）的数据，只在 detail 时有意义：空表示不放；否则夹具里的网页条目（Snapshots.Item）的来源换成公众号文章，
+	// web:snapshot 按 toolbar（完整的原文快照）、missing（没有快照）、warnings（改过 + 新版本 + 缺失资源）回视图，error 则读取失败（LibraryDetailFixture.SnapshotView）。
+	// React 一侧 config.detail.snapshot 同值。
+	snapshot string
 	// fullTranscript 为 true 时文字稿的文字块整份都画（Screen.FullTranscript）：文字稿场景（M2-6d）用，React 一侧 config.detail.transcript 不隐去阅读区内容。
 	fullTranscript bool
 	// readerToolbar 为 true 时工具栏里画读者工具条（原文 / AI 阅读、目录、编辑，Screen.ReaderToolbar）；React 一侧
