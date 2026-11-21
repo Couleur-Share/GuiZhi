@@ -870,8 +870,12 @@ func TestVersionPaneTextScalesWithTheFontTier(t *testing.T) {
 			r.click(gfx.RoleOption, kit.FormatDateTime(1_700_000_000_000, r.screen.loc(), r.screen.Locale)+" · engine-2")
 			for _, line := range []string{"网页正文。", "新版正文"} {
 				tx := textNamed(t, r, line)
-				if want := r.look.Rem(0.75); !near(tx.Style.Size, want) {
-					t.Errorf("「%s」字号 %.2f，期望 0.75rem = %.2f", line, tx.Style.Size, want)
+				wantSize := r.look.Rem(0.75)
+				if root == 18 {
+					wantSize = 14 // 大档 13.5px 下新宋体位图吸附到 14px（台账 B-072）
+				}
+				if !near(tx.Style.Size, wantSize) {
+					t.Errorf("「%s」字号 %.2f，期望 %.2f", line, tx.Style.Size, wantSize)
 				}
 				if want := r.look.Rem(1); !near(tx.Bounds.Height, want) {
 					t.Errorf("「%s」行高 %.2f，期望 1rem = %.2f", line, tx.Bounds.Height, want)

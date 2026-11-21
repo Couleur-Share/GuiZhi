@@ -23,9 +23,25 @@ import (
 // monoRuneAdvance 是一个字符排在 font-mono 文字里的前进量（字号 size）。
 func monoRuneAdvance(r rune, size float32) float32 {
 	if isWideRune(r) {
-		return size
+		return monoWideAdvance(size)
 	}
 	return size * consolasAdvance
+}
+
+// monoWideAdvance 是中文 Windows 下 font-mono 回退到新宋体（NSimSun）时一个全角字符的前进量。
+// 2026-11-21 在 React 参照里实测（9–18px，CSS.getPlatformFontsForNode 确认为 NSimSun）：
+// 新宋体在 12 / 14 / 16px 有内嵌位图，12.25→12、13/13.5→14、15.75→16；10.5 / 11 / 12 / 14 / 16 / 18px 等于字号本身。
+func monoWideAdvance(size float32) float32 {
+	switch {
+	case size >= 12.1 && size < 12.6:
+		return 12
+	case size >= 12.6 && size < 14.5:
+		return 14
+	case size >= 15.5 && size < 16.5:
+		return 16
+	default:
+		return size
+	}
 }
 
 // IsWideRune 报告 r 是否占两个字格（汉字、假名、谚文、全角标点等）：对照工具据此算固定间距文字的字格数。

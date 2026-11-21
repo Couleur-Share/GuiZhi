@@ -72,4 +72,16 @@ func TestMonoWidthCountsWideRunesAsOneEm(t *testing.T) {
 	if got, want := MonoWidth("ab汉", 10), 2*10*consolasAdvance+10; got < float32(want)-1e-3 || got > float32(want)+1e-3 {
 		t.Fatalf("MonoWidth = %v，期望 %v", got, want)
 	}
+	// 大字号档 13.5px 下新宋体位图吸附到 14px，13 个汉字占 182px、14 个占 196px（B-072）。
+	if got, want := MonoWidth("汉", 13.5), float32(14); got != want {
+		t.Fatalf("MonoWidth(13.5) = %v，期望 %v", got, want)
+	}
+	if got, want := MonoWidth("汉", 10.5), float32(10.5); got != want {
+		t.Fatalf("MonoWidth(10.5) = %v，期望 %v", got, want)
+	}
+	// 栏宽 190px、字号 13.5px 时 14 个汉字（196px）放不下，应折成 13 + 1（而不是按 13.5px 算出的 14）。
+	got := WrapMono("本地优先的软件把数据放在用户", 190, 13.5)
+	if len(got) != 2 || len([]rune(got[0])) != 13 || len([]rune(got[1])) != 1 {
+		t.Fatalf("13.5px 下 190px 宽折行 = %q，期望 13+1 字", got)
+	}
 }

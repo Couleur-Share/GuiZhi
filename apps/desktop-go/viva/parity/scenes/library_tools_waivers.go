@@ -43,8 +43,8 @@ func versionPaneWaivers() []parity.Waiver {
 			Note: "版本比较的原文栏是合成层里的滚动容器，文字用灰度抗锯齿；Viva 整窗 LCD，墨迹总量偏大（位置、字重、颜色、字号均一致）",
 		},
 		{
-			Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Subject: versionPaneLead, Variant: "dark-", MinDelta: 0.3, MaxDelta: 0.5, Dir: 1,
-			Note: "同上，深色主题：浅字压深底，灰度与 LCD 的墨迹总量差更大（读数 0.34–0.48，与 overlayInkWaiver 的深色读数同量级）",
+			Ledger: "A-009", Layer: parity.LayerL2, Kind: "ink-mass", Subject: versionPaneLead, Variant: "dark-", MinDelta: 0.15, MaxDelta: 0.55, Dir: 1,
+			Note: "同上，深色主题：浅字压深底，灰度与 LCD 的墨迹总量差随字号档分布更宽（T2 三档实测 0.167–0.534）",
 		},
 		{
 			Ledger: "C-015", Layer: parity.LayerL2, Kind: "ink", Subject: versionPaneLead, MaxDelta: 1, MaxDY: 1,
