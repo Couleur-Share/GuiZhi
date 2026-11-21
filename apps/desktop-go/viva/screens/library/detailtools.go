@@ -16,8 +16,8 @@ import (
 // 面板盖在文章栏的右侧（absolute bottom-4 right-4 top-4 z-30 w-[26rem] max-w-[calc(100%-2rem)]），Esc 只在焦点落在面板里时收起；
 // 打开时焦点落到收起钮上。阅读岛（原生视图）在场时，面板与查找条同理抬到更高的一层（见 findBar）。
 //
-// 本里程碑（M2-6b）接的是信息、标签、复制给 AI、来源评论与来源版本；AI 摘要卡片与图中文字卡片（M2-6c）、媒体预览（M2-6d）
-// 的位置在这里留着，台账 B-060、B-067。
+// 面板接的是信息、标签（含 AI 标签建议）、复制给 AI、图中文字、AI 摘要、来源评论与来源版本；媒体预览（M2-6d）
+// 的位置在这里留着，台账 B-067。
 
 // toolsUI 是工具侧栏的界面状态。openID 对应渲染层 ItemDetail 的 toolsItemId（条目 ID：换了条目面板自然是关着的）；
 // 其余随 ArticleToolsPanel 与来源评论的提供者挂载而生，Store 里的挂载序号变了（换条目、采用版本后重新读取）就整体清空。
@@ -34,6 +34,7 @@ type toolsUI struct {
 	scope gfx.ID
 
 	tags     tagEditorUI
+	summary  summaryUI
 	handoff  handoffUI
 	comments commentsUI
 	versions versionsUI
@@ -68,6 +69,7 @@ func (s *Screen) syncTools(tv ToolsView, id string) {
 	if t.mountItem == id && t.mount == mount {
 		return
 	}
+	t.tags.ai.reset() // 整体覆盖之前先作废在途的标签建议：它的后台回写只认令牌，不会写进新的状态
 	*t = toolsUI{openID: t.openID, mountItem: id, mount: mount, area: t.area, scope: t.scope}
 }
 
@@ -238,8 +240,9 @@ func (s *Screen) toolsProcessing(c ui.C, v View, item services.LibraryItem, caps
 			s.handoffButton(c.Key("handoff"), v, item)
 		})
 		ui.Flow(c.Key("cards")).FillWidth().Items(ui.Center).Gap(l.Space(2)).LineGap(l.Space(2)).Children(func() {
+			s.ocrCard(c.Key("ocr"), v, item)
 			if !caps.IsMediaItem {
-				s.summaryEntry(c.Key("summary"), item)
+				s.summaryCard(c.Key("summary"), v, item)
 			}
 			s.commentsCard(c.Key("comments"), v, item)
 		})
@@ -256,19 +259,5 @@ func (s *Screen) actionChipStyle() kit.ButtonStyle {
 		Fg: t.MutedForeground, FgHover: t.Primary, BgHover: t.Primary.WithAlpha(0.05),
 		Border: t.Border.WithAlpha(0.7), BorderHover: t.Primary.WithAlpha(0.5), BorderW: 1,
 		Transition: kit.DurationDefault, DisabledOpacity: 0.6,
-	}
-}
-
-// summaryEntry 是 AI 摘要的入口：没有摘要时是一枚淡的「生成 AI 摘要」动作钮（渲染层 AiSummaryCard 的无摘要分支）。
-// 摘要的生成、有摘要时的卡片与重新生成随 M2-6c 迁入：点它弹一条说明归属的失败提示（台账 B-060）；有摘要时这里先留白。
-func (s *Screen) summaryEntry(c ui.C, item services.LibraryItem) {
-	if item.Summary != "" {
-		return
-	}
-	l := s.Look
-	label := locales.LibraryAiSummaryGenerate()
-	box := l.Button(c, kit.ButtonSpec{Label: label, Icon: icons.Sparkles, IconSize: l.Rem(0.875)}, s.actionChipStyle())
-	if box.Clicked() {
-		s.notMigrated(label, "M2-6c", "B-060")
 	}
 }

@@ -1,7 +1,6 @@
 package library
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/vivaui/viva/gfx"
@@ -35,6 +34,8 @@ type tagPicker struct {
 	pop   kit.PopoverState
 	id    string
 	draft ui.Field
+	// ai 是 AI 建议的状态（候选与忙标记，见 tagsuggest.go）：每次打开、关闭都清空，对应渲染层浮层每次挂载都是新的组件。
+	ai *tagSuggestUI
 }
 
 // openTagPicker 在条目菜单的位置打开标签选择浮层（渲染层 onEditTags 取菜单的 x、y）。
@@ -42,11 +43,9 @@ func (s *Screen) openTagPicker(e services.LibraryEntry) {
 	p := &s.bulk.picker
 	p.id = e.ID
 	p.draft.SetText("")
+	p.ai.reset()
 	p.pop.Show(s.bulk.entry.at)
 }
-
-// errAiTagsPending 是「AI 建议标签」在 AI 功能迁入之前的失败原因（台账 B-053）：用户点了就要有交代，不能一声不响。
-var errAiTagsPending = errors.New("AI 标签建议尚未迁入原生界面，将随 AI 功能一起迁入；这里仍可手动输入或选择已有标签")
 
 const (
 	tagPanelWidth  = 260 // BulkTagPopover 的 PANEL_WIDTH（px 字面量）
@@ -92,6 +91,7 @@ func (s *Screen) bulkTagView(c ui.C, v View) {
 func (s *Screen) tagPickerView(c ui.C, v View) {
 	p := &s.bulk.picker
 	if !p.pop.Open {
+		p.ai.reset() // 关着的帧清掉 AI 建议：点外面、Esc 与别处的 Close 都走这里，下次打开不会带着上一次的候选
 		return
 	}
 	var entry *services.LibraryEntry
@@ -102,11 +102,13 @@ func (s *Screen) tagPickerView(c ui.C, v View) {
 		}
 	}
 	if entry == nil {
+		p.ai.reset() // 条目不在本页了：浮层随之不画，建议一并作废
 		return
 	}
 	id := entry.ID
 	s.tagPickerPanel(c, "tag-picker", &p.pop, &p.draft, tagPickerData{
 		tags: entry.Tags, all: v.Tags, apply: func(names []string) { s.setItemTags(id, names) },
+		itemID: id, ai: p.suggest(),
 	})
 }
 
@@ -118,6 +120,9 @@ type tagPickerData struct {
 	apply func(names []string)  // 把改后的标签名写回条目
 	// trigger 是触发钮的外框：点它只收起（详情的 + 钮）；列表右键菜单打开的没有触发钮，零值。
 	trigger gfx.Rect
+	// itemID 是正在编辑的条目（AI 建议按它取正文）；ai 是这块浮层的 AI 建议状态，由调用方持有（浮层关闭、换条目时它清空）。
+	itemID string
+	ai     *tagSuggestUI
 }
 
 // tagPickerPanel 声明单条标签选择浮层的面板（key 是它在 c 下的键）：宽 272，当前标签、输入加「添加」、选择已有标签、AI 建议四段。
@@ -167,7 +172,7 @@ func (s *Screen) tagPickerPanel(c ui.C, key string, pop *kit.PopoverState, draft
 				draft.SetText("")
 			}
 			s.tagChoices(c, unused, func(tag services.LibraryTag) { addTag(tag.Name) })
-			s.aiTagSuggest(c)
+			s.aiTagSuggest(c, names, d)
 		},
 	})
 }
@@ -306,30 +311,6 @@ func (s *Screen) chipRemove(c ui.C, name string, fg tokens.Color) bool {
 		l.Icon(c.Key("icon"), icons.X, size, ink)
 	})
 	return box.Clicked()
-}
-
-// aiTagSuggest 是「AI 建议标签」一段：mt-3 border-t border-border/60 pt-2.5，标题与「生成」钮一行（flex items-center
-// justify-between gap-2）。生成要调 AI 请求，随 AI 功能一起迁入（台账 B-053）：在那之前点击给出可理解的说明，不假装成功。
-func (s *Screen) aiTagSuggest(c ui.C) {
-	l := s.Look
-	t := l.T
-	ui.Column(c.Key("ai")).FillWidth().MarginTop(l.Space(3)).PadSides(l.Space(2.5)+1, 0, 0, 0).
-		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeTop, 1, t.Border.WithAlpha(0.6)) }).
-		Children(func() {
-			ui.Row(c.Key("head")).FillWidth().Items(ui.Center).Justify(ui.Between).Gap(l.Space(2)).Children(func() {
-				l.TextTracked(c.Key("title"), strings.ToUpper(locales.LibraryAiTagsSuggest()), kit.TextXS, kit.WeightMedium, t.MutedForeground, 0.025)
-				ui.Row(c.Key("actions")).Items(ui.Center).Gap(l.Space(0.5)).Children(func() {
-					// inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs text-primary transition-colors hover:bg-primary/10
-					gen := l.Button(c.Key("generate"), kit.ButtonSpec{Label: locales.LibraryTagsGenerate(), Icon: icons.Sparkles, IconSize: l.Rem(0.875)}, kit.ButtonStyle{
-						Height: l.Rem(1.5), PadX: l.Space(1.5), Radius: l.Rem(0.75) - 2, Gap: l.Space(1), Text: kit.TextXS, Weight: kit.WeightNormal,
-						Fg: t.Primary, BgHover: t.Primary.WithAlpha(0.1), Transition: kit.DurationDefault, DisabledOpacity: 0.6,
-					})
-					if gen.Clicked() {
-						s.Guard.Report(locales.LibraryAiTagsSuggest(), errAiTagsPending)
-					}
-				})
-			})
-		})
 }
 
 // containsString 报告 list 里有没有 s。

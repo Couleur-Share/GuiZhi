@@ -1053,11 +1053,6 @@ func TestEveryUnmigratedEntryNamesItsMilestone(t *testing.T) {
 			r.openCard(detailForumID)
 			r.click(gfx.RoleButton, locales.LibraryForumRepliesSection())
 		}, gfx.RoleButton, locales.LibraryForumDiscussionRefresh(), "M2-6"},
-		{"AI 摘要入口", func(r *rig) {
-			r.openCard(detailNoteID)
-			r.clickInDetail(gfx.RoleCombobox, locales.LibraryMoreActions())
-			r.click(gfx.RoleMenuItem, locales.ArticleReaderTools())
-		}, gfx.RoleButton, locales.LibraryAiSummaryGenerate(), "M2-6c"},
 		{"AI 排版文字稿", func(r *rig) {
 			r.openCard(detailVideoID)
 			r.clickPrefix(gfx.RoleButton, locales.LibraryTranscript())

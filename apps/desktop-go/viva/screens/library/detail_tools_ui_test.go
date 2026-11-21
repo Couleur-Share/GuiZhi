@@ -437,17 +437,13 @@ func TestHandoffButtonsAreDisabledWhileATaskRuns(t *testing.T) {
 
 // ---- AI 摘要入口 ----
 
-// 非音视频、没有摘要的条目摆「生成 AI 摘要」，点了弹说明归属里程碑的失败提示；有摘要或是音视频时这里留白。
+// 非音视频、没有摘要的条目摆「生成 AI 摘要」；有摘要时换成摘要卡片；音视频条目没有这个区块（卡片的完整行为见 detail_ai_ui_test.go）。
 func TestSummaryEntryAppearsOnlyWhereTheCardWould(t *testing.T) {
 	t.Parallel()
 	r := shellRig(t)
 	r.openTools(detailNoteID)
-	r.click(gfx.RoleButton, locales.LibraryAiSummaryGenerate())
-	text := r.toastText()
-	for _, want := range []string{locales.LibraryAiSummaryGenerate(), "M2-6c", "B-060"} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("应弹失败提示并写明「%s」：%q", want, text)
-		}
+	if !r.has(gfx.RoleButton, locales.LibraryAiSummaryGenerate()) {
+		t.Fatal("没有摘要的非音视频条目应摆「生成 AI 摘要」")
 	}
 
 	v := shellRig(t)
@@ -461,7 +457,10 @@ func TestSummaryEntryAppearsOnlyWhereTheCardWould(t *testing.T) {
 	})
 	s.openTools(detailNoteID)
 	if s.has(gfx.RoleButton, locales.LibraryAiSummaryGenerate()) {
-		t.Fatal("已有摘要时不画「生成 AI 摘要」（摘要卡片随 M2-6c 迁入）")
+		t.Fatal("已有摘要时不画「生成 AI 摘要」，该是摘要卡片")
+	}
+	if !s.has(gfx.RoleButton, locales.LibraryAiSummaryExpand()) {
+		t.Fatal("已有摘要时应摆折叠着的摘要卡片")
 	}
 }
 

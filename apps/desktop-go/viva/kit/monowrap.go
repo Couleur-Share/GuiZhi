@@ -212,13 +212,25 @@ func newUnit(text string, measure measureFn) monoUnit {
 // splitUnits 按断行机会把一行切成若干段；每段是「词 + 它后面的空格」，行首的缩进并入第一个词。
 func splitUnits(line string, measure measureFn) []monoUnit {
 	runes := []rune(line)
+	var units []monoUnit
+	start := 0
+	for _, end := range unitEnds(runes) {
+		units = append(units, newUnit(string(runes[start:end]), measure))
+		start = end
+	}
+	return units
+}
+
+// unitEnds 返回 runes 按断行机会切成的各段的结束下标（rune 下标，严格递增，最后一个是 len(runes)）；
+// 带样式的行内排版（prose.go）按它切分后再逐段按各自的字体量宽。
+func unitEnds(runes []rune) []int {
 	var (
-		units []monoUnit
+		ends  []int
 		start int
 	)
 	emit := func(end int) {
 		if end > start {
-			units = append(units, newUnit(string(runes[start:end]), measure))
+			ends = append(ends, end)
 			start = end
 		}
 	}
@@ -253,7 +265,7 @@ func splitUnits(line string, measure measureFn) []monoUnit {
 		}
 	}
 	emit(len(runes))
-	return units
+	return ends
 }
 
 func isWordRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }

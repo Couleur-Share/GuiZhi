@@ -17,6 +17,7 @@ import (
 // 卡片视图没有标签选择浮层（详情栏里的标签行自带 + 入口），切过来时丢掉表格视图留下的那一个。
 func (s *Screen) itemList(c ui.C, v View) {
 	s.bulk.picker.pop.Close()
+	s.bulk.picker.ai.reset()
 	ui.Column(c.Key("item-list")).FillWidth().Grow(1).MinHeight(0).Children(func() {
 		s.selectionBar(c, v, false)
 		s.batchStrip(c, v)

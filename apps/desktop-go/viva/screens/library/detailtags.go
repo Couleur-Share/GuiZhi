@@ -18,6 +18,8 @@ type tagEditorUI struct {
 	pop   kit.PopoverState
 	draft ui.Field
 	add   gfx.Rect
+	// ai 是 AI 建议的状态（候选与忙标记，见 tagsuggest.go）：浮层每次打开、关闭与换条目都清空。
+	ai *tagSuggestUI
 }
 
 // tagEditor 声明标签行：mt-2 flex flex-wrap items-center gap-1.5，条目的标签（带移除钮）依次排开，最后是「+」。
@@ -32,11 +34,14 @@ func (s *Screen) tagEditor(c ui.C, v View, item services.LibraryItem) {
 		}
 		s.tagAddButton(c.Key("add"), item, ed)
 	})
-	if ed.pop.Open {
-		s.tagPickerPanel(c, "tag-picker", &ed.pop, &ed.draft, tagPickerData{
-			tags: item.Tags, all: v.Tags, apply: s.updateItemTags, trigger: ed.add,
-		})
+	if !ed.pop.Open {
+		ed.ai.reset() // 关着的帧清掉 AI 建议：点外面、Esc 与「+」收起都走这里
+		return
 	}
+	s.tagPickerPanel(c, "tag-picker", &ed.pop, &ed.draft, tagPickerData{
+		tags: item.Tags, all: v.Tags, apply: s.updateItemTags, trigger: ed.add,
+		itemID: item.ID, ai: ed.suggest(),
+	})
 }
 
 // tagAddButton 是「+」钮：inline-flex h-6 items-center gap-1 rounded-full border border-dashed border-border px-2 text-xs
@@ -64,6 +69,7 @@ func (s *Screen) tagAddButton(c ui.C, item services.LibraryItem, ed *tagEditorUI
 			return
 		}
 		ed.draft.SetText("")
+		ed.ai.reset()
 		r := ed.add
 		ed.pop.Show(gfx.Point{X: r.X, Y: r.Y + r.Height + 6})
 	}

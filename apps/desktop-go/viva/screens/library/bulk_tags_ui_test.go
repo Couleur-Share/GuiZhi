@@ -2,7 +2,6 @@ package library
 
 import (
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/vivaui/viva/gfx"
@@ -225,12 +224,15 @@ func TestTagPickerEditsOneEntrysTags(t *testing.T) {
 		t.Fatal("移除后它应回到「选择已有标签」里")
 	}
 
+	// AI 建议：已经带着的「新」不再出现，其余成为可点的候选；点候选追加到条目（更细的行为见 detail_ai_ui_test.go）。
+	r.svc.SeedTagSuggestions([]string{"新", "ai"}, nil)
 	r.click(gfx.RoleButton, locales.LibraryTagsGenerate())
-	if !r.hasText(locales.CommonOperationFailed(locales.LibraryAiTagsSuggest())) {
-		t.Fatalf("AI 建议迁入之前应给出失败提示；画面文字 %q", r.session.Texts())
+	if r.hasInList(gfx.RoleButton, "新") || !r.hasInList(gfx.RoleButton, "ai") {
+		t.Fatalf("候选应只剩未带上的「ai」；画面文字 %q", r.session.Texts())
 	}
-	if !slices.ContainsFunc(r.log.logs, func(entry string) bool { return strings.Contains(entry, locales.LibraryAiTagsSuggest()) }) {
-		t.Fatalf("失败应留痕，日志 %q", r.log.logs)
+	r.clickInList(gfx.RoleButton, "ai")
+	if got := lastTags(); !slices.Contains(got, "ai") {
+		t.Fatalf("点候选应追加它，实际 %q", got)
 	}
 
 	r.keys("Escape")
