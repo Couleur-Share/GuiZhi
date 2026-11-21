@@ -25,8 +25,6 @@ type redPin struct {
 var knownRed = map[string]redPin{
 	// B-062：标题框单行，不折行也不随内容增高，头部以下整页差 31 px
 	"app.window.library.detail-long-title": {Ledger: "B-062", Kinds: []string{"L2/box", "L2/icon-extra", "L2/icon-missing", "L2/text-lines"}, Max: 21},
-	// B-063：折行的多段行内文字在 Viva 里是一段
-	"app.window.library.detail-conflict-open": {Ledger: "B-063", Kinds: []string{"L1/missing-text", "L1/text"}, Max: 15},
 	// G-027：L1 角色映射里没有 region 与 ListMarker（映射表有哈希守卫，扩展待追认）
 	"app.window.library.detail-review":      {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 2},
 	"app.window.library.detail-review-open": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 3},

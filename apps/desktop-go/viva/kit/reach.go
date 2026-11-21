@@ -287,6 +287,9 @@ func (l *Look) TabKey(e gfx.KeyEvent) gfx.EventResult {
 	from := a.snap[at]
 	from.Y -= to - a.offset
 	a.state.ScrollTo(to)
+	if l.tips != nil {
+		l.tips.noteTabScroll() // 渲染层里这个 Tab 的 focusin 紧接着被 scroll 收起：新焦点不出气泡（B-032）
+	}
 	if a.visible(from) {
 		if a.focused != at {
 			a.refocus = at

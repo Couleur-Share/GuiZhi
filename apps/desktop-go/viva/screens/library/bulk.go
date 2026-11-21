@@ -69,6 +69,9 @@ type bulkState struct {
 	details bool
 	// results 是展开后逐条结果清单的行窗口（台账 B-056）：只声明视口附近的行。
 	results kit.RowWindow
+	// resultsW 是清单一行上一帧量到的宽度：过长的失败原因按它折行（kit.TextFlow，台账 B-055）；
+	// 宽度变了要出一帧，并让窗口里量过的行高作废（RowEpoch.Width）。
+	resultsW float32
 }
 
 // selection 是此刻多选集合的副本：动作在后台执行，期间选择可能变。

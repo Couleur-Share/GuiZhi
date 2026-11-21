@@ -27,6 +27,8 @@ type noticeUI struct {
 	itemID       string
 	// reviewOpen 是复核提醒的折叠。
 	reviewOpen bool
+	// conflictW 是冲突比较里各栏（「字段/mine」「字段/saved」）上一帧的宽度：等宽原文按它折行（conflictField）。
+	conflictW map[string]float32
 }
 
 // syncNotices 在条目换了时清空折叠状态：渲染层的通知组件随条目卸载，下一条的 <details> 是新元素。
@@ -104,17 +106,41 @@ func (s *Screen) conflictNotice(c ui.C, v View, item services.LibraryItem) {
 	})
 }
 
+// conflictPaneScrollbar 是 pre 里出竖向滚动条时它占去的内容宽度（与 versionPane 同一个取值）。
+const conflictPaneScrollbar = 8
+
 // conflictField 是一个冲突字段的两栏比较：grid grid-cols-2 gap-3，每栏一个 pre（max-h-48 overflow-auto whitespace-pre-wrap，等宽字体）。
+//
+// pre 里是 `{label}{value}` 两个相邻的文本节点（台账 B-063）：折行按拼起来的整段做（kit.WrapMonoRuns，等宽字格按渲染层的度量，
+// 汉字回退到新宋体的前进量），再把每一行拆回标签与内容各画一个 Label（kit.MonoParagraphRuns），第二行回到 pre 的左缘。
+// 折行宽度取这一栏上一帧量到的宽度（首帧按硬换行排、量到之后出一帧）；长到超过最高处就竖向滚动，滚动条占去的宽度要重新折。
 func (s *Screen) conflictField(c ui.C, field string, local, server services.LibraryItem) {
 	l := s.Look
 	t := l.T
+	n := &s.detail.notice
+	size, line := l.Rem(0.875), l.Rem(1.25) // pre 的字体是等宽 1em（14px），行高继承 text-sm 的 20px
+	maxH := l.Rem(12)                       // max-h-48
 	pre := func(key, label, text string) {
-		ui.Column(c.Key(key)).Grow(1).Basis(0).MinWidth(0).Children(func() {
-			// max-h-48 overflow-auto whitespace-pre-wrap；pre 的字体是等宽 1em（14px），行高继承 text-sm 的 20px。
+		wkey := field + "/" + key
+		ui.Column(c.Key(key)).Grow(1).Basis(0).MinWidth(0).Draw(func(d *ui.DrawContext) {
+			if w := d.Rect.Width; w > 0 && abs32(w-n.conflictW[wkey]) > 0.01 {
+				if n.conflictW == nil {
+					n.conflictW = map[string]float32{}
+				}
+				n.conflictW[wkey] = w
+				d.Canvas.RequestFrame()
+			}
+		}).Children(func() {
+			runs := []string{label, text}
+			w := n.conflictW[wkey]
+			lines := kit.WrapMonoRuns(runs, w, size)
+			if float32(len(lines))*line > maxH+0.01 && w > 0 {
+				lines = kit.WrapMonoRuns(runs, w-conflictPaneScrollbar, size)
+			}
+			// max-h-48 overflow-auto whitespace-pre-wrap
 			l.ScrollArea(c.Key(key+"-scroll"), [4]float32{}, func() {
-				ui.Text(c.Key(key+"-text"), label+text).Mono().MaxLines(0).FontSize(l.Rem(0.875)).LineHeight(l.Rem(1.25)).
-					Color(l.Col(t.Foreground)).FillWidth()
-			}).MaxHeight(l.Rem(12))
+				l.MonoParagraphRuns(c.Key(key+"-pre"), lines, size, line, t.Foreground)
+			}).MaxHeight(maxH)
 		})
 	}
 	ui.Row(c).FillWidth().Gap(l.Space(3)).Items(ui.Start).Children(func() {

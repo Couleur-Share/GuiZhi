@@ -35,6 +35,12 @@ const (
 	// activePoll 是有气泡显示（或排期）时探测窗口是否仍在前台的间隔。Viva 没有窗口失活的回调
 	//（OnActivate 只在变成活动窗口时触发），渲染层的 window blur 监听只能靠轮询近似：失焦之后至多晚这么久才收起。
 	activePoll = 250 * time.Millisecond
+
+	// tabScrollWindow 是 Tab 触发滚动之后，对随后到达的新焦点「不出气泡」的有效期（B-032），从滚动那一帧起算。
+	// 渲染层里新焦点的 focusin 与滚动引起的 scroll 事件是同一次 focus() 的先后两步，所以这个焦点不出气泡；
+	// Viva 里滚动与聚焦隔着一到三帧（续走 Tab、AutoFocus 请求），这点时间足够，又短到不会压住之后真正无关的焦点变化。
+	// 超时没有等到焦点也不要紧：到期即失效，退回「照常出气泡」。
+	tabScrollWindow = 200 * time.Millisecond
 )
 
 // tooltipHost 是一个提示宿主的身份：带提示的命中区自己的 ID；由容器提供提示时（容器没有 ID）按它的外框与文字认。
@@ -63,6 +69,23 @@ type TooltipState struct {
 	lastFocus  gfx.ID // 上一次传感器运行时的键盘焦点：按键先于焦点移动，收起要记下「按键之前」的焦点
 	wasActive  bool   // 上一次探测时窗口在前台
 	waitActive bool   // 失焦收起之后在等窗口回到前台（回来时键盘焦点的控件像 focusin 那样重新排期）
+
+	tabScroll      bool          // 刚有 Tab 为了把下一个停靠点滚进视野而滚动（TabKey 经 noteTabScroll 置位）：窗口内到达的新焦点不出气泡
+	tabScrollBegun bool          // 有效期是否已经起算（传感器在滚动之后的第一次运行里起算）
+	tabScrollUntil time.Duration // 有效期的终点
+}
+
+// noteTabScroll 记下「这个 Tab 先滚动、后聚焦」（B-032）：渲染层里聚焦的 focusin 紧接着被滚动的 scroll 事件收起，
+// 新焦点不出气泡（见 tabScrollWindow）。传感器在之后的有效期内一直把键盘焦点当作「已收起」。
+// 与有没有气泡在显示无关：旧的气泡由按键与滚动各自收起。
+func (st *TooltipState) noteTabScroll() {
+	st.tabScroll, st.tabScrollBegun = true, false
+}
+
+// endTabScroll 让「Tab 滚动」的压制失效：每次新的按键到达时先调（这次按键若又是滚动的 Tab，随后会重新置位）——
+// 不带滚动的按键与 Tab 到达的焦点是新事件，照常排期。
+func (st *TooltipState) endTabScroll() {
+	st.tabScroll, st.tabScrollBegun = false, false
 }
 
 // noteKey 记下一次按键（渲染层 TooltipLayer 的 keydown 监听）：有气泡显示或排期时返回真，调用方要补一次重绘，
@@ -161,6 +184,22 @@ func (st *TooltipState) update(canvas *gfx.Canvas, scrolled bool) {
 			return
 		}
 		st.wasActive = active
+	}
+
+	// Tab 为了聚焦而先滚动（B-032）：渲染层的 focusin 之后紧跟 scroll，新焦点出不了气泡。
+	// 有效期内每次运行都把当前键盘焦点记成「已收起」（焦点可能先后落在出发点、再落到目标上），期满后焦点保持原处，
+	// 之后真正的焦点变化照常解除、排期。
+	if st.tabScroll {
+		switch {
+		case !st.tabScrollBegun:
+			st.tabScrollBegun, st.tabScrollUntil = true, now+tabScrollWindow
+		case now >= st.tabScrollUntil:
+			st.tabScroll, st.tabScrollBegun = false, false
+		}
+		if st.tabScroll {
+			st.hushFocus = focused
+			canvas.RequestFrameIn(tabScrollWindow) // 没有别的事件时也要有一帧收到期，不然压制会一直挂着
+		}
 	}
 
 	// 按键（keydown，捕获阶段，任何键都算）：收起；指针没动、键盘焦点没换之前不再提示。

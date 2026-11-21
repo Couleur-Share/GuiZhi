@@ -267,19 +267,108 @@ func TestTooltipScrollDismissesFocusTooltip(t *testing.T) {
 	}
 }
 
-// 已知差异（台账 B-017 的边界）：Tab 要先把下一个停靠点滚进视野再聚焦时，渲染层是 focusin 排期、紧接着的 scroll 事件立刻收起，
-// 不出气泡；Viva 先滚动（这一帧收起）、之后焦点才落到新控件，新焦点照常在 320 ms 后出气泡。
-// 这条测试钉住现状：哪天做成与渲染层一致，改这条断言并更新台账。
-func TestTooltipTabThatScrollsStillShowsTheFocusTooltip(t *testing.T) {
+// Tab 要先把下一个停靠点滚进视野再聚焦时不出气泡（台账 B-032，2026-11-22 在 React 里实测：focusin 之后 0.3 ms 就是 scroll 事件，
+// 排期被 dismiss() 取消，之后 560 ms 内 DOM 里没有 [role=tooltip]，证据 b032-probe-prescroll.json）。
+// 此前 Viva 先滚动（那一帧收起）、之后焦点才落到新控件，新焦点照常在 320 ms 后出气泡；现由 TabKey 通知提示层压住它。
+func TestTooltipTabThatScrollsDoesNotShowTheFocusTooltip(t *testing.T) {
 	h, _ := openTipScrollPage(t)
 	for i := 0; i < 15; i++ {
 		h.keys("Tab") // 宿主 0…14 都在视野里（600 / 40 = 15 个），不滚动
 	}
 	h.keys("Tab") // 宿主 15 完全在视野之外：先滚进视野，再聚焦
+	if n, ok := h.node(gfx.RoleButton, "宿主15"); !ok || !n.Focused {
+		t.Fatal("前提不成立：第 16 次 Tab 之后焦点应当落在宿主 15 上")
+	}
 	h.advance(TooltipDelay + 10*time.Millisecond)
 	h.frames(2)
-	if !h.shown(tipOf(15)) {
-		t.Fatal("Tab 滚动之后聚焦的控件没有出气泡：行为已变，更新台账 B-017 的边界 (3) 与本测试")
+	if h.shown(tipOf(15)) {
+		t.Fatal("Tab 滚动之后聚焦的控件出了气泡：渲染层里 focusin 紧接着被 scroll 收起，不出气泡")
+	}
+	h.advance(10 * TooltipDelay)
+	h.frames(2)
+	if h.shown(tipOf(15)) {
+		t.Fatal("压制期过后焦点仍在原处，不该补出气泡（渲染层没有新的 focusin）")
+	}
+}
+
+// 边界一：压制只管「滚动的那个 Tab」带来的焦点。不需要滚动的 Tab 正常出气泡（15 次 Tab 都在视野里，第 15 次的气泡照常出）。
+func TestTooltipTabWithoutScrollStillShowsTheFocusTooltip(t *testing.T) {
+	h, _ := openTipScrollPage(t)
+	for i := 0; i < 15; i++ {
+		h.keys("Tab")
+	}
+	h.advance(TooltipDelay + 10*time.Millisecond)
+	h.frames(2)
+	if !h.shown(tipOf(14)) {
+		t.Fatal("不需要滚动的 Tab 到达的焦点没有出气泡")
+	}
+}
+
+// 边界二：滚动的 Tab 之后再按一次不需要滚动的 Tab，到达的下一个焦点是新事件，照常出气泡（压制不跨按键）。
+func TestTooltipNextTabAfterAScrollingTabShowsTheFocusTooltip(t *testing.T) {
+	h, _ := openTipScrollPage(t)
+	for i := 0; i < 16; i++ {
+		h.keys("Tab") // 第 16 次滚动并聚焦宿主 15
+	}
+	h.advance(TooltipDelay + 10*time.Millisecond)
+	h.frames(2)
+	if h.shown(tipOf(15)) {
+		t.Fatal("前提不成立：滚动的 Tab 到达的焦点不该出气泡")
+	}
+	// 滚动之后宿主 15 居中，宿主 16 紧随其后还在视野里：这一步不滚动。
+	h.keys("Tab")
+	h.advance(TooltipDelay + 10*time.Millisecond)
+	h.frames(2)
+	if !h.shown(tipOf(16)) {
+		t.Fatal("滚动的 Tab 之后的下一个 Tab 到达的焦点应当照常出气泡：压制不能跨按键")
+	}
+}
+
+// 边界三：压制有到期时间。滚动的 Tab 之后迟迟没有焦点变化（压制起算后过了期），之后无关的焦点变化照常出气泡；
+// 不靠按键也能到期（传感器自己要一帧把它收掉）。
+func TestTooltipTabScrollSuppressionExpires(t *testing.T) {
+	h, p := openTipScrollPage(t)
+	for i := 0; i < 15; i++ {
+		h.keys("Tab")
+	}
+	p.st.noteTabScroll() // 模拟：一个滚动的 Tab 已经通知了提示层，但焦点一直没有到
+	h.frames(2)          // 传感器运行，起算有效期
+	if !p.st.tabScroll {
+		t.Fatal("通知之后压制应当生效")
+	}
+	h.advance(tabScrollWindow + 10*time.Millisecond)
+	h.frames(2)
+	if p.st.tabScroll {
+		t.Fatal("有效期过后压制应当失效")
+	}
+	// 焦点此时仍在宿主 14：它在压制里被记成「已收起」，不出气泡，因为焦点没有换。
+	h.advance(2 * TooltipDelay)
+	h.frames(2)
+	if h.shown(tipOf(14)) {
+		t.Fatal("压制期里记下的焦点没有换，期满之后不该补出气泡")
+	}
+	// 焦点换走再回来是新的 focusin，照常出气泡。
+	h.keys("shift+Tab")
+	h.keys("Tab")
+	h.advance(TooltipDelay + 10*time.Millisecond)
+	h.frames(2)
+	if !h.shown(tipOf(14)) {
+		t.Fatal("压制期满之后新的焦点变化应当照常出气泡")
+	}
+}
+
+// 边界四：新按键先结束上一次的压制。滚动的 Tab 通知了提示层之后、焦点到达之前又来一个不滚动的按键，它带来的焦点照常出气泡。
+func TestTooltipANewKeyEndsTheTabScrollSuppression(t *testing.T) {
+	h, p := openTipScrollPage(t)
+	for i := 0; i < 3; i++ {
+		h.keys("Tab") // 焦点在宿主 2
+	}
+	p.st.noteTabScroll()
+	h.keys("Tab") // 新按键：先结束压制；这个 Tab 不需要滚动，焦点落到宿主 3
+	h.advance(TooltipDelay + 10*time.Millisecond)
+	h.frames(2)
+	if !h.shown(tipOf(3)) {
+		t.Fatal("新按键之后到达的焦点应当照常出气泡：压制要在新按键处结束")
 	}
 }
 

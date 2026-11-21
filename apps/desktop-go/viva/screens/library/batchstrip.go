@@ -1,6 +1,8 @@
 package library
 
 import (
+	"math"
+
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -97,7 +99,7 @@ func (s *Screen) batchDetails(c ui.C, b BatchState) {
 		w.Seed = l.Rem(kit.TextXS.Line)
 		w.Rows(c, kit.RowsSpec{
 			Name: "results-rows", N: len(b.Results), View: view,
-			Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang())},
+			Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang()), Width: s.bulk.resultsW},
 			Key:   func(i int) string { return b.Results[i].ID },
 			Row:   func(i int) ui.Box { return s.resultRow(c, b.Results[i]) },
 		})
@@ -113,11 +115,15 @@ func (s *Screen) resultRow(c ui.C, r services.LibraryBatchResult) ui.Box {
 		outcome = r.Error
 	}
 	// 渲染层是 <li>{row.id}：{outcome}</li>：三个相邻的文字节点（编号、全角冒号、结果），采集到的文字行也是三段。
-	// 这里三段并排：编号与冒号一行排完，结果占余下的宽度（过长的失败原因在结果自己的盒里折行）。
+	// 它们在行内排成一段会折行的话：过长的失败原因折行之后第二行回到清单项的左缘（不是缩在结果列的左缘），
+	// 所以用 kit.TextFlow 在拼起来的整段上折行、再按三段拆回（B-055）；一行放得下时与三段并排的画法逐像素相同。
+	// 折行宽度取这一行上一帧的宽度（首帧按一行排，量到宽度之后再出一帧，窗口里量过的行高随 RowEpoch.Width 作废）。
 	key := c.Key("result-" + r.ID)
-	return ui.Row(key).FillWidth().Items(ui.Start).Children(func() {
-		l.Text(key.Key("id"), r.ID, kit.TextXS, kit.WeightNormal, t.Foreground)
-		l.Text(key.Key("sep"), locales.NativeLibraryResultSeparator(), kit.TextXS, kit.WeightNormal, t.Foreground)
-		l.Text(key.Key("outcome"), outcome, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Wrapped()).Grow(1).Shrink(1).MinWidth(0)
+	return l.TextFlow(key, kit.TextXS, kit.WeightNormal, t.Foreground, s.bulk.resultsW,
+		r.ID, locales.NativeLibraryResultSeparator(), outcome).FillWidth().Draw(func(d *ui.DrawContext) {
+		if w := float32(math.Round(float64(d.Rect.Width)*64)) / 64; w > 0 && w != s.bulk.resultsW {
+			s.bulk.resultsW = w
+			d.Canvas.RequestFrame()
+		}
 	})
 }

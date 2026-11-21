@@ -18,6 +18,9 @@ const (
 type RowEpoch struct {
 	RootPx  float32 // 根字号（字号档）
 	Variant int     // 其他会改变折行的输入，如界面语言
+	// Width 是行内文字折行用的内容宽度（逻辑像素，调用方先取整到 1/64 以免小数抖动）：行内按宽度折行（kit.TextFlow）的列表
+	// 要在宽度变了时作废量过的行高；行高与宽度无关的列表留零。
+	Width float32
 }
 
 // RowsSpec 是一次窗口化声明的输入。

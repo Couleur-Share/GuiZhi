@@ -10,6 +10,9 @@ import "github.com/vivaui/viva/gfx"
 // 文字输入框里敲字时，Viva 的 Windows 窗口把编辑键直接交给文字系统、不走 OnKey（读 internal/platform/windows/window_windows.go，
 // 没有真窗口验证），所以 Look.Input 另外在文字被编辑时补记一次按键；光标移动键与单按的修饰键不收起提示。
 func (l *Look) OnKey(e gfx.KeyEvent) gfx.EventResult {
+	if !e.Release && l.tips != nil {
+		l.tips.endTabScroll() // 上一次「Tab 先滚动」的压制到此为止；这次按键若又是滚动的 Tab，TabKey 会重新置位（B-032）
+	}
 	res := l.TabKey(e)
 	if !e.Release && l.tips != nil && l.tips.noteKey() {
 		res.Repaint = true
