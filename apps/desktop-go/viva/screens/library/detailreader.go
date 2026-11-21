@@ -266,10 +266,8 @@ func (e readerEvents) FindReset() {
 	p.findQuery, p.findActive = "", 0
 }
 
-// Failed 只留诊断：失败状态由 readerArea 向宿主查（Host.Failure）后画出来，那里有重试。
-func (e readerEvents) Failed(err error) {
-	e.s.Guard.Background("library.reader", err)
-}
+// Failed 什么也不做：诊断已由宿主的 Diag 记进日志，失败状态由 readerArea 向宿主查（Host.Failure）后画出来，那里有重试。
+func (e readerEvents) Failed(error) {}
 
 // 主题阅读「目录」浮层的开合（渲染层 ReconstructionReader 的 catalogOpen）：按「条目 + 来源」存在界面偏好 reading.catalogOpen，
 // 键是 original:<条目 ID>:<来源>，值只有 true（缺省收起；渲染层写 "false" 时迁移也不带）。

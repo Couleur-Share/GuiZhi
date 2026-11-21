@@ -12,6 +12,7 @@ import (
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/reader"
 	importsscreen "guizhi-mygo-shell/viva/screens/imports"
 	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
@@ -140,6 +141,14 @@ func (r *Root) mountLibrary(invalidate func()) {
 		// 编辑器默认预览每次现读：设置在别处改了，下一次打开条目就按新值走。
 		EditorPreview: func() bool { return r.store.Values().UI.EditorMarkdownPreview },
 	}
+	if r.opts.Web != nil {
+		// 阅读区的网页岛：宿主随窗口常驻，岛本身在有内容要显示时才懒开、不显示就关（不进空闲内存）；登记到 r.islands，收托盘前统一销毁。
+		r.library.SetReader(reader.New(reader.Options{
+			Opener: reader.IslandOpener{Web: r.opts.Web, Group: &r.islands},
+			Media:  r.opts.ReaderMedia,
+			Diag:   r.readerDiag,
+		}))
+	}
 	view := r.win.Modules[shell.ModuleLibrary]
 	view.Panel = r.library.Panel
 	view.Workspace = r.library.Workspace
@@ -149,6 +158,13 @@ func (r *Root) mountLibrary(invalidate func()) {
 	if r.importsStore != nil {
 		// 采集任务完成：条目与计数都变了（渲染层 import.store 的 handleChanged）。
 		r.importsStore.OnCompleted = func(task services.ImportTask) { store.OnImportCompleted(r.ctx, task) }
+	}
+}
+
+// readerDiag 把阅读岛的诊断（打不开、握手失败、页面事件不合规）写进日志；宿主保证错误文字里没有页面给的内容与链接地址。
+func (r *Root) readerDiag(err error) {
+	if log := r.opts.Services.Log; log != nil {
+		log.AppError("native", "reader", err.Error())
 	}
 }
 

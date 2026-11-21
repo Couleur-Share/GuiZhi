@@ -244,6 +244,7 @@ func runViva(vb vivaBoot) error {
 		AppVersion:      appVersion,
 		Platform:        nodePlatform(),
 		Appearance:      appearance,
+		ReaderMedia:     readerMedia(vb.lib.paths),
 		Shell:           shellHook,
 	})
 	if vs != nil {

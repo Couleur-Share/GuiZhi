@@ -15,6 +15,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/island"
 	"guizhi-mygo-shell/viva/kit"
+	"guizhi-mygo-shell/viva/reader"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
 
@@ -56,6 +57,10 @@ type Options struct {
 	// OSReduceMotion 报告系统是否要求减少动态效果，与设置里的动效偏好合并成实际动效档位；缺省读系统（Windows 的「显示动画」开关）。
 	// 无头测试注入固定值，结果才不随运行机器的系统设置变化。
 	OSReduceMotion func() bool
+	// Web 是窗口的 WebHost：网页岛（知识库的阅读区）经它开页面。Run 里为空时自己建一个；无头测试不给，阅读区留白。
+	Web *vapp.WebHost
+	// ReaderMedia 是阅读岛取本地媒体（用户数据目录里的图片）的实现；nil 表示取不到，文章里的本地图片显示不出来。
+	ReaderMedia reader.Media
 	// Shell 是外壳接线（关闭策略、托盘、界面命令；见 shell.go）：nil 表示没有（截图、对照与无头测试：关窗口就是关闭）。
 	Shell Shell
 	// HoverRefresh 在滚轮滚动了内容之后被调用，请求窗口在 (x, y)（逻辑像素、窗口坐标）补一次指针移动，让悬停跟上（台账 B-031）。
@@ -77,6 +82,9 @@ func Run(opts Options) error {
 	if log := opts.Services.Log; log != nil {
 		island.SetFailureHook(func(err error) { log.AppError("native", "island", err.Error()) })
 	}
+	if opts.Web == nil {
+		opts.Web = &vapp.WebHost{}
+	}
 	var inv vapp.Invalidator
 	root := NewRoot(opts, inv.Invalidate)
 	defer root.Close()
@@ -89,7 +97,7 @@ func Run(opts Options) error {
 	return vapp.RunApplication(func(a *vapp.Application) error {
 		look := root.Look()
 		config := page.Config(vapp.Config{
-			Title: opts.Title, Class: opts.Class,
+			Title: opts.Title, Class: opts.Class, Web: opts.Web,
 			Width: opts.Width, Height: opts.Height,
 			MinWidth: opts.MinWidth, MinHeight: opts.MinHeight,
 			// 自绘标题栏：内容铺满整窗，顶栏就是标题栏；窗口按钮由 Viva 画在右上角（台账 A-005）。
