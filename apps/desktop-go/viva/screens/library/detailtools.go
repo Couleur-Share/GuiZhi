@@ -187,7 +187,7 @@ func (s *Screen) toolsBody(c ui.C, v View, item services.LibraryItem, caps ItemC
 	l.ScrollAreaView(c.Key("scroll"), [4]float32{pad, pad, pad, pad}, func(kit.ScrollView) {
 		ui.Column(c.Key("sections")).FillWidth().Gap(l.Space(6)).Children(func() {
 			s.toolsInfo(c, v, item)
-			// 媒体预览（渲染层 MediaPreview，空时整块隐藏）随 M2-6d 迁入，台账 B-067。
+			// 媒体预览（渲染层 MediaPreview，空时整块隐藏）暂留空，待裁决，台账 C-016。
 			s.toolsProcessing(c, v, item, caps)
 			if item.ItemType == services.LibraryTypeWebpage {
 				s.toolsVersions(c, v, item)
