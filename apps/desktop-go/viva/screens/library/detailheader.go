@@ -141,7 +141,7 @@ func (s *Screen) detailChips(c ui.C, v View, item services.LibraryItem, trashed 
 	ui.Flow(c.Key("chips")).Grow(1).Shrink(1).Basis(l.Rem(16)).MinWidth(0).Items(ui.Center).Gap(l.Space(1.5)).Children(func() {
 		s.collectionChip(c, v, item, trashed)
 		s.sourceChip(c, item)
-		if words := wordCount(item.Content); words > 0 {
+		if words := s.derivedOf(item).words; words > 0 {
 			// px-1 text-xs text-muted-foreground
 			ui.Row(c.Key("words")).Shrink(0).PadSides(0, l.Space(1), 0, l.Space(1)).Children(func() {
 				l.Text(c.Key("words-text"), locales.LibraryWordCount(words), kit.TextXS, kit.WeightNormal, t.MutedForeground)
@@ -354,7 +354,7 @@ func sourceViewOf(item services.LibraryItem) sourceView {
 
 // sourceChip 是来源 chip（渲染层 SourceChip）：不可点的只有文字；链接那种旁边还有一枚刷新钮（回收站条目没有）。
 func (s *Screen) sourceChip(c ui.C, item services.LibraryItem) {
-	sv := sourceViewOf(item)
+	sv := s.derivedOf(item).source
 	if sv.label == "" {
 		return
 	}

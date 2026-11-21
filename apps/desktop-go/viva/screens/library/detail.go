@@ -43,6 +43,9 @@ type detailUI struct {
 	focusRect gfx.Rect
 	exitSize  gfx.Size
 
+	// derived 是只由正文等少数字段决定的派生值缓存（能力、来源 chip、字数，detailderived.go）。
+	derived contentDerived
+
 	// panel 是内容面板的界面状态（detailpanel.go）；modal 是表格视图的详情浮层（detailmodal.go）。
 	panel panelState
 	// notice 是头部上方三块通知条的折叠状态（detailnotice.go）。
@@ -186,7 +189,7 @@ func (s *Screen) itemDetailBody(c ui.C, v View, item services.LibraryItem, onClo
 	} else {
 		col = col.FillWidth()
 	}
-	caps := deriveCaps(item)
+	caps := s.derivedOf(item).caps
 	s.syncNotices(item.ID)
 	col.Children(func() {
 		s.conflictNotice(c, v, item)
