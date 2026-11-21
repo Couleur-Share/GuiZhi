@@ -385,7 +385,10 @@ export async function enterLibrary(session, options = {}) {
     const seen = window.__parityLibrary;
     return !!seen && seen.collections > 0 && seen.tags > 0 && seen.counts > 0 && (!withList || seen.list > 0);
   }, !!config.list);
-  await page.addStyleTag({ content: config.detail ? HIDE_READER_CSS : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
+  // showReader：阅读岛对照工具（tools/probe-reader-island.mjs）要看阅读区本身，不隐去；其余场景不传，行为不变。
+  if (!(config.detail && config.showReader)) {
+    await page.addStyleTag({ content: config.detail ? HIDE_READER_CSS : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
+  }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，
   // 需要点侧栏行的场景自己用 openCompactSidebar / closeCompactSidebar 开关。
   if (!config.list) await openCompactSidebar(page);
