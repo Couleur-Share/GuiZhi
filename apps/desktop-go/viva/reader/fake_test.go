@@ -15,15 +15,17 @@ import (
 // 本文件是测试替身：假页面、假打开器、假画布、记录型 Handler。宿主的全部逻辑都不需要真的 WebView2。
 
 type fakePage struct {
-	cfg    island.Config
-	closed func()
-	posts  []string
-	places []gfx.Rect
-	closes int
+	cfg     island.Config
+	closed  func()
+	posts   []string
+	places  []gfx.Rect
+	closes  int
+	focuses int
 }
 
 func (p *fakePage) Post(text string)            { p.posts = append(p.posts, text) }
 func (p *fakePage) Place(_ Surface, b gfx.Rect) { p.places = append(p.places, b) }
+func (p *fakePage) Focus()                      { p.focuses++ }
 func (p *fakePage) Close()                      { p.closes++ }
 
 // kinds 是已发消息的 t 字段，按发送顺序。

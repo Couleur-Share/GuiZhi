@@ -49,6 +49,8 @@ func (p *islandPage) Place(surface Surface, bounds gfx.Rect) {
 	surface.NativeView(p.isl.View().ID(), bounds)
 }
 
+func (p *islandPage) Focus() { p.isl.View().Focus() }
+
 // Close 销毁页面并通知宿主（宿主自己关页面时它已经先把页面置空，通知是空操作）。
 func (p *islandPage) Close() {
 	p.once.Do(func() {

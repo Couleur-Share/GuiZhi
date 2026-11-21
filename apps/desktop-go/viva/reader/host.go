@@ -24,6 +24,8 @@ type Page interface {
 	Post(text string)
 	// Place 把页面的原生视图放在这一帧的 bounds 上。
 	Place(surface Surface, bounds gfx.Rect)
+	// Focus 把键盘焦点交给页面（WebView.Focus）。
+	Focus()
 	// Close 销毁页面。可以重复调用。
 	Close()
 }
@@ -145,6 +147,9 @@ type Host struct {
 	req   Request
 	shown bool
 
+	// viewer 是图片查看岛（viewer.go）：与阅读岛共用 Opener、Media 与 Diag，生命周期随宿主。
+	viewer *Viewer
+
 	// gen 是页面的代数：每次打开或关闭加一，页面的回调带着打开时的代数，对不上就是旧页面迟到的东西。
 	gen      uint64
 	seq      uint64
@@ -154,7 +159,10 @@ type Host struct {
 }
 
 // New 创建宿主。Opener 为空时 Frame 只会报 Failed（没有 WebView 可用）。
-func New(opts Options) *Host { return &Host{opts: opts} }
+func New(opts Options) *Host { return &Host{opts: opts, viewer: newViewer(opts)} }
+
+// Viewer 是图片查看岛的宿主：阅读岛里点图片时，由界面一侧用它另开一个盖满窗口的岛。
+func (h *Host) Viewer() *Viewer { return h.viewer }
 
 // SetHandler 设置事件接收者。
 func (h *Host) SetHandler(handler Handler) { h.handler = handler }
@@ -190,18 +198,29 @@ func (h *Host) Frame(canvas Surface, bounds gfx.Rect, req Request) {
 	canvas.RequestFrameIn(readyPoll)
 }
 
-// EndFrame 在每帧收尾调用：这一帧没有调 Frame（阅读区没画出来：切了模块、关了详情、折叠到托盘前……），就关掉岛。
+// EndFrame 在每帧收尾调用：这一帧没有调 Frame（阅读区没画出来：切了模块、关了详情、折叠到托盘前……），就关掉岛；
+// 查看岛同理（Viewer.endFrame）。
 func (h *Host) EndFrame() {
 	if !h.shown {
 		h.closePage()
 	}
 	h.shown = false
+	h.viewer.endFrame()
 }
 
-// Close 关闭岛并丢弃状态（窗口关闭、折叠到托盘前）。
+// Close 关闭岛（含查看岛）并丢弃状态（窗口关闭、折叠到托盘前）。
 func (h *Host) Close() {
 	h.closePage()
 	h.shown = false
+	h.viewer.Hide()
+}
+
+// Focus 把键盘焦点交还给阅读岛（查看器关闭之后：岛销毁时焦点落回窗口本身，页面里的方向键、空格就没人收了）。
+// 岛没开或没握手时什么也不做。
+func (h *Host) Focus() {
+	if h.page != nil && h.ready {
+		h.page.Focus()
+	}
 }
 
 // Failure 返回 req 这份内容的岛为什么不可用（打不开、握手超时、协议不符）；没有失败或失败属于别的内容时为 nil。

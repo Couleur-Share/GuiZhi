@@ -39,17 +39,18 @@ func (h *Host) serve(p string) (mime string, data []byte, ok bool) {
 		}
 		return "text/html; charset=utf-8", bakeHTML(raw, h.req.Theme, h.req.Lang), true
 	case strings.HasPrefix(p, "media/"):
-		return h.serveMedia(strings.TrimPrefix(p, "media/"))
+		return serveMedia(h.opts.Media, strings.TrimPrefix(p, "media/"))
 	}
-	return serveAsset(p)
+	return serveAssetIn("assets/", p)
 }
 
-// serveAsset 提供 assets/ 下的静态文件：只认规整的相对路径（没有 ..、反斜杠、冒号、空字节）。
-func serveAsset(p string) (string, []byte, bool) {
+// serveAssetIn 提供嵌入目录 dir（以斜杠结尾，阅读岛是 assets/，查看岛是 assets/viewer/）下的静态文件：
+// 只认规整的相对路径（没有 ..、反斜杠、冒号、空字节）。
+func serveAssetIn(dir, p string) (string, []byte, bool) {
 	if strings.ContainsAny(p, "\\:\x00") || path.Clean(p) != p || strings.HasPrefix(p, ".") {
 		return "", nil, false
 	}
-	data, err := assets.ReadFile("assets/" + p)
+	data, err := assets.ReadFile(dir + p)
 	if err != nil {
 		return "", nil, false
 	}
@@ -78,16 +79,16 @@ func assetMIME(p string) string {
 	return "application/octet-stream"
 }
 
-// serveMedia 提供 media/<scheme>/<名称>：scheme 只认 local-image 与 local-video，名称交给 Media 校验。
-func (h *Host) serveMedia(rest string) (string, []byte, bool) {
-	if h.opts.Media == nil {
+// serveMedia 提供 media/<scheme>/<名称>：scheme 只认 local-image 与 local-video，名称交给 Media 校验。阅读岛与查看岛共用。
+func serveMedia(media Media, rest string) (string, []byte, bool) {
+	if media == nil {
 		return "", nil, false
 	}
 	kind, name, found := strings.Cut(rest, "/")
 	if !found || name == "" || (kind != "local-image" && kind != "local-video") {
 		return "", nil, false
 	}
-	return h.opts.Media(kind, name)
+	return media(kind, name)
 }
 
 // bakeHTML 把外观烘进 index.html 的 <html> 标签：页面脚本执行之前样式表就已经按当前主题算出令牌，
