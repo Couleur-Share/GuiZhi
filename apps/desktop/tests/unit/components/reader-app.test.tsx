@@ -489,3 +489,81 @@ describe("阅读岛页面：阅读区根节点的标记", () => {
     expect(target(container).itemId).toBe("b");
   });
 });
+
+describe("阅读岛页面：不可信内容（台账 A-018 的验收项）", () => {
+  // 条目正文来自网页抓取、论坛与用户粘贴，是不可信输入。岛的内容安全策略管不到 <meta http-equiv=refresh>、被点击的 <a> 与岛自己脚本
+  // 触发的导航（A-018），所以页面一侧要先把内容清理干净：这里用恶意内容走一遍真实的渲染链路
+  // （ReaderApp → 渲染层的 MarkdownPreview：rehype-raw + rehype-sanitize），检查产物 DOM，而不是只信「同一套组件」。
+  // javascript: 链接有三道闸门（消毒白名单、react-markdown 的 urlTransform、链接组件的 resolveSafeHref），任意一道在位都挡得住，
+  // 所以这里断言最终 DOM；变异检查：去掉消毒 / 放行 iframe / 放行 script·meta·base 各被杀，三道闸门全开也被杀，单开一道是等价变异。
+  const HOSTILE_BLOCK = [
+    "<script>window.__pwned = 1</script>",
+    '<meta http-equiv="refresh" content="0;url=https://evil.example/m">',
+    '<iframe src="https://evil.example/f"></iframe>',
+    '<base href="https://evil.example/">',
+    '<form action="https://evil.example/post"><input name="x"></form>',
+    '<object data="https://evil.example/o"></object><embed src="https://evil.example/e">',
+    '<link rel="stylesheet" href="https://evil.example/s.css">',
+    '<style>@import url("https://evil.example/i.css");</style>',
+    '<img src="x" onerror="window.__pwned = 2">',
+    '<svg onload="window.__pwned = 3"><circle r="1"/></svg>',
+    "[脚本链接](javascript:window.__pwned=4)",
+    '<a href="javascript:window.__pwned=5">内联脚本链接</a>',
+    '<a href="https://example.com/ok" onclick="window.__pwned=6" target="_blank">正常链接</a>',
+    "正文最后一段",
+  ].join("\n\n");
+  const FORBIDDEN = "script, meta, iframe, frame, frameset, base, form, object, embed, link, style, noscript, template";
+
+  function expectClean(container: HTMLElement) {
+    const reader = container.querySelector("[data-article-reader]") as HTMLElement;
+    expect(reader, "阅读区应已渲染").not.toBeNull();
+    expect(Array.from(reader.querySelectorAll(FORBIDDEN)).map((el) => el.tagName)).toEqual([]);
+    const handlers = Array.from(reader.querySelectorAll("*")).flatMap((el) =>
+      Array.from(el.attributes)
+        .filter((attr) => /^on/i.test(attr.name))
+        .map((attr) => `${el.tagName}.${attr.name}`),
+    );
+    expect(handlers).toEqual([]);
+    for (const anchor of Array.from(reader.querySelectorAll("a"))) {
+      expect(anchor.getAttribute("href") ?? "").not.toMatch(/^\s*(javascript|data|vbscript):/i);
+    }
+    expect((window as unknown as { __pwned?: number }).__pwned).toBeUndefined();
+    expect(reader.textContent).toContain("正文最后一段");
+  }
+
+  it("原文：脚本、meta refresh、内嵌框架、<base>、表单、对象、外链样式、事件属性、javascript: 链接都被清掉，正文与正常链接留下", () => {
+    const { post, container } = mount();
+    post(view({ view: { kind: "original", content: `# 标题\n\n${HOSTILE_BLOCK}`, sourceKind: "body" } }));
+    expectClean(container);
+    expect(container.querySelector("h1")?.textContent).toBe("标题");
+    const ok = container.querySelector('a[href="https://example.com/ok"]');
+    expect(ok?.textContent).toBe("正常链接");
+    expect(ok?.hasAttribute("onclick")).toBe(false);
+  });
+
+  it("Markdown 预览（图中文字）同样清理", () => {
+    const { post, container } = mount();
+    post(view({ tab: "recognized", view: { kind: "markdown", content: HOSTILE_BLOCK, tab: "recognized" } }));
+    expectClean(container);
+  });
+
+  it("论坛楼层卡片的正文同样清理（卡片正文是网页抓来的）", () => {
+    const { post, container } = mount();
+    const floors = ["### 1 楼 · 甲", HOSTILE_BLOCK, "", "### 2 楼 · 乙", "> 回复 @甲（1 楼）：<script>window.__pwned = 7</script>", "第二楼的内容"].join("\n");
+    post(view({ tab: "replies", view: { kind: "replies", content: floors } }));
+    expectClean(container);
+    expect(container.querySelectorAll("li[data-floor]")).toHaveLength(2);
+  });
+
+  it("清理之后留下的链接点击只交宿主，页面不导航；脚本链接没有可点的地址", () => {
+    const { post, container, events } = mount();
+    post(view({ view: { kind: "original", content: HOSTILE_BLOCK, sourceKind: "body" } }));
+    const ok = container.querySelector('a[href="https://example.com/ok"]') as HTMLAnchorElement;
+    expect(fireEvent.click(ok)).toBe(false);
+    expect(events("link")).toEqual([{ t: "link", seq: 1, url: "https://example.com/ok" }]);
+    for (const anchor of Array.from(container.querySelectorAll("a")).filter((a) => !a.getAttribute("href"))) {
+      fireEvent.click(anchor);
+    }
+    expect(events("link")).toHaveLength(1);
+  });
+});
