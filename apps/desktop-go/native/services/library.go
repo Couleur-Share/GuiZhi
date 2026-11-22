@@ -108,6 +108,8 @@ type Library interface {
 
 	// GetItem 取一条的完整形态（knowledge:get）；found 为假表示条目不存在（已被删除）。
 	GetItem(ctx context.Context, id string) (item LibraryItem, found bool, err error)
+	// CreateItem 新建一条空白笔记（knowledge:create）：快速采集的「空白笔记」。返回新建条目的完整形态。
+	CreateItem(ctx context.Context, in LibraryCreateInput) (LibraryItem, error)
 	// SaveDraft 保存编辑草稿（knowledge:saveDraft）：带基线比较，冲突时什么也不写、返回服务端的版本；
 	// 标签按相对基线的增删合并。错误（error）只表示调用本身失败；业务上的失败在 LibraryDraftResult 里。
 	SaveDraft(ctx context.Context, in LibraryDraftInput) (LibraryDraftResult, error)

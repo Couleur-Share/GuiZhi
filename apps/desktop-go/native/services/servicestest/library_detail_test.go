@@ -43,6 +43,35 @@ func TestGetItemJoinsEntryAndBody(t *testing.T) {
 	}
 }
 
+func TestCreateItemAddsBlankNoteToEntries(t *testing.T) {
+	f := detailFake()
+	ctx := context.Background()
+	item, err := f.CreateItem(ctx, services.LibraryCreateInput{CollectionID: "col"})
+	if err != nil || item.ID == "" || item.Title != "" || item.Content != "" || item.CollectionID != "col" ||
+		item.ItemType != services.LibraryTypeNote || item.Status != services.LibraryStatusActive || len(item.Tags) != 0 {
+		t.Fatalf("%+v err=%v", item, err)
+	}
+	if got, found := f.ItemNow(item.ID); !found || got.ID != item.ID {
+		t.Fatalf("新条目应进条目全集：%+v found=%v", got, found)
+	}
+	other, err := f.CreateItem(ctx, services.LibraryCreateInput{})
+	if err != nil || other.ID == item.ID || other.CollectionID != "" {
+		t.Fatalf("第二条应有新的 ID 且不带合集：%+v err=%v", other, err)
+	}
+	if got := f.Creates(); len(got) != 2 || got[0].CollectionID != "col" || got[1].CollectionID != "" {
+		t.Fatalf("参数记录：%+v", got)
+	}
+
+	f.FailOn("CreateItem", errors.New("新建失败"))
+	before := len(f.entries)
+	if _, err = f.CreateItem(ctx, services.LibraryCreateInput{}); err == nil {
+		t.Fatal("注入的失败要返回")
+	}
+	if len(f.entries) != before || len(f.Creates()) != 3 {
+		t.Fatalf("失败不能写入条目，但要记参数：entries=%d creates=%d", len(f.entries), len(f.Creates()))
+	}
+}
+
 func TestSaveDraftWritesAndMergesTags(t *testing.T) {
 	f := detailFake()
 	ctx := context.Background()

@@ -142,6 +142,10 @@ func bindInput(config *vapp.Config, root *Root) {
 	config.OnKey = kit.KeyFirst(root.OnKey, config.OnKey)
 	config.OnShortcut = kit.KeyFirst(root.OnShortcut, config.OnShortcut)
 	config.OnScroll = root.OnScroll(config.OnScroll)
+	if root.capture != nil {
+		// 系统文件拖到快速采集的草稿框上：只有装配了采集才注册为拖放目标，否则系统保持「拒绝拖放」。
+		config.OnFileDrop = root.capture.FileDrop
+	}
 }
 
 // clearColor 把 gfx 颜色换成窗口配置用的颜色类型。

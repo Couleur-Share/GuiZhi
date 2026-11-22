@@ -105,6 +105,10 @@ type Window struct {
 	OnNewBlankNote func()
 	OnImportFiles  func()
 
+	// Dialogs 声明应用级对话框（快速采集）：每帧调用，在整个页面与创建方式菜单之后、关闭对话框与提示之前，
+	// 所以对话框盖住页面，而「关闭应用」与提示仍在它之上。为空则没有。
+	Dialogs func(c ui.C)
+
 	// CloseDialogOpen 为真时显示「关闭应用」对话框（渲染层 CloseDialog：设置为「每次询问」时点关闭钮，主进程推 window:showCloseDialog）。
 	// OnCloseDialog 收用户的选择（最小化、退出、只关对话框），由外壳转给生命周期策略并把 CloseDialogOpen 置假。
 	CloseDialogOpen bool
@@ -174,6 +178,9 @@ func (w *Window) View(c ui.C) {
 		})
 	})
 	w.newMenu(c)
+	if w.Dialogs != nil {
+		w.Dialogs(c)
+	}
 	w.closeDialogView(c)
 	l.Toasts(c, w.Notifier)
 	w.tips.Active = w.WindowActive

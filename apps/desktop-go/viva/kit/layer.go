@@ -70,6 +70,9 @@ type dismissSpec struct {
 	// ByKeyboard 非空：关闭这一帧是由键盘（Esc）引起时写入 true，点背景引起时写入 false。
 	// 取色器据此决定要不要把焦点还给触发按钮（渲染层只在 Esc 时 triggerRef.focus()）。
 	ByKeyboard *bool
+	// InModal 为真：背景层的命中区归入打开着的 Modal 的焦点作用域。Modal 把指针与焦点限制在自己的作用域里，
+	// 声明在 Modal 里的浮层按层号画在页面树之后、已在作用域之外，不借用就够不着（Select 开在对话框里需要它）。
+	InModal bool
 }
 
 // fadePresence 让一个浮层淡入淡出：入场用 enter，入场播完之后换成 exit，撤掉时按它回放（Modal 的遮罩）。
@@ -84,12 +87,23 @@ func fadePresence(canvas *gfx.Canvas, id gfx.ID, enter, exit gfx.Motion, pivot g
 // dismissLayer 声明整窗的背景层并返回这一帧是否被要求关闭（点了背景，或按了 Esc）。
 func (l *Look) dismissLayer(c ui.C, s dismissSpec) bool {
 	id := ui.ID(c)
-	layer := ui.Overlay(c, ui.OverlaySpec{Band: s.Band, Bounds: c.Bounds()}).
-		HitWith(id, "", gfx.HitOptions{
-			Role: gfx.RoleButton, SkipFocus: true, Backdrop: true,
-			PassPrimary: s.PassPress, PassSecondary: s.PassPress,
-		}).
+	var popScope func()
+	backdrop := gfx.HitOptions{
+		Role: gfx.RoleButton, SkipFocus: true, Backdrop: true,
+		PassPrimary: s.PassPress, PassSecondary: s.PassPress,
+	}
+	// 盒子自带的命中在 Draw 钩子之前登记，进不了 Modal 的焦点作用域；在 Modal 里时改在钩子里（作用域之内）登记。
+	inModal := s.InModal && !l.modalScope.IsZero()
+	layer := ui.Overlay(c, ui.OverlaySpec{Band: s.Band, Bounds: c.Bounds()})
+	if !inModal {
+		layer = layer.HitWith(id, "", backdrop)
+	}
+	layer = layer.
 		Draw(func(d *ui.DrawContext) {
+			if inModal {
+				popScope = l.pushModalScope(d.Canvas)
+				d.Canvas.HitWithOptions(id, d.Rect, "", backdrop)
+			}
 			if s.Scrim != nil {
 				d.Canvas.Fill(d.Rect, d.Fade(l.Col(*s.Scrim)))
 			}
@@ -102,8 +116,19 @@ func (l *Look) dismissLayer(c ui.C, s dismissSpec) bool {
 			if !s.NoEscape {
 				d.Canvas.SetEscapeTarget(id)
 			}
+		}).
+		DrawOver(func(d *ui.DrawContext) {
+			if popScope != nil {
+				popScope()
+				popScope = nil
+			}
 		})
-	clicked := layer.Clicked()
+	clicked := false
+	if inModal {
+		clicked = c.Canvas().Clicked(id) // 没有盒子自带的命中，按身份读
+	} else {
+		clicked = layer.Clicked()
+	}
 	if clicked && s.ByKeyboard != nil {
 		*s.ByKeyboard = c.Canvas().ClickedByKey(id)
 	}

@@ -62,6 +62,12 @@ func (it LibraryItem) TagNames() []string {
 	return names
 }
 
+// LibraryCreateInput 是新建空白笔记的参数（knowledge:create 的 CreateInput 里界面用到的部分）。
+type LibraryCreateInput struct {
+	// CollectionID 为空表示不归入任何合集。
+	CollectionID string
+}
+
 // LibraryDraftFields 是草稿里可本地编辑并防抖保存的字段（KnowledgeDraftFields）：nil 的字段表示「没有这个字段」。
 // 分类不在其中：改分类是一次命令，立即落盘（LibraryEntryPatch）。
 type LibraryDraftFields struct {

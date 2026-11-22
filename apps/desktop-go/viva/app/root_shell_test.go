@@ -226,7 +226,7 @@ func TestRootDispatchCommands(t *testing.T) {
 	log := &servicestest.Logger{}
 	f := openRoot(t, func(o *Options) { o.Page, o.Module, o.Services.Log = shell.PageSettings, shell.ModuleImports, log })
 
-	// 托盘「新建」：渲染层先回到主页再请求采集——页面切换是真的，采集对话框还没迁移，要留痕而不是假装做了。
+	// 托盘「新建」：渲染层先回到主页再请求采集——页面切换是真的；这个夹具没有采集服务、没有装配对话框，要留痕而不是假装做了（装配了采集的情形见 root_capture_test.go）。
 	f.root.dispatch(CommandNewItem)
 	f.frames(t, 2)
 	if f.root.Window().Page != shell.PageHome {

@@ -449,6 +449,8 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - **立线登记写的「不新增 Waiver」没有守住**（同 M3-2a）：Step 3 为新场景新增了一批 Waiver 实例，全部沿用既有种类、有方向与区间；`thresholds.json`、`compare_*.go`、`waiver.go`、`a11y_map.go` 在四个提交里一行没动（`git diff --name-only 9aca289f~1..HEAD` 核对过）。
 - **没有测**：真窗口里的任何交互（归 R-18）；真模型服务的端点测试与模型拉取、真 MCP 客户端配置文件（Cursor / Codex）的写入与回滚、真下载与取消语音模型、真 FlareSolverr 连通；采集与转写、MCP、AI 三个分区的进程内存；偶发帧尖峰的成因。
 
+**M3-3 立线登记（2026-11-22，开工前按 §8.1.1 重算方法登记）**：M3-3 是快速采集对话框（`CaptureDialog`，盘点 `capture.dlg`），范围：`parseCaptureDraft` / `resolveCaptureAction` 解析（链接与分享口令提取、纯文本、混合态与 `draftOverride` 改判）、多行草稿框（经 `viva/kit` 的多行输入封装，满足 `viva/inputguard_test.go`）、文件选择 / 列表 / 移除与拖放能力核实（Viva v0.6.4 是否支持系统文件拖放，不支持则诚实登记、不假装）、混合模式切换钮、合集选择、标签输入与建议浮层、空白笔记创建并跳知识库、入队成功 / 失败反馈、Ctrl/Cmd+Enter 提交与 Esc 关窗，以及全局入口接线（顶栏新建钮、采集侧栏与空态「快速采集」等，替换原有的「尚未迁移」提示）。数据层复用 `Imports.SelectFiles` / `Enqueue` 与 `Library.Collections` / `Tags` / `CreateItem`，仅在确有缺口时最小扩展。重算估算 **6 段**，**线 = 重算估算 × 1.5 = 9 段**，硬停线 = 18 段（沿用按模块各自立线的约定，越线先停下汇报）。Step 0 登记本段；Step 1 做解析与服务核对、对话框 UI、Root 接线与 L4 测试，对照场景与变异检查在后续步骤；不改 `thresholds.json`、`compare_*.go`、`waiver.go` 与 `a11y_map.go`，不新增 Waiver。
+
 ### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
 
 真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。

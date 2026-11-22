@@ -3,6 +3,7 @@ package servicestest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"guizhi-mygo-shell/native/services"
@@ -29,6 +30,7 @@ type detailState struct {
 	bodies   map[string]DetailBody
 	versions map[string][]services.LibrarySourceVersion
 	gets     []string
+	creates  []services.LibraryCreateInput
 	drafts   []services.LibraryDraftInput
 	// getGate、saveGate 让下一次 GetItem、SaveDraft 卡住（HoldGet、HoldSave）。
 	getGate, saveGate chan struct{}
@@ -170,6 +172,34 @@ func (f *Library) GetItem(ctx context.Context, id string) (services.LibraryItem,
 	defer f.mu.Unlock()
 	item, ok := f.itemLocked(id)
 	return item, ok, nil
+}
+
+// CreateItem 实现 services.Library：新建一条空白笔记并放进条目全集（List 看到的是同一份），与真实处理器的默认值一致
+// （note、active、无标题无正文、复核状态 clear）。每次调用都记下参数（Creates），被 FailOn 拦下的也记。
+func (f *Library) CreateItem(ctx context.Context, in services.LibraryCreateInput) (services.LibraryItem, error) {
+	err := f.begin("CreateItem", "CreateItem")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.detail.creates = append(f.detail.creates, in)
+	if err != nil {
+		return services.LibraryItem{}, err
+	}
+	f.nextID++
+	now := f.nowMs()
+	entry := services.LibraryEntry{
+		ID: fmt.Sprintf("item-new-%d", f.nextID), ItemType: services.LibraryTypeNote, Status: services.LibraryStatusActive,
+		CollectionID: in.CollectionID, ReviewStatus: services.LibraryReviewClear, CreatedAt: now, UpdatedAt: now,
+	}
+	f.entries = append(slices.Clone(f.entries), entry)
+	item, _ := f.itemLocked(entry.ID)
+	return item, nil
+}
+
+// Creates 返回 CreateItem 收到的参数，按发生顺序。
+func (f *Library) Creates() []services.LibraryCreateInput {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.detail.creates)
 }
 
 // SaveDraft 实现 services.Library。

@@ -20,6 +20,22 @@ func (a libraryAdapter) GetItem(ctx context.Context, id string) (services.Librar
 	return *item, true, nil
 }
 
+// CreateItem 对应 knowledge:create：新建空白笔记，只带合集；处理器返回新条目的完整形态。
+func (a libraryAdapter) CreateItem(ctx context.Context, in services.LibraryCreateInput) (services.LibraryItem, error) {
+	payload := map[string]any{}
+	if in.CollectionID != "" {
+		payload["collectionId"] = in.CollectionID
+	}
+	item, err := callAs[*services.LibraryItem](ctx, a.b, "knowledge:create", payload)
+	if err != nil {
+		return services.LibraryItem{}, err
+	}
+	if item == nil {
+		return services.LibraryItem{}, errors.New("新建条目没有返回结果")
+	}
+	return *item, nil
+}
+
 // SaveDraft 对应 knowledge:saveDraft：业务上的失败（冲突、条目已不存在、参数无效）在回复的 ok / error 里，不是 Go 错误。
 func (a libraryAdapter) SaveDraft(ctx context.Context, in services.LibraryDraftInput) (services.LibraryDraftResult, error) {
 	return callAs[services.LibraryDraftResult](ctx, a.b, "knowledge:saveDraft", in)

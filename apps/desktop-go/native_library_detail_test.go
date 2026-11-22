@@ -49,6 +49,43 @@ func TestLibraryAdapterGetItemAgainstRealHandlers(t *testing.T) {
 	}
 }
 
+// 新建空白笔记经真实处理器往返：落成没有标题、没有正文的 note；带合集时归入该合集，条目随即能被读到，也进了列表。
+func TestLibraryAdapterCreateItemAgainstRealHandlers(t *testing.T) {
+	ctx := t.Context()
+	svc, _, _ := newLibraryDetailAdapterForTest(t)
+
+	blank, err := svc.CreateItem(ctx, services.LibraryCreateInput{})
+	if err != nil {
+		t.Fatalf("新建空白笔记：%v", err)
+	}
+	if blank.ID == "" || blank.Title != "" || blank.Content != "" || blank.ItemType != services.LibraryTypeNote ||
+		blank.Status != services.LibraryStatusActive || blank.CollectionID != "" || blank.DeletedAt != 0 ||
+		blank.CreatedAt == 0 || len(blank.Tags) != 0 || blank.ReviewStatus != services.LibraryReviewClear {
+		t.Fatalf("空白笔记的字段不对：%+v", blank)
+	}
+
+	col, err := svc.CreateCollection(ctx, "采集目标", "")
+	if err != nil {
+		t.Fatalf("建合集：%v", err)
+	}
+	filed, err := svc.CreateItem(ctx, services.LibraryCreateInput{CollectionID: col.ID})
+	if err != nil {
+		t.Fatalf("新建带合集的空白笔记：%v", err)
+	}
+	if filed.ID == blank.ID || filed.CollectionID != col.ID {
+		t.Fatalf("应归入合集 %q：%+v", col.ID, filed)
+	}
+
+	got, found, err := svc.GetItem(ctx, filed.ID)
+	if err != nil || !found || got.CollectionID != col.ID {
+		t.Fatalf("读回新条目：found=%v err=%v item=%+v", found, err, got)
+	}
+	page, err := svc.List(ctx, opsAllQuery())
+	if err != nil || page.Total != 2 {
+		t.Fatalf("两条空白笔记都应在列表里：total=%d err=%v", page.Total, err)
+	}
+}
+
 // 草稿保存经真实处理器往返：标题、正文、标签一起落盘；基线与服务端一致时没有冲突。
 func TestLibraryAdapterSaveDraftAgainstRealHandlers(t *testing.T) {
 	ctx := t.Context()

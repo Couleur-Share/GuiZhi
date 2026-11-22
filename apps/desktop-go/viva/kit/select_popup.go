@@ -125,7 +125,7 @@ func (l *Look) selectPanel(c ui.C, st *SelectState, spec SelectSpec) (picked str
 	}
 	rect := selectPanelRect(st.anchor, bounds.Width, bounds.Height, contentH, minWidth, spec.AlignEnd)
 
-	if l.dismissLayer(c, dismissSpec{Band: bandSelectDismiss, PassPress: true, Keep: &st.anchor}) {
+	if l.dismissLayer(c, dismissSpec{Band: bandSelectDismiss, PassPress: true, Keep: &st.anchor, InModal: true}) {
 		st.Open = false
 		return "", false
 	}
@@ -135,16 +135,21 @@ func (l *Look) selectPanel(c ui.C, st *SelectState, spec SelectSpec) (picked str
 	surface := Surface{Bg: t.Popover, Border: t.Border, BorderW: 1, Radius: radius, Shadows: ShadowLG}
 	id := ui.ID(c)
 	motion := l.Motion(DurationQuick, EaseEnter)
+	var popScope func()
 	panel := l.floatingPanel(c, bandSelectPanel, rect).
 		Pad(1).
 		Draw(func(d *ui.DrawContext) {
+			popScope = l.pushModalScope(d.Canvas) // 开在 Modal 里时借用它的焦点作用域，否则面板点不到
 			enterPresence(d.Canvas, id, 0, motion, 0.95, center(d.Rect))
 			l.PaintSurface(d, surface)
 			// 面板是不透明的：按在面板边距上不能落到下面的背景层（那会关闭面板）。
 			d.Canvas.Block(d.Rect)
 			d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleListBox, spec.Label, gfx.HitOptions{})
 		}).
-		DrawOver(func(d *ui.DrawContext) { d.Canvas.EndPresence() })
+		DrawOver(func(d *ui.DrawContext) {
+			d.Canvas.EndPresence()
+			popScope()
+		})
 	panel.Children(func() {
 		l.ScrollArea(c, [4]float32{padY, 0, padY, 0}, func() {
 			ui.Column(c).FillWidth().Children(func() {

@@ -81,8 +81,16 @@ func (r *Root) applyCommand(cmd Command) {
 		return
 	case CommandNewItem:
 		r.win.Page = shell.PageHome // 渲染层先回到主页，再请求快速采集
+		if r.openCapture() {
+			return
+		}
+	case CommandShortcutNewItem:
+		// 快捷键只发事件、不切页面：停在设置页时它不会把人带回主页，对话框直接盖在当前页上。
+		if r.openCapture() {
+			return
+		}
 	}
-	// 快速采集、更新对话框与搜索聚焦依赖的界面在 M3 才迁移（台账 B-008）：命令先留痕，不假装执行了。
+	// 更新对话框与搜索聚焦依赖的界面在 M3 才迁移（台账 B-008）；没有装配采集时快速采集也一样：命令先留痕，不假装执行了。
 	if log := r.opts.Services.Log; log != nil {
 		log.AppError("native", locales.NativeShellCommandAction(), locales.NativeShellCommandNotMigrated(string(cmd)))
 	}

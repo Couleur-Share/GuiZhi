@@ -13,6 +13,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/reader"
+	capturescreen "guizhi-mygo-shell/viva/screens/capture"
 	importsscreen "guizhi-mygo-shell/viva/screens/imports"
 	inboxscreen "guizhi-mygo-shell/viva/screens/inbox"
 	libraryscreen "guizhi-mygo-shell/viva/screens/library"
@@ -39,6 +40,9 @@ type Root struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	stopImports  func()
+
+	// capture 是快速采集对话框（顶栏新建、托盘与快捷键、采集页的入口都开它）；Services.Imports 为空时是 nil，入口按「尚未迁移」处理。
+	capture *capturescreen.Dialog
 
 	// 知识库模块：目前只有二级侧栏（工作区随 M2-2 迁入）。Services.Library 为空时是 nil，侧栏按「尚未迁移」处理。
 	library *libraryscreen.Screen
@@ -107,6 +111,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.win.Modules = map[shell.Module]shell.ModuleView{}
 	r.mountImports(invalidate)
 	r.mountLibrary(invalidate)
+	r.mountCapture(invalidate)
 	r.mountInbox(invalidate)
 	r.syncLook(nil)
 	return r
@@ -127,6 +132,7 @@ func (r *Root) mountImports(invalidate func()) {
 			// 每一帧现读（设置在别处改了，下一帧就跟上）。
 			WebSolverEnabled: func() bool { return r.store.Values().App.FlareSolverr.Enabled },
 			AppInfo:          func() (string, string) { return r.opts.AppVersion, r.opts.Platform },
+			QuickCapture:     func() { r.openCapture() },
 			OpenSettingsSection: func(section string) {
 				r.settings.Active = settingsscreen.SectionID(section)
 				r.win.Page = shell.PageSettings
@@ -234,6 +240,9 @@ func (r *Root) syncLook(c ui.C) {
 		}
 		if r.inbox != nil {
 			r.inbox.Look = r.look
+		}
+		if r.capture != nil {
+			r.capture.Look = r.look
 		}
 	}
 	if c != nil {
