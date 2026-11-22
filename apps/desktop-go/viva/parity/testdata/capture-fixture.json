@@ -1,0 +1,23 @@
+{
+  "collections": [
+    { "id": "col-study", "name": "学习笔记", "icon": "", "sortOrder": 0, "itemCount": 12, "createdAt": 1794700000000, "updatedAt": 1794700000000 },
+    { "id": "col-inspire", "name": "灵感收集", "icon": "", "sortOrder": 1, "itemCount": 8, "createdAt": 1794700001000, "updatedAt": 1794700001000 }
+  ],
+  "scenes": {
+    "urls": {
+      "draft": "https://example.com/post/42 https://github.com/vivaui"
+    },
+    "mixed": {
+      "draft": "【小红书】早春穿搭 http://xhslink.com/a/Qm3xYzAb 复制打开"
+    },
+    "filesTags": {
+      "files": [
+        "D:\\Documents\\调研资料\\本地优先软件白皮书.pdf",
+        "D:\\Downloads\\访谈录音-第三期.mp3",
+        "C:\\Users\\parity\\Desktop\\周会纪要.md"
+      ],
+      "tags": ["论文", "待读"],
+      "collection": "col-inspire"
+    }
+  }
+}

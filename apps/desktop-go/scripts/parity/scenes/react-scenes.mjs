@@ -22,6 +22,7 @@ import { LIBRARY_DETAIL_SCENES } from "./react-library-detail-scenes.mjs";
 import { INBOX_SCENES } from "./react-inbox-scenes.mjs";
 import { SETTINGS_CORE_SCENES } from "./react-settings-core-scenes.mjs";
 import { SETTINGS_ADVANCED_SCENES } from "./react-settings-advanced-scenes.mjs";
+import { CAPTURE_SCENES } from "./react-capture-scenes.mjs";
 import { SETTINGS_CONTENT_SCROLLER, openSettingsSection, scrollSettingsToEnd } from "../lib/react-settings-nav.mjs";
 
 /**
@@ -463,6 +464,8 @@ export const SCENES = {
   ...SETTINGS_CORE_SCENES,
   // 设置页三个外围分区（M3-2b）：采集与转写、MCP、AI 模型服务；场景在 react-settings-advanced-scenes.mjs
   ...SETTINGS_ADVANCED_SCENES,
+  // 快速采集对话框（M3-3）：空草稿、链接、分享口令、文件加标签加合集；场景在 react-capture-scenes.mjs
+  ...CAPTURE_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,

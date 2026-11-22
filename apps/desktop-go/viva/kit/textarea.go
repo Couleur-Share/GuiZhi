@@ -17,6 +17,9 @@ type TextAreaSpec struct {
 	// Placeholder 是占位符的颜色（渲染层 placeholder:text-muted-foreground/70）：Viva 的占位符只认主题的弱化色，
 	// 所以由这里在空输入上叠画，按框宽折行，与输入内容共用同一套行盒；输入法组合中（编辑器内容非空）自然不画。
 	Placeholder tokens.Color
+	// PlaceholderLeading 是占位符折成多行时的行距（渲染层 leading-5 的 1.25rem）；0 表示用 Viva 多行框的行高（字号加 7）。
+	// 只管占位符：输入内容的行高写死在 Viva 的多行框里（字号加 7），改不了，所以占位符与内容的行距在这里会差 1px（台账 B-062 同一成因）。
+	PlaceholderLeading float32
 }
 
 // TextArea 是去掉外观的多行文本输入（Viva 的 TextArea 去掉底色、边框、圆角与阴影）：只有可编辑的文字、占位符、插入符、选区与输入法，
@@ -55,6 +58,10 @@ func (l *Look) TextArea(c ui.C, f *ui.Field, label, placeholder string, spec Tex
 		}
 		size := l.Theme.Metrics.FontSizeM
 		lineHeight := size + 7
+		leading := lineHeight
+		if spec.PlaceholderLeading > 0 {
+			leading = spec.PlaceholderLeading
+		}
 		content := gfx.Rect{X: d.Rect.X + spec.PadX, Y: d.Rect.Y + spec.PadY, Width: d.Rect.Width - 2*spec.PadX, Height: d.Rect.Height - 2*spec.PadY}
 		style := gfx.TextStyle{Size: size, Weight: gfx.WeightRegular, Color: d.Fade(l.Col(spec.Placeholder))}
 		d.Canvas.Clip(content)
@@ -62,7 +69,7 @@ func (l *Look) TextArea(c ui.C, f *ui.Field, label, placeholder string, spec Tex
 		for from >= 0 && y < content.Y+content.Height {
 			row, next := d.Canvas.WrapRow(placeholder, from, size, gfx.WeightRegular, content.Width)
 			d.Canvas.Label(placeholder[row.Start:row.End], gfx.Rect{X: content.X, Y: y, Width: content.Width, Height: lineHeight}, style)
-			from, y = next, y+lineHeight
+			from, y = next, y+leading
 		}
 		d.Canvas.Unclip()
 	})

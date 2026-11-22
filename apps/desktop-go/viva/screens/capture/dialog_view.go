@@ -1,6 +1,8 @@
 package capture
 
 import (
+	"math"
+
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -59,13 +61,33 @@ func (d *Dialog) draftZone(c ui.C, draft Draft, action Action, canSubmit bool, s
 		d.submit(action, st)
 	}
 	zone.Children(func() {
-		l.TextArea(c.Key("draft"), &d.draft, locales.CapturePlaceholder(), locales.CapturePlaceholder(), kit.TextAreaSpec{
-			Height: l.Rem(9), PadX: l.Space(4), PadY: l.Space(3),
-			Color: t.Foreground, Placeholder: t.MutedForeground.WithAlpha(0.7),
-		}).FillWidth().AutoFocus()
+		// 草稿框是 inline-block 的 <textarea>：它下面留着一行盒的基线下沿（父级 16px 字号的 descent，约 6px），状态栏因此不贴着它。
+		// 全局规则 `:focus-visible { ring-2 ring-primary/50 }` 对文本框任何方式的聚焦都生效：环画在草稿框外侧（盖住拖放区的 1px 边框）。
+		var ring float32
+		ui.Column(c.Key("draft-wrap")).FillWidth().MarginBottom(draftBaselineGap(l)).
+			Draw(func(dc *ui.DrawContext) { l.PaintInputRing(dc, ring, l.Rem(0.75)) }).
+			Children(func() {
+				box := l.TextArea(c.Key("draft"), &d.draft, locales.CapturePlaceholder(), locales.CapturePlaceholder(), kit.TextAreaSpec{
+					Height: l.Rem(9), PadX: l.Space(4), PadY: draftPadY(l),
+					Color: t.Foreground, Placeholder: t.MutedForeground.WithAlpha(0.7), PlaceholderLeading: l.Rem(1.25),
+				}).FillWidth().AutoFocus()
+				ring = l.InputRing(c, ui.ID(c.Key("draft-ring")), box.State().Focused)
+			})
 		d.statusBar(c, draft, action)
 	})
 }
+
+// draftPadY 是草稿框的上下内边距：py-3，再扣掉一行高度差的一半。渲染层 leading-5 的行高是 1.25rem，Viva 多行框的行高是字号加 7（更高），
+// 行盒里的文字居中，所以同样的内边距下首行文字会比渲染层偏下半个差值（小档 0.875px，对拍里占位符墨迹偏下 1 像素）；上内边距扣掉它，首行就对齐了。
+// 第二行起每行仍比渲染层低 1px（行高本身写死在 Viva 的多行框里，见 dialog_pitch_test.go）。
+func draftPadY(l *kit.Look) float32 {
+	delta := l.Theme.Metrics.FontSizeM + 7 - l.Rem(1.25)
+	return l.Space(3) - max(delta, 0)/2
+}
+
+// draftBaselineGap 是草稿框与状态栏之间的间隙（inline-block 的基线下沿）：渲染层实测小 / 中 / 大三档字号分别是 6 / 6 / 7px，
+// 对得上 0.375rem（5.25 / 6 / 6.75px）向上取整——Chromium 把行盒的 descent 取整到整像素。三档之外的字号没有实测，取同一规则。
+func draftBaselineGap(l *kit.Look) float32 { return float32(math.Ceil(float64(l.Rem(0.375)))) }
 
 // statusBar 是草稿框下面的状态栏：左边是识别结果（链接时 text-primary 加地球图标，文字时剪贴板图标，至多两行），
 // 右边在文字夹链接（mixed）时是改判按钮。
