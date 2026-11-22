@@ -43,6 +43,9 @@ type Screen struct {
 	tagsPushed string          // 最近一次与 Store 对齐过的标签文本：输入框与 Store 谁先变，靠它分辨
 	tagsFocus  bool            // 上一帧标签输入框是否有焦点（边框高亮跟它走，晚一帧不可见）
 
+	window kit.RowWindow // 卡片列表的窗口化声明：只声明视口附近的行（rows.go 的 itemList）
+	leadH  float32       // 列表之上的提示条与错误条上一帧的高度：窗口把滚动几何换算成列表自己的坐标时要扣掉
+
 	// mounted 与 shown 是渲染层「挂载」的对应：这一帧没画工作区（切到别的模块、设置页）就当作卸载，
 	// 下次再画时重新进入并重读（EndFrame）。
 	mounted, shown bool

@@ -23,12 +23,17 @@ const reasonSeparator = "\uFF1B"
 // 里面先是 Wiki 提示条与局部错误条（不阻塞主列表），再按「读取失败、读取中、已处理完、列表」四选一画主体——
 // 读取失败必须画成错误态，不能画成「已处理完」的空态。
 //
-// 列表不做行窗口化：服务端每组最多回 100 条，三组加两个聚合行不超过 302 行，整表声明的开销与采集页的几十行同量级。
+// 列表做行窗口化（kit.RowWindow，MeasureAll 模式）：每帧只声明视口附近的卡片，窗口外用等高空位顶着，滚动条与内容总高仍按全部行算。
+// 整表声明在 352 行时稳态一帧 4.4 ms、滚轮一步 9 ms，超出帧预算（稳态 ≤ 2 ms、滚轮 ≤ 6 ms）。
+// 窗口只管列表本身，列表之上的提示条与错误条占的高度（leadH）要从滚动几何里扣掉，否则窗口会整体偏下。
 func (s *Screen) body(c ui.C, v View) {
 	l := s.Look
-	l.ScrollAreaFlush(c.Key("body"), [4]float32{l.Space(5), l.Space(5), l.Space(5), l.Space(5)}, func() {
-		s.wikiBanner(c, v)
-		s.sectionErrors(c, v)
+	l.ScrollAreaFlushView(c.Key("body"), [4]float32{l.Space(5), l.Space(5), l.Space(5), l.Space(5)}, func(view kit.ScrollView) {
+		// 提示条与错误条包在一列里量高：上一帧的实测高度供这一帧的窗口换算（条出现或消失的那一帧偏差一帧，Overscan 兜得住）。
+		ui.Column(c.Key("lead")).FillWidth().Draw(func(d *ui.DrawContext) { s.leadH = d.Rect.Height }).Children(func() {
+			s.wikiBanner(c, v)
+			s.sectionErrors(c, v)
+		})
 		switch {
 		case v.LoadError != "":
 			if l.LoadErrorState(c.Key("load-error"), v.LoadError) {
@@ -40,7 +45,7 @@ func (s *Screen) body(c ui.C, v View) {
 		case len(v.Visible) == 0:
 			s.emptyState(c)
 		default:
-			s.itemList(c, v)
+			s.itemList(c, v, view)
 		}
 	}).FillWidth().Grow(1).MinHeight(0)
 }
@@ -152,20 +157,29 @@ func (s *Screen) sectionErrors(c ui.C, v View) {
 }
 
 // itemList 是卡片列表：space-y-2。聚合行（语义索引、Wiki）是整块的大卡片，其余是带勾选框的条目卡片。
-func (s *Screen) itemList(c ui.C, v View) {
+// 行高不一（说明文字会折行），所以用变高窗口并开 MeasureAll：换了内容（筛选、字号档、界面语言、宽度）之后的第一帧整表声明、布局后量完每一行，
+// 之后位置全是实测，视口里的画面与整表声明逐像素相同，稳态每帧只跟看得见的行数有关。
+// 行高缓存的作废：RowEpoch 管字号档与界面语言；行键（itemKey）换了，该序号的旧实测作废（筛选、刷新）；列宽变了（滚动条槽出现、窗口缩放）由窗口在绘制时整体作废。
+func (s *Screen) itemList(c ui.C, v View, view kit.ScrollView) {
 	l := s.Look
 	selected := make(map[string]bool, len(v.Selection))
 	for _, id := range v.Selection {
 		selected[id] = true
 	}
-	ui.Column(c.Key("list")).FillWidth().Gap(l.Space(2)).Children(func() {
-		for _, item := range v.Visible {
+	view.Offset -= s.leadH // 列表上沿在内容区里的位置是 leadH：换算成列表自己的坐标
+	view.Content -= s.leadH
+	s.window.Seed = l.Rem(4.5) // 一张条目卡片（p-4 加标题、一行说明）大约 4.5 个 rem 高
+	s.window.Rows(c, kit.RowsSpec{
+		Name: "list", N: len(v.Visible), Gap: l.Space(2), View: view, MeasureAll: true,
+		Epoch: kit.RowEpoch{RootPx: l.RootPx, Variant: int(locales.CurrentLang())},
+		Key:   func(i int) string { return itemKey(v.Visible[i]) },
+		Row: func(i int) ui.Box {
+			item := v.Visible[i]
 			if item.IsAggregate() {
-				s.aggregateCard(c, v, item)
-				continue
+				return s.aggregateCard(c, v, item)
 			}
-			s.itemCard(c, v, item, selected)
-		}
+			return s.itemCard(c, v, item, selected)
+		},
 	})
 }
 
@@ -178,7 +192,8 @@ func itemKey(item services.InboxItem) string {
 }
 
 // aggregateCard 是后台任务的聚合行：flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4。
-func (s *Screen) aggregateCard(c ui.C, v View, item services.InboxItem) {
+// 返回卡片的最外层盒子：窗口化的行列（kit.RowWindow）布局后读它的高度。
+func (s *Screen) aggregateCard(c ui.C, v View, item services.InboxItem) ui.Box {
 	l := s.Look
 	t := l.T
 	c = c.Key("agg-" + itemKey(item))
@@ -187,7 +202,7 @@ func (s *Screen) aggregateCard(c ui.C, v View, item services.InboxItem) {
 	if semantic {
 		icon, title, desc = icons.ScanSearch, locales.InboxSemanticAggregateTitle(), locales.InboxSemanticAggregateDesc(item.Count)
 	}
-	ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(3)).Pad(s.pad(4)).
+	return ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(3)).Pad(s.pad(4)).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Primary.WithAlpha(0.05), Border: t.Primary.WithAlpha(0.2), BorderW: 1, Radius: l.Rem(0.75)})
 		}).
@@ -232,12 +247,13 @@ func (s *Screen) aggregateButton(c ui.C, v View, item services.InboxItem, semant
 
 // itemCard 是一条待处理的内容：flex items-start gap-3 rounded-xl border border-border bg-background/60 p-4。
 // 左边是勾选框（知识条目）或警示图标（采集问题），中间是标题与说明，右边是这一类行的动作。
-func (s *Screen) itemCard(c ui.C, v View, item services.InboxItem, selected map[string]bool) {
+// 返回卡片的最外层盒子：窗口化的行列（kit.RowWindow）布局后读它的高度。
+func (s *Screen) itemCard(c ui.C, v View, item services.InboxItem, selected map[string]bool) ui.Box {
 	l := s.Look
 	t := l.T
 	c = c.Key("item-" + itemKey(item))
 	itemID := item.KnowledgeItemID()
-	ui.Row(c).FillWidth().Items(ui.Start).Gap(l.Space(3)).Pad(s.pad(4)).
+	return ui.Row(c).FillWidth().Items(ui.Start).Gap(l.Space(3)).Pad(s.pad(4)).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.6), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)})
 		}).

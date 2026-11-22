@@ -65,6 +65,11 @@ func (l *Look) ScrollAreaFlush(c ui.C, pad [4]float32, body func()) ui.Box {
 	return l.scrollArea(c, pad, true, func(ScrollView) { body() })
 }
 
+// ScrollAreaFlushView 是 ScrollAreaFlush，另把滚动区上一帧的几何交给 body（窗口化的行列据此声明视口附近的行，同 ScrollAreaView）。
+func (l *Look) ScrollAreaFlushView(c ui.C, pad [4]float32, body func(ScrollView)) ui.Box {
+	return l.scrollArea(c, pad, true, body)
+}
+
 // scrollArea 是 ScrollAreaView 的实现：溢出超过 0.5px 算溢出，inclusive 为真时恰好 0.5px 也算。
 func (l *Look) scrollArea(c ui.C, pad [4]float32, inclusive bool, body func(ScrollView)) ui.Box {
 	box := ui.Scroll(c)
