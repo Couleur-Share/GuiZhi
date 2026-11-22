@@ -1038,31 +1038,8 @@ func TestWechatSnapshotToggleGoesBackAndForth(t *testing.T) {
 	}
 }
 
-// 还没迁入的入口点一下都弹失败提示，详情里写明归属的里程碑与台账编号（台账 B-060）：一个入口一条（现只剩 M3 的提问）。
-func TestEveryUnmigratedEntryNamesItsMilestone(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name      string
-		reach     func(r *rig) // 走到入口所在的状态
-		role      gfx.Role
-		label     string
-		milestone string
-	}{
-		// 媒体动作（总结、刷新讨论、AI 排版、转写、区分说话人）已在 M2-6d 接线，不再在这里（见 detail_media_ui_test.go）。
-		{"提问", func(r *rig) { r.openCard(detailNoteID) }, gfx.RoleButton, locales.ArticleAskTitle(), "M3"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			r := shellRig(t)
-			c.reach(r)
-			r.click(c.role, c.label)
-			text := r.toastText()
-			if !strings.Contains(text, locales.CommonOperationFailed(c.label)) || !strings.Contains(text, c.milestone) || !strings.Contains(text, "B-060") {
-				t.Fatalf("应弹失败提示并写明里程碑 %s 与 B-060，实际画面文字 %q", c.milestone, text)
-			}
-		})
-	}
-}
+// 详情里的入口都已接线：媒体动作（总结、刷新讨论、AI 排版、转写、区分说话人）在 M2-6d，提问栏在 M3-4（detail_ask_ui_test.go），
+// 所以不再有「点一下弹未迁移提示」的入口（原先逐项断言的表在这里，随最后一项迁入而撤掉）。
 
 // ---- 「更多」菜单 ----
 

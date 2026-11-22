@@ -55,6 +55,8 @@ type detailUI struct {
 	modal  detailModal
 	// tools 是文章工具侧栏的界面状态（detailtools.go）。
 	tools toolsUI
+	// ask 是围绕本文提问栏的界面状态（detailask.go）。
+	ask askUI
 }
 
 // FocusReading 报告是否处于专注阅读模式：外壳据此隐去二级侧栏（渲染层 App 的 `!(isFocusReadingMode && appModule === "library")`）。
@@ -78,6 +80,7 @@ func (s *Screen) remountDetail() {
 	s.detail.panel = panelState{}
 	s.detail.notice = noticeUI{}
 	s.detail.tools = toolsUI{} // 工具侧栏随 ItemDetail 重新挂载：toolsItemId 回到 null
+	s.resetAsk(false)          // 提问栏同理：askItemId 回到 null，在途的回答随阅读器卸载而停
 	s.detail.titleItem = ""
 	s.detail.edit.leave() // 编辑态随内容面板卸载而结束（草稿还在，再进来时恢复）
 }
@@ -165,6 +168,9 @@ func (s *Screen) itemDetail(c ui.C, v View, onClose func()) {
 	if det.LoadError != "" || det.Loading || det.Item == nil || det.Item.ID != v.List.SelectedID {
 		s.detail.edit.leave() // 内容面板不在树里：编辑态随它结束（草稿保留）
 	}
+	if det.Item == nil && det.LoadError == "" && !det.Loading {
+		s.syncAsk("") // 没有选中的条目：阅读器不在树里，在途的回答停掉
+	}
 	switch {
 	case det.LoadError != "":
 		if l.LoadErrorState(c.Key("load-error"), det.LoadError) {
@@ -196,8 +202,9 @@ func (s *Screen) itemDetailBody(c ui.C, v View, item services.LibraryItem, onClo
 	l := s.Look
 	trashed := item.DeletedAt != 0
 	col := ui.Column(c.Key("article")).FillHeight().MinHeight(0)
-	if s.detail.focusReading {
-		col = col.FillWidth().MaxWidth(l.Rem(detailMaxWidthRem)).Self(ui.Center) // mx-auto w-full max-w-4xl
+	if s.detail.focusReading && !s.askOpenFor(item.ID) {
+		// mx-auto w-full max-w-4xl；提问栏开着时不限宽（渲染层 askItemId !== item.id 才加），让栏贴到工作区右缘
+		col = col.FillWidth().MaxWidth(l.Rem(detailMaxWidthRem)).Self(ui.Center)
 	} else {
 		col = col.FillWidth()
 	}
@@ -209,7 +216,7 @@ func (s *Screen) itemDetailBody(c ui.C, v View, item services.LibraryItem, onClo
 		s.conflictNotice(c, v, item)
 		s.revisionsNotice(c, v, item)
 		s.detailHeader(c, v, item, caps, trashed, onClose)
-		s.contentPanel(c, v, item, caps)
+		s.askReader(c, v, item, caps)
 		s.toolsPanel(c, v, item, caps, s.detail.panel.live)
 	})
 }

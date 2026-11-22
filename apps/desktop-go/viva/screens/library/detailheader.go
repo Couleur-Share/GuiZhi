@@ -468,15 +468,21 @@ func (s *Screen) liveActions(c ui.C, v View, item services.LibraryItem, caps Ite
 	t := l.T
 	if caps.AskAvailable {
 		// mr-2 inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium；展开时 bg-primary/15 text-primary，
-		// 否则 text-foreground hover:bg-accent/60。提问栏随 M3 迁入：点击说明归属（台账 B-060）。
+		// 否则 text-foreground hover:bg-accent/60；aria-expanded。点击开合右侧的提问栏（detailask.go，台账 B-061）。
 		box := l.Button(c.Key("ask"), kit.ButtonSpec{
 			Label: locales.ArticleAskAction(), Icon: icons.MessageCircle, IconSize: l.Rem(1), Name: locales.ArticleAskTitle(),
+			Disclosure: true, On: s.askOpenFor(item.ID),
 		}, kit.ButtonStyle{
 			Height: l.Rem(2), PadX: l.Space(2.5), Radius: l.Rem(0.75), Gap: l.Space(1.5), Text: kit.TextXS, Weight: kit.WeightMedium,
-			Fg: t.Foreground, BgHover: t.Accent.WithAlpha(0.6), Ring: t.Primary, Transition: kit.DurationDefault,
+			Fg: t.Foreground, FgOn: t.Primary, BgOn: t.Primary.WithAlpha(0.15),
+			BgHover: t.Accent.WithAlpha(0.6), Ring: t.Primary, Transition: kit.DurationDefault,
 		}).MarginRight(l.Space(2))
 		if box.Clicked() {
-			s.notMigrated(locales.ArticleAskTitle(), "M3", "B-060")
+			if s.ArticleAsk == nil {
+				s.notMigrated(locales.ArticleAskTitle(), "M3", "B-061") // 没接问答界面的壳（对照与单测）
+			} else {
+				s.toggleAsk(item.ID)
+			}
 		}
 	}
 	// 专注阅读：aria-pressed 的切换钮，图标随状态换。

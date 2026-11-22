@@ -7,6 +7,7 @@ import (
 
 	"github.com/vivaui/viva/ui"
 
+	"guizhi-mygo-shell/aiflow"
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 )
@@ -17,6 +18,12 @@ type Hooks struct {
 	// OpenSource 打开一条引用来源：Wiki 页面切到 Wiki 模块，知识条目切到知识库并选中它（渲染层 AskMessageCard 的 useOpenSource）。
 	// 点「查看当前版本」时调用，界面线程。
 	OpenSource func(source services.AskSource)
+	// OpenURL 用系统浏览器打开网页来源（围绕本文的联网来源，渲染层 window.open）；为空时点击按「无法打开」处理。界面线程。
+	OpenURL func(url string) error
+	// LocateArticle 把文章来源定位到知识库阅读区里的原文位置：来源所属的文章已经由调用方打开（全局问答的「定位」先走
+	// OpenArticle），这里等阅读区就绪后按来源的视图与摘录查找；结果经 done 回报。可在任意 goroutine 调用（由外壳切到界面线程）。
+	// 为空时定位按失败处理。
+	LocateArticle func(source aiflow.ArticleSource, done func(found bool))
 }
 
 // searchDebounce 是历史搜索框的防抖：停止输入 250 ms 后才按新搜索词筛选（渲染层 HistoryControls 的 setTimeout）。
@@ -89,6 +96,11 @@ type Screen struct {
 
 	cards map[string]*cardState // 每轮消息卡的展开状态，按消息 id
 
+	// art 是围绕本文面板的界面状态（article_panel.go）：知识库详情的右侧栏与全局问答里的本文对话共用一份，
+	// 它们读写同一个 ArticleStore（渲染层同一个模块级 store）；artHistory 是「本文历史」的列表（第二个 HistoryStore，筛选条件互不影响）。
+	art        articleUI
+	artHistory *HistoryStore
+
 	// mounted 与 shown 是渲染层「挂载」的对应：这一帧没画侧栏与工作区（切到别的模块、设置页）就当作卸载，
 	// 下次再画时重新进入并重读（EndFrame）。
 	mounted, shown bool
@@ -157,6 +169,7 @@ func (s *Screen) EndFrame() {
 		s.scope.Open, s.rng.Open, s.article.Open = false, false, false
 	}
 	s.shown = false
+	s.endArticleFrame()
 }
 
 // card 取（或建）一轮消息卡的展开状态。

@@ -230,7 +230,10 @@ func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, ac
 // 页面事件的接收者：全部在界面线程、且都已被宿主校验过（viva/reader）。
 type readerEvents struct{ s *Screen }
 
-func (e readerEvents) Matches(count int) { e.s.detail.panel.findCount = count }
+func (e readerEvents) Matches(count int) {
+	e.s.detail.panel.findCount = count
+	e.s.locateMatches(count) // 来源定位发出的查找词得到回报
+}
 
 // Scroll 记阅读位置（渲染层 useDebouncedScrollSave 的 flush：标签与该标签的位置一起写进阅读记忆）。
 // 事件所属的条目与标签由宿主按序号找回，所以换条目前补报的那一次不会记到新条目名下。

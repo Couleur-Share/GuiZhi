@@ -139,9 +139,13 @@ func utf16Len(s string) int { return len(utf16.Encode([]rune(s))) }
 // renameModal 是重命名对话框（渲染层 HistoryRename）：一个标题输入框与「保存」钮；标题为空（只有空白）或正在保存时钮禁用，
 // 保存成功才关闭，失败时对话框保持打开、原因由 HistoryStore 弹出。
 func (s *Screen) renameModal(c ui.C) {
+	s.renameDialog(c, "rename", &s.rename, s.History)
+}
+
+// renameDialog 是重命名对话框的版面，侧栏的历史会话与围绕本文的「本文历史」共用：状态在 r，保存走 hist。key 区分两处的对话框身份。
+func (s *Screen) renameDialog(c ui.C, key string, r *renameState, hist *HistoryStore) {
 	l := s.Look
 	t := l.T
-	r := &s.rename
 	if r.saved.Swap(false) {
 		r.session = nil
 	}
@@ -150,7 +154,7 @@ func (s *Screen) renameModal(c ui.C) {
 			r.field.SetText(utf16Prefix(text, renameMaxUnits))
 		}
 	}
-	closed := l.Modal(c.Key("rename"), &r.modal, kit.ModalSpec{
+	closed := l.Modal(c.Key(key), &r.modal, kit.ModalSpec{
 		Open: r.session != nil, Title: locales.AskRenameSession(), CloseLabel: locales.CommonClose(),
 		Body: func(c ui.C) {
 			// mb-3 w-full rounded border border-border bg-background p-2：文字 1rem、行高 1.5。
@@ -167,7 +171,7 @@ func (s *Screen) renameModal(c ui.C) {
 				Shadows: []tokens.Shadow{{Y: 1, Blur: 2, Color: t.Primary.WithAlpha(0.25)}},
 			})
 			if b.Clicked() {
-				s.saveRename()
+				s.saveRename(r, hist)
 			}
 		},
 	})
@@ -177,8 +181,7 @@ func (s *Screen) renameModal(c ui.C) {
 }
 
 // saveRename 在后台保存新标题；成功后下一帧关闭对话框。
-func (s *Screen) saveRename() {
-	r := &s.rename
+func (s *Screen) saveRename(r *renameState, hist *HistoryStore) {
 	session := r.session
 	if session == nil || r.busy.Load() {
 		return
@@ -186,7 +189,7 @@ func (s *Screen) saveRename() {
 	id, title := session.ID, r.field.Text()
 	r.busy.Store(true)
 	s.spawn(func() {
-		ok := s.History.Update(id, services.AskSessionMetaPatch{Title: &title})
+		ok := hist.Update(id, services.AskSessionMetaPatch{Title: &title})
 		r.busy.Store(false)
 		if ok {
 			r.saved.Store(true)

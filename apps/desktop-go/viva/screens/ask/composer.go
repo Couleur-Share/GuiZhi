@@ -76,18 +76,22 @@ func (s *Screen) draftBox(c ui.C) {
 
 // countRows 数输入内容折成几行（含显式换行；至少一行）：按上一帧量到的文字区宽度折行，宽度没量到之前只按换行符算。
 func (s *Screen) countRows(canvas *gfx.Canvas, text string) int {
+	return countWrappedRows(canvas, text, s.inputWidth, s.Look.Theme.Metrics.FontSizeM)
+}
+
+// countWrappedRows 是 countRows 的纯算法：width 是文字区宽度（没量到为 0），size 是字号。全局与围绕本文的输入框共用。
+func countWrappedRows(canvas *gfx.Canvas, text string, width, size float32) int {
 	if text == "" {
 		return 1
 	}
-	size := s.Look.Theme.Metrics.FontSizeM
 	rows := 0
 	for _, para := range strings.Split(text, "\n") {
-		if para == "" || s.inputWidth <= 0 {
+		if para == "" || width <= 0 {
 			rows++
 			continue
 		}
 		for from := 0; from >= 0; {
-			_, next := canvas.WrapRow(para, from, size, gfx.WeightRegular, s.inputWidth)
+			_, next := canvas.WrapRow(para, from, size, gfx.WeightRegular, width)
 			rows++
 			if next <= from {
 				break

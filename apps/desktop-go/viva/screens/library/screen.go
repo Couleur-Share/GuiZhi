@@ -12,6 +12,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/reader"
+	askscreen "guizhi-mygo-shell/viva/screens/ask"
 )
 
 // Screen 是「知识库」模块的二级侧栏界面（渲染层 components/library/SidebarLibraryPanel）：
@@ -36,6 +37,8 @@ type Screen struct {
 	OpenExternal func(url string) error
 	// Imports 是采集队列（来源 chip 旁的「重新采集并待确认」入队）；nil 时点击弹失败提示。
 	Imports services.Imports
+	// ArticleAsk 是围绕本文的问答界面（详情右侧的提问栏，detailask.go）；nil 时「提问」钮只弹说明（对照与单测不接线）。
+	ArticleAsk *askscreen.Screen
 	// HideDetail 为真时详情栏内容隐去、表格行与 Enter 只选中不开详情浮层：对照场景专用，口径与采集端的 HIDE_DETAIL_CSS 一致——
 	// 渲染层一侧同样只隐去详情内容、不改布局（M2-4 之前的场景用，它们比的是列表栏、侧栏与批量条）。生产里恒为假。
 	HideDetail bool
@@ -134,6 +137,7 @@ func (s *Screen) EndFrame() {
 		// 卸载（切换模块）前保存未落盘内容（渲染层 LibraryWorkspace 的卸载 effect：flushPendingSave，不等结果）。
 		s.Store.Spawn(func() { s.Store.FlushPendingSave(s.Ctx) })
 		s.leaveTranscript()   // 文字稿里还没写进记忆的阅读位置先写掉
+		s.resetAsk(true)      // 阅读器卸载：停掉在途的回答，在途的来源定位按失败回报
 		s.detail = detailUI{} // 详情栏、专注阅读（离开知识库即退出）与详情浮层同理
 	}
 	if s.readerHost != nil {

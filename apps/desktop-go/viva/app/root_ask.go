@@ -1,6 +1,7 @@
 package app
 
 import (
+	"guizhi-mygo-shell/aiflow"
 	"guizhi-mygo-shell/native/services"
 	askscreen "guizhi-mygo-shell/viva/screens/ask"
 	"guizhi-mygo-shell/viva/screens/shell"
@@ -38,8 +39,10 @@ func (r *Root) mountAsk(invalidate func()) {
 	r.askStore = store
 	r.ask = &askscreen.Screen{
 		Store: store, History: history, Setup: setup, Ctx: r.ctx, Guard: r.guard,
-		Hooks: askscreen.Hooks{OpenSource: r.openAskSource},
-		Now:   r.opts.Services.Now,
+		Hooks: askscreen.Hooks{
+			OpenSource: r.openAskSource, OpenURL: r.opts.Services.OpenExternal, LocateArticle: r.locateArticle,
+		},
+		Now: r.opts.Services.Now,
 		// 输入框里 Enter 发送、Shift+Enter 换行：Shift 的状态读系统键盘。
 		ShiftHeld: shiftHeld,
 	}
@@ -49,6 +52,8 @@ func (r *Root) mountAsk(invalidate func()) {
 	// 不会再次展示旧证据（渲染层 clearCachedConversationEvidence）。回调在知识库的后台 goroutine 里调用，Store 本身并发安全。
 	if r.library != nil {
 		r.library.Store.OnEvidenceCleared = store.ClearEvidenceForItems
+		// B-061：知识库详情右侧的「围绕本文提问」栏与全局问答里的本文对话读写同一个 ArticleStore（r.ask.Store.Article()）。
+		r.library.ArticleAsk = r.ask
 	}
 	// 导入结果里的「就此提问」：新建会话（不污染刚浏览的历史会话）、预填草稿（只预填不发送）、切到问答。
 	if r.imports != nil {
@@ -78,6 +83,18 @@ func (r *Root) openAskSource(source services.AskSource) {
 		return
 	}
 	r.openLibraryItem(r.ctx, source.RefID)
+}
+
+// locateArticle 把全局问答里的文章来源定位到知识库阅读区（渲染层 locateArticleSource）：来源所属的文章已经由调用方打开，
+// 定位本身要在界面线程上排进知识库详情的帧循环里。任意 goroutine；知识库没有装配时按没找到回报。
+func (r *Root) locateArticle(source aiflow.ArticleSource, done func(found bool)) {
+	r.runOnUI(func() {
+		if r.library == nil {
+			done(false)
+			return
+		}
+		r.library.LocateArticle(source, done)
+	})
 }
 
 // closeAsk 取消在途的问答请求。

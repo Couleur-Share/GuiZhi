@@ -76,7 +76,7 @@ func (s *Screen) detailKey(e gfx.KeyEvent, canvas *gfx.Canvas) gfx.EventResult {
 			p.findOpen = false
 			return gfx.EventResult{Handled: true, Repaint: true}
 		}
-		if s.toolsEscape(focus) {
+		if s.toolsEscape(focus) || s.askEscape(canvas) {
 			return gfx.EventResult{Handled: true, Repaint: true}
 		}
 		if s.detail.focusReading && !focus.Floating() {

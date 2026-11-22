@@ -34,6 +34,9 @@ type textBtn struct {
 	Gap      float32
 	// Expanded 非 nil 时按钮是展开收起钮（aria-expanded）。
 	Expanded *bool
+	// Role 非零时盖过按钮角色（开关用 RoleSwitch），Checked 是它此刻的勾选状态（aria-checked）。
+	Role    gfx.Role
+	Checked bool
 	// Radius 是聚焦环的圆角；0 取 0.25rem。
 	Radius float32
 }
@@ -46,6 +49,9 @@ func (s *Screen) textButton(c ui.C, label string, b textBtn) bool {
 		b.Groups.Add(b.Group, id)
 	}
 	opts := gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Hint: b.Hint, Disabled: b.Disabled}
+	if b.Role != 0 {
+		opts.Role, opts.Checked = b.Role, b.Checked
+	}
 	if b.Expanded != nil {
 		opts.Expandable, opts.Expanded = true, *b.Expanded
 	}

@@ -484,8 +484,9 @@ func TestSourceLinkOpensInTheSystemBrowser(t *testing.T) {
 	}
 }
 
-// 还没迁移的入口点一下弹失败提示，详情里写明归属的里程碑与台账编号（台账 B-060），而不是什么也不发生。
-func TestUnmigratedActionsAnswerWithAFailureToastNamingTheMilestone(t *testing.T) {
+// 没接问答界面的壳（对照与单测里不装配 ArticleAsk）里，「提问」钮点一下弹失败提示而不是什么也不发生；
+// 接了问答界面时它开合右侧的提问栏（detail_ask_ui_test.go）。
+func TestAskButtonWithoutAnAskScreenAnswersWithAFailureToast(t *testing.T) {
 	t.Parallel()
 	r := detailRig(t)
 	r.openCard(detailNoteID)
@@ -494,8 +495,8 @@ func TestUnmigratedActionsAnswerWithAFailureToastNamingTheMilestone(t *testing.T
 	if !strings.Contains(text, locales.CommonOperationFailed(locales.ArticleAskTitle())) {
 		t.Fatalf("点「提问」应弹失败提示，实际画面文字 %q", text)
 	}
-	if !strings.Contains(text, "M3") || !strings.Contains(text, "B-060") {
-		t.Fatalf("提示详情应写明里程碑 M3 与台账 B-060，实际画面文字 %q", text)
+	if !strings.Contains(text, "M3") || !strings.Contains(text, "B-061") {
+		t.Fatalf("提示详情应写明里程碑 M3 与台账 B-061，实际画面文字 %q", text)
 	}
 	if n := len(r.log.entries()); n != 0 {
 		t.Fatalf("没迁移不是故障，不该写应用错误日志，实际 %d 条", n)

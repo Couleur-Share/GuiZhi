@@ -3,7 +3,6 @@ package ask
 import (
 	"github.com/vivaui/viva/ui"
 
-	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
@@ -16,7 +15,7 @@ const stickToBottomPx float32 = 80
 // Workspace 是主区域（渲染层 AskWorkspace）：页头、消息列表（或加载、读取失败、空态）与底部输入框。
 //
 // flex h-full min-h-0 flex-1 flex-col overflow-hidden app-wallpaper-section。
-// 读取失败整页换成错误态；当前会话是「围绕本文」的会话时换成本文对话的占位（Step 3 接入 GlobalArticleConversation）。
+// 读取失败整页换成错误态；当前会话是「围绕本文」的会话时换成本文对话的占位（由 globalArticle 渲染）。
 func (s *Screen) Workspace(c ui.C) {
 	l := s.Look
 	t := l.T
@@ -37,7 +36,7 @@ func (s *Screen) Workspace(c ui.C) {
 					s.spawn(func() { s.Store.RetryLoad() })
 				}
 			case v.ArticleSession != nil && v.ArticleSession.Target != nil:
-				s.articlePlaceholder(c, *v.ArticleSession)
+				s.globalArticle(c, *v.ArticleSession)
 			default:
 				s.header(c, v)
 				s.messageArea(c, v, set)
@@ -169,22 +168,5 @@ func (s *Screen) latestButton(c ui.C) {
 		if b.Clicked() {
 			s.toEnd = true
 		}
-	})
-}
-
-// articlePlaceholder 是「围绕本文」会话在全局问答里的过渡占位：本文对话（GlobalArticleConversation）随 M3-4 Step 3 迁入，
-// 在那之前老实说明，不渲染成一个空的普通对话。
-func (s *Screen) articlePlaceholder(c ui.C, session services.AskSessionMeta) {
-	l := s.Look
-	t := l.T
-	title := session.ArticleTitle
-	if title == "" {
-		title = locales.ArticleAskHistoryBadge()
-	}
-	ui.Column(c.Key("article")).FillWidth().Grow(1).MinHeight(0).Items(ui.Center).Justify(ui.Center).Gap(l.Space(2)).
-		PadSides(0, l.Space(6), 0, l.Space(6)).Children(func() {
-		l.Heading(c.Key("title"), 2, title, kit.TextSM, kit.WeightSemibold, t.Foreground, kit.Centered(), kit.Wrapped())
-		l.Text(c.Key("hint"), locales.NativeShellNotMigrated(locales.ArticleAskHistoryBadge()), kit.TextXS, kit.WeightNormal,
-			t.MutedForeground, kit.Centered(), kit.Wrapped())
 	})
 }

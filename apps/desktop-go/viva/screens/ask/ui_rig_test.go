@@ -45,8 +45,10 @@ type uiRig struct {
 	tips     kit.TooltipState
 	canvas   gfx.Canvas
 
-	hidden    bool        // 为真时整个模块不画（模拟切到别的模块）
-	shiftDown atomic.Bool // 模拟 Shift 是否按着（ShiftHeld 读它）
+	hidden bool // 为真时整个模块不画（模拟切到别的模块）
+	// articleSpec 非空时在右侧画一块围绕本文面板（模拟知识库详情的右侧栏），与模块是否隐藏无关。
+	articleSpec *ArticleSpec
+	shiftDown   atomic.Bool // 模拟 Shift 是否按着（ShiftHeld 读它）
 
 	mu         sync.Mutex
 	opened     []services.AskSource // Hooks.OpenSource 收到的来源
@@ -109,6 +111,11 @@ func newUIRig(t *testing.T, mutate ...func(*uiRig)) *uiRig {
 				if !r.hidden {
 					ui.Column(c.Key("panel")).Width(r.look.Rem(15)).FillHeight().Children(func() { r.screen.Panel(c) })
 					ui.Column(c.Key("main")).Grow(1).FillHeight().MinWidth(0).Children(func() { r.screen.Workspace(c) })
+				}
+				if r.articleSpec != nil {
+					ui.Column(c.Key("aside")).Width(r.look.Rem(25)).FillHeight().Shrink(0).Children(func() {
+						r.screen.ArticlePanel(c, *r.articleSpec)
+					})
 				}
 			})
 			r.look.Tooltips(c, &r.tips)

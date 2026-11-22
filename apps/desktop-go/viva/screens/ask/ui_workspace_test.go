@@ -378,18 +378,3 @@ func TestUILoadFailureIsAnErrorStateNotAnEmptyState(t *testing.T) {
 		t.Fatalf("重试成功后应进入空态：%q", r.session.Texts())
 	}
 }
-
-func TestUIArticleSessionShowsATransitionPlaceholder(t *testing.T) {
-	r := newUIRig(t, withActive("a1"), func(r *uiRig) {
-		tg := target("item-1")
-		rec := services.AskSessionRecord{MessagesJSON: "[]"}
-		rec.ID, rec.Title, rec.Scope, rec.ItemID, rec.ArticleTitle, rec.Target = "a1", "article chat", services.AskScopeArticle, "item-1", "Some article", &tg
-		r.svc.PutSession(rec)
-	})
-	if !r.contains(locales.NativeShellNotMigrated(locales.ArticleAskHistoryBadge())) {
-		t.Fatalf("本文会话应给出过渡占位：%q", r.session.Texts())
-	}
-	if r.hasButton(locales.AskSend()) {
-		t.Fatal("占位期间不该有全局问答的输入框")
-	}
-}

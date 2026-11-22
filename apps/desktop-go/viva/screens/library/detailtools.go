@@ -47,6 +47,7 @@ func (s *Screen) toolsOpenFor(id string) bool {
 
 // toggleTools 开合工具侧栏（头部菜单两项共用：渲染层 setAskItemId(null) 之后 setToolsItemId(开着 ? null : item.id)）。
 func (s *Screen) toggleTools(id string) {
+	s.closeAsk()
 	t := &s.detail.tools
 	if t.openID == id {
 		t.openID = ""

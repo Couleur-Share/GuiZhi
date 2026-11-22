@@ -6,6 +6,7 @@ import (
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
+	"guizhi-mygo-shell/aiflow"
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
@@ -21,10 +22,21 @@ const reasonSeparator = "\uFF1B"
 // （最高 16rem、超出滚动、保留换行）；没有保存证据时说明当前版本可能已变化。
 // 底部「查看当前版本」（已清除的来源没有）与「关闭」。
 func (s *Screen) evidenceExcerpt(c ui.C, st *cardState, m services.AskMessage, src services.AskSource, group string) {
+	s.evidencePanel(c, src.Evidence, src.Cleared, group,
+		func() {
+			if s.Hooks.OpenSource != nil {
+				s.Hooks.OpenSource(src)
+			}
+		},
+		func() { st.choice = nil })
+}
+
+// evidencePanel 是证据摘录的版面，全局问答与围绕本文共用（渲染层同一个 EvidenceExcerpt 组件）：
+// onCurrent 是「查看当前版本」（已清除的来源没有这个钮），onClose 是「关闭」。group 非空时命中区登记进该轮的悬停分组。
+func (s *Screen) evidencePanel(c ui.C, ev *aiflow.EvidenceSnapshot, cleared bool, group string, onCurrent, onClose func()) {
 	l := s.Look
 	t := l.T
-	ev := src.Evidence
-	removed := src.Cleared || (ev != nil && ev.Cleared != nil && *ev.Cleared)
+	removed := cleared || (ev != nil && ev.Cleared != nil && *ev.Cleared)
 	ui.Column(c.Key("excerpt")).FillWidth().MarginTop(l.Space(3)).Gap(l.Space(2)).Pad(l.Space(3) + 1).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.3), Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)})
@@ -52,15 +64,15 @@ func (s *Screen) evidenceExcerpt(c ui.C, st *cardState, m services.AskMessage, s
 				if !removed {
 					if s.textButton(c.Key("current"), locales.AskEvidenceViewCurrent(), textBtn{
 						Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.Primary, Underline: true, Groups: &s.turns, Group: group,
-					}) && s.Hooks.OpenSource != nil {
-						s.Hooks.OpenSource(src)
+					}) {
+						onCurrent()
 					}
 				}
 				ui.Row(c.Key("close-wrap")).MarginLeft(l.Space(3)).Children(func() {
 					if s.textButton(c.Key("close"), locales.CommonClose(), textBtn{
 						Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground, Groups: &s.turns, Group: group,
 					}) {
-						st.choice = nil
+						onClose()
 					}
 				})
 			})

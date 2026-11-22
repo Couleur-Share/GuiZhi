@@ -14,6 +14,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/viva/kit"
+	askscreen "guizhi-mygo-shell/viva/screens/ask"
 )
 
 // 本文件是知识库侧栏的无头测试台：不开真窗口、不碰 WebView2，毫秒级。
@@ -43,6 +44,9 @@ type rig struct {
 	canvas              gfx.Canvas
 	nextID              int
 	copied              []string
+	// ask 与 askSvc 是接在详情「提问」栏上的问答界面与它的服务替身（withArticleAsk 才有；nil 时详情不接问答）。
+	ask    *askscreen.Screen
+	askSvc *servicestest.AskFake
 }
 
 // libraryFixture 是常用的数据：两个合集、三个标签，其中一个标签没有条目。
@@ -110,6 +114,9 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 				}
 			})
 			r.screen.EndFrame()
+			if r.ask != nil {
+				r.ask.EndFrame()
+			}
 			r.look.Toasts(c, r.notifier)
 		},
 		Theme: &r.look.Theme, Background: &bg,
