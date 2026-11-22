@@ -137,9 +137,7 @@ func InputPad(weight, size, height, scale float32) (top, bottom float32) {
 	d := roundHalfUp(f.descent * sizeDev)
 	line := size + 6 // components.inputLineBox：fontSize+6
 	rv := VivaBaselineRow(VivaLabelRows(line, scale), sizeDev)
-	topDev := float64(height)*float64(scale)/2 + (a-d)/2 - float64(rv)
-	top = float32(topDev / float64(scale))
-	return top, height - line - top
+	return inputPadAt(a, d, rv, size, height, scale)
 }
 
 // TextareaPad 是 InputPad 的 <textarea> 版：返回让 Viva 输入框里那一行文字落在渲染层 <textarea> 首行位置所需的上、下内边距（逻辑像素）。

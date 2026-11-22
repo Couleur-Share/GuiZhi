@@ -285,6 +285,67 @@ func TestSettingItemStaysHoveredOverItsControl(t *testing.T) {
 	expectPixel(t, "指针在开关上时行底色", pixelAt(h, 200, 10), want, 2)
 }
 
+// 指针停在行内任一种控件（开关、下拉触发器、按钮）上，整行都是悬停底色（CSS 的 :hover 对祖先也成立，台账 B-050），
+// 且不改变控件自己的悬停与点击：控件仍是命中目标，点击照常触发。
+func TestSettingItemHoveredOverInlineControls(t *testing.T) {
+	type ctl struct {
+		name string
+		hit  string
+		make func(l *Look, c ui.C, clicked *int)
+	}
+	ctls := []ctl{
+		{"开关", "控件开关", func(l *Look, c ui.C, _ *int) { l.Switch(c, new(bool), "控件开关") }},
+		{"下拉触发器", "控件下拉", func(l *Look, c ui.C, _ *int) { l.SelectTrigger(c, "控件下拉", "值", false, 140, false) }},
+		{"按钮", "控件按钮", func(l *Look, c ui.C, clicked *int) {
+			th := l.T
+			b := l.Button(c.Key("btn"), ButtonSpec{Label: "控件按钮"}, ButtonStyle{
+				Height: l.Rem(2.25), PadX: l.Space(3), Radius: l.Rem(0.75), Text: TextSM, Weight: WeightNormal,
+				Fg: th.Foreground, Bg: th.Muted, Transition: DurationDefault,
+			})
+			if b.Clicked() {
+				*clicked++
+			}
+		}},
+	}
+	for _, mode := range []tokens.Mode{tokens.ModeLight, tokens.ModeDark} {
+		for _, k := range ctls {
+			t.Run(fmt.Sprintf("%v/%s", mode, k.name), func(t *testing.T) {
+				spec := still()
+				spec.Mode = mode
+				clicked := 0
+				h := openPage(t, spec, 400, 200, func(l *Look, c ui.C) {
+					l.SettingItem(c, SettingRow{Label: "后台任务", Description: "说明", Control: func() { k.make(l, c, &clicked) }}, true)
+				})
+				th := h.look.T
+				before := rgbOf(th.Muted.WithAlpha(0), th.Background)
+				expectPixel(t, "指针不在时行底色", pixelAt(h, 200, 10), before, 2)
+				hit, ok := h.session.Hit(k.hit)
+				if !ok {
+					t.Fatalf("找不到 %s", k.hit)
+				}
+				if err := h.session.Move(hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2); err != nil {
+					t.Fatal(err)
+				}
+				h.frames(3)
+				want := rgbOf(th.Muted.WithAlpha(0.2), th.Background)
+				expectPixel(t, "指针在控件上时行底色", pixelAt(h, 200, 10), want, 1)
+				// 指针离开行（页面下方的空白处）：底色撤掉。
+				if err := h.session.Move(200, 150); err != nil {
+					t.Fatal(err)
+				}
+				h.frames(3)
+				expectPixel(t, "指针离开后行底色", pixelAt(h, 200, 10), before, 2)
+				if k.name == "按钮" {
+					h.click(k.hit)
+					if clicked != 1 {
+						t.Errorf("行的悬停判定不应吃掉控件的点击：按钮点击次数 %d", clicked)
+					}
+				}
+			})
+		}
+	}
+}
+
 // ---- 分段按钮 ----
 
 // segmentPage 是一排三枚分段按钮（甲乙丙），初始选中 sel；点击改选中。按钮网格从 (20,20) 起、宽 760，三格各 245.33。

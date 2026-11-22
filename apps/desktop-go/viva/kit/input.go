@@ -54,6 +54,9 @@ func (l *Look) Input(c ui.C, f *ui.Field, label, placeholder string, spec InputS
 	top, bottom := InputPad(spec.Weight, spec.Size, spec.Height, l.Scale)
 	if spec.LineHeight > 0 {
 		top, bottom = TextareaPad(spec.Weight, spec.Size, spec.Height, spec.PadTop, spec.LineHeight, l.Scale)
+	} else if spec.Mono {
+		// 渲染层的等宽 <input> 用 Consolas 的 ascent / descent 居中，与比例字体的度量不同（台账 B-022，见 baseline_mono.go）。
+		top, bottom = InputPadMono(spec.Size, spec.Height, l.Scale)
 	}
 	own := spec.Placeholder != (tokens.Color{}) && placeholder != ""
 	shown := placeholder

@@ -366,8 +366,10 @@ func (l *Look) toastDetailBody(c ui.C, n *Notifier, t *toast, cardWidth float32,
 		text := strings.Join(lines, "\n")
 		pre := func() {
 			// MaxLines(0)：不限行数，并认 \n 为硬换行（单行文字会把换行符当空格）；每行都已按渲染层的宽度折好，Viva 不会再折
-			ui.Text(c.Key("pre"), text).Mono().MaxLines(0).FontSize(toastDetailPx).LineHeight(lineH).
+			box := ui.Text(c.Key("pre"), text).Mono().MaxLines(0).FontSize(toastDetailPx).LineHeight(lineH).
 				Color(l.Col(l.T.MutedForeground)).FillWidth()
+			// Mono 文字与渲染层 font-mono（Consolas 的行盒度量）的基线差零到一行（台账 B-022，见 baseline_mono.go）。
+			shiftBaseline(box, MonoBaselineShift(toastDetailPx, toastDetailPx, lineH, l.Scale))
 		}
 		if scrolls {
 			l.ScrollArea(c.Key("pre-scroll"), [4]float32{}, pre).Height(maxH)

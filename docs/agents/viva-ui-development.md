@@ -394,6 +394,8 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - **窗口化后的复测范围**：`vivaparity-m31w.exe` 只复测 `inbox` 6 场景 254 份；7889 份全家族回归跑在 `vivaparity-m31.exe` 上，窗口化改动只涉及新增的 `ScrollAreaFlushView` 与 `inbox/rows.go`，没有在 `m31w` 上重跑全家族。
 - **没有测**：真窗口里的任何交互（归 R-16）；处理中心页的进程内存；真实 AI 服务、真实网络与真数据库下的批量整理与归类（只用 `servicestest` 假实现与主包适配器 `TestInboxAdapter*` 9 例对拍）；真窗口里紧凑布局浮层开着时的读屏与 Tab 顺序（B-073）。
 
+**M3-2a 立线登记（2026-11-22，开工前按 §8.1.1 重算方法登记）**：M3-2 拆为 M3-2a 与 M3-2b 两批，各自立线。**M3-2a 的范围**是设置页（`settings-core`）的余项分区——网络与 FlareSolverr、快捷键、数据与备份（含配置导入 / 导出）、关于——以及两个前置台账：B-022（等宽文字 `font-mono` 的 1 像素基线差，先修 `viva/kit`，再把相关 Waiver 的 `MaxDY` 收紧）与 B-050（`kit.SettingItem` 的行悬停底色在指针落在行内控件上时缺失）。**AI 设置、采集与转写设置、MCP 设置归 M3-2b**，不在本批。重算估算 **8 段**，**线 = 重算估算 × 1.5 = 12 段**，硬停线 = 24 段（沿用按模块各自立线的约定，越线先停下汇报）。Step 0 登记本段，Step 1 做 B-022 与 B-050 两个前置修复并验证，后续步骤再迁入各分区；不改 `thresholds.json` 与比较器，不新增 Waiver，不放宽任何既有容差。
+
 ### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
 
 真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。

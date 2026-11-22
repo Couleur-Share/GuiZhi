@@ -1,7 +1,6 @@
 package kit
 
 import (
-	"math"
 	"strconv"
 
 	"github.com/vivaui/viva/gfx"
@@ -13,20 +12,6 @@ import (
 // chromeMonoFace 是中文 Windows 下 font-mono 行盒的垂直度量（2026-11-21 在 React 参照里按 10.5/14、12/16、13.5/18 实测：
 // 内容区高 13 / 14 / 15，基线 10 / 12 / 13；A=round(0.92·s)=10/11/12，D=round(0.25·s)=3/3/3）。
 var chromeMonoFace = face{0.92, 0.25}
-
-// monoBaselineShift 返回让 Viva 界面字体（字号 drawSize、行高 lineH）落在渲染层 font-mono（字号 size、行高 lineH）
-// 基线位置所需的纵向平移（逻辑像素，取整到设备像素）。
-func monoBaselineShift(size, drawSize, lineH, scale float32) float32 {
-	if scale <= 0 {
-		scale = 1
-	}
-	sc := float64(scale)
-	a := roundHalfUp(chromeMonoFace.ascent * float64(size) * sc)
-	d := roundHalfUp(chromeMonoFace.descent * float64(size) * sc)
-	chrome := int(math.Floor((float64(lineH)*sc-(a+d))/2) + a)
-	viva := VivaBaselineRow(VivaLabelRows(lineH, scale), float64(drawSize)*sc)
-	return float32(chrome-viva) / scale
-}
 
 // MonoParagraph 画一段已经按渲染层规则折好的等宽原文（font-mono 的 pre，lines 是 WrapMono 的结果）：每行一个 Label，行高固定为 lineH，
 // 空行只占行高。折行点由调用方在渲染层的度量下定好，这里保证 Viva 不会再折、也不会把行尾截掉。
@@ -89,7 +74,7 @@ type monoStyle struct {
 
 func (l *Look) monoStyleOf(size, lineH float32, color tokens.Color) monoStyle {
 	drawSize := monoWideAdvance(size)
-	return monoStyle{size: size, drawSize: drawSize, lineH: lineH, dy: monoBaselineShift(size, drawSize, lineH, l.Scale), color: color}
+	return monoStyle{size: size, drawSize: drawSize, lineH: lineH, dy: MonoBaselineShift(size, drawSize, lineH, l.Scale), color: color}
 }
 
 // monoFrag 画一行（或一行里的一截）非空的等宽文字：含汉字的用界面字体画并对齐 font-mono 的基线，其余用 Mono 画。
@@ -106,12 +91,7 @@ func (l *Look) monoFrag(c ui.C, key, text string, st monoStyle, slot float32) {
 				Color(l.Col(st.color)).
 				Width(w).
 				Shrink(0)
-			switch {
-			case st.dy > 0:
-				box.PadTop(st.dy).MarginBottom(-st.dy)
-			case st.dy < 0:
-				box.MarginTop(st.dy).PadBottom(-st.dy)
-			}
+			shiftBaseline(box, st.dy)
 		})
 		return
 	}

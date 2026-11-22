@@ -708,7 +708,7 @@ func (b *proseCode) draw(d *ui.DrawContext) {
 		scale = 1
 	}
 	wideSize := monoWideAdvance(b.size)
-	dy := monoBaselineShift(b.size, wideSize, b.line, scale)
+	dy := MonoBaselineShift(b.size, wideSize, b.line, scale)
 	for i, text := range b.linesAt(d.Rect.Width) {
 		if text == "" {
 			continue

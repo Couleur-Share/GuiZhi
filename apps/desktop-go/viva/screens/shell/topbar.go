@@ -215,7 +215,7 @@ func (w *Window) shortcutChip(c ui.C) {
 		// text-[10px] font-mono：行高继承 1.5 倍（15px）。Viva 的固定间距文字按整数字格排（宽度取整、行高取字格高），
 		// 与 Chromium 按字体真实字距排的结果不同（台账 A-006）：这里把行盒与宽度做成渲染层的值，字形仍按 Viva 的字格画。
 		ui.Row(c).Width(kit.MonoAdvance(w.SearchShortcut, 10)).Height(15).Items(ui.Center).Children(func() {
-			ui.Text(c, w.SearchShortcut).FontSize(10).Color(l.Col(fg)).Mono()
+			l.MonoText(c, w.SearchShortcut, 10, 15, fg)
 		})
 	})
 	if box.Clicked() && w.OnOpenPalette != nil {

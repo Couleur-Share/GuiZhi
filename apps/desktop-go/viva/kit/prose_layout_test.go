@@ -723,7 +723,7 @@ func TestProseCodeBlock(t *testing.T) {
 	if !approx(abc.Bounds.Y, 12+12) {
 		t.Errorf("第一行 y = %v，期望 上外边距 12 + 内边距 12", abc.Bounds.Y)
 	}
-	dy := monoBaselineShift(14.4, 14, proseLine16, 1)
+	dy := MonoBaselineShift(14.4, 14, proseLine16, 1)
 	if !approx(han.Bounds.Y, abc.Bounds.Y+proseLine16+dy) {
 		t.Errorf("第二行 y = %v，期望一行高之下 %v 加基线平移 %v", han.Bounds.Y, abc.Bounds.Y+proseLine16, dy)
 	}

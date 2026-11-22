@@ -76,6 +76,8 @@ type Look struct {
 
 	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
 	advances noKernCache
+	// inside 是各命中区「整个包在自己外框里的后代命中区」的登记（行悬停对后代成立，见 hoverinside.go）。
+	inside insideHits
 	// markShapes 是命中词底色的圆角矩形（按尺寸与圆角缓存，见 marktext.go 的 markShape）。
 	markShapes map[markShapeKey]gfx.Icon
 }

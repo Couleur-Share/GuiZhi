@@ -82,6 +82,7 @@ func (l *Look) SettingsCard(c ui.C, body func()) {
 // 说明 text-xs muted mt-0.5；左侧可收缩（min-w-0），右侧控件不收缩。
 func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
 	t := l.T
+	id := ui.ID(c)
 	pad := [4]float32{l.Space(3), l.Space(4), l.Space(3), l.Space(4)} // py-3 px-4
 	if !last {
 		pad[2]++ // border-b 占 1px，画在行盒的最底部
@@ -91,11 +92,17 @@ func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
 		Justify(ui.Between).
 		Gap(l.Space(4)).
 		PadSides(pad[0], pad[1], pad[2], pad[3]).
-		HitWith(ui.ID(c), "", gfx.HitOptions{SkipFocus: true}).
-		Hover(ui.Look{}.Background(l.Col(t.Muted.WithAlpha(0.2)))).
+		HitWith(id, "", gfx.HitOptions{SkipFocus: true}).
+		// hover:bg-muted/20：指针在行的矩形内（含行内控件的命中区）就悬停，见 hoverInside。
 		// transition-colors：Tailwind 默认时长 150 ms、标准曲线（不随「减弱」档缩放，台账 B-004）。
-		TransitionWith(l.Motion(DurationDefault, EaseStandard)).
+		Draw(func(d *ui.DrawContext) {
+			p := l.hoverTo(d.Canvas, id, 0, l.hoverInside(d.Canvas, id), DurationDefault)
+			if p > 0 {
+				d.Canvas.Fill(d.Rect, d.Fade(l.Col(t.Muted.WithAlpha(0.2*p))))
+			}
+		}).
 		DrawOver(func(d *ui.DrawContext) {
+			l.noteInside(d.Canvas, id, d.Rect)
 			if last {
 				return
 			}

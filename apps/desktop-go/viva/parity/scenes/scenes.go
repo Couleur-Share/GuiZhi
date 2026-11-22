@@ -31,7 +31,7 @@ var pageSettingsWaivers = []parity.Waiver{
 	},
 	{
 		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "Alt+Shift+F", MaxDY: 1,
-		Note: "同上：字格取整使整行墨迹整体偏短，左缘与每个字符的位置累计最多差一个字格（5.5px）；小、大字号档纵向另差 1 像素（Viva 偏下，等宽字体的基线，台账 B-022）",
+		Note: "同上：字格取整使整行墨迹整体偏短，左缘与每个字符的位置累计最多差一个字格（5.5px）；纵向仅中字号档另差 1 像素（Viva 偏上；小、大字号档已对齐。渲染层该档基线比 Consolas 度量模型低一行，成因未明，台账 B-022 余项）",
 	},
 }
 
@@ -234,8 +234,8 @@ var toastMonoWaivers = []parity.Waiver{
 		Note: "详情原文是固定间距文字，Viva 把字格取整（Consolas 11px 的 6.048→6px），整行偏短最多 2.6px",
 	},
 	{
-		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "SQLITE_BUSY", MaxDY: 1,
-		Note: "同上：字格取整使每行墨迹整体偏短，字形位置累计最多差一个字格；大字号档纵向另差 1 像素（Viva 偏下，等宽字体的基线，台账 B-022）",
+		Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: "SQLITE_BUSY",
+		Note: "同上：字格取整使每行墨迹整体偏短，字形位置累计最多差一个字格（纵向基线已按 Consolas 度量对齐，台账 B-022 对应纵向已对齐，余项见 B-022）",
 	},
 }
 
@@ -600,8 +600,8 @@ func monoFieldWaivers(subject string, maxWidth float64) []parity.Waiver {
 			Note: "输入框里的固定间距文字，Viva 把字格取整（Consolas 的 7.70→8px 等），整行与渲染层的宽度差在半个字格×字数以内",
 		},
 		{
-			Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: 2, MaxDY: 1,
-			Note: "同上：字格取整使每个字符的位置累计最多差两个像素（大字号档的纵向基线另差一个像素，台账 B-022）",
+			Ledger: "A-006", Layer: parity.LayerL2, Kind: "ink", Subject: subject, MaxDelta: 2,
+			Note: "同上：字格取整使每个字符的位置累计最多差两个像素（纵向基线已按 Consolas 度量对齐，台账 B-022 对应纵向已对齐，余项见 B-022）",
 		},
 	}
 }
