@@ -342,7 +342,11 @@ func (a *AI) wizardGoals(c ui.C, w *wizardState) {
 			l.Text(c.Key("desc"), g.desc, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
 		})
 		if box.Clicked() {
-			w.goals[g.goal] = !on
+			if on {
+				delete(w.goals, g.goal)
+			} else {
+				w.goals[g.goal] = true
+			}
 		}
 	})
 }

@@ -62,6 +62,7 @@ func budgetData(t *testing.T, ready bool, dialog string) *rig {
 // 页面：通用、外观（M3-2a Step 1），以及数据与备份的四个场景（M3-2a Step 3 收尾）：
 // 已启用完整备份的整页（含旧快照列表、完整快照列表、配置迁移）、未启用（启用表单加换机导入）的整页、
 // 导出对话框打开、导入预览对话框打开。对话框打开时滚轮落在遮罩上，页面不动，所以不量滚动。
+// M3-2b 追加：采集与转写（capture）、MCP 接入（mcp）、AI 模型服务工作台（ai_workbench）、快速配置向导的服务步骤（ai_wizard）。
 func TestFrameBudget(t *testing.T) {
 	if os.Getenv("VIVA_FRAME_BUDGET") == "" {
 		t.Skip("帧耗时读数与机器有关，默认不跑：VIVA_FRAME_BUDGET=1 时运行")
@@ -80,6 +81,27 @@ func TestFrameBudget(t *testing.T) {
 		{"data_repo_setup", func(t *testing.T) *rig { return budgetData(t, false, "") }, false},
 		{"data_export_dialog", func(t *testing.T) *rig { return budgetData(t, true, "export") }, true},
 		{"data_import_dialog", func(t *testing.T) *rig { return budgetData(t, true, "import") }, true},
+		// M3-2b：采集与转写、MCP 接入、AI 模型服务（工作台与快速配置向导）。向导是对话框，滚轮落在遮罩上，不量滚动。
+		{"capture", func(t *testing.T) *rig {
+			r := newCaptureEnv().open(t)
+			r.frames(10)
+			return r
+		}, false},
+		{"mcp", func(t *testing.T) *rig {
+			r := newMCPEnv().open(t)
+			r.frames(10)
+			return r
+		}, false},
+		{"ai_workbench", func(t *testing.T) *rig {
+			r := newAIEnv().open(t)
+			waitText(r, locales.SettingsAiWorkbenchStatusOverview())
+			return r
+		}, false},
+		{"ai_wizard", func(t *testing.T) *rig {
+			e := newAIEnv()
+			e.ai.PutConfig(services.AIConfig{Routes: map[string]string{}})
+			return e.openWizardAtService(t)
+		}, true},
 	}
 	for _, pg := range pages {
 		t.Run(pg.name, func(t *testing.T) {
