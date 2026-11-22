@@ -249,9 +249,12 @@ func (s *Store) loadInitial() error {
 		activeID = s.newID("session")
 	}
 	s.mu.Lock()
-	if s.generation != gen {
+	if s.generation != gen || s.view.ActiveSessionID != "" {
 		// 读取期间用户已经切到别的会话或新建了会话（例如导入结果里的「就此提问」）：只补上历史列表，
 		// 不能把活跃会话改回上次的那个。
+		// 光比代次不够：NewSession 与 SwitchSession 先 beginSwitch（代次加一）、后落地活跃会话，两步之间
+		// 开始的首次加载拿到的是已加一的代次，却在对方落地之后才返回，会把新建的空会话盖回上次会话。
+		// 所以首次加载只在还没有任何活跃会话时才有权落地；已有活跃会话说明用户的选择在前。
 		s.view.Sessions = page.Entries
 		s.mu.Unlock()
 		return nil
