@@ -11,6 +11,9 @@
       "reasonSeparator": "；",
       "snapshotTaskEnded": "任务已结束或无法取消"
     },
+    "wiki": {
+      "suggestionStale": "更新建议已变化，已重新读取，请重新核对。"
+    },
     "languageName": {
       "zh": "简体中文",
       "en": "English"

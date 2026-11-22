@@ -75,11 +75,11 @@ func (r *Root) askAboutItem(draft string) {
 	}
 }
 
-// openAskSource 打开问答来源（渲染层 onOpenSource）：条目来源在知识库里打开；Wiki 页来源指向 Wiki 模块，
-// 它随 M3 的 Wiki 迁移落地，在那之前切过去会落在「尚未迁移」的占位页上（与处理中心的 Wiki 入口同一处理）。
+// openAskSource 打开问答来源（渲染层 onOpenSource）：条目来源在知识库里打开；Wiki 页来源切到 Wiki 模块并选中该页
+// （没有 Wiki 服务的实例只切模块，落在「尚未迁移」的占位页上）。
 func (r *Root) openAskSource(source services.AskSource) {
 	if source.Kind == "wiki" {
-		r.runOnUI(func() { r.win.Module, r.win.Page = shell.ModuleWiki, shell.PageHome })
+		r.openWikiPage(source.RefID)
 		return
 	}
 	r.openLibraryItem(r.ctx, source.RefID)

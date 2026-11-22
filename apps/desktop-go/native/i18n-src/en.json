@@ -11,6 +11,9 @@
       "reasonSeparator": "；",
       "snapshotTaskEnded": "The task has already ended or cannot be canceled"
     },
+    "wiki": {
+      "suggestionStale": "The update suggestion has changed. It was reloaded; review it again."
+    },
     "languageName": {
       "zh": "简体中文",
       "en": "English"

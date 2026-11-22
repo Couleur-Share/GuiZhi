@@ -19856,6 +19856,16 @@ func (msgs Messages) NativeLibrarySnapshotTaskEnded() string {
 	return Catalog.Format(msgs.locale, "native_library_snapshotTaskEnded", nil)
 }
 
+// NativeWikiSuggestionStale says "更新建议已变化，已重新读取，请重新核对。"
+// in the language the app shows.
+func NativeWikiSuggestionStale() string { return In(i18n.Locale()).NativeWikiSuggestionStale() }
+
+// NativeWikiSuggestionStale says "更新建议已变化，已重新读取，请重新核对。"
+// in the language of msgs.
+func (msgs Messages) NativeWikiSuggestionStale() string {
+	return Catalog.Format(msgs.locale, "native_wiki_suggestionStale", nil)
+}
+
 // NativeLanguageNameZh says "简体中文"
 // in the language the app shows.
 func NativeLanguageNameZh() string { return In(i18n.Locale()).NativeLanguageNameZh() }

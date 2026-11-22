@@ -70,6 +70,15 @@ func (a *wikiAdapter) mapErr(err error) error {
 	return err
 }
 
+// scrubJob 抹掉编译任务 Error 字段里的 API Key：任务检查点里的失败原因来自模型服务商的原始响应，可能回显密钥；
+// 它会被界面原样显示并允许复制，所以和其余错误文本一样在适配器出口统一脱敏。
+func (a *wikiAdapter) scrubJob(j services.WikiCompileJob) services.WikiCompileJob {
+	if j.Error != "" {
+		j.Error = scrubKeys(j.Error, apiKeysOf(a.cfg.AISettings()))
+	}
+	return j
+}
+
 func wikiCall[T any](ctx context.Context, a *wikiAdapter, channel string, args ...any) (T, error) {
 	out, err := callAs[T](ctx, a.b, channel, args...)
 	return out, a.mapErr(err)
@@ -184,7 +193,7 @@ func (a *wikiAdapter) CompileJobs(ctx context.Context) ([]services.WikiCompileJo
 	}
 	out := make([]services.WikiCompileJob, len(reply.Jobs))
 	for i, j := range reply.Jobs {
-		out[i] = services.WikiCompileJob(j)
+		out[i] = a.scrubJob(services.WikiCompileJob(j))
 	}
 	return out, nil
 }
@@ -202,22 +211,22 @@ func (a *wikiAdapter) StartCompile(ctx context.Context, selected []services.Wiki
 		return services.WikiCompileJob{}, a.mapErr(err)
 	}
 	if !reply.OK || reply.Job == nil {
-		rejected := &services.WikiStartError{Message: orStr(reply.Error, "任务未启动")}
+		rejected := &services.WikiStartError{Message: scrubKeys(orStr(reply.Error, "任务未启动"), apiKeysOf(a.cfg.AISettings()))}
 		if preview, err := decodePreview[services.WikiCompilePreview](reply.Preview); err == nil {
 			rejected.Preview = preview
 		}
 		return services.WikiCompileJob{}, rejected
 	}
-	return services.WikiCompileJob(*reply.Job), nil
+	return a.scrubJob(services.WikiCompileJob(*reply.Job)), nil
 }
 
 func (a *wikiAdapter) RunCompile(ctx context.Context, job services.WikiCompileJob, progress func(services.WikiCompileJob)) (services.WikiCompileJob, error) {
 	var onProgress func(aiflow.WikiCompileJob)
 	if progress != nil {
-		onProgress = func(j aiflow.WikiCompileJob) { progress(services.WikiCompileJob(j)) }
+		onProgress = func(j aiflow.WikiCompileJob) { progress(a.scrubJob(services.WikiCompileJob(j))) }
 	}
 	out, err := a.driver.RunJob(ctx, aiflow.WikiCompileJob(job), onProgress)
-	return services.WikiCompileJob(out), a.mapErr(err)
+	return a.scrubJob(services.WikiCompileJob(out)), a.mapErr(err)
 }
 
 func (a *wikiAdapter) ControlCompile(ctx context.Context, jobID, status string) (services.WikiCompileJob, error) {
@@ -228,7 +237,7 @@ func (a *wikiAdapter) ControlCompile(ctx context.Context, jobID, status string) 
 	if job == nil {
 		return services.WikiCompileJob{}, errors.New("修改编译状态失败")
 	}
-	return services.WikiCompileJob(*job), nil
+	return a.scrubJob(services.WikiCompileJob(*job)), nil
 }
 
 // ---- 更新建议 ----

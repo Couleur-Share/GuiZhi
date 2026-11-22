@@ -15187,6 +15187,14 @@ func NativeLibrarySnapshotTaskEnded() string {
 	return "任务已结束或无法取消"
 }
 
+// NativeWikiSuggestionStale 是 native.wiki.suggestionStale：更新建议已变化，已重新读取，请重新核对。
+func NativeWikiSuggestionStale() string {
+	if useEn() {
+		return "The update suggestion has changed. It was reloaded; review it again."
+	}
+	return "更新建议已变化，已重新读取，请重新核对。"
+}
+
 // NativeLanguageNameZh 是 native.languageName.zh：简体中文
 func NativeLanguageNameZh() string {
 	if useEn() {

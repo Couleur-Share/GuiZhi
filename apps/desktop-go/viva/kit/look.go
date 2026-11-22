@@ -73,6 +73,10 @@ type Look struct {
 	// ShortcutHook 是界面的窗口级快捷键（知识库详情的 Ctrl+S、Ctrl+F、Alt+Z）：带修饰键的可打印字符不走 OnKey、走 OnShortcut，
 	// 窗口接线时设置；nil 表示没有。每敲一个字都会来问一遍，钩子要立刻放行不相干的键。
 	ShortcutHook func(gfx.KeyEvent) gfx.EventResult
+	// WheelHook 是界面的窗口级滚轮（Wiki 关系图谱的滚轮缩放）：Viva 没有「某个控件接走滚轮」的钩子，滚轮只交给滚动区；
+	// 画布自己要缩放时，由外壳在 OnScroll 里先问它。事件的坐标是窗口坐标，钩子自己判断指针在不在它的矩形里，不在就放行
+	// （返回零值）；返回 Handled 表示滚轮被它接走，不再交给滚动区。窗口接线时设置；nil 表示没有。
+	WheelHook func(gfx.ScrollEvent) gfx.EventResult
 
 	// advances 是单个字符前进量的缓存（TextNoKern 逐字符求和用，见 textnokern.go）。
 	advances noKernCache

@@ -124,7 +124,8 @@ func TestRootInboxConfigureModelOpensSettingsAI(t *testing.T) {
 	})
 }
 
-// Wiki 编译预览随 Wiki 模块迁入：点「查看范围和任务」只说明去向（提示条标题是「操作失败」，详情说明尚未迁移，与其他未迁移入口一致），不跳转、不崩。
+// 没有装配 Wiki 服务的实例：点「查看范围和任务」只说明去向（提示条标题是「操作失败」，详情说明尚未迁移，与其他未迁移入口一致），不跳转、不崩。
+// 装配了 Wiki 的实例改为打开编译对话框，见 root_wiki_test.go 的 TestRootInboxWikiPreviewOpensCompileDialog。
 func TestRootInboxWikiPreviewSaysItIsNotMigrated(t *testing.T) {
 	f, svc, _ := openInboxRoot(t, shell.ModuleInbox)
 	svc.SetWikiCandidates(services.InboxWikiCandidates{Ready: 3})

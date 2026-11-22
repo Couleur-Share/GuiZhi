@@ -33,7 +33,7 @@ func (r *Root) mountInbox(invalidate func()) {
 	store := inboxscreen.NewStore(svc, r.guard, invalidate)
 	store.OnOpenSettingsAI = r.openSettingsAI
 	store.OnOpenItem = r.openLibraryItem
-	// Wiki 编译预览随 Wiki 模块迁入：点「查看范围和任务」只说明去向，不假装有预览（Wiki 模块自己的占位页同样说明未迁移）。
+	// Wiki 模块装配后（mountWiki）这里改接到编译对话框；没有 Wiki 服务的实例点「查看范围和任务」只说明去向，不假装有预览。
 	store.OnWikiPreview = func() {
 		action := locales.InboxWikiCandidatesView()
 		r.notifier.Error(locales.CommonOperationFailed(action), locales.NativeShellNotMigrated(locales.NavWiki()))

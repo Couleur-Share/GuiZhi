@@ -20,6 +20,7 @@ import (
 	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
+	wikiscreen "guizhi-mygo-shell/viva/screens/wiki"
 )
 
 // Root 是主窗口的根：把服务、外观与各页面装配起来，交给 Viva 的页面声明。
@@ -58,6 +59,9 @@ type Root struct {
 	// Services.Ask 为空时两者都是 nil，rail 与工作区按「尚未迁移」处理（root_ask.go）。
 	ask      *askscreen.Screen
 	askStore *askscreen.Store
+
+	// Wiki 模块：目录、详情、关系图谱与全文编译。Services.Wiki 为空时是 nil，rail 与工作区按「尚未迁移」处理（root_wiki.go）。
+	wiki *wikiscreen.Screen
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -120,6 +124,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.mountCapture(invalidate)
 	r.mountInbox(invalidate)
 	r.mountAsk(invalidate)
+	r.mountWiki(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -254,6 +259,11 @@ func (r *Root) syncLook(c ui.C) {
 		if r.ask != nil {
 			r.ask.Look = r.look
 		}
+		if r.wiki != nil {
+			r.wiki.Look = r.look
+			// 图谱的滚轮缩放走窗口级钩子（页面的滚动区不接这类滚轮）。
+			r.look.WheelHook = r.wiki.GraphWheel
+		}
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -344,7 +354,19 @@ func (r *Root) OnScroll(next func(gfx.ScrollEvent) gfx.EventResult) func(gfx.Scr
 			}
 		}
 	}
-	return kit.RefreshHoverAfterWheel(next, post)
+	// 窗口级滚轮（Wiki 图谱缩放）先于页面的滚动区：被它接走的滚轮不再滚动背后的内容。
+	inner := func(e gfx.ScrollEvent) gfx.EventResult {
+		if r.look != nil && r.look.WheelHook != nil {
+			if res := r.look.WheelHook(e); res.Handled {
+				return res
+			}
+		}
+		if next == nil {
+			return gfx.EventResult{}
+		}
+		return next(e)
+	}
+	return kit.RefreshHoverAfterWheel(inner, post)
 }
 
 // View 声明整个窗口内容。
@@ -366,6 +388,9 @@ func (r *Root) View(c ui.C) {
 	}
 	if r.ask != nil {
 		r.ask.EndFrame()
+	}
+	if r.wiki != nil {
+		r.wiki.EndFrame()
 	}
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)

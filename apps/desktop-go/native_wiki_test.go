@@ -530,6 +530,64 @@ func TestNativeWikiMapErrScrubsAPIKey(t *testing.T) {
 	}
 }
 
+// 任务检查点里的失败原因来自服务商的原始响应，可能回显密钥：解码出来的任务与进度回调里的任务都要脱敏，
+// 没有 Error 的任务原样返回。
+func TestNativeWikiScrubJobErrorField(t *testing.T) {
+	f := newWikiFixture(t, nil)
+	job := services.WikiCompileJob{ID: "j1", Status: services.WikiJobFailed, Total: 3, Error: "401 bad key " + askTestSecret + " rejected"}
+	got := f.a.scrubJob(job)
+	if strings.Contains(got.Error, askTestSecret) || !strings.Contains(got.Error, "***") {
+		t.Fatalf("任务 Error 应抹掉 API Key：%q", got.Error)
+	}
+	if got.ID != job.ID || got.Status != job.Status || got.Total != job.Total {
+		t.Fatalf("其余字段不变：%+v", got)
+	}
+	if clean := (services.WikiCompileJob{ID: "j2"}); f.a.scrubJob(clean) != clean {
+		t.Fatal("没有 Error 的任务应原样返回")
+	}
+}
+
+// 端到端验证：服务商错误响应回显 API Key 时，RunCompile 返回的终态任务、进度回调以及 CompileJobs 读回的记录
+// 都不能泄漏明文密钥。
+func TestNativeWikiCompileJobsAndRunScrubAPIKey(t *testing.T) {
+	ctx := t.Context()
+	f := newWikiFixture(t, func(int, string) *askLLMReply {
+		return &askLLMReply{Status: 401, Raw: "401 unauthorized key=" + askTestSecret}
+	})
+	preview, err := f.a.CompilePreview(ctx)
+	if err != nil || len(preview.Entries) == 0 {
+		t.Fatalf("预览：%v %+v", err, preview)
+	}
+	job, err := f.a.StartCompile(ctx, preview.Entries[:1])
+	if err != nil {
+		t.Fatalf("开始：%v", err)
+	}
+	var seenProgress []services.WikiCompileJob
+	done, runErr := f.a.RunCompile(ctx, job, func(j services.WikiCompileJob) {
+		seenProgress = append(seenProgress, j)
+	})
+	if runErr != nil && strings.Contains(runErr.Error(), askTestSecret) {
+		t.Fatalf("RunCompile 错误文本泄漏 API Key：%v", runErr)
+	}
+	if strings.Contains(done.Error, askTestSecret) {
+		t.Fatalf("RunCompile 终态 Error 泄漏 API Key：%q", done.Error)
+	}
+	for _, p := range seenProgress {
+		if strings.Contains(p.Error, askTestSecret) {
+			t.Fatalf("进度回调 Error 泄漏 API Key：%q", p.Error)
+		}
+	}
+	jobs, err := f.a.CompileJobs(ctx)
+	if err != nil || len(jobs) == 0 {
+		t.Fatalf("CompileJobs：%v %+v", err, jobs)
+	}
+	for _, j := range jobs {
+		if strings.Contains(j.Error, askTestSecret) {
+			t.Fatalf("CompileJobs Error 泄漏 API Key：%q", j.Error)
+		}
+	}
+}
+
 // 手动改过的页面在来源更新后不会被直接覆盖：新内容存成更新建议，令牌失效后采用返回 false，令牌有效时采用并存快照。
 func TestNativeWikiSuggestionFlow(t *testing.T) {
 	ctx := t.Context()

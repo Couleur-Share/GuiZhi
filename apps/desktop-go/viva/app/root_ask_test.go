@@ -123,7 +123,8 @@ func TestRootAskOpenSourceGoesToLibraryAndSelectsIt(t *testing.T) {
 	}
 }
 
-// Wiki 页来源指向 Wiki 模块（随 M3 的 Wiki 迁移落地，目前切过去是占位页）。
+// Wiki 页来源指向 Wiki 模块。没有装配 Wiki 服务的实例只切模块（落在占位页上）；装配了 Wiki 的实例还会打开那一页，
+// 见 root_wiki_test.go 的 TestRootAskWikiSourceOpensWikiPage。
 func TestRootAskOpenWikiSourceSwitchesToWikiModule(t *testing.T) {
 	f, _, _ := openAskRoot(t, nil)
 	f.waitFrames(t, "会话内容出现", f.hasChip)

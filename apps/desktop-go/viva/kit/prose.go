@@ -27,7 +27,7 @@ import (
 // 垂直外边距按 CSS 折叠：兄弟之间取较大者；容器（ul、li、blockquote 没有垂直方向的内边距与边框）的首尾外边距与首尾子元素折叠。
 // 最后一块的下外边距折叠出 .prose 之后，仍落在卡片的内边距里（卡片有 padding），所以由 Prose 的调用方留在盒内（返回盒的 MarginBottom）。
 //
-// 没有照做的：代码块的横向滚动改为折行（只读卡片里没有横向滚动条）、右上角的语言标签与复制钮不画；链接只画样式、不能点；
+// 没有照做的：代码块的横向滚动改为折行（只读卡片里没有横向滚动条）、右上角的语言标签与复制钮不画；链接默认只画样式、不能点（ProseWith 传 OnLink 才可点，Wiki 正文用它）；
 // 表格、任务列表复选框、行内 HTML 不渲染（见 markdown.go）。
 
 // 各元素的外观常数（单位 em 的随该元素字号缩放，px 的不缩放）。
@@ -47,6 +47,7 @@ const (
 	proseChipPadX    = 0.4
 	proseChipPadY    = 0.15
 	proseChipRadius  = 0.25
+	proseLinkPadX    = 2.0  // 站内链接的 px-0.5（px）
 	proseBlockPadY   = 0.75 // .prose pre
 	proseBlockPadX   = 1.0
 	proseBlockRadius = 0.5
@@ -120,6 +121,8 @@ func isLeadPara(b *MdBlock) bool {
 type proseBuilder struct {
 	l    *Look
 	base float32 // 1rem（px）
+	opts ProseOpts
+	top  map[*proseNode]bool // 顶层节点：标题锚点只回报它们
 }
 
 // Prose 把 Markdown 块排成一列，返回外层盒。lead 是它上方已有的外边距（卡片里内容区的 mt-1.5）：它与第一块的上外边距折叠，
@@ -132,8 +135,31 @@ func (l *Look) Prose(c ui.C, blocks []MdBlock, lead float32) ui.Box {
 // 末块的下外边距穿出父盒，与下一个兄弟的上外边距取较大者，而不是相加）。ui 的列不折叠外边距，所以这里把返回盒的下外边距减去 follow，
 // 调用方给下一个兄弟照常保留它自己的上外边距 follow：两者之和恰好是 max(末块下外边距, follow)。
 func (l *Look) ProseFollowed(c ui.C, blocks []MdBlock, lead, follow float32) ui.Box {
-	p := &proseBuilder{l: l, base: l.Rem(1)}
+	return l.ProseWith(c, blocks, lead, follow, ProseOpts{})
+}
+
+// ProseOpts 是 Prose 的可选行为：零值就是只读的排版（链接只画样式）。
+type ProseOpts struct {
+	// OnLink 非空时，链接是可点的：每一截链接文字登记一块命中区（角色 link、手形光标、键盘可达），
+	// 点击在事件遍之后回调 OnLink(href)。Wiki 的 [[双链]] 与外部链接靠它。
+	OnLink func(href string)
+	// LinkChip 报告某个链接是否画成「站内链接」的底色小块（font-medium、primary/8 底、两侧 2px 内边距；悬停 primary/15）。
+	// 为空则链接都只有颜色加下划线。
+	LinkChip func(href string) bool
+	// Anchor 在每个顶层标题画出时回报它的矩形（窗口坐标）：页内目录据此滚动到标题。b 指向 blocks 里的元素。
+	Anchor func(b *MdBlock, r gfx.Rect)
+}
+
+// ProseWith 是 ProseFollowed，另带可选行为（链接可点、标题锚点）。
+func (l *Look) ProseWith(c ui.C, blocks []MdBlock, lead, follow float32, opts ProseOpts) ui.Box {
+	p := &proseBuilder{l: l, base: l.Rem(1), opts: opts}
 	nodes := p.build(blocks, proseInherit{color: l.T.Foreground}, 0)
+	if opts.Anchor != nil {
+		p.top = make(map[*proseNode]bool, len(nodes))
+		for _, n := range nodes {
+			p.top[n] = true
+		}
+	}
 	top, bottom := lead, float32(0)
 	if len(nodes) > 0 {
 		top, bottom = max(lead, nodes[0].top), nodes[len(nodes)-1].bottom
@@ -312,11 +338,19 @@ func (p *proseBuilder) renderText(c ui.C, n *proseNode) ui.Box {
 		weight = WeightSemibold
 	}
 	layout := newProseText(l, c.Canvas(), p.runs(b.Spans, n, weight), n.size, n.line, weight)
+	layout.key, layout.onLink = c, p.opts.OnLink
 	box := ui.CustomLayout(c, layout).FillWidth()
 	if b.Kind == MdHeading {
 		plain, level := MdPlain(b.Spans), uint8(b.Level)
+		anchor := p.opts.Anchor
+		if !p.top[n] {
+			anchor = nil
+		}
 		return box.Draw(func(d *ui.DrawContext) {
 			d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleHeading, plain, gfx.HitOptions{Level: level})
+			if anchor != nil {
+				anchor(b, d.Rect)
+			}
 			layout.draw(d)
 		})
 	}
@@ -337,7 +371,13 @@ func (p *proseBuilder) runs(spans []MdSpan, n *proseNode, base float32) []proseR
 			r.weight = WeightBold
 		}
 		if s.Href != "" {
-			r.color, r.underline = t.Primary, true
+			r.color, r.underline, r.href = t.Primary, true, s.Href
+			if chip := p.opts.LinkChip; chip != nil && chip(s.Href) {
+				r.linkChip = true
+				if !s.Bold && r.weight < WeightMedium {
+					r.weight = WeightMedium
+				}
+			}
 		}
 		if s.Code {
 			r.size, r.mono, r.chip = n.size*proseCodeEm, true, true
@@ -374,6 +414,8 @@ type proseRun struct {
 	strike    bool
 	underline bool
 	chip      bool // 行内代码的底色块
+	linkChip  bool // 站内链接的底色小块（ProseOpts.LinkChip）
+	href      string
 	brk       bool // 硬换行
 	color     tokens.Color
 }
@@ -405,6 +447,9 @@ type proseText struct {
 	lines  []proseLine
 	width  float32
 	filled bool
+
+	key    ui.C // 本段的键：链接命中区的标识由它派生
+	onLink func(href string)
 }
 
 func newProseText(l *Look, canvas *gfx.Canvas, runs []proseRun, size, line, weight float32) *proseText {
@@ -478,7 +523,15 @@ func (b *proseText) runWidth(ri int, text string) float32 {
 	return b.canvas.TextWidthWeight(text, r.size, r.weight)
 }
 
-func (b *proseText) chipPad(ri int) float32 { return proseChipPadX * b.runs[ri].size }
+// padded 报告这一段两端带内边距（行内代码块与站内链接小块）。
+func (r *proseRun) padded() bool { return r.chip || r.linkChip }
+
+func (b *proseText) chipPad(ri int) float32 {
+	if b.runs[ri].linkChip {
+		return proseLinkPadX
+	}
+	return proseChipPadX * b.runs[ri].size
+}
 
 // rangeWidth 是 runes[a:e] 的宽度：按所属的段分组量宽，行内代码块的两端加内边距。
 func (b *proseText) rangeWidth(a, e int) float32 {
@@ -490,7 +543,7 @@ func (b *proseText) rangeWidth(a, e int) float32 {
 			z++
 		}
 		w += b.runWidth(ri, string(b.runes[a:z]))
-		if b.runs[ri].chip {
+		if b.runs[ri].padded() {
 			if a == b.first[ri] {
 				w += b.chipPad(ri)
 			}
@@ -517,7 +570,7 @@ func (b *proseText) buildLine(a, e int) proseLine {
 			z++
 		}
 		f := proseFrag{run: ri, text: string(b.runes[a:z])}
-		chip := b.runs[ri].chip
+		chip := b.runs[ri].padded()
 		if chip && a == b.first[ri] {
 			f.chipL = true
 			x += b.chipPad(ri)
@@ -637,9 +690,17 @@ func (b *proseText) draw(d *ui.DrawContext) {
 	for i, ln := range b.linesAt(d.Rect.Width) {
 		top := d.Rect.Y + float32(i)*b.line
 		baseline := top + parentRow/scale
-		for _, f := range ln {
+		for fi, f := range ln {
 			r := &b.runs[f.run]
 			x := d.Rect.X + f.x
+			var linkID gfx.ID
+			if b.onLink != nil && r.href != "" {
+				linkID = ui.ID(b.key.Key("lk" + strconv.Itoa(i) + "." + strconv.Itoa(fi)))
+				b.linkHit(d, linkID, f, r, x, top)
+			}
+			if r.linkChip {
+				b.paintLinkChip(d, f, r, x, baseline, scale, linkID)
+			}
 			if r.chip {
 				pad := b.chipPad(f.run)
 				a := float32(roundHalfUp(chromeMonoFace.ascent*float64(r.size*scale))) / scale
@@ -676,6 +737,37 @@ func (b *proseText) draw(d *ui.DrawContext) {
 			}
 		}
 	}
+}
+
+// linkHit 登记一截链接文字的命中区（角色 link、手形光标），并在点击到达时（事件遍之后）回调 onLink。
+func (b *proseText) linkHit(d *ui.DrawContext, id gfx.ID, f proseFrag, r *proseRun, x, top float32) {
+	d.Canvas.HitWithOptions(id, gfx.Rect{X: x, Y: top, Width: f.w, Height: b.line}, f.text,
+		gfx.HitOptions{Role: gfx.RoleLink, Cursor: gfx.PointerCursorHand})
+	if d.Canvas.Clicked(id) {
+		href, open := r.href, b.onLink
+		d.Canvas.AfterPaint(func() { open(href) })
+	}
+}
+
+// paintLinkChip 铺站内链接的底色小块（rounded-sm bg-primary/8 px-0.5，悬停 bg-primary/15）：高度取界面字体的上下伸展，
+// 左右在折行的真正两端各多出 2px 内边距。
+func (b *proseText) paintLinkChip(d *ui.DrawContext, f proseFrag, r *proseRun, x, baseline, scale float32, id gfx.ID) {
+	face := faceOfWeight(r.weight)
+	a := float32(roundHalfUp(face.ascent*float64(r.size*scale))) / scale
+	dsc := float32(roundHalfUp(face.descent*float64(r.size*scale))) / scale
+	left, right := x, x+f.w
+	if f.chipL {
+		left -= proseLinkPadX
+	}
+	if f.chipR {
+		right += proseLinkPadX
+	}
+	alpha := float32(0.08)
+	if !id.IsZero() && d.Canvas.Hovered() == id {
+		alpha = 0.15
+	}
+	b.look.PaintSurfaceAt(d, gfx.Rect{X: left, Y: baseline - a, Width: right - left, Height: a + dsc},
+		Surface{Bg: b.look.T.Primary.WithAlpha(alpha), Radius: 2})
 }
 
 // ---- 代码块 ----
