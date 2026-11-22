@@ -4,6 +4,8 @@
  * 宿主用 focus 把焦点交给编辑器）。
  * v3 相对 v2：网页快照视图（snapshot 视图：整页 HTML 放进沙箱 iframe；页面用 snapshotState 上报目录是否常驻窄轨与开合；
  * 宿主用 ui 消息里的 snapshotWidth 增量改宽度；转发键增加 escape）。
+ * v4 相对 v3：阅读区小数像素版面（宿主的 layout 消息：阅读区起点与尺寸带小数时，子窗口按 Viva 的规则取整到整数物理像素，
+ * 宿主把「真实起点减去取整起点」与精确尺寸发来，页面把根节点挪过去并按精确尺寸设宽高，见 layout.ts；台账 B-068）。
  *
  * 方向与信任：
  * - 宿主 → 页面（HostMessage）：宿主是可信的，但页面仍按形状校验，坏消息直接丢弃，不能让 React 渲染崩掉。
@@ -13,7 +15,7 @@
  * Reader island protocol v1: JSON text between the Go host and the page.
  */
 
-export const READER_PROTOCOL = 3;
+export const READER_PROTOCOL = 4;
 
 export type ReaderLang = "zh" | "en";
 
@@ -31,6 +33,17 @@ export interface ReaderTheme {
   motion: ReaderMotion;
   /** 窗口宽度（逻辑像素）：响应式断点按它判定，不按岛自己的宽度（breakpoints.ts）；缺省取页面自身宽度。 */
   viewportWidth?: number;
+}
+
+/**
+ * 阅读区在小数像素上的版面（逻辑像素）：dx、dy 是真实起点减去子窗口取整起点（可为负，例如 222.75 - 223 = -0.25），
+ * width、height 是真实的逻辑尺寸。落在设备像素上的阅读区没有版面（宿主发 null，或根本不发）。
+ */
+export interface ReaderLayout {
+  dx: number;
+  dy: number;
+  width: number;
+  height: number;
 }
 
 /** 内容面板的标签页（与渲染层 ReadingPanelTab 同一套取值）。 */
@@ -130,8 +143,15 @@ export interface HostFocus {
   t: "focus";
 }
 
+/** 阅读区的小数像素版面；layout 为 null 表示阅读区落在设备像素上，页面回到默认的满视口。 */
+export interface HostLayout {
+  t: "layout";
+  layout: ReaderLayout | null;
+}
+
 export type HostMessage =
   | HostInit
+  | HostLayout
   | HostView
   | HostFind
   | HostTheme
@@ -202,6 +222,28 @@ export function parseTheme(value: unknown): ReaderTheme | null {
   if (viewportWidth === undefined) return { dark, hue, saturation, basePx, motion };
   if (typeof viewportWidth !== "number" || !Number.isFinite(viewportWidth) || viewportWidth < 100 || viewportWidth > 20000) return null;
   return { dark, hue, saturation, basePx, motion, viewportWidth };
+}
+
+/** 版面的上限：与 Go 一侧 viva/reader/layout.go 的 maxLayoutOffset、maxLayoutSize 一致。 */
+const MAX_LAYOUT_OFFSET = 1;
+const MAX_LAYOUT_SIZE = 20000;
+
+/** 解析小数像素版面；形状不对、偏移超出取整误差、尺寸非正或过大都返回 null（整条丢弃，页面保持原样）。 */
+export function parseLayout(value: unknown): ReaderLayout | null {
+  if (!isRecord(value)) return null;
+  const { dx, dy, width, height } = value;
+  if (
+    typeof dx !== "number" ||
+    typeof dy !== "number" ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    ![dx, dy, width, height].every(Number.isFinite)
+  ) {
+    return null;
+  }
+  if (Math.abs(dx) > MAX_LAYOUT_OFFSET || Math.abs(dy) > MAX_LAYOUT_OFFSET) return null;
+  if (width <= 0 || height <= 0 || width > MAX_LAYOUT_SIZE || height > MAX_LAYOUT_SIZE) return null;
+  return { dx, dy, width, height };
 }
 
 export function parseLang(value: unknown): ReaderLang {
@@ -343,6 +385,11 @@ export function parseHostMessage(text: string): HostMessage | null {
       return { t: "copyResult", id: raw.id, ok: raw.ok };
     case "focus":
       return { t: "focus" };
+    case "layout": {
+      if (raw.layout === null) return { t: "layout", layout: null };
+      const layout = parseLayout(raw.layout);
+      return layout ? { t: "layout", layout } : null;
+    }
     default:
       return null;
   }

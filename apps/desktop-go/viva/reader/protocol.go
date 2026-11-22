@@ -25,7 +25,8 @@ import (
 // ProtocolVersion 与 apps/desktop/src/renderer/reader/protocol.ts 的 READER_PROTOCOL 一致：页面 ready 时带上它，对不上就拒绝。
 // v2：复制带回执（copy 带 id，宿主回 copyResult）；编辑态（editor 视图、页面的 edit 事件、宿主的 focus 消息）。
 // v3：网页快照视图（snapshot 视图、页面的 snapshotState 事件、宿主 ui 消息里的 snapshotWidth、转发键增加 escape）。
-const ProtocolVersion = 3
+// v4：阅读区小数像素版面（宿主的 layout 消息，台账 B-068）。
+const ProtocolVersion = 4
 
 // 页面事件的各项上限。超过上限的整条丢弃（页面不会正常超过它们）；编辑事件另有一档（见 MaxEditBytes）。
 const (
@@ -334,6 +335,11 @@ type (
 	// focusMessage 要求页面把键盘焦点交给编辑器（标题框里按 Enter）；当前不是编辑视图时页面忽略。
 	focusMessage struct {
 		T string `json:"t"`
+	}
+	// layoutMessage 告诉页面阅读区的小数像素版面（台账 B-068，layout.go）；Layout 为 nil 表示阅读区落在设备像素上，页面回到默认的满视口。
+	layoutMessage struct {
+		T      string  `json:"t"`
+		Layout *Layout `json:"layout"`
 	}
 )
 

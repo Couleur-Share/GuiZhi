@@ -12,10 +12,15 @@
  * 逐节点比：标签、class、属性、自有文字、盒子（相对阅读区左上角）、一组计算样式；整体比：outerHTML 与像素。
  *   - display:none 的子树不进逐节点与 outerHTML 的比较（看不见、不占位），只报数量；可见子节点的序号只数可见的。
  *   - 岛的外观里带窗口宽度（viewportWidth）：岛的视口只有阅读区那么宽，sm: / xl: 这些断点要按窗口宽度判定（见 reader/breakpoints.ts）。
- *   - 对照实验 --frac-shift：阅读区在大字号档位的起点/高度带小数（222.75 / 577.25），原生子窗口只能落在整数像素上；
- *     开了它，岛的视口按向外取整的整数框设置、页面再按起点的小数部分平移，用来验证「像素差只来自小数起点」。
+ *   - 小数起点（台账 B-068）：阅读区在大字号档位的起点/高度带小数（222.75 / 577.25），原生子窗口只能落在整数物理像素上。
+ *     **默认**按真实宿主的做法重放：子窗口（视口）取 Viva 的取整框（Left=round(X·s)、Right=round((X+W)·s)，不向外扩大），
+ *     React 一侧的参照也截同一个整数设备框，宿主协议里多一条 `layout`（真实起点减去取整起点、精确逻辑尺寸；整数像素上不发），
+ *     页面把根节点挪过去并按精确尺寸设宽高（viva/reader/layout.go、reader/layout.ts；JS 一侧的 layoutFor 与 Go 的 LayoutFor 同一公式，
+ *     测试向量见 layout_test.go）。
+ *   - `--no-layout`：改造前的基线。同样的整数视口与整数设备框参照，但不发 layout 消息，用来量「小数起点」本身带来的差异。
+ *   - 对照实验 --frac-shift：岛的视口按向外取整的整数框设置、页面再按起点的小数部分平移，用来验证「像素差只来自小数起点」（B-068 的对照实验，保留）。
  *
- * 用法：node apps/desktop-go/scripts/parity/tools/probe-reader-island.mjs [--out <目录>] [--variants a,b] [--scenes x,y] [--frac-shift]
+ * 用法：node apps/desktop-go/scripts/parity/tools/probe-reader-island.mjs [--out <目录>] [--variants a,b] [--scenes x,y] [--no-layout | --frac-shift]
  * 前提：已有 React 参照构建（readBuildRecord）与 viva/reader/assets（pnpm --filter @guizhi/desktop-go gen 的产物）。
  * 会话用一次性 userData，不含用户数据；本机 http 服务只绑 127.0.0.1、随机端口、用完即关。
  */
@@ -44,6 +49,35 @@ const ONLY = arg("--scenes", null)?.split(",") ?? null;
 // --frac-shift：对照实验。React 阅读区的位置/尺寸可能带小数（大字号档位 222.75 / 577.25），原生子窗口只能落在整数像素上；
 // 开了它，岛的视口按「向外取整」的整数框（floor 起点、ceil 终点）设置，页面内容再按起点的小数部分平移，看内容的像素是否因此与 React 一致。
 const FRAC_SHIFT = process.argv.includes("--frac-shift");
+// --no-layout：基线，整数视口 + 整数设备框参照，但不发 layout 消息（改造前的行为）。
+const NO_LAYOUT = process.argv.includes("--no-layout");
+if (FRAC_SHIFT && NO_LAYOUT) throw new Error("--frac-shift 与 --no-layout 不能同时使用");
+// 宿主协议版本：与 viva/reader/protocol.go 的 ProtocolVersion、reader/protocol.ts 的 READER_PROTOCOL 一致（页面不校验 init 的 v，这里只求如实）。
+const PROTOCOL_VERSION = 4;
+
+// ---- 小数像素版面：与 viva/reader/layout.go 的 LayoutFor 同一公式（Viva Windows 平台的取整，float32 的先加后乘） ----
+// 本探针的 WebView2 会话固定 --force-device-scale-factor=1，所以缩放是 1；Math.fround 复刻宿主的 float32 运算。
+const SCALE = 1;
+const vivaRound = (v) => (v < 0 ? -vivaRound(-v) : Math.floor(v + 0.5));
+const ALIGNED_EPSILON = 1e-3;
+/** 阅读区的整数设备框：Viva 把子窗口放在这上面（Left/Top/Right/Bottom 各自取整，宽高是差）。 */
+function deviceRectOf(rect) {
+  const x = Math.fround(rect.x), y = Math.fround(rect.y), w = Math.fround(rect.width), h = Math.fround(rect.height);
+  const left = vivaRound(Math.fround(x * SCALE)), top = vivaRound(Math.fround(y * SCALE));
+  const right = vivaRound(Math.fround(Math.fround(x + w) * SCALE)), bottom = vivaRound(Math.fround(Math.fround(y + h) * SCALE));
+  return { x: left, y: top, width: right - left, height: bottom - top, right, bottom };
+}
+/** 宿主发给页面的 layout（落在设备像素上返回 null：宿主不发消息）。 */
+function layoutFor(rect) {
+  const x = Math.fround(rect.x), y = Math.fround(rect.y), w = Math.fround(rect.width), h = Math.fround(rect.height);
+  const device = deviceRectOf(rect);
+  const off = (logical, dev) => logical * SCALE - dev;
+  const dx = off(x, device.x), dy = off(y, device.y);
+  const dr = off(Math.fround(x + w), device.right), db = off(Math.fround(y + h), device.bottom);
+  const aligned = (v) => Math.abs(v) <= ALIGNED_EPSILON;
+  if (aligned(dx) && aligned(dy) && aligned(dr) && aligned(db)) return null;
+  return { dx: aligned(dx) ? 0 : dx / SCALE, dy: aligned(dy) ? 0 : dy / SCALE, width: w, height: h };
+}
 
 // ---- 场景：怎么把 React 带到该条目的阅读区，以及对应的宿主 view 消息（与 viva/screens/library/detailreader.go 的 readerViewFor 一致） ----
 const detail = (id) => LIBRARY_DETAIL_FIXTURE.details[id];
@@ -291,17 +325,22 @@ try {
       await settle(win, { quietMs: 250 });
       const data = await win.evaluate(collectInPage, STYLE_PROPS);
       if (!data) throw new Error(`${key} ${scenario.id}：React 里没有 [data-article-reader]`);
-      const png = await captureRegionPng(session, data.rect);
-      refs.push({ key, scenario, applied, data, png });
+      // 参照截图两份：整数设备框（Viva 子窗口真正盖住的那块，默认的判定依据）与阅读区的小数矩形（旧口径，--frac-shift 与对照读数用）。
+      const device = deviceRectOf(data.rect);
+      const png = await captureRegionPng(session, device);
+      const pngRect = await captureRegionPng(session, data.rect);
+      refs.push({ key, scenario, applied, data, png, pngRect, device });
       await leaveLibrary(session);
     }
   }
 
   // 第二段：岛。同一个窗口导航到本机服务，视口钉成阅读区尺寸，按协议重放 init 与 view。
   for (const ref of refs) {
-    const { key, scenario, applied, data, png } = ref;
-    let width = Math.round(data.rect.width);
-    let height = Math.round(data.rect.height);
+    const { key, scenario, applied, data, png, pngRect, device } = ref;
+    // 子窗口（岛的视口）：Viva 的取整框，宽高是取整后右下角减左上角（不是各自取整的宽高）。
+    let width = device.width;
+    let height = device.height;
+    const layout = FRAC_SHIFT || NO_LAYOUT ? null : layoutFor(data.rect);
     const fractional = Math.abs(width - data.rect.width) > 0.001 || Math.abs(height - data.rect.height) > 0.001 || Math.abs(data.rect.x - Math.round(data.rect.x)) > 0.001 || Math.abs(data.rect.y - Math.round(data.rect.y)) > 0.001;
     const fracX = data.rect.x - Math.floor(data.rect.x);
     const fracY = data.rect.y - Math.floor(data.rect.y);
@@ -320,7 +359,9 @@ try {
     // viewportWidth：岛的视口只有阅读区那么宽，响应式断点要按窗口宽度判定（宿主给，见 reader.Theme.ViewportWidth）。
     const theme = { dark: applied.dark, hue: Number(applied.hue), saturation: Number(applied.saturation), basePx: applied.rootFontPx, motion, viewportWidth: applied.viewport[0] };
     const send = (msg) => win.evaluate((text) => window.viva.onmessage({ data: text }), JSON.stringify(msg));
-    await send({ t: "init", v: 1, theme, lang: "zh" });
+    await send({ t: "init", v: PROTOCOL_VERSION, theme, lang: "zh" });
+    // 真实宿主在 init 之后、view 之前发 layout（host.go flush 的顺序）；整数设备像素上的阅读区不发。
+    if (layout) await send({ t: "layout", layout });
     await send({
       t: "view", seq: 1, itemId: scenario.itemId, tab: scenario.tab, view: scenario.view(detail(scenario.itemId)),
       restoreTop: scenario.restoreTop ?? null, catalogOpen: false, tocOpen: scenario.tocOpen ?? false,
@@ -348,11 +389,16 @@ try {
     // 岛实际生效的外观必须与 React 一致，否则后面的差异都是外观没对上造成的，不是内容的差异。
     const islandApplied = await readAppliedAppearance(win);
     const appearanceMismatch = ["dark", "hue", "saturation", "rootFontPx"].filter((k) => String(islandApplied[k]) !== String(applied[k]));
-    const islandPng = await captureRegionPng(session, island.rect);
+    // 旧口径：React 的小数矩形与岛的根节点矩形（带版面偏移时根节点的矩形也带同样的小数部分）。
+    const islandPngRect = await captureRegionPng(session, island.rect);
+    // 默认口径：子窗口盖住的整个整数视口，对 React 的整数设备框。--frac-shift 保持旧口径。
+    const islandPng = FRAC_SHIFT ? islandPngRect : await captureRegionPng(session, { x: 0, y: 0, width, height });
     const diffs = compareNodes(data, island);
     const htmlSame = data.html === island.html;
-    const pixels = await pixelDiff(win, png, islandPng);
+    const pixels = await pixelDiff(win, FRAC_SHIFT ? pngRect : png, islandPng);
+    const pixelsRect = FRAC_SHIFT ? pixels : await pixelDiff(win, pngRect, islandPngRect);
     const row = {
+      mode: FRAC_SHIFT ? "frac-shift" : NO_LAYOUT ? "no-layout" : "layout", layout, deviceRect: device, pixelsRect,
       variant: key, scene: scenario.id, region: [data.rect.width, data.rect.height], reactRect: [data.rect.x, data.rect.y, data.rect.width, data.rect.height], islandRegion: [island.rect.x, island.rect.y, island.rect.width, island.rect.height],
       fractionalRegion: fractional, appearanceMismatch, islandApplied, reactApplied: applied, nodes: [data.nodes.length, island.nodes.length], htmlSame,
       hidden: { react: data.hidden, island: island.hidden },
@@ -362,7 +408,7 @@ try {
     if (outDir) {
       const dir = path.resolve(outDir, key);
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(path.join(dir, `${scenario.id}.react.png`), png);
+      fs.writeFileSync(path.join(dir, `${scenario.id}.react.png`), FRAC_SHIFT ? pngRect : png);
       fs.writeFileSync(path.join(dir, `${scenario.id}.island.png`), islandPng);
       fs.writeFileSync(path.join(dir, `${scenario.id}.react.html`), data.html);
       fs.writeFileSync(path.join(dir, `${scenario.id}.island.html`), island.html);
@@ -385,7 +431,9 @@ for (const r of results) {
   if (!clean) failed += 1;
   if (r.appearanceMismatch.length) console.log(`外观没对上 ${r.variant} ${r.scene}：${r.appearanceMismatch.join("、")}；岛 ${JSON.stringify(r.islandApplied)}；React ${JSON.stringify(r.reactApplied)}`);
   const px = r.pixels.sizeMismatch ? `尺寸不同 ${r.pixels.sizeMismatch}` : `像素 ${r.pixels.differing}/${r.pixels.total}（>16：${r.pixels.over16}，最大差 ${r.pixels.maxDelta}${r.pixels.box ? `，范围 ${r.pixels.box}` : ""}）`;
-  console.log(`${clean ? "相同" : "有差"} ${r.variant} ${r.scene}：节点 ${r.nodes.join("/")}，结构 ${structural}，盒子 ${c.rect}，样式 ${c.style}，outerHTML ${r.htmlSame ? "相同" : "不同"}，${px}，阅读区 ${r.region.join("x")}，岛阅读区 ${r.islandRegion.join(",")}${r.fractionalRegion ? `（阅读区尺寸非整数，React 阅读区 ${r.reactRect.join(",")}）` : ""}，隐藏子树 React ${r.hidden.react.length}/岛 ${r.hidden.island.length}`);
+  const legacy = r.mode === "frac-shift" ? "" : `，旧口径（小数矩形）像素 ${r.pixelsRect.sizeMismatch ? `尺寸不同 ${r.pixelsRect.sizeMismatch}` : r.pixelsRect.differing}`;
+  const layoutText = r.mode === "layout" ? (r.layout ? `，layout ${JSON.stringify(r.layout)}` : "，无 layout（整数设备像素）") : "";
+  console.log(`${clean ? "相同" : "有差"} ${r.variant} ${r.scene}：节点 ${r.nodes.join("/")}，结构 ${structural}，盒子 ${c.rect}，样式 ${c.style}，outerHTML ${r.htmlSame ? "相同" : "不同"}，${px}${legacy}${layoutText}，阅读区 ${r.region.join("x")}，岛阅读区 ${r.islandRegion.join(",")}${r.fractionalRegion ? `（阅读区尺寸非整数，React 阅读区 ${r.reactRect.join(",")}）` : ""}，隐藏子树 React ${r.hidden.react.length}/岛 ${r.hidden.island.length}`);
   if (!clean) {
     for (const [k, list] of Object.entries(r.samples)) for (const s of list) console.log(`    ${k}：${s}`);
   }

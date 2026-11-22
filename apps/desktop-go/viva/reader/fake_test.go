@@ -82,10 +82,18 @@ func (o *fakeOpener) last() *fakePage {
 type fakeSurface struct {
 	views []gfx.NativeViewID
 	wakes []time.Duration
+	// scale 是显示缩放（0 按 1，与真画布一致：PixelScale 恒为正）。
+	scale float32
 }
 
 func (s *fakeSurface) NativeView(id gfx.NativeViewID, _ gfx.Rect) { s.views = append(s.views, id) }
 func (s *fakeSurface) RequestFrameIn(d time.Duration)             { s.wakes = append(s.wakes, d) }
+func (s *fakeSurface) PixelScale() float32 {
+	if s.scale > 0 {
+		return s.scale
+	}
+	return 1
+}
 
 // recHandler 把每个回调记成一行文字，测试直接比较。copyErr 非空时 Copy 返回它（测复制回执的失败路径）。
 type recHandler struct {

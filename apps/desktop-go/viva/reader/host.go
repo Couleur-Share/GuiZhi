@@ -16,6 +16,8 @@ type Surface interface {
 	NativeView(id gfx.NativeViewID, bounds gfx.Rect)
 	// RequestFrameIn 要求至少 delay 之后再出一帧（gfx.Canvas.RequestFrameIn）。
 	RequestFrameIn(delay time.Duration)
+	// PixelScale 是每个逻辑像素对应的设备像素数（gfx.Canvas.PixelScale，恒为正）：阅读区的小数像素版面按它算（layout.go）。
+	PixelScale() float32
 }
 
 // Page 是岛里的一个页面（真实实现包着 island.Island，测试用假的）。方法只在窗口线程调用。
@@ -130,6 +132,7 @@ type sent struct {
 	themeSet    bool
 	theme       Theme
 	lang        Lang
+	layout      Layout
 	viewSet     bool
 	key         viewKey
 	view        View
@@ -155,6 +158,8 @@ type Host struct {
 
 	req   Request
 	shown bool
+	// layout 是这一帧阅读区的小数像素版面（零值：落在设备像素上）。
+	layout Layout
 
 	// viewer 是图片查看岛（viewer.go）：与阅读岛共用 Opener、Media 与 Diag，生命周期随宿主。
 	viewer *Viewer
@@ -181,6 +186,7 @@ func (h *Host) SetHandler(handler Handler) { h.handler = handler }
 func (h *Host) Frame(canvas Surface, bounds gfx.Rect, req Request) {
 	h.shown = true
 	h.req = req
+	h.layout = LayoutFor(bounds, canvas.PixelScale())
 	if req.View.Kind == ViewNone || req.View.Kind == "" {
 		h.closePage()
 		return
@@ -374,6 +380,22 @@ func (h *Host) flush() {
 			return
 		}
 		h.sent.themeSet, h.sent.theme, h.sent.lang = true, req.Theme, req.Lang
+	}
+	// 小数像素版面在内容之前发：第一份内容渲染出来时根节点就已经在正确的位置上。落在设备像素上的阅读区一条都不发（页面默认就是满视口）。
+	if h.sent.layout != h.layout {
+		message := layoutMessage{T: "layout"}
+		if !h.layout.IsZero() {
+			if err := h.layout.Validate(); err != nil {
+				h.fail(viewKey{req.ItemID, req.Tab, req.View.Kind}, err)
+				return
+			}
+			layout := h.layout
+			message.Layout = &layout
+		}
+		if !h.post(message) {
+			return
+		}
+		h.sent.layout = h.layout
 	}
 	key := viewKey{req.ItemID, req.Tab, req.View.Kind}
 	if !h.sent.viewSet || h.sent.key != key || !h.sent.view.sameContent(req.View) {

@@ -32,9 +32,11 @@ import {
   READER_PROTOCOL,
   type HostView,
   type ReaderLang,
+  type ReaderLayout,
   type ReaderTheme,
   type SnapshotWidth,
 } from "./protocol";
+import { layoutStyle } from "./layout";
 import { applyTheme } from "./theme";
 
 /**
@@ -98,6 +100,8 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
     lang: ReaderLang;
   } | null>(null);
   const [state, setState] = useState<HostView | null>(null);
+  // 阅读区的小数像素版面（宿主的 layout 消息，台账 B-068）；null 是默认的满视口。
+  const [layout, setLayout] = useState<ReaderLayout | null>(null);
   const [find, setFind] = useState<FindState>({ query: "", index: 0 });
   const [ui, setUiState] = useState<UiState>({
     catalogOpen: false,
@@ -128,6 +132,9 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
           case "init":
           case "theme":
             setLook({ theme: message.theme, lang: message.lang });
+            break;
+          case "layout":
+            setLayout(message.layout);
             break;
           case "view":
             setState(message);
@@ -244,11 +251,15 @@ export function ReaderApp({ bridge }: { bridge: ReaderBridge }) {
   }, [bridge]);
 
   if (!state) return <div className="h-full" />;
+  const style = layoutStyle(layout);
   const props: ViewProps = { bridge, state, find, ui, setUi, setFind, focusTick };
   // 渲染层按条目与标签换分支（key={item.id}）：换了条目或标签就重建，滚动回到顶部；同一条的内容更新只换内容。
   const key = `${state.itemId}:${state.tab}:${state.view.kind}`;
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden app-wallpaper-panel">
+    <div
+      className="relative flex h-full min-h-0 flex-col overflow-hidden app-wallpaper-panel"
+      style={style}
+    >
       <ViewBody key={key} {...props} />
     </div>
   );
