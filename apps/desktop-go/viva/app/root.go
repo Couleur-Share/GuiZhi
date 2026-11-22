@@ -13,6 +13,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/reader"
+	askscreen "guizhi-mygo-shell/viva/screens/ask"
 	capturescreen "guizhi-mygo-shell/viva/screens/capture"
 	importsscreen "guizhi-mygo-shell/viva/screens/imports"
 	inboxscreen "guizhi-mygo-shell/viva/screens/inbox"
@@ -52,6 +53,11 @@ type Root struct {
 	inbox      *inboxscreen.Screen
 	inboxStore *inboxscreen.Store
 	inboxWatch inboxWatch // 知识库计数变化的监听（root_inbox.go）
+
+	// AI 问答模块：活跃会话与流式提问在 Store 里常驻（切到别的模块时回答照常进行），界面只在进入该模块时才画。
+	// Services.Ask 为空时两者都是 nil，rail 与工作区按「尚未迁移」处理（root_ask.go）。
+	ask      *askscreen.Screen
+	askStore *askscreen.Store
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -113,6 +119,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.mountLibrary(invalidate)
 	r.mountCapture(invalidate)
 	r.mountInbox(invalidate)
+	r.mountAsk(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -244,6 +251,9 @@ func (r *Root) syncLook(c ui.C) {
 		if r.capture != nil {
 			r.capture.Look = r.look
 		}
+		if r.ask != nil {
+			r.ask.Look = r.look
+		}
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -354,6 +364,9 @@ func (r *Root) View(c ui.C) {
 	if r.inbox != nil {
 		r.inbox.EndFrame()
 	}
+	if r.ask != nil {
+		r.ask.EndFrame()
+	}
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)
 	}
@@ -384,6 +397,7 @@ func (r *Root) Close() {
 		r.library.Store.Close() // 取消转写与排版的进度订阅
 	}
 	r.closeInbox()
+	r.closeAsk()
 	if r.stopImports != nil {
 		r.stopImports()
 	}

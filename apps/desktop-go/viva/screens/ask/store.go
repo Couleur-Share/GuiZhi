@@ -212,6 +212,9 @@ func (s *Store) Initialize() {
 }
 
 func (s *Store) loadInitial() error {
+	s.mu.Lock()
+	gen := s.generation
+	s.mu.Unlock()
 	page, err := s.svc.QuerySessions(s.ctx(), services.AskSessionQuery{Limit: 50})
 	if err != nil {
 		return err
@@ -241,14 +244,24 @@ func (s *Store) loadInitial() error {
 			}
 		}
 	}
-	if activeID == "" {
+	fresh := activeID == ""
+	if fresh {
 		activeID = s.newID("session")
-		s.remember(activeID)
 	}
 	s.mu.Lock()
+	if s.generation != gen {
+		// 读取期间用户已经切到别的会话或新建了会话（例如导入结果里的「就此提问」）：只补上历史列表，
+		// 不能把活跃会话改回上次的那个。
+		s.view.Sessions = page.Entries
+		s.mu.Unlock()
+		return nil
+	}
 	s.view.Sessions, s.view.ActiveSessionID, s.view.Messages, s.view.ArticleSession = page.Entries, activeID, messages, articleSession
 	s.rev++
 	s.mu.Unlock()
+	if fresh {
+		s.remember(activeID)
+	}
 	return nil
 }
 
