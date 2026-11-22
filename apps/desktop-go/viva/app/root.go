@@ -79,7 +79,11 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.store = newSettingsStore(opts.Services.Settings, invalidate)
 	r.notifier = kit.NewNotifier(invalidate)
 	r.guard = kit.Guard{Notify: r.notifier, Log: opts.Services.Log}
-	r.settings = &settingsscreen.Shell{Store: r.store, Guard: r.guard}
+	r.settings = &settingsscreen.Shell{
+		Store: r.store, Guard: r.guard, Wake: invalidate,
+		Solver: opts.Services.Solver, Shortcuts: opts.Services.Shortcuts, Updater: opts.Services.Updater,
+		AppVersion: opts.AppVersion, OpenExternal: opts.Services.OpenExternal,
+	}
 	r.win = &shell.Window{
 		Settings:        r.settings,
 		Notifier:        r.notifier,

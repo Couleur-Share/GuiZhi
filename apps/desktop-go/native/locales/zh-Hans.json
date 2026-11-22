@@ -3752,6 +3752,17 @@
   "native_languageName_en": "English",
   "native_settings_loadAction": "读取设置",
   "native_settings_saveAction": "保存设置",
+  "native_settings_lastCheckFailedReason": "{label}（{reason}）",
+  "@native_settings_lastCheckFailedReason": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
   "native_shell_notMigrated": "「{module}」还没有迁移到原生界面",
   "@native_shell_notMigrated": {
     "placeholders": {

@@ -15219,6 +15219,14 @@ func NativeSettingsSaveAction() string {
 	return "保存设置"
 }
 
+// NativeSettingsLastCheckFailedReason 是 native.settings.lastCheckFailedReason：{{label}}（{{reason}}）
+func NativeSettingsLastCheckFailedReason(label, reason any) string {
+	if useEn() {
+		return fmtArg(label) + "（" + fmtArg(reason) + "）"
+	}
+	return fmtArg(label) + "（" + fmtArg(reason) + "）"
+}
+
 // NativeShellNotMigrated 是 native.shell.notMigrated：「{{module}}」还没有迁移到原生界面
 func NativeShellNotMigrated(module any) string {
 	if useEn() {

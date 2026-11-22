@@ -1,9 +1,12 @@
 package settings
 
 import (
+	"time"
+
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
+	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
@@ -62,8 +65,54 @@ type Shell struct {
 	PickBackground func() (fileName string, err error)
 	Wake           func()
 
+	// Solver、Shortcuts、Updater 是「网络」「快捷键」「关于」三页要用的服务；nil 表示外壳没接，各页自行如实报错或降级。
+	Solver    services.FlareSolverr
+	Shortcuts services.Shortcuts
+	Updater   services.Updater
+	// AppVersion 是当前应用版本号（关于页显示）。
+	AppVersion string
+	// OpenExternal 用系统浏览器打开链接（关于页的链接）；nil 时点击弹出失败提示。
+	OpenExternal func(url string) error
+	// OpenSetupGuide 打开设置引导；nil 时关于页不显示那一行。
+	OpenSetupGuide func()
+	// Now 给关于页的检查时间戳；nil 取系统时间。
+	Now func() time.Time
+
 	general    *General
 	appearance *Appearance
+	network    *Network
+	shortcuts  *Shortcuts
+	about      *About
+
+	// mounted 是上一帧挂载的分区：切走时关闭它的后台工作并丢弃状态，回来时重新开始（渲染层切分区即卸载重挂）。
+	mounted SectionID
+	// lastCheck 是最近一次更新检查的记录：跨分区保留（渲染层存在 updater.store 里）。
+	lastCheck UpdateRecord
+}
+
+// remount 在分区切换时收尾上一个分区：「网络」「快捷键」「关于」有后台请求与订阅，切走就关掉并重置。
+func (s *Shell) remount() {
+	if s.mounted == s.section() {
+		return
+	}
+	switch s.mounted {
+	case SectionNetwork:
+		if s.network != nil {
+			s.network.Close()
+		}
+		s.network = nil
+	case SectionShortcuts:
+		if s.shortcuts != nil {
+			s.shortcuts.Close()
+		}
+		s.shortcuts = nil
+	case SectionAbout:
+		if s.about != nil {
+			s.about.Close()
+		}
+		s.about = nil
+	}
+	s.mounted = s.section()
 }
 
 // section 返回当前分区。
@@ -85,6 +134,7 @@ func (s *Shell) Page(c ui.C) {
 // content 是右侧内容区：按分区分派；还没迁移的分区如实说明，而不是一个看起来能用的空页。
 func (s *Shell) content(c ui.C) {
 	l := s.Look
+	s.remount()
 	if s.loadFailed(c) {
 		return
 	}
@@ -102,6 +152,28 @@ func (s *Shell) content(c ui.C) {
 		a := s.appearance
 		a.Look, a.Store, a.Guard, a.PickBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.Wake
 		a.Page(c)
+	case SectionNetwork:
+		if s.network == nil {
+			s.network = &Network{}
+		}
+		n := s.network
+		n.Look, n.Store, n.Guard, n.Solver, n.Wake = l, s.Store, s.Guard, s.Solver, s.Wake
+		n.Page(c)
+	case SectionShortcuts:
+		if s.shortcuts == nil {
+			s.shortcuts = &Shortcuts{}
+		}
+		k := s.shortcuts
+		k.Look, k.Guard, k.Service, k.Wake = l, s.Guard, s.Shortcuts, s.Wake
+		k.Page(c)
+	case SectionAbout:
+		if s.about == nil {
+			s.about = &About{}
+		}
+		ab := s.about
+		ab.Look, ab.Store, ab.Guard, ab.Updater, ab.Version = l, s.Store, s.Guard, s.Updater, s.AppVersion
+		ab.OpenExternal, ab.OpenSetupGuide, ab.Record, ab.Now, ab.Wake = s.OpenExternal, s.OpenSetupGuide, &s.lastCheck, s.Now, s.Wake
+		ab.Page(c)
 	default:
 		title := s.sectionTitle()
 		l.SettingsContent(c, title, func() {

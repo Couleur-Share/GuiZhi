@@ -17,7 +17,8 @@
     },
     "settings": {
       "loadAction": "Load settings",
-      "saveAction": "Save settings"
+      "saveAction": "Save settings",
+      "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
     "shell": {
       "notMigrated": "\"{{module}}\" has not been moved to the native UI yet",

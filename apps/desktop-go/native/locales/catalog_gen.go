@@ -19896,6 +19896,18 @@ func (msgs Messages) NativeSettingsSaveAction() string {
 	return Catalog.Format(msgs.locale, "native_settings_saveAction", nil)
 }
 
+// NativeSettingsLastCheckFailedReason says "{label}（{reason}）"
+// in the language the app shows.
+func NativeSettingsLastCheckFailedReason(label any, reason any) string {
+	return In(i18n.Locale()).NativeSettingsLastCheckFailedReason(label, reason)
+}
+
+// NativeSettingsLastCheckFailedReason says "{label}（{reason}）"
+// in the language of msgs.
+func (msgs Messages) NativeSettingsLastCheckFailedReason(label any, reason any) string {
+	return Catalog.Format(msgs.locale, "native_settings_lastCheckFailedReason", map[string]any{"label": label, "reason": reason})
+}
+
 // NativeShellNotMigrated says "「{module}」还没有迁移到原生界面"
 // in the language the app shows.
 func NativeShellNotMigrated(module any) string {

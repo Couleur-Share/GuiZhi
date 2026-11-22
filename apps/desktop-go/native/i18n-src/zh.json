@@ -17,7 +17,8 @@
     },
     "settings": {
       "loadAction": "读取设置",
-      "saveAction": "保存设置"
+      "saveAction": "保存设置",
+      "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
     "shell": {
       "notMigrated": "「{{module}}」还没有迁移到原生界面",

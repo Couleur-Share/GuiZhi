@@ -1902,6 +1902,7 @@
   "native_languageName_en": "English",
   "native_settings_loadAction": "Load settings",
   "native_settings_saveAction": "Save settings",
+  "native_settings_lastCheckFailedReason": "{label}（{reason}）",
   "native_shell_notMigrated": "\"{module}\" has not been moved to the native UI yet",
   "native_shell_notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone.",
   "native_shell_commandAction": "Handle window command",

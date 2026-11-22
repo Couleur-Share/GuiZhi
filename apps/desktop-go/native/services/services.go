@@ -24,6 +24,12 @@ type Services struct {
 	Settings Settings
 	Prefs    Prefs
 
+	// Shortcuts、Solver 与 Updater 是设置页「快捷键」「网络与 FlareSolverr」「关于」分区的系统能力（见 settings_system.go）；
+	// nil 时对应的动作按「不可用」处理：快捷键显示默认值、测试连接与检查更新弹失败提示（测试与对照里不接线）。
+	Shortcuts Shortcuts
+	Solver    FlareSolverr
+	Updater   Updater
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 

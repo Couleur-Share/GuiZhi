@@ -51,6 +51,33 @@ func (g Guard) Report(action string, err error) bool {
 	return false
 }
 
+// Fail 报告一次已经捕获的失败，提示标题由调用方给定：渲染层里有专属文案的失败（如「快捷键保存失败」）不是「<动作>失败」的格式。
+// 原文照常进详情与日志（日志里的动作名是 action）；返回 false 便于直接 return。
+func (g Guard) Fail(title, action string, err error) bool {
+	msg := err.Error()
+	if g.Log != nil {
+		g.Log.AppError(logScope, action, msg)
+	}
+	if g.Notify != nil {
+		g.Notify.Error(title, msg)
+	}
+	return false
+}
+
+// Succeed 弹出一条成功提示（渲染层 showToast(…, "success")）；没有提示通道时什么也不做。
+func (g Guard) Succeed(message string) {
+	if g.Notify != nil {
+		g.Notify.Success(message)
+	}
+}
+
+// Reject 弹出一条没有详情的错误提示（渲染层 showToast(…, "error") 不带 detail）：校验拒绝这类用户可直接读懂的失败用它；没有提示通道时什么也不做。
+func (g Guard) Reject(message string) {
+	if g.Notify != nil {
+		g.Notify.Error(message, "")
+	}
+}
+
 // Go 在新的 goroutine 里 Run；done 非 nil 时带着结果回调（在那个 goroutine 里，改界面状态要自己同步）。
 func (g Guard) Go(action string, fn func() error, done func(ok bool)) {
 	go func() {
