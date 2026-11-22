@@ -67,7 +67,7 @@ type Shell struct {
 	// Locale 是时间的区域写法（系统区域，kit.ParseDateLocale）；零值按中文。
 	Locale kit.DateLocale
 
-	// Solver 是 FlareSolverr 的连通性测试服务：渲染层它属于「采集与转写」页（M3-2b 挂载 FlareSolverr 块时用），「网络」页不用它。
+	// Solver 是 FlareSolverr 的连通性测试服务：渲染层它属于「采集与转写」页，页内挂载的 FlareSolverr 块用它，「网络」页不用它。
 	// Shortcuts、Updater 是「快捷键」「关于」两页要用的服务；nil 表示外壳没接，各页自行如实报错或降级。
 	Solver    services.FlareSolverr
 	Shortcuts services.Shortcuts
@@ -76,6 +76,12 @@ type Shell struct {
 	Data           services.Data
 	Backup         services.Backup
 	ConfigTransfer services.ConfigTransfer
+	// CaptureTools、MCP 是「采集与转写」「MCP 接入」两页要用的服务；Collections 给 MCP 范围选择器列出合集；
+	// Platform 是运行平台（Node 写法，"win32" 等；说话人分离据此判断可用与否）。nil 或空表示外壳没接，各页如实报错或降级。
+	CaptureTools services.CaptureTools
+	MCP          services.MCP
+	Collections  CollectionSource
+	Platform     string
 	// AppVersion 是当前应用版本号（关于页显示）。
 	AppVersion string
 	// OpenExternal 用系统浏览器打开链接（关于页的链接）；nil 时点击弹出失败提示。
@@ -89,8 +95,13 @@ type Shell struct {
 	appearance *Appearance
 	data       *Data
 	network    *Network
+	capture    *Capture
+	mcp        *MCP
 	shortcuts  *Shortcuts
 	about      *About
+
+	// engines 是引擎状态缓存：跨分区保留（渲染层存在模块级缓存里），回到「采集与转写」时先展示旧值再静默刷新。
+	engines EngineCache
 
 	// mounted 是上一帧挂载的分区：切走时关闭它的后台工作并丢弃状态，回来时重新开始（渲染层切分区即卸载重挂）。
 	mounted SectionID
@@ -111,6 +122,16 @@ func (s *Shell) remount() {
 		s.data = nil
 	case SectionNetwork:
 		s.network = nil
+	case SectionCapture:
+		if s.capture != nil {
+			s.capture.Close()
+		}
+		s.capture = nil
+	case SectionMCP:
+		if s.mcp != nil {
+			s.mcp.Close()
+		}
+		s.mcp = nil
 	case SectionShortcuts:
 		if s.shortcuts != nil {
 			s.shortcuts.Close()
@@ -177,6 +198,21 @@ func (s *Shell) content(c ui.C) {
 		n := s.network
 		n.Look, n.Store, n.Guard = l, s.Store, s.Guard
 		n.Page(c)
+	case SectionCapture:
+		if s.capture == nil {
+			s.capture = &Capture{}
+		}
+		p := s.capture
+		p.Look, p.Store, p.Guard, p.Service, p.Solver = l, s.Store, s.Guard, s.CaptureTools, s.Solver
+		p.Platform, p.Cache, p.Now, p.Wake = s.Platform, &s.engines, s.Now, s.Wake
+		p.Page(c)
+	case SectionMCP:
+		if s.mcp == nil {
+			s.mcp = &MCP{}
+		}
+		m := s.mcp
+		m.Look, m.Guard, m.Service, m.Collections, m.Wake = l, s.Guard, s.MCP, s.Collections, s.Wake
+		m.Page(c)
 	case SectionShortcuts:
 		if s.shortcuts == nil {
 			s.shortcuts = &Shortcuts{}

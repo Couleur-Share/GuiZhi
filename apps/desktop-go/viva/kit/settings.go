@@ -77,6 +77,35 @@ func (l *Look) SettingsCard(c ui.C, body func()) {
 	}).Children(body)
 }
 
+// SettingBlock 是内容自定的设置行容器：与 SettingItem 同样的行底线（非末行 border-b border-border/70）与悬停底色
+// （hover:bg-muted/20，过渡 150 ms），但不预设左右布局，里面可以是主行加折叠面板（采集页的引擎行：
+// `border-b border-border/70 transition-colors last:border-0 hover:bg-muted/20`）。
+func (l *Look) SettingBlock(c ui.C, last bool, body func()) {
+	t := l.T
+	id := ui.ID(c)
+	bottom := float32(0)
+	if !last {
+		bottom = 1 // border-b 占 1px，画在块的最底部
+	}
+	ui.Column(c).FillWidth().PadSides(0, 0, bottom, 0).
+		HitWith(id, "", gfx.HitOptions{SkipFocus: true}).
+		Draw(func(d *ui.DrawContext) {
+			p := l.hoverTo(d.Canvas, id, 0, l.hoverInside(d.Canvas, id), DurationDefault)
+			if p > 0 {
+				d.Canvas.Fill(d.Rect, d.Fade(l.Col(t.Muted.WithAlpha(0.2*p))))
+			}
+		}).
+		DrawOver(func(d *ui.DrawContext) {
+			l.noteInside(d.Canvas, id, d.Rect)
+			if last {
+				return
+			}
+			line := gfx.Rect{X: d.Rect.X, Y: d.Rect.Y + d.Rect.Height - 1, Width: d.Rect.Width, Height: 1}
+			d.Canvas.Fill(line, d.Fade(l.Col(t.Border.WithAlpha(0.7))))
+		}).
+		Children(body)
+}
+
 // SettingItem 复刻渲染层的 SettingItem：flex items-center justify-between gap-4 px-4 py-3，
 // 非末行带 border-b border-border/70，悬停 bg-muted/20。左侧标签 text-sm font-medium，
 // 说明 text-xs muted mt-0.5；左侧可收缩（min-w-0），右侧控件不收缩。

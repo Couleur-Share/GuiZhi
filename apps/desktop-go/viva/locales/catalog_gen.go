@@ -15219,6 +15219,14 @@ func NativeSettingsSaveAction() string {
 	return "保存设置"
 }
 
+// NativeSettingsPlatformBrowser 是 native.settings.platformBrowser：归知内置登录窗口
+func NativeSettingsPlatformBrowser() string {
+	if useEn() {
+		return "GuiZhi's built-in sign-in window"
+	}
+	return "归知内置登录窗口"
+}
+
 // NativeSettingsLastCheckFailedReason 是 native.settings.lastCheckFailedReason：{{label}}（{{reason}}）
 func NativeSettingsLastCheckFailedReason(label, reason any) string {
 	if useEn() {

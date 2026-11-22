@@ -67,6 +67,14 @@ var tailwindPalette = map[string]string{
 	// 完整备份密钥环状态条（RepositoryBackupSection）的文字色：text-emerald-700 / dark:text-emerald-300。
 	"emerald-700": "#047857",
 	"emerald-300": "#6ee7b7",
+	// 「采集与转写」页引擎状态徽章与主操作状态（CaptureEngineRow）：emerald-600/40 边框、text-emerald-800 / dark:text-emerald-200、
+	// text-emerald-600 / dark:text-emerald-400；未安装徽章 border-amber-600/40、text-amber-800 / dark:text-amber-200。
+	"emerald-200": "#a7f3d0",
+	"emerald-400": "#34d399",
+	"emerald-600": "#059669",
+	"emerald-800": "#065f46",
+	"amber-200":   "#fde68a",
+	"amber-800":   "#92400e",
 	"green-700":   "#15803d",
 	"teal-300":    "#5eead4",
 	"teal-700":    "#0f766e",

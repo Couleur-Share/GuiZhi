@@ -18,6 +18,7 @@
     "settings": {
       "loadAction": "读取设置",
       "saveAction": "保存设置",
+      "platformBrowser": "归知内置登录窗口",
       "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
     "shell": {

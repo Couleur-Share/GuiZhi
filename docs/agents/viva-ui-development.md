@@ -420,6 +420,8 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - **T1 800×600 余项**：`network.manual` 的 L2、`data` 的 L3 0.311%（阈值 0.25%）、`audit-lowamp` 的 `export-dlg` 与 `network.manual`；原因没有逐项查明，不在本批修，也没有放宽阈值。
 - **没有测**：真窗口里的任何交互（归 R-17）；真代理、真全局热键、真更新服务、真用户数据目录下的备份与 WAL 恢复重启、真 DPAPI 的配置加密导出导入；网络、快捷键、关于三页的帧耗时；设置页的进程内存。
 
+**M3-2b 立线登记（2026-11-22，开工前按 §8.1.1 重算方法登记）**：M3-2b 是设置页（`settings-ai-capture-mcp`）的最后一批，范围是三个分区——**采集与转写**（平台账号、yt-dlp / ffmpeg / 本地转写引擎三行及其安装、更新、卸载与进度，加上 M3-2a 遗留的 `flaresolverr.go` 正式挂载）、**MCP 设置**（服务状态、可访问合集、Cursor / Codex 接入片段与一键写入），以及 **AI 模型服务**（含快速配置向导与模型工作台）。做完后整个设置模块迁完。数据层经 `Bridge.call` 复用主包现成的 `ytdlp:*`、`ffmpeg:*`、`funasr:*`、`platformCapture:*`、`mcp:*` 处理器，不新写后端逻辑；机密（MCP 环境变量、平台登录凭证、代理口令）不进日志、错误详情与 `String()` / `GoString()`。重算估算 **10 段**，**线 = 重算估算 × 1.5 = 15 段**，硬停线 = 30 段（沿用按模块各自立线的约定，越线先停下汇报）。Step 0 登记本段；Step 1 做采集与转写、MCP 设置的数据层与界面，AI 模型服务在后续步骤迁入；不改 `thresholds.json`、比较器、`waiver.go` 与 `a11y_map.go`，不新增 Waiver。
+
 ### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
 
 真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。

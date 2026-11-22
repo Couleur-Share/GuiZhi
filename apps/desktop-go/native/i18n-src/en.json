@@ -18,6 +18,7 @@
     "settings": {
       "loadAction": "Load settings",
       "saveAction": "Save settings",
+      "platformBrowser": "GuiZhi's built-in sign-in window",
       "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
     "shell": {

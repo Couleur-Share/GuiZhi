@@ -3752,6 +3752,7 @@
   "native_languageName_en": "English",
   "native_settings_loadAction": "读取设置",
   "native_settings_saveAction": "保存设置",
+  "native_settings_platformBrowser": "归知内置登录窗口",
   "native_settings_lastCheckFailedReason": "{label}（{reason}）",
   "@native_settings_lastCheckFailedReason": {
     "placeholders": {

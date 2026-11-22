@@ -19896,6 +19896,16 @@ func (msgs Messages) NativeSettingsSaveAction() string {
 	return Catalog.Format(msgs.locale, "native_settings_saveAction", nil)
 }
 
+// NativeSettingsPlatformBrowser says "归知内置登录窗口"
+// in the language the app shows.
+func NativeSettingsPlatformBrowser() string { return In(i18n.Locale()).NativeSettingsPlatformBrowser() }
+
+// NativeSettingsPlatformBrowser says "归知内置登录窗口"
+// in the language of msgs.
+func (msgs Messages) NativeSettingsPlatformBrowser() string {
+	return Catalog.Format(msgs.locale, "native_settings_platformBrowser", nil)
+}
+
 // NativeSettingsLastCheckFailedReason says "{label}（{reason}）"
 // in the language the app shows.
 func NativeSettingsLastCheckFailedReason(label any, reason any) string {

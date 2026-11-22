@@ -36,6 +36,11 @@ type Services struct {
 	Backup         Backup
 	ConfigTransfer ConfigTransfer
 
+	// CaptureTools 与 MCP 是设置页「采集与转写」「MCP 设置」分区的系统能力（见 capture_tools.go、mcp.go）；
+	// nil 时对应分区的动作按「不可用」处理：引擎与账号状态读不出来、动作弹失败提示（测试与对照里不接线）。
+	CaptureTools CaptureTools
+	MCP          MCP
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 
