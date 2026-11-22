@@ -1,6 +1,7 @@
 package ask
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/vivaui/viva/gfx"
@@ -169,12 +170,47 @@ func sessionTitle(e services.AskSessionMeta) string {
 	if e.Pinned {
 		b.WriteString(locales.AskSessionPinned() + " · ")
 	}
-	if e.Title != "" {
-		b.WriteString(e.Title)
-	} else {
-		b.WriteString(locales.AskUntitledSession())
-	}
+	b.WriteString(sessionBareTitle(e))
 	return b.String()
+}
+
+// sessionTitleRuns 画会话行的标题：一个 truncate 的 span 里相邻的文本节点（渲染层 SidebarAskPanel：本文前缀、置顶前缀、标题，
+// 空串不成节点），可访问树与文字行按节点各记一条，所以拆成同样的几段；整行视觉上是一行，只在末端截断。
+// 按上一帧量到的行宽依次排：前缀放得下就是一段定宽的文字（宽度取自然字宽，含行尾空格——与 kit.TextRuns 同口径），
+// 放不下就由这一段带省略号收尾、后面的段（含标题）都被截掉不画（渲染层的文字行只收看得见的节点）；前缀都放得下，标题占剩下的宽度。
+// 行宽还没量到（首帧）按放得下排。
+func (s *Screen) sessionTitleRuns(c ui.C, e services.AskSessionMeta, fg tokens.Color) {
+	l := s.Look
+	var prefixes []string
+	if e.Scope == services.AskScopeArticle {
+		prefixes = append(prefixes, locales.ArticleAskHistoryBadge()+" · "+e.ArticleTitle+" · ")
+	}
+	if e.Pinned {
+		prefixes = append(prefixes, locales.AskSessionPinned()+" · ")
+	}
+	canvas := c.Canvas()
+	size := l.Rem(kit.TextSM.Size)
+	left := s.titleWidth
+	for i, run := range prefixes {
+		w := canvas.TextWidthWeight(run, size, kit.WeightNormal)
+		if left > 0 && w > left {
+			// Chromium 把行尾空格算进文字宽度再判断截不截；Viva 的 Label 量宽时不计行尾的 ASCII 空格（trimSpaceRight），所以把它换成同宽的不换行空格（U+00A0）。
+			pad := strings.Repeat("\u00a0", len(run)-len(strings.TrimRight(run, " ")))
+			l.Text(c.Key("prefix"+strconv.Itoa(i)), strings.TrimRight(run, " ")+pad, kit.TextSM, kit.WeightNormal, fg, kit.Ellipsis()).Shrink(1).MinWidth(0)
+			return
+		}
+		l.TextRuns(c.Key("prefix"+strconv.Itoa(i)), kit.TextSM, kit.WeightNormal, fg, run).Shrink(0)
+		left -= w
+	}
+	l.Text(c.Key("title"), sessionBareTitle(e), kit.TextSM, kit.WeightNormal, fg, kit.Ellipsis()).Shrink(1).MinWidth(0)
+}
+
+// sessionBareTitle 是不带前缀的标题，空标题落到「新对话」。
+func sessionBareTitle(e services.AskSessionMeta) string {
+	if e.Title != "" {
+		return e.Title
+	}
+	return locales.AskUntitledSession()
 }
 
 // sessionRow 是一行历史会话：group relative w-full py-0.5。
@@ -228,8 +264,8 @@ func (s *Screen) sessionMain(c ui.C, e services.AskSessionMeta, active bool, gro
 		l.PaintSurface(d, surf)
 	}).Children(func() {
 		// w-full truncate pr-5 text-sm
-		ui.Column(c.Key("title-wrap")).FillWidth().PadRight(l.Space(5)).Children(func() {
-			l.Text(c.Key("title"), title, kit.TextSM, kit.WeightNormal, fg, kit.Ellipsis())
+		ui.Row(c.Key("title-wrap")).FillWidth().PadRight(l.Space(5)).Draw(func(d *ui.DrawContext) { s.titleWidth = d.Rect.Width - l.Space(5) }).Children(func() {
+			s.sessionTitleRuns(c, e, fg)
 		})
 		l.Text(c.Key("time"), when, kit.TextXS, kit.WeightNormal, timeFg)
 	})

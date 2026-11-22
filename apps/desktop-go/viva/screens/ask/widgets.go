@@ -14,8 +14,11 @@ type textBtn struct {
 	// Style 是字号档；Px 与 Line 非零时盖过它（text-[11px] 这类 px 字面量不随字号档缩放，行高是继承来的 1.5 倍）。
 	Style    kit.TextStyle
 	Px, Line float32
-	Weight   float32
-	Fg       tokens.Color
+	// Runs 非空时文字按这几段画（JSX 里相邻的文本节点，如 `{"☑ "}{t(..)}`，kit.TextRuns），此时 label 只作可访问名；
+	// 只认 Style，不支持 Px 与下划线。
+	Runs   []string
+	Weight float32
+	Fg     tokens.Color
 	// FgHover 非零时悬停（或聚焦）后文字色在 150 ms 里补间到它（hover:text-foreground）。
 	FgHover tokens.Color
 	// Underline 让文字一直带下划线；UnderlineHover 只在悬停时带（hover:underline）。
@@ -91,6 +94,10 @@ func (s *Screen) textButton(c ui.C, label string, b textBtn) bool {
 			}
 			l.Icon(c.Key("icon"), b.Icon, size, fg)
 		}
+		if len(b.Runs) > 0 {
+			l.TextRuns(c.Key("text"), b.Style, b.Weight, fg, b.Runs...)
+			return
+		}
 		under := kit.Underline(b.Underline || (b.UnderlineHover && hovered))
 		if b.Px > 0 {
 			l.TextPx(c.Key("text"), label, b.Px, b.Line, b.Weight, fg, under)
@@ -99,6 +106,30 @@ func (s *Screen) textButton(c ui.C, label string, b textBtn) bool {
 		l.Text(c.Key("text"), label, b.Style, b.Weight, fg, under)
 	})
 	return box.Clicked() && !b.Disabled
+}
+
+// disclosureSummary 声明一行 <summary>：行首是渲染层 disclosure 标记（实心三角，不是 SVG 图标），后面是文字，整行可点；
+// 返回是否被点击。文字起点让出标记的宽度（kit.ChromeDisclosureMarker 的实测几何）。group 非空时命中区登记进该轮的悬停分组。
+func (s *Screen) disclosureSummary(c ui.C, label string, open bool, size kit.TextStyle, fg tokens.Color, group string) bool {
+	l := s.Look
+	marker := kit.ChromeDisclosureMarker(l.Rem(size.Size), l.Rem(size.Line), l.Scale)
+	id := ui.ID(c)
+	if group != "" {
+		s.turns.Add(group, id)
+	}
+	row := ui.Row(c).FillWidth().Items(ui.Center).PadSides(0, 0, 0, marker.Advance).
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: open}).
+		Draw(func(d *ui.DrawContext) {
+			if d.State.FocusVisible {
+				l.PaintRing(d, 2, l.T.Primary.WithAlpha(0.5), l.Rem(0.25))
+			}
+			kit.PaintDisclosure(d, d.Rect, marker, open, fg)
+		})
+	l.TabStop(row)
+	row.Children(func() {
+		l.Text(c.Key("text"), label, size, kit.WeightNormal, fg)
+	})
+	return row.Clicked()
 }
 
 // corner 是 paintCornered 里圆角较小的那个角。
@@ -149,8 +180,10 @@ func markStatus(d *ui.DrawContext) {
 }
 
 // boxedInput 声明一个带边框的单行输入框（border border-border bg-background，聚焦时全局的 ring-2 ring-primary/50），
-// 返回输入框这一帧是否有焦点。height 是整框高度（含边框）；pad 是左右内边距（不含边框）。
-func (s *Screen) boxedInput(c ui.C, f *ui.Field, name, placeholder string, size, height, pad, radius float32) (focused bool) {
+// 返回输入框这一帧是否有焦点。height 是整框高度（含边框）；pad 是左右内边距（不含边框）；
+// lift 是把文字基线上抬的量（逻辑像素）：渲染层 12px 文字在 34px 高的 <input> 里落点恰在取整的临界处，InputPad 的取整会差 1 个设备像素，
+// 给 InputPad 的框高减去 lift 让它落到同一行；文字区仍铺满整框。
+func (s *Screen) boxedInput(c ui.C, f *ui.Field, name, placeholder string, size, height, pad, radius, lift float32) (focused bool) {
 	l := s.Look
 	t := l.T
 	var ring float32
@@ -162,8 +195,8 @@ func (s *Screen) boxedInput(c ui.C, f *ui.Field, name, placeholder string, size,
 		Children(func() {
 			box := l.Input(c.Key("input"), f, name, placeholder, kit.InputSpec{
 				Size: size, Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: tokens.Tailwind("gray-400"),
-				Height: height, Left: pad + 1, Right: pad + 1,
-			}).FillWidth()
+				Height: height - lift, Left: pad + 1, Right: pad + 1,
+			}).Absolute().Inset(0)
 			focused = box.State().Focused
 			// 渲染层的输入框没有写 transition-shadow：聚焦环立即出现，不补间。
 			ring = 0
@@ -173,4 +206,3 @@ func (s *Screen) boxedInput(c ui.C, f *ui.Field, name, placeholder string, size,
 		})
 	return focused
 }
-

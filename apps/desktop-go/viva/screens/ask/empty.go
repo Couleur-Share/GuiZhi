@@ -55,14 +55,16 @@ func (s *Screen) emptyState(c ui.C, set SetupView, view kit.ScrollView) {
 		if set.QAChecked && !set.QAReady {
 			s.needModelCard(c)
 		}
-		if ready {
-			// flex w-full max-w-md flex-col gap-1.5
-			ui.Column(c.Key("examples")).FillWidth().MaxWidth(l.Rem(28)).Gap(l.Space(1.5)).Children(func() {
-				for i, text := range examples() {
-					s.exampleButton(c.Key("example-"+string(rune('1'+i))), text)
-				}
-			})
-		}
+		// flex w-full max-w-md flex-col gap-1.5：没配文本模型时这一列是空的，但容器仍在，整列的 gap-5 照样多出一份
+		// （渲染层无条件渲染它），垂直居中的位置因此上移半个 gap。
+		ui.Column(c.Key("examples")).FillWidth().MaxWidth(l.Rem(28)).Gap(l.Space(1.5)).Children(func() {
+			if !ready {
+				return
+			}
+			for i, text := range examples() {
+				s.exampleButton(c.Key("example-"+string(rune('1'+i))), text)
+			}
+		})
 		if ready && set.SemanticChecked && !set.SemanticConfigured {
 			s.semanticHint(c)
 		}

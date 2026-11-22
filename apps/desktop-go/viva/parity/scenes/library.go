@@ -58,6 +58,9 @@ type libraryOptions struct {
 	// holdDetail 为 true 时，场景里的 detailHoldGet、detailHoldSave 会让之后的第一次详情读取（草稿保存）卡在服务里不返回：
 	// 读取中、保存中的画面（React 一侧 config.detail.get、save 为 hold）。卡住的请求要到画面采集完才放走（同 holdBatch）。
 	holdDetail bool
+	// askPanel 为 true 时详情右侧接上围绕本文的提问栏（Screen.ArticleAsk，只在 detail 时有意义；装配见 ask.go libraryAskScreen）：
+	// 没有它「提问」钮只弹说明。React 一侧由场景自己在页内装好会话接口（react-ask-scenes.mjs）。
+	askPanel bool
 	// fault 是列表读取的故障注入（只在 list 时有意义）。
 	fault listFault
 	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
@@ -179,6 +182,9 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			// 文字稿场景（M2-6d）：长稿整份都画，视口之外的行记为 Hidden，才拼得齐渲染层整段文字节点（Screen.FullTranscript）。
 			FullTranscript: opt.fullTranscript,
 		}
+		if opt.askPanel {
+			screen.ArticleAsk = libraryAskScreen(look, ctx)
+		}
 		workspace := blankWorkspace
 		if opt.list {
 			workspace = screen.Workspace
@@ -204,6 +210,9 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			canvas = c.Canvas()
 			w.View(c)
 			screen.EndFrame()
+			if screen.ArticleAsk != nil {
+				screen.ArticleAsk.EndFrame() // 根每帧都收尾问答界面（root.go）：提问栏这一帧没画出来就算卸载
+			}
 		}
 		compact := look.Viewport <= compactMaxWidth
 		env := &libraryEnv{store: store, screen: screen, ctx: ctx, svc: svc}

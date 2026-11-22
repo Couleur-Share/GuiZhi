@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/url"
 	"slices"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -99,7 +100,8 @@ func (s *Screen) articleCard(c ui.C, m aiflow.ArticleMessage, running bool) {
 			if m.Answer != "" {
 				// 正文里的 [n] 标记按展示编号改写成纯文字：Viva 的 Markdown 排版里链接不可点（与全局问答同一处差异），
 				// 点击来源 chip 才是「这句话依据哪份资料」的入口。
-				l.Prose(c.Key("prose"), st.base.blocks(RenumberCitations(m.Answer, ordinals, labels)), 0)
+				// space-y-3 的下一个兄弟有 12px 上外边距，与段落的下外边距折叠取大者（Column 的 Gap 已给出这 12px）。
+				l.ProseFollowed(c.Key("prose"), st.base.blocks(RenumberCitations(m.Answer, ordinals, labels)), 0, l.Space(3))
 			}
 			s.articleOutcome(c, m)
 			s.articleSources(c, st, m, labels)
@@ -188,7 +190,6 @@ func (s *Screen) articleSources(c ui.C, st *articleCardState, m aiflow.ArticleMe
 		return
 	}
 	l := s.Look
-	t := l.T
 	order := make([]int, len(m.Sources))
 	for i := range order {
 		order[i] = i
@@ -199,17 +200,36 @@ func (s *Screen) articleSources(c ui.C, st *articleCardState, m aiflow.ArticleMe
 	ui.Flow(c.Key("sources")).FillWidth().Gap(l.Space(1.5)).Children(func() {
 		for _, i := range order {
 			src := m.Sources[i]
-			label := fmt.Sprintf("[%d] %s", labels.LabelOf(src.Ordinal), src.Title)
-			b := l.Button(c.Key(fmt.Sprintf("chip-%d", src.Ordinal)), kit.ButtonSpec{Label: label}, kit.ButtonStyle{
-				PadX: l.Space(2) + 1, PadY: l.Space(1) + 1, Radius: l.Rem(0.25), Text: kit.TextXS, Weight: kit.WeightNormal,
-				Fg: t.Foreground, Border: t.Border, BorderW: 1,
-			}).MaxWidthPercent(100)
-			if b.Clicked() {
+			if s.articleChip(c, src, labels.LabelOf(src.Ordinal)) {
 				st.open, st.index, st.locationError = true, i, false
 				st.located.Store(locateIdle)
 			}
 		}
 	})
+}
+
+// articleChip 是一枚来源 chip：max-w-full truncate rounded border border-border px-2 py-1 text-left text-xs。
+// JSX 的 `[{n}] {title}` 在 DOM 里是「[」「n」「] 」与标题四个相邻的文本节点，可访问树按四段记，所以前三段拆开画（kit.TextRuns），
+// 标题单独一段并在放不下时省略。边框画在 padding 里面（border + px-2 py-1 = 外框 26 高），所以内边距各加 1。
+func (s *Screen) articleChip(c ui.C, src aiflow.ArticleSource, label int) bool {
+	l := s.Look
+	t := l.T
+	c = c.Key(fmt.Sprintf("chip-%d", src.Ordinal))
+	id := ui.ID(c)
+	box := ui.Row(c).MaxWidthPercent(100).Items(ui.Center).
+		PadSides(l.Space(1)+1, l.Space(2)+1, l.Space(1)+1, l.Space(2)+1).
+		HitWith(id, fmt.Sprintf("[%d] %s", label, src.Title), gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
+	l.TabStop(box)
+	box.Draw(func(d *ui.DrawContext) {
+		if d.State.FocusVisible {
+			l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25))
+		}
+		l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.25)})
+	}).Children(func() {
+		l.TextRuns(c.Key("badge"), kit.TextXS, kit.WeightNormal, t.Foreground, "[", strconv.Itoa(label), "] ").Shrink(0)
+		l.Text(c.Key("title"), src.Title, kit.TextXS, kit.WeightNormal, t.Foreground, kit.Ellipsis()).Shrink(1).MinWidth(0)
+	})
+	return box.Clicked()
 }
 
 // articleExcerpt 是展开的来源摘录：有证据快照（或已被清除）用共用的 EvidenceExcerpt 版面，

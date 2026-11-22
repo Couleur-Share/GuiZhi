@@ -3,6 +3,7 @@ package ask
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/vivaui/viva/gfx"
@@ -146,7 +147,7 @@ func (s *Screen) assistantCard(c ui.C, v View, st *cardState, m services.AskMess
 				body := RenumberCitations(m.Answer, ordinals, labels)
 				// 正文里的 [n] 标记按展示编号改写成纯文字：Viva 的 Markdown 排版里链接不可点，做成蓝字链接是假的可点提示；
 				// 点击来源 chip 才是「这句话依据哪份资料」的入口（台账 B-061 之外的新增差异，见 M3-4 收口说明）。
-				l.Prose(c.Key("prose"), st.blocks(body), 0)
+				l.ProseFollowed(c.Key("prose"), st.blocks(body), 0, s.answerFollow(st, m, running))
 				if m.Truncated {
 					s.truncatedNote(c)
 				}
@@ -164,6 +165,25 @@ func (s *Screen) assistantCard(c ui.C, v View, st *cardState, m services.AskMess
 				s.cardFooter(c, v, st, m, ordinals, labels, group)
 			}
 		})
+}
+
+// answerFollow 是回答正文后面那个兄弟的上外边距：正文末块的下外边距与它折叠（CSS 外边距折叠），取较大者。
+// 顺序与 assistantCard 里的声明顺序一致：截断提示 mt-2，引用来源 mt-3，全部证据 my-2，证据摘录（不带外边距），底部一行 mt-1。
+func (s *Screen) answerFollow(st *cardState, m services.AskMessage, running bool) float32 {
+	l := s.Look
+	switch {
+	case m.Truncated:
+		return l.Space(2)
+	case m.Status == services.AskStatusDone && len(m.Sources) > 0:
+		return l.Space(3)
+	case len(m.EvidenceSources) > 0:
+		return l.Space(2)
+	case st.selected(m) != nil:
+		return l.Space(3)
+	case !running:
+		return l.Space(1)
+	}
+	return 0
 }
 
 // agentSteps 是检索过程。运行中只显示当前这一步（带转圈与已走的步数）——把已完成的步骤全堆着，每多一步卡片就长一截，
@@ -192,10 +212,15 @@ func (s *Screen) agentSteps(c ui.C, st *cardState, steps []string, running bool,
 			icon = icons.ChevronDown
 		}
 		// text-xs text-muted-foreground/70 hover:text-muted-foreground；箭头 h-3 w-3，折叠时朝右（渲染层是 -rotate-90 的向下箭头）。
-		if s.textButton(c.Key("toggle"), locales.AskStepsLabel(len(steps)), textBtn{
-			Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground.WithAlpha(0.7), FgHover: t.MutedForeground,
-			Icon: icon, IconSize: l.Rem(0.75), Expanded: &open, Groups: &s.turns, Group: group,
-		}) {
+		// 按钮是 flex（块级）但 <button> 的宽度仍是内容宽：放进一行里让它贴着内容，而不是撑满整行。
+		var clicked bool
+		ui.Row(c.Key("toggle-row")).FillWidth().Children(func() {
+			clicked = s.textButton(c.Key("toggle"), locales.AskStepsLabel(len(steps)), textBtn{
+				Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground.WithAlpha(0.7), FgHover: t.MutedForeground,
+				Icon: icon, IconSize: l.Rem(0.75), Expanded: &open, Groups: &s.turns, Group: group,
+			})
+		})
+		if clicked {
 			st.stepsOpen = !st.stepsOpen
 		}
 		if !open {
@@ -330,7 +355,7 @@ func (s *Screen) sourceChip(c ui.C, src services.AskSource, label int, lit bool,
 		l.PaintSurface(d, kit.Surface{Bg: bg, Border: border, BorderW: 1, Radius: l.Rem(0.75)})
 	}).Children(func() {
 		// shrink-0 font-mono text-[10px] text-primary：编号（等宽字体没有现成的 kit 文字入口，用界面字体）。
-		l.TextPx(c.Key("badge"), badge, 10, 15, kit.WeightNormal, t.Primary).Shrink(0)
+		s.monoBadge(c, label)
 		icon := icons.BookOpen
 		if src.Kind == "wiki" {
 			icon = icons.Network
@@ -343,6 +368,21 @@ func (s *Screen) sourceChip(c ui.C, src services.AskSource, label int, lit bool,
 	return box.Clicked()
 }
 
+// monoBadge 是来源 chip 里的编号：shrink-0 font-mono text-[10px] text-primary。JSX 的 `[{n}]` 在 DOM 里是「[」「n」「]」
+// 三个相邻的文本节点，可访问树与文字行都按三段记（对照的 L1 文字序列按这个口径），所以拆成三段画；每段按 Consolas 的字距
+// 留宽（kit.MonoAdvance，台账 A-006），行盒高 1rem（随字号档缩放）：行高继承自按钮的 text-xs。
+func (s *Screen) monoBadge(c ui.C, label int) {
+	l := s.Look
+	ui.Row(c.Key("badge")).Shrink(0).Items(ui.Center).Children(func() {
+		for i, run := range []string{"[", strconv.Itoa(label), "]"} {
+			key := strconv.Itoa(i)
+			ui.Row(c.Key("badge-" + key)).Width(kit.MonoAdvance(run, 10)).Height(l.Rem(1)).Items(ui.Center).Children(func() {
+				l.MonoText(c.Key("badge-text-"+key), run, 10, l.Rem(1), l.T.Primary)
+			})
+		}
+	})
+}
+
 // evidenceAll 是「本次读取的全部证据（N）」折叠区（渲染层 <details>）：my-2 text-xs text-muted-foreground，
 // 展开后是一排 rounded border border-border px-2 py-1 的按钮，点击展开对应来源的证据摘录。
 func (s *Screen) evidenceAll(c ui.C, st *cardState, m services.AskMessage, group string) {
@@ -351,16 +391,18 @@ func (s *Screen) evidenceAll(c ui.C, st *cardState, m services.AskMessage, group
 	}
 	l := s.Look
 	t := l.T
-	ui.Column(c.Key("evidence-all")).FillWidth().MarginY(l.Space(2)).Children(func() {
+	// 下外边距与下一个兄弟的上外边距折叠（证据摘录 mt-3、底部一行 mt-1，取较大者）；ui 的列不折叠，所以减去下一个兄弟自己保留的那份。
+	next := float32(0)
+	switch {
+	case st.selected(m) != nil:
+		next = l.Space(3)
+	case m.Status != services.AskStatusRunning:
+		next = l.Space(1)
+	}
+	ui.Column(c.Key("evidence-all")).FillWidth().MarginTop(l.Space(2)).MarginBottom(max(l.Space(2), next) - next).Children(func() {
 		open := st.evidenceOpen
-		icon := icons.ChevronRight
-		if open {
-			icon = icons.ChevronDown
-		}
-		if s.textButton(c.Key("summary"), locales.AskEvidenceAll(len(m.EvidenceSources)), textBtn{
-			Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground,
-			Icon: icon, IconSize: l.Rem(0.75), Expanded: &open, Groups: &s.turns, Group: group,
-		}) {
+		// <details><summary> 的标记是 Chromium 的 disclosure 三角，不是 SVG 图标。
+		if s.disclosureSummary(c.Key("summary"), locales.AskEvidenceAll(len(m.EvidenceSources)), open, kit.TextXS, t.MutedForeground, group) {
 			st.evidenceOpen = !st.evidenceOpen
 		}
 		if !open {

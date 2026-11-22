@@ -131,10 +131,11 @@ func (s *Screen) chatInputBox(c ui.C, in *chatInput) {
 	l := s.Look
 	t := l.T
 	canvas := c.Canvas()
-	lineH := l.Theme.Metrics.FontSizeM + 7
 	padX, padY := l.Space(3), l.Space(2)
 	in.rows = countWrappedRows(canvas, in.field.Text(), in.width, l.Theme.Metrics.FontSizeM)
-	h := min(max(float32(max(in.rows, 2))*lineH+2*padY+2, l.Rem(3)), askInputMaxHeight)
+	// 外框高按渲染层口径：scrollHeight（行高 20 × 行数 + 上下内边距）在 border-box 下就是外框高，所以没有再加边框的 2。
+	// 多行框的每行实高是 21（B-062），内容比框高多出的几像素由内边距吸收（滚动），不影响外框与上下文版面。
+	h := min(max(float32(max(in.rows, 2))*l.Rem(1.25)+2*padY, l.Rem(3)), askInputMaxHeight)
 	radius := l.Rem(0.5)
 	focused := in.focus
 

@@ -125,12 +125,20 @@ type proseBuilder struct {
 // Prose 把 Markdown 块排成一列，返回外层盒。lead 是它上方已有的外边距（卡片里内容区的 mt-1.5）：它与第一块的上外边距折叠，
 // 取较大者作为返回盒的上外边距；最后一块的下外边距作为返回盒的下外边距。调用方不要再给返回盒加垂直外边距。
 func (l *Look) Prose(c ui.C, blocks []MdBlock, lead float32) ui.Box {
+	return l.ProseFollowed(c, blocks, lead, 0)
+}
+
+// ProseFollowed 是 Prose，且让最后一块的下外边距与「下一个兄弟的上外边距 follow」折叠（CSS 的外边距折叠：父盒没有内边距与边框时，
+// 末块的下外边距穿出父盒，与下一个兄弟的上外边距取较大者，而不是相加）。ui 的列不折叠外边距，所以这里把返回盒的下外边距减去 follow，
+// 调用方给下一个兄弟照常保留它自己的上外边距 follow：两者之和恰好是 max(末块下外边距, follow)。
+func (l *Look) ProseFollowed(c ui.C, blocks []MdBlock, lead, follow float32) ui.Box {
 	p := &proseBuilder{l: l, base: l.Rem(1)}
 	nodes := p.build(blocks, proseInherit{color: l.T.Foreground}, 0)
 	top, bottom := lead, float32(0)
 	if len(nodes) > 0 {
 		top, bottom = max(lead, nodes[0].top), nodes[len(nodes)-1].bottom
 	}
+	bottom = max(bottom, follow) - follow
 	return ui.Column(c).FillWidth().MarginTop(top).MarginBottom(bottom).Children(func() { p.renderKids(c, nodes) })
 }
 

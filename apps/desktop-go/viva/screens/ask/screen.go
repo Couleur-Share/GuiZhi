@@ -92,7 +92,9 @@ type Screen struct {
 	toEnd      bool   // 下一帧把消息列表滚到底（换会话、发出问题、点「回到最新」）
 	// awayFromEnd 为真表示消息列表滚离底部超过 80px（上一帧的读数，「回到最新」据此显示）。
 	awayFromEnd bool
-	loading     kit.Delayed // 首次读取的转圈延迟登场
+	// titleWidth 是会话行标题那一行可用的内容宽度（上一帧的读数，0 表示还没量到）：标题拆成几个文本节点时，据此判断前缀放不放得下。
+	titleWidth float32
+	loading    kit.Delayed // 首次读取的转圈延迟登场
 
 	cards map[string]*cardState // 每轮消息卡的展开状态，按消息 id
 

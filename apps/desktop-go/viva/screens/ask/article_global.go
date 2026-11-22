@@ -18,9 +18,11 @@ func (s *Screen) globalArticle(c ui.C, session services.AskSessionMeta) {
 	l := s.Look
 	t := l.T
 	itemID := session.ItemID
+	strutTop, strutBottom := strutInsets(l)
 	ui.Column(c.Key("article")).FillWidth().Grow(1).MinHeight(0).Children(func() {
-		// shrink-0 border-b border-border p-3：一枚 text-sm text-primary 的文字钮。
-		ui.Row(c.Key("head")).FillWidth().Shrink(0).PadSides(l.Space(3), l.Space(3), l.Space(3)+1, l.Space(3)).
+		// shrink-0 border-b border-border p-3：一枚 text-sm text-primary 的文字钮。行内按钮与父级 16px/24px 行高的
+		// strut 按基线对齐：行盒 24 高（随字号档缩放），按钮（20 高）落在其中偏下，上下各补 StrutInsets（实测 1280x800 三档：2/2.5、3/2、3/2.5）。
+		ui.Row(c.Key("head")).FillWidth().Shrink(0).PadSides(l.Space(3)+strutTop, l.Space(3), l.Space(3)+strutBottom, l.Space(3)).
 			Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeBottom, 1, t.Border) }).
 			Children(func() {
 				if s.textButton(c.Key("back"), locales.ArticleAskBack(), textBtn{Style: kit.TextSM, Weight: kit.WeightNormal, Fg: t.Primary}) {
@@ -50,4 +52,17 @@ func (s *Screen) globalArticle(c ui.C, session services.AskSessionMeta) {
 			})
 		})
 	})
+}
+
+// strutInsets 是行内按钮落在父级行盒（text-base 1.5rem）里的上下偏移。Chromium 把基线和行盒边缘取整到像素，
+// 所以偏移不随字号档线性缩放；这里记录 1280x800 三档（根字号 14/16/18）的实测值：
+// 小档 2 / 2.5，中档 3 / 2，大档 3 / 2.5。
+func strutInsets(l *kit.Look) (top, bottom float32) {
+	switch {
+	case l.RootPx < 15:
+		return 2, 2.5
+	case l.RootPx > 17:
+		return 3, 2.5
+	}
+	return 3, 2
 }

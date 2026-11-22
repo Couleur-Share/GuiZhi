@@ -1,6 +1,7 @@
 package ask
 
 import (
+	"math"
 	"strings"
 
 	"github.com/vivaui/viva/gfx"
@@ -46,7 +47,9 @@ func (s *Screen) draftBox(c ui.C) {
 	padY := max((minH-2-lineH)/2, 0)
 
 	s.inputRows = s.countRows(canvas, s.draft.Text())
-	h := min(max(float32(s.inputRows)*lineH+2*padY+2, minH), askInputMaxHeight)
+	// 外框高按渲染层口径：textarea 的 scrollHeight（行高 1.25rem × 行数 + 上下内边距）取整后设为 border-box 高度（31.5 → 32、40.5 → 41），
+	// 不低于 min-h-9。多行框每行实高是字号加 7（B-062），内容比框高多出的几像素由内边距吸收。
+	h := min(max(float32(math.Round(float64(float32(s.inputRows)*l.Rem(1.25)+2*l.Space(2)))), minH), askInputMaxHeight)
 	radius := l.Rem(0.75)
 	focused := s.draftFocus
 

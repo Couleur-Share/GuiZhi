@@ -1,0 +1,186 @@
+{
+  "now": 1794790800000,
+  "timezone": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "semantic": {"eligibleItems": 120, "indexedItems": 96},
+  "conversationId": "ask-session-goroutine",
+  "articleSessionId": "ask-session-article",
+  "article": {"itemId": "item-001", "title": "学习笔记：Go 并发模式"},
+  "models": {"chat": "parity-chat", "embedding": "parity-embedding"},
+  "sessions": [
+    {
+      "id": "ask-session-wal",
+      "title": "对比 SQLite WAL 与回滚日志模式",
+      "pinned": true,
+      "createdAt": 1793926800000,
+      "updatedAt": 1794012000000,
+      "messages": [
+        {
+          "id": "ask-wal-1",
+          "question": "对比 SQLite WAL 与回滚日志模式",
+          "answer": "WAL 模式把写入先追加到日志文件，读写互不阻塞；回滚日志模式写入时会锁住整个数据库。",
+          "sources": [],
+          "steps": [],
+          "status": "done",
+          "model": "parity-chat"
+        }
+      ]
+    },
+    {
+      "id": "ask-session-goroutine",
+      "title": "Go 里 goroutine 泄漏有哪些常见原因？",
+      "createdAt": 1794780000000,
+      "updatedAt": 1794783600000,
+      "messages": [
+        {
+          "id": "ask-goroutine-1",
+          "question": "Go 里 goroutine 泄漏有哪些常见原因？",
+          "answer": "goroutine 泄漏最常见的原因有三类：channel 无人收发、没有取消机制、WaitGroup 计数失配。\n\n发送方或接收方提前退出时，另一端会永远阻塞；后台任务不监听取消信号时，调用方放弃之后它仍在运行。排查时可以对比两次 pprof 的 goroutine 剖面。",
+          "sources": [
+            {
+              "ordinal": 1,
+              "kind": "item",
+              "refId": "item-001",
+              "title": "学习笔记：Go 并发模式",
+              "evidence": {
+                "version": 1,
+                "kind": "item",
+                "sourceId": "item-001",
+                "title": "学习笔记：Go 并发模式",
+                "text": "有缓冲 channel 满了之后，发送方会一直阻塞，直到有接收方取走数据；如果接收方已经退出，这个发送方就永远不会返回，形成泄漏。",
+                "fingerprint": "fp-item-001",
+                "capturedAt": 1794531600000,
+                "reviewStatus": "clear",
+                "reviewReasons": []
+              }
+            },
+            {
+              "ordinal": 2,
+              "kind": "wiki",
+              "refId": "wiki-concurrency",
+              "title": "并发编程",
+              "evidence": {
+                "version": 1,
+                "kind": "wiki",
+                "sourceId": "wiki-concurrency",
+                "title": "并发编程",
+                "text": "sync.WaitGroup 的计数必须在启动 goroutine 之前 Add，否则 Wait 可能提前返回。",
+                "fingerprint": "fp-wiki-concurrency",
+                "capturedAt": 1794531600000,
+                "reviewStatus": "clear",
+                "reviewReasons": []
+              }
+            }
+          ],
+          "evidenceSources": [
+            {"ordinal": 1, "kind": "item", "refId": "item-001", "title": "学习笔记：Go 并发模式"},
+            {"ordinal": 2, "kind": "wiki", "refId": "wiki-concurrency", "title": "并发编程"},
+            {"ordinal": 3, "kind": "item", "refId": "item-007", "title": "Context 取消传播示例"}
+          ],
+          "steps": ["检索：goroutine 泄漏", "阅读：学习笔记：Go 并发模式", "阅读：并发编程"],
+          "status": "done",
+          "model": "parity-chat"
+        }
+      ]
+    },
+    {
+      "id": "ask-session-article",
+      "title": "Go 的 channel 什么时候会阻塞？",
+      "createdAt": 1794700000000,
+      "updatedAt": 1794704400000,
+      "scope": "article",
+      "itemId": "item-001",
+      "articleTitle": "学习笔记：Go 并发模式",
+      "webEnabled": true,
+      "target": {"itemId": "item-001", "view": "body"},
+      "messages": [
+        {
+          "id": "art-1",
+          "question": "Go 的 channel 什么时候会阻塞？",
+          "answer": "无缓冲 channel 在没有接收方时，发送会立刻阻塞；有缓冲 channel 要等缓冲区写满之后才会阻塞。官方博客里的流水线例子也强调了这一点。",
+          "status": "done",
+          "sources": [
+            {
+              "ordinal": 1,
+              "kind": "article",
+              "title": "学习笔记：Go 并发模式",
+              "text": "无缓冲 channel 的发送必须等到接收方就绪。",
+              "target": {"itemId": "item-001", "view": "body"},
+              "fingerprint": "fp-art-1",
+              "capturedAt": 1794700000000,
+              "evidence": {
+                "version": 1,
+                "kind": "article",
+                "sourceId": "item-001",
+                "title": "学习笔记：Go 并发模式",
+                "text": "无缓冲 channel 的发送必须等到接收方就绪。",
+                "fingerprint": "fp-art-1",
+                "capturedAt": 1794700000000,
+                "reviewStatus": "clear",
+                "reviewReasons": []
+              }
+            },
+            {
+              "ordinal": 2,
+              "kind": "web",
+              "title": "Go Concurrency Patterns: Pipelines and cancellation",
+              "text": "Sends on an unbuffered channel block until a receiver is ready.",
+              "url": "https://go.dev/blog/pipelines",
+              "fingerprint": "fp-art-2",
+              "capturedAt": 1794700000000,
+              "evidence": {
+                "version": 1,
+                "kind": "web",
+                "title": "Go Concurrency Patterns: Pipelines and cancellation",
+                "text": "Sends on an unbuffered channel block until a receiver is ready.",
+                "fingerprint": "fp-art-2",
+                "capturedAt": 1794700000000,
+                "reviewStatus": "clear",
+                "reviewReasons": [],
+                "url": "https://go.dev/blog/pipelines"
+              }
+            }
+          ],
+          "webEnabled": true,
+          "webStatus": "ready",
+          "warnings": [],
+          "model": "parity-chat"
+        }
+      ]
+    },
+    {
+      "id": "ask-session-themes",
+      "title": "总结我最近采集的内容里有哪些主题",
+      "createdAt": 1794500000000,
+      "updatedAt": 1794531600000,
+      "messages": [
+        {
+          "id": "ask-themes-1",
+          "question": "总结我最近采集的内容里有哪些主题",
+          "answer": "最近的内容集中在三个主题：本地优先软件、Go 并发与知识管理。",
+          "sources": [],
+          "steps": [],
+          "status": "done",
+          "model": "parity-chat"
+        }
+      ]
+    },
+    {
+      "id": "ask-session-seven",
+      "title": "本地优先软件的七个理想分别是什么？",
+      "createdAt": 1793600000000,
+      "updatedAt": 1793700000000,
+      "messages": [
+        {
+          "id": "ask-seven-1",
+          "question": "本地优先软件的七个理想分别是什么？",
+          "answer": "速度、跨设备、离线、协作、长久保存、隐私、用户掌控。",
+          "sources": [],
+          "steps": [],
+          "status": "done",
+          "model": "parity-chat"
+        }
+      ]
+    }
+  ]
+}

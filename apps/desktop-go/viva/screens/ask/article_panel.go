@@ -228,7 +228,8 @@ func (s *Screen) articleHeader(c ui.C, spec ArticleSpec, v ArticleView, key stri
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeBottom, 1, t.Border) }).
 		Children(func() {
 			ui.Column(c.Key("titles")).Grow(1).Shrink(1).Basis(0).MinWidth(0).Children(func() {
-				l.Heading(c.Key("title"), 2, locales.ArticleAskTitle(), kit.TextSM, kit.WeightSemibold, t.Foreground)
+				// 窄面板里英文标题会折成两行（渲染层 h2 不截断），所以允许折行。
+				l.Heading(c.Key("title"), 2, locales.ArticleAskTitle(), kit.TextSM, kit.WeightSemibold, t.Foreground, kit.Wrapped())
 				l.Text(c.Key("item"), v.Title, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Ellipsis())
 			})
 			base := textBtn{Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.Foreground}
@@ -359,16 +360,25 @@ func (s *Screen) articleFooter(c ui.C, spec ArticleSpec, v ArticleView, key stri
 			if q := draft.Quote; q != nil && q.Selection != nil {
 				s.articleQuote(c, key, q)
 			}
+			webTop, webBottom := float32(6), float32(2)
+			if s.Look.RootPx < 15 || s.Look.RootPx > 17 {
+				webTop, webBottom = 5, 3
+			}
 			label := "\u2610 "
 			if v.WebEnabled {
 				label = "\u2611 "
 			}
-			if s.textButton(c.Key("web"), label+locales.ArticleAskWeb(), textBtn{
-				Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground,
-				Role: gfx.RoleSwitch, Checked: v.WebEnabled, Disabled: v.Running,
-			}) {
-				art.SetWeb(!v.WebEnabled)
-			}
+			// 开关按钮是行内元素，只占自己的宽度（外层 Row 吃掉 Column 的拉伸）；勾选符与文字是相邻的两个文本节点。
+			// 它落在父级 16px/24px 行高的 strut 行盒里：行盒 24 高，按钮（16 高）中档从第 6 px 起（上 +6、下 +2）；小、大档像素取整后实测各上移 1px（5 / 3）。
+			ui.Row(c.Key("web-wrap")).PadSides(webTop, 0, webBottom, 0).Children(func() {
+				if s.textButton(c.Key("web"), label+locales.ArticleAskWeb(), textBtn{
+					Style: kit.TextXS, Weight: kit.WeightNormal, Fg: t.MutedForeground,
+					Role: gfx.RoleSwitch, Checked: v.WebEnabled, Disabled: v.Running,
+					Runs: []string{label, locales.ArticleAskWeb()},
+				}) {
+					art.SetWeb(!v.WebEnabled)
+				}
+			})
 			if art.MissingSearch() {
 				s.articleMissingSearch(c, spec, key)
 			}

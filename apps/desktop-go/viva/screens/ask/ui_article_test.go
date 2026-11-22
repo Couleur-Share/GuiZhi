@@ -141,6 +141,26 @@ func TestUIArticleMessageCardShowsEveryPart(t *testing.T) {
 	}
 }
 
+// 渲染层的 JSX `[{n}] {title}` 与 `{"☑ "}{t(..)}` 在 DOM 里是相邻的几个文本节点，可访问树按节点各记一条（对照的 L1 文字序列按这个口径）：
+// 来源 chip 是「[」「1」「] 」与标题四段，联网开关是勾选符与文字两段；按钮的可访问名仍是拼起来的整句。
+func TestUIArticleChipAndWebSwitchTextsAreSeparateNodes(t *testing.T) {
+	r := newArticleRig(t, withArticleSession("s1", richTurn()))
+	for _, text := range []string{"[", "1", "] ", "Src A", "\u2611 ", locales.ArticleAskWeb()} {
+		if !r.hasText(text) {
+			t.Fatalf("缺文本节点「%s」：%q", text, r.session.Texts())
+		}
+	}
+	if r.hasText("[1] Src A") || r.hasText("\u2611 "+locales.ArticleAskWeb()) {
+		t.Fatalf("相邻的文本节点不该被拼成一段：%q", r.session.Texts())
+	}
+	if !r.hasButton("[1] Src A") {
+		t.Fatalf("chip 的可访问名是整句：%q", r.session.Texts())
+	}
+	if _, ok := r.node(gfx.RoleSwitch, "\u2611 "+locales.ArticleAskWeb()); !ok {
+		t.Fatalf("开关的可访问名是整句：%q", r.session.Texts())
+	}
+}
+
 func TestUIArticleMessageCardRunningShowsStepAndDisablesRetry(t *testing.T) {
 	gate := make(chan struct{})
 	step := "searching the article"
@@ -657,6 +677,19 @@ func TestUIGlobalArticleConversationReplacesThePlaceholder(t *testing.T) {
 	}
 	if !r.hasText("what is it?") {
 		t.Fatalf("应显示这条会话的问答：%q", r.session.Texts())
+	}
+}
+
+// 渲染层历史行的标题是一个 truncate 的 span 里相邻的文本节点（本文前缀、标题），可访问树按节点各记一条（对照的 L1 文字序列按这个口径）：
+// 前缀「本文问答 · 文章标题 · 」带行尾空格，标题单独一段；行按钮的可访问名仍是拼起来的整句加时间。
+func TestUISessionRowTitleIsSplitIntoPrefixAndTitleNodes(t *testing.T) {
+	r := newUIRig(t, withGlobalArticle(richTurn()))
+	prefix := locales.ArticleAskHistoryBadge() + " · Some article · "
+	if !r.hasText(prefix) || !r.hasText("what is it?") {
+		t.Fatalf("历史行应有前缀与标题两段文字：%q", r.session.Texts())
+	}
+	if r.hasText(prefix + "what is it?") {
+		t.Fatalf("前缀与标题不该拼成一段：%q", r.session.Texts())
 	}
 }
 

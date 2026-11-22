@@ -59,6 +59,17 @@ var knownRed = map[string]redPin{
 	"settings.ai":              {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	"settings.ai.endpoint-dlg": {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	"settings.ai.wizard":       {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	// B-062（M3-4）：多行输入框的无障碍外框有最小高度（ui.TextArea 的 a11y 矩形不随 Height 缩小，全局输入框 47 对 36），
+	// 占位文字的行高也是字号加 7（21 对 20），所以外框差与占位文字墨迹 −1；画出来的输入框本身与渲染层一致（L3 0.006%）。
+	"app.window.ask.empty":          {Ledger: "B-062", Kinds: []string{"L2/box", "L2/ink"}, Max: 2},
+	"app.window.ask.not-configured": {Ledger: "B-062", Kinds: []string{"L2/box", "L2/ink"}, Max: 2},
+	// G-027 + B-062（M3-4）：对话场景里「回答时的证据」是带名字的 region（映射表没有规则，Viva 表达成 group → extra-node），
+	// 加上同样的输入框外框；其余（文字宽度、编号字形的墨迹量）已按既有条目登记放过。
+	"app.window.ask.conversation": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/box", "L2/ink"}, Max: 4},
+	// G-027 + B-062（M3-4）：围绕本文的面板是带名字的 region，内含 header（sectionheader）、article、footer（sectionfooter），
+	// 映射表都没有规则；输入框外框同上。勾选符 ☑ 在渲染层里是彩色表情字形、Viva 画成单色符号，墨迹总量比 1.25（L2/ink-mass）。
+	"app.window.ask.article-global": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/box", "L2/ink", "L2/ink-mass"}, Max: 7},
+	"app.window.library.detail-ask": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/box", "L2/ink", "L2/ink-mass"}, Max: 7},
 }
 
 func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {

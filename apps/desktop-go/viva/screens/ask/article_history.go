@@ -86,7 +86,7 @@ func (s *Screen) articleHistory(c ui.C, itemID string, onOpen func(id string)) {
 				// mb-2 w-full rounded border border-border bg-background px-2 py-1 text-xs
 				ui.Column(c.Key("search-wrap")).FillWidth().MarginBottom(l.Space(2)).Children(func() {
 					s.boxedInput(c.Key("search"), &h.search, locales.ArticleAskHistorySearch(), locales.ArticleAskHistorySearchPlaceholder(),
-						l.Rem(0.75), l.Rem(1)+l.Space(2)+2, l.Space(2), l.Rem(0.25))
+						l.Rem(0.75), l.Rem(1)+l.Space(2)+2, l.Space(2), l.Rem(0.25), 0)
 				})
 				for _, e := range view.Entries {
 					s.articleHistoryRow(c, e, view.Loading, onOpen)

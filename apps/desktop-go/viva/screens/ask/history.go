@@ -66,7 +66,7 @@ func (s *Screen) historyControls(c ui.C, h HistoryView) {
 	ui.Column(c.Key("history-controls")).FillWidth().MarginY(l.Space(2)).PadX(l.Space(1)).Gap(l.Space(2)).Children(func() {
 		// w-full rounded-lg border border-border bg-background px-3 py-2 text-xs：行高 1rem，加上下内边距与边框。
 		s.searchFocus = s.boxedInput(c.Key("search"), &s.search, locales.AskHistorySearch(), locales.AskHistorySearchPlaceholder(),
-			l.Rem(0.75), l.Rem(1)+l.Space(4)+2, l.Space(3), l.Rem(0.75))
+			l.Rem(0.75), l.Rem(1)+l.Space(4)+2, l.Space(3), l.Rem(0.75), 1)
 
 		ui.Row(c.Key("selects")).FillWidth().Gap(l.Space(2)).Children(func() {
 			// min-w-0 flex-1：两个下拉平分一行。
@@ -160,7 +160,7 @@ func (s *Screen) renameDialog(c ui.C, key string, r *renameState, hist *HistoryS
 			// mb-3 w-full rounded border border-border bg-background p-2：文字 1rem、行高 1.5。
 			ui.Column(c.Key("field")).FillWidth().MarginBottom(l.Space(3)).Children(func() {
 				s.boxedInput(c.Key("title"), &r.field, locales.AskSessionTitle(), "",
-					l.Rem(1), l.Rem(1.5)+l.Space(4)+2, l.Space(2), l.Rem(0.25))
+					l.Rem(1), l.Rem(1.5)+l.Space(4)+2, l.Space(2), l.Rem(0.25), 0)
 			})
 			// Button md primary：h-10 px-5 text-sm font-semibold rounded-xl，shadow-sm shadow-primary/25。
 			busy := r.busy.Load()
