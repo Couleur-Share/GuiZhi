@@ -1,0 +1,152 @@
+{
+  "platform": "win32",
+  "tools": {
+    "ytdlp": {
+      "installed": true,
+      "source": "managed",
+      "version": "2026.07.15",
+      "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\tools\\yt-dlp.exe",
+      "managedPath": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\tools\\yt-dlp.exe",
+      "installSupported": true
+    },
+    "ffmpeg": {
+      "installed": false,
+      "source": null,
+      "managedPath": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\tools\\ffmpeg.exe",
+      "installSupported": true
+    }
+  },
+  "funasr": {
+    "installed": true,
+    "running": false,
+    "port": 10095,
+    "dir": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\funasr",
+    "version": "1.2.0",
+    "installSupported": true,
+    "updateSupported": true,
+    "installFlavor": "python"
+  },
+  "accounts": [
+    { "platform": "xiaohongshu", "browser": "embedded", "browserVersion": "126.0.6478.127", "available": true, "loggedIn": true, "busy": false },
+    { "platform": "douyin", "browser": "embedded", "browserVersion": "126.0.6478.127", "available": true, "loggedIn": false, "busy": false },
+    { "platform": "linuxdo", "browser": "embedded", "browserVersion": "126.0.6478.127", "available": true, "loggedIn": false, "busy": false }
+  ],
+  "mcp": {
+    "config": {
+      "available": true,
+      "serverPath": "C:\\Program Files\\GuiZhi\\GuiZhi.exe",
+      "command": "C:\\Program Files\\GuiZhi\\GuiZhi.exe",
+      "args": ["--mcp"],
+      "env": {}
+    },
+    "scope": { "mode": "selected", "allowedCollectionIds": [], "allowUncategorized": true }
+  },
+  "ai": {
+    "providers": [
+      {
+        "id": "prov-openai",
+        "name": "OpenAI",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0001",
+        "apiUrl": "https://api.openai.com/v1",
+        "enabled": true
+      },
+      {
+        "id": "prov-qwen",
+        "name": "通义千问",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0002",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "enabled": true
+      }
+    ],
+    "models": [
+      {
+        "id": "model-gpt-4o",
+        "providerId": "prov-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0001",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o",
+        "isDefault": true,
+        "enabled": true,
+        "capabilities": { "chat": true, "vision": true, "reasoning": false, "toolUse": true, "webSearch": false, "embedding": false, "rerank": false, "audioTranscription": false, "imageGeneration": false }
+      },
+      {
+        "id": "model-gpt-4o-mini",
+        "providerId": "prov-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0001",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini",
+        "enabled": true,
+        "capabilities": { "chat": true, "vision": false, "reasoning": false, "toolUse": true, "webSearch": false, "embedding": false, "rerank": false, "audioTranscription": false, "imageGeneration": false }
+      },
+      {
+        "id": "model-embed-3-small",
+        "providerId": "prov-openai",
+        "provider": "openai",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0001",
+        "apiUrl": "https://api.openai.com/v1",
+        "model": "text-embedding-3-small",
+        "enabled": true,
+        "capabilities": { "chat": false, "vision": false, "reasoning": false, "toolUse": false, "webSearch": false, "embedding": true, "rerank": false, "audioTranscription": false, "imageGeneration": false }
+      },
+      {
+        "id": "model-qwen-plus",
+        "providerId": "prov-qwen",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0002",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus",
+        "enabled": true,
+        "capabilities": { "chat": true, "vision": false, "reasoning": false, "toolUse": true, "webSearch": false, "embedding": false, "rerank": false, "audioTranscription": false, "imageGeneration": false }
+      },
+      {
+        "id": "model-paraformer",
+        "providerId": "prov-qwen",
+        "provider": "qwen",
+        "apiProtocol": "openai",
+        "apiKey": "parity-fixture-key-0002",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "paraformer-v2",
+        "enabled": true,
+        "capabilities": { "chat": false, "vision": false, "reasoning": false, "toolUse": false, "webSearch": false, "embedding": false, "rerank": false, "audioTranscription": true, "imageGeneration": false }
+      }
+    ],
+    "routes": { "fastText": "model-gpt-4o-mini" },
+    "usage": {
+      "days": 30,
+      "calls": 128,
+      "failedCalls": 3,
+      "promptTokens": 182400,
+      "completionTokens": 41300,
+      "byScenario": [
+        { "scenario": "qa", "model": "", "calls": 64, "failedCalls": 1, "promptTokens": 120000, "completionTokens": 28000 },
+        { "scenario": "summary", "model": "", "calls": 40, "failedCalls": 2, "promptTokens": 46400, "completionTokens": 9300 },
+        { "scenario": "wiki", "model": "", "calls": 24, "failedCalls": 0, "promptTokens": 16000, "completionTokens": 4000 }
+      ],
+      "byModel": [
+        { "scenario": "", "model": "gpt-4o", "calls": 70, "failedCalls": 1, "promptTokens": 130000, "completionTokens": 30000 },
+        { "scenario": "", "model": "gpt-4o-mini", "calls": 40, "failedCalls": 2, "promptTokens": 46400, "completionTokens": 9300 },
+        { "scenario": "", "model": "qwen-plus", "calls": 18, "failedCalls": 0, "promptTokens": 6000, "completionTokens": 2000 }
+      ]
+    }
+  },
+  "readingSearch": {
+    "success": true,
+    "search": {
+      "configured": true,
+      "persistent": true,
+      "provider": "tavily",
+      "configuredProviders": ["tavily"],
+      "defaultEnabled": false
+    }
+  }
+}

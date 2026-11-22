@@ -54,6 +54,11 @@ var knownRed = map[string]redPin{
 	// G-035（M3-2a）：快捷键录制框在 Viva 里表达不成「只读文本框 + 值」（ui.Control 没有 Value/ReadOnly）：
 	// 4 个录制框各一条 missing-node（React 的 textfield）与 extra-node（Viva 的同名 group），加 L2/alignment。
 	"settings.shortcuts": {Ledger: "G-035", Kinds: []string{"L1/extra-node", "L1/missing-node", "L2/alignment"}, Max: 9},
+	// G-034（M3-2b 延伸）：模型服务页的供应商品牌图标是带 alt 的 <img>（15 套品牌 SVG，B-075），映射表没有 image 规则。
+	// 三个场景的 L2 在 T0 全部通过，只有这 1 条 L1/unmapped-role；L3 另有 B-074 的差异（见台账），不在这张表的口径里。
+	"settings.ai":              {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	"settings.ai.endpoint-dlg": {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	"settings.ai.wizard":       {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 }
 
 func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {

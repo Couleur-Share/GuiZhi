@@ -94,7 +94,7 @@ func (k *mcpClients) Page(c ui.C, cfg services.MCPConfig) {
 	}
 	ui.Column(c).FillWidth().Children(func() {
 		k.tabs(c.Key("tabs"), presets)
-		l.Text(c.Key("location"), preset.location, kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(3))
+		l.Text(c.Key("location"), preset.location, relaxed(kit.TextXS), kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(3))
 		if preset.oneClick {
 			style := primaryBtn(l, shape(l, 2.25, 3, 1.5, kit.TextSM, kit.WeightMedium))
 			style.DisabledOpacity = 0.6
@@ -110,7 +110,7 @@ func (k *mcpClients) Page(c ui.C, cfg services.MCPConfig) {
 		for _, s := range preset.snippets {
 			k.snippet(c.Key("snippet-"+s.key), s)
 		}
-		l.Text(c.Key("pitfall"), preset.pitfall, kit.TextXS, kit.WeightNormal, amber, kit.Wrapped()).MarginTop(l.Space(3))
+		l.Text(c.Key("pitfall"), preset.pitfall, relaxed(kit.TextXS), kit.WeightNormal, amber, kit.Wrapped()).MarginTop(l.Space(3))
 	})
 }
 
@@ -126,7 +126,8 @@ func (k *mcpClients) tabs(c ui.C, presets []clientPreset) {
 				tc := c.Key(string(p.id))
 				id := ui.ID(tc)
 				box := ui.Row(tc).Items(ui.Center).PadSides(l.Space(1.5), l.Space(3), l.Space(1.5)+2, l.Space(3)).
-					HitWith(id, p.label, gfx.HitOptions{Role: gfx.RoleTab, Selected: on, Cursor: gfx.PointerCursorHand})
+					// 渲染层的标签是普通按钮（没有 role=tab / aria-selected）：当前项只靠下划线与文字色表达，可访问树里与其余按钮一样。
+					HitWith(id, p.label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 				l.TabStop(box)
 				ink, line := t.MutedForeground, t.Border.WithAlpha(0)
 				switch {

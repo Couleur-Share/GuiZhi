@@ -96,8 +96,12 @@ func (l *Look) monoFrag(c ui.C, key, text string, st monoStyle, slot float32) {
 		return
 	}
 	w := canvas.TextWidthStyle(text, gfx.TextStyle{Size: st.size, Mono: true})
+	// 基线对齐渲染层 font-mono 的行盒（baseline_mono.go）：行高带小数（leading-relaxed 的 17.875 等）时，Viva 的居中规则与渲染层的取整会差一行。
+	dy := MonoBaselineShift(st.size, st.size, st.lineH, l.Scale)
 	mono := func(k ui.C) ui.Box {
-		return ui.Text(k, text).Mono().MaxLines(1).FontSize(st.size).LineHeight(st.lineH).Color(l.Col(st.color)).Width(w).Shrink(0)
+		box := ui.Text(k, text).Mono().MaxLines(1).FontSize(st.size).LineHeight(st.lineH).Color(l.Col(st.color)).Width(w).Shrink(0)
+		shiftBaseline(box, dy)
+		return box
 	}
 	if slot > 0 {
 		ui.Row(c.Key(key)).Width(slot).Height(st.lineH).Items(ui.Start).Shrink(0).Children(func() { mono(c.Key("text")) })

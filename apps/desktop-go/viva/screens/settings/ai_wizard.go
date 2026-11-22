@@ -254,7 +254,12 @@ func (a *AI) wizardProgress(c ui.C, w *wizardState) {
 			}
 			ui.Row(c.Key(itoa(i))).Grow(1).Basis(0).MinWidth(0).Justify(ui.Center).PadSides(l.Space(1), l.Space(2), l.Space(1), l.Space(2)).
 				Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: bg, Radius: mdRadius(l)}) }).Children(func() {
-				l.Text(c.Key("t"), itoa(i+1)+". "+label, kit.TextXS, kit.WeightNormal, fg, kit.Ellipsis()).MinWidth(0)
+				// JSX 里 {index + 1}. {label} 是三个相邻的文本节点（序号、「. 」、标签），各画各的，文字序列才与渲染层一致。
+				ui.Row(c.Key("t")).Shrink(1).MinWidth(0).Children(func() {
+					l.Text(c.Key("n"), itoa(i+1), kit.TextXS, kit.WeightNormal, fg).Shrink(0)
+					l.Text(c.Key("dot"), ". ", kit.TextXS, kit.WeightNormal, fg).Shrink(0)
+					l.Text(c.Key("label"), label, kit.TextXS, kit.WeightNormal, fg, kit.Ellipsis()).MinWidth(0)
+				})
 			})
 		}
 	})
@@ -298,11 +303,18 @@ func (a *AI) wizardGoals(c ui.C, w *wizardState) {
 	}
 	cellGrid(l, c, cols, len(goals)+1, l.Space(2), func(c ui.C, i int) {
 		if i == len(goals) {
-			st := kit.ButtonStyle{
-				PadX: l.Space(3), PadY: l.Space(3), Radius: l.Rem(0.75), Text: kit.TextSM, Weight: kit.WeightNormal, Fg: t.Foreground,
-				Border: t.Border, BorderW: 1, Dashed: true, Transition: kit.DurationDefault, BgHover: t.Muted.WithAlpha(0.3),
-			}
-			if l.Button(c, kit.ButtonSpec{Label: locales.SettingsQuickSetupSelectAll(), Full: true}, st).Clicked() {
+			// 「完整能力」是 `rounded-xl border border-dashed border-border p-3 text-left text-sm` 的普通按钮：撑满网格行高，文字左对齐、纵向居中，
+			// 没有悬停样式。
+			name := locales.SettingsQuickSetupSelectAll()
+			box := ui.Column(c).FillWidth().Grow(1).Justify(ui.Center).Pad(l.Space(3)+1).
+				HitWith(ui.ID(c), name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
+			l.TabStop(box)
+			box.Draw(func(d *ui.DrawContext) {
+				l.PaintDashedBorder(d, t.Border, 1, l.Rem(1))
+			}).Children(func() {
+				l.Text(c.Key("label"), name, kit.TextSM, kit.WeightNormal, t.Foreground)
+			})
+			if box.Clicked() {
 				for _, g := range services.QuickSetupGoals {
 					w.goals[g] = true
 				}
@@ -312,7 +324,7 @@ func (a *AI) wizardGoals(c ui.C, w *wizardState) {
 		g := goals[i]
 		on := w.goals[g.goal]
 		box := ui.Column(c).FillWidth().Grow(1).Pad(l.Space(3)+1).
-			HitWith(ui.ID(c), g.label, gfx.HitOptions{Role: gfx.RoleButton, Selected: on, Cursor: gfx.PointerCursorHand})
+			HitWith(ui.ID(c), g.label+" "+g.desc, gfx.HitOptions{Role: gfx.RoleButton, Selected: on, Cursor: gfx.PointerCursorHand})
 		l.TabStop(box)
 		surface := kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(1)}
 		if on {
@@ -492,12 +504,14 @@ func (a *AI) wizardFooter(c ui.C, w *wizardState) {
 	t := l.T
 	ui.Row(c).FillWidth().Items(ui.Center).Justify(ui.Between).PadSides(l.Space(4)+1, 0, 0, 0).
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeTop, 1, t.Border) }).Children(func() {
-		back := outlineBtn(l, shape(l, 2.5, 4, 2, kit.TextSM, kit.WeightNormal), t.Muted)
+		// py-2 + text-sm 的 1.25rem 行高：描边的「上一步」多 2px 边框（38），主色的「下一步」「保存」没有边框（36）。
+		back := outlineBtn(l, shape(l, 2.25, 4, 2, kit.TextSM, kit.WeightNormal), t.Muted)
+		back.Height += 2 // 2px 边框不随字号档缩放
 		back.DisabledOpacity = 0.4
 		if btn(l, c.Key("back"), kit.ButtonSpec{Label: locales.SettingsQuickSetupBack(), Disabled: w.step == 0 || w.saving}, back, false) {
 			w.step = max(0, w.step-1)
 		}
-		primary := primaryBtn(l, shape(l, 2.5, 4, 2, kit.TextSM, kit.WeightNormal))
+		primary := primaryBtn(l, shape(l, 2.25, 4, 2, kit.TextSM, kit.WeightNormal))
 		if w.step < 3 {
 			label := locales.SettingsQuickSetupNext()
 			if w.step == 1 {

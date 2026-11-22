@@ -145,6 +145,8 @@ func (a *AI) endpointBody(c ui.C, f *endpointForm) {
 			}
 			if picked, changed := l.Select(c.Key("select"), &f.provSel, kit.SelectSpec{
 				Label: locales.SettingsAiWorkbenchProviderType(), Value: f.provider, Options: options, Width: -1,
+				// 触发按钮里的品牌图标（18px，aria-hidden）：没有品牌图标时用同尺寸的徽标替身，文字起点与渲染层一致（台账 B-075）。
+				Leading: func(c ui.C) { brandBadge(l, c, preset.ID, 18, t.Primary.WithAlpha(0.1), t.Primary, 4, 0) },
 			}); changed {
 				f.changeProvider(picked)
 			}
@@ -257,13 +259,14 @@ func (a *AI) urlGuide(c ui.C, f *endpointForm, preset services.AIProviderPreset)
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Muted.WithAlpha(0.2), Border: t.Border.WithAlpha(0.6), BorderW: 1, Radius: l.Rem(0.75)})
 		}).Children(func() {
-		l.Text(c.Key("guide"), locales.SettingsAiWorkbenchApiUrlGuide(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
-		a.guideLine(c.Key("examples"), locales.SettingsAiWorkbenchApiUrlExamplesLabel()+":", strings.Join(examples, "  ·  "), t.MutedForeground, true)
+		// 折行按 Chromium 的断行机会（斜杠之后不断：「/images/generations」整词落到下一行），Viva 自带的折行会在斜杠后断开。
+		l.TextNoKern(c.Key("guide"), locales.SettingsAiWorkbenchApiUrlGuide(), l.Rem(kit.TextXS.Size), l.Rem(kit.TextXS.Line), kit.WeightNormal, t.MutedForeground, kit.NoKernOptions{})
+		a.guideLine(c.Key("examples"), locales.SettingsAiWorkbenchApiUrlExamplesLabel(), strings.Join(examples, " · "), t.MutedForeground, true)
 		if base != "" {
-			a.guideLine(c.Key("base"), locales.SettingsAiWorkbenchApiUrlBaseLabel()+":", base, t.Primary, false)
+			a.guideLine(c.Key("base"), locales.SettingsAiWorkbenchApiUrlBaseLabel(), base, t.Primary, false)
 		}
 		if request != "" {
-			a.guideLine(c.Key("request"), locales.SettingsAiWorkbenchApiUrlRequestLabel()+":", request, t.Primary, false)
+			a.guideLine(c.Key("request"), locales.SettingsAiWorkbenchApiUrlRequestLabel(), request, t.Primary, false)
 		}
 		if strings.HasSuffix(trim, "#") {
 			ui.Row(c.Key("hash")).PadSides(l.Space(1), l.Space(2), l.Space(1), l.Space(2)).
@@ -283,12 +286,25 @@ func (a *AI) urlGuide(c ui.C, f *endpointForm, preset services.AIProviderPreset)
 func (a *AI) guideLine(c ui.C, label, value string, valueInk tokens.Color, inline bool) {
 	l := a.Look
 	t := l.T
-	box := ui.Column(c).FillWidth().Gap(l.Space(1))
+	// 容器按 inline 二选一：先建 Column 再改成 Row 会留下一个空的 Column 子项，被外层的 Gap 多算一次（示例行与上一段之间曾是 16px、渲染层是 8px）。
+	var box ui.Box
 	if inline {
-		box = ui.Row(c).FillWidth().Gap(l.Space(1))
+		// 同一行里夹着等宽（Consolas）文字，行盒比单纯的行高多 1px（React 参照在三个字号档都量到 +1）。
+		box = ui.Row(c).FillWidth().Gap(l.Space(1)).MinHeight(l.Rem(kit.TextXS.Line) + 1)
+	} else {
+		box = ui.Column(c).FillWidth().Gap(l.Space(1))
 	}
 	box.Children(func() {
-		l.Text(c.Key("label"), label, kit.TextXS, kit.WeightMedium, t.Foreground).Shrink(0)
-		ui.Text(c.Key("value"), value).Mono().MaxLines(0).FontSize(l.Rem(0.75)).LineHeight(l.Rem(1)).Color(l.Col(valueInk)).MinWidth(0).Shrink(1)
+		// 标签与冒号是 JSX 里相邻的两个文本节点（{t(...)}:），各画各的，文字序列才与渲染层一致。
+		ui.Row(c.Key("head")).Shrink(0).Children(func() {
+			l.Text(c.Key("label"), label, kit.TextXS, kit.WeightMedium, t.Foreground).Shrink(0)
+			l.Text(c.Key("colon"), ":", kit.TextXS, kit.WeightMedium, t.Foreground).Shrink(0)
+		})
+		// 等宽值：基线对齐渲染层的 font-mono；与标签同一行时按基线对齐，比标签的行盒中心低 1px（React 参照读数，中档）。
+		extra := float32(0)
+		if inline {
+			extra = 1
+		}
+		l.MonoWrapped(c.Key("value"), value, l.Rem(0.75), l.Rem(1), valueInk, extra).MinWidth(0).Shrink(1)
 	})
 }

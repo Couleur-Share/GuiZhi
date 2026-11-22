@@ -18,8 +18,8 @@ import (
 func (e *aiEnv) openProvider(t *testing.T) *rig {
 	t.Helper()
 	r := e.open(t)
-	waitButton(r, "Main")
-	r.clickNode(gfx.RoleButton, "Main")
+	waitButton(r, mainProviderBtn)
+	r.clickNode(gfx.RoleButton, mainProviderBtn)
 	waitUntil(r, "端点卡", func() bool { return r.hasText("gpt-4o") && r.has(gfx.RoleButton, locales.SettingsTestConnection()) })
 	return r
 }
@@ -29,7 +29,7 @@ func (e *aiEnv) openProvider(t *testing.T) *rig {
 func TestAIAddEndpointSavesCredentials(t *testing.T) {
 	e := newAIEnv()
 	r := e.open(t)
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 	r.clickNode(gfx.RoleButton, locales.SettingsAddProvider())
 	waitUntil(r, "添加弹窗", func() bool { return r.dialogOpen(locales.SettingsAiWorkbenchAddProvider()) })
 
@@ -84,7 +84,7 @@ func TestAIEditEndpointRenamesAndClearsVerification(t *testing.T) {
 			t.Errorf("凭据改动后验证时间应清空：%s %q", m.ID, m.LastVerifiedAt)
 		}
 	}
-	waitButton(r, "Team OpenAI")
+	waitButton(r, "GPT Team OpenAI api.openai.com 2")
 	e.assertNoSecret(t, r)
 }
 
@@ -389,7 +389,7 @@ func TestAIUsageLoadFailureToasts(t *testing.T) {
 	e := newAIEnv()
 	e.ai.FailUsage(errors.New("read usage: database is locked"))
 	r := e.open(t)
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 	waitUntil(r, "错误提示", func() bool { return len(e.toasts(kit.ToastError)) == 1 })
 	toast := e.toasts(kit.ToastError)[0]
 	if toast.Message != locales.SettingsAiUsageLoadFailed() || !strings.Contains(toast.Detail, "database is locked") {
@@ -411,12 +411,14 @@ func TestAIQuickSetupWizardSavesWholeSetup(t *testing.T) {
 	r.clickNode(gfx.RoleButton, locales.SettingsQuickSetupOpen())
 	waitUntil(r, "向导", func() bool { return r.dialogOpen(locales.SettingsQuickSetupTitle()) })
 
-	// 第一步：默认只勾基础问答；再勾语义检索。
-	if !r.selected(gfx.RoleButton, locales.SettingsQuickSetupBasic()) || r.selected(gfx.RoleButton, locales.SettingsQuickSetupSemantic()) {
+	// 第一步：默认只勾基础问答；再勾语义检索。目标卡按钮的名字与渲染层一致，是「标题 说明」（同一个按钮里的两段文字）。
+	basicGoal := locales.SettingsQuickSetupBasic() + " " + locales.SettingsQuickSetupBasicDesc()
+	semanticGoal := locales.SettingsQuickSetupSemantic() + " " + locales.SettingsQuickSetupSemanticDesc()
+	if !r.selected(gfx.RoleButton, basicGoal) || r.selected(gfx.RoleButton, semanticGoal) {
 		t.Fatal("默认应只勾「基础问答」")
 	}
-	r.clickNode(gfx.RoleButton, locales.SettingsQuickSetupSemantic())
-	waitUntil(r, "勾选", func() bool { return r.selected(gfx.RoleButton, locales.SettingsQuickSetupSemantic()) })
+	r.clickNode(gfx.RoleButton, semanticGoal)
+	waitUntil(r, "勾选", func() bool { return r.selected(gfx.RoleButton, semanticGoal) })
 	r.clickNode(gfx.RoleButton, locales.SettingsQuickSetupNext())
 
 	// 第二步：缺密钥，提示并停在原步骤。
@@ -567,8 +569,8 @@ func TestAISwitchingSectionClosesModalsAndBackgroundWork(t *testing.T) {
 		}
 		return sh.Page
 	})
-	waitButton(r, "Main")
-	r.clickNode(gfx.RoleButton, "Main")
+	waitButton(r, mainProviderBtn)
+	r.clickNode(gfx.RoleButton, mainProviderBtn)
 	waitButton(r, locales.SettingsTestConnection())
 	r.clickNode(gfx.RoleButton, locales.SettingsTestConnection()) // 测试挂起在 TestGate 上
 	waitUntil(r, "测试已发出", func() bool { return len(e.ai.Tests()) == 1 })
@@ -587,7 +589,7 @@ func TestAISwitchingSectionClosesModalsAndBackgroundWork(t *testing.T) {
 	// 切回来：重新读取，弹窗与选中状态不残留。
 	r.clickNode(gfx.RoleButton, locales.SettingsAi())
 	waitUntil(r, "重新读取", func() bool { return e.ai.Loads() == 2 })
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 	if r.dialogOpen(locales.SettingsQuickSetupTitle()) {
 		t.Error("回来时不应残留弹窗")
 	}

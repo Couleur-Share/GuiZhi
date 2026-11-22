@@ -82,6 +82,23 @@ function pageInit({ fixture, flagKey }) {
     wrap(electron.updater, "getVersion", () => fixture.version);
   };
   const hook = (name, patch) => {
+    // 别的初始化脚本（外围分区的 react-settings-advanced.mjs）可能已在同一属性上装了访问器：沿用它的存取，赋值之后接着 patch，不覆盖。
+    const existing = Object.getOwnPropertyDescriptor(window, name);
+    if (existing && existing.get && existing.set) {
+      const { get, set } = existing;
+      Object.defineProperty(window, name, {
+        configurable: true,
+        enumerable: true,
+        get: () => get.call(window),
+        set: (next) => {
+          set.call(window, next);
+          patch(next);
+        },
+      });
+      const current = get.call(window);
+      if (current) patch(current);
+      return;
+    }
     if (window[name]) {
       patch(window[name]);
       return;

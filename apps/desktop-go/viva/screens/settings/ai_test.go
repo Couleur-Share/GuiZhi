@@ -19,6 +19,9 @@ import (
 // aiSecret 是配置里的 API Key：只能出现在密码框的内容里，界面文字、提示、详情与日志里一个字都不能有。
 const aiSecret = "sk-live-9f2c-SECRET-7d41"
 
+// mainProviderBtn 是种子配置里供应商行按钮的可访问名称：品牌图标 alt（分类名）+ 名称 + 主机 + 模型数，与渲染层按内容拼名一致。
+const mainProviderBtn = "GPT Main api.openai.com 2"
+
 // aiEnv 是「AI 模型服务」页的测试环境：假的 AI 配置服务。
 type aiEnv struct {
 	*sysEnv
@@ -90,7 +93,7 @@ func (e *aiEnv) waitSaves(r *rig, n int) {
 func TestAIShowsOverviewAndProviders(t *testing.T) {
 	e := newAIEnv()
 	r := e.open(t)
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 	// 状态总览：六条路由各一张卡；主文本与向量已解析到模型，转写与文生图没有候选。
 	for _, label := range []string{
 		locales.SettingsAiWorkbenchRouteMainText(), locales.SettingsAiWorkbenchRouteFastText(), locales.SettingsAiWorkbenchRouteVisionText(),
@@ -122,7 +125,7 @@ func TestAILoadFailureShowsRetry(t *testing.T) {
 	r := e.open(t)
 	waitText(r, locales.SettingsAi())
 	waitUntil(r, "读取失败状态", func() bool { return r.has(gfx.RoleButton, locales.CommonRetry()) })
-	if r.hasText(locales.SettingsAiWorkbenchStatusOverview()) || r.has(gfx.RoleButton, "Main") {
+	if r.hasText(locales.SettingsAiWorkbenchStatusOverview()) || r.has(gfx.RoleButton, mainProviderBtn) {
 		t.Error("读取失败不能渲染成正常页或空态")
 	}
 	if len(e.logs.all()) == 0 {
@@ -130,7 +133,7 @@ func TestAILoadFailureShowsRetry(t *testing.T) {
 	}
 	e.ai.FailLoad(nil)
 	r.clickNode(gfx.RoleButton, locales.CommonRetry())
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 }
 
 func TestAIRouteSwitchSavesAndRollsBackOnFailure(t *testing.T) {
@@ -142,7 +145,7 @@ func TestAIRouteSwitchSavesAndRollsBackOnFailure(t *testing.T) {
 		return c
 	}())
 	r := e.open(t)
-	waitButton(r, "Main")
+	waitButton(r, "GPT Main api.openai.com 3")
 	label := locales.SettingsAiWorkbenchRouteFastText()
 
 	// 切换「快速文本」到 gpt-4.1-mini：立即落盘。
@@ -168,7 +171,7 @@ func TestAIRouteSwitchSavesAndRollsBackOnFailure(t *testing.T) {
 func TestAIRouteSelectDisabledWithoutCandidates(t *testing.T) {
 	e := newAIEnv()
 	r := e.open(t)
-	waitButton(r, "Main")
+	waitButton(r, mainProviderBtn)
 	n, ok := r.node(gfx.RoleCombobox, locales.SettingsAiWorkbenchRouteImageGen())
 	if !ok {
 		t.Fatal("找不到文生图路由的下拉")

@@ -31,6 +31,8 @@ type SelectState struct {
 
 // SelectSpec 描述一个下拉。
 type SelectSpec struct {
+	// Leading 非空时在触发按钮的文字前画一枚前导标记（图标，不进可访问树）；只用于默认触发样式，面板里的选项行不画。
+	Leading func(c ui.C)
 	Label   string // 可访问名（aria-label）
 	Value   string // 当前值
 	Options []SelectOption
@@ -65,7 +67,7 @@ func (l *Look) Select(c ui.C, st *SelectState, spec SelectSpec) (picked string, 
 	if spec.Trigger != nil {
 		trigger = l.selectTriggerCompact(c, spec.Label, display, muted, *spec.Trigger, st.Open)
 	} else {
-		trigger = l.SelectTrigger(c, spec.Label, display, muted, spec.Width, st.Open)
+		trigger = l.selectTrigger(c, spec.Label, display, muted, spec.Width, st.Open, spec.Leading)
 	}
 	trigger = trigger.DrawOver(func(d *ui.DrawContext) { st.anchor = d.Rect })
 	if trigger.Clicked() {

@@ -21,6 +21,12 @@ const slotChevron uint8 = 1
 // 对外的可访问语义是带弹层的下拉触发器（combobox，展开状态与当前值）：渲染层是
 // button[aria-haspopup=listbox][aria-expanded]，L1 的角色映射把两者归为同一类。
 func (l *Look) SelectTrigger(c ui.C, label, value string, muted bool, width float32, open bool) ui.Box {
+	return l.selectTrigger(c, label, value, muted, width, open, nil)
+}
+
+// selectTrigger 是 SelectTrigger 的实现；lead 非空时在文字前画一枚前导标记（渲染层选项里的品牌图标，
+// <span className="flex items-center gap-2">图标 + 文字</span>），占一个 gap。
+func (l *Look) selectTrigger(c ui.C, label, value string, muted bool, width float32, open bool, lead func(c ui.C)) ui.Box {
 	t := l.T
 	id := ui.ID(c)
 	ring := l.Col(t.Primary.WithAlpha(0.3))
@@ -55,6 +61,9 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, muted bool, width floa
 		fg = t.MutedForeground
 	}
 	return box.Children(func() {
+		if lead != nil {
+			lead(c.Key("lead"))
+		}
 		l.Text(c, value, TextSM, WeightNormal, fg, Ellipsis()).Grow(1).Shrink(1)
 		l.RotatingChevron(c, id, chevron, open, l.T.MutedForeground, DurationBase)
 	})

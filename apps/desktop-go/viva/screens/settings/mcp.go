@@ -122,6 +122,11 @@ func (m *MCP) applyScope(next services.MCPScope) {
 	})
 }
 
+// relaxed 是 Tailwind 的 leading-relaxed：保持字号，行高取 1.625 倍字号（text-sm 的 20px 变 22.75px，text-xs 的 16px 变 19.5px）。
+func relaxed(st kit.TextStyle) kit.TextStyle {
+	return kit.TextStyle{Size: st.Size, Line: st.Size * 1.625}
+}
+
 // Page 声明整页。
 func (m *MCP) Page(c ui.C) {
 	l := m.Look
@@ -177,7 +182,7 @@ func (m *MCP) readyView(c ui.C) {
 	t := l.T
 	cfg := *m.config
 	l.SettingSections(c, func() {
-		l.Text(c.Key("desc"), locales.SettingsMcpDesc(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
+		l.Text(c.Key("desc"), locales.SettingsMcpDesc(), relaxed(kit.TextSM), kit.WeightNormal, t.MutedForeground, kit.Wrapped())
 		l.SettingSectionBody(c.Key("status"), locales.SettingsMcpStatusTitle(), func() { m.status(c, cfg) })
 		if !cfg.Available {
 			return
@@ -218,7 +223,7 @@ func (m *MCP) status(c ui.C, cfg services.MCPConfig) {
 				title = locales.SettingsMcpStatusMissing()
 			}
 			l.Text(c.Key("title"), title, kit.TextSM, kit.WeightMedium, t.Foreground)
-			l.TextBreakAll(c.Key("path"), cfg.ServerPath, kit.TextXS, kit.WeightNormal, t.MutedForeground)
+			l.TextBreakAll(c.Key("path"), cfg.ServerPath, relaxed(kit.TextXS), kit.WeightNormal, t.MutedForeground)
 			if !cfg.Available {
 				l.Text(c.Key("hint"), locales.SettingsMcpMissing(), kit.TextXS, kit.WeightNormal, amberText, kit.Wrapped()).MarginTop(l.Space(1))
 			}

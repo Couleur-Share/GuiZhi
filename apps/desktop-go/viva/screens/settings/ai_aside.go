@@ -10,6 +10,7 @@ import (
 	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // aside 是左侧栏（`app-wallpaper-panel` 14rem）：「模型路由」入口、供应商搜索、供应商列表与底部的「添加供应商」。
@@ -31,10 +32,18 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 			l.PaintEdge(d, kit.EdgeBottom, 1, t.UiPanelBorder)
 		}
 	}).Children(func() {
-		a.asideTop(c.Key("top"), len(groups) > 0)
-		l.ScrollArea(c.Key("list"), [4]float32{l.Space(2), l.Space(2), l.Space(2), l.Space(2)}, func() {
-			a.providerList(c.Key("rows"), groups)
-		}).FillWidth().Grow(1).MinHeight(0)
+		a.asideTop(c.Key("top"))
+		if len(groups) == 0 {
+			// 没有供应商：说明文字在剩余高度里居中（flex min-h-0 flex-1 items-center justify-center p-6 text-center）；窄窗口里侧栏封顶 18rem，
+			// 这一块按 flex-shrink 让出高度（内容被裁，底部的「添加供应商」留在可见区）。
+			ui.Row(c.Key("list")).FillWidth().Grow(1).Shrink(1).MinHeight(0).Items(ui.Center).Justify(ui.Center).Pad(l.Space(6)).Children(func() {
+				l.Text(c.Key("empty"), locales.SettingsAiWorkbenchNoModels(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped(), kit.Centered())
+			})
+		} else {
+			l.ScrollArea(c.Key("list"), [4]float32{l.Space(2), l.Space(2), l.Space(2), l.Space(2)}, func() {
+				a.providerList(c.Key("rows"), groups)
+			}).FillWidth().Grow(1).MinHeight(0)
+		}
 		ui.Column(c.Key("add")).FillWidth().Pad(l.Space(3)).
 			PadSides(l.Space(3)+1, l.Space(3), l.Space(3), l.Space(3)).
 			DrawOver(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeTop, 1, t.Border) }).
@@ -50,7 +59,7 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 }
 
 // asideTop 是侧栏上半：两个分组标题、模型路由入口与搜索框（border-b p-3）。
-func (a *AI) asideTop(c ui.C, hasGroups bool) {
+func (a *AI) asideTop(c ui.C) {
 	l := a.Look
 	t := l.T
 	ui.Column(c).FillWidth().Pad(l.Space(3)).PadSides(l.Space(3), l.Space(3), l.Space(3)+1, l.Space(3)).
@@ -59,11 +68,8 @@ func (a *AI) asideTop(c ui.C, hasGroups bool) {
 			sectionDivider(l, c.Key("d1"), locales.SettingsAiWorkbenchSubmenuModelConfig(), 0, l.Space(3))
 			a.routingEntry(c.Key("routing"))
 			sectionDivider(l, c.Key("d2"), locales.SettingsProviderName(), l.Space(3), 0)
-			top := l.Space(3)
-			if !hasGroups {
-				top = 0
-			}
-			a.searchBox(c.Key("search")).MarginTop(top)
+			// 分组标题的 my-3 与搜索框的 mt-3（有供应商时）是相邻块的外边距，折叠成 12px；没有供应商时只有 my-3，也是 12px。
+			a.searchBox(c.Key("search")).MarginTop(l.Space(3))
 		})
 }
 
@@ -75,7 +81,7 @@ func (a *AI) routingEntry(c ui.C) {
 	active := a.panel == panelRouting
 	id := ui.ID(c)
 	box := ui.Row(c).FillWidth().Height(l.Rem(2.5)).Items(ui.Center).Gap(l.Space(3)).PadSides(0, l.Space(3), 0, l.Space(3)).
-		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: active, Cursor: gfx.PointerCursorHand})
+		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand}) // 渲染层是普通按钮，选中只靠底色，没有 aria-pressed
 	l.TabStop(box)
 	fg := t.Foreground
 	surface := kit.Surface{Radius: l.Rem(0.75)}
@@ -102,7 +108,7 @@ func (a *AI) searchBox(c ui.C) ui.Box {
 	return ui.Stack(c).FillWidth().Children(func() {
 		aiField(l, c.Key("field"), &a.search, aiFieldSpec{
 			Name: ph, Placeholder: ph, Height: l.Rem(2.5), Radius: l.Rem(0.75), Bg: t.Background, Border: t.Border, BorderW: 1,
-			Left: l.Space(9), Right: l.Space(3), PlaceholderInk: t.MutedForeground,
+			Left: l.Space(9), Right: l.Space(3), PlaceholderInk: tokens.Tailwind("gray-400"), // 渲染层没写占位符颜色类：用 preflight 的 gray-400
 		})
 		ui.Row(c.Key("icon")).Absolute().Left(l.Space(3)).Top(0).Bottom(0).Items(ui.Center).Children(func() {
 			l.Icon(c, icons.Search, l.Rem(1), t.MutedForeground)
@@ -110,15 +116,9 @@ func (a *AI) searchBox(c ui.C) ui.Box {
 	})
 }
 
-// providerList 是供应商行；搜索按显示名、主机、旗下模型名过滤。没有任何供应商时给空态说明。
+// providerList 是供应商行；搜索按显示名、主机、旗下模型名过滤。没有任何供应商时由 aside 给空态说明。
 func (a *AI) providerList(c ui.C, groups []services.AIEndpointGroup) {
 	l := a.Look
-	if len(groups) == 0 {
-		ui.Row(c).FillWidth().Height(l.Rem(10)).Items(ui.Center).Justify(ui.Center).PadSides(0, l.Space(4), 0, l.Space(4)).Children(func() {
-			l.Text(c, locales.SettingsAiWorkbenchNoModels(), kit.TextSM, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped(), kit.Centered())
-		})
-		return
-	}
 	ui.Column(c).FillWidth().Gap(l.Space(1)).Children(func() {
 		for _, g := range a.filterGroups(groups) {
 			a.providerRow(c.Key(g.Key), g)
@@ -173,8 +173,9 @@ func (a *AI) providerRow(c ui.C, g services.AIEndpointGroup) {
 		detail = locales.SettingsAiWorkbenchDisabled() + " · " + detail
 	}
 	id := ui.ID(c)
+	category := services.EndpointCategory(g.Provider, g.Models)
 	box := ui.Row(c).FillWidth().Height(l.Rem(3)).Items(ui.Center).Gap(l.Space(2)).PadSides(0, l.Space(2)+1, 0, l.Space(2)+1).
-		HitWith(id, name, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected, Cursor: gfx.PointerCursorHand})
+		HitWith(id, category+" "+name+" "+detail+" "+itoa(len(g.Models)), gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand}) // 名称由内容拼成：品牌图标 alt（分类名）+ 名称 + 主机 + 模型数
 	l.TabStop(box)
 	surface := kit.Surface{Radius: l.Rem(0.5), BorderW: 1}
 	switch {
@@ -191,7 +192,7 @@ func (a *AI) providerRow(c ui.C, g services.AIEndpointGroup) {
 		dot = t.MutedForeground.WithAlpha(0.4)
 	}
 	box.Draw(func(d *ui.DrawContext) { l.PaintSurface(d, surface) }).Children(func() {
-		brandBadge(l, c.Key("brand"), services.EndpointCategory(g.Provider, g.Models), l.Rem(1.75), t.Muted, t.Primary, l.Rem(0.5), 12)
+		brandBadge(l, c.Key("brand"), category, l.Rem(1.75), t.Muted, t.Primary, l.Rem(0.5), 12)
 		ui.Column(c.Key("text")).Grow(1).MinWidth(0).Children(func() {
 			l.Text(c.Key("name"), name, kit.TextSM, kit.WeightMedium, t.Foreground, kit.Ellipsis()).MinWidth(0)
 			l.TextPx(c.Key("detail"), detail, 11, 16.5, kit.WeightNormal, t.MutedForeground, kit.Ellipsis()).MinWidth(0)

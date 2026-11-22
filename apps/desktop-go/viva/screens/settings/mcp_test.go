@@ -19,6 +19,13 @@ import (
 // secretValue 是配置里的环境变量值：客户端配置片段里要原样出现（用户要拿去粘贴），但日志、错误提示与详情里一个字都不能有。
 const secretValue = "s3cr3t-env-value-9f2c"
 
+// 范围选择器按钮的可访问名：渲染层的按钮名取自内容，是「标题 + 说明」拼起来的（同 parity 里 React 的 a11y 名）。
+var (
+	scopeAllName           = locales.SettingsMcpScopeAll() + " " + locales.SettingsMcpScopeAllDesc()
+	scopeSelectedName      = locales.SettingsMcpScopeSelected() + " " + locales.SettingsMcpScopeSelectedDesc()
+	scopeUncategorizedName = locales.SettingsMcpScopeUncategorized() + " " + locales.SettingsMcpScopeUncategorizedHint()
+)
+
 // mcpEnv 是「MCP 接入」页的测试环境：假的 MCP 服务与合集来源。
 type mcpEnv struct {
 	*sysEnv
@@ -64,14 +71,14 @@ func TestMCPShowsStatusScopeAndClients(t *testing.T) {
 	if !r.hasText(`C:\gz\mcp\server.js`) {
 		t.Error("应显示 server 路径（要拿去和配置文件核对）")
 	}
-	if !r.hasText(locales.SettingsMcpScopeDesc()) || !r.has(gfx.RoleTab, "Cursor") || !r.has(gfx.RoleTab, "Codex") {
+	if !r.hasText(locales.SettingsMcpScopeDesc()) || !r.has(gfx.RoleButton, "Cursor") || !r.has(gfx.RoleButton, "Codex") {
 		t.Error("组件就绪时应有可访问范围与客户端两块")
 	}
-	// 默认全部合集：模式卡选中，没有合集勾选行。
-	if !r.selected(gfx.RoleButton, locales.SettingsMcpScopeAll()) || r.selected(gfx.RoleButton, locales.SettingsMcpScopeSelected()) {
-		t.Error("默认应选中「全部合集」")
+	// 默认全部合集：两张模式卡都在（渲染层的模式卡没有选中态的可访问属性，选中只靠边框与底色），没有合集勾选行。
+	if !r.has(gfx.RoleButton, scopeAllName) || !r.has(gfx.RoleButton, scopeSelectedName) {
+		t.Error("应有「全部合集」「指定合集」两张模式卡")
 	}
-	if r.has(gfx.RoleButton, locales.SettingsMcpScopeUncategorized()) {
+	if r.has(gfx.RoleButton, scopeUncategorizedName) {
 		t.Error("全部合集模式下不列合集")
 	}
 }
@@ -100,7 +107,7 @@ func TestMCPMissingComponentHidesScopeAndClients(t *testing.T) {
 	if !r.hasText(locales.SettingsMcpMissing()) {
 		t.Error("组件缺失应说明原因与处理办法")
 	}
-	if r.hasText(locales.SettingsMcpScopeDesc()) || r.has(gfx.RoleTab, "Cursor") {
+	if r.hasText(locales.SettingsMcpScopeDesc()) || r.has(gfx.RoleButton, "Cursor") {
 		t.Error("组件缺失时不应显示范围与客户端")
 	}
 }
@@ -111,13 +118,13 @@ func TestMCPScopeAppliesImmediately(t *testing.T) {
 	waitText(r, locales.SettingsMcpStatusReady())
 
 	// 切到「指定合集」：立即落盘，列出「未归合集」与各合集。
-	r.press(gfx.RoleButton, locales.SettingsMcpScopeSelected())
+	r.press(gfx.RoleButton, scopeSelectedName)
 	waitUntil(r, "范围写入", func() bool { return len(e.mcp.ScopeSets()) == 1 })
 	if got := e.mcp.ScopeSets()[0]; got.Mode != services.MCPScopeSelected {
 		t.Fatalf("写入的范围 = %+v", got)
 	}
 	waitButton(r, "Reading notes")
-	if !r.has(gfx.RoleButton, "Work") || !r.has(gfx.RoleButton, locales.SettingsMcpScopeUncategorized()) {
+	if !r.has(gfx.RoleButton, "Work") || !r.has(gfx.RoleButton, scopeUncategorizedName) {
 		t.Error("应列出「未归合集」与全部合集")
 	}
 
@@ -132,7 +139,7 @@ func TestMCPScopeAppliesImmediately(t *testing.T) {
 	// 取消「未归合集」与「Reading notes」：一个都没勾，提醒 AI 什么都搜不到。
 	r.press(gfx.RoleButton, "Reading notes")
 	waitUntil(r, "取消勾选写入", func() bool { return len(e.mcp.ScopeSets()) == 3 })
-	r.press(gfx.RoleButton, locales.SettingsMcpScopeUncategorized())
+	r.press(gfx.RoleButton, scopeUncategorizedName)
 	waitUntil(r, "取消未归写入", func() bool { return len(e.mcp.ScopeSets()) == 4 })
 	waitText(r, locales.SettingsMcpScopeEmptyWarning())
 	if !e.mcp.CurrentScope().IsEmpty() {
@@ -145,17 +152,15 @@ func TestMCPScopeSaveFailureRollsBack(t *testing.T) {
 	e.mcp.FailSetScope(errors.New("write mcp scope: disk full"))
 	r := e.open(t)
 	waitText(r, locales.SettingsMcpStatusReady())
-	r.press(gfx.RoleButton, locales.SettingsMcpScopeSelected())
+	r.press(gfx.RoleButton, scopeSelectedName)
 	waitUntil(r, "错误提示", func() bool { return len(e.toasts(kit.ToastError)) == 1 })
 	toast := e.toasts(kit.ToastError)[0]
 	if toast.Message != locales.SettingsMcpScopeSaveFailed() || !strings.Contains(toast.Detail, "disk full") {
 		t.Errorf("保存失败应提示并给原因：%+v", toast)
 	}
 	// 失败后回到原值（全部合集），不能让界面显示一个没生效的范围。
-	waitUntil(r, "回滚", func() bool { return r.selected(gfx.RoleButton, locales.SettingsMcpScopeAll()) })
-	if r.selected(gfx.RoleButton, locales.SettingsMcpScopeSelected()) {
-		t.Error("保存失败后不应停在「指定合集」")
-	}
+	// 「指定合集」才会列出的「未归合集」行消失，说明回到了「全部合集」。
+	waitUntil(r, "回滚", func() bool { return !r.has(gfx.RoleButton, scopeUncategorizedName) })
 }
 
 func TestMCPClientTabsAndCopy(t *testing.T) {
@@ -175,10 +180,7 @@ func TestMCPClientTabsAndCopy(t *testing.T) {
 	waitButton(r, locales.SettingsMcpCopied())
 
 	// 切到 Codex：没有一键写入，两段片段（命令行、TOML）与自己的提醒。
-	r.clickNode(gfx.RoleTab, "Codex")
-	if !r.selected(gfx.RoleTab, "Codex") || r.selected(gfx.RoleTab, "Cursor") {
-		t.Error("应选中 Codex 标签")
-	}
+	r.clickNode(gfx.RoleButton, "Codex")
 	if !r.hasText(locales.SettingsMcpCodexLocation()) || r.has(gfx.RoleButton, locales.SettingsMcpInstallOneClick("Codex")) {
 		t.Error("Codex 应显示自己的位置说明且没有一键写入")
 	}
@@ -190,7 +192,7 @@ func TestMCPClientTabsAndCopy(t *testing.T) {
 		t.Errorf("第二段应复制 TOML，得到 %q", got)
 	}
 	// 切回 Cursor。
-	r.clickNode(gfx.RoleTab, "Cursor")
+	r.clickNode(gfx.RoleButton, "Cursor")
 	if !r.hasText(locales.SettingsMcpCursorLocation()) {
 		t.Error("切回 Cursor 应显示它的说明")
 	}

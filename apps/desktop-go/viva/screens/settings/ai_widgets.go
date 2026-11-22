@@ -1,9 +1,6 @@
 package settings
 
 import (
-	"strings"
-	"unicode"
-
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -113,19 +110,15 @@ func fieldLabel(l *kit.Look, c ui.C, text string) {
 	l.Text(c, text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground).MarginBottom(l.Space(1))
 }
 
-// brandBadge 是品牌图标的替身：渲染层按供应商或模型家族画品牌 SVG，Viva 没有这批图标，改用分类名首字母。
-// 与渲染层自己的回落（没有对应图标时画首字母）同一做法。
+// brandBadge 是品牌图标的替身：渲染层按供应商或模型家族画 15 套品牌 SVG（<img>，有 alt 但不是文本节点），
+// Viva 没有这批图标，只画底色徽标加一个居中的实心圆点。圆点不是文字：换成首字母会多出一个文本节点，
+// 把后面的文字序列整体错位（M3-2b 实测，AI 页 L1 一次错位 41 处）。
+// category 与 fontPx 暂不参与绘制，留给补齐品牌图标时按分类选图。
 func brandBadge(l *kit.Look, c ui.C, category string, box float32, bg, fg tokens.Color, radius float32, fontPx float32) {
-	letter := "?"
-	for _, r := range strings.TrimSpace(category) {
-		letter = string(unicode.ToUpper(r))
-		break
-	}
-	ui.Row(c).Size(box, box).Shrink(0).Items(ui.Center).Justify(ui.Center).
-		Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: bg, Radius: radius}) }).
-		Children(func() {
-			l.TextPx(c.Key("letter"), letter, fontPx, fontPx*1.5, kit.WeightSemibold, fg)
-		})
+	_, _ = category, fontPx
+	badge := ui.Row(c).Size(box, box).Shrink(0).Items(ui.Center).Justify(ui.Center).
+		Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: bg, Radius: radius}) })
+	badge.Children(func() { statusDot(l, c.Key("mark"), box/2, fg, 0, 0) })
 }
 
 // statusDot 是状态点：size 的圆，ringW 大于 0 时外面带一圈同色半透明的环（ring-[3px]）。

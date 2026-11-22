@@ -59,7 +59,9 @@ export async function openReactSession({ executable, dist, dataDb = null, env = 
 
   let exited = false;
   let output = "";
-  const child = spawn(executable, ["-dist", dist, "-userdata", userDataDir, "-db", dbFile, "-bench"], {
+  // -config 指向一次性 userData 下的 config 目录：AI 端点与模型的写入（M3-2b 的 settings.set）要落到 ai-models.json，不给则报「未指定 config 目录」。
+  const configDir = path.join(userDataDir, "config");
+  const child = spawn(executable, ["-dist", dist, "-userdata", userDataDir, "-db", dbFile, "-config", configDir, "-bench"], {
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
     env: {

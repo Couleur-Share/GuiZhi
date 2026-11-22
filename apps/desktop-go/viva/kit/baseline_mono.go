@@ -76,6 +76,14 @@ func (l *Look) MonoText(c ui.C, text string, size, lineH float32, color tokens.C
 	return box
 }
 
+// MonoWrapped 是 MonoText 的折行版（`font-mono break-all` 之类的多行等宽文字）：基线同样已对齐渲染层，行数不限、宽度由外层给。
+// extraDY 是在对齐之后再向下平移的逻辑像素（行内与别的字体基线对齐时用）。
+func (l *Look) MonoWrapped(c ui.C, text string, size, lineH float32, color tokens.Color, extraDY float32) ui.Box {
+	box := ui.Text(c, text).Mono().MaxLines(0).FontSize(size).LineHeight(lineH).Color(l.Col(color))
+	shiftBaseline(box, MonoBaselineShift(size, size, lineH, l.Scale)+extraDY)
+	return box
+}
+
 // InputPadMono 是 InputPad 的等宽版：返回让 Viva 输入框里那一行 Mono 文字落在渲染层 font-mono <input> 文字位置所需的上、下内边距
 // （逻辑像素）。Viva 一侧与比例字体相同（行盒高 size+6 的标签，基线行 VivaBaselineRow），渲染层一侧的 A、D 取 Consolas 的：
 //

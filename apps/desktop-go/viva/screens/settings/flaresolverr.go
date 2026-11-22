@@ -125,7 +125,12 @@ func (f *FlareSolverr) fields(c ui.C) {
 			col = col.FillWidth()
 		}
 		col.Children(func() {
-			l.Text(c, label, kit.TextSM, kit.WeightNormal, l.T.Foreground)
+			// 渲染层的标签是 <label> 里的内联 <span class="text-sm">：行盒由外层的 16px/24px 行高撑成 24px，14px 的文字按基线落在其中，
+			// 比单独一行 20px 的文字低 3px、行盒高 4px（实测：文字顶低 3px，控件顶低 4px）。
+			lc := c.Key(key + "-label")
+			ui.Column(lc).FillWidth().Height(l.Rem(1.5)).PadTop(l.Rem(0.1875)).Children(func() {
+				l.Text(lc.Key("text"), label, kit.TextSM, kit.WeightNormal, l.T.Foreground)
+			})
 			body()
 		})
 	}

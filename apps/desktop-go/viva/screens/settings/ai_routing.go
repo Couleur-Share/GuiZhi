@@ -228,7 +228,9 @@ func (a *AI) disabledSelect(c ui.C, label, display string, width float32) {
 	if width < 0 {
 		box = box.FillWidth()
 	} else {
-		box = box.Width(width).Shrink(0)
+		// 与 SelectTrigger 同一规则：行被挤窄时可收缩，但不窄于「文字 + px-3 + 箭头 + gap」。
+		minW := 2*l.Rem(0.75) + l.Rem(1) + l.Rem(0.5) + c.Canvas().TextWidthWeight(display, l.Rem(kit.TextSM.Size), kit.WeightNormal)
+		box = box.Width(width).MinWidth(min(minW, width))
 	}
 	box.Items(ui.Center).Gap(l.Rem(0.5)).PadSides(0, l.Rem(0.75), 0, l.Rem(0.75)).Opacity(0.5).
 		HitWith(ui.ID(c), label, gfx.HitOptions{Role: gfx.RoleCombobox, Expandable: true, Value: display, Disabled: true, Cursor: gfx.PointerCursorNotAllowed}).

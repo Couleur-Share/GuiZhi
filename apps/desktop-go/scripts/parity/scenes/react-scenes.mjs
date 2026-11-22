@@ -21,6 +21,7 @@ import { LIBRARY_BULK_SCENES } from "./react-library-bulk-scenes.mjs";
 import { LIBRARY_DETAIL_SCENES } from "./react-library-detail-scenes.mjs";
 import { INBOX_SCENES } from "./react-inbox-scenes.mjs";
 import { SETTINGS_CORE_SCENES } from "./react-settings-core-scenes.mjs";
+import { SETTINGS_ADVANCED_SCENES } from "./react-settings-advanced-scenes.mjs";
 import { SETTINGS_CONTENT_SCROLLER, openSettingsSection, scrollSettingsToEnd } from "../lib/react-settings-nav.mjs";
 
 /**
@@ -460,6 +461,8 @@ export const SCENES = {
   ...INBOX_SCENES,
   // 设置页四个核心分区（M3-2a）：场景在 react-settings-core-scenes.mjs
   ...SETTINGS_CORE_SCENES,
+  // 设置页三个外围分区（M3-2b）：采集与转写、MCP、AI 模型服务；场景在 react-settings-advanced-scenes.mjs
+  ...SETTINGS_ADVANCED_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,

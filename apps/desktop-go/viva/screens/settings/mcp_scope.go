@@ -65,7 +65,8 @@ func (m *MCP) modeCard(c ui.C, label, desc string, active bool) bool {
 	id := ui.ID(c)
 	box := ui.Column(c).Grow(1).Basis(0).MinWidth(0).Pad(l.Space(4)+1).
 		PadSides(l.Space(3)+1, l.Space(4)+1, l.Space(3)+1, l.Space(4)+1).
-		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: active, Description: desc, Cursor: gfx.PointerCursorHand})
+		// 渲染层的模式卡是普通按钮（没有 aria-pressed）：名字是两行文字拼起来（label + 说明），选中只靠边框与底色表达。
+		HitWith(id, label+" "+desc, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 	l.TabStop(box)
 	hovered := box.State().Hovered
 	surface := kit.Surface{Border: t.Border.WithAlpha(0.7), BorderW: 1, Radius: l.Rem(0.75)}
@@ -90,7 +91,7 @@ func (m *MCP) scopeRow(c ui.C, col *services.LibraryCollection, label, hint stri
 	id := ui.ID(c)
 	box := ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(2.5)).
 		PadSides(l.Space(2)+1, l.Space(3)+1, l.Space(2)+1, l.Space(3)+1).
-		HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: on, Description: hint, Cursor: gfx.PointerCursorHand})
+		HitWith(id, strings.TrimSpace(label+" "+hint), gfx.HitOptions{Role: gfx.RoleButton, Selected: on, Cursor: gfx.PointerCursorHand})
 	l.TabStop(box)
 	hovered := box.State().Hovered
 	surface := kit.Surface{Border: t.Border.WithAlpha(0.6), BorderW: 1, Radius: l.Rem(0.75)}

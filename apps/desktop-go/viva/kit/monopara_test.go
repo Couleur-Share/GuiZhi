@@ -78,11 +78,12 @@ func TestMonoParagraphAcrossFontTiers(t *testing.T) {
 			if len(texts) != 2 {
 				t.Fatalf("应有两个 Label，实际 %d", len(texts))
 			}
-			wide, ascii := texts[0], texts[1]
+			wide := texts[0]
 			if math.Abs(float64(wide.Style.Size-tc.wantSize)) > 0.01 {
 				t.Errorf("汉字行字号 %v，期望 %v", wide.Style.Size, tc.wantSize)
 			}
-			top := ascii.Bounds.Y - tc.lh
+			// 段落顶就是外层的上内边距 10：Mono 行自己也带基线平移（大档 −1），不能再拿它的位置当行盒顶的参照。
+			const top = 10
 			if got := wide.Bounds.Y - top; math.Abs(float64(got-tc.wantShift)) > 0.01 {
 				t.Errorf("汉字行相对行盒顶位移 %v，期望 %v", got, tc.wantShift)
 			}
