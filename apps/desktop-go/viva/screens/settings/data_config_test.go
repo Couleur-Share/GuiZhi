@@ -243,7 +243,7 @@ func TestConfigImportApplyFlow(t *testing.T) {
 	// 密码不对：就地提示，不弹错误提示，对话框保留，可改后重试。
 	r.typeInto(pwName, "wrong-import-pw")
 	r.clickNode(gfx.RoleButton, confirm)
-	waitUntil(r, "就地提示", func() bool { return r.hasText("密码不正确") })
+	waitUntil(r, "就地提示", func() bool { return r.hasText("wrong password") })
 	if len(e.toasts(kit.ToastError)) != 0 || !r.dialogOpen(locales.SettingsConfigImportTitle()) {
 		t.Fatal("密码不对应就地提示，不弹错误提示，对话框保留")
 	}

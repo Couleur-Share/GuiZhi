@@ -332,7 +332,7 @@ func (f *Backup) PreviewRestore(_ context.Context, snapshotID, recoveryPassword 
 	}
 	i := find(f.snaps, snapshotID)
 	if i < 0 {
-		return services.RestorePreview{}, &services.RestorePreviewError{Message: "找不到指定的快照"}
+		return services.RestorePreview{}, &services.RestorePreviewError{Message: "snapshot not found"}
 	}
 	return services.RestorePreview{Snapshot: f.snaps[i], Warnings: []string{}}, nil
 }
@@ -349,7 +349,7 @@ func (f *Backup) DeleteSnapshot(_ context.Context, snapshotID string) error {
 	defer f.mu.Unlock()
 	i := find(f.snaps, snapshotID)
 	if i < 0 {
-		return errors.New("找不到指定的快照")
+		return errors.New("snapshot not found")
 	}
 	f.snaps = append(f.snaps[:i:i], f.snaps[i+1:]...)
 	return nil
@@ -471,7 +471,7 @@ func (f *ConfigTransfer) Apply(_ context.Context, filePath, password string, sel
 		return services.ConfigApplyResult{}, err
 	}
 	if want != "" && password != want {
-		return services.ConfigApplyResult{}, &services.ConfigWrongPasswordError{Message: "密码不正确"}
+		return services.ConfigApplyResult{}, &services.ConfigWrongPasswordError{Message: "wrong password"}
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
