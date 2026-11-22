@@ -474,6 +474,9 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - **B-008 与 B-016 的文字已过时、本步没有改**：B-008（顶栏「新建」主按钮等三处动作）与 B-016（采集页「快速采集」入口）里写着快速采集入口「目前没有反应」，M3-3 接线之后这一部分已不成立，命令面板与更新对话框那一部分仍成立；本步按指令只做台账指定的几处改动，需要负责人决定是否由下一步补注或关闭其中的快速采集部分。
 - **M3-2c（B-074、B-075、B-076）仍未立线、未估算**；待追认项与 C-016、C-017、G-034、G-035 原样保持，**本步没有追认任何一项**。
 - **没有测**：真窗口里的任何交互（归 R-19）：真实资源管理器拖放（`IDropTarget` / `WM_DROPFILES`）、多行中文输入法组词、真键盘 `Ctrl+Enter` 提交、空白笔记创建后聚焦标题框；对话框的进程内存；真采集队列。
+
+**M3-4 立线登记（2026-11-23，开工前按 §8.1.1 重算方法登记）**：M3-4 是 AI 问答（盘点 `ask`），范围：全局问答工作区（`AskWorkspace`、`SidebarAskPanel`、`AskEmptyState`、`AskMessageCard`、`ChatComposer`）、围绕本文提问（`ArticleAskReader`、`ArticleConversation`、`GlobalArticleConversation`，关闭 B-061）、知识库彻底删除后的问答证据清理回调接线（`Store.OnEvidenceCleared` → 问答 Store 的 `ClearEvidenceForItems`，关闭 B-054）、全套对拍、变异与收口。数据层新增 `services.Ask`（会话持久化、全局问答与围绕本文问答的流式执行与取消、联网搜索配置检查），主包适配 `native_ask.go` 复用现有的 `askSession:*` / `ask:*` / `articleAsk:*` / `knowledge:*` / `wiki:*` / `semantic:*` 处理器与 `aiflow`（问答引擎、本文问答、混合检索），AI 请求经 Go 壳的 `ai:httpRequest` / `ai:httpStream` 代理（SSRF 守卫不绕过）；状态层放在 `viva/screens/ask`。重算估算 **12 段**，**线 = 重算估算 × 1.5 = 18 段**，硬停线 = 36 段（沿用按模块各自立线的约定，越线先停下汇报）。Step 0 登记本段；Step 1 做数据层服务、主包适配与状态层（Store、引用解析、单测），界面、对照场景与变异检查在后续步骤；不改 `thresholds.json`、`compare_*.go`、`waiver.go` 与 `a11y_map.go`，不新增 Waiver。
+
 ### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
 
 真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。

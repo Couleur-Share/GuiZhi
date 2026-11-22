@@ -363,14 +363,32 @@ func (p *aiProxy) request(ctx context.Context, req aiRequest) aiResponse {
 	return out
 }
 
+type aiStreamSinkKey struct{}
+
+// withAIStreamSink 让 ai:httpStream 的流式块（chunk / error）交给进程内的接收者，而不是推给调用方页面。
+// 原生界面经 Bridge.call 进来时没有页面，靠它拿到增量。sink 在读流的 goroutine 上同步执行，须轻量。
+func withAIStreamSink(ctx context.Context, sink func(channel string, payload aiStreamPayload)) context.Context {
+	return context.WithValue(ctx, aiStreamSinkKey{}, sink)
+}
+
+func aiStreamSinkFrom(ctx context.Context) func(channel string, payload aiStreamPayload) {
+	sink, _ := ctx.Value(aiStreamSinkKey{}).(func(channel string, payload aiStreamPayload))
+	return sink
+}
+
 func (p *aiProxy) stream(ctx context.Context, req aiRequest) aiResponse {
 	call, release := p.begin(ctx, req.RequestID)
 	defer release()
 	page := mygo.CallerPage(ctx)
+	sink := aiStreamSinkFrom(ctx)
 	push := func(channel string, payload aiStreamPayload) {
 		payload.RequestID = req.RequestID
 		if p.emit != nil {
 			p.emit(channel, payload)
+			return
+		}
+		if sink != nil { // 原生界面的进程内调用：没有调用方页面，块直接交给 sink
+			sink(channel, payload)
 			return
 		}
 		if page == nil {

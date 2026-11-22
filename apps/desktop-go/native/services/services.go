@@ -45,6 +45,10 @@ type Services struct {
 	// nil 时分区读不出配置、显示加载失败（测试与对照里不接线）。
 	AI AISettings
 
+	// Ask 是 AI 问答（全局问答工作区、围绕本文提问）的数据层（见 ask.go）；
+	// nil 时问答模块按「尚未迁移」处理，测试与对照里不关心问答时可以不给。
+	Ask Ask
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 

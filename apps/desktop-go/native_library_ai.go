@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"guizhi-mygo-shell/aiflow"
 	"guizhi-mygo-shell/native/services"
@@ -25,9 +27,9 @@ type bridgeTransport struct {
 	b *Bridge
 }
 
-func (t bridgeTransport) Request(ctx context.Context, req aiflow.TransportRequest) (aiflow.TransportResponse, error) {
+func (t bridgeTransport) payload(requestID string, req aiflow.TransportRequest) map[string]any {
 	payload := map[string]any{
-		"requestId": "",
+		"requestId": requestID,
 		"method":    req.Method,
 		"url":       req.URL,
 		"headers":   req.Headers,
@@ -38,11 +40,33 @@ func (t bridgeTransport) Request(ctx context.Context, req aiflow.TransportReques
 	if req.TimeoutMs > 0 {
 		payload["timeoutMs"] = req.TimeoutMs
 	}
-	return callAs[aiflow.TransportResponse](ctx, t.b, chAIHTTPRequest, payload)
+	return payload
 }
 
-func (bridgeTransport) RequestStream(context.Context, aiflow.TransportRequest, aiflow.StreamHandler) (aiflow.TransportResponse, error) {
-	return aiflow.TransportResponse{}, errors.New("ai streaming is not supported in library adapter")
+func (t bridgeTransport) Request(ctx context.Context, req aiflow.TransportRequest) (aiflow.TransportResponse, error) {
+	return callAs[aiflow.TransportResponse](ctx, t.b, chAIHTTPRequest, t.payload("", req))
+}
+
+// bridgeStreamSeq 给进程内发起的流式请求编号：代理按 requestId 登记取消，同一进程内不能重复。
+var bridgeStreamSeq atomic.Uint64
+
+// RequestStream 走 ai:httpStream（同一个代理、同一套 SSRF 守卫）：没有调用方页面，
+// 流式块经 ctx 里的 sink 交给 h，在读流的 goroutine 上同步回调；ctx 取消即中断请求。
+func (t bridgeTransport) RequestStream(ctx context.Context, req aiflow.TransportRequest, h aiflow.StreamHandler) (aiflow.TransportResponse, error) {
+	sctx := withAIStreamSink(ctx, func(channel string, payload aiStreamPayload) {
+		switch channel {
+		case chAIHTTPStreamChunk:
+			if h.OnChunk != nil {
+				h.OnChunk(payload.Chunk)
+			}
+		case chAIHTTPStreamError:
+			if h.OnError != nil {
+				h.OnError(payload.Error)
+			}
+		}
+	})
+	id := "native-" + strconv.FormatUint(bridgeStreamSeq.Add(1), 10)
+	return callAs[aiflow.TransportResponse](sctx, t.b, chAIHTTPStream, t.payload(id, req))
 }
 
 type bridgeUsageSink struct {
@@ -61,14 +85,20 @@ func (u bridgeUsageSink) RecordUsage(entry aiflow.UsageEntry) {
 }
 
 func (a libraryAdapter) newAIRunner(ctx context.Context) (*aiflow.Runner, error) {
-	raw, err := callAs[map[string]any](ctx, a.b, "settings:get")
+	return newBridgeRunner(ctx, a.b, nil)
+}
+
+// newBridgeRunner 按当前设置组装一个经壳代理发请求的 Runner；log 为 nil 表示不记诊断日志。
+func newBridgeRunner(ctx context.Context, b *Bridge, log aiflow.Logger) (*aiflow.Runner, error) {
+	raw, err := callAs[map[string]any](ctx, b, "settings:get")
 	if err != nil {
 		return nil, err
 	}
 	return &aiflow.Runner{
-		Client: &aiflow.Client{Transport: bridgeTransport{b: a.b}},
+		Client: &aiflow.Client{Transport: bridgeTransport{b: b}, Log: log},
 		Config: staticAIConfig{settings: aiflow.NormalizeAISettings(raw)},
-		Usage:  bridgeUsageSink{b: a.b, ctx: ctx},
+		Usage:  bridgeUsageSink{b: b, ctx: ctx},
+		Log:    log,
 	}, nil
 }
 

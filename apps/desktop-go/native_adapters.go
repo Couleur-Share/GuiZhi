@@ -231,6 +231,7 @@ func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 		CaptureTools: captureToolsAdapter{b: b, hub: hub},
 		MCP:          mcpAdapter{b: b},
 		AI:           aiSettingsAdapter{b: b},
+		Ask:          newAskAdapter(b),
 		Log:          logAdapter{b: b},
 		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
 	}
