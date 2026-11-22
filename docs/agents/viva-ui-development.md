@@ -512,6 +512,8 @@ go test -count=1 ./viva/... ./native/services/... ./native/settings/... ./aiflow
 - **没有重跑的门禁**：本步（Step 4c）只复核文档校验（`pnpm test:validation`、`pnpm lint:file-size`）与 `-p 1` 的 `go test`；`go vet`、`pnpm typecheck`、`fmtcheck.ps1` 与主包（根）测试沿用 Step 4b 的结论、没有重跑，因为本步只改文档。
 - **没有测**：真窗口里的任何交互（归 R-20）：真实 AI SSE 流式问答、联网搜索缺失提示与离线发送、B-054 彻底删除实时清除证据、B-061 详情并排问答与阅读岛定位查找、全局文章对话「返回文章」定位时序、中文输入法；进程内存与 GPU 共享内存。
 
+**M3-5a 立线登记（2026-11-23，开工前按 §8.1.1 重算方法登记）**：M3-5a 是 Wiki 模块（盘点 `wiki`），范围：目录（类型与「手动 / 孤立」筛选、最近 / 被引用 / 标题三种排序、全文搜索命中叠加筛选）、详情（元数据、来源、反向链接、历史版本、目录大纲）、正文编辑与保存（落手动标记、按新正文重建出链）、释放回自动编译、删除与回滚到上一版、`[[链接]]` 的解析与跳转（`[[目标|显示]]` 改写成站内链接，规范化标题优先、别名其次）与 Markdown 排版、全文编译对话框（预览、勾选、开始、暂停 / 取消 / 继续、任务进度）、更新建议（采用与令牌失效重核对）、关系图谱（节点按连接度取前 300、有向边、点击跳详情）、全套对拍、变异与收口。数据层新增 `services.Wiki`，主包适配 `native_wiki.go` 复用现有的 `wiki:*` 与 `wiki:compiler` 处理器与 `aiflow.WikiDriver`（同一个适配器共用一个驱动，取消能中止正在跑的一轮；每次读取实时配置，编译途中改了模型会被发现），AI 请求仍经 Go 壳代理（SSRF 守卫不绕过，密钥在错误里脱敏）；状态层放在 `viva/screens/wiki`（`Store`、`CompileStore`、`SuggestionStore`，加目录筛选排序、链接、大纲与图谱布局的纯逻辑）。图谱用原生 `gfx.Canvas` 绘制，布局在状态层算好（确定性的力导向，单位坐标），命中测试走 `NodeAt`，不需要 WebView 岛。重算估算 **10 段**，**线 = 重算估算 × 1.5 = 15 段**，硬停线 = 30 段（越线先停下汇报）。Step 0 登记本段；Step 1 做数据层服务、主包适配与状态层（Store、纯逻辑、单测与 `-race`），界面、对照场景与变异检查在后续步骤；不改 `thresholds.json`、`compare_*.go`、`waiver.go`、`a11y_map.go` 与 `viva/reader/protocol.go`，不新增 Waiver。
+
 ### 8.2 外壳冒烟（`smoke-viva-shell.ps1`）与变异检查
 
 真窗口冒烟，脚本在 `D:\Project\GuiZhi-bench\tools\smoke-viva-shell.ps1`（不入库）。每个场景用一次性 `LOCALAPPDATA`/`APPDATA`/userdata 与库副本，只按 PID 结束自己拉起的进程；用 `WM_CLOSE` 模拟点关闭钮（与标题栏关闭钮、Alt+F4 同一条 `OnCloseRequest`），窗口可见性用 `IsWindowVisible` 读；`-Only 'S[0-4]'` 可只跑部分场景。

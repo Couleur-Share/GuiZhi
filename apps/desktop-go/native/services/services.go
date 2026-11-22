@@ -49,6 +49,10 @@ type Services struct {
 	// nil 时问答模块按「尚未迁移」处理，测试与对照里不关心问答时可以不给。
 	Ask Ask
 
+	// Wiki 是 Wiki 模块（目录、搜索、详情与编辑、关系图谱、全文编译、更新建议）的数据层（见 wiki.go）；
+	// nil 时 Wiki 模块按「尚未迁移」处理，测试与对照里不关心 Wiki 时可以不给。
+	Wiki Wiki
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 
