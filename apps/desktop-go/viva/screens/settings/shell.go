@@ -69,6 +69,10 @@ type Shell struct {
 	Solver    services.FlareSolverr
 	Shortcuts services.Shortcuts
 	Updater   services.Updater
+	// Data、Backup、ConfigTransfer 是「数据与备份」页要用的服务：运行时路径与重启、本地与完整备份、配置导出导入；nil 表示外壳没接，各块如实报错。
+	Data           services.Data
+	Backup         services.Backup
+	ConfigTransfer services.ConfigTransfer
 	// AppVersion 是当前应用版本号（关于页显示）。
 	AppVersion string
 	// OpenExternal 用系统浏览器打开链接（关于页的链接）；nil 时点击弹出失败提示。
@@ -80,6 +84,7 @@ type Shell struct {
 
 	general    *General
 	appearance *Appearance
+	data       *Data
 	network    *Network
 	shortcuts  *Shortcuts
 	about      *About
@@ -90,12 +95,17 @@ type Shell struct {
 	lastCheck UpdateRecord
 }
 
-// remount 在分区切换时收尾上一个分区：「网络」「快捷键」「关于」有后台请求与订阅，切走就关掉并重置。
+// remount 在分区切换时收尾上一个分区：「数据与备份」「网络」「快捷键」「关于」有后台请求与订阅，切走就关掉并重置。
 func (s *Shell) remount() {
 	if s.mounted == s.section() {
 		return
 	}
 	switch s.mounted {
+	case SectionData:
+		if s.data != nil {
+			s.data.Close()
+		}
+		s.data = nil
 	case SectionNetwork:
 		if s.network != nil {
 			s.network.Close()
@@ -152,6 +162,14 @@ func (s *Shell) content(c ui.C) {
 		a := s.appearance
 		a.Look, a.Store, a.Guard, a.PickBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.Wake
 		a.Page(c)
+	case SectionData:
+		if s.data == nil {
+			s.data = &Data{}
+		}
+		d := s.data
+		d.Look, d.Store, d.Guard, d.Wake = l, s.Store, s.Guard, s.Wake
+		d.Runtime, d.Backup, d.Transfer = s.Data, s.Backup, s.ConfigTransfer
+		d.Page(c)
 	case SectionNetwork:
 		if s.network == nil {
 			s.network = &Network{}

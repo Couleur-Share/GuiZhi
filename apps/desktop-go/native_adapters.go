@@ -226,6 +226,8 @@ func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 		Shortcuts:    shortcutsAdapter{b: b},
 		Solver:       solverAdapter{b: b},
 		Updater:      updaterAdapter{b: b, hub: hub},
+		Data:         dataAdapter{b: b},
+		Backup:       backupAdapter{b: b},
 		Log:          logAdapter{b: b},
 		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
 	}

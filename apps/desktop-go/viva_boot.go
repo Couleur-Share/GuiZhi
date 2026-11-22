@@ -220,6 +220,10 @@ func runViva(vb vivaBoot) error {
 	vb.lib.setPush(hub.Dispatch) // 单监听推送 → 订阅者
 	svc := newNativeServices(vb.bridge, hub)
 	svc.Settings, svc.Prefs = nset, store
+	svc.ConfigTransfer = newConfigAdapter(vb.bridge, vb.lib, nset, store)
+	// 自动完整备份的调度跟着设置走（渲染层靠 syncRendererSettings 推送，原生界面靠设置订阅）。
+	stopBackupWatch := watchBackupSchedule(nset, vb.lib)
+	defer stopBackupWatch()
 
 	var ready atomic.Bool
 	if vb.bench {

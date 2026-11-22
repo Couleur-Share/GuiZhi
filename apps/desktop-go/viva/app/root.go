@@ -82,6 +82,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.settings = &settingsscreen.Shell{
 		Store: r.store, Guard: r.guard, Wake: invalidate,
 		Solver: opts.Services.Solver, Shortcuts: opts.Services.Shortcuts, Updater: opts.Services.Updater,
+		Data: opts.Services.Data, Backup: opts.Services.Backup, ConfigTransfer: opts.Services.ConfigTransfer,
 		AppVersion: opts.AppVersion, OpenExternal: opts.Services.OpenExternal,
 	}
 	r.win = &shell.Window{
