@@ -105,14 +105,15 @@ func (s *Screen) themedTasksButton(c ui.C) {
 }
 
 // refreshButton 是页头的刷新钮：rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground，
-// 里面 h-4 w-4 的 RefreshCw，读取期间转圈（animate-spin）。可访问名是「刷新处理中心」，悬停提示是「刷新」。
+// 里面 h-4 w-4 的 RefreshCw，读取期间转圈（animate-spin）。可访问名是「刷新处理中心」，悬停提示是「刷新」
+// （title 属性：名称来自 aria-label 时 Chromium 把它报成可访问描述，所以 Hint 与 Description 都给）。
 func (s *Screen) refreshButton(c ui.C, loading bool) {
 	l := s.Look
 	t := l.T
 	c = c.Key("refresh")
 	id := ui.ID(c)
 	box := ui.Row(c).Shrink(0).Items(ui.Center).Justify(ui.Center).Pad(l.Space(2)).
-		HitWith(id, locales.InboxRefresh(), gfx.HitOptions{Role: gfx.RoleButton, Hint: locales.CommonRefresh(), Cursor: gfx.PointerCursorHand})
+		HitWith(id, locales.InboxRefresh(), gfx.HitOptions{Role: gfx.RoleButton, Hint: locales.CommonRefresh(), Description: locales.CommonRefresh(), Cursor: gfx.PointerCursorHand})
 	l.TabStop(box)
 	p := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
 	bg := kit.MixToken(tokens.Transparent, t.Muted, p)
@@ -176,6 +177,7 @@ func (s *Screen) collectionSelect(c ui.C, v View) {
 }
 
 // tagsInput 是标签输入框：h-9 w-52 rounded-lg border border-border bg-background px-3 text-sm，聚焦时边框 primary/50。
+// 渲染层没有给占位符写颜色类，用的是 Tailwind preflight 的 input::placeholder（gray-400，两种主题相同），不是 muted-foreground。
 func (s *Screen) tagsInput(c ui.C) {
 	l := s.Look
 	t := l.T
@@ -191,7 +193,7 @@ func (s *Screen) tagsInput(c ui.C) {
 		})
 		placeholder := locales.InboxAddTagsPlaceholder()
 		input := l.Input(c.Key("input"), &s.tags, placeholder, placeholder, kit.InputSpec{
-			Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: t.MutedForeground,
+			Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: tokens.Tailwind("gray-400"),
 			Height: height, Left: l.Rem(0.75) + 1, Right: l.Rem(0.75) + 1,
 		}).Absolute().Inset(0)
 		s.tagsFocus = input.State().Focused

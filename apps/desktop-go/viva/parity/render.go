@@ -316,6 +316,10 @@ func nodeOf(n app.AccessNode) Node {
 	switch n.Role {
 	case gfx.RoleSwitch, gfx.RoleCheckbox, gfx.RoleRadio:
 		props["checked"] = strconv.FormatBool(n.Checked)
+		// 半选（aria-checked="mixed"，处理中心的「全选当前列表」）：渲染层记 "mixed"，Viva 的节点用 Mixed 位表达，两边同值才可比。
+		if n.Mixed {
+			props["checked"] = "mixed"
+		}
 	}
 	if n.Expandable {
 		props["expanded"] = strconv.FormatBool(n.Expanded)

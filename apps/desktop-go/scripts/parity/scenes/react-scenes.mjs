@@ -19,6 +19,7 @@ import { LIBRARY_LIST_SCENES } from "./react-library-list-scenes.mjs";
 import { LIBRARY_TABLE_SCENES } from "./react-library-table-scenes.mjs";
 import { LIBRARY_BULK_SCENES } from "./react-library-bulk-scenes.mjs";
 import { LIBRARY_DETAIL_SCENES } from "./react-library-detail-scenes.mjs";
+import { INBOX_SCENES } from "./react-inbox-scenes.mjs";
 
 /** 打开设置并切到某个分区，等内容壳出现。 */
 async function openSettingsSection(win, section) {
@@ -476,6 +477,8 @@ export const SCENES = {
   ...LIBRARY_TABLE_SCENES,
   ...LIBRARY_BULK_SCENES,
   ...LIBRARY_DETAIL_SCENES,
+  // 处理中心（M3-1）：场景在 react-inbox-scenes.mjs
+  ...INBOX_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,

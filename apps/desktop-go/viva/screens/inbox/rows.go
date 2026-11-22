@@ -19,14 +19,14 @@ const defaultCollectionIcon = "\U0001F4DA"
 // reasonSeparator 是复核原因之间的分隔：全角分号（渲染层 reasons.join 的分隔符，不随界面语言变）。写成转义：它是分隔符不是文案。
 const reasonSeparator = "\uFF1B"
 
-// body 是页头与批量条下面的滚动区：min-h-0 flex-1 overflow-y-auto p-5。
+// body 是页头与批量条下面的滚动区：min-h-0 flex-1 overflow-y-auto p-5。用 ScrollAreaFlush：小字号档下内容恰好溢出 0.5px 时渲染层出了滚动条槽。
 // 里面先是 Wiki 提示条与局部错误条（不阻塞主列表），再按「读取失败、读取中、已处理完、列表」四选一画主体——
 // 读取失败必须画成错误态，不能画成「已处理完」的空态。
 //
 // 列表不做行窗口化：服务端每组最多回 100 条，三组加两个聚合行不超过 302 行，整表声明的开销与采集页的几十行同量级。
 func (s *Screen) body(c ui.C, v View) {
 	l := s.Look
-	l.ScrollArea(c.Key("body"), [4]float32{l.Space(5), l.Space(5), l.Space(5), l.Space(5)}, func() {
+	l.ScrollAreaFlush(c.Key("body"), [4]float32{l.Space(5), l.Space(5), l.Space(5), l.Space(5)}, func() {
 		s.wikiBanner(c, v)
 		s.sectionErrors(c, v)
 		switch {
@@ -64,11 +64,12 @@ func (s *Screen) emptyState(c ui.C) {
 }
 
 // notice 是列表上方的提示条：mb-2 rounded-lg border border-border p-3 text-sm，里面一段文字加一枚行内的文字按钮。
-// 文字按钮（text-primary hover:underline）紧跟在文字后面，放不下时折到下一行。alert 为真时它是带直播属性的区域（role="alert"）。
+// 文字按钮（text-primary hover:underline）紧跟在文字后面，放不下时折到下一行；
+// 行内的空格只占水平的 4px，换行不加行距（LineGap(0)：Flow 的 Gap 缺省同时是行距）。alert 为真时它是带直播属性的区域（role="alert"）。
 func (s *Screen) notice(c ui.C, key, text, action string, alert bool, onAction func()) {
 	l := s.Look
 	t := l.T
-	ui.Flow(c.Key(key)).FillWidth().Items(ui.Center).Gap(l.Space(1)).Pad(s.pad(3)).MarginBottom(l.Space(2)).
+	ui.Flow(c.Key(key)).FillWidth().Items(ui.Center).Gap(l.Space(1)).LineGap(0).Pad(s.pad(3)).MarginBottom(l.Space(2)).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)})
 			if alert {

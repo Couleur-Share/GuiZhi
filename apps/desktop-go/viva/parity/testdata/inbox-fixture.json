@@ -1,0 +1,40 @@
+{
+  "loadError": "读取处理中心失败：数据库暂时被占用",
+  "semanticError": "语义索引服务暂时不可用",
+  "collections": [
+    { "id": "col-study", "name": "学习笔记", "icon": "📖", "sortOrder": 0, "itemCount": 12, "createdAt": 1794700000000, "updatedAt": 1794700000000 },
+    { "id": "col-work", "name": "工作资料", "icon": "", "sortOrder": 1, "itemCount": 8, "createdAt": 1794700001000, "updatedAt": 1794700001000 }
+  ],
+  "variants": {
+    "data": {
+      "list": {
+        "items": [
+          { "kind": "review-required", "id": "review-required:item-001", "itemId": "item-001", "title": "产品设计原则：极简与克制", "reasons": ["标题可能不完整", "正文疑似被截断"], "createdAt": 1794800000000 },
+          { "kind": "review-required", "id": "review-required:item-002", "itemId": "item-002", "title": "如何构建本地优先的个人知识库", "reasons": [], "createdAt": 1794799000000 },
+          { "kind": "review-required", "id": "review-required:item-003", "itemId": "item-003", "title": "", "reasons": ["来源页面需要登录后才能查看完整内容"], "createdAt": 1794798000000 },
+          { "kind": "import-issue", "id": "import-issue:task-f1", "taskId": "task-f1", "title": "微信公众号：本地优先软件的七个理想", "status": "failed", "message": "网络连接超时，已重试 3 次仍未成功", "resultItemId": null, "duplicateItemId": null, "createdAt": 1794797000000 },
+          { "kind": "import-issue", "id": "import-issue:task-f2", "taskId": "task-f2", "title": "知乎专栏：为什么要做本地优先的笔记软件，以及它与云端同步方案之间的取舍", "status": "failed", "message": "目标站点要求登录后访问，当前的采集策略无法获取正文，请在设置中配置浏览器登录状态后再重试", "resultItemId": null, "duplicateItemId": null, "createdAt": 1794796000000 },
+          { "kind": "import-issue", "id": "import-issue:task-d1", "taskId": "task-d1", "title": "技术论坛：数据库备份的常见误区", "status": "duplicate", "message": "内容与已有条目重复，已跳过保存", "resultItemId": null, "duplicateItemId": "item-012", "createdAt": 1794795000000 },
+          { "kind": "import-issue", "id": "import-issue:task-w1", "taskId": "task-w1", "title": "视频：深入理解操作系统", "status": "completed", "message": "正文提取不完整：已保留部分文字，缺少 2 张图片", "resultItemId": "item-020", "duplicateItemId": null, "createdAt": 1794794000000 },
+          { "kind": "unclassified", "id": "unclassified:item-101", "itemId": "item-101", "title": "读书清单：二〇二六年第四季度", "createdAt": 1794793000000 },
+          { "kind": "unclassified", "id": "unclassified:item-102", "itemId": "item-102", "title": "周末徒步路线整理", "createdAt": 1794792000000 },
+          { "kind": "unclassified", "id": "unclassified:item-103", "itemId": "item-103", "title": "旅行预算与行程草稿", "createdAt": 1794791000000 },
+          { "kind": "unclassified", "id": "unclassified:item-104", "itemId": "item-104", "title": "会议纪要：产品评审", "createdAt": 1794790000000 }
+        ],
+        "counts": { "review-required": 3, "unclassified": 4, "import-issue": 4, "discovery-candidate": 0, "semantic-pending": 0, "wiki-pending": 0 },
+        "total": 7
+      },
+      "wiki": { "ready": 5, "review": 2, "waiting": 1, "upgrade": 1 },
+      "semantic": { "eligibleItems": 120, "indexedItems": 80 }
+    },
+    "empty": {
+      "list": {
+        "items": [],
+        "counts": { "review-required": 0, "unclassified": 0, "import-issue": 0, "discovery-candidate": 0, "semantic-pending": 0, "wiki-pending": 0 },
+        "total": 0
+      },
+      "wiki": { "ready": 0, "review": 0, "waiting": 0, "upgrade": 0 },
+      "semantic": { "eligibleItems": 0, "indexedItems": 0 }
+    }
+  }
+}

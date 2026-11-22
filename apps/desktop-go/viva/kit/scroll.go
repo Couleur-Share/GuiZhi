@@ -55,18 +55,30 @@ func (v ScrollView) Span() (lo, hi float32) {
 
 // ScrollAreaView 是 ScrollArea，另把滚动区上一帧的几何交给 body。
 func (l *Look) ScrollAreaView(c ui.C, pad [4]float32, body func(ScrollView)) ui.Box {
+	return l.scrollArea(c, pad, false, body)
+}
+
+// ScrollAreaFlush 是 ScrollArea，但溢出恰好 0.5px 也算溢出（槽与拇指都出）：Chromium 按 1/64 像素判定溢出，
+// 而 ScrollArea 的 0.5px 容差把「恰好 0.5」放成了没有滚动条。处理中心在小字号档下列表溢出恰好 0.5px，渲染层出了滚动条槽（M3-1，`inbox.all` 的 T2）。
+// 容差没有统一改小：已通过对照的家族没有逐个核对过，改动留给下一次全量回归（见交付报告）。
+func (l *Look) ScrollAreaFlush(c ui.C, pad [4]float32, body func()) ui.Box {
+	return l.scrollArea(c, pad, true, func(ScrollView) { body() })
+}
+
+// scrollArea 是 ScrollAreaView 的实现：溢出超过 0.5px 算溢出，inclusive 为真时恰好 0.5px 也算。
+func (l *Look) scrollArea(c ui.C, pad [4]float32, inclusive bool, body func(ScrollView)) ui.Box {
 	box := ui.Scroll(c)
 	state := box.ScrollState()
 	// 区里声明的可聚焦控件登记到这个区域名下（Tab 可达与聚焦跟随滚动，见 reach.go）；快照在画完时取。
 	area := l.reach.enter(state)
 	view := ScrollView{Offset: state.Offset, Viewport: state.Viewport, Content: state.Content, Pad: pad, State: state, reach: area}
 	right := pad[1]
-	if state.Content > state.Viewport+0.5 {
+	if overflows(state.Content, state.Viewport, inclusive) {
 		right += scrollbarPx
 	}
 	out := box.PadSides(pad[0], right, pad[2], pad[3]).
 		DrawOver(func(d *ui.DrawContext) {
-			l.paintScrollThumb(d, box.ScrollState())
+			l.paintScrollThumb(d, box.ScrollState(), inclusive)
 			l.settleReach(d, area)
 		}).
 		Children(func() { body(view) })
@@ -74,11 +86,19 @@ func (l *Look) ScrollAreaView(c ui.C, pad [4]float32, body func(ScrollView)) ui.
 	return out
 }
 
+// overflows 报告内容是否比视口高出了 0.5px 以上（inclusive 为真时恰好高出 0.5px 也算）。
+func overflows(content, viewport float32, inclusive bool) bool {
+	if inclusive {
+		return content >= viewport+0.5
+	}
+	return content > viewport+0.5
+}
+
 // paintScrollThumb 在滚动区右缘画拇指。state.Content 是内容总高（含内边距），Viewport 是视口高（不含内边距）。
-func (l *Look) paintScrollThumb(d *ui.DrawContext, state *ui.ScrollState) {
+func (l *Look) paintScrollThumb(d *ui.DrawContext, state *ui.ScrollState, inclusive bool) {
 	view := d.Rect.Height
 	content := state.Content + (d.Rect.Height - state.Viewport) // 内容 + 上下内边距 = 可滚动总高
-	if content <= view+0.5 {
+	if !overflows(content, view, inclusive) {
 		return
 	}
 	track := view
