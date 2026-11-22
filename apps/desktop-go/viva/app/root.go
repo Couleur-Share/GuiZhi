@@ -83,7 +83,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 		Store: r.store, Guard: r.guard, Wake: invalidate,
 		Solver: opts.Services.Solver, Shortcuts: opts.Services.Shortcuts, Updater: opts.Services.Updater,
 		Data: opts.Services.Data, Backup: opts.Services.Backup, ConfigTransfer: opts.Services.ConfigTransfer,
-		CaptureTools: opts.Services.CaptureTools, MCP: opts.Services.MCP, Collections: opts.Services.Library, Platform: opts.Platform,
+		CaptureTools: opts.Services.CaptureTools, MCP: opts.Services.MCP, AI: opts.Services.AI, Collections: opts.Services.Library, Platform: opts.Platform,
 		AppVersion: opts.AppVersion, OpenExternal: opts.Services.OpenExternal,
 	}
 	r.win = &shell.Window{

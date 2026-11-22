@@ -16,6 +16,8 @@ type SwitchSpec struct {
 	Label string
 	// Disabled 对应 `disabled`：整枚开关 opacity-50，点击与键盘都不起作用。
 	Disabled bool
+	// Compact 是紧凑尺寸（ToggleSwitch size="compact"）：h-5 w-9 border，旋钮 h-4 w-4，top 1px，left 为 1px / 17px（px 字面量）。
+	Compact bool
 }
 
 // Switch 复刻渲染层设置页的 ToggleSwitch（默认尺寸）：h-7 w-12 border-2 的全圆角按钮，
@@ -42,6 +44,12 @@ func (l *Look) SwitchWith(c ui.C, on *bool, spec SwitchSpec) ui.Box {
 	anim := ui.ID(c.Key("anim"))
 	width, height := l.Rem(3), l.Rem(1.75)
 	diameter, top := l.Rem(1.25), l.Rem(0.125)
+	border, off, travel := float32(2), float32(2), float32(20) // 边框宽、未选中的 left、旋钮行程（px 字面量）
+	if spec.Compact {
+		width, height = l.Rem(2.25), l.Rem(1.25)
+		diameter, top = l.Rem(1), 1
+		border, off, travel = 1, 1, 16
+	}
 	radius := height / 2
 
 	// flex-shrink-0：窄行里让说明文字让位，开关保持原宽。
@@ -64,10 +72,10 @@ func (l *Look) SwitchWith(c ui.C, on *bool, spec SwitchSpec) ui.Box {
 	}
 	opacity := 1 - 0.5*dim // disabled:opacity-50
 	fill := fade(MixToken(offFill, t.Primary, p), opacity)
-	border := fade(MixToken(offBorder, t.Primary, p), opacity)
+	borderInk := fade(MixToken(offBorder, t.Primary, p), opacity)
 	knob := fade(MixToken(offKnob, white, p), opacity)
-	left := 2 + 20*p // 2px → 22px，px 字面量
-	trackSurface := Surface{Bg: fill, Border: border, BorderW: 2, Radius: radius}
+	left := off + travel*p // 默认 2px → 22px，紧凑 1px → 17px，px 字面量
+	trackSurface := Surface{Bg: fill, Border: borderInk, BorderW: border, Radius: radius}
 
 	return track.Draw(func(d *ui.DrawContext) {
 		// 聚焦环只出现在边框盒外侧（box-shadow 的环不进盒子里面）：用空心环，半透明的轨道底色才不会透出环色。
@@ -77,7 +85,7 @@ func (l *Look) SwitchWith(c ui.C, on *bool, spec SwitchSpec) ui.Box {
 		// 轨道与旋钮都按 Chromium 的规则吸附到设备像素（见 surface.go）；
 		// 旋钮相对按钮的内边距盒（边框之内）定位：border-2 + top / left，直径与 top 随根字号缩放。
 		l.PaintSurface(d, trackSurface)
-		bounds := gfx.Rect{X: d.Rect.X + 2 + left, Y: d.Rect.Y + 2 + top, Width: diameter, Height: diameter}
+		bounds := gfx.Rect{X: d.Rect.X + border + left, Y: d.Rect.Y + border + top, Width: diameter, Height: diameter}
 		d.Canvas.Rounded(SnapRect(bounds, d.Canvas.PixelScale()), diameter/2, d.Fade(l.Col(knob)))
 	})
 }

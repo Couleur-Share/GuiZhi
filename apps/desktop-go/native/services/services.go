@@ -41,6 +41,10 @@ type Services struct {
 	CaptureTools CaptureTools
 	MCP          MCP
 
+	// AI 是设置页「AI 模型服务」分区的系统能力（见 ai_settings.go）；
+	// nil 时分区读不出配置、显示加载失败（测试与对照里不接线）。
+	AI AISettings
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 

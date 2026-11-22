@@ -80,8 +80,10 @@ type Shell struct {
 	// Platform 是运行平台（Node 写法，"win32" 等；说话人分离据此判断可用与否）。nil 或空表示外壳没接，各页如实报错或降级。
 	CaptureTools services.CaptureTools
 	MCP          services.MCP
-	Collections  CollectionSource
-	Platform     string
+	// AI 是「AI 模型服务」页要用的服务（配置读写、连通性测试、模型拉取、用量）；nil 表示外壳没接，页面如实显示读取失败。
+	AI          services.AISettings
+	Collections CollectionSource
+	Platform    string
 	// AppVersion 是当前应用版本号（关于页显示）。
 	AppVersion string
 	// OpenExternal 用系统浏览器打开链接（关于页的链接）；nil 时点击弹出失败提示。
@@ -96,6 +98,7 @@ type Shell struct {
 	data       *Data
 	network    *Network
 	capture    *Capture
+	ai         *AI
 	mcp        *MCP
 	shortcuts  *Shortcuts
 	about      *About
@@ -127,6 +130,11 @@ func (s *Shell) remount() {
 			s.capture.Close()
 		}
 		s.capture = nil
+	case SectionAI:
+		if s.ai != nil {
+			s.ai.Close()
+		}
+		s.ai = nil
 	case SectionMCP:
 		if s.mcp != nil {
 			s.mcp.Close()
@@ -206,6 +214,14 @@ func (s *Shell) content(c ui.C) {
 		p.Look, p.Store, p.Guard, p.Service, p.Solver = l, s.Store, s.Guard, s.CaptureTools, s.Solver
 		p.Platform, p.Cache, p.Now, p.Wake = s.Platform, &s.engines, s.Now, s.Wake
 		p.Page(c)
+	case SectionAI:
+		if s.ai == nil {
+			s.ai = &AI{}
+		}
+		a := s.ai
+		a.Look, a.Guard, a.Service, a.Wake, a.Locale, a.Now = l, s.Guard, s.AI, s.Wake, s.Locale, s.Now
+		a.OnManageEngine = func() { s.Active = SectionCapture }
+		a.Page(c)
 	case SectionMCP:
 		if s.mcp == nil {
 			s.mcp = &MCP{}
