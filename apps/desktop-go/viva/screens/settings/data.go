@@ -52,6 +52,8 @@ type Data struct {
 	Transfer services.ConfigTransfer
 	// Wake 请求窗口重绘：后台结果回到界面线程前调用。可为 nil。
 	Wake func()
+	// Locale 是时间的区域写法（系统区域，kit.ParseDateLocale）；零值按中文。
+	Locale kit.DateLocale
 
 	intervalSel, keepSel kit.SelectState
 
@@ -84,8 +86,8 @@ func (d *Data) Page(c ui.C) {
 	l := d.Look
 	d.w.drain()
 	d.start()
-	d.repo.Look, d.repo.Guard, d.repo.Backup, d.repo.Wake = l, d.Guard, d.Backup, d.Wake
-	d.transfer.Look, d.transfer.Guard, d.transfer.Service, d.transfer.Runtime, d.transfer.Wake = l, d.Guard, d.Transfer, d.Runtime, d.Wake
+	d.repo.Look, d.repo.Guard, d.repo.Backup, d.repo.Wake, d.repo.Locale = l, d.Guard, d.Backup, d.Wake, d.Locale
+	d.transfer.Look, d.transfer.Guard, d.transfer.Service, d.transfer.Runtime, d.transfer.Wake, d.transfer.Locale = l, d.Guard, d.Transfer, d.Runtime, d.Wake, d.Locale
 	l.SettingsContent(c, locales.SettingsData(), func() {
 		l.SettingSections(c, func() {
 			d.plan(c)
@@ -264,7 +266,7 @@ func (d *Data) toolbar(c ui.C) {
 				d.open(d.paths.BackupsDir, locales.SettingsOpenBackupsDir())
 			}
 			// 后台任务（定时备份、后台 Wiki 编译）失败时不弹窗，只记进 error.log；这个按钮是它们唯一的出口。
-			logs := kit.ButtonSpec{Label: locales.SettingsOpenLogs(), Icon: icons.ScrollText, Disabled: !d.havePaths, Hint: locales.SettingsOpenLogsHint()}
+			logs := kit.ButtonSpec{Label: locales.SettingsOpenLogs(), Icon: icons.ScrollText, Disabled: !d.havePaths, Hint: locales.SettingsOpenLogsHint(), Description: locales.SettingsOpenLogsHint()}
 			if btn(l, c.Key("open-logs"), logs, outline, false) {
 				d.open(d.paths.LogsDir, locales.SettingsOpenLogs())
 			}
@@ -288,9 +290,9 @@ func (d *Data) snapshotRow(c ui.C, b services.BackupInfo, last bool) {
 		}).
 		Children(func() {
 			backupKindBadge(l, c.Key("badge"), b.Kind)
-			ui.Column(c.Key("info")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
-				l.Text(c.Key("time"), formatDateTime(b.CreatedAt, true), kit.TextSM, kit.WeightNormal, t.Foreground, kit.Ellipsis())
-				l.Text(c.Key("file"), b.FileName+" \u00b7 "+formatBytes(b.SizeBytes, true), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Ellipsis())
+			ui.Column(c.Key("info")).Grow(1).Basis(0).MinWidth(0).Children(func() {
+				l.Text(c.Key("time"), formatDateTime(b.CreatedAt, true, d.Locale), kit.TextSM, kit.WeightNormal, t.Foreground, kit.Ellipsis())
+				backupFileMeta(l, c.Key("file"), b.FileName, formatBytes(b.SizeBytes, true))
 			})
 			ic, size := iconOf(l, icons.ArchiveRestore, true)
 			restore := kit.ButtonSpec{Label: locales.SettingsBackupRestore(), Icon: ic, IconSize: size, Disabled: !idle}
@@ -314,7 +316,7 @@ func (d *Data) dialog(c ui.C) {
 	switch d.ask {
 	case askRestore:
 		spec.Title = locales.SettingsBackupRestoreConfirmTitle()
-		spec.Message = locales.SettingsBackupRestoreConfirmMessage(formatDateTime(d.target.CreatedAt, true))
+		spec.Message = locales.SettingsBackupRestoreConfirmMessage(formatDateTime(d.target.CreatedAt, true, d.Locale))
 	case askDelete:
 		spec.Title = locales.SettingsBackupDelete()
 		spec.Message = locales.SettingsBackupDeleteConfirmMessage(d.target.FileName)
@@ -435,5 +437,20 @@ func (d *Data) exportMarkdown() {
 			}
 		}
 		return func() { d.busy = dataIdle }
+	})
+}
+
+// backupFileMeta 是行里的「文件名 · 大小」：渲染层的 {fileName} · {size} 是三个相邻的文本节点（truncate 的 p），
+// 所以拆成三段画、对照才逐段对得上；文件名一段在放不下时带省略号收缩，分隔与大小保持完整。
+func backupFileMeta(l *kit.Look, c ui.C, name, size string) {
+	st := kit.TextXS
+	px := l.Rem(st.Size)
+	canvas := c.Canvas()
+	muted := l.T.MutedForeground
+	ui.Row(c).FillWidth().MinWidth(0).Items(ui.Start).Children(func() {
+		l.Text(c.Key("name"), name, st, kit.WeightNormal, muted, kit.Ellipsis()).Width(canvas.TextWidthWeight(name, px, kit.WeightNormal)).Shrink(1).MinWidth(0)
+		for i, run := range []string{" \u00b7 ", size} {
+			l.Text(c.Key("tail"+string(rune('0'+i))), run, st, kit.WeightNormal, muted).Width(canvas.TextWidthWeight(run, px, kit.WeightNormal)).Shrink(0)
+		}
 	})
 }

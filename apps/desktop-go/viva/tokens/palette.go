@@ -45,6 +45,10 @@ var tailwindPalette = map[string]string{
 	"amber-900":   "#78350f",
 	"amber-950":   "#451a03", // 搜索命中词（mark）的字色：highlight-text.tsx 的 text-amber-950
 	"emerald-500": "#10b981",
+	// 「恢复前」备份徽标（DataSettings 的 BackupKindBadge）：bg-violet-500/15 text-violet-600 dark:text-violet-400。
+	"violet-500": "#8b5cf6",
+	"violet-600": "#7c3aed",
+	"violet-400": "#a78bfa",
 	// 标签色点（type-meta.tsx 的 TAG_DOT_CLASSES）：十个颜色里除上面已有的 red / amber / green / blue 的 500 档之外的六个。
 	"orange-500": "#f97316",
 	"teal-500":   "#14b8a6",

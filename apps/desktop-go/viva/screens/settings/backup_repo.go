@@ -36,10 +36,12 @@ const (
 //
 // 口令只存在文本框里：作为参数交给服务，不进日志、提示与错误文案；启用、改口令成功与分区被切走时清空文本框。
 type RepositoryBackup struct {
-	Look    *kit.Look
-	Guard   kit.Guard
-	Backup  services.Backup
-	Wake    func()
+	Look   *kit.Look
+	Guard  kit.Guard
+	Backup services.Backup
+	Wake   func()
+	// Locale 是时间的区域写法（系统区域）；零值按中文。
+	Locale  kit.DateLocale
 	started bool
 
 	status    *services.RepositoryStatus
@@ -190,7 +192,7 @@ func (r *RepositoryBackup) importBlock(c ui.C) {
 			l.Text(c.Key("title"), locales.SettingsFullBackupImportTitle(), kit.TextSM, kit.WeightMedium, t.Foreground, kit.Wrapped())
 			l.Text(c.Key("desc"), locales.SettingsFullBackupImportDesc(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
 			ui.Flow(c.Key("row")).FillWidth().MarginTop(l.Space(3)).Gap(l.Space(2)).LineGap(l.Space(2)).Items(ui.End).Children(func() {
-				labeledField(l, c.Key("unlock"), &r.unlock, "", locales.SettingsFullBackupImportPasswordPlaceholder(), "", l.Rem(14), true)
+				namedField(l, c.Key("unlock"), &r.unlock, "", locales.SettingsFullBackupImportPasswordLabel(), locales.SettingsFullBackupImportPasswordPlaceholder(), "", intrinsicInputWidth(l), true)
 				r.importButton(c.Key("import-button"))
 			})
 		})
@@ -213,7 +215,7 @@ func (r *RepositoryBackup) ready(c ui.C) {
 		ui.Column(c.Key("top")).FillWidth().Pad(l.Space(4)).Gap(l.Space(3)).Children(func() {
 			r.keyring(c.Key("keyring"))
 			ui.Flow(c.Key("actions")).FillWidth().Gap(l.Space(2)).LineGap(l.Space(2)).Items(ui.End).Children(func() {
-				labeledField(l, c.Key("unlock"), &r.unlock, "", locales.SettingsFullBackupUnlockPlaceholder(), "", l.Rem(14), true)
+				namedField(l, c.Key("unlock"), &r.unlock, "", locales.SettingsFullBackupUnlockLabel(), locales.SettingsFullBackupUnlockPlaceholder(), "", intrinsicInputWidth(l), true)
 				now := kit.ButtonSpec{Label: locales.SettingsFullBackupNow(), Icon: icons.DatabaseBackup, Disabled: !idle}
 				if btn(l, c.Key("now"), now, primaryBtn(l, shape(l, 2.5, 3, 2, kit.TextSM, kit.WeightMedium)), r.busy == repoCreate) {
 					r.createSnapshot()
@@ -300,8 +302,8 @@ func (r *RepositoryBackup) snapshotRow(c ui.C, s services.BackupInfo, last bool)
 				kind = locales.SettingsBackupKindAuto()
 			}
 			pill(l, c.Key("kind"), kind, t.Primary.WithAlpha(0.1), t.Primary, 0, false)
-			ui.Column(c.Key("info")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
-				l.Text(c.Key("time"), formatDateTime(s.CreatedAt, false), kit.TextSM, kit.WeightNormal, t.Foreground)
+			ui.Column(c.Key("info")).Grow(1).Basis(0).MinWidth(0).Children(func() {
+				l.Text(c.Key("time"), formatDateTime(s.CreatedAt, false, r.Locale), kit.TextSM, kit.WeightNormal, t.Foreground)
 				var items, assets, schema int
 				if s.Summary != nil {
 					items, assets, schema = s.Summary.ItemCount, s.Summary.AssetCount, s.Summary.SchemaVersion
@@ -332,7 +334,7 @@ func (r *RepositoryBackup) snapshotRow(c ui.C, s services.BackupInfo, last bool)
 func (r *RepositoryBackup) changePassword(c ui.C) {
 	l := r.Look
 	t := l.T
-	ui.Column(c).FillWidth().Pad(l.Space(4) + 1).
+	ui.Column(c).FillWidth().PadSides(l.Space(4)+1, l.Space(4), l.Space(4), l.Space(4)).
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeTop, 1, t.Border.WithAlpha(0.6)) }).
 		Children(func() {
 			if summaryRow(l, c.Key("details"), locales.SettingsFullBackupChangePassword(), r.changeOpen, t.Foreground) {
@@ -342,8 +344,8 @@ func (r *RepositoryBackup) changePassword(c ui.C) {
 				return
 			}
 			ui.Flow(c.Key("form")).FillWidth().MarginTop(l.Space(3)).Gap(l.Space(2)).LineGap(l.Space(2)).Items(ui.End).Children(func() {
-				labeledField(l, c.Key("current"), &r.current, locales.SettingsFullBackupCurrentPassword(), "", "", l.Rem(13), true)
-				labeledField(l, c.Key("next"), &r.next, locales.SettingsFullBackupNewPassword(), "", "", l.Rem(13), true)
+				labeledField(l, c.Key("current"), &r.current, locales.SettingsFullBackupCurrentPassword(), "", "", intrinsicInputWidth(l), true)
+				labeledField(l, c.Key("next"), &r.next, locales.SettingsFullBackupNewPassword(), "", "", intrinsicInputWidth(l), true)
 				spec := kit.ButtonSpec{Label: locales.SettingsFullBackupConfirmChange(), Disabled: r.busy != repoIdle}
 				if btn(l, c.Key("confirm"), spec, outlineBtn(l, shape(l, 2.5, 3, 0, kit.TextSM, kit.WeightNormal), t.Muted), r.busy == repoPassword) {
 					r.changeRecoveryPassword()

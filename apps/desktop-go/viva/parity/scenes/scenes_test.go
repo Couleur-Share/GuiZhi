@@ -49,6 +49,11 @@ var knownRed = map[string]redPin{
 	// B-071：工具侧栏在 Viva 里排在内容面板之后，渲染层里在它之前——留着内容面板的工具栏时，工具栏与侧栏文字的先后错开，
 	// L1 文字顺序整段错位（其余场景把工具栏隐去，见 C-013）；这个场景专门钉住这个差别。
 	"app.window.library.detail-tools-note-toolbar": {Ledger: "B-071", Kinds: []string{"L1/extra-node", "L1/missing-node", "L1/text", "L1/unmapped-role", "L2/alignment"}, Max: 23},
+	// G-034（M3-2a）：「关于」页的应用图标是有名字的 image，映射表没有规则；该场景其余全部通过，只有这 1 条 L1/unmapped-role。
+	"settings.about": {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	// G-035（M3-2a）：快捷键录制框在 Viva 里表达不成「只读文本框 + 值」（ui.Control 没有 Value/ReadOnly）：
+	// 4 个录制框各一条 missing-node（React 的 textfield）与 extra-node（Viva 的同名 group），加 L2/alignment。
+	"settings.shortcuts": {Ledger: "G-035", Kinds: []string{"L1/extra-node", "L1/missing-node", "L2/alignment"}, Max: 9},
 }
 
 func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {

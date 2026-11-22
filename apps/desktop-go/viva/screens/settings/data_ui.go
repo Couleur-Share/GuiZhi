@@ -3,6 +3,7 @@ package settings
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 	"unicode/utf16"
@@ -33,10 +34,10 @@ func formatBytes(n int64, withBytes bool) string {
 }
 
 // formatDateTime 是备份时间的显示（渲染层 toLocaleString）。compact 为真时是年月日时分、日期时间各两位（DataSettings 指定的格式）；
-// 否则是默认格式（带秒，月日不补零；RepositoryBackupSection）。中文与英文各按各自的区域习惯。
-func formatDateTime(ms int64, compact bool) string {
+// 否则是默认格式（带秒，月日不补零；RepositoryBackupSection）。区域取系统区域（kit.ParseDateLocale），不是界面语言：英文界面配中文系统时，渲染层照样写成「2026/11/21 14:30:12」。
+func formatDateTime(ms int64, compact bool, locale kit.DateLocale) string {
 	at := time.UnixMilli(ms).Local()
-	en := locales.CurrentLang() == locales.En
+	en := locale != kit.DateLocaleZH && locale != "" // 渲染层的 toLocaleString() 取浏览器区域（系统区域），不随界面语言；零值按中文
 	switch {
 	case compact && en:
 		return at.Format("01/02/2006, 03:04 PM")
@@ -182,6 +183,19 @@ func backupKindBadge(l *kit.Look, c ui.C, kind string) {
 // labeledField 是 components/ui/Input：可选的标签（text-sm font-medium）、文本框（h-10）与错误行（text-xs text-destructive）纵排，gap-1.5。
 // width 为 0 时撑满容器；secure 为真时内容是圆点。返回里面的输入元素，调用方用 Changed() 感知编辑。
 func labeledField(l *kit.Look, c ui.C, f *ui.Field, label, placeholder, errText string, width float32, secure bool) ui.Box {
+	return namedField(l, c, f, label, "", placeholder, errText, width, secure)
+}
+
+// intrinsicInputWidth 是没有显式宽度的 <input>（size=20，px-4，border）的外框宽度。
+// 组件库 Input 把 className（如 w-56）挂在 <input> 上，外层 div 是 flex 子项按内容收缩，w-full 因此退回固有宽度：
+// 内容宽度 = 20 × 字体平均字符宽，并取整到整像素（实测 text-sm 三个字号档：小 135、中 155、大 174，即 31/56em 的 20 倍向下取整）。
+func intrinsicInputWidth(l *kit.Look) float32 {
+	content := float64(20*31) / 56 * float64(l.Rem(0.875))
+	return 2 + 2*l.Rem(1) + float32(math.Floor(content+1e-3))
+}
+
+// namedField 同 labeledField，另可给出与可见标签不同的可访问名（aria-label）；name 为空时取标签，再取占位文字。
+func namedField(l *kit.Look, c ui.C, f *ui.Field, label, name, placeholder, errText string, width float32, secure bool) ui.Box {
 	t := l.T
 	col := ui.Column(c).Gap(l.Space(1.5))
 	if width > 0 {
@@ -195,11 +209,13 @@ func labeledField(l *kit.Look, c ui.C, f *ui.Field, label, placeholder, errText 
 			l.Text(c.Key("label"), label, kit.TextSM, kit.WeightMedium, t.Foreground)
 		}
 		f.Secure = secure
-		name := label
+		if name == "" {
+			name = label
+		}
 		if name == "" {
 			name = placeholder
 		}
-		input = l.FieldInput(c.Key("input"), f, kit.FieldSpec{Name: name, Placeholder: placeholder})
+		input = l.FieldInput(c.Key("input"), f, kit.FieldSpec{Name: name, Placeholder: placeholder, PlaceholderInk: t.MutedForeground})
 		if errText != "" {
 			l.Text(c.Key("error"), errText, kit.TextXS, kit.WeightNormal, t.Destructive, kit.Wrapped())
 		}
@@ -214,7 +230,7 @@ func summaryRow(l *kit.Look, c ui.C, name string, open bool, fg tokens.Color) bo
 	size := kit.TextSM
 	marker := kit.ChromeDisclosureMarker(l.Rem(size.Size), l.Rem(size.Line), l.Scale)
 	sc := c.Key("summary")
-	row := ui.Row(sc).Self(ui.Start).Items(ui.Center).PadSides(0, 0, 0, marker.Advance).
+	row := ui.Row(sc).FillWidth().Items(ui.Center).PadSides(0, 0, 0, marker.Advance).
 		HitWith(ui.ID(sc), name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Expandable: true, Expanded: open}).
 		Draw(func(d *ui.DrawContext) { kit.PaintDisclosure(d, d.Rect, marker, open, fg) })
 	l.TabStop(row)

@@ -110,7 +110,7 @@ func (l *Look) SettingItem(c ui.C, row SettingRow, last bool) {
 			d.Canvas.Fill(line, d.Fade(l.Col(t.Border.WithAlpha(0.7))))
 		})
 	box.Children(func() {
-		ui.Column(c).Shrink(1).Children(func() {
+		ui.Column(c).Shrink(1).MinWidth(0).Children(func() { // min-w-0：说明长了可以收缩折行，把宽度让给 w-full 的右侧控件
 			l.Text(c, row.Label, TextSM, WeightMedium, t.Foreground)
 			if row.Description != "" {
 				l.Text(c, row.Description, TextXS, WeightNormal, t.MutedForeground, Wrapped()).MarginTop(l.Space(0.5))

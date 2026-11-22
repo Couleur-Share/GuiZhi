@@ -23,6 +23,9 @@ var (
 // errShortcutsUnavailable 表示外壳没有接快捷键服务：保存不了，必须如实说，不能弹一句「已更新」。
 var errShortcutsUnavailable = errors.New("shortcut service is not available")
 
+// textXSNormal 是 text-xs leading-normal：12px 字、行高 1.5 倍（18px）。
+var textXSNormal = kit.TextStyle{Size: 0.75, Line: 0.75 * 1.5}
+
 // shortcutItem 是一项可设置的快捷键：动作键（与主进程一致）、标签与说明。
 type shortcutItem struct {
 	action      string
@@ -132,7 +135,8 @@ func (s *Shortcuts) tips(c ui.C) {
 		for i, tip := range []string{
 			locales.SettingsShortcutTip1(), locales.SettingsShortcutTip2(), locales.SettingsShortcutTip3(), locales.SettingsShortcutModeDesc(),
 		} {
-			l.Text(c.Key(string(rune('a'+i))), "• "+tip, kit.TextSM, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
+			// 渲染层是 <p>• {tip}</p>：「• 」与正文是两个相邻文本节点，拆成两段画对照才逐段对得上。
+			l.TextRuns(c.Key(string(rune('a'+i))), kit.TextSM, kit.WeightNormal, l.T.MutedForeground, "• ", tip)
 		}
 	})
 }
@@ -143,8 +147,8 @@ func (s *Shortcuts) item(c ui.C, idx int, it shortcutItem) {
 	t := l.T
 	label := it.label()
 	l.ShortcutRow(c, idx == len(shortcutItems)-1, func() {
-		l.Text(c, label, kit.TextSM, kit.WeightMedium, t.Foreground)
-		l.Text(c.Key("desc"), it.desc(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1.5))
+		l.Text(c, label, kit.TextSM, kit.WeightMedium, t.Foreground, kit.Wrapped())
+		l.Text(c.Key("desc"), it.desc(), textXSNormal, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1.5))
 		if other := s.conflicts[it.action]; other != "" {
 			ui.Row(c.Key("conflict")).Items(ui.Center).Gap(l.Space(1.5)).MarginTop(l.Space(2)).Children(func() {
 				l.Icon(c, icons.TriangleAlert, l.Space(3.5), red500)
@@ -152,7 +156,7 @@ func (s *Shortcuts) item(c ui.C, idx int, it shortcutItem) {
 			})
 		}
 	}, func() {
-		s.modeSelect(c, idx, it, label)
+		s.modeSelect(c, idx, it)
 		s.recorders[idx].declare(l, c.Key("recorder"), locales.SettingsShortcutInputLabel(label), s.accelerators[it.action], func(accel string) {
 			s.change(it.action, accel)
 		})
@@ -160,24 +164,29 @@ func (s *Shortcuts) item(c ui.C, idx int, it shortcutItem) {
 	})
 }
 
-// modeSelect 是「全局 / 应用内」下拉（w-[110px]，h-9 text-xs）。
-func (s *Shortcuts) modeSelect(c ui.C, idx int, it shortcutItem, label string) {
+// modeSelect 是「全局 / 局部」下拉：外层 <div class="w-[110px]">，className 的 h-9 text-xs 落在 Select 的容器上，
+// 触发按钮自己仍是 w-full h-10 text-sm，所以按钮（40px）比容器（36px）高，向下溢出 4px；容器让一行的对齐按 36px 算。
+// 按钮没有 aria-label，可访问名取按钮里的文字（当前模式的名称）。
+func (s *Shortcuts) modeSelect(c ui.C, idx int, it shortcutItem) {
 	l := s.Look
-	t := l.T
-	trigger := kit.SelectTriggerStyle{
-		Height: l.Rem(2.25), MinWidth: 110, PadX: l.Rem(0.75), Gap: l.Rem(0.5), Radius: l.Rem(0.75),
-		Bg: t.Muted, BgHover: t.Muted.WithAlpha(0.8), FontPx: l.Rem(0.75), LinePx: l.Rem(1), Transition: kit.DurationQuick, TextStart: true,
+	options := []kit.SelectOption{
+		{Value: services.ShortcutModeGlobal, Label: locales.SettingsShortcutModeGlobal()},
+		{Value: services.ShortcutModeLocal, Label: locales.SettingsShortcutModeLocal()},
 	}
-	picked, changed := l.Select(c.Key("mode"), &s.modeSels[idx], kit.SelectSpec{
-		Label: locales.SettingsShortcutMode() + " · " + label, Value: s.modes[it.action], MenuMinWidth: 110, Trigger: &trigger,
-		Options: []kit.SelectOption{
-			{Value: services.ShortcutModeGlobal, Label: locales.SettingsShortcutModeGlobal()},
-			{Value: services.ShortcutModeLocal, Label: locales.SettingsShortcutModeLocal()},
-		},
+	current := ""
+	for _, o := range options {
+		if o.Value == s.modes[it.action] {
+			current = o.Label
+		}
+	}
+	ui.Column(c.Key("mode-box")).Width(110).Height(l.Rem(2.25)).Shrink(0).Children(func() {
+		picked, changed := l.Select(c.Key("mode"), &s.modeSels[idx], kit.SelectSpec{
+			Label: current, Value: s.modes[it.action], MenuMinWidth: 110, Width: 110, Options: options,
+		})
+		if changed {
+			s.setMode(it.action, picked)
+		}
 	})
-	if changed {
-		s.setMode(it.action, picked)
-	}
 }
 
 // clearSlot 是 w-8 的清除按钮位：有快捷键才显示（p-2 圆形图标按钮，悬停 bg-muted、text-destructive）。

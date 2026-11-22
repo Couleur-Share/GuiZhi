@@ -59,12 +59,13 @@ func (a *About) identity(c ui.C) {
 			if version == "" {
 				version = "..."
 			}
-			line := locales.SettingsCurrentVersion(version) + " · " + a.channelLabel()
 			opts := []kit.TextOpt{kit.Wrapped()}
 			if !wide {
 				opts = append(opts, kit.Centered())
 			}
-			l.Text(c.Key("version"), line, kit.TextSM, kit.WeightNormal, t.MutedForeground, opts...).MarginTop(l.Space(1))
+			// 渲染层是「版本」「 · 」（aria-hidden 的 span）「通道」三个相邻文本节点：拆成同样三段画，对照才逐段对得上。
+			// 这一行很短（约 200px），不折行。
+			l.TextRuns(c.Key("version"), kit.TextSM, kit.WeightNormal, t.MutedForeground, locales.SettingsCurrentVersion(version), " \u00b7 ", a.channelLabel()).MarginTop(l.Space(1))
 			// text-xs leading-5：行高 1.25rem，不是 text-xs 自带的 1rem。
 			l.TextPx(c.Key("policy"), locales.SettingsSupportPolicyDesc(), l.Rem(0.75), l.Rem(1.25), kit.WeightNormal, t.MutedForeground, opts...).
 				MarginTop(l.Space(2)).MaxWidth(l.Rem(36))
@@ -412,10 +413,10 @@ func (a *About) contact(c ui.C) {
 	t := l.T
 	l.SettingSectionBody(c.Key("contact"), locales.SettingsContactAuthor(), func() {
 		ui.Column(c).FillWidth().PadSides(l.Space(3), l.Space(4), l.Space(3), l.Space(4)).Gap(l.Space(3)).Children(func() {
-			if a.contactRow(c.Key("github"), authorHandle, authorHandle, "GitHub", icons.Github, t.Foreground, t.Foreground.WithAlpha(0.1), icons.ExternalLink) {
+			if a.contactRow(c.Key("github"), gfx.RoleLink, authorHandle, "GitHub", icons.Github, t.Foreground, t.Foreground.WithAlpha(0.1), icons.ExternalLink) {
 				a.open(authorHandle, authorURL)
 			}
-			if a.contactRow(c.Key("email"), authorEmail, authorEmail, "Email", icons.Mail, t.Primary, t.Primary.WithAlpha(0.1), icons.ClipboardCopy) {
+			if a.contactRow(c.Key("email"), gfx.RoleButton, authorEmail, "Email", icons.Mail, t.Primary, t.Primary.WithAlpha(0.1), icons.ClipboardCopy) {
 				a.copyEmail()
 			}
 		})
@@ -424,11 +425,11 @@ func (a *About) contact(c ui.C) {
 
 // contactRow 画一行联系方式：32px 圆形头像底加图标，两行文字（主文字 text-sm font-medium，说明 text-xs muted），
 // 右侧一枚只在悬停时出现的图标（group-hover:opacity-100）。悬停底色 bg-muted/50，返回是否被点击。
-func (a *About) contactRow(c ui.C, name, title, subtitle string, icon gfx.Icon, ink, avatarBg tokens.Color, hoverIcon gfx.Icon) bool {
+func (a *About) contactRow(c ui.C, role gfx.Role, title, subtitle string, icon gfx.Icon, ink, avatarBg tokens.Color, hoverIcon gfx.Icon) bool {
 	l := a.Look
 	t := l.T
 	box := ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(3)).Pad(l.Space(2)).
-		HitWith(ui.ID(c), name, gfx.HitOptions{Role: gfx.RoleLink, Cursor: gfx.PointerCursorHand})
+		HitWith(ui.ID(c), title+" "+subtitle, gfx.HitOptions{Role: role, Cursor: gfx.PointerCursorHand}) // 可访问名取行内文字「标题 说明」
 	hovered := box.State().Hovered
 	radius := l.Rem(0.75)
 	box.Draw(func(d *ui.DrawContext) {

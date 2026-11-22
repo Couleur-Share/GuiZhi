@@ -1,0 +1,96 @@
+{
+  "version": "0.31.2",
+  "runtimePaths": {
+    "userDataPath": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi",
+    "dataDir": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\data",
+    "databasePath": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\data\\knowledge.db",
+    "backupsDir": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\backups",
+    "logsDir": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\logs"
+  },
+  "shortcuts": {
+    "showApp": "Ctrl+Alt+G",
+    "newItem": "Alt+Shift+N",
+    "search": "Alt+Shift+F",
+    "settings": ""
+  },
+  "proxy": {
+    "protocol": "socks5",
+    "host": "proxy.example.com",
+    "port": 1080,
+    "username": "alice",
+    "bypass": "<local>,localhost,127.0.0.1,*.corp.example.com"
+  },
+  "legacyBackups": [
+    {
+      "fileName": "knowledge-manual-20261121-103015.db",
+      "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\backups\\knowledge-manual-20261121-103015.db",
+      "kind": "manual",
+      "sizeBytes": 2516582,
+      "createdAt": 1795228215000,
+      "format": "legacy-db",
+      "encrypted": false,
+      "validation": "valid"
+    },
+    {
+      "fileName": "knowledge-auto-20261120-180005.db",
+      "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\backups\\knowledge-auto-20261120-180005.db",
+      "kind": "auto",
+      "sizeBytes": 2411724,
+      "createdAt": 1795168805000,
+      "format": "legacy-db",
+      "encrypted": false,
+      "validation": "valid"
+    },
+    {
+      "fileName": "knowledge-pre-update-20261118-222248.db",
+      "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\backups\\knowledge-pre-update-20261118-222248.db",
+      "kind": "pre-update",
+      "sizeBytes": 981504,
+      "createdAt": 1795011768000,
+      "format": "legacy-db",
+      "encrypted": false,
+      "validation": "valid"
+    },
+    {
+      "fileName": "knowledge-pre-restore-20261115-170509.db",
+      "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\backups\\knowledge-pre-restore-20261115-170509.db",
+      "kind": "pre-restore",
+      "sizeBytes": 524288,
+      "createdAt": 1794733509000,
+      "format": "legacy-db",
+      "encrypted": false,
+      "validation": "valid"
+    }
+  ],
+  "repository": {
+    "status": {
+      "initialized": true,
+      "automaticAccessAvailable": true,
+      "keyStorageBackend": "Windows DPAPI"
+    },
+    "snapshots": [
+      {
+        "fileName": "snap-20261121-143012",
+        "path": "",
+        "kind": "auto",
+        "sizeBytes": 52428800,
+        "createdAt": 1795242612000,
+        "format": "repository-snapshot",
+        "encrypted": true,
+        "validation": "valid",
+        "summary": { "itemCount": 128, "assetCount": 342, "configDomains": ["ai", "shortcuts", "ui"], "schemaVersion": 33, "appVersion": "0.31.2" }
+      },
+      {
+        "fileName": "snap-20261119-214530",
+        "path": "",
+        "kind": "manual",
+        "sizeBytes": 48234496,
+        "createdAt": 1795095930000,
+        "format": "repository-snapshot",
+        "encrypted": true,
+        "validation": "valid",
+        "summary": { "itemCount": 119, "assetCount": 318, "configDomains": ["ai", "shortcuts", "ui"], "schemaVersion": 33, "appVersion": "0.31.1" }
+      }
+    ]
+  }
+}

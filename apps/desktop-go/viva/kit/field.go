@@ -2,6 +2,8 @@ package kit
 
 import (
 	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // 表单文本框（渲染层 components/ui/Input.tsx，不带 label 与 error 的形态）：
@@ -22,6 +24,9 @@ type FieldSpec struct {
 	// AutoFocus 请求在出现的那一帧取得键盘焦点（渲染层 autoFocus）；Viva 只在元素刚出现时认这个请求，
 	// 用户挪走焦点之后不会拉回来，所以每一帧都可以传。
 	AutoFocus bool
+	// PlaceholderInk 非零时占位符由本控件自己画（裁切、不加省略号，与浏览器 <input> 的占位符一致）；
+	// 零值沿用 Viva 文本框自带的占位符（过长时会画省略号）。
+	PlaceholderInk tokens.Color
 }
 
 // FieldInput 声明表单文本框，返回里面的输入元素：调用方用 Changed() 感知编辑、Submitted() 感知回车。
@@ -49,6 +54,7 @@ func (l *Look) FieldInput(c ui.C, f *ui.Field, spec FieldSpec) ui.Box {
 		})
 		box = l.Input(c.Key("input"), f, name, spec.Placeholder, InputSpec{
 			Size: l.Rem(0.875), Weight: WeightNormal, Color: t.Foreground, Height: height, Left: pad, Right: pad,
+			Placeholder: spec.PlaceholderInk,
 		}).Absolute().Inset(0)
 		target := float32(0)
 		if box.State().Focused {

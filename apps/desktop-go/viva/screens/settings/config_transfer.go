@@ -44,6 +44,8 @@ type ConfigTransferSection struct {
 	Service services.ConfigTransfer
 	Runtime services.Data
 	Wake    func()
+	// Locale 是时间的区域写法（系统区域）；零值按中文。
+	Locale kit.DateLocale
 
 	busy xferBusy
 

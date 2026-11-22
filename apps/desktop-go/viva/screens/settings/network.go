@@ -6,45 +6,34 @@ import (
 
 	"github.com/vivaui/viva/ui"
 
-	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/settings"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
 
-// Network 是「网络」页（渲染层 NetworkSettings）：网络代理与应用更新的镜像源。
+// Network 是「网络」页（渲染层 NetworkSettings）：网络代理与应用更新的镜像源，两个分区，没有别的内容。
 //
-// 渲染层的 FlareSolverr 配置块挂在「采集与转写」页；那一页还没迁移，这里把它放在本页最下面（FlareSolverr 自成一块，
-// 迁移采集页时把它挂过去即可，台账登记为有意的临时位置）。
+// 渲染层的 FlareSolverr 配置块（FlareSolverrSettings）归「采集与转写」页（CaptureSettings），不在本页；
+// 它的 Viva 实现是同包的 FlareSolverr（flaresolverr.go），M3-2b 迁移采集页时直接挂载。
 type Network struct {
 	Look  *kit.Look
 	Store Store
 	// Guard 接住写入失败：弹出带原因的错误提示并记日志；零值时失败只会静默回到原值。
 	Guard kit.Guard
-	// Solver 与 Wake 交给本页最下面的 FlareSolverr 块（见 FlareSolverr 同名字段）。
-	Solver services.FlareSolverr
-	Wake   func()
 
 	modeSel, protocolSel kit.SelectState
 	// 手动代理的五个文本框：受控，每次编辑立即写入（渲染层 setNetworkProxy 逐键写入），文字始终跟设置里的值一致。
 	host, port, username, password, bypass ui.Field
 	showPassword                           bool
-
-	solver FlareSolverr
 }
 
-// Close 在分区被切走时调用：放掉后台状态（测试连接进行中的结果不再回来改界面）。
-func (n *Network) Close() { n.solver.Close() }
-
-// Page 声明整页：代理、应用更新两个分区，加 FlareSolverr 块。
+// Page 声明整页：代理、应用更新两个分区。
 func (n *Network) Page(c ui.C) {
 	l := n.Look
 	l.SettingsContent(c, locales.SettingsNetwork(), func() {
 		l.SettingSections(c, func() {
 			n.proxy(c)
 			n.mirror(c)
-			n.solver.Look, n.solver.Store, n.solver.Guard, n.solver.Solver, n.solver.Wake = l, n.Store, n.Guard, n.Solver, n.Wake
-			n.solver.Page(c.Key("flaresolverr"))
 		})
 	})
 }
@@ -109,7 +98,7 @@ func (n *Network) proxy(c ui.C) {
 			kit.SettingRow{
 				Label: locales.SettingsNetworkProxyBypass(), Description: locales.SettingsNetworkProxyBypassDesc(),
 				Control: func() {
-					n.field(c.Key("bypass"), &n.bypass, kit.SettingsInputSpec{Name: locales.SettingsNetworkProxyBypass()},
+					n.field(c.Key("bypass"), &n.bypass, kit.SettingsInputSpec{Name: locales.SettingsNetworkProxyBypass(), MaxWidth: n.maxControlWidth()}, // w-full max-w-md
 						func() string { return n.proxyNow().Bypass },
 						func(text string) { n.setProxy(func(p *settings.NetworkProxy) { p.Bypass = text }) })
 				},
@@ -125,7 +114,7 @@ func (n *Network) maxControlWidth() float32 { return n.Look.Rem(28) }
 // hostPort 是「代理地址」行的控件：主机输入（flex-1）加端口输入（w-24），中间 gap-2。
 func (n *Network) hostPort(c ui.C) {
 	l := n.Look
-	ui.Row(c.Key("host-port")).FillWidth().MaxWidth(n.maxControlWidth()).Items(ui.Center).Gap(l.Space(2)).Children(func() {
+	ui.Row(c.Key("host-port")).WidthPercent(100).MaxWidth(n.maxControlWidth()).Items(ui.Center).Gap(l.Space(2)).Children(func() {
 		n.field(c.Key("host"), &n.host, kit.SettingsInputSpec{Name: locales.SettingsNetworkProxyHost(), Placeholder: "127.0.0.1", Grow: true},
 			func() string { return n.proxyNow().Host },
 			func(text string) { n.setProxy(func(p *settings.NetworkProxy) { p.Host = text }) })
@@ -138,7 +127,7 @@ func (n *Network) hostPort(c ui.C) {
 // auth 是「代理认证」行的控件：用户名与口令两列等宽（grid-cols-2 gap-2）。口令框带显示/隐藏按钮，默认是圆点。
 func (n *Network) auth(c ui.C) {
 	l := n.Look
-	ui.Row(c.Key("auth")).FillWidth().MaxWidth(n.maxControlWidth()).Items(ui.Center).Gap(l.Space(2)).Children(func() {
+	ui.Row(c.Key("auth")).WidthPercent(100).MaxWidth(n.maxControlWidth()).Items(ui.Center).Gap(l.Space(2)).Children(func() {
 		n.field(c.Key("username"), &n.username, kit.SettingsInputSpec{
 			Name: locales.SettingsNetworkProxyUsername(), Placeholder: locales.SettingsNetworkProxyUsername(), Grow: true,
 		}, func() string { return n.proxyNow().Username },

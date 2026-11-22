@@ -31,7 +31,10 @@ func (l *Look) SelectTrigger(c ui.C, label, value string, muted bool, width floa
 	if width < 0 { // 负宽度表示撑满容器（w-full）
 		box = box.FillWidth()
 	} else {
-		box = box.Width(width)
+		// 网页里弹性项的 min-width:auto 是内容的最小尺寸，但不超过显式宽度：
+		// 行被挤窄时触发按钮最窄收到「文字 + px-3 + 箭头 + gap」，不会把当前值截成省略号。
+		minW := 2*pad + chevron + gap + c.Canvas().TextWidthWeight(value, l.Rem(TextSM.Size), WeightNormal)
+		box = box.Width(width).MinWidth(min(minW, width))
 	}
 	box = box.
 		Radius(l.Rem(0.75)).

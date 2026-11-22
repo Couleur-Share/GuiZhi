@@ -23,6 +23,8 @@ type SettingsInputSpec struct {
 	// Width 大于 0 时定宽（w-24）；Grow 为真时占满行内剩余（flex-1 min-w-0）；都没有时撑满容器宽（w-full）。
 	Width float32
 	Grow  bool
+	// MaxWidth 大于 0 且没有 Width / Grow 时，在撑满容器的基础上加宽度上限（w-full max-w-md）。
+	MaxWidth float32
 	// Mono 让内容用等宽字体（font-mono）。
 	Mono bool
 	// RightPad 大于 0 时替换右侧内边距（pr-10 给显示/隐藏口令的按钮留位），单位逻辑像素，不含边框。
@@ -53,6 +55,10 @@ func (l *Look) SettingsInput(c ui.C, f *ui.Field, spec SettingsInputSpec) ui.Box
 		wrap = wrap.Grow(1).Shrink(1).Basis(0).MinWidth(0)
 	default:
 		wrap = wrap.FillWidth()
+		if spec.MaxWidth > 0 {
+			// w-full 在 flex 子项里的基准宽度是容器宽（百分比），不是 0 加增长：说明文字长时要和它按基准宽度的比例分担收缩。
+			wrap = wrap.WidthPercent(100).MaxWidth(spec.MaxWidth)
+		}
 	}
 	var box ui.Box
 	var ring float32 // 聚焦环的进度：底板先声明、输入后声明，环要等输入的聚焦状态，所以由绘制闭包在绘制时读

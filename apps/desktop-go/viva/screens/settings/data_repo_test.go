@@ -106,7 +106,7 @@ func TestRepoCreateSnapshot(t *testing.T) {
 		t.Error("第二份快照的摘要也应显示")
 	}
 
-	r.fill(locales.SettingsFullBackupUnlockPlaceholder(), recoveryPW)
+	r.fill(locales.SettingsFullBackupUnlockLabel(), recoveryPW)
 	e.backup.Fail("CreateSnapshot", errors.New("object store full"))
 	r.press(gfx.RoleButton, now)
 	waitUntil(r, "失败提示", func() bool { return len(e.toasts(kit.ToastError)) == 1 })
@@ -134,7 +134,7 @@ func TestRepoPreviewAndRestore(t *testing.T) {
 	r := e.open(t)
 	restore := locales.SettingsFullBackupRestoreAction()
 	waitUntil(r, "快照列表出现", func() bool { return r.has(gfx.RoleButton, restore) })
-	r.fill(locales.SettingsFullBackupUnlockPlaceholder(), recoveryPW)
+	r.fill(locales.SettingsFullBackupUnlockLabel(), recoveryPW)
 
 	e.backup.Fail("PreviewRestore", &services.RestorePreviewError{Message: "快照不完整", MissingFiles: []string{"a.obj"}, DamagedFiles: []string{"b.obj"}})
 	r.press(gfx.RoleButton, restore)
@@ -220,7 +220,7 @@ func TestRepoPortableExportAndImport(t *testing.T) {
 	waitUntil(r, "快照列表出现", func() bool { return r.has(gfx.RoleButton, export) })
 
 	e.backup.SetPortableExport(services.PortableExport{Canceled: true})
-	r.fill(locales.SettingsFullBackupUnlockPlaceholder(), recoveryPW)
+	r.fill(locales.SettingsFullBackupUnlockLabel(), recoveryPW)
 	r.press(gfx.RoleButton, export)
 	waitUntil(r, "导出调用结束", func() bool {
 		return len(e.backup.CallsOf("ExportPortable")) == 1 && !r.disabled(gfx.RoleButton, export)
@@ -236,7 +236,7 @@ func TestRepoPortableExportAndImport(t *testing.T) {
 	}
 
 	// 导入：口令为空时只提示。
-	r.fill(locales.SettingsFullBackupUnlockPlaceholder(), "")
+	r.fill(locales.SettingsFullBackupUnlockLabel(), "")
 	r.press(gfx.RoleButton, importBtn)
 	if errs := e.toasts(kit.ToastError); len(errs) != 1 || errs[0].Message != locales.SettingsFullBackupImportNeedPassword() || errs[0].Detail != "" {
 		t.Fatalf("没有口令应提示先输入口令，得到 %+v", errs)
@@ -246,7 +246,7 @@ func TestRepoPortableExportAndImport(t *testing.T) {
 	}
 
 	e.backup.SetPortableImport(services.PortableImport{ReplacedRepository: true})
-	r.fill(locales.SettingsFullBackupUnlockPlaceholder(), recoveryPW)
+	r.fill(locales.SettingsFullBackupUnlockLabel(), recoveryPW)
 	r.press(gfx.RoleButton, importBtn)
 	waitUntil(r, "导入成功", func() bool { return len(e.toasts(kit.ToastSuccess)) == 2 })
 	ok := e.toasts(kit.ToastSuccess)[1]

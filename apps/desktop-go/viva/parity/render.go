@@ -199,10 +199,23 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		Schema: SchemaVersion, Scene: scene, Variant: v, Region: region,
 		Capture: Capture{DPR: 1, Engine: "viva v0.6.4"},
 	}
+	var secure []secureBox // 口令框的外框与所在层：同层、框里的文字（占位符或圆点）不进事实，口径同渲染层（见下）
 	for _, n := range session.Access() {
 		f.Nodes = append(f.Nodes, nodeOf(n))
 	}
+	// 口令框取自命中区而不是可访问树：模态对话框打开后背后页面的节点退出可访问树（A-015），页面上的口令框仍在命中区里，
+	// 它的占位符文字也仍在画面上（渲染层采集同样跳过 type=password，不论它是否在遮罩背后）。
+	for _, h := range snap.Hits {
+		if h.Secure {
+			secure = append(secure, secureBox{h.Bounds, h.Layer})
+		}
+	}
 	for i, t := range snap.Texts {
+		if insideAny(secure, t.Bounds, t.Layer) {
+			// 渲染层一侧的采集跳过 type=password 的输入框（react-facts.mjs 的 skipTypes：它的值是圆点、占位符也不算文字事实），
+			// Viva 一侧对口令框同口径处理，否则空口令框的占位符与填了口令的圆点会成为 React 没有的文字。
+			continue
+		}
 		if t.Style.Color.Alpha < kit.VisibleInkAlpha {
 			// 透明的文字看不见，不是「呈现出来的文字」：kit.Input 画大写叠层时把输入框自己的字设成透明，
 			// 看得见的是叠层画的那一份（React 一侧采集的也是 text-transform 之后的字）。
@@ -267,6 +280,23 @@ func collectViva(session *headless.Session, scene string, v Variant, region Regi
 		}
 	}
 	return f
+}
+
+// secureBox 是一个口令框的外框与所在层：只有同层的文字才属于它（模态对话框里的口令框会盖在页面文字上，页面文字不是它的）。
+type secureBox struct {
+	gfx.Rect
+	layer uint16
+}
+
+// insideAny 报告 r（在 layer 层）的中心点是否落在 boxes 中同层的某一个里。
+func insideAny(boxes []secureBox, r gfx.Rect, layer uint16) bool {
+	cx, cy := r.X+r.Width/2, r.Y+r.Height/2
+	for _, b := range boxes {
+		if b.layer == layer && cx >= b.X && cx <= b.X+b.Width && cy >= b.Y && cy <= b.Y+b.Height {
+			return true
+		}
+	}
+	return false
 }
 
 // contentClippedOut 报告文字的内容区（基线上 A 行、下 D 行，与渲染层 Range 外框同一把尺子）是否被裁剪矩形整个切掉。
@@ -372,4 +402,14 @@ func cssColor(c gfx.Color) string {
 		return fmt.Sprintf("rgb(%d, %d, %d)", to8(c.Red), to8(c.Green), to8(c.Blue))
 	}
 	return fmt.Sprintf("rgba(%d, %d, %d, %s)", to8(c.Red), to8(c.Green), to8(c.Blue), strconv.FormatFloat(float64(c.Alpha), 'f', -1, 32))
+}
+
+// hitLayer 是命中区 id 所在的层；找不到按 0 层。
+func hitLayer(hits []gfx.Hit, id gfx.ID) uint16 {
+	for _, h := range hits {
+		if h.ID == id {
+			return h.Layer
+		}
+	}
+	return 0
 }

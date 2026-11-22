@@ -50,7 +50,8 @@ func dialogBody(l *kit.Look, c ui.C, body, footer func()) {
 
 // boxed 声明一个圆角边框框：rounded-lg border border-border/60，内边距由调用方给。
 func boxed(l *kit.Look, c ui.C, bg, border tokens.Color, pad [4]float32) ui.Box {
-	return ui.Column(c).FillWidth().PadSides(pad[0], pad[1], pad[2], pad[3]).
+	// 1px 边框占位：盒模型里 border 在 padding 之外，内容离外框是 padding + 1。
+	return ui.Column(c).FillWidth().PadSides(pad[0]+1, pad[1]+1, pad[2]+1, pad[3]+1).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: bg, Border: border, BorderW: 1, Radius: l.Rem(0.75)})
 		})
@@ -63,6 +64,9 @@ func toggleRow(l *kit.Look, c ui.C, on *bool, label string) {
 		l.Switch(c.Key("switch"), on, label)
 	})
 }
+
+// textXSRelaxed 是 text-xs leading-relaxed：12px 字、行高 1.625 倍（19.5px），导出对话框的说明段落用它。
+var textXSRelaxed = kit.TextStyle{Size: 0.75, Line: 0.75 * 1.625}
 
 // ── 导出 ──
 
@@ -98,7 +102,7 @@ func (s *ConfigTransferSection) exportFields(c ui.C) {
 					l.Icon(c.Key("icon"), icons.KeyRound, l.Rem(1), t.Primary)
 					l.Text(c.Key("label"), locales.SettingsConfigExportIncludeKeys(), kit.TextSM, kit.WeightMedium, t.Foreground)
 				})
-				l.Text(c.Key("desc"), locales.SettingsConfigExportIncludeKeysDesc(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
+				l.Text(c.Key("desc"), locales.SettingsConfigExportIncludeKeysDesc(), textXSRelaxed, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
 			})
 			l.Switch(c.Key("switch"), &e.secrets, locales.SettingsConfigExportIncludeKeys())
 		})
@@ -106,7 +110,7 @@ func (s *ConfigTransferSection) exportFields(c ui.C) {
 
 	if e.secrets {
 		ui.Column(c.Key("secrets")).FillWidth().Gap(l.Space(3)).Children(func() {
-			l.Text(c.Key("hint"), locales.SettingsConfigExportPasswordHint(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
+			l.Text(c.Key("hint"), locales.SettingsConfigExportPasswordHint(), textXSRelaxed, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
 			l.SettingsPasswordInput(c.Key("password"), &e.password, &e.showPassword, kit.SettingsInputSpec{
 				Name: locales.SettingsConfigExportPassword(), Placeholder: locales.SettingsConfigExportPasswordPlaceholder(minExportPassword),
 			}, locales.CommonShowPassword(), locales.CommonHidePassword())
@@ -131,7 +135,7 @@ func (s *ConfigTransferSection) exportFields(c ui.C) {
 			toggleRow(l, c.Key("mcp"), &e.mcp, locales.SettingsConfigExportMcpScope())
 		})
 	})
-	l.Text(c.Key("scope"), locales.SettingsConfigExportScopeNote(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
+	l.Text(c.Key("scope"), locales.SettingsConfigExportScopeNote(), textXSRelaxed, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
 }
 
 func (s *ConfigTransferSection) exportFooter(c ui.C) {
@@ -146,6 +150,7 @@ func (s *ConfigTransferSection) exportFooter(c ui.C) {
 	ok := kit.ButtonSpec{Label: locales.SettingsConfigExportConfirm(), Disabled: !canExport || s.busy != xferIdle}
 	st := primaryBtn(l, shape(l, 2.25, 3, 1.5, kit.TextSM, kit.WeightMedium))
 	st.DisabledOpacity = 0.6
+	st.Surface = l.T.UiPanelStrongBg // 禁用时整层淡出：文字按它背后的面板色算（对话框面板）
 	if btn(l, c.Key("confirm"), ok, st, s.busy == xferExport) {
 		s.exportConfig()
 	}
@@ -162,7 +167,7 @@ func (s *ConfigTransferSection) importDialog(c ui.C) {
 	}
 	if i.pending != nil {
 		p := i.pending.preview
-		sub := locales.SettingsConfigImportSubtitle(formatExportedAt(p.ExportedAt), versionText(p.AppVersion))
+		sub := locales.SettingsConfigImportSubtitle(formatExportedAt(p.ExportedAt, s.Locale), versionText(p.AppVersion))
 		spec.SubtitleText = sub
 		spec.Subtitle = func(c ui.C) { l.Text(c, sub, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped()) }
 	}
@@ -173,9 +178,9 @@ func (s *ConfigTransferSection) importDialog(c ui.C) {
 }
 
 // formatExportedAt 是文件里的导出时间；缺失或解析不了时是「未知时间」。
-func formatExportedAt(value string) string {
+func formatExportedAt(value string, locale kit.DateLocale) string {
 	if at, err := time.Parse(time.RFC3339, value); err == nil {
-		return formatDateTime(at.UnixMilli(), false)
+		return formatDateTime(at.UnixMilli(), false, locale)
 	}
 	return locales.SettingsConfigImportUnknownTime()
 }
@@ -290,6 +295,7 @@ func (s *ConfigTransferSection) importFooter(c ui.C) {
 	ok := kit.ButtonSpec{Label: locales.SettingsConfigImportConfirm(), Disabled: !canConfirm}
 	st := destructiveBtn(l, shape(l, 2.25, 3, 1.5, kit.TextSM, kit.WeightMedium))
 	st.DisabledOpacity = 0.6
+	st.Surface = l.T.UiPanelStrongBg
 	if btn(l, c.Key("confirm"), ok, st, s.busy == xferApply) {
 		s.applyImport()
 	}

@@ -63,7 +63,8 @@ func TestAboutShowsIdentityAndStaticContent(t *testing.T) {
 	r := openAbout(t, &servicestest.Updater{}, nil)
 	for _, want := range []string{
 		"GuiZhi",
-		locales.SettingsCurrentVersion("1.2.3") + " · " + locales.SettingsStableChannel(),
+		locales.SettingsCurrentVersion("1.2.3"), // 版本与通道是相邻的三段文字（版本、分隔、通道），分别判定
+		locales.SettingsStableChannel(),
 		locales.SettingsSupportPolicyDesc(),
 		locales.SettingsProductOverviewLocalTitle(),
 		locales.SettingsProductOverviewAiTitle(),
@@ -188,7 +189,7 @@ func TestAboutPreviewChannelConfirmFlow(t *testing.T) {
 	if prefs.UpdateChannel != nsettings.ChannelPreview || !prefs.UpdateChannelExplicitlySet {
 		t.Fatalf("确认后应切到预览通道并标记显式选择：%+v", prefs)
 	}
-	if !r.switchChecked(name) || !r.hasText(locales.SettingsCurrentVersion("1.2.3")+" · "+locales.SettingsPreviewChannel()) {
+	if !r.switchChecked(name) || !r.hasText(locales.SettingsCurrentVersion("1.2.3")) || !r.hasText(locales.SettingsPreviewChannel()) {
 		t.Error("切换后开关应打开，版本行应显示预览通道")
 	}
 
@@ -397,7 +398,7 @@ func TestAboutLinksOpenExternal(t *testing.T) {
 		{locales.SettingsOpenChangelog(), repo + "/blob/main/CHANGELOG.md"},
 		{"github.com/Couleur-Share/GuiZhi", repo},
 		{locales.SettingsSubmitIssue(), repo + "/issues/new/choose"},
-		{"@Couleur-Share", "https://github.com/Couleur-Share"},
+		{"@Couleur-Share GitHub", "https://github.com/Couleur-Share"},
 		{locales.SettingsVisitSoftMemo(), "https://couleurapp.com/"},
 	} {
 		before := len(r.opened)
@@ -434,7 +435,7 @@ func TestAboutLinkFailures(t *testing.T) {
 func TestAboutCopyEmail(t *testing.T) {
 	r := openAbout(t, &servicestest.Updater{}, nil)
 	r.scrollToEnd()
-	r.clickNode(gfx.RoleLink, "couleurapp@gmail.com")
+	r.clickNode(gfx.RoleButton, "couleurapp@gmail.com Email")
 	if len(r.env.copied) != 1 || r.env.copied[0] != "couleurapp@gmail.com" {
 		t.Fatalf("应复制作者邮箱，得到 %v", r.env.copied)
 	}
@@ -443,7 +444,7 @@ func TestAboutCopyEmail(t *testing.T) {
 	}
 
 	r.env.clipErr = errors.New("clipboard busy")
-	r.clickNode(gfx.RoleLink, "couleurapp@gmail.com")
+	r.clickNode(gfx.RoleButton, "couleurapp@gmail.com Email")
 	if errs := r.env.toasts(kit.ToastError); len(errs) != 1 || !strings.Contains(errs[0].Detail, "clipboard busy") {
 		t.Errorf("复制失败应弹带原因的提示，得到 %+v", errs)
 	}

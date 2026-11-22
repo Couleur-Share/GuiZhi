@@ -64,8 +64,11 @@ type Shell struct {
 	// PickBackground 与 Wake 交给「显示设置」页的背景图分区（见 Appearance 同名字段）。
 	PickBackground func() (fileName string, err error)
 	Wake           func()
+	// Locale 是时间的区域写法（系统区域，kit.ParseDateLocale）；零值按中文。
+	Locale kit.DateLocale
 
-	// Solver、Shortcuts、Updater 是「网络」「快捷键」「关于」三页要用的服务；nil 表示外壳没接，各页自行如实报错或降级。
+	// Solver 是 FlareSolverr 的连通性测试服务：渲染层它属于「采集与转写」页（M3-2b 挂载 FlareSolverr 块时用），「网络」页不用它。
+	// Shortcuts、Updater 是「快捷键」「关于」两页要用的服务；nil 表示外壳没接，各页自行如实报错或降级。
 	Solver    services.FlareSolverr
 	Shortcuts services.Shortcuts
 	Updater   services.Updater
@@ -107,9 +110,6 @@ func (s *Shell) remount() {
 		}
 		s.data = nil
 	case SectionNetwork:
-		if s.network != nil {
-			s.network.Close()
-		}
 		s.network = nil
 	case SectionShortcuts:
 		if s.shortcuts != nil {
@@ -168,14 +168,14 @@ func (s *Shell) content(c ui.C) {
 		}
 		d := s.data
 		d.Look, d.Store, d.Guard, d.Wake = l, s.Store, s.Guard, s.Wake
-		d.Runtime, d.Backup, d.Transfer = s.Data, s.Backup, s.ConfigTransfer
+		d.Runtime, d.Backup, d.Transfer, d.Locale = s.Data, s.Backup, s.ConfigTransfer, s.Locale
 		d.Page(c)
 	case SectionNetwork:
 		if s.network == nil {
 			s.network = &Network{}
 		}
 		n := s.network
-		n.Look, n.Store, n.Guard, n.Solver, n.Wake = l, s.Store, s.Guard, s.Solver, s.Wake
+		n.Look, n.Store, n.Guard = l, s.Store, s.Guard
 		n.Page(c)
 	case SectionShortcuts:
 		if s.shortcuts == nil {

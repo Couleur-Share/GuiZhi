@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -26,6 +27,33 @@ func openShortcuts(t *testing.T, svc *servicestest.Shortcuts, env *sysEnv) *rig 
 		t.Cleanup(s.Close)
 		return s.Page
 	})
+}
+
+// modeBox 取第 idx 个（按阅读顺序，与 shortcutItems 同序）触发范围下拉。下拉按钮没有 aria-label，
+// 可访问名取按钮里的当前模式文字，四个同名且随值变化，所以只能按顺序找。
+func (r *rig) modeBox(idx int) app.AccessNode {
+	r.t.Helper()
+	var boxes []app.AccessNode
+	for _, n := range r.s.Access() {
+		if n.Role == gfx.RoleCombobox {
+			boxes = append(boxes, n)
+		}
+	}
+	if idx >= len(boxes) {
+		r.t.Fatalf("只有 %d 个下拉，取不到第 %d 个", len(boxes), idx)
+	}
+	return boxes[idx]
+}
+
+// pickMode 展开第 idx 个触发范围下拉并选中某一项。
+func (r *rig) pickMode(idx int, option string) {
+	r.t.Helper()
+	b := r.modeBox(idx).Bounds
+	if err := r.s.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+		r.t.Fatalf("展开下拉失败：%v", err)
+	}
+	r.frames(3)
+	r.clickNode(gfx.RoleOption, option)
 }
 
 // 录制框的可访问名与说明里用到的标签。
@@ -65,10 +93,10 @@ func TestShortcutsLoadsSavedConfig(t *testing.T) {
 	if !r.hasText(locales.SettingsNotSet()) {
 		t.Error("清空的快捷键应显示「未设置」")
 	}
-	if n, _ := r.node(gfx.RoleCombobox, locales.SettingsShortcutMode()+" · "+newItemLabel); n.Value != locales.SettingsShortcutModeGlobal() {
+	if n := r.modeBox(1); n.Value != locales.SettingsShortcutModeGlobal() {
 		t.Errorf("新建条目的触发范围应是全局，得到 %q", n.Value)
 	}
-	if n, _ := r.node(gfx.RoleCombobox, locales.SettingsShortcutMode()+" · "+showAppLabel); n.Value != locales.SettingsShortcutModeLocal() {
+	if n := r.modeBox(0); n.Value != locales.SettingsShortcutModeLocal() {
 		t.Errorf("显示窗口的触发范围应是应用内，得到 %q", n.Value)
 	}
 }
@@ -287,11 +315,11 @@ func TestShortcutsModeChange(t *testing.T) {
 	svc := &servicestest.Shortcuts{}
 	env := newEnv()
 	r := openShortcuts(t, svc, env)
-	name := locales.SettingsShortcutMode() + " · " + newItemLabel
+	const idx = 1 // 新建知识条目
 
 	svc.FailModes(errors.New("registry busy"))
-	r.pick(name, locales.SettingsShortcutModeGlobal())
-	if n, _ := r.node(gfx.RoleCombobox, name); n.Value != locales.SettingsShortcutModeLocal() {
+	r.pickMode(idx, locales.SettingsShortcutModeGlobal())
+	if n := r.modeBox(idx); n.Value != locales.SettingsShortcutModeLocal() {
 		t.Errorf("写入失败时范围应保持「应用内」，得到 %q", n.Value)
 	}
 	if errs := env.toasts(kit.ToastError); len(errs) != 1 || !strings.Contains(errs[0].Detail, "registry busy") {
@@ -299,12 +327,12 @@ func TestShortcutsModeChange(t *testing.T) {
 	}
 
 	svc.FailModes(nil)
-	r.pick(name, locales.SettingsShortcutModeGlobal())
+	r.pickMode(idx, locales.SettingsShortcutModeGlobal())
 	sets := svc.ModeSets()
 	if len(sets) != 1 || sets[0]["newItem"] != "global" || sets[0]["showApp"] != "global" || sets[0]["search"] != "local" {
 		t.Errorf("应写回全部四项的范围，得到 %v", sets)
 	}
-	if n, _ := r.node(gfx.RoleCombobox, name); n.Value != locales.SettingsShortcutModeGlobal() {
+	if n := r.modeBox(idx); n.Value != locales.SettingsShortcutModeGlobal() {
 		t.Errorf("成功后范围应是「全局」，得到 %q", n.Value)
 	}
 }
