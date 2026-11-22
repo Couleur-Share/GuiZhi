@@ -20,7 +20,9 @@ import (
 // 与渲染层一致。
 //
 // disabled：label 上 opacity-50 cursor-not-allowed，点击直接返回，<input> 禁用（不取键盘焦点）。
-// 渲染层的 indeterminate 还没有使用方，随用到它的界面一起补。
+//
+// indeterminate（半选，处理中心的「全选当前列表」）：方框与选中同色，里面画一条横线（M2 6H10）而不是对勾，
+// 可访问状态是 mixed；点击仍按 *checked 翻转（半选时 *checked 为假，所以点一下是全选）。
 
 // CheckboxSpec 描述一个复选框。
 type CheckboxSpec struct {
@@ -30,6 +32,20 @@ type CheckboxSpec struct {
 	Name string
 	// Disabled 让复选框整体变淡到 50%、点不动、没有键盘停靠点（渲染层 disabled）。
 	Disabled bool
+	// Indeterminate 是半选态（渲染层 indeterminate）：与 *checked 无关，画横线、可访问状态 mixed。
+	Indeterminate bool
+}
+
+// dashMark 是半选的横线：viewBox 12，M2 6 H10，笔画 2（渲染层 Checkbox 里 indeterminate 的路径）。
+var dashMark = gfx.Icon{
+	ViewBox: 12,
+	Stroke:  2,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(2, 6),
+		gfx.LineTo(10, 6),
+	},
 }
 
 // checkMark 是对勾：viewBox 12，M2 6 L5 9 L10 3，笔画 2（渲染层 Checkbox 里的内联 SVG）。
@@ -77,6 +93,16 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 			// （渲染层的 <input disabled> 在 ARIA 快照里是 checkbox [disabled]）。没有键盘停靠点，也点不动。
 			box = ui.Row(c.Key("box")).Size(side, side).Shrink(0).Items(ui.Center).Justify(ui.Center).
 				HitWith(ui.ID(c.Key("box-off")), name, gfx.HitOptions{Role: gfx.RoleCheckbox, Checked: *checked, Disabled: true})
+		} else if spec.Indeterminate {
+			// 半选：ui.CheckboxBase 的命中区没有 mixed 状态，自己声明一块 checkbox 命中区；点击与 label 一样翻转 *checked。
+			boxKey := c.Key("box-mixed")
+			boxID := ui.ID(boxKey)
+			if canvas := c.Canvas(); canvas.Clicked(boxID) {
+				*checked = !*checked
+			}
+			box = ui.Row(boxKey).Size(side, side).Shrink(0).Items(ui.Center).Justify(ui.Center).
+				HitWith(boxID, name, gfx.HitOptions{Role: gfx.RoleCheckbox, Mixed: true, Cursor: gfx.PointerCursorHand})
+			l.noteStop(box)
 		} else {
 			box = ui.CheckboxBase(c.Key("box"), checked, name).Size(side, side).Shrink(0).HitOutset(0, 0, 0, 0).
 				Items(ui.Center).Justify(ui.Center)
@@ -84,7 +110,7 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 		}
 		canvas := c.Canvas()
 		hover := l.hoverTo(canvas, anim, 0, box.State().Hovered, DurationBase)
-		active := l.hoverTo(canvas, anim, 1, *checked, DurationBase)
+		active := l.hoverTo(canvas, anim, 1, *checked || spec.Indeterminate, DurationBase)
 		box.Draw(func(d *ui.DrawContext) {
 			// 未选中的悬停边框先混，再按选中进度混向 primary：选中后悬停不再变化，取消选中时回到悬停色，与 CSS 过渡的终点一致。
 			border := MixToken(MixToken(t.Border, t.Primary.WithAlpha(0.5), hover), t.Primary, active)
@@ -97,7 +123,11 @@ func (l *Look) Checkbox(c ui.C, checked *bool, spec CheckboxSpec) ui.Box {
 			// 对勾 h-3 w-3，居中；不透明度随选中进度（transition-opacity duration-base）。
 			// 未选中时也要声明（全透明、不画任何图元）：渲染层那枚 SVG 一直在，只是 opacity-0；对照按外框与数量比，
 			// 看不见的图标只是不比墨迹（compare_icons.go 的 invisibleReactIcons）。
-			l.Icon(c.Key("mark"), checkMark, markSide, t.PrimaryForeground.WithAlpha(t.PrimaryForeground.A*active))
+			mark := checkMark
+			if spec.Indeterminate {
+				mark = dashMark
+			}
+			l.Icon(c.Key("mark"), mark, markSide, t.PrimaryForeground.WithAlpha(t.PrimaryForeground.A*active))
 		})
 		if spec.Label != "" {
 			l.Text(c.Key("label"), spec.Label, TextSM, WeightNormal, t.Foreground)

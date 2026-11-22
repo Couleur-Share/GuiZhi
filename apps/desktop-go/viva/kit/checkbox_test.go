@@ -90,3 +90,38 @@ func TestCheckboxDisabledIsInertAndFaded(t *testing.T) {
 		t.Error("恢复启用后点文字应翻转（取消勾选）")
 	}
 }
+
+// indeterminate（半选）：可访问状态是 mixed 而不是 checked；点方框与点文字都按 *checked 翻转（半选时 *checked 为假，所以点一下是「选中」）；
+// 半选解除之后回到普通复选框。
+func TestCheckboxIndeterminateIsMixedAndClickFlipsTheBoundValue(t *testing.T) {
+	var on, mixed bool
+	mixed = true
+	h := openPage(t, still(), 400, 200, func(l *Look, c ui.C) {
+		ui.Column(c).Fill().Pad(24).Children(func() {
+			l.Checkbox(c.Key("cb"), &on, CheckboxSpec{Label: "全选", Indeterminate: mixed})
+		})
+	})
+	n, ok := h.node(gfx.RoleCheckbox, "全选")
+	if !ok {
+		t.Fatal("没有找到复选框")
+	}
+	if !n.Mixed || n.Checked {
+		t.Fatalf("半选时应是 mixed、不是 checked：%+v", n)
+	}
+	h.clickAt(n.Bounds.X+8, n.Bounds.Y+8) // 点方框
+	if !on {
+		t.Fatal("半选时点方框应翻转 *checked（选中）")
+	}
+	on, mixed = false, true
+	h.frames(3)
+	label, _ := confirmTextBounds(h, "全选")
+	h.clickAt(label.X+4, label.Y+4) // 点文字
+	if !on {
+		t.Fatal("半选时点文字也应翻转 *checked（选中）")
+	}
+	on, mixed = true, false
+	h.frames(3)
+	if n, _ = h.node(gfx.RoleCheckbox, "全选"); n.Mixed || !n.Checked {
+		t.Fatalf("解除半选并选中后应是 checked：%+v", n)
+	}
+}

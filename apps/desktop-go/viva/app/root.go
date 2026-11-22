@@ -14,6 +14,7 @@ import (
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/reader"
 	importsscreen "guizhi-mygo-shell/viva/screens/imports"
+	inboxscreen "guizhi-mygo-shell/viva/screens/inbox"
 	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
@@ -41,6 +42,12 @@ type Root struct {
 
 	// 知识库模块：目前只有二级侧栏（工作区随 M2-2 迁入）。Services.Library 为空时是 nil，侧栏按「尚未迁移」处理。
 	library *libraryscreen.Screen
+
+	// 处理中心模块：待处理数在窗口生命周期内常驻（rail 角标在别的模块里也要实时），界面只在进入该模块时才画。
+	// Services.Inbox 为空时两者都是 nil，rail 与工作区按「尚未迁移」处理。
+	inbox      *inboxscreen.Screen
+	inboxStore *inboxscreen.Store
+	inboxWatch inboxWatch // 知识库计数变化的监听（root_inbox.go）
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -94,6 +101,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.win.Modules = map[shell.Module]shell.ModuleView{}
 	r.mountImports(invalidate)
 	r.mountLibrary(invalidate)
+	r.mountInbox(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -136,12 +144,7 @@ func (r *Root) mountLibrary(invalidate func()) {
 	// 自动保存开关每次现读：设置在别处改了，下一次编辑就按新值排（或不排）防抖保存。
 	store.AutoSave = func() bool { return r.store.Values().UI.AutoSave }
 	// AI 功能未配置时跳设置页的 AI 分区：回调来自后台 goroutine，窗口状态只能在界面线程上改，所以经 runOnUI 排队。
-	store.OnOpenSettingsAI = func() {
-		r.runOnUI(func() {
-			r.settings.Active = settingsscreen.SectionAI
-			r.win.Page = shell.PageSettings
-		})
-	}
+	store.OnOpenSettingsAI = r.openSettingsAI
 	r.library = &libraryscreen.Screen{
 		Store: store, Ctx: r.ctx, Guard: r.guard, Prefs: r.opts.Services.Prefs, Now: r.opts.Services.Now,
 		OpenExternal: r.opts.Services.OpenExternal, Imports: r.opts.Services.Imports,
@@ -177,6 +180,7 @@ func (r *Root) readerDiag(err error) {
 
 // startBackground 在第一帧启动常驻的后台工作：采集队列的推送订阅与首次读取（rail 角标要在任何模块里都准）。
 func (r *Root) startBackground() {
+	r.startInbox()
 	if r.importsStore == nil {
 		return
 	}
@@ -221,6 +225,9 @@ func (r *Root) syncLook(c ui.C) {
 		}
 		if r.library != nil {
 			r.library.Look = r.look
+		}
+		if r.inbox != nil {
+			r.inbox.Look = r.look
 		}
 	}
 	if c != nil {
@@ -324,9 +331,13 @@ func (r *Root) View(c ui.C) {
 	if r.importsStore != nil {
 		r.win.ActiveImports = r.importsStore.View().ActiveCount
 	}
+	r.syncInbox()
 	r.win.View(c)
 	if r.library != nil {
 		r.library.EndFrame()
+	}
+	if r.inbox != nil {
+		r.inbox.EndFrame()
 	}
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)
@@ -357,6 +368,7 @@ func (r *Root) Close() {
 		r.library.Store.FlushRemovals()
 		r.library.Store.Close() // 取消转写与排版的进度订阅
 	}
+	r.closeInbox()
 	if r.stopImports != nil {
 		r.stopImports()
 	}
