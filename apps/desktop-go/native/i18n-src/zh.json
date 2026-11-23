@@ -27,6 +27,22 @@
       "platformBrowser": "归知内置登录窗口",
       "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
+    "palette": {
+      "searching": "正在搜索…",
+      "failedSources": "部分来源搜索失败：{{sources}}（详情见日志）",
+      "hintMove": "↑↓ 选择",
+      "hintRun": "Enter 执行",
+      "hintClose": "Esc 关闭"
+    },
+    "update": {
+      "releasedOn": "发布于 {{date}}"
+    },
+    "migration": {
+      "sourcePath": "旧库文件：{{path}}"
+    },
+    "setup": {
+      "loadError": "没能读取 AI 配置（{{reason}}），下面的完成状态可能不准确。"
+    },
     "shell": {
       "notMigrated": "「{{module}}」还没有迁移到原生界面",
       "notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。",

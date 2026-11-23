@@ -27,6 +27,22 @@
       "platformBrowser": "GuiZhi's built-in sign-in window",
       "lastCheckFailedReason": "{{label}}（{{reason}}）"
     },
+    "palette": {
+      "searching": "Searching…",
+      "failedSources": "Some sources failed to search: {{sources}} (see the log for details)",
+      "hintMove": "↑↓ Select",
+      "hintRun": "Enter Run",
+      "hintClose": "Esc Close"
+    },
+    "update": {
+      "releasedOn": "Released {{date}}"
+    },
+    "migration": {
+      "sourcePath": "Legacy database: {{path}}"
+    },
+    "setup": {
+      "loadError": "The AI configuration could not be read ({{reason}}), so the completion status below may be inaccurate."
+    },
     "shell": {
       "notMigrated": "\"{{module}}\" has not been moved to the native UI yet",
       "notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone.",

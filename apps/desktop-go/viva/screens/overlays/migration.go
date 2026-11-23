@@ -50,6 +50,9 @@ type Migration struct {
 	OnMigrated func()
 	// OnClose 在对话框关闭后调用（设置清单据此补上被推迟的弹出）。
 	OnClose func()
+	// OnDetected 在 Detect 有了结论之后调用（找到了旧库并已打开确认页、没找到、探测失败、用户选过暂不迁移都算）：
+	// 设置清单据此排在迁移确认之后再评估，不会两个对话框同时弹出。后台线程调用。
+	OnDetected func()
 
 	invalidate func()
 
@@ -82,9 +85,11 @@ func (m *Migration) IsOpen() bool {
 // 但旧库在、新库空的用户据此无从得知迁移入口，所以日志必须留）；找到就打开确认页。
 func (m *Migration) Detect() {
 	if m.Service == nil || prefTrue(m.Prefs, settings.PrefMigrationDismissed) {
+		m.detected()
 		return
 	}
 	m.spawn(func() {
+		defer m.detected()
 		det, found, err := m.Service.DetectLegacy(m.context())
 		if err != nil {
 			m.Guard.Background("migration.detect", err)
@@ -102,6 +107,12 @@ func (m *Migration) Detect() {
 		m.mu.Unlock()
 		m.wake()
 	})
+}
+
+func (m *Migration) detected() {
+	if m.OnDetected != nil {
+		m.OnDetected()
+	}
 }
 
 // SetSourcePath 另选旧库路径（空串回到默认路径）；只在确认页与失败页可改。

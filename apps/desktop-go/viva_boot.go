@@ -250,6 +250,8 @@ func runViva(vb vivaBoot) error {
 		Appearance:      appearance,
 		ReaderMedia:     readerMedia(vb.lib.paths),
 		Shell:           shellHook,
+		// 自动检查更新、旧库迁移确认与设置清单只在用户真正在用的外壳实例里弹出：自动化、截图与基准实例用真实服务，但不能被对话框盖住。
+		AutoOverlays: shellHook != nil && !vb.automation,
 	})
 	if vs != nil {
 		vs.Shutdown() // 事件循环已停：摘托盘图标、撤销快捷键与订阅、释放单实例锁

@@ -49,6 +49,8 @@ type Shortcuts struct {
 	Service services.Shortcuts
 	// Wake 请求窗口重绘：后台加载完成后调用。可为 nil。
 	Wake func()
+	// OnChanged 在快捷键或触发范围保存成功之后调用：窗口内（局部）快捷键据此重读已保存的配置。可为 nil。
+	OnChanged func()
 
 	accelerators map[string]string // 动作 → 快捷键；空串表示未设置
 	modes        map[string]string // 动作 → global / local
@@ -272,6 +274,7 @@ func (s *Shortcuts) persist(action, accel, success string) {
 	}
 	s.accelerators = next
 	s.Guard.Succeed(success)
+	s.changed()
 }
 
 // setMode 保存一项的触发范围（渲染层 setShortcutMode：连同其余项的范围一起写回）。
@@ -287,7 +290,25 @@ func (s *Shortcuts) setMode(action, mode string) {
 	})
 	if ok {
 		s.modes = next
+		s.changed()
 	}
+}
+
+// changed 通知宿主快捷键配置变了。
+func (s *Shortcuts) changed() {
+	if s.OnChanged != nil {
+		s.OnChanged()
+	}
+}
+
+// Recording 报告是否有录制框正在录制：此时按键都归录制框，窗口内快捷键不能抢（App.tsx 对录制框的放行）。
+func (s *Shortcuts) Recording() bool {
+	for i := range s.recorders {
+		if s.recorders[i].rec {
+			return true
+		}
+	}
+	return false
 }
 
 func cloneStrings(m map[string]string) map[string]string {

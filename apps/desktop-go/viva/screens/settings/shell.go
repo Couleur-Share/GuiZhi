@@ -92,6 +92,8 @@ type Shell struct {
 	OpenExternal func(url string) error
 	// OpenSetupGuide 打开设置引导；nil 时关于页不显示那一行。
 	OpenSetupGuide func()
+	// OnShortcutsChanged 在快捷键或触发范围保存成功之后调用：窗口内（局部）快捷键据此重读已保存的配置。可为 nil。
+	OnShortcutsChanged func()
 	// Now 给关于页的检查时间戳；nil 取系统时间。
 	Now func() time.Time
 
@@ -112,6 +114,23 @@ type Shell struct {
 	mounted SectionID
 	// lastCheck 是最近一次更新检查的记录：跨分区保留（渲染层存在 updater.store 里）。
 	lastCheck UpdateRecord
+	// openAIQuickSetup 在 AI 分区下一次绘制时自动打开快速配置向导（首次设置清单「去配置」触发）。
+	openAIQuickSetup bool
+}
+
+// OpenAIQuickSetup 请求 AI 设置页打开快速配置向导（若 AI 分区已挂载则立即打开，否则在切到 SectionAI 后首帧打开）。
+func (s *Shell) OpenAIQuickSetup() {
+	if s.ai != nil {
+		s.ai.openWizard()
+		s.openAIQuickSetup = false
+		return
+	}
+	s.openAIQuickSetup = true
+}
+
+// ShortcutRecording 报告「快捷键」页是否有录制框正在录制（窗口级按键据此放行，不抢录制框的按键）。
+func (s *Shell) ShortcutRecording() bool {
+	return s.shortcuts != nil && s.shortcuts.Recording()
 }
 
 // remount 在分区切换时收尾上一个分区：「数据与备份」「网络」「快捷键」「关于」有后台请求与订阅，切走就关掉并重置。
@@ -220,6 +239,10 @@ func (s *Shell) content(c ui.C) {
 		if s.ai == nil {
 			s.ai = &AI{}
 		}
+		if s.openAIQuickSetup {
+			s.ai.openWizard()
+			s.openAIQuickSetup = false
+		}
 		a := s.ai
 		a.Look, a.Guard, a.Service, a.Wake, a.Locale, a.Now = l, s.Guard, s.AI, s.Wake, s.Locale, s.Now
 		a.OnManageEngine = func() { s.Active = SectionCapture }
@@ -237,7 +260,7 @@ func (s *Shell) content(c ui.C) {
 			s.shortcuts = &Shortcuts{}
 		}
 		k := s.shortcuts
-		k.Look, k.Guard, k.Service, k.Wake = l, s.Guard, s.Shortcuts, s.Wake
+		k.Look, k.Guard, k.Service, k.Wake, k.OnChanged = l, s.Guard, s.Shortcuts, s.Wake, s.OnShortcutsChanged
 		k.Page(c)
 	case SectionAbout:
 		if s.about == nil {

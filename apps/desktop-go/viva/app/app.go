@@ -63,6 +63,9 @@ type Options struct {
 	ReaderMedia reader.Media
 	// Shell 是外壳接线（关闭策略、托盘、界面命令；见 shell.go）：nil 表示没有（截图、对照与无头测试：关窗口就是关闭）。
 	Shell Shell
+	// AutoOverlays 为真时启动会自动弹出对话框的后台流程：自动检查更新、旧版数据库探测与迁移确认、首次使用设置清单。
+	// 只有用户真正在用的外壳实例才开；自动化、截图与对照实例用的是真实服务，但不能被这些对话框盖住画面（root_overlays.go）。
+	AutoOverlays bool
 	// HoverRefresh 在滚轮滚动了内容之后被调用，请求窗口在 (x, y)（逻辑像素、窗口坐标）补一次指针移动，让悬停跟上（台账 B-031）。
 	// 空表示用系统实现（Windows 上向主窗口 PostMessage(WM_MOUSEMOVE)，hover_windows.go）；无头测试注入记录器，不碰系统消息。
 	HoverRefresh func(x, y float32)
@@ -125,7 +128,9 @@ func Run(opts Options) error {
 		}
 		if opts.Shell != nil {
 			// 事件循环线程：外壳在这里建托盘（AddStatusItem 只能在这条线程上调用）。
-			opts.Shell.Attach(&Host{app: a, win: win, root: root})
+			host := &Host{app: a, win: win, root: root}
+			root.attachHost(host)
+			opts.Shell.Attach(host)
 		}
 		return nil
 	})

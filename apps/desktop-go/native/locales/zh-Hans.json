@@ -3766,6 +3766,42 @@
       }
     }
   },
+  "native_palette_searching": "正在搜索…",
+  "native_palette_failedSources": "部分来源搜索失败：{sources}（详情见日志）",
+  "@native_palette_failedSources": {
+    "placeholders": {
+      "sources": {
+        "type": "Object"
+      }
+    }
+  },
+  "native_palette_hintMove": "↑↓ 选择",
+  "native_palette_hintRun": "Enter 执行",
+  "native_palette_hintClose": "Esc 关闭",
+  "native_update_releasedOn": "发布于 {date}",
+  "@native_update_releasedOn": {
+    "placeholders": {
+      "date": {
+        "type": "Object"
+      }
+    }
+  },
+  "native_migration_sourcePath": "旧库文件：{path}",
+  "@native_migration_sourcePath": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "native_setup_loadError": "没能读取 AI 配置（{reason}），下面的完成状态可能不准确。",
+  "@native_setup_loadError": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
   "native_shell_notMigrated": "「{module}」还没有迁移到原生界面",
   "@native_shell_notMigrated": {
     "placeholders": {

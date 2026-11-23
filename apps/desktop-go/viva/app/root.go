@@ -83,6 +83,9 @@ type Root struct {
 	hoverWarned atomic.Bool // 悬停刷新找不到窗口的日志只记一次（OnScroll）
 
 	shellState // 外壳接线：跨线程任务、关闭对话框、网页岛（root_shell.go）
+
+	// overlay 是全局浮层：命令面板、更新对话框、设置清单、旧库迁移与窗口内快捷键（root_overlays.go）。
+	overlay overlayState
 }
 
 // NewRoot 装配根。invalidate 在设置被别处改动后调用，请求重绘（可为空）。
@@ -130,6 +133,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.mountAsk(invalidate)
 	r.mountWiki(invalidate)
 	r.mountThemed(invalidate)
+	r.mountOverlays(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -150,6 +154,8 @@ func (r *Root) mountImports(invalidate func()) {
 			WebSolverEnabled: func() bool { return r.store.Values().App.FlareSolverr.Enabled },
 			AppInfo:          func() (string, string) { return r.opts.AppVersion, r.opts.Platform },
 			QuickCapture:     func() { r.openCapture() },
+			// 导入结果与任务详情里的「打开条目」：切到知识库并选中它（B-016）。点击处理在界面线程里，openLibraryItem 自己排队窗口状态。
+			OpenItem: func(itemID string) { r.openLibraryItem(r.ctx, itemID) },
 			OpenSettingsSection: func(section string) {
 				r.settings.Active = settingsscreen.SectionID(section)
 				r.win.Page = shell.PageSettings
@@ -209,6 +215,7 @@ func (r *Root) readerDiag(err error) {
 
 // startBackground 在第一帧启动常驻的后台工作：采集队列的推送订阅与首次读取（rail 角标要在任何模块里都准）。
 func (r *Root) startBackground() {
+	r.startOverlays()
 	r.startInbox()
 	if r.importsStore == nil {
 		return
@@ -272,6 +279,7 @@ func (r *Root) syncLook(c ui.C) {
 		if r.themed != nil {
 			r.themed.Look = r.look
 		}
+		r.overlay.screen.Look = r.look
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -301,6 +309,9 @@ func (r *Root) OnKey(e gfx.KeyEvent) gfx.EventResult {
 	if r.look == nil {
 		return gfx.EventResult{}
 	}
+	if r.localShortcut(e) { // 窗口内（局部）快捷键：具名键与不带 Ctrl / Alt 的组合走这一路（B-026）
+		return gfx.EventResult{Handled: true, Repaint: true}
+	}
 	return r.look.OnKey(e)
 }
 
@@ -316,6 +327,9 @@ func (r *Root) listKey(e gfx.KeyEvent) gfx.EventResult {
 func (r *Root) OnShortcut(e gfx.KeyEvent) gfx.EventResult {
 	if r.look == nil {
 		return gfx.EventResult{}
+	}
+	if r.localShortcut(e) { // 带 Ctrl / Alt 的可打印字符走这一路（Alt+Shift+N 一类的默认组合，B-026）
+		return gfx.EventResult{Handled: true, Repaint: true}
 	}
 	return r.look.OnShortcut(e)
 }
@@ -387,6 +401,7 @@ func (r *Root) View(c ui.C) {
 		r.win.ActiveImports = r.importsStore.View().ActiveCount
 	}
 	r.syncInbox()
+	r.syncOverlays()
 	r.win.View(c)
 	if r.library != nil {
 		r.library.EndFrame()
@@ -425,6 +440,7 @@ func (r *Root) WatchSystemAppearance(invalidate func()) (stop func()) {
 // Close 释放订阅、取消后台请求。采集队列里还在撤销窗口内的移除先提交，关窗口不会把「已删除」的行带回来。
 func (r *Root) Close() {
 	r.closeIslands()
+	r.closeOverlays()
 	if r.importsStore != nil {
 		r.importsStore.FlushRemovals()
 	}

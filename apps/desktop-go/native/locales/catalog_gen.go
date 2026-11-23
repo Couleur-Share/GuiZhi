@@ -19938,6 +19938,90 @@ func (msgs Messages) NativeSettingsLastCheckFailedReason(label any, reason any) 
 	return Catalog.Format(msgs.locale, "native_settings_lastCheckFailedReason", map[string]any{"label": label, "reason": reason})
 }
 
+// NativePaletteSearching says "正在搜索…"
+// in the language the app shows.
+func NativePaletteSearching() string { return In(i18n.Locale()).NativePaletteSearching() }
+
+// NativePaletteSearching says "正在搜索…"
+// in the language of msgs.
+func (msgs Messages) NativePaletteSearching() string {
+	return Catalog.Format(msgs.locale, "native_palette_searching", nil)
+}
+
+// NativePaletteFailedSources says "部分来源搜索失败：{sources}（详情见日志）"
+// in the language the app shows.
+func NativePaletteFailedSources(sources any) string {
+	return In(i18n.Locale()).NativePaletteFailedSources(sources)
+}
+
+// NativePaletteFailedSources says "部分来源搜索失败：{sources}（详情见日志）"
+// in the language of msgs.
+func (msgs Messages) NativePaletteFailedSources(sources any) string {
+	return Catalog.Format(msgs.locale, "native_palette_failedSources", map[string]any{"sources": sources})
+}
+
+// NativePaletteHintMove says "↑↓ 选择"
+// in the language the app shows.
+func NativePaletteHintMove() string { return In(i18n.Locale()).NativePaletteHintMove() }
+
+// NativePaletteHintMove says "↑↓ 选择"
+// in the language of msgs.
+func (msgs Messages) NativePaletteHintMove() string {
+	return Catalog.Format(msgs.locale, "native_palette_hintMove", nil)
+}
+
+// NativePaletteHintRun says "Enter 执行"
+// in the language the app shows.
+func NativePaletteHintRun() string { return In(i18n.Locale()).NativePaletteHintRun() }
+
+// NativePaletteHintRun says "Enter 执行"
+// in the language of msgs.
+func (msgs Messages) NativePaletteHintRun() string {
+	return Catalog.Format(msgs.locale, "native_palette_hintRun", nil)
+}
+
+// NativePaletteHintClose says "Esc 关闭"
+// in the language the app shows.
+func NativePaletteHintClose() string { return In(i18n.Locale()).NativePaletteHintClose() }
+
+// NativePaletteHintClose says "Esc 关闭"
+// in the language of msgs.
+func (msgs Messages) NativePaletteHintClose() string {
+	return Catalog.Format(msgs.locale, "native_palette_hintClose", nil)
+}
+
+// NativeUpdateReleasedOn says "发布于 {date}"
+// in the language the app shows.
+func NativeUpdateReleasedOn(date any) string { return In(i18n.Locale()).NativeUpdateReleasedOn(date) }
+
+// NativeUpdateReleasedOn says "发布于 {date}"
+// in the language of msgs.
+func (msgs Messages) NativeUpdateReleasedOn(date any) string {
+	return Catalog.Format(msgs.locale, "native_update_releasedOn", map[string]any{"date": date})
+}
+
+// NativeMigrationSourcePath says "旧库文件：{path}"
+// in the language the app shows.
+func NativeMigrationSourcePath(path any) string {
+	return In(i18n.Locale()).NativeMigrationSourcePath(path)
+}
+
+// NativeMigrationSourcePath says "旧库文件：{path}"
+// in the language of msgs.
+func (msgs Messages) NativeMigrationSourcePath(path any) string {
+	return Catalog.Format(msgs.locale, "native_migration_sourcePath", map[string]any{"path": path})
+}
+
+// NativeSetupLoadError says "没能读取 AI 配置（{reason}），下面的完成状态可能不准确。"
+// in the language the app shows.
+func NativeSetupLoadError(reason any) string { return In(i18n.Locale()).NativeSetupLoadError(reason) }
+
+// NativeSetupLoadError says "没能读取 AI 配置（{reason}），下面的完成状态可能不准确。"
+// in the language of msgs.
+func (msgs Messages) NativeSetupLoadError(reason any) string {
+	return Catalog.Format(msgs.locale, "native_setup_loadError", map[string]any{"reason": reason})
+}
+
 // NativeShellNotMigrated says "「{module}」还没有迁移到原生界面"
 // in the language the app shows.
 func NativeShellNotMigrated(module any) string {

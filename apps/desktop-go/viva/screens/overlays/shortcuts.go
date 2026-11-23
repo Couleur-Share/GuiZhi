@@ -95,6 +95,13 @@ func (l *LocalShortcuts) Reload() {
 	})
 }
 
+// Accelerator 是动作当前生效的组合键（规范化写法）；没有则为空串。
+func (l *LocalShortcuts) Accelerator(action string) string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.accels[action]
+}
+
 // Mode 是动作的模式：没设置过按局部。
 func (l *LocalShortcuts) Mode(action string) string {
 	l.mu.Lock()

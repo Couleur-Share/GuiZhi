@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/settings"
 	"guizhi-mygo-shell/viva/island"
 	"guizhi-mygo-shell/viva/kit"
@@ -89,8 +90,15 @@ func (r *Root) applyCommand(cmd Command) {
 		if r.openCapture() {
 			return
 		}
+	case CommandOpenUpdater:
+		r.overlay.update.Open() // 托盘「检查更新」：打开更新对话框并检查（渲染层 open-update-dialog）
+		return
+	case CommandFocusSearch:
+		// search 快捷键（全局或局部）：打开全局命令面板（渲染层 shortcut:search）。
+		r.overlay.shortcuts.Trigger(services.ShortcutSearch)
+		return
 	}
-	// 更新对话框与搜索聚焦依赖的界面在 M3 才迁移（台账 B-008）；没有装配采集时快速采集也一样：命令先留痕，不假装执行了。
+	// 没有装配采集时快速采集没有去处：命令先留痕，不假装执行了。
 	if log := r.opts.Services.Log; log != nil {
 		log.AppError("native", locales.NativeShellCommandAction(), locales.NativeShellCommandNotMigrated(string(cmd)))
 	}

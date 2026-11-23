@@ -61,7 +61,13 @@ type Host struct {
 }
 
 // Show 把窗口带到前台：最小化先还原，再显示并聚焦（Viva 的 Show 就是「显示或提升」）。
-func (h *Host) Show() { h.win.Show() }
+// 显示之后补做隐藏期间被跳过的自动更新检查（渲染层 window:visibility-changed）。
+func (h *Host) Show() {
+	h.win.Show()
+	if h.root != nil {
+		h.root.windowShown()
+	}
+}
 
 // Hide 把窗口收到托盘：窗口与内容保留，应用继续运行。收起前先销毁岛（WebView 子进程只在可见时存在）。
 func (h *Host) Hide() {

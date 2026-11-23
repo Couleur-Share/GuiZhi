@@ -15251,6 +15251,70 @@ func NativeSettingsLastCheckFailedReason(label, reason any) string {
 	return fmtArg(label) + "（" + fmtArg(reason) + "）"
 }
 
+// NativePaletteSearching 是 native.palette.searching：正在搜索…
+func NativePaletteSearching() string {
+	if useEn() {
+		return "Searching…"
+	}
+	return "正在搜索…"
+}
+
+// NativePaletteFailedSources 是 native.palette.failedSources：部分来源搜索失败：{{sources}}（详情见日志）
+func NativePaletteFailedSources(sources any) string {
+	if useEn() {
+		return "Some sources failed to search: " + fmtArg(sources) + " (see the log for details)"
+	}
+	return "部分来源搜索失败：" + fmtArg(sources) + "（详情见日志）"
+}
+
+// NativePaletteHintMove 是 native.palette.hintMove：↑↓ 选择
+func NativePaletteHintMove() string {
+	if useEn() {
+		return "↑↓ Select"
+	}
+	return "↑↓ 选择"
+}
+
+// NativePaletteHintRun 是 native.palette.hintRun：Enter 执行
+func NativePaletteHintRun() string {
+	if useEn() {
+		return "Enter Run"
+	}
+	return "Enter 执行"
+}
+
+// NativePaletteHintClose 是 native.palette.hintClose：Esc 关闭
+func NativePaletteHintClose() string {
+	if useEn() {
+		return "Esc Close"
+	}
+	return "Esc 关闭"
+}
+
+// NativeUpdateReleasedOn 是 native.update.releasedOn：发布于 {{date}}
+func NativeUpdateReleasedOn(date any) string {
+	if useEn() {
+		return "Released " + fmtArg(date)
+	}
+	return "发布于 " + fmtArg(date)
+}
+
+// NativeMigrationSourcePath 是 native.migration.sourcePath：旧库文件：{{path}}
+func NativeMigrationSourcePath(path any) string {
+	if useEn() {
+		return "Legacy database: " + fmtArg(path)
+	}
+	return "旧库文件：" + fmtArg(path)
+}
+
+// NativeSetupLoadError 是 native.setup.loadError：没能读取 AI 配置（{{reason}}），下面的完成状态可能不准确。
+func NativeSetupLoadError(reason any) string {
+	if useEn() {
+		return "The AI configuration could not be read (" + fmtArg(reason) + "), so the completion status below may be inaccurate."
+	}
+	return "没能读取 AI 配置（" + fmtArg(reason) + "），下面的完成状态可能不准确。"
+}
+
 // NativeShellNotMigrated 是 native.shell.notMigrated：「{{module}}」还没有迁移到原生界面
 func NativeShellNotMigrated(module any) string {
 	if useEn() {
