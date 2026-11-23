@@ -56,6 +56,10 @@ type Services struct {
 	// nil 时「AI 阅读」入口按「尚未迁移」处理，测试与对照里不关心主题阅读时可以不给。
 	Themed ThemedReading
 
+	// Migration 是旧版（.NET）数据库的探测与一次性迁移（见 migration.go）；
+	// nil 时不探测、不弹迁移对话框，测试与对照里不关心迁移时可以不给。
+	Migration Migration
+
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
 

@@ -75,7 +75,21 @@ type UpdateCheckOptions struct {
 	UseMirror bool
 	// Channel 是更新通道；空按稳定版。
 	Channel settings.UpdateChannel
+	// Trigger 是检查的触发来源，写进更新日志：UpdateTriggerStartup / Interval / Visibility 是自动检查，空串是手动。
+	Trigger string
 }
+
+// 自动检查更新的触发来源（UpdateCheckOptions.Trigger；手动检查留空）。
+const (
+	UpdateTriggerStartup    = "startup"
+	UpdateTriggerInterval   = "interval"
+	UpdateTriggerVisibility = "visibility"
+)
+
+// UpdateDisabledError 表示这次检查被主进程禁用（开发模式），不是检查失败：自动检查据此既不记失败也不提示。
+type UpdateDisabledError struct{ Reason string }
+
+func (e *UpdateDisabledError) Error() string { return e.Reason }
 
 // UpdateCheckResult 是一次检查更新的结果。
 type UpdateCheckResult struct {
@@ -104,11 +118,14 @@ type UpdateStatus struct {
 	Percent float64
 	// Error 在 error 时是原因。
 	Error string
+	// ReleaseNotes 与 ReleaseDate 在 available / downloaded 时是更新说明（Markdown）与发布日期（原样字符串），可能为空。
+	ReleaseNotes string
+	ReleaseDate  string
 }
 
 // Updater 是应用更新（updater:*）。检查与下载是同步调用：返回时已有结果；进度与状态另经 OnStatus 推送。
 type Updater interface {
-	// Check 检查更新。失败（含开发模式禁用、镜像源全挂）返回带原因的错误。
+	// Check 检查更新。失败（含镜像源全挂）返回带原因的错误；开发模式被禁用时返回 *UpdateDisabledError（errors.As 可辨认）。
 	Check(ctx context.Context, opts UpdateCheckOptions) (UpdateCheckResult, error)
 	// Download 下载已检查到的更新；失败返回带原因的错误。
 	Download(ctx context.Context, opts UpdateCheckOptions) error
@@ -116,6 +133,12 @@ type Updater interface {
 	Install(ctx context.Context) error
 	// OpenReleases 用系统浏览器打开发布页。
 	OpenReleases() error
+	// OpenDownloaded 在资源管理器里显示已下载的安装包（没有下载过或文件丢失时打开下载目录）；
+	// 没有可用文件或打开失败返回带原因的错误（updater:openDownloadedUpdate）。
+	OpenDownloaded() error
+	// LogAutoSkip 记下一次自动检查被跳过的原因（updater:logAutoSkip），没有它「没检查」与「检查了没有新版本」无法区分；
+	// 只写日志，失败也不影响界面，所以没有返回值。trigger 取 UpdateTrigger*，reason 取 disabled / hidden / offline / in-flight / cooldown。
+	LogAutoSkip(trigger, reason string)
 	// OnStatus 订阅更新状态推送（回调在推送方的 goroutine 上，必须很快返回）；返回取消函数，可重复调用。
 	OnStatus(fn func(UpdateStatus)) (cancel func())
 }

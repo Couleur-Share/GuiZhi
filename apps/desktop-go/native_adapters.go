@@ -234,6 +234,7 @@ func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 		Ask:          newAskAdapter(b),
 		Wiki:         newWikiAdapter(b),
 		Themed:       newThemedAdapter(b, hub),
+		Migration:    migrationAdapter{b: b},
 		Log:          logAdapter{b: b},
 		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
 	}

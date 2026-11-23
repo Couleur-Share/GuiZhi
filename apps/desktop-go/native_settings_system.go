@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -168,13 +169,26 @@ func updaterOptions(o services.UpdateCheckOptions) map[string]any {
 	if channel != string(settings.ChannelPreview) {
 		channel = string(settings.ChannelStable)
 	}
-	return map[string]any{"useMirror": o.UseMirror, "channel": channel, "trigger": "manual"}
+	trigger := "manual"
+	if slices.Contains(updateCheckTriggers, o.Trigger) {
+		trigger = o.Trigger
+	}
+	return map[string]any{"useMirror": o.UseMirror, "channel": channel, "trigger": trigger}
+}
+
+// LogAutoSkip 经 updater:logAutoSkip 记下自动检查被跳过的原因；只写日志，处理器拒绝（白名单外）或出错都不上报。
+func (a updaterAdapter) LogAutoSkip(trigger, reason string) {
+	_, _ = a.b.call(context.Background(), "updater:logAutoSkip", map[string]any{"trigger": trigger, "reason": reason})
 }
 
 func (a updaterAdapter) Check(ctx context.Context, opts services.UpdateCheckOptions) (services.UpdateCheckResult, error) {
 	reply, err := callAs[updaterReply](ctx, a.b, "updater:check", updaterOptions(opts))
 	if err != nil {
 		return services.UpdateCheckResult{}, err
+	}
+	if reply.DevDisabled {
+		// 开发模式下主进程本就不检查：不是失败（渲染层的自动检查对它既不记失败也不提示），原因照常带回
+		return services.UpdateCheckResult{}, &services.UpdateDisabledError{Reason: reply.err("update check disabled").Error()}
 	}
 	if err := reply.err("update check failed"); err != nil {
 		return services.UpdateCheckResult{}, err
@@ -203,11 +217,23 @@ func (a updaterAdapter) OpenReleases() error {
 	return err
 }
 
-// updaterStatusWire 是 updater:status 推送的载荷：{ status, info?:{version}, progress?:{percent}, error? }。
+// OpenDownloaded 经 updater:openDownloadedUpdate 在资源管理器里显示安装包；处理器回复 { success, path, error? }，
+// 失败（没有下载过、文件丢失、打不开目录）时带回原因，不能让界面拿到既失败又没有原因的结果。
+func (a updaterAdapter) OpenDownloaded() error {
+	reply, err := callAs[updaterReply](context.Background(), a.b, "updater:openDownloadedUpdate")
+	if err != nil {
+		return err
+	}
+	return reply.err("open downloaded update failed")
+}
+
+// updaterStatusWire 是 updater:status 推送的载荷：{ status, info?:{version, releaseNotes?, releaseDate?}, progress?:{percent}, error? }。
 type updaterStatusWire struct {
 	Status string `json:"status"`
 	Info   *struct {
-		Version string `json:"version"`
+		Version      string `json:"version"`
+		ReleaseNotes string `json:"releaseNotes"`
+		ReleaseDate  string `json:"releaseDate"`
 	} `json:"info"`
 	Progress *struct {
 		Percent float64 `json:"percent"`
@@ -218,7 +244,7 @@ type updaterStatusWire struct {
 func (w updaterStatusWire) status() services.UpdateStatus {
 	st := services.UpdateStatus{State: w.Status, Error: w.Error}
 	if w.Info != nil {
-		st.Version = w.Info.Version
+		st.Version, st.ReleaseNotes, st.ReleaseDate = w.Info.Version, w.Info.ReleaseNotes, w.Info.ReleaseDate
 	}
 	if w.Progress != nil {
 		st.Percent = w.Progress.Percent

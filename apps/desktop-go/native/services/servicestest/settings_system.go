@@ -150,6 +150,9 @@ type Updater struct {
 	downloads  []services.UpdateCheckOptions
 	installs   int
 	releases   int
+	openDlErr  error
+	openDls    int
+	skips      []AutoSkip
 	nextSub    int
 	subs       map[int]func(services.UpdateStatus)
 	// Gate 非 nil 时 Check 先等它关闭再返回：测试用来把「检查中」状态停在界面上；DownloadGate 同理，停在「下载中」。
@@ -164,6 +167,10 @@ func (f *Updater) SetResult(r services.UpdateCheckResult) { f.mu.Lock(); f.resul
 func (f *Updater) FailCheck(err error)                    { f.mu.Lock(); f.checkErr = err; f.mu.Unlock() }
 func (f *Updater) FailDownload(err error)                 { f.mu.Lock(); f.dlErr = err; f.mu.Unlock() }
 func (f *Updater) FailInstall(err error)                  { f.mu.Lock(); f.installErr = err; f.mu.Unlock() }
+
+// FailOpenDownloaded 注入「显示已下载安装包」的错误（nil 取消）；DownloadOpens 是调用次数。
+func (f *Updater) FailOpenDownloaded(err error) { f.mu.Lock(); f.openDlErr = err; f.mu.Unlock() }
+func (f *Updater) DownloadOpens() int           { f.mu.Lock(); defer f.mu.Unlock(); return f.openDls }
 
 // Checks、Downloads 返回收到的参数；Installs、ReleaseOpens 是次数。
 func (f *Updater) Checks() []services.UpdateCheckOptions {
@@ -229,6 +236,29 @@ func (f *Updater) OpenReleases() error {
 	defer f.mu.Unlock()
 	f.releases++
 	return nil
+}
+
+// AutoSkip 是一次 LogAutoSkip 调用的记录。
+type AutoSkip struct{ Trigger, Reason string }
+
+func (f *Updater) LogAutoSkip(trigger, reason string) {
+	f.mu.Lock()
+	f.skips = append(f.skips, AutoSkip{Trigger: trigger, Reason: reason})
+	f.mu.Unlock()
+}
+
+// AutoSkips 返回记下的自动检查跳过原因（按顺序）。
+func (f *Updater) AutoSkips() []AutoSkip {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]AutoSkip(nil), f.skips...)
+}
+
+func (f *Updater) OpenDownloaded() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.openDls++
+	return f.openDlErr
 }
 
 func (f *Updater) OnStatus(fn func(services.UpdateStatus)) (cancel func()) {

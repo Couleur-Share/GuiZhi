@@ -9,6 +9,9 @@ const (
 	LibrarySortTitle     = "title"
 )
 
+// 全文搜索的匹配方式（LibraryListQuery.SearchMode）。
+const LibrarySearchRecall = "recall"
+
 // 列表排序方向。
 const (
 	LibraryOrderAsc  = "asc"
@@ -40,10 +43,13 @@ type LibraryListQuery struct {
 	TagID        string `json:"tagId,omitempty"`
 	Platform     string `json:"platform,omitempty"`
 	// Search 是全文搜索关键词（已去掉首尾空白）；非空时结果按相关度排序，排序字段不起作用。
-	Search    string `json:"search,omitempty"`
-	SortBy    string `json:"sortBy,omitempty"`
-	SortOrder string `json:"sortOrder,omitempty"`
-	Limit     int    `json:"limit,omitempty"`
+	Search string `json:"search,omitempty"`
+	// SearchMode 是全文搜索的匹配方式（knowledge:list 的 searchMode）：空串取处理器的默认（phrase，短语）；
+	// LibrarySearchRecall 是召回式（按虚词切开后多词取并集，命令面板用，渲染层 GlobalCommandPalette 传 "recall"）。
+	SearchMode string `json:"searchMode,omitempty"`
+	SortBy     string `json:"sortBy,omitempty"`
+	SortOrder  string `json:"sortOrder,omitempty"`
+	Limit      int    `json:"limit,omitempty"`
 	// Cursor 是不透明的 keyset 游标，提供时优先于 Offset；游标绑定了查询的指纹，换了条件就失效。
 	Cursor string `json:"cursor,omitempty"`
 	Offset int    `json:"offset"`

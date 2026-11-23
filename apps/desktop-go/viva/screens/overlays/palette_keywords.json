@@ -1,0 +1,8 @@
+{
+  "general": "启动 关闭 语言 通知 Wiki startup launch close language notifications",
+  "capture": "平台 登录 yt-dlp ffmpeg FunASR 转写 platform sign-in login transcription",
+  "ai": "模型 Provider 路由 快速配置 用量 model routing quick setup usage",
+  "data": "备份 恢复 导出 数据目录 backup restore export data folder",
+  "appearance": "主题 字体 背景图 theme font background image",
+  "shortcuts": "快捷键 全局 shortcuts hotkeys keyboard global"
+}

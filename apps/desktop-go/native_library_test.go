@@ -248,3 +248,40 @@ func TestLibraryAdapterListAgainstRealHandlers(t *testing.T) {
 		t.Fatal("换了筛选之后，旧游标应被拒绝")
 	}
 }
+
+// 搜索模式经真实处理器往返：命令面板用召回式（多词取并集），默认的短语式要求词连在一起；
+// 空的 SearchMode 保持处理器的默认，不改变既有列表的行为。
+func TestLibraryAdapterListSearchModeAgainstRealHandlers(t *testing.T) {
+	ctx := t.Context()
+	svc, b := newLibraryAdapterForTest(t)
+	for _, in := range []map[string]any{
+		{"title": "甲", "content": "关于量子退火的笔记"},
+		{"title": "乙", "content": "咖啡豆的烘焙曲线"},
+		{"title": "丙", "content": "与搜索词无关的正文"},
+	} {
+		if _, err := b.call(ctx, "knowledge:create", in); err != nil {
+			t.Fatalf("创建条目 %v：%v", in, err)
+		}
+	}
+	titles := func(q services.LibraryListQuery) []string {
+		t.Helper()
+		q.Scope, q.Limit = services.LibraryScopeAll, 10
+		page, err := svc.List(ctx, q)
+		if err != nil {
+			t.Fatalf("搜索 %+v：%v", q, err)
+		}
+		out := make([]string, len(page.Entries))
+		for i, e := range page.Entries {
+			out[i] = e.Title
+		}
+		return out
+	}
+	const query = "量子退火 咖啡豆"
+	if got := titles(services.LibraryListQuery{Search: query}); len(got) != 0 {
+		t.Fatalf("短语式不应命中分散在两条里的两个词：%v", got)
+	}
+	got := titles(services.LibraryListQuery{Search: query, SearchMode: services.LibrarySearchRecall})
+	if len(got) != 2 || got[0] == "丙" || got[1] == "丙" {
+		t.Fatalf("召回式应命中甲与乙：%v", got)
+	}
+}

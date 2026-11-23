@@ -4,9 +4,11 @@ package main
 // 真实的 IPC 处理器 + 临时数据目录（不碰 %APPDATA%\GuiZhi）+ 本地 httptest（不访问真实网络）。
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -302,8 +304,10 @@ func TestSettingsAdapterUpdaterCheckFailure(t *testing.T) {
 	b := newSystemBridge()
 	f.u.register(b)
 	svc := newNativeServices(b, newPushHub()).Updater
-	if _, err := svc.Check(context.Background(), services.UpdateCheckOptions{}); err == nil || !strings.Contains(err.Error(), "development mode") {
-		t.Fatalf("开发模式：%v", err)
+	_, err := svc.Check(context.Background(), services.UpdateCheckOptions{})
+	var disabled *services.UpdateDisabledError
+	if err == nil || !strings.Contains(err.Error(), "development mode") || !errors.As(err, &disabled) {
+		t.Fatalf("开发模式应返回带原因的 *UpdateDisabledError：%v", err)
 	}
 	// 回复没有原因时补兜底原因
 	if err := (updaterReply{}).err("fallback"); err == nil || err.Error() != "fallback" {
@@ -321,5 +325,83 @@ func TestSettingsAdapterUpdaterOptions(t *testing.T) {
 	}
 	if o := updaterOptions(services.UpdateCheckOptions{Channel: "nightly"}); o["channel"] != "stable" || o["useMirror"] != false {
 		t.Errorf("未知通道按稳定版：%v", o)
+	}
+	// 触发来源：自动检查的三种照传，空串与白名单外按手动。
+	for trigger, want := range map[string]string{
+		services.UpdateTriggerStartup: "startup", services.UpdateTriggerInterval: "interval",
+		services.UpdateTriggerVisibility: "visibility", "": "manual", "bogus": "manual",
+	} {
+		if o := updaterOptions(services.UpdateCheckOptions{Trigger: trigger}); o["trigger"] != want {
+			t.Errorf("触发来源 %q：%v，应为 %q", trigger, o["trigger"], want)
+		}
+	}
+}
+
+// 更新说明与发布日期随 available 状态与检查结果的推送带到界面；
+// OpenDownloaded 在已下载时显示安装包，没有下载过时带回原因（并打开下载目录，与渲染层一致）。
+func TestSettingsAdapterUpdaterNotesAndOpenDownloaded(t *testing.T) {
+	f := newUpdaterFixture(t, "0.29.0")
+	b := newSystemBridge()
+	f.u.register(b)
+	hub := newPushHub()
+	inner := f.u.d.push
+	f.u.d.push = func(ch string, p any) { inner(ch, p); hub.Dispatch(ch, p) }
+	svc := newNativeServices(b, hub).Updater
+	ctx := context.Background()
+
+	var mu sync.Mutex
+	var got []services.UpdateStatus
+	svc.OnStatus(func(s services.UpdateStatus) { mu.Lock(); got = append(got, s); mu.Unlock() })
+
+	// 没有下载过：失败带原因，并打开下载目录。
+	if err := svc.OpenDownloaded(); err == nil || !strings.Contains(err.Error(), "No downloaded update file is available") {
+		t.Fatalf("没下载过：%v", err)
+	}
+	if len(f.opened) != 1 || len(f.revealed) != 0 {
+		t.Fatalf("应打开下载目录而不是显示安装包：opened=%v revealed=%v", f.opened, f.revealed)
+	}
+
+	if res, err := svc.Check(ctx, services.UpdateCheckOptions{Channel: settings.ChannelStable}); err != nil || !res.Available {
+		t.Fatalf("检查：%+v %v", res, err)
+	}
+	mu.Lock()
+	var avail services.UpdateStatus
+	for _, s := range got {
+		if s.State == services.UpdateStateAvailable {
+			avail = s
+		}
+	}
+	mu.Unlock()
+	if avail.Version != "0.30.0" || !strings.Contains(avail.ReleaseNotes, "notes of v0.30.0") {
+		t.Errorf("available 应带版本与更新说明：%+v", avail)
+	}
+
+	if err := svc.Download(ctx, services.UpdateCheckOptions{Channel: settings.ChannelStable}); err != nil {
+		t.Fatalf("下载：%v", err)
+	}
+	if err := svc.OpenDownloaded(); err != nil || len(f.revealed) != 1 {
+		t.Fatalf("已下载应显示安装包：%v %v", err, f.revealed)
+	}
+}
+
+// 自动检查的跳过原因经 updater:logAutoSkip 写进日志；白名单外的值被处理器拒绝，也不向界面报错。
+func TestSettingsAdapterUpdaterLogAutoSkip(t *testing.T) {
+	b := newSystemBridge()
+	b.registerSimpleBoot(&rendererBackupSettings{})
+	svc := newNativeServices(b, newPushHub()).Updater
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	svc.LogAutoSkip(services.UpdateTriggerVisibility, "cooldown")
+	svc.LogAutoSkip("bogus", "cooldown")
+	svc.LogAutoSkip(services.UpdateTriggerStartup, "bogus")
+	out := buf.String()
+	if !strings.Contains(out, "auto_skip trigger=visibility reason=cooldown") {
+		t.Errorf("应记下合法的跳过原因：%q", out)
+	}
+	if strings.Count(out, "auto_skip") != 1 {
+		t.Errorf("白名单外的值不应写日志：%q", out)
 	}
 }
