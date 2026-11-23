@@ -61,6 +61,9 @@ type libraryOptions struct {
 	// askPanel 为 true 时详情右侧接上围绕本文的提问栏（Screen.ArticleAsk，只在 detail 时有意义；装配见 ask.go libraryAskScreen）：
 	// 没有它「提问」钮只弹说明。React 一侧由场景自己在页内装好会话接口（react-ask-scenes.mjs）。
 	askPanel bool
+	// themed 非空时详情的阅读区接上主题阅读（Screen.Themed，B-064；装配见 themed.go）：值是这篇笔记的页面与任务数据，
+	// React 一侧由场景自己在页内装好 themedReading 接口（react-themed-scenes.mjs）并用 config.detail.themed 隐去岛里的页面本体。
+	themed themedMode
 	// fault 是列表读取的故障注入（只在 list 时有意义）。
 	fault listFault
 	// view 是列表的视图模式偏好（card | list）；空表示没有保存过（缺省卡片）。
@@ -185,6 +188,9 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 		if opt.askPanel {
 			screen.ArticleAsk = libraryAskScreen(look, ctx)
 		}
+		if opt.themed != "" {
+			screen.Themed = libraryThemedScreen(look, ctx, guard, opt.themed)
+		}
 		workspace := blankWorkspace
 		if opt.list {
 			workspace = screen.Workspace
@@ -212,6 +218,9 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			screen.EndFrame()
 			if screen.ArticleAsk != nil {
 				screen.ArticleAsk.EndFrame() // 根每帧都收尾问答界面（root.go）：提问栏这一帧没画出来就算卸载
+			}
+			if screen.Themed != nil {
+				screen.Themed.EndFrame() // 根每帧都收尾主题阅读（root_themed.go）：这一帧没绑定到详情就放开阅读状态
 			}
 		}
 		compact := look.Viewport <= compactMaxWidth

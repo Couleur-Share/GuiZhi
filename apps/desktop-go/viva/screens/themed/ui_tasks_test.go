@@ -3,8 +3,6 @@ package themed
 import (
 	"testing"
 
-	"github.com/vivaui/viva/gfx"
-
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/locales"
 )
@@ -20,7 +18,8 @@ func putTask(r *uiRig, req services.ThemedRequest, title, state, stage string) s
 	return r.svc.PutTask(services.ThemedTask{ItemID: req.ItemID, SourceKind: req.SourceKind, Title: title, State: state, Stage: stage})
 }
 
-func openName(title string) string { return locales.ThemedReadingOpen() + " " + title }
+// openName 是任务卡上「查看主题页」按钮的可访问名：渲染层的按钮名就是这四个字，不带标题（每张卡都一样，点哪一张靠卡片位置）。
+func openName(string) string { return locales.ThemedReadingOpen() }
 
 func TestTasksListShowsEveryTask(t *testing.T) {
 	r := newUIRig(t, withHost(hostTasks), func(r *uiRig) {
@@ -123,14 +122,14 @@ func TestTasksShowLiveProgress(t *testing.T) {
 	})
 	r.settle()
 	before := task
-	if !r.has(gfx.RoleStatus, statusTitle(before, StatusOptions{HasPage: true})) {
+	if !r.hasStatusCard(statusTitle(before, StatusOptions{HasPage: true})) {
 		t.Fatalf("应显示写作阶段；画面上有 %q", r.session.Texts())
 	}
 	r.svc.UpdateTask(task.ID, func(tk *services.ThemedTask) { tk.Stage = services.ThemedStageDesign })
 	r.settle()
 	after := before
 	after.Stage = services.ThemedStageDesign
-	if !r.has(gfx.RoleStatus, statusTitle(after, StatusOptions{HasPage: true})) {
+	if !r.hasStatusCard(statusTitle(after, StatusOptions{HasPage: true})) {
 		t.Fatalf("推送进度后卡片应更新为设计阶段；画面上有 %q", r.session.Texts())
 	}
 }

@@ -142,13 +142,13 @@ func TestRootThemedInboxTaskOpensTheItemInAIReading(t *testing.T) {
 	if f.session.HasText("待复核二") {
 		t.Fatal("任务页应代替处理中心的列表")
 	}
-	f.clickButton(t, locales.ThemedReadingOpen()+" 任务标题一")
+	f.clickButton(t, locales.ThemedReadingOpen())
 	f.waitFrames(t, "切到知识库并选中条目", func() bool {
 		d := f.root.library.Store.View().Detail
 		return f.root.Window().Module == shell.ModuleLibrary && d.Item != nil && d.Item.ID == "n1"
 	})
 	f.waitFrames(t, "直接进入 AI 阅读", func() bool {
-		return f.root.themed.ModeView().Active && e.hasButton(locales.ThemedReadingReaderSettings())
+		return f.root.themed.ModeView().Active && e.f.hasRole(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	})
 	if scope := f.root.library.Store.View().Filters.Scope; scope != services.LibraryScopeAll {
 		t.Errorf("范围应设为全部，实际 %q", scope)
@@ -186,8 +186,8 @@ func TestRootThemedReferenceLinkOpensThroughServices(t *testing.T) {
 	})
 	f := e.f
 	e.openDetail(t)
-	f.waitFrames(t, "AI 阅读工具栏", func() bool { return e.hasButton(locales.ThemedReadingReaderSettings()) })
-	f.clickButton(t, locales.ThemedReadingReaderSettings())
+	f.waitFrames(t, "AI 阅读工具栏", func() bool { return e.f.hasRole(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) })
+	f.clickRole(t, gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	n, ok := f.session.AccessByRole(gfx.RoleMenuItem, locales.ThemedReadingReaderReferences())
 	if !ok {
 		t.Fatalf("菜单里应有「参考资料」；画面上有 %q", f.session.Texts())
@@ -196,7 +196,7 @@ func TestRootThemedReferenceLinkOpensThroughServices(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitFrames(t, "资料列出", func() bool { return f.session.HasText("Primary Source") })
-	f.clickButton(t, "Primary Source")
+	f.clickRole(t, gfx.RoleLink, "Primary Source")
 	if len(e.external) != 1 || e.external[0] != "https://example.org/a" {
 		t.Fatalf("应经 Services.OpenExternal 打开：%q", e.external)
 	}

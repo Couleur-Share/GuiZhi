@@ -39,10 +39,21 @@ func (s *Screen) compactPrimary() kit.ButtonStyle {
 
 // textLink 是纯文字的链接钮（text-primary，悬停加下划线）：命中区是整个盒子，键盘可达。返回这一帧是否被点了。
 func (s *Screen) textLink(c ui.C, label string, style kit.TextStyle) bool {
+	return s.textLinkAs(c, label, style, gfx.RoleButton)
+}
+
+// textLinkAs 是 textLink 指定可访问角色的写法：渲染层的 <a href> 是 link，<button> 是 button。
+//
+// boxH>0 时命中盒的高度固定为 boxH（居中在文字行里）：行内 <a> 的盒子是内容区（字号 14 时 18px），比行高（20px）矮。
+func (s *Screen) textLinkAs(c ui.C, label string, style kit.TextStyle, role gfx.Role, boxH ...float32) bool {
 	l := s.Look
 	t := l.T
 	id := ui.ID(c)
-	box, _ := s.hitButton(c, id, ui.Row(c).Shrink(0).Items(ui.Center), label)
+	box := ui.Row(c).Shrink(0).Items(ui.Center).HitWith(id, label, gfx.HitOptions{Role: role, Cursor: gfx.PointerCursorHand})
+	if len(boxH) > 0 && boxH[0] > 0 {
+		box = box.Height(boxH[0])
+	}
+	l.TabStop(box)
 	hovered := box.State().Hovered
 	box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
@@ -78,9 +89,9 @@ func (s *Screen) bodyText(c ui.C, text string, color tokens.Color) {
 }
 
 // smallText 是 text-xs 的弱化说明，折行。
-func (s *Screen) smallText(c ui.C, text string) {
+func (s *Screen) smallText(c ui.C, text string) ui.Box {
 	l := s.Look
-	l.Text(c, text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
+	return l.Text(c, text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
 }
 
 // uiPrimaryStyle 是通用按钮（components/ui/Button.tsx）的 primary 变体、md 档。
@@ -105,10 +116,21 @@ func (s *Screen) compactButton() kit.ButtonStyle {
 
 // card 是带边框的圆角块（rounded-lg border border-border p-3）。
 func (s *Screen) card(c ui.C, body func()) {
+	s.cardWith(c, s.Look.Space(3)+1, s.Look.Space(2), body)
+}
+
+// cardWith 是 card 的内边距（含边框）与子项间距可调的写法：生成设置里的块是 p-4 / space-y-3。
+func (s *Screen) cardWith(c ui.C, pad, gap float32, body func()) {
 	l := s.Look
 	t := l.T
-	ui.Column(c).FillWidth().Gap(l.Space(2)).Pad(l.Space(3) + 1).
+	ui.Column(c).FillWidth().Gap(gap).Pad(pad).
 		Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)})
 		}).Children(body)
+}
+
+// relaxedText 是带 leading-relaxed（行高 1.625 倍字号）的折行文字。
+func (s *Screen) relaxedText(c ui.C, text string, st kit.TextStyle, color tokens.Color, opts ...kit.TextOpt) ui.Box {
+	st.Line = st.Size * 1.625
+	return s.Look.Text(c, text, st, kit.WeightNormal, color, append([]kit.TextOpt{kit.Wrapped()}, opts...)...)
 }

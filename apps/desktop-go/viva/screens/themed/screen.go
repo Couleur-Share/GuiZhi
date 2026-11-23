@@ -2,6 +2,7 @@ package themed
 
 import (
 	"context"
+	"time"
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
@@ -48,6 +49,12 @@ type Screen struct {
 	Look  *kit.Look
 	Guard kit.Guard
 	Hooks Hooks
+	// BlankPage 为 true 时没有岛宿主的页面占位（pageShell）画成纯空白：对照里渲染层一侧的页面本体被隐去（B-064），
+	// 占位的标题行与文档容器不应该出现在可访问树与文字里。生产环境有宿主，不会走到占位。
+	BlankPage bool
+	// Loc 与 Locale 是日期的时区与区域写法（渲染层的 toLocaleDateString 跟系统走）；零值取本机时区与中文。
+	Loc    *time.Location
+	Locale kit.DateLocale
 
 	Mode    *ModeStore
 	Reading *ReadingStore
@@ -76,6 +83,8 @@ type Screen struct {
 	del    kit.ConfirmState
 	tools  toolsUI
 	status statusUI
+	// bodyH 是阅读区主体（任务状态、读取提示、空态）上一帧画出来的自然高度，居中溢出时用来算顶上被推出视口的那一半。
+	bodyH float32
 
 	tasks  tasksUI
 	search searchUI

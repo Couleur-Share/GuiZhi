@@ -38,7 +38,10 @@ var knownRed = map[string]redPin{
 	"app.window.library.detail-tools-webpage-selected": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
 	"app.window.library.detail-tools-comments":         {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
 	"app.window.library.detail-tools-comments-open":    {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 7},
-	"app.window.library.detail-tools-comments-empty":   {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
+	// G-027（M3-5b 延伸）：主题阅读的资料面板与处理中心的任务卡都是 <article>，同样没有映射规则；L2、L3 全部通过，只因 L1 未通过。
+	"app.window.library.detail-themed-tools":         {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 2},
+	"app.window.inbox.themed-tasks":                  {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 2},
+	"app.window.library.detail-tools-comments-empty": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},
 	// G-027（M2-6c 延伸）：AI 摘要展开后的 Markdown 正文多出 strong、ListMarker、code 三个未映射角色，其余同上；
 	// 其余场景（摘要折叠、OCR 两态、标签建议）与评论一样只有 region / DescriptionList / term / definition 与 extra-node。
 	"app.window.library.detail-tools-summary-collapsed": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 5},

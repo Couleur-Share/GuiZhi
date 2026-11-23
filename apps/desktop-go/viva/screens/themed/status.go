@@ -45,6 +45,8 @@ type StatusModel struct {
 	// Error 是失败原因原文（可复制）；Lines 是「生成详情」里的其余各行，按显示顺序。
 	Error string
 	Lines []string
+	// Usage 是详情末尾的用量（文本请求 / 生图请求 / 新图保存，渲染层是并排的三个 span）；没有记录用量时为空，「此任务未记录用量」在 Lines 末尾。
+	Usage []string
 	// BackgroundHint 是「可以切换文章」的提示：展开样式放在卡片底部，紧凑样式放在详情里（仅活动中）。
 	BackgroundHint string
 }
@@ -242,11 +244,11 @@ func BuildStatus(task services.ThemedTask, o StatusOptions) StatusModel {
 		m.Lines = append(m.Lines, timingLine(task.Timings))
 	}
 	if u := task.Usage; u != nil {
-		m.Lines = append(m.Lines, strings.Join([]string{
+		m.Usage = []string{
 			locales.ThemedReadingTextCalls(u.TextCalls),
 			locales.ThemedReadingImageCalls(u.ImageCalls),
 			locales.ThemedReadingImagesSaved(u.ImagesSaved),
-		}, "   "))
+		}
 	} else {
 		m.Lines = append(m.Lines, locales.ThemedReadingUsageMissing())
 	}

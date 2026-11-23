@@ -70,7 +70,7 @@ func TestThemedItemWithPageOpensInAIReadingAndFeedsTheIsland(t *testing.T) {
 	svc.PutPage(themedNote, services.ThemedPage{ID: "page-1"})
 	rr := themedRig(t, svc)
 	rr.openCard(detailNoteID)
-	if !rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if !rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatalf("有页面的条目默认进 AI 阅读，工具栏应有「阅读页设置」；画面上有 %q", rr.session.Texts())
 	}
 	p := rr.ready()
@@ -92,7 +92,7 @@ func TestThemedOriginalModeFeedsTheOriginalToTheIsland(t *testing.T) {
 	if got := rr.viewOf(p); got["kind"] == "snapshot" {
 		t.Fatalf("切回原文后岛里不该还是主题页：%v", got)
 	}
-	if rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("原文模式不画「阅读页设置」")
 	}
 }
@@ -107,7 +107,7 @@ func TestThemedTrashedItemShowsPageReadOnly(t *testing.T) {
 	if !rr.hasText(locales.ThemedReadingReaderReadOnly()) {
 		t.Fatalf("回收站里的条目应提示只读；画面上有 %q", rr.session.Texts())
 	}
-	rr.click(gfx.RoleButton, locales.ThemedReadingReaderSettings())
+	rr.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	if n, ok := rr.node(gfx.RoleMenuItem, locales.ThemedReadingReaderDelete()); !ok || !n.Disabled {
 		t.Fatalf("回收站里不能删除 AI 阅读页：%+v ok=%v", n, ok)
 	}
@@ -122,7 +122,7 @@ func TestThemedEditingTheOriginalLeavesAIReading(t *testing.T) {
 	svc.PutPage(themedNote, services.ThemedPage{ID: "page-1"})
 	rr := themedRig(t, svc)
 	rr.openCard(detailNoteID)
-	if !rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if !rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("前置：应在 AI 阅读")
 	}
 	rr.click(gfx.RoleButton, rr.editButtonName())
@@ -130,7 +130,7 @@ func TestThemedEditingTheOriginalLeavesAIReading(t *testing.T) {
 	if !rr.isEditing() {
 		t.Fatal("应进入编辑")
 	}
-	if rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("编辑原文时 AI 阅读退出显示")
 	}
 }
@@ -184,14 +184,14 @@ func TestThemedKeepsTheArticleAskBar(t *testing.T) {
 	svc.PutPage(themedNote, services.ThemedPage{ID: "page-1"})
 	rr := themedRig(t, svc, withArticleAsk)
 	rr.openCard(detailNoteID)
-	if !rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if !rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("前置：应在 AI 阅读")
 	}
 	rr.toggleAskButton()
 	if _, ok := rr.askPane(); !ok {
 		t.Fatalf("AI 阅读下点「提问」应展开提问栏；画面上有 %q", rr.session.Texts())
 	}
-	if !rr.has(gfx.RoleButton, locales.ThemedReadingReaderSettings()) {
+	if !rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("提问栏展开后阅读区仍是 AI 阅读")
 	}
 	rr.click(gfx.RoleTextField, locales.ArticleAskQuestion())

@@ -100,6 +100,16 @@ const HIDE_SNAPSHOT_BODY_CSS = `
 [data-testid="web-snapshot-pane"] > .min-h-0.flex-1 { visibility: hidden !important; }
 `;
 /**
+ * 主题阅读（AI 阅读，M3-5b，config.detail.themed）：阅读区里的状态卡、空态与生成设置对话框是 Viva 的原生界面、要参与对照，
+ * 只隐去 AI 阅读页本体——NativeReadingView 的宿主容器（阅读岛的内容，WebView2 承载，Viva 的岛在无头会话里画不出来，
+ * 对话框盖住时宿主里会画一份降级的文章，一并隐去）。读者工具条照常显示；`data-parity-hide` 是场景自己打的记号（隐去页面的「目录」钮：
+ * 岛里没有桥接脚本，Viva 一侧没有目录）。同样是采集端的口径（页内样式），不是渲染层源码的改动。
+ */
+const HIDE_THEMED_PAGE_CSS = `
+[data-testid="native-reading-view"] [data-article-reader] > * { visibility: hidden !important; }
+[data-testid="article-toolbar"] [data-parity-hide] { display: none !important; }
+`;
+/**
  * 文章工具侧栏的场景（config.detail.hideToolbar）再把内容面板的整条工具栏隐去（display: none，不占位）：侧栏在渲染层 DOM 里排在内容面板之前，
  * Viva 没有 z-index、绘制序就是读屏与文字序，侧栏只能声明在内容之后，工具栏里的文字在两侧的文字序里前后颠倒，会让整段侧栏文字错位一格比不上
  * （台账 C-013）。Viva 一侧对应 Screen.HideToolbar。
@@ -495,7 +505,7 @@ export async function enterLibrary(session, options = {}) {
     // toolbar：只隐去阅读区内容，保留读者工具条（B-065）；hideToolbar：连工具栏一起隐去（C-013）；
     // transcript：文字稿场景（M2-6d）里文字稿面板是 Viva 的原生面板、要参与对照，只隐去读者工具条挂载点里的控件、不隐去阅读区内容。
     // snapshot：网页快照场景（M2-5b）里快照面板的工具条与通知条是 Viva 的原生界面、要参与对照，只隐去面板里最后那一块（岛的内容，HIDE_SNAPSHOT_BODY_CSS）与读者工具条挂载点里的控件。
-    const readerCss = (config.detail?.snapshot ? HIDE_SNAPSHOT_BODY_CSS + HIDE_READER_TOOLBAR_CSS : config.detail?.transcript ? HIDE_READER_TOOLBAR_CSS : config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : "");
+    const readerCss = (config.detail?.themed ? HIDE_THEMED_PAGE_CSS : config.detail?.snapshot ? HIDE_SNAPSHOT_BODY_CSS + HIDE_READER_TOOLBAR_CSS : config.detail?.transcript ? HIDE_READER_TOOLBAR_CSS : config.detail?.toolbar ? HIDE_READER_CONTENT_CSS : HIDE_READER_CSS) + (config.detail?.hideToolbar ? HIDE_TOOLBAR_CSS : "");
     await page.addStyleTag({ content: config.detail ? readerCss : config.list ? HIDE_DETAIL_CSS : HIDE_WORKSPACE_CSS });
   }
   // 侧栏场景比的就是侧栏，紧凑布局下先把浮层展开；列表场景比的是工作区里的列表栏，浮层会盖住它，

@@ -17,6 +17,7 @@ import (
 	"guizhi-mygo-shell/viva/parity"
 	inboxscreen "guizhi-mygo-shell/viva/screens/inbox"
 	shellscreen "guizhi-mygo-shell/viva/screens/shell"
+	themedscreen "guizhi-mygo-shell/viva/screens/themed"
 )
 
 // 处理中心（M3-1）的整窗对照场景：顶栏 + rail + 二级侧栏（筛选）+ 工作区（待办列表）。
@@ -30,6 +31,7 @@ type inboxOptions struct {
 	loadError      bool   // 主列表读取失败
 	wikiNeedsModel bool   // Wiki 场景没有配置文本模型
 	semanticError  bool   // 语义索引状态读取失败（局部错误条，不挡主列表）
+	themedTasks    bool   // 接上主题阅读（B-064）：「主题页任务」页里是夹具里的任务（themed-fixture.json 的 inbox.tasks）
 }
 
 // inboxEnv 是一次渲染里步骤能用到的东西，由 prepare 装配页面时填入；每次渲染各有一份（见 parity.Scene.Prepare）。
@@ -90,6 +92,11 @@ func inboxScene(id string, opt inboxOptions, steps inboxSteps, waivers ...parity
 				LoadCollections: func(context.Context) {},
 			},
 		}
+		var themed *themedscreen.Screen
+		if opt.themedTasks {
+			themed = inboxThemedScreen(look, ctx)
+			screen.Hooks.ThemedTasks = func(c ui.C, back func()) { themed.TasksPage(c, back) }
+		}
 		w := &shellscreen.Window{
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleInbox,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F",
@@ -101,6 +108,9 @@ func inboxScene(id string, opt inboxOptions, steps inboxSteps, waivers ...parity
 			w.InboxTotal = store.View().Total
 			w.View(c)
 			screen.EndFrame()
+			if themed != nil {
+				themed.EndFrame() // 根每帧都收尾主题阅读（root_themed.go）：任务页这一帧没画出来就算卸载
+			}
 		}
 		var run func(s *headless.Session) error
 		if steps != nil {

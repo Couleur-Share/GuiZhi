@@ -4,7 +4,6 @@ import (
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
-	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
@@ -34,13 +33,13 @@ func (s *Screen) TasksPage(c ui.C, back func()) {
 			PadSides(0, l.Space(5), 1, l.Space(5)).Draw(func(d *ui.DrawContext) {
 			l.PaintEdge(d, kit.EdgeBottom, 1, t.Border)
 		}).Children(func() {
-			if l.Button(c.Key("back"), kit.ButtonSpec{Label: locales.ThemedReadingBackToInbox(), Icon: icons.ArrowLeft, IconSize: l.Rem(0.875)}, s.compactButton()).Clicked() && back != nil {
+			if l.Button(c.Key("back"), kit.ButtonSpec{Label: locales.ThemedReadingBackToInbox()}, s.compactButton()).Clicked() && back != nil {
 				back()
 			}
 			ui.Row(c.Key("title")).Grow(1).Children(func() {
 				l.Heading(c.Key("h2"), 2, locales.ThemedReadingTasks(), kit.TextSM, kit.WeightSemibold, t.Foreground)
 			})
-			if l.Button(c.Key("refresh"), kit.ButtonSpec{Label: locales.CommonRefresh(), Icon: icons.RefreshCw, IconSize: l.Rem(0.875), Disabled: v.Loading}, s.compactButton()).Clicked() {
+			if l.Button(c.Key("refresh"), kit.ButtonSpec{Label: locales.CommonRefresh(), Disabled: v.Loading}, s.compactButton()).Clicked() {
 				s.spawn(s.Tasks.Reload)
 			}
 		})
@@ -87,17 +86,18 @@ func (s *Screen) taskCard(c ui.C, task services.ThemedTask, busy bool) {
 		kind = locales.LibraryForumSummarySection()
 	}
 	id := task.ID
-	s.card(c, func() {
+	// <article className="space-y-3 rounded-xl border border-border p-4">
+	s.cardWith(c, l.Space(4)+1, l.Space(3), func() {
 		ui.Row(c.Key("head")).FillWidth().Gap(l.Space(3)).Children(func() {
-			ui.Column(c.Key("info")).Grow(1).Shrink(1).MinWidth(0).Gap(l.Space(1)).Children(func() {
+			ui.Column(c.Key("info")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
 				l.Heading(c.Key("title"), 3, task.Title, kit.TextSM, kit.WeightMedium, t.Foreground, kit.Wrapped())
-				s.smallText(c.Key("kind"), kind)
+				s.smallText(c.Key("kind"), kind).MarginTop(l.Space(1))
 			})
-			if l.Button(c.Key("open"), kit.ButtonSpec{Label: locales.ThemedReadingOpen(), Name: locales.ThemedReadingOpen() + " " + task.Title}, s.compactButton()).Clicked() {
+			if l.Button(c.Key("open"), kit.ButtonSpec{Label: locales.ThemedReadingOpen()}, s.compactButton()).Clicked() {
 				s.Tasks.Open(id)
 			}
 		})
-		s.statusCard(c.Key("status"), task, StatusOptions{ReadOnly: false, Expanded: false, HasPage: true}, statusActions{
+		s.statusCard(c.Key("status"), task, StatusOptions{ReadOnly: false, Expanded: false, HasPage: false}, statusActions{
 			Busy:   busy,
 			Stop:   func() { s.spawn(func() { s.Tasks.Cancel(id) }) },
 			Resume: func() { s.spawn(func() { s.Tasks.Resume(id) }) },

@@ -3,6 +3,7 @@ package themed
 import (
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
+	"math"
 
 	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
@@ -32,51 +33,67 @@ func (s *Screen) Toolbar(c ui.C) {
 	tb := s.pane.Toolbar
 	c = c.Key("themed-toolbar")
 	style := s.compactButton()
-	if tb.PreviewToggle {
-		label := locales.ThemedReadingReaderPreviewDraft()
-		if tb.PreviewOpen {
-			label = locales.ThemedReadingReaderBackToCurrent()
+	// 渲染层的容器：<div className="flex shrink-0 items-center gap-1">，第一个子项是给目录钮的空挂载点（零宽，但前后各占一个 gap）。
+	ui.Row(c).Shrink(0).Items(ui.Center).Gap(l.Space(1)).MarginLeft(-l.Space(0.5)).Children(func() {
+		ui.Spacer(c.Key("mount")).Width(0).Height(0).Shrink(0).Grow(0)
+		if tb.PreviewToggle {
+			label := locales.ThemedReadingReaderPreviewDraft()
+			if tb.PreviewOpen {
+				label = locales.ThemedReadingReaderBackToCurrent()
+			}
+			if l.Button(c.Key("preview"), kit.ButtonSpec{Label: label}, style).Clicked() {
+				s.Reading.TogglePreview()
+			}
 		}
-		spec := kit.ButtonSpec{Label: label, Icon: icons.Eye, IconSize: l.Rem(0.875)}
-		if l.Button(c.Key("preview"), spec, style).Clicked() {
-			s.Reading.TogglePreview()
+		if tb.SwitchLatest {
+			if l.Button(c.Key("latest"), kit.ButtonSpec{Label: locales.ThemedReadingReaderSwitchLatest()}, style).Clicked() {
+				s.Reading.AdoptLatest()
+			}
 		}
-	}
-	if tb.SwitchLatest {
-		spec := kit.ButtonSpec{Label: locales.ThemedReadingReaderSwitchLatest(), Icon: icons.RefreshCw, IconSize: l.Rem(0.875)}
-		if l.Button(c.Key("latest"), spec, style).Clicked() {
-			s.Reading.AdoptLatest()
+		if tb.StartOver {
+			spec := kit.ButtonSpec{Label: locales.ThemedReadingReaderStartOver(), Disabled: tb.StartOverDisabled}
+			if l.Button(c.Key("start-over"), spec, style).Clicked() {
+				s.Reading.OpenSetup(SetupNew)
+			}
 		}
-	}
-	if tb.StartOver {
-		spec := kit.ButtonSpec{
-			Label: locales.ThemedReadingReaderStartOver(), Icon: icons.RotateCcw, IconSize: l.Rem(0.875),
-			Disabled: tb.StartOverDisabled,
+		if tb.Tools {
+			s.toolsButton(c.Key("tools"))
 		}
-		if l.Button(c.Key("start-over"), spec, style).Clicked() {
-			s.Reading.OpenSetup(SetupNew)
-		}
-	}
-	if tb.Tools {
-		s.toolsButton(c.Key("tools"), style)
-	}
+	})
 }
 
 // toolsButton 是「阅读页设置」按钮：点击展开菜单，菜单锚在按钮左下。
-func (s *Screen) toolsButton(c ui.C, style kit.ButtonStyle) {
+func (s *Screen) toolsButton(c ui.C) {
 	l := s.Look
+	t := l.T
 	u := &s.tools
 	name := locales.ThemedReadingReaderSettings()
-	spec := kit.ButtonSpec{
-		Label: name, Icon: icons.SlidersHorizontal, IconSize: l.Rem(0.875), Disclosure: true, On: u.open,
-	}
-	box := l.Button(c, spec, style)
-	box = box.DrawOver(func(d *ui.DrawContext) { u.btn = d.Rect })
+	id := ui.ID(c)
+	// inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground；
+	// aria-haspopup="menu"：可访问树里是 combobox。没有边框、图标是 12px 的向下箭头；状态直接切换。
+	box := ui.Row(c).Shrink(0).Items(ui.Center).Gap(l.Space(1)).Height(l.Rem(2)).PadSides(0, l.Space(2), 0, l.Space(2)).
+		HitWith(id, name, gfx.HitOptions{Role: gfx.RoleCombobox, Value: name, Expandable: true, Expanded: u.open, Cursor: gfx.PointerCursorHand})
+	l.TabStop(box)
+	ph := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationNone)
+	radius := l.Rem(0.75) - 2
+	box = box.Draw(func(d *ui.DrawContext) {
+		u.btn = d.Rect
+		if d.State.FocusVisible {
+			l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), radius)
+		}
+		l.PaintSurface(d, kit.Surface{Bg: t.Accent.WithAlpha(ph), Radius: radius})
+	})
+	box.Children(func() {
+		ink := kit.MixToken(t.MutedForeground, t.Foreground, ph)
+		l.Text(c.Key("label"), name, kit.TextXS, kit.WeightNormal, ink)
+		l.Icon(c.Key("chevron"), icons.ChevronDown, l.Rem(0.75), ink)
+	})
 	if box.Clicked() {
 		if u.open {
 			u.open = false
 		} else {
-			u.open, u.at = true, gfx.Point{X: u.btn.X, Y: u.btn.Y + u.btn.Height + 4}
+			// 菜单 220px 宽，右缘对齐按钮右缘（x = rect.right - 220），在按钮下方 4px。
+			u.open, u.at = true, gfx.Point{X: u.btn.X + u.btn.Width - 220, Y: u.btn.Y + u.btn.Height + 4}
 		}
 	}
 }
@@ -176,8 +193,27 @@ func (s *Screen) Area(c ui.C, island func(c ui.C, v reader.View)) {
 		if island != nil {
 			island(c.Key("island"), reader.View{Kind: reader.ViewNone})
 		}
-		ui.Column(c.Key("body")).FillWidth().Grow(1).MinHeight(0).Items(ui.Center).Justify(ui.Center).
-			Pad(l.Space(4)).Children(func() { s.nativeBody(c.Key("native"), p) })
+		// 渲染层：任务状态与读取提示的外层是 p-6；空态自带 p-8。
+		pad := l.Space(6)
+		if p.Body == BodyEmpty && !p.ShowLoading && !p.ShowLoadError {
+			pad = 0
+		}
+		// <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">：内容矮时在区里居中；
+		// 高过区时浏览器两头各溢出一半，顶上那一半滚不到（滚动范围只到底部的一半）。这里用负的上边距让内容顶出视口一半，
+		// 滚动区的内容高度随之是「视口 + 溢出的一半」，与浏览器的滚动范围一致。内容自然高度取上一帧画出来的值。
+		l.ScrollAreaFlushView(c.Key("body"), [4]float32{}, func(v kit.ScrollView) {
+			var top float32
+			if h := s.bodyH; v.Viewport > 0 && h > v.Viewport {
+				top = -(h - v.Viewport) / 2
+			}
+			ui.Column(c.Key("body-in")).FillWidth().MinHeight(v.Viewport).MarginTop(top).Items(ui.Center).Justify(ui.Center).
+				Pad(pad).Draw(func(d *ui.DrawContext) {
+				if h := d.Rect.Height; math.Abs(float64(h-s.bodyH)) > 0.25 {
+					s.bodyH = h
+					d.Canvas.RequestFrame() // 内容高度变了：按新高度重排一次
+				}
+			}).Children(func() { s.nativeBody(c.Key("native"), p) })
+		}).FillWidth().Grow(1).MinHeight(0)
 	})
 }
 
@@ -189,22 +225,32 @@ func (s *Screen) notices(c ui.C) {
 	if !show {
 		return
 	}
-	ui.Column(c).FillWidth().Gap(l.Space(2)).PadSides(l.Space(3), l.Space(4), 0, l.Space(4)).Children(func() {
+	ui.Column(c).FillWidth().Children(func() {
 		if p.ReadOnlyNote {
-			s.noticeLine(c.Key("readonly"), locales.ThemedReadingReaderReadOnly())
+			s.noticePlain(c.Key("readonly"), locales.ThemedReadingReaderReadOnly(), l.Space(2))
 		}
 		if p.StatusStrip && s.view.Task != nil {
 			s.statusCard(c.Key("status"), *s.view.Task, s.statusOptions(false), s.statusActions())
 		}
 		if p.StaleNote {
-			s.noticeLine(c.Key("stale"), locales.ThemedReadingReaderStale())
+			s.noticePlain(c.Key("stale"), locales.ThemedReadingReaderStale(), l.Space(1.5))
 		}
 		if p.LegacyNote {
-			s.noticeLine(c.Key("legacy"), locales.ThemedReadingReaderLegacyReadOnly())
+			s.noticePlain(c.Key("legacy"), locales.ThemedReadingReaderLegacyReadOnly(), l.Space(1.5))
 		}
 		if s.docOmitted() {
-			s.noticeLine(c.Key("omitted"), locales.NativeThemedImagesOmitted())
+			ui.Column(c.Key("omitted-box")).FillWidth().PadSides(l.Space(2), l.Space(4), 0, l.Space(4)).Children(func() {
+				s.noticeLine(c.Key("omitted"), locales.NativeThemedImagesOmitted())
+			})
 		}
+	})
+}
+
+// noticePlain 是页面上方的一行提示（<p className="shrink-0 px-4 py-2 text-xs text-muted-foreground">）：没有底色，上下内边距 padY。
+func (s *Screen) noticePlain(c ui.C, text string, padY float32) {
+	l := s.Look
+	ui.Column(c).FillWidth().PadSides(padY, l.Space(4), padY, l.Space(4)).Children(func() {
+		l.Text(c.Key("text"), text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
 	})
 }
 
@@ -242,6 +288,11 @@ func (s *Screen) statusActions() statusActions {
 // 好让无头测试断言「此刻显示的是 AI 阅读页」。
 func (s *Screen) pageShell(c ui.C) {
 	l := s.Look
+	if s.BlankPage {
+		// 对照：渲染层一侧的页面本体（阅读岛）被隐去，只留一块占位的空白，不画标题行也不进可访问树。
+		ui.Column(c).FillWidth().Grow(1).MinHeight(0).Children(func() {})
+		return
+	}
 	ui.Column(c).FillWidth().Grow(1).MinHeight(0).Draw(func(d *ui.DrawContext) {
 		d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleGroup, s.subjectLine(), gfx.HitOptions{})
 	}).Children(func() {
@@ -279,17 +330,19 @@ func (s *Screen) nativeBody(c ui.C, p PaneModel) {
 	}
 }
 
-// emptyState 是还没有阅读页时的引导：图标、说明与「生成阅读页」。
+// emptyState 是还没有阅读页时的引导：标题、说明与「生成阅读页」（flex-col items-center gap-3 p-8 text-center，没有图标）。
 func (s *Screen) emptyState(c ui.C) {
 	l := s.Look
 	t := l.T
 	disabled := s.view.Disabled(s.sub.ReadOnly) || s.view.Result == nil
-	ui.Column(c).Items(ui.Center).Gap(l.Space(3)).MaxWidth(l.Rem(26)).Children(func() {
-		l.Icon(c.Key("icon"), icons.Sparkles, l.Rem(2), t.Primary.WithAlpha(0.7))
-		l.Text(c.Key("title"), locales.ThemedReadingReaderEmpty(), kit.TextBase, kit.WeightSemibold, t.Foreground, kit.Centered(), kit.Wrapped())
-		l.Text(c.Key("hint"), locales.ThemedReadingReaderEmptyHint(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Centered(), kit.Wrapped())
-		spec := kit.ButtonSpec{Label: locales.ThemedReadingReaderCreate(), Icon: icons.Sparkles, IconSize: l.Rem(0.875), Disabled: disabled}
-		if l.Button(c.Key("create"), spec, s.compactPrimary()).Clicked() {
+	ui.Column(c).FillWidth().Items(ui.Center).Gap(l.Space(3)).Pad(l.Space(8)).Children(func() {
+		l.Heading(c.Key("title"), 3, locales.ThemedReadingReaderEmpty(), kit.TextBase, kit.WeightMedium, t.Foreground, kit.Centered(), kit.Wrapped())
+		s.relaxedText(c.Key("hint"), locales.ThemedReadingReaderEmptyHint(), kit.TextSM, t.MutedForeground, kit.Centered()).FillWidth().MaxWidth(l.Rem(24))
+		// themeButton mt-1 bg-primary：边框仍是 border-border。
+		style := s.compactPrimary()
+		style.Border = t.Border
+		spec := kit.ButtonSpec{Label: locales.ThemedReadingReaderCreate(), Disabled: disabled}
+		if l.Button(c.Key("create"), spec, style).MarginTop(l.Space(1)).Clicked() {
 			s.Reading.OpenSetup(SetupNew)
 		}
 	})

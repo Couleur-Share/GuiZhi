@@ -6,7 +6,6 @@ import (
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
-	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 	"guizhi-mygo-shell/viva/tokens"
@@ -47,10 +46,8 @@ func (s *Screen) setupDialog(c ui.C) {
 	closed := l.Modal(c, &u.modal, kit.ModalSpec{
 		Open: open, Size: kit.ModalLG, Title: title, CloseLabel: locales.CommonClose(),
 		SubtitleText: s.subjectLine(),
-		Subtitle: func(c ui.C) {
-			l.Text(c, s.subjectLine(), kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
-		},
-		Body: s.setupBody,
+		Subtitle:     s.subjectView,
+		Body:         s.setupBody,
 	})
 	if closed {
 		s.Reading.CloseSetup()
@@ -69,13 +66,38 @@ func (s *Screen) subjectLine() string {
 	return s.sub.Title + " · " + kind
 }
 
+// subjectView 画副标题：渲染层是 {title} ·{" "}{kind} 三个相邻的文字节点（title、" ·"、kind，中间一个空格），
+// 对照按文字节点比较，所以这里也分成三段，段间的空格用一个空格的宽度补。
+func (s *Screen) subjectView(c ui.C) {
+	l := s.Look
+	kind := locales.LibraryBodySection()
+	if s.view.SourceKind == "summary" {
+		kind = locales.LibraryForumSummarySection()
+	}
+	if s.sub.Title == "" {
+		l.Text(c, kind, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
+		return
+	}
+	size := l.Rem(kit.TextXS.Size)
+	space := c.Canvas().TextWidthWeight(" ", size, kit.WeightNormal)
+	part := func(key, text string) {
+		l.Text(c.Key(key), text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped()).Shrink(0)
+	}
+	ui.Flow(c).FillWidth().Children(func() {
+		part("title", s.sub.Title)
+		part("dot", " ·")
+		ui.Row(c.Key("gap")).Width(space).Shrink(0).Children(func() {})
+		part("kind", kind)
+	})
+}
+
 func (s *Screen) setupBody(c ui.C) {
 	l := s.Look
 	t := l.T
 	u := &s.setup
 	f := u.form
 	ui.Column(c).FillWidth().Gap(l.Space(5)).Children(func() {
-		s.bodyText(c.Key("hint"), locales.ThemedReadingReaderSetupHint(), t.MutedForeground)
+		s.relaxedText(c.Key("hint"), locales.ThemedReadingReaderSetupHint(), kit.TextSM, t.MutedForeground)
 
 		if f.Adjusting {
 			if v, ok := l.Select(c.Key("action"), &u.action, kit.SelectSpec{
@@ -111,6 +133,7 @@ func (s *Screen) setupBody(c ui.C) {
 // researchBlock 是联网补充资料：勾选、说明、搜索服务缺失的提醒（带「前往配置」）、查证深度。
 func (s *Screen) researchBlock(c ui.C, f SetupForm) SetupForm {
 	l := s.Look
+	t := l.T
 	u := &s.setup
 	ui.Column(c).FillWidth().Gap(l.Space(2)).Children(func() {
 		on := f.Research
@@ -120,7 +143,7 @@ func (s *Screen) researchBlock(c ui.C, f SetupForm) SetupForm {
 		if f.Research {
 			hint = locales.ThemedReadingReaderResearchHint()
 		}
-		s.smallText(c.Key("hint"), hint)
+		s.relaxedText(c.Key("hint"), hint, kit.TextXS, t.MutedForeground)
 		if f.ResearchMissingSearch() {
 			ui.Flow(c.Key("missing")).FillWidth().Items(ui.Center).Gap(l.Space(2)).Children(func() {
 				l.Text(c.Key("text"), locales.ThemedReadingReaderSearchMissing(), kit.TextSM, kit.WeightNormal,
@@ -150,9 +173,10 @@ func (s *Screen) styleField(c ui.C, f SetupForm) SetupForm {
 	l := s.Look
 	t := l.T
 	u := &s.setup
-	ui.Column(c).FillWidth().Gap(l.Space(2)).Children(func() {
+	// <label className="block space-y-2 text-sm">：textarea 是 inline-block，沿基线放在行盒里，行盒底部多出一段行内下沿（小、中、大字号档实测 4.5、5、5.5px，即 1px + 0.25rem）。
+	ui.Column(c).FillWidth().Gap(l.Space(2)).PadSides(0, 0, l.Space(1)+1, 0).Children(func() {
 		l.Text(c.Key("label"), locales.ThemedReadingStyle(), kit.TextSM, kit.WeightNormal, t.Foreground)
-		height := 3*l.Rem(1.375) + 2*l.Space(2) + 2
+		height := 3*l.Rem(1.25) + 2*l.Space(2) + 2 // rows=3，text-sm 行高 20px
 		ui.Stack(c.Key("box")).FillWidth().Height(height).Children(func() {
 			sid := ui.ID(c.Key("surface"))
 			p := l.HoverProgress(c, sid, 0, u.styleFocus, kit.DurationDefault)
@@ -162,7 +186,7 @@ func (s *Screen) styleField(c ui.C, f SetupForm) SetupForm {
 			})
 			box := l.TextArea(c.Key("input"), &u.style, locales.ThemedReadingStyle(), locales.ThemedReadingStylePlaceholder(), kit.TextAreaSpec{
 				Height: height, PadX: l.Space(3) + 1, PadY: l.Space(2) + 1, Color: t.Foreground,
-				Placeholder: t.MutedForeground.WithAlpha(0.7),
+				Placeholder: uaPlaceholder, PlaceholderLeading: l.Rem(1.25),
 			}).Absolute().Inset(0)
 			u.styleFocus = box.State().Focused
 			if box.Changed() {
@@ -181,7 +205,8 @@ func (s *Screen) imageBlock(c ui.C, f SetupForm) SetupForm {
 	l := s.Look
 	t := l.T
 	u := &s.setup
-	s.card(c, func() {
+	// rounded-xl border border-border p-4，内部 space-y-3。
+	s.cardWith(c, l.Space(4)+1, l.Space(3), func() {
 		on := f.GenerateImages
 		l.Checkbox(c.Key("check"), &on, kit.CheckboxSpec{
 			Label: locales.ThemedReadingGenerateImages(), Disabled: f.Models.Image == nil && !f.GenerateImages,
@@ -208,7 +233,7 @@ func (s *Screen) imageBlock(c ui.C, f SetupForm) SetupForm {
 		if f.GenerateImages {
 			cost = locales.ThemedReadingImageCost()
 		}
-		s.smallText(c.Key("cost"), cost)
+		s.relaxedText(c.Key("cost"), cost, kit.TextXS, t.MutedForeground)
 	})
 	return f
 }
@@ -220,11 +245,21 @@ func (s *Screen) modelsDisclosure(c ui.C, f SetupForm) {
 	u := &s.setup
 	ui.Column(c).FillWidth().Gap(l.Space(1)).Children(func() {
 		id := ui.ID(c.Key("toggle-id"))
-		box, _ := s.hitDisclosure(c, id, ui.Row(c.Key("toggle")).Items(ui.Center).Gap(l.Space(1)), locales.ThemedReadingReaderModels(), u.modelsOpen)
-		hovered := box.State().Hovered
-		box.Children(func() {
-			ink := kit.MixToken(t.MutedForeground, t.Foreground, boolF(hovered))
-			l.Icon(c.Key("chevron"), icons.ChevronDown, l.Rem(0.75), ink)
+		// <summary className="cursor-pointer py-1 hover:text-foreground">：标记是浏览器自带的 disclosure 三角（行内，不是图标），文字让出它的宽度。
+		marker := kit.ChromeDisclosureMarker(l.Rem(kit.TextXS.Size), l.Rem(kit.TextXS.Line), l.Scale)
+		padY := l.Space(1)
+		row := ui.Row(c.Key("toggle")).FillWidth().Items(ui.Center).PadSides(padY, 0, padY, marker.Advance)
+		box, ph := s.hitDisclosure(c, id, row, locales.ThemedReadingReaderModels(), u.modelsOpen)
+		ink := kit.MixToken(t.MutedForeground, t.Foreground, ph)
+		box.Draw(func(d *ui.DrawContext) {
+			if d.State.FocusVisible {
+				l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25))
+			}
+			line := d.Rect
+			line.Y += padY
+			line.Height -= 2 * padY
+			kit.PaintDisclosure(d, line, marker, u.modelsOpen, ink)
+		}).Children(func() {
 			l.Text(c.Key("label"), locales.ThemedReadingReaderModels(), kit.TextXS, kit.WeightNormal, ink)
 		})
 		if box.Clicked() {
@@ -291,3 +326,6 @@ func (s *Screen) openSettingsAI() {
 		s.Hooks.OpenSettingsAI()
 	}
 }
+
+// uaPlaceholder 是Tailwind 预检样式给 ::placeholder 的颜色（gray-400，#9CA3AF）：设计要求的 <textarea> 没有 placeholder: 类，用的就是这个，深浅主题下都不变。
+var uaPlaceholder = tokens.RGBA(156, 163, 175, 1)

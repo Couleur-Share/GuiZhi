@@ -79,7 +79,7 @@ func TestPaneLegacyPageUsesStoredDocument(t *testing.T) {
 	if !r.textHas(locales.ThemedReadingReaderLegacyReadOnly()) {
 		t.Fatalf("旧格式页面应说明只读；画面上有 %q", r.session.Texts())
 	}
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	if r.has(gfx.RoleMenuItem, locales.ThemedReadingReaderAdjust()) {
 		t.Fatal("旧格式页面不能调整")
 	}
@@ -102,7 +102,7 @@ func TestPaneOriginalModeCollapsesIsland(t *testing.T) {
 	r.screen.Mode.Select(false)
 	r.settle()
 	r.wantNoSnapshot()
-	if r.hasButton(locales.ThemedReadingReaderSettings()) {
+	if r.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("原文模式不画 AI 阅读的工具栏")
 	}
 }
@@ -162,7 +162,7 @@ func TestPaneEditingHidesAIReading(t *testing.T) {
 		t.Fatal("编辑原文时不该显示 AI 阅读")
 	}
 	r.wantNoSnapshot()
-	if r.hasButton(locales.ThemedReadingReaderSettings()) {
+	if r.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
 		t.Fatal("编辑时不该画 AI 阅读的工具栏")
 	}
 }
@@ -175,7 +175,7 @@ func TestPaneTrashedItemIsReadOnly(t *testing.T) {
 	if !r.textHas(locales.ThemedReadingReaderReadOnly()) {
 		t.Fatalf("回收站里的条目应提示只读；画面上有 %q", r.session.Texts())
 	}
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	for _, label := range []string{locales.ThemedReadingReaderRegenerate(), locales.ThemedReadingReaderDelete()} {
 		n, ok := r.node(gfx.RoleMenuItem, label)
 		if !ok || !n.Disabled {
@@ -260,7 +260,7 @@ func TestPanePreviewShownWhileNoPage(t *testing.T) {
 	if len(calls) == 0 || calls[len(calls)-1].TaskID != task.ID {
 		t.Fatalf("预览应按任务渲染：%+v", calls)
 	}
-	if !r.has(gfx.RoleStatus, statusTitle(task, StatusOptions{HasPage: true, OfflineAvailable: true})) {
+	if !r.hasStatusCard(statusTitle(task, StatusOptions{HasPage: true, OfflineAvailable: true})) {
 		t.Fatalf("预览上方应有进度条；画面上有 %q", r.session.Texts())
 	}
 }

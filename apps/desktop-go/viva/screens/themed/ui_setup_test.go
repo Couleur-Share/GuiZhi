@@ -195,7 +195,7 @@ func TestSetupGenerateFailureKeepsDialogAndToasts(t *testing.T) {
 // openTool 打开「阅读页设置」菜单并点其中一项。
 func (r *uiRig) openTool(label string) {
 	r.t.Helper()
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	r.click(gfx.RoleMenuItem, label)
 }
 

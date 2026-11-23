@@ -158,16 +158,16 @@ func TestStatusDetailLines(t *testing.T) {
 			locales.ThemedReadingReaderStageTiming(locales.ThemedReadingStageDesign(), "12.3") + " · " +
 			locales.ThemedReadingReaderStageTiming("custom", "1.0"),
 	}
-	if len(m.Lines) != 5 {
-		t.Fatalf("应有 5 行: %q", m.Lines)
+	if len(m.Lines) != 4 {
+		t.Fatalf("应有 4 行（用量另放在 Usage 里）: %q", m.Lines)
 	}
 	for i, w := range want {
 		if m.Lines[i] != w {
 			t.Errorf("第 %d 行: %q，期望 %q", i, m.Lines[i], w)
 		}
 	}
-	if !strings.Contains(m.Lines[4], locales.ThemedReadingTextCalls(3)) || !strings.Contains(m.Lines[4], locales.ThemedReadingImagesSaved(1)) {
-		t.Fatalf("用量行: %q", m.Lines[4])
+	if len(m.Usage) != 3 || !strings.Contains(m.Usage[0], locales.ThemedReadingTextCalls(3)) || !strings.Contains(m.Usage[2], locales.ThemedReadingImagesSaved(1)) {
+		t.Fatalf("用量（文本请求 / 生图请求 / 新图保存）: %q", m.Usage)
 	}
 	if m.BackgroundHint != "" || m.Active {
 		t.Fatal("非活动任务没有「可以切换文章」的提示")

@@ -1,0 +1,191 @@
+{
+  "now": 1794790800000,
+  "timezone": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "itemId": "item-001",
+  "itemTitle": "学习笔记：Go 并发模式",
+  "sourceKind": "body",
+  "models": { "text": "parity-writer", "image": "parity-painter" },
+  "search": {
+    "configured": true,
+    "persistent": true,
+    "provider": "tavily",
+    "configuredProviders": ["tavily"],
+    "defaultEnabled": false
+  },
+  "running": {
+    "id": "task-themed-running",
+    "itemId": "item-001",
+    "sourceKind": "body",
+    "versionId": "version-themed-working",
+    "title": "学习笔记：Go 并发模式",
+    "state": "running",
+    "stage": "design",
+    "completed": 0,
+    "total": 0,
+    "plannedImages": 2,
+    "designProgress": { "attempt": 1, "receivedChars": 3280 },
+    "usage": { "textCalls": 4, "imageCalls": 0, "imagesSaved": 0, "searchCalls": 2, "pagesRead": 5 },
+    "createdAt": 1794790710000,
+    "updatedAt": 1794790795000
+  },
+  "failed": {
+    "id": "task-themed-failed",
+    "itemId": "item-001",
+    "sourceKind": "body",
+    "versionId": "version-themed-working",
+    "title": "学习笔记：Go 并发模式",
+    "state": "failed",
+    "stage": "design",
+    "completed": 0,
+    "total": 0,
+    "plannedImages": 2,
+    "usage": { "textCalls": 5, "imageCalls": 0, "imagesSaved": 0, "searchCalls": 2, "pagesRead": 5 },
+    "error": "设计请求失败：模型服务返回 429（请求过于频繁）。\n已完成的章节与参考资料已保留，稍后点「继续生成」即可接着做。",
+    "firstContentAt": 1794790308400,
+    "reused": { "chapters": 2, "notes": 1, "references": 3, "assets": 0 },
+    "timings": { "prepare": 1200, "understand": 8300, "research": 15400, "write": 42100 },
+    "createdAt": 1794790300000,
+    "updatedAt": 1794790420000
+  },
+  "page": {
+    "id": "version-themed-1",
+    "itemId": "item-001",
+    "sourceKind": "body",
+    "role": "current",
+    "formatVersion": 3,
+    "reconstruction": {
+      "notes": [],
+      "references": [
+        {
+          "id": "ref-1",
+          "title": "Effective Go：并发",
+          "url": "https://go.dev/doc/effective_go#concurrency",
+          "capturedAt": 1794618000000,
+          "text": "Do not communicate by sharing memory; instead, share memory by communicating.",
+          "status": "ready"
+        },
+        {
+          "id": "ref-2",
+          "title": "Rob Pike：并发不是并行",
+          "url": "https://go.dev/blog/waza-talk",
+          "capturedAt": 1794621600000,
+          "text": "Concurrency is about dealing with lots of things at once.",
+          "status": "ready"
+        },
+        {
+          "id": "ref-3",
+          "title": "Go 内存模型",
+          "url": "https://go.dev/ref/mem",
+          "capturedAt": 1794625200000,
+          "text": "The Go memory model specifies the conditions under which reads of a variable.",
+          "status": "ready"
+        },
+        {
+          "id": "ref-4",
+          "title": "Pipelines and cancellation",
+          "url": "https://go.dev/blog/pipelines",
+          "capturedAt": 1794628800000,
+          "text": "",
+          "status": "failed",
+          "error": "HTTP 403"
+        }
+      ],
+      "draft": [
+        { "title": "为什么需要并发模式", "markdown": "goroutine 很轻，但无约束的并发会泄漏。", "referenceIds": ["ref-1"] },
+        { "title": "扇入与扇出", "markdown": "把一个输入分给多个工人，再把结果合并回一条通道。", "referenceIds": ["ref-1", "ref-2", "ref-4"] }
+      ],
+      "interactions": []
+    },
+    "source": {
+      "title": "学习笔记：Go 并发模式",
+      "content": "",
+      "sourceUri": null,
+      "fingerprint": "fingerprint-themed-1",
+      "blocks": []
+    },
+    "options": {
+      "style": "",
+      "research": true,
+      "generateImages": true,
+      "maxImages": 2,
+      "enhancedInteraction": true,
+      "action": "create"
+    },
+    "design": { "direction": "杂志式长文", "html": "", "css": "", "assets": [] },
+    "assets": [
+      {
+        "id": "asset-1",
+        "role": "generated",
+        "purpose": "封面插画",
+        "prompt": "并发流水线的抽象插画",
+        "alt": "并发流水线",
+        "aspectRatio": "16:9",
+        "status": "failed",
+        "error": "生图请求超时，已保留占位。"
+      },
+      {
+        "id": "asset-2",
+        "role": "original",
+        "purpose": "",
+        "prompt": "",
+        "alt": "工人池示意图",
+        "aspectRatio": "4:3",
+        "status": "failed",
+        "error": "原图下载失败（HTTP 404）。"
+      }
+    ],
+    "warnings": ["部分图片未能生成，页面中保留了占位。"],
+    "createdAt": 1794787200000,
+    "updatedAt": 1794787500000
+  },
+  "inbox": {
+    "tasks": [
+      {
+        "id": "task-inbox-running",
+        "itemId": "item-001",
+        "sourceKind": "body",
+        "versionId": "version-inbox-1",
+        "title": "学习笔记：Go 并发模式",
+        "state": "running",
+        "stage": "write",
+        "completed": 2,
+        "total": 5,
+        "plannedImages": 2,
+        "usage": { "textCalls": 3, "imageCalls": 0, "imagesSaved": 0 },
+        "createdAt": 1794790710000,
+        "updatedAt": 1794790795000
+      },
+      {
+        "id": "task-inbox-failed",
+        "itemId": "item-003",
+        "sourceKind": "body",
+        "versionId": "version-inbox-2",
+        "title": "如何构建本地优先的个人知识库",
+        "state": "failed",
+        "stage": "research",
+        "completed": 0,
+        "total": 0,
+        "usage": { "textCalls": 2, "imageCalls": 0, "imagesSaved": 0, "searchCalls": 1, "pagesRead": 0 },
+        "error": "联网搜索失败：搜索服务暂时不可用（HTTP 503）。",
+        "createdAt": 1794790200000,
+        "updatedAt": 1794790320000
+      },
+      {
+        "id": "task-inbox-done",
+        "itemId": "item-012",
+        "sourceKind": "summary",
+        "versionId": "version-inbox-3",
+        "title": "技术论坛：SQLite WAL 模式的备份坑",
+        "state": "completed",
+        "stage": "done",
+        "completed": 0,
+        "total": 0,
+        "plannedImages": 0,
+        "usage": { "textCalls": 4, "imageCalls": 0, "imagesSaved": 0 },
+        "createdAt": 1794787200000,
+        "updatedAt": 1794787500000
+      }
+    ]
+  }
+}

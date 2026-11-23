@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"guizhi-mygo-shell/native/services"
+	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
 
@@ -172,9 +173,10 @@ func (s *ReadingStore) loadRefs() {
 	s.wake()
 }
 
-// ReferenceDate 是参考资料的「获取于」日期（本地时区）。
-func ReferenceDate(r services.ThemedReference) string {
-	return locales.ThemedReadingReaderCapturedAt(time.UnixMilli(r.CapturedAt).Local().Format("2006-01-02"))
+// ReferenceDate 是参考资料的「获取于」日期：渲染层的 new Date(capturedAt).toLocaleDateString()，
+// 跟系统区域走（zh 为 2026/11/14，en 为 11/14/2026，月日不补零），时区取 loc（nil 为本机）。
+func ReferenceDate(r services.ThemedReference, loc *time.Location, locale kit.DateLocale) string {
+	return locales.ThemedReadingReaderCapturedAt(kit.FormatDate(r.CapturedAt, loc, locale))
 }
 
 // AssetRow 是页面图片面板里的一行。

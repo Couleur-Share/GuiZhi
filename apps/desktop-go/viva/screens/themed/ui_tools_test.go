@@ -23,7 +23,7 @@ func TestToolsMenuListsItemsInOrder(t *testing.T) {
 	r.svc.PutPrevious(reqA, services.ThemedPage{ID: "page-prev"})
 	r.screen.Reading.Reload()
 	r.settle()
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	want := []string{
 		locales.ThemedReadingReaderAdjust(), locales.ThemedReadingReaderRegenerate(), locales.ThemedReadingReaderReferences(),
 		locales.ThemedReadingAssets(), locales.ThemedReadingExport(), locales.ThemedReadingExportText(),
@@ -51,7 +51,7 @@ func TestToolsMenuDisabledWhileGenerating(t *testing.T) {
 	r.taskIn(services.ThemedTask{State: services.ThemedTaskRunning, Stage: services.ThemedStageDesign})
 	r.screen.Reading.Reload()
 	r.settle()
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	for _, label := range []string{locales.ThemedReadingReaderAdjust(), locales.ThemedReadingReaderRegenerate(), locales.ThemedReadingReaderDelete()} {
 		if n, ok := r.node(gfx.RoleMenuItem, label); !ok || !n.Disabled {
 			t.Fatalf("生成中「%s」应禁用：%+v ok=%v", label, n, ok)
@@ -185,7 +185,7 @@ func TestToolsReferencesListAndOpenLink(t *testing.T) {
 	if !r.textHas("Primary Source") || !r.textHas("Unsafe Source") {
 		t.Fatalf("应列出参考资料；画面上有 %q", r.session.Texts())
 	}
-	if !r.textHas(ReferenceDate(services.ThemedReference{CapturedAt: 1_700_000_000_000})) {
+	if !r.textHas(ReferenceDate(services.ThemedReference{CapturedAt: 1_700_000_000_000}, nil, "")) {
 		t.Fatal("应显示获取日期")
 	}
 	if r.has(gfx.RoleButton, "Unsafe Source") || r.has(gfx.RoleLink, "Unsafe Source") {
@@ -308,7 +308,7 @@ func TestToolsNotesPanelShowsWarningsAndStale(t *testing.T) {
 
 func TestToolsMenuClosesWhenModeLeavesAI(t *testing.T) {
 	r := withPage(t)
-	r.clickButton(locales.ThemedReadingReaderSettings())
+	r.click(gfx.RoleCombobox, locales.ThemedReadingReaderSettings())
 	if !r.has(gfx.RoleMenuItem, locales.ThemedReadingExport()) {
 		t.Fatal("菜单应已展开")
 	}

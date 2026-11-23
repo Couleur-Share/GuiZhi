@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/viva/icons"
@@ -83,21 +84,20 @@ func (s *Screen) referencesPanel(c ui.C) {
 	}
 	for i, r := range refs.Items {
 		kc := c.Key("ref" + strconv.Itoa(i))
-		s.card(kc, func() {
+		// <article className="border-b border-border/50 pb-3 text-sm">：链接标题、下面一行「获取于 日期」，没有网址行与外链图标。
+		ui.Column(kc).FillWidth().PadSides(0, 0, l.Space(3)+1, 0).Draw(func(d *ui.DrawContext) {
+			l.PaintEdge(d, kit.EdgeBottom, 1, t.Border.WithAlpha(0.5))
+		}).Children(func() {
 			if safeURL(r.URL) && s.Hooks.OpenExternal != nil {
-				ui.Row(kc.Key("title-row")).FillWidth().Items(ui.Center).Gap(l.Space(1.5)).Children(func() {
-					ui.Row(kc.Key("link")).Shrink(1).MinWidth(0).Children(func() {
-						if s.textLink(kc.Key("title"), refTitle(r.Title, r.URL), kit.TextSM) {
-							s.openLink(r.URL)
-						}
-					})
-					l.Icon(kc.Key("icon"), icons.ExternalLink, l.Rem(0.75), t.MutedForeground)
+				ui.Row(kc.Key("link")).Height(l.Rem(1.25)).Items(ui.Center).Children(func() {
+					if s.textLinkAs(kc.Key("title"), refTitle(r.Title, r.URL), kit.TextSM, gfx.RoleLink, l.Rem(1.125)) {
+						s.openLink(r.URL)
+					}
 				})
 			} else {
-				l.Text(kc.Key("title"), refTitle(r.Title, r.URL), kit.TextSM, kit.WeightMedium, t.Foreground, kit.Wrapped())
+				l.Text(kc.Key("title"), refTitle(r.Title, r.URL), kit.TextSM, kit.WeightNormal, t.Primary, kit.Wrapped())
 			}
-			s.smallText(kc.Key("url"), r.URL)
-			s.smallText(kc.Key("date"), ReferenceDate(r))
+			s.smallText(kc.Key("date"), ReferenceDate(r, s.Loc, s.Locale)).MarginTop(l.Space(1))
 		})
 	}
 }

@@ -4,9 +4,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
+	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
 
@@ -296,7 +298,7 @@ func TestReferencesPanelLoadsAndRetries(t *testing.T) {
 	if v.Refs.Error != "" || len(v.Refs.Items) != 1 || v.Refs.Items[0].Title != "Doc" {
 		t.Fatalf("重试后应读到: %+v", v.Refs)
 	}
-	if got := ReferenceDate(v.Refs.Items[0]); !strings.Contains(got, "2023-11-") {
+	if got := ReferenceDate(v.Refs.Items[0], time.UTC, kit.DateLocaleZH); !strings.Contains(got, "2023/11/14") {
 		t.Fatalf("日期文案: %q", got)
 	}
 	r.reading.ClosePanel()
