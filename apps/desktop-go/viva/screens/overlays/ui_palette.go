@@ -78,14 +78,23 @@ func (s *Screen) paletteSearchBox(c ui.C) {
 	l := s.Look
 	t := l.T
 	c = c.Key("search")
+	anim := ui.ID(c.Key("ring"))
+	var ring float32 // 聚焦环进度：输入后声明、环在绘制时读（同 SettingsInput）
 	ui.Stack(c).FillWidth().Height(l.Rem(3) + 1).Draw(func(d *ui.DrawContext) {
 		l.PaintEdge(d, kit.EdgeBottom, 1, t.Border)
+		// 渲染层的 input:focus-visible { ring-2 ring-primary/50 }：输入框 h-12 铺满面板，环只剩下沿 2px 可见（面板 overflow-hidden）。
+		box := d.Rect
+		box.Height = l.Rem(3)
+		sub := *d
+		sub.Rect = box
+		l.PaintInputRingBelow(&sub, ring)
 	}).Children(func() {
-		box := l.Input(c.Key("input"), &s.palette.input, locales.CommandPaletteTitle(), locales.CommandPalettePlaceholder(), kit.InputSpec{
+		box := l.Input(c.Key("input"), &s.palette.input, locales.CommandPalettePlaceholder(), locales.CommandPalettePlaceholder(), kit.InputSpec{
 			Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground,
 			Placeholder: tokens.Tailwind("gray-400"), // 渲染层的 <input> 没有 placeholder 类：Tailwind 预检的默认占位色 gray-400
 			Height:      l.Rem(3), Left: l.Space(11), Right: l.Space(4),
 		}).Absolute().Inset(0).AutoFocus()
+		ring = l.InputRing(c, anim, box.State().Focused)
 		box.OnKey(s.paletteKey)
 		l.Icon(c.Key("icon"), icons.Search, l.Rem(1), t.MutedForeground).
 			Absolute().Left(l.Space(4)).Top((l.Rem(3) - l.Rem(1)) / 2)
@@ -182,7 +191,7 @@ func (s *Screen) paletteRow(c ui.C, v PaletteView, index int, it PaletteItem) {
 	active := index == v.Active
 	id := ui.ID(c)
 	box := ui.Row(c).FillWidth().Items(ui.Center).Gap(l.Space(3)).PadSides(l.Space(2), l.Space(3), l.Space(2), l.Space(3)).
-		HitWith(id, it.Title, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand, Description: it.Subtitle})
+		HitWith(id, strings.TrimSpace(it.Title+" "+it.Subtitle), gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
 	hovered := box.State().Hovered
 	switch {
 	case hovered && p.hover != index:
@@ -243,29 +252,24 @@ func (s *Screen) paletteReveal(d *ui.DrawContext, index int) {
 	d.Canvas.RequestFrame()
 }
 
-// paletteFooter 是底部提示条：左侧是「正在搜索」或部分来源搜索失败的说明，右侧是按键提示。
-// 渲染层没有这一条；失败来源的说明是 Viva 版的补充（渲染层把任何一个来源失败都吞成「没有结果」）。
+// paletteFooter 是底部状态条：「正在搜索」或部分来源搜索失败的说明；没有可说的就不画（空的状态条会让面板比渲染层多出一截）。
+// 渲染层没有这一条，也没有按键提示行；失败来源的说明是 Viva 版的补充（渲染层把任何一个来源失败都吞成「没有结果」，用户无从得知）。
 func (s *Screen) paletteFooter(c ui.C, v PaletteView) {
+	if len(v.FailedSources) == 0 && !v.Searching {
+		return
+	}
 	l := s.Look
 	t := l.T
 	c = c.Key("footer")
-	ui.Row(c).FillWidth().Shrink(0).Items(ui.Center).Gap(l.Space(4)).PadSides(l.Space(2)+1, l.Space(4), l.Space(2), l.Space(4)).
+	ui.Row(c).FillWidth().Shrink(0).Items(ui.Center).Gap(l.Space(2)).PadSides(l.Space(2)+1, l.Space(4), l.Space(2), l.Space(4)).
 		Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeTop, 1, t.Border) }).
 		Children(func() {
-			ui.Row(c.Key("status")).Grow(1).Shrink(1).MinWidth(0).Items(ui.Center).Gap(l.Space(2)).Children(func() {
-				switch {
-				case len(v.FailedSources) > 0:
-					l.Text(c.Key("failed"), locales.NativePaletteFailedSources(s.sourceNames(v.FailedSources)), kit.TextXS, kit.WeightNormal, t.Destructive, kit.Wrapped())
-				case v.Searching:
-					l.Spinner(c.Key("spinner"), l.Rem(0.75), t.MutedForeground)
-					l.Text(c.Key("searching"), locales.NativePaletteSearching(), kit.TextXS, kit.WeightNormal, t.MutedForeground)
-				}
-			})
-			ui.Row(c.Key("hints")).Shrink(0).Items(ui.Center).Gap(l.Space(3)).Children(func() {
-				for i, h := range []string{locales.NativePaletteHintMove(), locales.NativePaletteHintRun(), locales.NativePaletteHintClose()} {
-					l.Text(c.Key(string(rune('a'+i))), h, kit.TextXS, kit.WeightNormal, t.MutedForeground)
-				}
-			})
+			if len(v.FailedSources) > 0 {
+				l.Text(c.Key("failed"), locales.NativePaletteFailedSources(s.sourceNames(v.FailedSources)), kit.TextXS, kit.WeightNormal, t.Destructive, kit.Wrapped())
+				return
+			}
+			l.Spinner(c.Key("spinner"), l.Rem(0.75), t.MutedForeground)
+			l.Text(c.Key("searching"), locales.NativePaletteSearching(), kit.TextXS, kit.WeightNormal, t.MutedForeground)
 		})
 }
 
@@ -277,7 +281,7 @@ func (s *Screen) sourceNames(sources []string) string {
 		case SourceKnowledge:
 			names = append(names, locales.CommandPaletteGroupKnowledge())
 		case SourceWiki:
-			names = append(names, "Wiki")
+			names = append(names, locales.NavWiki())
 		case SourceTasks:
 			names = append(names, locales.ImportsTitle())
 		default:

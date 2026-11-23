@@ -190,9 +190,9 @@ func Compare(in Inputs, th Thresholds) (*Report, *image.RGBA) {
 	if !in.React.Capture.ForcedDSF {
 		rep.add(LayerL1, "stale-reference", rep.Scene, "React 参照没有 forcedDsf 标记：它在未钉死设备缩放的采集器下生成，文字基线可能带宿主 DPI 印记，请重新采集")
 	}
-	if in.Backdrop != nil && len(in.Backdrop.Inert) > 0 {
+	if in.Backdrop != nil && (len(in.Backdrop.Inert) > 0 || in.Backdrop.DialogFirst) {
 		// 模态让背后的节点惰性化（台账 A-015）：把它们按「对话框打开之前」的渲染补回 Viva 一侧，背景照常逐节点比对。
-		in.Viva = withInertNodes(in.Viva, in.Backdrop.Inert)
+		in.Viva = withInertNodes(in.Viva, in.Backdrop.Inert, in.Backdrop.DialogFirst)
 		rep.L1.Inert = len(in.Backdrop.Inert)
 	}
 	nodePairs, textPairs := compareL1(rep, in)

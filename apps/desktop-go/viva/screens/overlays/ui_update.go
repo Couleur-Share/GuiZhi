@@ -158,8 +158,9 @@ func (s *Screen) updateLatest(c ui.C, v UpdateView) {
 	})
 }
 
-// updateCard 是版本卡片：flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4，左边 44px 的绿色图标块，右边标题与说明行。
-func (s *Screen) updateCard(c ui.C, icon gfx.Icon, title string, lines ...string) {
+// updateCard 是版本卡片：flex items-start gap-3 rounded-xl border border-border/60 bg-muted/20 p-4，左边 44px 的绿色图标块，右边是标题、版本行与（有的话）发布日期行。
+// 右边的文字块没有 flex-1：宽度是内容的宽度（标题的盒因此只有文字那么宽）。版本行在渲染层是 JSX 里的三段文字（「版本」「: 」版本号），文字行也按三段对照。
+func (s *Screen) updateCard(c ui.C, icon gfx.Icon, title, version, releaseDate string) {
 	l := s.Look
 	t := l.T
 	green := tokens.Tailwind("green-500")
@@ -171,31 +172,25 @@ func (s *Screen) updateCard(c ui.C, icon gfx.Icon, title string, lines ...string
 		}).Children(func() {
 			l.Icon(c.Key("icon"), icon, l.Rem(1.5), green)
 		})
-		ui.Column(c.Key("text")).Grow(1).Shrink(1).MinWidth(0).Children(func() {
+		ui.Column(c.Key("text")).Shrink(1).MinWidth(0).Children(func() {
 			l.Heading(c.Key("title"), 3, title, kit.TextLG, kit.WeightSemibold, t.Foreground)
-			for i, line := range lines {
-				if line != "" {
-					l.Text(c.Key(string(rune('a'+i))), line, kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
+			ui.Row(c.Key("version")).Items(ui.Center).MarginTop(l.Space(1)).Children(func() {
+				for i, part := range []string{locales.SettingsVersion(), ": ", version} {
+					l.Text(c.Key(string(rune('a'+i))), part, kit.TextSM, kit.WeightNormal, t.MutedForeground)
 				}
+			})
+			if releaseDate != "" {
+				l.Text(c.Key("date"), locales.NativeUpdateReleasedOn(releaseDate), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))
 			}
 		})
 	})
-}
-
-// updateVersionLines 是新版本卡片的说明行：版本号，有发布日期时再加一行。
-func (s *Screen) updateVersionLines(v UpdateView) []string {
-	lines := []string{locales.SettingsVersion() + ": " + v.DisplayVersion()}
-	if v.ReleaseDate != "" {
-		lines = append(lines, locales.NativeUpdateReleasedOn(v.ReleaseDate))
-	}
-	return lines
 }
 
 // updateAvailable 是有新版本：卡片、更新说明、「下载更新」与「稍后安装」。
 func (s *Screen) updateAvailable(c ui.C, v UpdateView) {
 	c = c.Key("available")
 	ui.Column(c).FillWidth().Gap(s.Look.Space(4)).Children(func() {
-		s.updateCard(c.Key("card"), icons.Download, locales.SettingsUpdateAvailable(), s.updateVersionLines(v)...)
+		s.updateCard(c.Key("card"), icons.Download, locales.SettingsUpdateAvailable(), v.DisplayVersion(), v.ReleaseDate)
 		if v.ReleaseNotes != "" {
 			s.updateNotes(c.Key("notes"), v.ReleaseNotes)
 		}
@@ -285,7 +280,7 @@ func (s *Screen) updateDownloaded(c ui.C, v UpdateView) {
 	t := l.T
 	c = c.Key("downloaded")
 	ui.Column(c).FillWidth().Gap(l.Space(4)).Children(func() {
-		s.updateCard(c.Key("card"), icons.CircleCheck, locales.SettingsDownloadComplete(), s.updateVersionLines(v)...)
+		s.updateCard(c.Key("card"), icons.CircleCheck, locales.SettingsDownloadComplete(), v.DisplayVersion(), v.ReleaseDate)
 		l.Text(c.Key("hint"), locales.SettingsInstallRestartHint(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
 		ui.Column(c.Key("actions")).FillWidth().Gap(l.Space(2)).Children(func() {
 			ui.Row(c.Key("row")).FillWidth().Justify(ui.End).Gap(l.Space(2)).Children(func() {

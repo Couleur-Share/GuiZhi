@@ -48,6 +48,9 @@ type BackdropSpec struct {
 	// BaseSteps 把页面带到「对话框打开之前」的状态：与 Scene.Steps 里打开对话框之前的那部分一致，空表示不需要任何操作。
 	// look 是这次「打开之前」渲染自己的外观（滚动到目标这类步骤要它，见 kit.Look.RevealNear）。
 	BaseSteps func(s *headless.Session, look *kit.Look) error
+	// DialogFirst 为真表示渲染层里这个面板在文档里排在页面之前（命令面板渲染在 App 组件树最前面），
+	// 比较 L1 时 Viva 一侧的节点与文字按「对话框在前」的顺序对齐（见 inert.go 的 withInertNodes）。Modal 经 portal 挂在末尾，不需要。
+	DialogFirst bool
 }
 
 // Backdrop 是一次比较里已解析的模糊区域。
@@ -61,6 +64,8 @@ type Backdrop struct {
 	// （Canvas.TrapFocus）把背后的一切从可访问树里拿掉，渲染层的 aria-modal 不拿（Playwright 的 ARIA 快照仍列出背景）。
 	// 对照 L1 时把它们按原顺序补回 Viva 一侧的节点里，背景就仍与 React 逐节点比对（位置、名称、状态），而不是整体豁免。
 	Inert []Node
+	// DialogFirst 同 BackdropSpec.DialogFirst。
+	DialogFirst bool
 }
 
 // Resolve 在 Viva 事实里找到面板，得到本次比较用的 Backdrop；withImage 为真时再渲染一次对话框打开之前的页面，算出清晰与模糊的背景。
@@ -69,7 +74,7 @@ func (s *BackdropSpec) Resolve(scene Scene, viva *Facts, withImage bool) (*Backd
 	if s == nil {
 		return nil, nil
 	}
-	b := &Backdrop{Sigma: s.Sigma}
+	b := &Backdrop{Sigma: s.Sigma, DialogFirst: s.DialogFirst}
 	found := false
 	panelName := s.PanelName
 	if s.PanelNameFn != nil {

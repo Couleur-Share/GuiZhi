@@ -87,7 +87,7 @@ func TestNoInertNodesWhenNothingWasTakenOut(t *testing.T) {
 		t.Fatalf("背景仍在树里，不应有惰性节点：%q", nodeNames(got))
 	}
 	f := &Facts{Scene: "s", Nodes: after}
-	if withInertNodes(f, nil) != f {
+	if withInertNodes(f, nil, false) != f {
 		t.Fatal("没有惰性节点时应原样返回")
 	}
 }
@@ -95,7 +95,7 @@ func TestNoInertNodesWhenNothingWasTakenOut(t *testing.T) {
 func TestWithInertNodesPutsThePageBeforeTheDialog(t *testing.T) {
 	inert := []Node{node("group", "页面", -1), node("button", "新建", 0)}
 	f := &Facts{Scene: "s", Nodes: []Node{node("group", "对话框", -1), node("button", "关闭", 0)}}
-	got := withInertNodes(f, inert)
+	got := withInertNodes(f, inert, false)
 	want := []string{"group:页面", "button:新建", "group:对话框", "button:关闭"}
 	if !slices.Equal(nodeNames(got.Nodes), want) {
 		t.Fatalf("合并后的节点 = %q，期望 %q", nodeNames(got.Nodes), want)

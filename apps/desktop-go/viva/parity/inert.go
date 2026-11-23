@@ -55,14 +55,36 @@ func inertNodes(base, after []Node) []Node {
 	return out
 }
 
-// withInertNodes 返回 f 的副本，节点列表是 inert 加上 f 原有的节点（页面在前、对话框在后，与渲染层的文档顺序一致）。
-// f 原有节点的 Parent 随之后移。
-func withInertNodes(f *Facts, inert []Node) *Facts {
-	if len(inert) == 0 {
+// withInertNodes 返回 f 的副本，节点列表是 inert 加上 f 原有的节点。
+// 默认页面在前、对话框在后，与渲染层的文档顺序一致（Modal 经 portal 挂在 body 末尾）。
+// dialogFirst 为真时反过来：对话框在前、页面在后，并且文字也让浮层里的排在前面——渲染层的命令面板（GlobalCommandPalette）
+// 渲染在 App 组件树的最前面，ARIA 快照与文字的文档顺序都是它在先；Viva 的浮层画在页面之后，可访问树与文字都是它在后，
+// 两个序列按最长公共子序列对齐，次序不同整块的节点会被报成缺失加多余。这里只调整顺序，不增删、不改写任何一项。
+// f 原有节点的 Parent 随之后移（页面在前）或保持（对话框在前，惰性节点的 Parent 后移）。
+func withInertNodes(f *Facts, inert []Node, dialogFirst bool) *Facts {
+	if len(inert) == 0 && !dialogFirst {
 		return f
 	}
 	merged := *f
 	merged.Nodes = make([]Node, 0, len(inert)+len(f.Nodes))
+	if dialogFirst {
+		merged.Nodes = append(merged.Nodes, f.Nodes...)
+		for _, n := range inert {
+			if n.Parent >= 0 {
+				n.Parent += len(f.Nodes)
+			}
+			merged.Nodes = append(merged.Nodes, n)
+		}
+		merged.Texts = make([]Text, 0, len(f.Texts))
+		for _, overlay := range []bool{true, false} {
+			for _, t := range f.Texts {
+				if t.Overlay == overlay {
+					merged.Texts = append(merged.Texts, t)
+				}
+			}
+		}
+		return &merged
+	}
 	merged.Nodes = append(merged.Nodes, inert...)
 	for _, n := range f.Nodes {
 		if n.Parent >= 0 {

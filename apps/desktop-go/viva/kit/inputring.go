@@ -28,3 +28,17 @@ func (l *Look) PaintInputRing(d *ui.DrawContext, p, radius float32) {
 	}
 	l.PaintRingBand(d, 2*p, Fade(l.T.Primary.WithAlpha(0.5), p), radius)
 }
+
+// PaintInputRingBelow 画整行宽、紧贴文本框下沿的聚焦环：命令面板的搜索框铺满面板，聚焦环（ring-2 的 box-shadow）
+// 在左、右、上三侧都被面板的 overflow-hidden 裁掉，只剩下沿的 2px（压在容器的 border-b 与它下面的第一行上）。
+// d.Rect 是文本框的外框（不含容器下边框），p 由 InputRing 给出。
+func (l *Look) PaintInputRingBelow(d *ui.DrawContext, p float32) {
+	if p <= 0 {
+		return
+	}
+	scale := d.Canvas.PixelScale()
+	box := SnapRect(d.Rect, scale)
+	px := 1 / scale
+	band := gfx.Rect{X: box.X, Y: box.Y + box.Height, Width: box.Width, Height: 2 * px}
+	d.Canvas.Fill(band, d.Fade(l.Col(Fade(l.T.Primary.WithAlpha(0.5), p))))
+}

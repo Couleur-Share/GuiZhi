@@ -4,8 +4,10 @@ import (
 	"errors"
 	"math"
 	"slices"
+	"strings"
 	"testing"
 
+	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 
 	"guizhi-mygo-shell/native/services"
@@ -47,12 +49,12 @@ func (r *uiRig) paletteOpen() bool { return r.has(gfx.RoleGroup, locales.Command
 
 func TestUIPaletteClosedDrawsNothing(t *testing.T) {
 	r := newUIRig(t, withPalette)
-	if r.paletteOpen() || r.hasText(locales.NativePaletteHintClose()) {
+	if r.paletteOpen() || r.hasText(locales.CommandPalettePlaceholder()) {
 		t.Fatal("没打开时不应画面板")
 	}
 }
 
-// 打开：面板顶部对齐（pt-[12vh] = 96）、宽 42rem = 672 水平居中，带搜索框、分组标题、静态动作与按键提示。
+// 打开：面板顶部对齐（pt-[12vh] = 96）、宽 42rem = 672 水平居中，带搜索框、分组标题与静态动作；没有按键提示行（渲染层没有这一条）。
 func TestUIPaletteOpensTopAlignedWithStaticItems(t *testing.T) {
 	r := newPaletteUI(t)
 	panel, ok := r.node(gfx.RoleGroup, locales.CommandPaletteTitle())
@@ -64,15 +66,18 @@ func TestUIPaletteOpensTopAlignedWithStaticItems(t *testing.T) {
 	if math.Abs(float64(b.Y-96)) > 1 || math.Abs(float64(b.Width-672)) > 1 || math.Abs(float64(b.X+b.Width/2-640)) > 1 {
 		t.Errorf("面板位置不对：%+v，期望 y=96 宽 672 居中", b)
 	}
-	if !r.has(gfx.RoleTextField, locales.CommandPaletteTitle()) {
+	if !r.has(gfx.RoleTextField, locales.CommandPalettePlaceholder()) {
 		t.Error("应有搜索框")
 	}
-	for _, name := range []string{locales.CommandPaletteGroupActions(), locales.SettingsTitle(), locales.NativePaletteHintMove(), locales.NativePaletteHintRun(), locales.NativePaletteHintClose()} {
+	for _, name := range []string{locales.CommandPaletteGroupActions(), locales.SettingsTitle()} {
 		if !r.hasText(name) {
 			t.Errorf("缺少文字 %q；画面上有 %q", name, r.session.Texts())
 		}
 	}
-	if !r.hasButton(locales.CommandPaletteCompileWiki()) || !r.hasText(locales.CommandPalettePlaceholder()) {
+	if r.hasText(locales.NativePaletteHintMove()) || r.hasText(locales.NativePaletteHintRun()) || r.hasText(locales.NativePaletteHintClose()) {
+		t.Errorf("渲染层的命令面板没有按键提示行，Viva 不应画：%q", r.session.Texts())
+	}
+	if !r.hasRow(locales.CommandPaletteCompileWiki()) || !r.hasText(locales.CommandPalettePlaceholder()) {
 		t.Errorf("应列出静态动作并显示占位文字：%q", r.session.Texts())
 	}
 }
@@ -84,7 +89,7 @@ func TestUIPaletteAutoFocusTypesIntoSearch(t *testing.T) {
 	if got := r.screen.Palette.View().Query; got != "wiki" {
 		t.Fatalf("打字应直接进搜索框并驱动查询：%q", got)
 	}
-	if !r.hasButton(locales.CommandPaletteCompileWiki()) || r.hasButton(locales.CaptureTitle()) {
+	if !r.hasRow(locales.CommandPaletteCompileWiki()) || r.hasRow(locales.CaptureTitle()) {
 		t.Errorf("静态动作应按输入立即过滤：%q", r.session.Texts())
 	}
 }
@@ -102,7 +107,7 @@ func TestUIPaletteReopenClearsQuery(t *testing.T) {
 	if got := r.screen.Palette.View().Query; got != "" {
 		t.Errorf("重新打开应清空查询：%q", got)
 	}
-	if !r.hasButton(locales.CaptureTitle()) {
+	if !r.hasRow(locales.CaptureTitle()) {
 		t.Error("重新打开应回到全部静态项")
 	}
 }
@@ -118,7 +123,7 @@ func TestUIPaletteSearchShowsGroupedResults(t *testing.T) {
 	r.timers.fire(r.timers.count() - 1)
 	r.frames(3)
 	for _, name := range []string{"alpha note", "other", "alpha wiki", "alpha task"} {
-		if !r.hasButton(name) {
+		if !r.hasRow(name) {
 			t.Errorf("缺少结果 %q；画面上有 %q", name, r.session.Texts())
 		}
 	}
@@ -153,7 +158,7 @@ func TestUIPaletteFailedSourceHint(t *testing.T) {
 	if !r.hasText(locales.NativePaletteFailedSources("Wiki")) {
 		t.Errorf("应说明 Wiki 搜索失败：%q", r.session.Texts())
 	}
-	if !r.hasButton("alpha note") || r.hasButton("alpha wiki") {
+	if !r.hasRow("alpha note") || r.hasRow("alpha wiki") {
 		t.Error("其余来源应照常显示、失败来源没有结果")
 	}
 }
@@ -188,7 +193,7 @@ func TestUIPaletteArrowKeysAndEnterRun(t *testing.T) {
 // 点击一行执行并关闭。
 func TestUIPaletteClickRunsRow(t *testing.T) {
 	r := newPaletteUI(t)
-	r.clickButton(locales.CaptureTitle())
+	r.clickRow(locales.CaptureTitle())
 	if got := r.called(); !slices.Equal(got, []string{"capture"}) {
 		t.Fatalf("点击应执行「快速采集」：%v", got)
 	}
@@ -202,7 +207,7 @@ func TestUIPaletteClickKnowledgeResultOpensItem(t *testing.T) {
 	r := newPaletteUI(t)
 	r.seedPaletteRemote()
 	r.searchPalette("alpha")
-	r.clickButton("alpha note")
+	r.clickRow("alpha note")
 	if got := r.called(); !slices.Equal(got, []string{"item:i1"}) {
 		t.Fatalf("应打开条目 i1：%v", got)
 	}
@@ -278,8 +283,8 @@ func TestUIPaletteKeyboardRevealsActiveRow(t *testing.T) {
 		t.Fatalf("应有 15 条结果：%d", count)
 	}
 	first, last := r.screen.Palette.View().Items[0], r.screen.Palette.View().Items[count-1]
-	if _, ok := r.node(gfx.RoleButton, last.Title); ok {
-		if n, _ := r.node(gfx.RoleButton, last.Title); n.Bounds.Y+n.Bounds.Height <= 420 {
+	if _, ok := r.rowNode(last.Title); ok {
+		if n, _ := r.rowNode(last.Title); n.Bounds.Y+n.Bounds.Height <= 420 {
 			t.Fatalf("测试台应让最后一项一开始在视口之外：%+v", n.Bounds)
 		}
 	}
@@ -287,7 +292,7 @@ func TestUIPaletteKeyboardRevealsActiveRow(t *testing.T) {
 		r.keys("Down")
 	}
 	r.frames(6)
-	n, ok := r.node(gfx.RoleButton, last.Title)
+	n, ok := r.rowNode(last.Title)
 	if !ok {
 		t.Fatalf("选中到最后一项后它应在画面上：%q", last.Title)
 	}
@@ -298,7 +303,32 @@ func TestUIPaletteKeyboardRevealsActiveRow(t *testing.T) {
 		r.keys("Up")
 	}
 	r.frames(6)
-	if n, ok := r.node(gfx.RoleButton, first.Title); !ok || n.Bounds.Y < 0 {
+	if n, ok := r.rowNode(first.Title); !ok || n.Bounds.Y < 0 {
 		t.Errorf("回到第一项后它应在视口里：%+v", n.Bounds)
 	}
+}
+
+// hasRow 报告面板里有没有这一行：行的无障碍名是「标题 副标题」（渲染层的行是一个整体的按钮，名字取全部文字），所以按标题前缀匹配。
+func (r *uiRig) hasRow(title string) bool {
+	_, ok := r.rowNode(title)
+	return ok
+}
+
+func (r *uiRig) rowNode(title string) (app.AccessNode, bool) {
+	for _, n := range r.session.Access() {
+		if n.Role == gfx.RoleButton && (n.Label == title || strings.HasPrefix(n.Label, title+" ")) {
+			return n, true
+		}
+	}
+	return app.AccessNode{}, false
+}
+
+// clickRow 点击面板里的一行。
+func (r *uiRig) clickRow(title string) {
+	r.t.Helper()
+	n, ok := r.rowNode(title)
+	if !ok {
+		r.t.Fatalf("找不到行「%s」；画面上有 %q", title, r.session.Texts())
+	}
+	r.clickAt(n.Bounds.X+n.Bounds.Width/2, n.Bounds.Y+n.Bounds.Height/2)
 }

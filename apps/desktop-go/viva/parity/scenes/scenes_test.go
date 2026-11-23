@@ -62,6 +62,9 @@ var knownRed = map[string]redPin{
 	"settings.ai":              {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	"settings.ai.endpoint-dlg": {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	"settings.ai.wizard":       {Ledger: "G-034", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	// G-027（M3-6a 延伸）：更新说明里的列表项是 ListMarker、设置清单的各区块是带名字的 region，映射表没有规则；这两个场景的 L2、L3 全部通过，只因 L1 未通过。
+	"app.window.overlays.update-available": {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	"app.window.overlays.setup-checklist":  {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	// B-062（M3-4）：多行输入框的无障碍外框有最小高度（ui.TextArea 的 a11y 矩形不随 Height 缩小，全局输入框 47 对 36），
 	// 占位文字的行高也是字号加 7（21 对 20），所以外框差与占位文字墨迹 −1；画出来的输入框本身与渲染层一致（L3 0.006%）。
 	"app.window.ask.empty":          {Ledger: "B-062", Kinds: []string{"L2/box", "L2/ink"}, Max: 2},

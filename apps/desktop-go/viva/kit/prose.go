@@ -699,7 +699,7 @@ func (b *proseText) draw(d *ui.DrawContext) {
 			var linkID gfx.ID
 			if b.onLink != nil && r.href != "" {
 				linkID = ui.ID(b.key.Key("lk" + strconv.Itoa(b.seq) + "." + strconv.Itoa(i) + "." + strconv.Itoa(fi)))
-				b.linkHit(d, linkID, f, r, x, top)
+				b.linkHit(d, linkID, f, r, x, top, baseline, scale)
 			}
 			if r.linkChip {
 				b.paintLinkChip(d, f, r, x, baseline, scale, linkID)
@@ -744,7 +744,7 @@ func (b *proseText) draw(d *ui.DrawContext) {
 
 // linkHit 登记一截链接文字的命中区（手形光标），并在点击到达时（事件遍之后）回调 onLink。
 // 角色：普通链接是 link；站内链接（linkChip，渲染层 WikiMarkdown 的 [[双链]]）在渲染层里是 <button>，所以是 button。
-func (b *proseText) linkHit(d *ui.DrawContext, id gfx.ID, f proseFrag, r *proseRun, x, top float32) {
+func (b *proseText) linkHit(d *ui.DrawContext, id gfx.ID, f proseFrag, r *proseRun, x, top, baseline, scale float32) {
 	role := gfx.RoleLink
 	if r.linkChip {
 		role = gfx.RoleButton
@@ -759,7 +759,16 @@ func (b *proseText) linkHit(d *ui.DrawContext, id gfx.ID, f proseFrag, r *proseR
 			right += proseLinkPadX
 		}
 	}
-	d.Canvas.HitWithOptions(id, gfx.Rect{X: left, Y: top, Width: right - left, Height: b.line}, f.text,
+	// 普通链接是行内的 <a>：外框是行内盒（界面字体的上伸与下伸，与 paintLinkChip 的底色同高），不是整行的行盒；
+	// 站内链接是 <button>，沿用整行高度（渲染层的按钮盒连行距一起，已逐场景核对过）。
+	rect := gfx.Rect{X: left, Y: top, Width: right - left, Height: b.line}
+	if !r.linkChip {
+		face := faceOfWeight(r.weight)
+		a := float32(roundHalfUp(face.ascent*float64(r.size*scale))) / scale
+		dsc := float32(roundHalfUp(face.descent*float64(r.size*scale))) / scale
+		rect.Y, rect.Height = baseline-a, a+dsc
+	}
+	d.Canvas.HitWithOptions(id, rect, f.text,
 		gfx.HitOptions{Role: role, Cursor: gfx.PointerCursorHand})
 	if d.Canvas.Clicked(id) {
 		href, open := r.href, b.onLink

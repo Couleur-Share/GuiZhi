@@ -60,8 +60,9 @@ func (l *Look) PaletteLayer(c ui.C, spec PaletteLayerSpec) bool {
 			d.Canvas.PopFocusScope()
 		})
 	host.Children(func() {
-		// h-fit w-full max-w-2xl：宽度随窗口、上限 42rem，高度随内容；边框 1px 在盒内，内容缩进一个边框宽（overflow-hidden）。
-		ui.Column(c.Key("panel")).FillWidth().MaxWidth(l.Rem(42)).MinHeight(0).Pad(1).Clip().
+		// h-fit w-full max-w-2xl：宽度随窗口、上限 42rem，高度随内容；边框 1px 在盒内，内容缩进一个边框宽。
+		// 不对面板调用 Clip()：它会连面板自己的 Draw 一起裁掉，shadow-2xl 的外投影就画不出来（实测外侧一圈 3% 对 React 的 16% 变暗）；内容区的列表自带滚动裁剪。
+		ui.Column(c.Key("panel")).FillWidth().MaxWidth(l.Rem(42)).MinHeight(0).Pad(1).
 			Draw(func(d *ui.DrawContext) {
 				l.PaintSurface(d, surface)
 				// 面板是不透明的：按在面板上不能落到下面的遮罩（那会关闭面板）。

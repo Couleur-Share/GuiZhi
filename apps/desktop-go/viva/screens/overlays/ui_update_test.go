@@ -82,7 +82,7 @@ func TestUIUpdateAvailableShowsVersionNotesAndDownloads(t *testing.T) {
 	r := newUpdateUI(t)
 	r.emit(services.UpdateStatus{State: services.UpdateStateAvailable, Version: "2.0.0", ReleaseDate: "2026-11-23",
 		ReleaseNotes: "# Highlights\n- first change\n- second change"})
-	for _, want := range []string{locales.SettingsUpdateAvailable(), locales.SettingsVersion() + ": 2.0.0", locales.NativeUpdateReleasedOn("2026-11-23"),
+	for _, want := range []string{locales.SettingsUpdateAvailable(), locales.SettingsVersion(), "2.0.0", locales.NativeUpdateReleasedOn("2026-11-23"),
 		locales.SettingsReleaseNotes(), "first change", "second change"} {
 		if !r.hasText(want) {
 			t.Errorf("缺少 %q；画面上有 %q", want, r.session.Texts())

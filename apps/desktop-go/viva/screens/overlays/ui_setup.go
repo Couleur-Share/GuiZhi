@@ -109,9 +109,14 @@ func (s *Screen) setupOptional(c ui.C, v SetupView) {
 			Fg: t.MutedForeground, FgHover: t.Foreground, Transition: kit.DurationDefault,
 		}
 		spec := kit.ButtonSpec{Label: locales.SetupMoreOptional(len(v.Optional)), Icon: icon, IconSize: l.Rem(0.875), Disclosure: true, On: v.OptionalOpen}
-		if l.Button(c.Key("toggle"), spec, st).Self(ui.Start).Clicked() {
-			s.Setup.ToggleOptional()
-		}
+		// 渲染层的展开钮是 inline-flex，放在块级 div 的行盒里，与基线对齐后行盒比钮高一截：钮的下面多出这一截（折叠时也在，
+		// 展开时列表的 mt-2 从这一截之后算起）。同 kit.StrutDescent 的口径：行盒要容得下支撑文字基线以下的 round(0.4×根字号)，
+		// 钮自己在基线以下的部分是 py-1（Space(1)）加上 text-xs 的下降量（根字号/16）；三个字号档（14 / 16 / 18px）实测多出 1.625 / 1.0 / 1.375px，与公式相符。
+		ui.Column(c.Key("toggle-line")).FillWidth().PadSides(0, 0, l.StrutDescent()-l.Space(1)-l.RootPx/16, 0).Children(func() {
+			if l.Button(c.Key("toggle"), spec, st).Self(ui.Start).Clicked() {
+				s.Setup.ToggleOptional()
+			}
+		})
 		if !v.OptionalOpen {
 			return
 		}

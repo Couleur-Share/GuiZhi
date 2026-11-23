@@ -1,0 +1,28 @@
+{
+  "palette": {
+    "query": "备份",
+    "knowledge": [
+      { "id": "item-backup-wal", "title": "SQLite WAL 模式的备份坑", "snippet": "库打开时只拷主文件会丢掉 -wal 里最近的写入，备份应当用 VACUUM INTO，字节级保存现场才连旁文件一起拷。" },
+      { "id": "item-backup-plan", "title": "个人知识库的备份策略", "snippet": "每周一次完整备份，加上每天的增量快照；恢复演练比备份本身更重要，备份之后一定要试着还原一次。" }
+    ],
+    "wiki": [
+      { "id": "wiki-backup", "title": "数据备份与恢复", "kind": "concept", "summary": "整理本地优先软件在备份、校验与恢复上的做法，以及常见的丢数据陷阱。" }
+    ],
+    "tasks": [
+      { "id": "task-backup-done", "displayName": "技术论坛：备份方案对比", "status": "completed", "error": "" },
+      { "id": "task-backup-failed", "displayName": "云存储备份服务评测", "status": "failed", "error": "网络连接超时" }
+    ]
+  },
+  "update": {
+    "currentVersion": "1.0.0",
+    "version": "1.2.3",
+    "releaseNotes": "## 归知 1.2.3\n\n- 新增全局命令面板的分组搜索结果\n- 修复完整备份在 WAL 模式下遗漏最近写入的问题\n- 改进采集队列的失败重试提示\n\n完整更新说明见 [发布页](https://example.com/guizhi/releases/1.2.3)。"
+  },
+  "setup": {
+    "optionalOpen": true
+  },
+  "migration": {
+    "itemCount": 128,
+    "path": "C:\\Users\\parity\\AppData\\Roaming\\GuiZhi\\data\\guizhi.db"
+  }
+}
