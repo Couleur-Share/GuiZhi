@@ -107,3 +107,62 @@ func TestWithInertNodesPutsThePageBeforeTheDialog(t *testing.T) {
 		t.Error("不得改动传入的事实")
 	}
 }
+
+func overlayText(text string, overlay bool) Text { return Text{Text: text, Overlay: overlay} }
+
+func textLines(texts []Text) []string {
+	out := make([]string, len(texts))
+	for i, t := range texts {
+		out[i] = t.Text
+	}
+	return out
+}
+
+// dialogFirst：浮层在前、页面在后——节点按「对话框、惰性页面」排，惰性节点的 Parent 后移而对话框节点的 Parent 不动；
+// 文字则是浮层里的先、页面的后，各自保持原有相对次序（命令面板在 React 的 App 树最前面）。
+func TestWithInertNodesDialogFirstPutsTheDialogBeforeThePage(t *testing.T) {
+	inert := []Node{node("group", "页面", -1), node("button", "新建", 0)}
+	f := &Facts{
+		Scene: "s",
+		Nodes: []Node{node("group", "对话框", -1), node("button", "关闭", 0)},
+		Texts: []Text{overlayText("页面一", false), overlayText("浮层一", true), overlayText("页面二", false), overlayText("浮层二", true)},
+	}
+	got := withInertNodes(f, inert, true)
+	wantNodes := []string{"group:对话框", "button:关闭", "group:页面", "button:新建"}
+	if !slices.Equal(nodeNames(got.Nodes), wantNodes) {
+		t.Fatalf("对话框在前的节点 = %q，期望 %q", nodeNames(got.Nodes), wantNodes)
+	}
+	for i, wantParent := range []int{-1, 0, -1, 2} {
+		if got.Nodes[i].Parent != wantParent {
+			t.Errorf("节点 %d 的 Parent = %d，期望 %d（对话框节点不动，惰性节点随页面后移 %d 位）", i, got.Nodes[i].Parent, wantParent, len(f.Nodes))
+		}
+	}
+	wantTexts := []string{"浮层一", "浮层二", "页面一", "页面二"}
+	if !slices.Equal(textLines(got.Texts), wantTexts) {
+		t.Errorf("文字应浮层在前、页面在后且各自保持次序：%q，期望 %q", textLines(got.Texts), wantTexts)
+	}
+	if len(got.Texts) != len(f.Texts) {
+		t.Errorf("只调整顺序、不增删：%d 项变成 %d 项", len(f.Texts), len(got.Texts))
+	}
+	if !slices.Equal(textLines(f.Texts), []string{"页面一", "浮层一", "页面二", "浮层二"}) || len(f.Nodes) != 2 {
+		t.Error("不得改动传入的事实")
+	}
+}
+
+// dialogFirst 没有惰性节点时（命令面板打开前页面本来就在树里的情形）仍要重排文字，不能走「原样返回」的捷径。
+func TestWithInertNodesDialogFirstReordersTextsEvenWithoutInertNodes(t *testing.T) {
+	f := &Facts{
+		Scene: "s", Nodes: []Node{node("group", "对话框", -1)},
+		Texts: []Text{overlayText("页面", false), overlayText("浮层", true)},
+	}
+	got := withInertNodes(f, nil, true)
+	if got == f {
+		t.Fatal("dialogFirst 即使没有惰性节点也应返回重排后的副本")
+	}
+	if !slices.Equal(textLines(got.Texts), []string{"浮层", "页面"}) {
+		t.Errorf("文字应浮层在前：%q", textLines(got.Texts))
+	}
+	if !slices.Equal(nodeNames(got.Nodes), []string{"group:对话框"}) || got.Nodes[0].Parent != -1 {
+		t.Errorf("节点不应变化：%q", nodeNames(got.Nodes))
+	}
+}

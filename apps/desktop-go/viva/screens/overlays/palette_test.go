@@ -233,6 +233,39 @@ func TestPaletteStaleResponseIsDiscarded(t *testing.T) {
 	}
 }
 
+// 被新查询取消的请求即使以错误返回（取消之后底层调用失败）也不是来源失败：不记日志、不进失败来源。
+// 上一个用例的假服务放行后是成功返回，走不到失败路径；这里先注入失败再放行，才能验证「取消不算失败」。
+func TestPaletteCancelledRequestFailureIsNotLogged(t *testing.T) {
+	pr := newPaletteRig(t)
+	pr.p.Env = pr.asyncEnv()
+	pr.seedRemote()
+	release, arrived := pr.wiki.Hold(servicestest.WikiOpSearch)
+
+	pr.p.SetQuery("alpha")
+	pr.timers.fire(0)
+	<-arrived // 第一次搜索卡在 Wiki
+	pr.wiki.Fail(servicestest.WikiOpSearch, errors.New("request canceled"))
+	pr.p.SetQuery("beta") // 取消在途请求
+	release()
+	pr.wait()
+
+	if logs := pr.log.entries(); len(logs) != 0 {
+		t.Errorf("被取消的请求不是失败，不应留日志：%v", logs)
+	}
+	if v := pr.p.View(); len(v.FailedSources) != 0 {
+		t.Errorf("被取消的请求不应计入失败来源：%v", v.FailedSources)
+	}
+	// 对照：没被取消的同样失败仍照常记日志（取消的判断不能把真失败吞掉）。
+	pr.timers.fire(1)
+	pr.wait()
+	if v := pr.p.View(); !slices.Equal(v.FailedSources, []string{SourceWiki}) {
+		t.Errorf("新查询里的真失败应报告：%v", v.FailedSources)
+	}
+	if logs := pr.log.entries(); len(logs) != 1 || !strings.HasPrefix(logs[0], "palette.search.wiki|") {
+		t.Errorf("真失败应记一条日志：%v", logs)
+	}
+}
+
 func TestPaletteCloseAndReopenInvalidateInFlightSearch(t *testing.T) {
 	pr := newPaletteRig(t)
 	pr.p.Env = pr.asyncEnv()

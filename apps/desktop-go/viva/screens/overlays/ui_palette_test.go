@@ -47,6 +47,21 @@ func (r *uiRig) searchPalette(query string) {
 
 func (r *uiRig) paletteOpen() bool { return r.has(gfx.RoleGroup, locales.CommandPaletteTitle()) }
 
+// 按住 Enter 的重复事件只消化、不再执行：只有第一次按下执行选中项（渲染层 onKeyDown 对重复的 Enter 同样直接返回）。
+func TestUIPaletteHeldEnterRunsOnlyOnce(t *testing.T) {
+	r := newPaletteUI(t)
+	if res := r.screen.paletteKey(gfx.KeyEvent{Key: gfx.KeyEnter, Repeat: true}); !res.Handled {
+		t.Error("重复的 Enter 应被消化")
+	}
+	if got := r.called(); len(got) != 0 || !r.screen.Palette.View().Open {
+		t.Fatalf("重复的 Enter 不应执行选中项或关闭面板：%v", got)
+	}
+	r.keys("Enter")
+	if got := r.called(); !slices.Equal(got, []string{"capture"}) {
+		t.Errorf("第一次按下才执行选中项（第一项是快速采集）：%v", got)
+	}
+}
+
 func TestUIPaletteClosedDrawsNothing(t *testing.T) {
 	r := newUIRig(t, withPalette)
 	if r.paletteOpen() || r.hasText(locales.CommandPalettePlaceholder()) {
