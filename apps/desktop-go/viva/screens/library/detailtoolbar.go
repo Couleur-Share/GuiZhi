@@ -44,6 +44,7 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 	s.syncSnapshot(v, item, caps)
 	active := p.activeTab(caps)
 	s.syncEdit(item, active)
+	s.bindThemed(item, caps, active) // 要在 readerLive 之前：它决定阅读区此刻是原文还是 AI 阅读页
 	s.persistPanel(item, active)
 	showFind := p.showFindBar(active, caps)
 	p.canFind = showFind
@@ -79,6 +80,9 @@ func (s *Screen) contentPanel(c ui.C, v View, item services.LibraryItem, caps It
 				}
 			})
 		s.longFormatDialog(c, v)
+		if s.Themed != nil {
+			s.Themed.Dialogs(c) // 生成设置、删除确认、阅读页设置菜单与资料面板：每一帧都要经过（关着的那一帧负责复位）
+		}
 	})
 }
 

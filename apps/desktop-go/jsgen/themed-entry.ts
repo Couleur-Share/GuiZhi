@@ -33,9 +33,10 @@ function guarded<T>(fn: () => T): { ok: T } | { issue: unknown } {
   cleanV3Html: (html: string, assets: string) => cleanV3Html(html, JSON.parse(assets)),
   checkScript: (module: string) => JSON.stringify(checkReadingScript(JSON.parse(module)) ?? null),
   /** export.ts 的 HTML 组装部分（图片字节与大小核验在 Go 侧）。 */
-  exportDocument: (version: string, urls: string, staticOnly: boolean) => {
+  exportDocument: (version: string, urls: string, staticOnly: boolean, partial?: boolean) => {
     const page = JSON.parse(version), map = JSON.parse(urls);
-    let html = page.formatVersion === 3 ? v3InnerDocument(page, map, !staticOnly, false, false) : themedReadingDocument(page, undefined, map);
+    // partial 只给阅读岛渲染生成途中的预览（章节还没写完，不做整页校验）用，导出不传。
+    let html = page.formatVersion === 3 ? v3InnerDocument(page, map, !staticOnly, partial === true, false) : themedReadingDocument(page, undefined, map);
     if (page.formatVersion === 3) {
       if (staticOnly) {
         const doc = parseHTML(html).document;

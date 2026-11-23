@@ -55,6 +55,8 @@ type AI struct {
 	Wake func()
 	// OnManageEngine 是内置转写引擎卡上的「管理引擎」：跳到「采集与转写」分区。可为 nil。
 	OnManageEngine func()
+	// Search 画「联网搜索」设置块（主题阅读的搜索服务，ReadingSearchSettings；台账 B-074），每一帧调用；nil 时这一块不出现，其余版面不变。
+	Search func(c ui.C)
 	// Locale 是时间的区域写法（系统区域）；零值按中文。
 	Locale kit.DateLocale
 	// Now 给连通性验证时间戳；nil 取系统时间。

@@ -17,9 +17,12 @@ type Hooks struct {
 	Collections func() []services.LibraryCollection
 	// LoadCollections 在进入模块时读取合集：知识库没打开过时合集列表是空的（渲染层靠全局的 fetchCollections）。在后台调用。
 	LoadCollections func(ctx context.Context)
+	// ThemedTasks 画「主题页任务」页（主题阅读的任务列表，台账 B-064）：代替工作区的内容，每一帧调用；back 回到处理中心。
+	// 为空（没接主题阅读）时入口退回成「尚未迁移」的说明。
+	ThemedTasks func(c ui.C, back func())
 }
 
-// themedTasksMilestone 与 themedTasksLedger 是「主题页任务」入口的去向：主题阅读（AI 阅读）随 M3 迁入，台账 B-064。
+// themedTasksMilestone 与 themedTasksLedger 是「主题页任务」入口在没接线时的去向：主题阅读（AI 阅读）随 M3 迁入，台账 B-064。
 const (
 	themedTasksMilestone = "M3"
 	themedTasksLedger    = "B-064"
@@ -49,6 +52,8 @@ type Screen struct {
 	// mounted 与 shown 是渲染层「挂载」的对应：这一帧没画工作区（切到别的模块、设置页）就当作卸载，
 	// 下次再画时重新进入并重读（EndFrame）。
 	mounted, shown bool
+	// themedTasks 为真时工作区显示「主题页任务」页（渲染层 InboxWorkspace 的 showThemedTasks）；离开处理中心即复位。
+	themedTasks bool
 }
 
 // enter 在工作区或侧栏出现时调用：第一次出现（或卸载之后再出现）重读列表与 Wiki、语义索引的状态，
@@ -71,6 +76,7 @@ func (s *Screen) EndFrame() {
 	if !s.shown {
 		s.mounted = false
 		s.collection.Open = false
+		s.themedTasks = false
 	}
 	s.shown = false
 }

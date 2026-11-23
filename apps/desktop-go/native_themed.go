@@ -42,6 +42,11 @@ type themedReply struct {
 	Search     *services.ThemedSearchStatus `json:"search"`
 	Path       string                       `json:"path"`
 	Cancelled  bool                         `json:"cancelled"`
+
+	// themedReading:renderDocument 的回包。
+	Document      string `json:"document"`
+	VersionID     string `json:"versionId"`
+	ImagesOmitted bool   `json:"imagesOmitted"`
 }
 
 // scrub 抹掉文本里的 API Key：当前设置里的全部密钥，外加调用方额外给出的候选密钥。
@@ -267,6 +272,14 @@ func (a *themedAdapter) RestorePrevious(ctx context.Context, req services.Themed
 func (a *themedAdapter) Remove(ctx context.Context, req services.ThemedRequest) error {
 	_, _, err := a.call(ctx, "themedReading:remove", nil, themedReqArg(req))
 	return err
+}
+
+func (a *themedAdapter) Render(ctx context.Context, in services.ThemedRenderInput) (services.ThemedRender, error) {
+	r, _, err := a.call(ctx, chThemedRenderDocument, nil, in)
+	if err != nil {
+		return services.ThemedRender{}, err
+	}
+	return services.ThemedRender{Document: r.Document, VersionID: r.VersionID, ImagesOmitted: r.ImagesOmitted}, nil
 }
 
 func (a *themedAdapter) ExportHTML(ctx context.Context, in services.ThemedExportInput) (services.ThemedExportResult, error) {

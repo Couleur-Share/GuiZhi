@@ -62,7 +62,8 @@ func (s *Screen) editActions(c ui.C, item services.LibraryItem, active ReadingTa
 //	  分隔线（mx-1 h-4 w-px bg-border/70）
 //	  目录（只在原文版本里；展开时 bg-muted）、编辑（回收站里没有）
 //
-// 编辑态下整组换成「正在编辑原文」与「完成编辑」（editActions）。「AI 阅读」的功能不在本里程碑：点了弹失败提示并写明归属（台账 B-064），不假装成功。
+// 编辑态下整组换成「正在编辑原文」与「完成编辑」（editActions）。接了主题阅读（Themed）时「AI 阅读」在两个版本间切换，
+// AI 阅读下目录让位给生成进度、预览与阅读页设置（themed.Screen.Toolbar）；没接时点「AI 阅读」弹失败提示并写明归属（台账 B-064），不假装成功。
 func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab) {
 	l := s.Look
 	t := l.T
@@ -70,6 +71,7 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 	s.syncToc(item.ID, kind)
 	tocOpen := s.detail.panel.tocOpen
 	editing := s.editing(item, active)
+	aiOn := s.themedOn()
 	ui.Row(c).Items(ui.Center).Gap(l.Space(1.5)).Shrink(0).Children(func() {
 		if editing {
 			s.editActions(c, item, active, kind)
@@ -84,20 +86,32 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 			Children(func() {
 				picked := s.readerButtonStyle(l.Rem(1.75))
 				picked.Bg, picked.Fg, picked.Weight, picked.Shadows = t.Background, t.Foreground, kit.WeightMedium, kit.ShadowSM
-				// 原文是选中的版本（这里没有 AI 阅读的状态：AI 阅读不在本里程碑）。
-				l.Button(c.Key("original"), kit.ButtonSpec{Label: locales.ThemedReadingReaderOriginal(), Toggle: true, On: true}, picked)
-				if l.Button(c.Key("ai"), kit.ButtonSpec{Label: locales.ThemedReadingReaderAi(), Toggle: true}, s.readerButtonStyle(l.Rem(1.75))).Clicked() {
-					s.notMigrated(locales.ThemedReadingReaderAi(), "M3", "B-064")
+				// 选中的版本：没接主题阅读时恒为原文；接了就看当前模式。
+				origStyle, aiStyle := picked, s.readerButtonStyle(l.Rem(1.75))
+				if aiOn {
+					origStyle, aiStyle = aiStyle, picked
+				}
+				if l.Button(c.Key("original"), kit.ButtonSpec{Label: locales.ThemedReadingReaderOriginal(), Toggle: true, On: !aiOn}, origStyle).Clicked() && aiOn {
+					s.Themed.Mode.Select(false)
+				}
+				if l.Button(c.Key("ai"), kit.ButtonSpec{Label: locales.ThemedReadingReaderAi(), Toggle: true, On: aiOn}, aiStyle).Clicked() {
+					if s.Themed == nil {
+						s.notMigrated(locales.ThemedReadingReaderAi(), "M3", "B-064")
+					} else if !aiOn {
+						s.Themed.Mode.Select(true)
+					}
 				}
 			})
 		ui.Row(c.Key("sep")).Width(1).Height(l.Rem(1)).MarginX(l.Space(1)).Shrink(0).Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Border.WithAlpha(0.7)})
 		})
-		toc := s.readerButtonStyle(l.Rem(2))
-		toc.BgOn, toc.FgOn = t.Muted, t.Foreground
-		// 目录钮是 aria-expanded（不是 aria-pressed）：展开时 bg-muted，可访问状态取「展开」。
-		if l.Button(c.Key("toc"), kit.ButtonSpec{Label: locales.LibraryCatalog(), Disclosure: true, On: tocOpen}, toc).Clicked() {
-			s.setTocOpen(!tocOpen)
+		if !aiOn { // 目录只属于原文版本：AI 阅读页的岛里没有目录脚本
+			toc := s.readerButtonStyle(l.Rem(2))
+			toc.BgOn, toc.FgOn = t.Muted, t.Foreground
+			// 目录钮是 aria-expanded（不是 aria-pressed）：展开时 bg-muted，可访问状态取「展开」。
+			if l.Button(c.Key("toc"), kit.ButtonSpec{Label: locales.LibraryCatalog(), Disclosure: true, On: tocOpen}, toc).Clicked() {
+				s.setTocOpen(!tocOpen)
+			}
 		}
 		if !caps.Trashed {
 			name := locales.ThemedReadingReaderEditOriginal()
@@ -107,6 +121,9 @@ func (s *Screen) readerToolbar(c ui.C, item services.LibraryItem, caps ItemCaps,
 			if l.Button(c.Key("edit"), kit.ButtonSpec{Label: locales.ThemedReadingReaderEdit(), Name: name}, s.readerButtonStyle(l.Rem(2))).Clicked() {
 				s.startEdit(item, active)
 			}
+		}
+		if aiOn { // 生成进度、预览、阅读页设置菜单：只在 AI 阅读时出现，排在编辑之后
+			s.Themed.Toolbar(c.Key("themed"))
 		}
 	})
 }

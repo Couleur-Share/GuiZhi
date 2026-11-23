@@ -101,6 +101,13 @@ func (s *Screen) readerViewOf(item services.LibraryItem, caps ItemCaps, active R
 	if v, ok := s.editorView(item, active); ok {
 		return v
 	}
+	// AI 阅读紧随其后：页面文档就绪时是 ViewSnapshot，其余（读取中、任务进度、空态）阅读区由原生控件画，岛收起。
+	if s.themedOn() {
+		if v, ok := s.Themed.IslandView(); ok {
+			return v
+		}
+		return reader.View{Kind: reader.ViewNone}
+	}
 	p := &s.detail.panel
 	key := readerViewKey{content: item.Content, itemType: item.ItemType, wechat: caps.IsWechat, pane: p.snapshotPane(), active: active}
 	if !p.viewCache.ok || p.viewCache.key != key {
@@ -186,6 +193,10 @@ func (s *Screen) SetReader(host *reader.Host) {
 
 // readerArea 是阅读区的那一格（min-h-0 flex-1）：有岛就把原生视图放在它的矩形上；岛不可用时画「读取失败」与重试。
 func (s *Screen) readerArea(c ui.C, item services.LibraryItem, caps ItemCaps, active ReadingTab) {
+	if s.themedOn() { // 编辑态时 Bind 已让 AI 阅读退出，这里自然不会进来
+		s.themedArea(c, item, caps, active)
+		return
+	}
 	col := ui.Column(c.Key("reader")).FillWidth().Grow(1).MinHeight(0)
 	host := s.readerHost
 	notices := s.snapshotPaneOn(caps)

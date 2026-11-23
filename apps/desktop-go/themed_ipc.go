@@ -29,8 +29,10 @@ const (
 	chThemedRestorePrevious = "themedReading:restorePrevious"
 	chThemedRemove          = "themedReading:remove"
 	chThemedExport          = "themedReading:exportHtml"
-	chThemedListTasks       = "themedReading:listTasks"
-	chThemedProgress        = "themedReading:progress"
+	// chThemedRenderDocument 只给原生界面（阅读岛里的静态阅读页）用，不在 preload 白名单里，渲染层不会调它。
+	chThemedRenderDocument = "themedReading:renderDocument"
+	chThemedListTasks      = "themedReading:listTasks"
+	chThemedProgress       = "themedReading:progress"
 )
 
 var reThemedInstanceID = regexp.MustCompile(`^[\w-]{1,100}$`)
@@ -412,6 +414,11 @@ func (l *Library) themedAssertImagesHealthy(version *jsObj, allowKnownIncomplete
 const themedExportLimit = 100 * 1024 * 1024
 
 func (l *Library) themedExportHTML(version *jsObj, withoutImages, staticOnly bool) (string, error) {
+	return l.themedExportDocument(version, withoutImages, staticOnly, false)
+}
+
+// themedExportDocument 是导出与阅读岛渲染共用的组装：partial 只给生成途中的预览（章节没写完，不做整页校验）。
+func (l *Library) themedExportDocument(version *jsObj, withoutImages, staticOnly, partial bool) (string, error) {
 	release, err := retainAssetFiles(themedAssetFiles(version))
 	if err != nil {
 		return "", err
@@ -436,7 +443,7 @@ func (l *Library) themedExportHTML(version *jsObj, withoutImages, staticOnly boo
 			urls.set(themedStr(a, "id"), "data:"+mime+";base64,"+base64.StdEncoding.EncodeToString(data))
 		}
 	}
-	html, err := themedCall("exportDocument", themedJSON(version), themedJSON(urls), staticOnly)
+	html, err := themedCall("exportDocument", themedJSON(version), themedJSON(urls), staticOnly, partial)
 	if err != nil {
 		return "", err
 	}
@@ -842,6 +849,80 @@ func (l *Library) registerThemedReading(b *Bridge) {
 			return nil, err
 		}
 		return map[string]any{"success": true, "path": dest}, nil
+	})
+	b.handlers[chThemedRenderDocument] = wrap("renderDocument", func(ctx context.Context, a []json.RawMessage) (any, error) {
+		raw := jsArg(a, 0)
+		req, err := parseThemedRequest(raw)
+		if err != nil {
+			return nil, err
+		}
+		instanceID := ""
+		if s, ok := jsGet(raw, "instanceId").(string); ok && reThemedInstanceID.MatchString(s) {
+			instanceID = s
+		}
+		var page *jsObj
+		preview := false
+		switch {
+		case vTruthy(jsGet(raw, "taskId")):
+			// 生成途中的预览：用任务的工作版本拼出已有章节（与 themedReading:preview 同源）。
+			task, err := pages.getTask(ctx, jsToString(jsGet(raw, "taskId")))
+			if err != nil {
+				return nil, err
+			}
+			if task == nil || themedStr(task, "itemId") != req.itemID || themedStr(task, "sourceKind") != req.kind {
+				return nil, errors.New("生成任务不属于当前文章")
+			}
+			version, err := pages.getVersion(ctx, themedStr(task, "versionId"))
+			if err != nil {
+				return nil, err
+			}
+			if version != nil {
+				page = themedPreviewVersion(version)
+			}
+			if page == nil {
+				return nil, errors.New("任务还没有可预览的章节")
+			}
+			preview = true
+		case vTruthy(jsGet(raw, "versionId")):
+			if page, err = pages.getVersion(ctx, jsToString(jsGet(raw, "versionId"))); err != nil {
+				return nil, err
+			}
+			if page != nil && (themedStr(page, "itemId") != req.itemID || themedStr(page, "sourceKind") != req.kind || themedStr(page, "role") == "working") {
+				return nil, errors.New("页面版本不属于当前文章或尚未发布")
+			}
+		default:
+			if page, err = pages.get(ctx, req.itemID, req.kind, ""); err != nil {
+				return nil, err
+			}
+		}
+		if page == nil {
+			return nil, errors.New("还没有可渲染的主题页")
+		}
+		var doc string
+		omitted := false
+		if !preview && jsToNumber(page.get("formatVersion")) != 3 {
+			// 旧格式整页文档：与 themedReading:get 同一条路径（先体检图片，再按实例标识生成）。
+			inspected, err := l.themedInspectImages(page)
+			if err != nil {
+				return nil, err
+			}
+			var inst any
+			if instanceID != "" {
+				inst = instanceID
+			}
+			if doc, err = themedCall("document", themedJSON(inspected), inst, nil); err != nil {
+				return nil, err
+			}
+		} else {
+			// 当前格式：静态文档，图片内联为 data: 地址；素材没就绪时退回无图版本（页面照常可读），并说明。
+			if doc, err = l.themedExportDocument(page, false, true, preview); err != nil {
+				if doc, err = l.themedExportDocument(page, true, true, preview); err != nil {
+					return nil, err
+				}
+				omitted = true
+			}
+		}
+		return map[string]any{"success": true, "document": doc, "versionId": themedStr(page, "id"), "imagesOmitted": omitted}, nil
 	})
 	l.registerThemedRuntime(b)
 	l.registerReadingViews(b, wrap)

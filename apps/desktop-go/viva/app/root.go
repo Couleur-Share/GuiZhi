@@ -20,6 +20,7 @@ import (
 	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
+	themedscreen "guizhi-mygo-shell/viva/screens/themed"
 	wikiscreen "guizhi-mygo-shell/viva/screens/wiki"
 )
 
@@ -62,6 +63,9 @@ type Root struct {
 
 	// Wiki 模块：目录、详情、关系图谱与全文编译。Services.Wiki 为空时是 nil，rail 与工作区按「尚未迁移」处理（root_wiki.go）。
 	wiki *wikiscreen.Screen
+
+	// 主题阅读（AI 阅读）：知识库阅读区、处理中心的任务页与设置里的联网搜索共用一套界面。Services.Themed 为空时是 nil（root_themed.go）。
+	themed *themedscreen.Screen
 
 	// notifier 是窗口的提示通道，guard 是变更类操作的失败通道（错误提示 + 日志）：所有模块共用这一对。
 	notifier *kit.Notifier
@@ -125,6 +129,7 @@ func NewRoot(opts Options, invalidate func()) *Root {
 	r.mountInbox(invalidate)
 	r.mountAsk(invalidate)
 	r.mountWiki(invalidate)
+	r.mountThemed(invalidate)
 	r.syncLook(nil)
 	return r
 }
@@ -264,6 +269,9 @@ func (r *Root) syncLook(c ui.C) {
 			// 图谱的滚轮缩放走窗口级钩子（页面的滚动区不接这类滚轮）。
 			r.look.WheelHook = r.wiki.GraphWheel
 		}
+		if r.themed != nil {
+			r.themed.Look = r.look
+		}
 	}
 	if c != nil {
 		canvas := c.Canvas()
@@ -392,6 +400,9 @@ func (r *Root) View(c ui.C) {
 	if r.wiki != nil {
 		r.wiki.EndFrame()
 	}
+	if r.themed != nil {
+		r.themed.EndFrame() // 在知识库、处理中心、设置之后：它们这一帧有没有画主题阅读，由各自的调用记下
+	}
 	if r.opts.OnReady != nil {
 		r.ready.Do(r.opts.OnReady)
 	}
@@ -423,6 +434,9 @@ func (r *Root) Close() {
 	}
 	r.closeInbox()
 	r.closeAsk()
+	if r.themed != nil {
+		r.themed.Close()
+	}
 	if r.stopImports != nil {
 		r.stopImports()
 	}

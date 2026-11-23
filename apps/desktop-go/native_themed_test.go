@@ -617,6 +617,43 @@ func TestNativeThemedExport(t *testing.T) {
 	}
 }
 
+// 阅读岛渲染（原生界面专用的 themedReading:renderDocument）：没有页面报错；旧格式页面按实例标识出整页文档；
+// 版本号只认当前文章已发布的版本，别的文章的版本与不存在的任务一律拒绝；渲染不了的页面如实报错而不是空文档。
+func TestNativeThemedRenderDocument(t *testing.T) {
+	ctx := t.Context()
+	r := newThemedRig(t)
+	req := r.item(t, "Render")
+	if _, err := r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: req}); err == nil || !strings.Contains(err.Error(), "还没有可渲染") {
+		t.Fatalf("没有页面：%v", err)
+	}
+	id := r.seedPage(t, req, services.ThemedRoleCurrent, 1, true, nil)
+	out, err := r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: req, InstanceID: "inst-1"})
+	if err != nil || out.VersionID != id || !strings.Contains(out.Document, "body paragraph") || !strings.Contains(out.Document, `data-instance="inst-1"`) {
+		t.Fatalf("渲染当前页：%v %q %.120q", err, out.VersionID, out.Document)
+	}
+	if out.ImagesOmitted {
+		t.Fatalf("旧格式页面不应标记图片省略：%+v", out)
+	}
+	if out, err = r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: req, VersionID: id}); err != nil || out.VersionID != id {
+		t.Fatalf("按版本号渲染：%+v %v", out, err)
+	}
+
+	other := r.item(t, "Other")
+	otherID := r.seedPage(t, other, services.ThemedRoleCurrent, 1, true, nil)
+	if _, err := r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: req, VersionID: otherID}); err == nil || !strings.Contains(err.Error(), "不属于当前文章") {
+		t.Fatalf("别的文章的版本应被拒绝：%v", err)
+	}
+	if _, err := r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: req, TaskID: "no-such-task"}); err == nil {
+		t.Fatal("不存在的任务应报错")
+	}
+	// 当前格式但还没有设计稿：两次尝试（含图/不含图）都渲染失败，应报错而不是返回空文档。
+	v3 := r.item(t, "V3Empty")
+	r.seedPage(t, v3, services.ThemedRoleCurrent, 3, true, nil)
+	if out, err := r.a.Render(ctx, services.ThemedRenderInput{ThemedRequest: v3}); err == nil || out.Document != "" {
+		t.Fatalf("没有设计稿的当前格式页面应报错：%+v %v", out, err)
+	}
+}
+
 // 搜索设置：读状态不带参数；写入后状态更新、可清除；坏的服务商被拒绝；候选密钥不出现在任何返回里。
 func TestNativeThemedSearchConfig(t *testing.T) {
 	ctx := t.Context()

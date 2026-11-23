@@ -54,7 +54,10 @@ type ThemedFake struct {
 	restores    []services.ThemedRequest
 	removes     []services.ThemedRequest
 	exports     []services.ThemedExportInput
+	renders     []services.ThemedRenderInput
 	searchCfgs  []string
+
+	imagesOmitted bool
 }
 
 // ThemedPreviewCall 是一次 Preview 调用记录。
@@ -106,6 +109,7 @@ const (
 	ThemedOpRestorePrevious = "restorePrevious"
 	ThemedOpRemove          = "remove"
 	ThemedOpExport          = "export"
+	ThemedOpRender          = "render"
 	ThemedOpSearchStatus    = "searchStatus"
 	ThemedOpConfigureSearch = "configureSearch"
 )
@@ -791,6 +795,47 @@ func (f *ThemedFake) ExportHTML(ctx context.Context, in services.ThemedExportInp
 	return services.ThemedExportResult{Path: f.exportPath}, nil
 }
 
+// SetImagesOmitted 让之后的 Render 都带「图片未放入」标记（素材还没就绪时的情形）。
+func (f *ThemedFake) SetImagesOmitted(omitted bool) { f.with(func() { f.imagesOmitted = omitted }) }
+
+// Render 返回一份确定的假文档：正文里写着渲染的版本（或预览的版本号）与实例标识，测试据此认出是哪一份。
+func (f *ThemedFake) Render(ctx context.Context, in services.ThemedRenderInput) (services.ThemedRender, error) {
+	f.with(func() { f.renders = append(f.renders, in) })
+	f.gate(ThemedOpRender)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if err := f.failure(ThemedOpRender); err != nil {
+		return services.ThemedRender{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return services.ThemedRender{}, err
+	}
+	row := f.row(in.ThemedRequest)
+	if in.TaskID != "" {
+		t := f.findTask(in.TaskID)
+		if t == nil || t.ItemID != in.ItemID || t.SourceKind != in.SourceKind {
+			return services.ThemedRender{}, errors.New("the task does not belong to this article")
+		}
+		if row.preview == nil {
+			return services.ThemedRender{}, errors.New("there is no section to preview")
+		}
+		return services.ThemedRender{
+			Document:  "<html>preview " + row.preview.Page.ID + " rev " + strconv.Itoa(row.preview.Revision) + "</html>",
+			VersionID: row.preview.Page.ID, ImagesOmitted: f.imagesOmitted,
+		}, nil
+	}
+	page := row.current
+	if in.VersionID != "" && row.previous != nil && row.previous.ID == in.VersionID {
+		page = row.previous
+	}
+	if page == nil {
+		return services.ThemedRender{}, errors.New("there is no theme page to render")
+	}
+	return services.ThemedRender{
+		Document: "<html>page " + page.ID + " instance " + in.InstanceID + "</html>", VersionID: page.ID, ImagesOmitted: f.imagesOmitted,
+	}, nil
+}
+
 // ---- 搜索设置 ----
 
 func (f *ThemedFake) SearchStatus(ctx context.Context) (services.ThemedSearchStatus, error) {
@@ -856,6 +901,7 @@ type ThemedCalls struct {
 	Restores    []services.ThemedRequest
 	Removes     []services.ThemedRequest
 	Exports     []services.ThemedExportInput
+	Renders     []services.ThemedRenderInput
 	// SearchConfigs 是 ConfigureSearch 的入参文本（已隐去密钥）。
 	SearchConfigs []string
 }
@@ -869,7 +915,7 @@ func (f *ThemedFake) Calls() ThemedCalls {
 		Previews: slices.Clone(f.previews), ListTasks: f.listCalls, Generates: slices.Clone(f.generates),
 		Cancels: slices.Clone(f.cancels), Resumes: slices.Clone(f.resumes), Offlines: slices.Clone(f.offlines),
 		Regenerates: slices.Clone(f.regenerates), Restores: slices.Clone(f.restores), Removes: slices.Clone(f.removes),
-		Exports: slices.Clone(f.exports), SearchConfigs: slices.Clone(f.searchCfgs),
+		Exports: slices.Clone(f.exports), Renders: slices.Clone(f.renders), SearchConfigs: slices.Clone(f.searchCfgs),
 	}
 }
 

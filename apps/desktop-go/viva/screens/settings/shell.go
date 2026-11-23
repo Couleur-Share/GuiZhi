@@ -81,9 +81,11 @@ type Shell struct {
 	CaptureTools services.CaptureTools
 	MCP          services.MCP
 	// AI 是「AI 模型服务」页要用的服务（配置读写、连通性测试、模型拉取、用量）；nil 表示外壳没接，页面如实显示读取失败。
-	AI          services.AISettings
-	Collections CollectionSource
-	Platform    string
+	AI services.AISettings
+	// ReadingSearch 画 AI 分区里的「联网搜索」块（主题阅读的搜索服务，台账 B-074）；nil 表示外壳没接，该块不出现。
+	ReadingSearch func(c ui.C)
+	Collections   CollectionSource
+	Platform      string
 	// AppVersion 是当前应用版本号（关于页显示）。
 	AppVersion string
 	// OpenExternal 用系统浏览器打开链接（关于页的链接）；nil 时点击弹出失败提示。
@@ -221,6 +223,7 @@ func (s *Shell) content(c ui.C) {
 		a := s.ai
 		a.Look, a.Guard, a.Service, a.Wake, a.Locale, a.Now = l, s.Guard, s.AI, s.Wake, s.Locale, s.Now
 		a.OnManageEngine = func() { s.Active = SectionCapture }
+		a.Search = s.ReadingSearch
 		a.Page(c)
 	case SectionMCP:
 		if s.mcp == nil {

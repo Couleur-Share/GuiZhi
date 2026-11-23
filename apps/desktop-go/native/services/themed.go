@@ -10,7 +10,9 @@ package services
 // 界面据此刷新；关闭面板只退订，绝不隐式取消已付费的生成。状态机（切换条目的防串页、固定当前页等新版完成再切、
 // 任务轮询与列表筛选）在 viva/screens/themed，不在这里。
 //
-// 渲染 AI 阅读页本身（v3 的外壳文档、旧格式的整页 HTML）不经这个接口：阅读岛承载它们（见 M3-5b Step 2）。
+// AI 阅读页本身由阅读岛的沙箱 iframe 承载：旧格式页面的整页文档随 Get 返回（ThemedReadResult.Document），
+// 当前格式（v3）页面的文档由 Render 生成——它是去掉全部脚本的静态文档（图片内联为 data: 地址），
+// 与「导出静态 HTML」同源；交互版（外壳 + 沙箱 iframe + 脚本）仍只在渲染层那条路径上。
 
 import "context"
 
@@ -312,6 +314,23 @@ type ThemedExportResult struct {
 	Cancelled bool   `json:"cancelled,omitempty"`
 }
 
+// ThemedRenderInput 是渲染页面文档的入参。TaskID 非空时渲染这个任务生成途中的预览（已有章节拼出的页面）；
+// 否则渲染 VersionID 指定的版本，VersionID 为空取当前版本。InstanceID 是阅读实例标识（符合 [\w-]{1,100}），旧格式文档里的消息按它过滤。
+type ThemedRenderInput struct {
+	ThemedRequest
+	InstanceID string `json:"instanceId,omitempty"`
+	TaskID     string `json:"taskId,omitempty"`
+	VersionID  string `json:"versionId,omitempty"`
+}
+
+// ThemedRender 是渲染出的页面文档：整页 HTML，放进阅读岛的沙箱 iframe（ViewSnapshot）显示。
+// VersionID 是实际渲染的版本；ImagesOmitted 为 true 表示部分素材还没就绪、文档里没有放图（页面照常可读，界面据此说明）。
+type ThemedRender struct {
+	Document      string `json:"document"`
+	VersionID     string `json:"versionId,omitempty"`
+	ImagesOmitted bool   `json:"imagesOmitted,omitempty"`
+}
+
 // ThemedSearchConfigInput 是联网搜索配置的写入入参：Provider 空表示不改；APIKey 为 nil 表示不改密钥、指向空串表示清除；
 // DefaultEnabled 为 nil 表示不改；Test 为 true 时先用候选配置真实搜索一次，通过才保存（失败时保留原先可用的配置）。
 type ThemedSearchConfigInput struct {
@@ -372,6 +391,9 @@ type ThemedReading interface {
 	RestorePrevious(ctx context.Context, req ThemedRequest) error
 	// Remove 对应 themedReading:remove：删除这份内容的主题页（当前页、上一版与专属素材），先取消进行中的任务；正文保留。
 	Remove(ctx context.Context, req ThemedRequest) error
+	// Render 生成页面的静态文档（见 ThemedRenderInput）：没有可渲染的页面、任务不属于这份内容都是错误。
+	// 它不对应渲染层的 themedReading:* 频道（渲染层自己渲染 v3 页面），是 Go 壳内部的 themedReading:renderDocument。
+	Render(ctx context.Context, in ThemedRenderInput) (ThemedRender, error)
 	// ExportHTML 对应 themedReading:exportHtml：弹出保存对话框，写出自包含的单文件 HTML。
 	ExportHTML(ctx context.Context, in ThemedExportInput) (ThemedExportResult, error)
 

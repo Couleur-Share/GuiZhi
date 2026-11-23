@@ -11,6 +11,9 @@
       "reasonSeparator": "；",
       "snapshotTaskEnded": "The task has already ended or cannot be canceled"
     },
+    "themed": {
+      "imagesOmitted": "Some images could not be loaded, so they are left out of this view. The page and its exports are unaffected."
+    },
     "wiki": {
       "suggestionStale": "The update suggestion has changed. It was reloaded; review it again."
     },

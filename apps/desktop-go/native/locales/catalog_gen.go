@@ -19856,6 +19856,16 @@ func (msgs Messages) NativeLibrarySnapshotTaskEnded() string {
 	return Catalog.Format(msgs.locale, "native_library_snapshotTaskEnded", nil)
 }
 
+// NativeThemedImagesOmitted says "部分图片暂时无法载入，这里已省略图片显示；页面和导出文件不受影响。"
+// in the language the app shows.
+func NativeThemedImagesOmitted() string { return In(i18n.Locale()).NativeThemedImagesOmitted() }
+
+// NativeThemedImagesOmitted says "部分图片暂时无法载入，这里已省略图片显示；页面和导出文件不受影响。"
+// in the language of msgs.
+func (msgs Messages) NativeThemedImagesOmitted() string {
+	return Catalog.Format(msgs.locale, "native_themed_imagesOmitted", nil)
+}
+
 // NativeWikiSuggestionStale says "更新建议已变化，已重新读取，请重新核对。"
 // in the language the app shows.
 func NativeWikiSuggestionStale() string { return In(i18n.Locale()).NativeWikiSuggestionStale() }

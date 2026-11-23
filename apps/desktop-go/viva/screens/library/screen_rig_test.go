@@ -15,6 +15,7 @@ import (
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/viva/kit"
 	askscreen "guizhi-mygo-shell/viva/screens/ask"
+	themedscreen "guizhi-mygo-shell/viva/screens/themed"
 )
 
 // 本文件是知识库侧栏的无头测试台：不开真窗口、不碰 WebView2，毫秒级。
@@ -47,6 +48,8 @@ type rig struct {
 	// ask 与 askSvc 是接在详情「提问」栏上的问答界面与它的服务替身（withArticleAsk 才有；nil 时详情不接问答）。
 	ask    *askscreen.Screen
 	askSvc *servicestest.AskFake
+	// themed 是接在阅读区「AI 阅读」上的主题阅读界面（withThemed 才有；nil 时「AI 阅读」钮只弹说明，台账 B-064）。
+	themed *themedscreen.Screen
 }
 
 // libraryFixture 是常用的数据：两个合集、三个标签，其中一个标签没有条目。
@@ -114,6 +117,9 @@ func newRig(t *testing.T, mutate ...func(*rig)) *rig {
 				}
 			})
 			r.screen.EndFrame()
+			if r.themed != nil {
+				r.themed.EndFrame() // 生产里由根在帧末调用（root.View）
+			}
 			if r.ask != nil {
 				r.ask.EndFrame()
 			}

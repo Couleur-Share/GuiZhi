@@ -11,6 +11,9 @@
       "reasonSeparator": "；",
       "snapshotTaskEnded": "任务已结束或无法取消"
     },
+    "themed": {
+      "imagesOmitted": "部分图片暂时无法载入，这里已省略图片显示；页面和导出文件不受影响。"
+    },
     "wiki": {
       "suggestionStale": "更新建议已变化，已重新读取，请重新核对。"
     },

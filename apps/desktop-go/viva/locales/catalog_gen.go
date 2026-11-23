@@ -15187,6 +15187,14 @@ func NativeLibrarySnapshotTaskEnded() string {
 	return "任务已结束或无法取消"
 }
 
+// NativeThemedImagesOmitted 是 native.themed.imagesOmitted：部分图片暂时无法载入，这里已省略图片显示；页面和导出文件不受影响。
+func NativeThemedImagesOmitted() string {
+	if useEn() {
+		return "Some images could not be loaded, so they are left out of this view. The page and its exports are unaffected."
+	}
+	return "部分图片暂时无法载入，这里已省略图片显示；页面和导出文件不受影响。"
+}
+
 // NativeWikiSuggestionStale 是 native.wiki.suggestionStale：更新建议已变化，已重新读取，请重新核对。
 func NativeWikiSuggestionStale() string {
 	if useEn() {

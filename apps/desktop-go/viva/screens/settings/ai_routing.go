@@ -45,6 +45,9 @@ func (a *AI) routing(c ui.C, groups []services.AIEndpointGroup) {
 		a.routingActions(c.Key("actions"), groups)
 		a.statusOverview(c.Key("overview"))
 		a.scenarioDefaults(c.Key("scenarios"))
+		if a.Search != nil { // 联网搜索（主题阅读的搜索服务，台账 B-074）：夹在场景默认模型与用量之间，渲染层 AISettingsPrototype 同序
+			a.Search(c.Key("reading-search"))
+		}
 		a.usageSection(c.Key("usage"))
 	})
 }

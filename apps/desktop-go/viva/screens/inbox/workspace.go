@@ -19,6 +19,13 @@ func (s *Screen) Workspace(c ui.C) {
 	s.enter()
 	v := s.Store.View()
 	s.syncTags(v)
+	if s.themedTasks && s.Hooks.ThemedTasks != nil {
+		// 主题页任务页整个代替工作区（渲染层 `showThemedTasks ? <ThemedReadingTasks/> : …`）。
+		ui.Column(c.Key("workspace-themed")).FillWidth().Grow(1).MinHeight(0).Clip().
+			Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: t.UiSectionBg}) }).
+			Children(func() { s.Hooks.ThemedTasks(c, func() { s.themedTasks = false }) })
+		return
+	}
 	ui.Column(c.Key("workspace")).FillWidth().Grow(1).MinHeight(0).Clip().
 		Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: t.UiSectionBg}) }).
 		Children(func() {
@@ -90,7 +97,7 @@ func (s *Screen) header(c ui.C, v View) {
 }
 
 // themedTasksButton 是「主题页任务」入口：rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-accent。
-// 主题阅读随 M3 迁入（台账 B-064）：点击弹一条说明归属的提示，不崩溃、不假装有内容。
+// 接了主题阅读（Hooks.ThemedTasks，台账 B-064）就打开任务页；没接时点击弹一条说明归属的提示，不崩溃、不假装有内容。
 func (s *Screen) themedTasksButton(c ui.C) {
 	l := s.Look
 	t := l.T
@@ -100,6 +107,10 @@ func (s *Screen) themedTasksButton(c ui.C) {
 		Fg: t.Foreground, Border: t.Border, BorderW: 1, BgHover: t.Accent, Transition: kit.DurationDefault,
 	})
 	if b.Clicked() {
+		if s.Hooks.ThemedTasks != nil {
+			s.themedTasks = true
+			return
+		}
 		s.notMigrated(label, themedTasksMilestone, themedTasksLedger)
 	}
 }
