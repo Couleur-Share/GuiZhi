@@ -50,13 +50,13 @@ func (m *mdCache) get(body string) ([]kit.MdBlock, map[*kit.MdBlock]string) {
 
 // wikiMarkdown 渲染一页正文（渲染层 WikiMarkdown）：[[链接]] 画成站内小块、点击跳页；http(s) 外链经系统浏览器打开；
 // 其余地址（mailto、片段）不可点。二、三级标题的位置记进 d.anchors，页内目录据此滚动。
-func (s *Screen) wikiMarkdown(c ui.C, body string) {
+func (s *Screen) wikiMarkdown(c ui.C, body string, lead, follow float32) {
 	d := &s.detail
 	blocks, slugs := d.md.get(body)
 	if d.anchors == nil {
 		d.anchors = map[string]gfx.Rect{}
 	}
-	s.Look.ProseWith(c.Key("prose"), blocks, 0, 0, kit.ProseOpts{
+	s.Look.ProseWith(c.Key("prose"), blocks, lead, follow, kit.ProseOpts{
 		OnLink:   s.openLink,
 		LinkChip: func(href string) bool { return strings.HasPrefix(href, wikiLinkOrigin+HrefPrefix) },
 		Anchor: func(b *kit.MdBlock, r gfx.Rect) {

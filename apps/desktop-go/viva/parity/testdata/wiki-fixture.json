@@ -1,0 +1,359 @@
+{
+  "now": 1794790800000,
+  "timezone": "Asia/Shanghai",
+  "locale": "zh-CN",
+  "models": {
+    "chat": "parity-chat"
+  },
+  "status": {
+    "compiledItemCount": 18,
+    "eligibleItemCount": 23
+  },
+  "pages": [
+    {
+      "id": "wiki-sqlite-wal",
+      "title": "SQLite 预写日志",
+      "kind": "topic",
+      "summary": "预写日志让读写互不阻塞，适合本地优先的桌面应用。",
+      "body": "## 概述\n\n预写日志（又称先写日志）把改动先追加到日志文件，读者继续读取主库的旧快照，写者与读者互不阻塞。详见本地优先架构一文。\n\n## 读写并发\n\n读者开始时记录水位线，只看到水位线之前的提交；同一时刻只有一个写者，写入追加到日志末尾；日志超过阈值后由检查点（Checkpoint）合并回主库。\n\n## 与回滚日志的差异\n\n相比回滚日志，WAL 的写入是顺序追加，崩溃恢复只需重放日志。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1794704400000,
+      "manualEditedAt": null,
+      "updatedAt": 1794704400000,
+      "normalizedTitle": "SQLITE 预写日志",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794704400000
+    },
+    {
+      "id": "wiki-checkpoint",
+      "title": "检查点（Checkpoint）",
+      "kind": "concept",
+      "summary": "把 WAL 日志里已提交的页合并回主库文件的过程。",
+      "body": "检查点把 `-wal` 里已提交的页写回主库文件，之后日志才能被复用。参见 [[SQLite 预写日志]]。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1794618000000,
+      "manualEditedAt": null,
+      "updatedAt": 1794618000000,
+      "normalizedTitle": "检查点（CHECKPOINT）",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794618000000
+    },
+    {
+      "id": "wiki-local-first",
+      "title": "本地优先架构",
+      "kind": "topic",
+      "summary": "数据主权留在用户设备，云端只作可选的同步通道。",
+      "body": "## 核心主张\n\n数据首先存在用户自己的设备上，网络只是可选的增强。归知的采集、检索与问答都在本机完成。\n\n## 取舍\n\n离线可用与隐私换来了同步与冲突处理的复杂度，见 SQLite 预写日志 与 SQLite。",
+      "promptVersion": "fulltext-v1",
+      "model": "parity-chat",
+      "generatedAt": 1794013200000,
+      "manualEditedAt": 1794531600000,
+      "updatedAt": 1794531600000,
+      "normalizedTitle": "本地优先架构",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794013200000
+    },
+    {
+      "id": "wiki-journal",
+      "title": "回滚日志模式",
+      "kind": "concept",
+      "summary": "SQLite 的默认日志模式：写入前先把原页面备份到回滚日志，再改动主库文件。",
+      "body": "回滚日志模式在改动前把原页面写入 `-journal` 文件，写入期间会锁住整个数据库。参见 [[SQLite]]。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1794445200000,
+      "manualEditedAt": null,
+      "updatedAt": 1794445200000,
+      "normalizedTitle": "回滚日志模式",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794445200000
+    },
+    {
+      "id": "wiki-sqlite",
+      "title": "SQLite",
+      "kind": "entity",
+      "summary": "嵌入式关系数据库，归知本地知识库的存储引擎。",
+      "body": "SQLite 是单文件的嵌入式数据库，支持 [[SQLite 预写日志]] 与 [[回滚日志模式]]。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1794272400000,
+      "manualEditedAt": null,
+      "updatedAt": 1794272400000,
+      "normalizedTitle": "SQLITE",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794272400000
+    },
+    {
+      "id": "wiki-vacuum-into",
+      "title": "在线备份快照",
+      "kind": "concept",
+      "summary": "把整理后的数据库写入新文件，是库打开时的安全备份方式。",
+      "body": "`VACUUM INTO 'file'` 把当前数据库整理后写入一个新文件，源库保持可读写。\n\n- 备份时优先使用它，而不是直接拷贝主库文件\n- 目标文件必须不存在或为空\n- 结果是一份不含 `-wal` 的完整副本\n\n参见 [[SQLite 预写日志]]。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1794013200000,
+      "manualEditedAt": null,
+      "updatedAt": 1794488400000,
+      "normalizedTitle": "在线备份快照",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1794013200000
+    },
+    {
+      "id": "wiki-webview2",
+      "title": "WebView2",
+      "kind": "entity",
+      "summary": "Windows 上的 Chromium 内嵌运行时，桌面外壳依赖它。",
+      "body": "WebView2 是微软提供的 Chromium 内嵌运行时。桌面外壳用它承载界面，参见 [[本地优先架构]]。",
+      "promptVersion": "fulltext-v2",
+      "model": "parity-chat",
+      "generatedAt": 1793754000000,
+      "manualEditedAt": null,
+      "updatedAt": 1793754000000,
+      "normalizedTitle": "WEBVIEW2",
+      "aliasesJson": null,
+      "provider": "parity",
+      "createdAt": 1793754000000
+    }
+  ],
+  "links": [
+    {
+      "from": "wiki-sqlite-wal",
+      "to": "wiki-local-first"
+    },
+    {
+      "from": "wiki-sqlite-wal",
+      "to": "wiki-checkpoint"
+    },
+    {
+      "from": "wiki-sqlite-wal",
+      "to": "wiki-journal"
+    },
+    {
+      "from": "wiki-sqlite-wal",
+      "to": "wiki-sqlite"
+    },
+    {
+      "from": "wiki-local-first",
+      "to": "wiki-sqlite-wal"
+    },
+    {
+      "from": "wiki-local-first",
+      "to": "wiki-sqlite"
+    },
+    {
+      "from": "wiki-sqlite",
+      "to": "wiki-sqlite-wal"
+    },
+    {
+      "from": "wiki-sqlite",
+      "to": "wiki-journal"
+    },
+    {
+      "from": "wiki-checkpoint",
+      "to": "wiki-sqlite-wal"
+    },
+    {
+      "from": "wiki-vacuum-into",
+      "to": "wiki-sqlite-wal"
+    },
+    {
+      "from": "wiki-webview2",
+      "to": "wiki-local-first"
+    }
+  ],
+  "sources": {
+    "wiki-sqlite-wal": [
+      {
+        "itemId": "item-wal-1",
+        "title": "SQLite 备份策略对比",
+        "reviewStatus": "clear",
+        "reviewReasons": []
+      },
+      {
+        "itemId": "item-wal-2",
+        "title": "WAL 模式实践笔记",
+        "reviewStatus": "clear",
+        "reviewReasons": []
+      },
+      {
+        "itemId": "item-wal-3",
+        "title": "为什么备份不能只拷主库文件",
+        "reviewStatus": "clear",
+        "reviewReasons": []
+      }
+    ],
+    "wiki-local-first": [
+      {
+        "itemId": "item-lf-1",
+        "title": "本地优先软件的同步难题",
+        "reviewStatus": "clear",
+        "reviewReasons": []
+      },
+      {
+        "itemId": "item-lf-2",
+        "title": "一次失败的采集记录",
+        "reviewStatus": "needs_review",
+        "reviewReasons": [
+          "正文疑似被截断"
+        ]
+      }
+    ]
+  },
+  "revisions": {
+    "wiki-sqlite-wal": [
+      {
+        "id": "rev-wal-1",
+        "pageId": "wiki-sqlite-wal",
+        "title": "SQLite 预写日志",
+        "kind": "topic",
+        "summary": "预写日志让读写互不阻塞。",
+        "body": "WAL 把改动先追加到日志文件。",
+        "aliasesJson": null,
+        "model": "parity-chat",
+        "promptVersion": "fulltext-v2",
+        "createdAt": 1794358800000
+      }
+    ]
+  },
+  "suggestions": {
+    "wiki-local-first": {
+      "draft": {
+        "title": "本地优先架构",
+        "normalizedTitle": "本地优先架构",
+        "kind": "topic",
+        "summary": "数据主权留在用户设备，云端只作可选的同步通道，冲突靠合并算法或最后写入者胜出处理。",
+        "body": "## 核心主张\n\n数据首先存在用户自己的设备上，网络只是可选的增强。\n\n## 同步与冲突\n\n多设备同步依赖合并算法或最后写入者胜出的策略，见 [[SQLite]]。",
+        "aliasesJson": null,
+        "linkTargets": [
+          "SQLite"
+        ]
+      },
+      "model": "parity-chat",
+      "sourceIds": [
+        "item-lf-1",
+        "item-lf-2"
+      ],
+      "reason": "2 个来源条目有更新，AI 整理了新版内容",
+      "token": "parity-token-1"
+    }
+  },
+  "compile": {
+    "preview": {
+      "entries": [
+        {
+          "id": "item-101",
+          "title": "Go 并发模式学习笔记",
+          "fingerprint": "fp-item-101",
+          "state": "ready",
+          "blocks": 3,
+          "reusable": 0
+        },
+        {
+          "id": "item-102",
+          "title": "SQLite 备份策略对比",
+          "fingerprint": "fp-item-102",
+          "state": "ready",
+          "blocks": 2,
+          "reusable": 1
+        },
+        {
+          "id": "item-103",
+          "title": "WebView2 嵌入式部署指南",
+          "fingerprint": "fp-item-103",
+          "state": "ready",
+          "blocks": 5,
+          "reusable": 0
+        },
+        {
+          "id": "item-104",
+          "title": "本地优先软件的同步难题",
+          "fingerprint": "fp-item-104",
+          "state": "upgrade",
+          "reason": "旧版覆盖：此前仅使用了来源开头",
+          "blocks": 4,
+          "reusable": 2
+        },
+        {
+          "id": "item-105",
+          "title": "一次失败的采集记录",
+          "fingerprint": "fp-item-105",
+          "state": "review",
+          "reason": "来源内容缺失，需复核后再编译",
+          "blocks": 1,
+          "reusable": 0
+        },
+        {
+          "id": "item-106",
+          "title": "CRDT 入门",
+          "fingerprint": "fp-item-106",
+          "state": "waiting",
+          "reason": "上次编译在第 2 块中断，可继续",
+          "blocks": 3,
+          "reusable": 1
+        },
+        {
+          "id": "item-107",
+          "title": "已编译的旧资料 A",
+          "fingerprint": "fp-item-107",
+          "state": "current",
+          "blocks": 2,
+          "reusable": 2
+        },
+        {
+          "id": "item-108",
+          "title": "已编译的旧资料 B",
+          "fingerprint": "fp-item-108",
+          "state": "current",
+          "blocks": 1,
+          "reusable": 1
+        }
+      ],
+      "counts": {
+        "ready": 3,
+        "review": 1,
+        "waiting": 1,
+        "upgrade": 1,
+        "current": 17,
+        "excluded": 0
+      },
+      "requests": {
+        "min": 11,
+        "max": 22
+      }
+    }
+  },
+  "empty": {
+    "status": {
+      "compiledItemCount": 0,
+      "eligibleItemCount": 12
+    },
+    "preview": {
+      "entries": [],
+      "counts": {
+        "ready": 12,
+        "review": 0,
+        "waiting": 0,
+        "upgrade": 0,
+        "current": 0,
+        "excluded": 0
+      },
+      "requests": {
+        "min": 0,
+        "max": 0
+      }
+    }
+  },
+  "scene": {
+    "detailPageId": "wiki-sqlite-wal",
+    "editPageId": "wiki-vacuum-into",
+    "suggestionPageId": "wiki-local-first"
+  }
+}

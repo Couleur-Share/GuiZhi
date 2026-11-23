@@ -216,10 +216,10 @@ func (s *Screen) catalogAndDetail(c ui.C, v View) {
 		s.pane.Width = s.stored
 	}
 	ui.Row(c.Key("two-pane")).FillWidth().Grow(1).MinHeight(0).Children(func() {
-		ui.Row(c.Key("catalog-pane")).Width(s.pane.Width).Shrink(0).FillHeight().PadSides(0, 1, 0, 0).
+		ui.Row(c.Key("catalog-pane")).Width(s.pane.Width).Shrink(0).MinHeight(0).FillHeight().PadSides(0, 1, 0, 0).
 			Draw(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeRight, 1, t.Border) }).
 			Children(func() {
-				ui.Column(c.Key("catalog-col")).Grow(1).MinWidth(0).FillHeight().Children(func() { s.catalogList(c, v) })
+				ui.Column(c.Key("catalog-col")).Grow(1).MinWidth(0).MinHeight(0).FillHeight().Children(func() { s.catalogList(c, v) })
 				// absolute inset-y-0 right-0 z-10 flex：里面一条 ColumnResizer。
 				ui.Row(c.Key("catalog-resizer")).Absolute().Top(0).Right(0).Bottom(0).Children(func() {
 					l.ColumnResizer(c, &s.pane, kit.ColumnResizerSpec{

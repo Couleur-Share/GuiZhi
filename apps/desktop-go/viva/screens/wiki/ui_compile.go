@@ -97,7 +97,7 @@ func (s *Screen) compilePreview(c ui.C, cv CompileView) {
 		s.entryList(c, cv)
 		items, blocks, lo, hi := cv.Estimate()
 		s.bodyText(c.Key("estimate"), locales.WikiCompileEstimate(items, blocks, lo, hi), t.Foreground)
-		start := l.Button(c.Key("start"), kit.ButtonSpec{Label: locales.WikiCompileStart(), Disabled: !cv.CanStart()}, s.uiPrimaryStyle())
+		start := l.Button(c.Key("start"), kit.ButtonSpec{Label: locales.WikiCompileStart(), Disabled: !cv.CanStart()}, s.uiPrimaryStyle()).Self(ui.Start)
 		if start.Clicked() {
 			s.spawn(func() { s.Store.Compile().Start() })
 		}
@@ -113,7 +113,7 @@ func (s *Screen) noModelHint(c ui.C, cv CompileView) {
 		if s.Hooks.OpenSettingsAI == nil {
 			return
 		}
-		if s.textLink(c.Key("configure"), locales.ArticleAskConfigure(), kit.TextSM, true) {
+		if s.textLink(c.Key("configure"), locales.ArticleAskConfigure(), kit.TextSM, true, 0) {
 			s.Store.Compile().Close()
 			s.Hooks.OpenSettingsAI()
 		}
@@ -126,7 +126,7 @@ func (s *Screen) filterBox(c ui.C) {
 	t := l.T
 	d := &s.compile
 	c = c.Key("filter")
-	height := l.Rem(2.5)
+	height := l.Rem(2.25) + 2 // py-2（rem 计，16）+ text-sm 行高 20（rem 计）+ 上下边框 2（固定 px）= 38；小字号档 33.5
 	ui.Stack(c).FillWidth().Height(height).Children(func() {
 		ui.Row(c.Key("surface")).Absolute().Inset(0).Draw(func(dc *ui.DrawContext) {
 			l.PaintSurface(dc, kit.Surface{Bg: t.Background, Border: t.Border, BorderW: 1, Radius: l.Rem(0.25)})
@@ -134,8 +134,8 @@ func (s *Screen) filterBox(c ui.C) {
 		label := locales.WikiCompileFilter()
 		placeholder := locales.WikiCompileFilterPlaceholder()
 		l.Input(c.Key("input"), &d.filter, label, placeholder, kit.InputSpec{
-			Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: t.MutedForeground,
-			Height: height, Left: l.Space(3) + 1, Right: l.Space(3) + 1,
+			Size: l.Rem(0.875), Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: tokens.Tailwind("gray-400"), // 渲染层的 <input> 没有 placeholder 类：Chromium 的默认占位色 gray-400
+			Height: height, Left: l.Space(3) + 1, Right: l.Space(3) + 1, PadTop: l.Space(2) + 1, LineHeight: l.Rem(1.25), // 内容区恰是一行高：<input> 的内部编辑器顶 = 框顶 + py-2 + 边框
 		}).Absolute().Inset(0)
 	})
 }

@@ -77,13 +77,30 @@ func (s *Screen) hitButton(c ui.C, id gfx.ID, box ui.Box, name, hint string, sel
 	return box, l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
 }
 
+// keepBottom 把「是否保留下外边距」换成 0 或 1，乘在外边距上用。
+func (s *Screen) keepBottom(keep bool) float32 {
+	if keep {
+		return 1
+	}
+	return 0
+}
+
+// hitDisclosure 是 hitButton 的折叠面板版：展开状态走 Expanded（可访问性播报「已展开/已折叠」），不占 Selected——
+// 渲染层 <details> 的 <summary> 在 L1 里是没有按下状态的按钮（见 a11y_map 的 DisclosureTriangle），Selected 会多出一个 pressed 状态。
+func (s *Screen) hitDisclosure(c ui.C, id gfx.ID, box ui.Box, name string, open bool) (ui.Box, float32) {
+	l := s.Look
+	box = box.HitWith(id, name, gfx.HitOptions{Role: gfx.RoleButton, Expandable: true, Expanded: open, Cursor: gfx.PointerCursorHand})
+	l.TabStop(box)
+	return box, l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
+}
+
 // textLink 是纯文字的链接钮（text-primary，悬停加下划线；always 为真时一直带下划线）：命中区是整个盒子，键盘可达。
-// 返回这一帧是否被点了。
-func (s *Screen) textLink(c ui.C, label string, style kit.TextStyle, always bool) bool {
+// 返回这一帧是否被点了。marginLeft 是 ml-*：行内的外边距折行之后仍在行首，所以用外边距而不是容器的间距。
+func (s *Screen) textLink(c ui.C, label string, style kit.TextStyle, always bool, marginLeft float32) bool {
 	l := s.Look
 	t := l.T
 	id := ui.ID(c)
-	box, _ := s.hitButton(c, id, ui.Row(c).Shrink(0).Items(ui.Center), label, "", false)
+	box, _ := s.hitButton(c, id, ui.Row(c).Shrink(0).Items(ui.Center).MarginLeft(marginLeft), label, "", false)
 	hovered := box.State().Hovered
 	box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
@@ -126,20 +143,6 @@ func (s *Screen) uiPrimaryStyle() kit.ButtonStyle {
 	st.Fg, st.Bg, st.BgHover = t.PrimaryForeground, t.Primary, t.Primary
 	st.Ring = t.Primary
 	return st
-}
-
-// rotIcon 画一枚旋转了 angle 弧度的图标（展开箭头的 rotate transition）。
-func (s *Screen) rotIcon(c ui.C, ic gfx.Icon, size float32, color tokens.Color, angle float32) {
-	l := s.Look
-	col := l.Col(color)
-	ui.Slot(c).Size(size, size).Shrink(0).Draw(func(d *ui.DrawContext) {
-		tint := d.Fade(col)
-		if angle == 0 {
-			kit.PaintIcon(d.Canvas, ic, d.Rect, tint)
-			return
-		}
-		d.Canvas.DrawIconTransformed(ic, d.Rect, tint, gfx.IconTransform{Rotate: angle})
-	})
 }
 
 // ghostFg 是纯图标或次要文字的前景：muted-foreground，悬停 foreground（transition-colors）。

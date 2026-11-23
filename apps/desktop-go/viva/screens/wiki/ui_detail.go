@@ -1,8 +1,6 @@
 package wiki
 
 import (
-	"math"
-
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
@@ -79,45 +77,53 @@ func (s *Screen) pageBody(c ui.C, v View) {
 	d := &s.detail
 	page := v.Detail.Page
 	s.syncDraft(v)
-	l.ScrollAreaView(c.Key("scroll"), [4]float32{}, func(view kit.ScrollView) {
-		if d.pageID != v.SelectedPageID {
-			d.pageID = v.SelectedPageID
-			d.anchors = map[string]gfx.Rect{}
-			view.State.ScrollTo(0) // 切页回到顶部
-		}
-		ui.Column(c.Key("outer")).FillWidth().Items(ui.Center).Children(func() {
-			ui.Column(c.Key("inner")).FillWidth().MaxWidth(l.Rem(detailMaxWidth)).
-				PadSides(l.Space(5), l.Space(6), l.Space(5), l.Space(6)).
-				Draw(func(dc *ui.DrawContext) { d.colTop = dc.Rect.Y }).
-				Children(func() {
-					s.pageHeader(c, v, page)
-					s.pageMeta(c, v, page)
-					if len(v.Detail.Backlinks) > 0 {
-						ui.Row(c.Key("backlinks")).FillWidth().MarginBottom(l.Space(4)).Children(func() {
-							s.relatedChips(c.Key("backlinks-chips"), locales.WikiBacklinks(), icons.Link2, backlinkEntries(v.Detail.Backlinks), func(id string) {
-								s.spawn(func() { s.Store.SelectPage(id) })
+	// 外面套一层列：右栏在两栏的行里，纵向的滚动区要放在定高的列里才会被夹住（内容超出视口时用 Grow(1) + MinHeight(0) 收住）。
+	ui.Column(c.Key("pane")).Grow(1).MinWidth(0).MinHeight(0).FillHeight().Children(func() {
+		l.ScrollAreaView(c.Key("scroll"), [4]float32{}, func(view kit.ScrollView) {
+			if d.pageID != v.SelectedPageID {
+				d.pageID = v.SelectedPageID
+				d.anchors = map[string]gfx.Rect{}
+				view.State.ScrollTo(0) // 切页回到顶部
+			}
+			ui.Column(c.Key("outer")).FillWidth().Items(ui.Center).Children(func() {
+				ui.Column(c.Key("inner")).FillWidth().MaxWidth(l.Rem(detailMaxWidth)).
+					PadSides(l.Space(5), l.Space(6), l.Space(5), l.Space(6)).
+					Draw(func(dc *ui.DrawContext) { d.colTop = dc.Rect.Y }).
+					Children(func() {
+						rendered := RenderedBody(page.Body, page.Title)
+						hasToc := !v.Editing && ShowToc(ExtractToc(rendered))
+						// 正文（.prose）的第一个块的上外边距会与它前一个兄弟的 mb-4 折叠（取较大者）：正文之前的最后一个兄弟不留下外边距，
+						// 由 wikiMarkdown 的 lead 参数一并折叠（编辑态后面是编辑框，没有折叠，各块照常 mb-4）。
+						backlinks := len(v.Detail.Backlinks) > 0
+						metaLast := !v.Editing && !backlinks && !hasToc
+						s.pageHeader(c, v, page)
+						s.pageMeta(c, v, page, metaLast)
+						if backlinks {
+							ui.Row(c.Key("backlinks")).FillWidth().MarginBottom(l.Space(4) * s.keepBottom(v.Editing || hasToc)).Children(func() {
+								s.relatedChips(c.Key("backlinks-chips"), locales.WikiBacklinks(), icons.Link2, backlinkEntries(v.Detail.Backlinks), func(id string) {
+									s.spawn(func() { s.Store.SelectPage(id) })
+								})
 							})
-						})
-					}
-					rendered := RenderedBody(page.Body, page.Title)
-					if v.Editing {
-						s.editor(c, v)
-					} else {
-						s.pageToc(c, rendered, view)
-						s.wikiMarkdown(c, rendered)
-					}
-					s.updateSuggestion(c, page)
-					s.sourcesSection(c, v)
-				})
-		})
-	}).Grow(1).MinWidth(0).FillHeight()
+						}
+						if v.Editing {
+							s.editor(c, v)
+						} else {
+							s.pageToc(c, rendered, view)
+							s.wikiMarkdown(c, rendered, l.Space(4), s.followAfterProse(v, page))
+						}
+						s.updateSuggestion(c, page)
+						s.sourcesSection(c, v)
+					})
+			})
+		}).FillWidth().Grow(1).MinHeight(0)
+	})
 }
 
 // pageHeader 是标题行：mb-1.5 flex items-start gap-2，标题 text-xl font-semibold leading-tight，后面是类型徽标。
 func (s *Screen) pageHeader(c ui.C, v View, page services.WikiPage) {
 	l := s.Look
 	t := l.T
-	ui.Row(c.Key("title-row")).FillWidth().Gap(l.Space(2)).MarginBottom(l.Space(1.5)).Children(func() {
+	ui.Row(c.Key("title-row")).FillWidth().Items(ui.Start).Gap(l.Space(2)).MarginBottom(l.Space(1.5)).Children(func() {
 		l.Heading(c.Key("title"), 1, page.Title, kit.TextStyle{Size: 1.25, Line: 1.5625}, kit.WeightSemibold, t.Foreground, kit.Wrapped()).
 			Grow(1).Shrink(1).MinWidth(0)
 		s.kindBadge(c, page.Kind)
@@ -125,10 +131,10 @@ func (s *Screen) pageHeader(c ui.C, v View, page services.WikiPage) {
 }
 
 // pageMeta 是出处行：生成或手动编辑的时间、手动编辑标记，行尾是「编辑」与「更多」。mb-4 text-xs text-muted-foreground。
-func (s *Screen) pageMeta(c ui.C, v View, page services.WikiPage) {
+func (s *Screen) pageMeta(c ui.C, v View, page services.WikiPage, last bool) {
 	l := s.Look
 	t := l.T
-	ui.Row(c.Key("meta")).FillWidth().Items(ui.Center).Gap(l.Space(2)).MarginBottom(l.Space(4)).Children(func() {
+	ui.Row(c.Key("meta")).FillWidth().Items(ui.Center).Gap(l.Space(2)).MarginBottom(l.Space(4) * s.keepBottom(!last)).Children(func() {
 		text := ""
 		if page.ManualEditedAt != nil {
 			text = locales.WikiManualEditedAt(kit.FormatItemTime(*page.ManualEditedAt, s.nowTime(), s.loc(), s.Locale))
@@ -223,7 +229,8 @@ func (s *Screen) sourcesSection(c ui.C, v View) {
 	for _, src := range sources {
 		if src.NeedsReview() {
 			// my-3 text-sm text-muted-foreground：role=status 的一句提示。
-			ui.Row(c.Key("needs-review")).FillWidth().MarginTop(l.Space(3)).MarginBottom(l.Space(3)).
+			// 下面一定还有来源块（mt-6，24px）：它的上外边距与这里的 my-3 下外边距折叠，取较大者，所以这里不再留下外边距。
+			ui.Row(c.Key("needs-review")).FillWidth().MarginTop(l.Space(3)).
 				Draw(func(d *ui.DrawContext) { d.Canvas.ContainerWithOptions(d.Rect, gfx.RoleStatus, "", gfx.HitOptions{}) }).
 				Children(func() {
 					l.Text(c.Key("text"), locales.WikiSourcesNeedReview(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
@@ -256,18 +263,18 @@ func (s *Screen) pageToc(c ui.C, body string, view kit.ScrollView) {
 	t := l.T
 	d := &s.detail
 	c = c.Key("toc")
-	ui.Column(c).FillWidth().MarginBottom(l.Space(4)).
+	// 外框有 1px 边框（占布局）：里面的按钮与列表在框内缩进 1px。mb-4 不在这里留：正文第一块的上外边距与它折叠（见 pageBody）。
+	ui.Column(c).FillWidth().Pad(1).
 		Draw(func(dc *ui.DrawContext) {
 			l.PaintSurface(dc, kit.Surface{Bg: t.Background.WithAlpha(0.4), Border: t.Border.WithAlpha(0.6), BorderW: 1, Radius: s.radiusLG()})
 		}).Children(func() {
 		label := locales.WikiToc(len(toc))
 		id := ui.ID(c.Key("head"))
 		head := ui.Row(c.Key("head-row")).FillWidth().Items(ui.Center).Gap(l.Space(1.5)).
-			PadSides(l.Space(1.5)+1, l.Space(3)+1, l.Space(1.5), l.Space(3)+1)
+			PadSides(l.Space(1.5), l.Space(3), l.Space(1.5), l.Space(3))
 		head, hover := s.hitButton(c, id, head, label, "", false)
 		fg := s.ghostFg(hover)
 		open := d.tocOpen
-		turn := l.HoverProgress(c, id, 1, open, kit.DurationQuick)
 		head.Draw(func(dc *ui.DrawContext) {
 			if dc.State.FocusVisible {
 				l.PaintRing(dc, 2, t.Primary.WithAlpha(0.5), s.radiusLG())
@@ -276,7 +283,7 @@ func (s *Screen) pageToc(c ui.C, body string, view kit.ScrollView) {
 			l.Icon(c.Key("icon"), icons.ListTree, l.Rem(0.875), fg).Shrink(0)
 			l.TextPx(c.Key("text"), label, 11, px11Line, kit.WeightNormal, fg)
 			ui.Spacer(c.Key("auto")).Grow(1)
-			s.rotIcon(c.Key("chevron"), icons.ChevronDown, l.Rem(0.875), fg, float32(math.Pi)*turn)
+			l.RotatingChevron(c.Key("chevron"), ui.ID(c.Key("chevron")), l.Rem(0.875), open, fg, kit.DurationQuick)
 		})
 		if head.Clicked() {
 			d.tocOpen = !d.tocOpen

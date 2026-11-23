@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/vivaui/viva/gfx"
@@ -53,10 +54,36 @@ func (f *rootFixture) hasButtonNamed(name string) bool {
 	return ok
 }
 
+// hasWikiRow 报告目录里是否有标题为 title 的页面行：行的可访问名是整行内容（标题 类型 摘要 引用数），以「标题 」开头；
+// 只认前缀加空格，反向链接芯片的名字恰好是标题，不能当成行。
+func (f *rootFixture) hasWikiRow(title string) bool {
+	for _, n := range f.session.Access() {
+		if n.Role == gfx.RoleButton && strings.HasPrefix(n.Label, title+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+// clickWikiRow 点目录里标题为 title 的页面行（前缀匹配，见 hasWikiRow）。
+func (f *rootFixture) clickWikiRow(t *testing.T, title string) {
+	t.Helper()
+	for _, n := range f.session.Access() {
+		if n.Role == gfx.RoleButton && strings.HasPrefix(n.Label, title+" ") {
+			if err := f.session.Click(n.Bounds.X+n.Bounds.Width/2, n.Bounds.Y+n.Bounds.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			f.frames(t, 3)
+			return
+		}
+	}
+	t.Fatalf("找不到页面行「%s」", title)
+}
+
 // 模块挂的是真的界面（不是「尚未迁移」占位）：进入后读到目录。
 func TestRootWikiModuleMountsTheRealScreen(t *testing.T) {
 	f, _, _ := openWikiRoot(t, shell.ModuleWiki, nil)
-	f.waitFrames(t, "目录出现", func() bool { return f.hasButtonNamed("Alpha") && f.hasButtonNamed("Beta") })
+	f.waitFrames(t, "目录出现", func() bool { return f.hasWikiRow("Alpha") && f.hasWikiRow("Beta") })
 	if f.session.HasText(locales.NativeShellNotMigrated(locales.NavWiki())) {
 		t.Error("Wiki 已接入，不应再显示「尚未迁移」占位")
 	}
@@ -73,7 +100,7 @@ func TestRootRailSwitchesToWiki(t *testing.T) {
 		t.Fatalf("点 rail 的 Wiki 失败：%v", err)
 	}
 	f.waitFrames(t, "进入 Wiki 并读出目录", func() bool {
-		return f.root.Window().Module == shell.ModuleWiki && f.hasButtonNamed("Alpha")
+		return f.root.Window().Module == shell.ModuleWiki && f.hasWikiRow("Alpha")
 	})
 }
 
@@ -139,8 +166,8 @@ func openAskWikiRoot(t *testing.T) (*rootFixture, *servicestest.AskFake, *servic
 // 详情里的来源条目：点它跳到知识库并选中该条目（Store.OnOpenSource → openLibraryItem）。
 func TestRootWikiSourceChipOpensLibraryItem(t *testing.T) {
 	f, _, _ := openWikiRoot(t, shell.ModuleWiki, nil)
-	f.waitFrames(t, "目录出现", func() bool { return f.hasButtonNamed("Alpha") })
-	f.clickButton(t, "Alpha")
+	f.waitFrames(t, "目录出现", func() bool { return f.hasWikiRow("Alpha") })
+	f.clickWikiRow(t, "Alpha")
 	f.waitFrames(t, "来源芯片出现", func() bool { return f.hasButtonNamed("Source One") })
 	f.clickButton(t, "Source One")
 	store := f.root.library.Store
@@ -159,7 +186,7 @@ func TestRootWikiGoConfigureOpensSettingsAI(t *testing.T) {
 		wiki.SetCompileConfigured(false)
 		wiki.SetPreview(wikiPreview(2))
 	})
-	f.waitFrames(t, "目录出现", func() bool { return f.hasButtonNamed("Alpha") })
+	f.waitFrames(t, "目录出现", func() bool { return f.hasWikiRow("Alpha") })
 	f.clickButton(t, locales.WikiCompileDialog())
 	f.waitFrames(t, "配置入口出现", func() bool { return f.hasButtonNamed(locales.ArticleAskConfigure()) })
 	f.clickButton(t, locales.ArticleAskConfigure())
@@ -174,7 +201,7 @@ func TestRootWikiGoConfigureOpensSettingsAI(t *testing.T) {
 // 设置里开了自动编译：工具栏有指示，点它回设置页的通用分区；没开就没有指示。
 func TestRootWikiAutoCompileIndicatorOpensSettingsGeneral(t *testing.T) {
 	f, _, _ := openWikiRoot(t, shell.ModuleWiki, nil)
-	f.waitFrames(t, "目录出现", func() bool { return f.hasButtonNamed("Alpha") })
+	f.waitFrames(t, "目录出现", func() bool { return f.hasWikiRow("Alpha") })
 	if f.hasButtonNamed(locales.WikiAutoCompile()) {
 		t.Fatal("自动编译关着不该有指示")
 	}
@@ -217,7 +244,7 @@ func TestRootInboxWikiPreviewOpensCompileDialog(t *testing.T) {
 // 图谱滚轮缩放走窗口级钩子：Root 把它装进 Look，滚轮落在画布上就缩放，不滚动背后的内容。
 func TestRootWikiGraphWheelZoomsThroughWindowHook(t *testing.T) {
 	f, _, _ := openWikiRoot(t, shell.ModuleWiki, nil)
-	f.waitFrames(t, "目录出现", func() bool { return f.hasButtonNamed("Alpha") })
+	f.waitFrames(t, "目录出现", func() bool { return f.hasWikiRow("Alpha") })
 	if f.root.look.WheelHook == nil {
 		t.Fatal("装配了 Wiki 应把图谱滚轮钩子装进 Look")
 	}

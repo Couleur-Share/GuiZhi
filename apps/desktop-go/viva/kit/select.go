@@ -74,6 +74,14 @@ func (l *Look) selectTrigger(c ui.C, label, value string, muted bool, width floa
 // 静止（0° 与 180°）时用精确栅格化的 ChevronDown / ChevronUp——lucide 的 chevron-up 正是 chevron-down 绕中心转半圈，
 // 几何完全相同；只有动画中途才用 Viva 原生的旋转绘制。
 func (l *Look) RotatingChevron(c ui.C, id gfx.ID, size float32, open bool, color tokens.Color, dur DurationName) ui.Box {
+	return l.RotatingIcon(c, id, icons.ChevronDown, icons.ChevronUp, math.Pi, size, open, color, dur)
+}
+
+// RotatingIcon 是 RotatingChevron 的通用形式：展开时图标 from 转 angle 弧度，转完后几何上正好等于 to。
+// 静止（转角为 0 或转满）时用精确栅格化的 from / to，只有动画中途才用 Viva 原生的旋转绘制，
+// 所以静止帧的图标与渲染层逐像素一致、并如实记入图标清单（对照工具靠它配对）。
+// 例：ChevronDown 转 π 等于 ChevronUp；ChevronRight 转 π/2 等于 ChevronDown。
+func (l *Look) RotatingIcon(c ui.C, id gfx.ID, from, to gfx.Icon, angle, size float32, open bool, color tokens.Color, dur DurationName) ui.Box {
 	col := l.Col(color)
 	target := float32(0)
 	if open {
@@ -86,11 +94,11 @@ func (l *Look) RotatingChevron(c ui.C, id gfx.ID, size float32, open bool, color
 		turn := d.Canvas.Animate(id, slotChevron, target, motion)
 		switch {
 		case turn <= 0.001:
-			PaintIcon(d.Canvas, icons.ChevronDown, d.Rect, tint)
+			PaintIcon(d.Canvas, from, d.Rect, tint)
 		case turn >= 0.999:
-			PaintIcon(d.Canvas, icons.ChevronUp, d.Rect, tint)
+			PaintIcon(d.Canvas, to, d.Rect, tint)
 		default:
-			d.Canvas.DrawIconTransformed(icons.ChevronDown, d.Rect, tint, gfx.IconTransform{Rotate: math.Pi * turn})
+			d.Canvas.DrawIconTransformed(from, d.Rect, tint, gfx.IconTransform{Rotate: angle * turn})
 		}
 		l.reportIcon(d, mark)
 	})

@@ -24,6 +24,7 @@ import { SETTINGS_CORE_SCENES } from "./react-settings-core-scenes.mjs";
 import { SETTINGS_ADVANCED_SCENES } from "./react-settings-advanced-scenes.mjs";
 import { CAPTURE_SCENES } from "./react-capture-scenes.mjs";
 import { ASK_SCENES } from "./react-ask-scenes.mjs";
+import { WIKI_SCENES } from "./react-wiki-scenes.mjs";
 import { SETTINGS_CONTENT_SCROLLER, openSettingsSection, scrollSettingsToEnd } from "../lib/react-settings-nav.mjs";
 
 /**
@@ -469,6 +470,8 @@ export const SCENES = {
   ...CAPTURE_SCENES,
   // AI 问答（M3-4）：全局问答四态与知识库详情的提问栏；场景在 react-ask-scenes.mjs
   ...ASK_SCENES,
+  // Wiki（M3-5a）：空态、页面详情、编辑态、更新建议、编译对话框；场景在 react-wiki-scenes.mjs（关系图谱不纳入像素对拍）
+  ...WIKI_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,

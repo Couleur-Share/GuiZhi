@@ -51,7 +51,7 @@ func TestUIDetailShowsHeaderBodyAndMeta(t *testing.T) {
 func TestUIWikiLinkOpensTargetPage(t *testing.T) {
 	r := newUIRig(t, withLinkedBodies)
 	r.clickButton("Alpha")
-	r.click(gfx.RoleLink, "Beta")
+	r.click(gfx.RoleButton, "Beta") // 站内链接在渲染层是 <button>
 	if got := r.store.View().SelectedPageID; got != "beta" {
 		t.Fatalf("点 [[Beta]] 应打开 beta：%q", got)
 	}
@@ -63,7 +63,7 @@ func TestUIWikiLinkOpensTargetPage(t *testing.T) {
 func TestUIWikiLinkToMissingPageSaysNotFound(t *testing.T) {
 	r := newUIRig(t, withLinkedBodies)
 	r.clickButton("Alpha")
-	r.click(gfx.RoleLink, "Nowhere")
+	r.click(gfx.RoleButton, "Nowhere")
 	r.wantNoSelectionChange("alpha")
 	r.wantToast(kit.ToastInfo, locales.WikiLinkNotFound("Nowhere"), "")
 }
@@ -100,9 +100,12 @@ func TestUINeedsReviewSourceShowsStatus(t *testing.T) {
 func TestUIBacklinkChipOpensPage(t *testing.T) {
 	r := newUIRig(t, withLinkedBodies)
 	r.clickButton("Beta")
-	// 目录里有 Alpha 一行，详情的反向链接区里还有一个 Alpha 芯片：点最后一个（详情里的）。
-	if n := r.count(gfx.RoleButton, "Alpha"); n < 2 {
-		t.Fatalf("应有目录行与反向链接芯片两个 Alpha：%d", n)
+	// 目录里有 Alpha 一行（可访问名是整行内容，以「Alpha 」开头），详情的反向链接区里还有一个名为 Alpha 的芯片：点最后一个同名的（详情里的）。
+	if n := r.count(gfx.RoleButton, "Alpha"); n != 1 {
+		t.Fatalf("反向链接区应有一个名为 Alpha 的芯片：%d", n)
+	}
+	if _, ok := r.node(gfx.RoleButton, "Alpha"); !ok {
+		t.Fatal("应能找到 Alpha")
 	}
 	r.clickNth(gfx.RoleButton, "Alpha", r.count(gfx.RoleButton, "Alpha")-1)
 	if got := r.store.View().SelectedPageID; got != "alpha" {
@@ -370,5 +373,61 @@ func (r *uiRig) wantNoSelectionChange(id string) {
 	r.t.Helper()
 	if got := r.store.View().SelectedPageID; got != id {
 		r.t.Fatalf("选中页面不该变：got %q want %q", got, id)
+	}
+}
+
+// 正文里多个段落、列表项各带链接：每段的链接命中区键不能重名（曾因键只含行号与片段号，同一容器里两段都有首行第二截链接而 panic）。
+func TestUIWikiLinksInSeveralBlocksDoNotCollide(t *testing.T) {
+	r := newUIRig(t, func(r *uiRig) {
+		r.svc.PutPage(services.WikiPage{
+			ID: "alpha", Title: "Alpha",
+			Body: "see [[Beta]] first\n\n- item [[Beta]]\n- item [[Beta]]\n\nlast [[Beta]]",
+		})
+		r.svc.PutPage(services.WikiPage{ID: "beta", Title: "Beta", Body: "body of beta"})
+	})
+	r.clickButton("Alpha")
+	if !r.has(gfx.RoleHeading, "Alpha") {
+		t.Fatalf("详情应显示 Alpha：%q", r.session.Texts())
+	}
+}
+
+// 站内链接小块（渲染层是 <button>，px-0.5）的命中区与可访问外框连两端的 2px 内边距一起：行首的链接，外框左缘就是行盒左缘，
+// 而不是文字起点（曾比渲染层窄 4px、左缘偏 2px）。
+func TestUIWikiLinkChipBoundsIncludePadding(t *testing.T) {
+	r := newUIRig(t, func(r *uiRig) {
+		r.svc.PutPage(services.WikiPage{ID: "alpha", Title: "Alpha", Body: "[[Beta]] opens"})
+		r.svc.PutPage(services.WikiPage{ID: "beta", Title: "Beta", Body: "body of beta"})
+	})
+	r.clickButton("Alpha")
+	title, ok := r.node(gfx.RoleHeading, "Alpha")
+	if !ok {
+		t.Fatalf("应有标题 Alpha：%q", r.session.Texts())
+	}
+	chip, ok := r.node(gfx.RoleButton, "Beta")
+	if !ok {
+		t.Fatalf("行首的 [[Beta]] 应是按钮：%q", r.session.Texts())
+	}
+	if chip.Bounds.X != title.Bounds.X {
+		t.Errorf("行首链接小块的外框左缘应在行盒左缘：chip %.2f，标题 %.2f", chip.Bounds.X, title.Bounds.X)
+	}
+}
+
+// 正文很长时右栏在自己的滚动区里滚，不把整个工作区撑高（曾因右栏直接放在两栏的行里没有被夹住，内容超出视口时整页被撑出窗口）。
+func TestUILongPageScrollsInsideDetail(t *testing.T) {
+	var body strings.Builder
+	for i := range 80 {
+		body.WriteString("paragraph ")
+		body.WriteString(strings.Repeat("x", i%7+3))
+		body.WriteString("\n\n")
+	}
+	r := newUIRig(t, func(r *uiRig) {
+		r.svc.PutPage(services.WikiPage{ID: "long", Title: "Long", Body: body.String()})
+	})
+	r.clickButton("Long")
+	before := r.top(gfx.RoleButton, locales.WikiEditPage())
+	r.scrollBy(900, 400, 300)
+	// 滚过之后编辑钮要么滚出视口（出了无障碍树），要么在更靠上的位置。
+	if edit, ok := r.node(gfx.RoleButton, locales.WikiEditPage()); ok && edit.Bounds.Y >= before {
+		t.Errorf("长页应能在右栏里滚动：编辑钮 y 滚前 %.1f，滚后 %.1f", before, edit.Bounds.Y)
 	}
 }

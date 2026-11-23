@@ -119,10 +119,11 @@ func isLeadPara(b *MdBlock) bool {
 
 // proseBuilder 把块树翻成排版树并声明控件。
 type proseBuilder struct {
-	l    *Look
-	base float32 // 1rem（px）
-	opts ProseOpts
-	top  map[*proseNode]bool // 顶层节点：标题锚点只回报它们
+	l     *Look
+	base  float32 // 1rem（px）
+	opts  ProseOpts
+	top   map[*proseNode]bool // 顶层节点：标题锚点只回报它们
+	texts int                 // 已声明的文字段数：给每段一个序号，链接命中区的键由它区分（Key 只按文字在容器作用域里排重，不含段落自己的路径）
 }
 
 // Prose 把 Markdown 块排成一列，返回外层盒。lead 是它上方已有的外边距（卡片里内容区的 mt-1.5）：它与第一块的上外边距折叠，
@@ -338,7 +339,8 @@ func (p *proseBuilder) renderText(c ui.C, n *proseNode) ui.Box {
 		weight = WeightSemibold
 	}
 	layout := newProseText(l, c.Canvas(), p.runs(b.Spans, n, weight), n.size, n.line, weight)
-	layout.key, layout.onLink = c, p.opts.OnLink
+	layout.key, layout.onLink, layout.seq = c, p.opts.OnLink, p.texts
+	p.texts++
 	box := ui.CustomLayout(c, layout).FillWidth()
 	if b.Kind == MdHeading {
 		plain, level := MdPlain(b.Spans), uint8(b.Level)
@@ -449,6 +451,7 @@ type proseText struct {
 	filled bool
 
 	key    ui.C // 本段的键：链接命中区的标识由它派生
+	seq    int  // 本段在一次 Prose 里的序号：同一容器里多段带链接的文字，命中区的键不能重名
 	onLink func(href string)
 }
 
@@ -695,7 +698,7 @@ func (b *proseText) draw(d *ui.DrawContext) {
 			x := d.Rect.X + f.x
 			var linkID gfx.ID
 			if b.onLink != nil && r.href != "" {
-				linkID = ui.ID(b.key.Key("lk" + strconv.Itoa(i) + "." + strconv.Itoa(fi)))
+				linkID = ui.ID(b.key.Key("lk" + strconv.Itoa(b.seq) + "." + strconv.Itoa(i) + "." + strconv.Itoa(fi)))
 				b.linkHit(d, linkID, f, r, x, top)
 			}
 			if r.linkChip {
@@ -739,10 +742,25 @@ func (b *proseText) draw(d *ui.DrawContext) {
 	}
 }
 
-// linkHit 登记一截链接文字的命中区（角色 link、手形光标），并在点击到达时（事件遍之后）回调 onLink。
+// linkHit 登记一截链接文字的命中区（手形光标），并在点击到达时（事件遍之后）回调 onLink。
+// 角色：普通链接是 link；站内链接（linkChip，渲染层 WikiMarkdown 的 [[双链]]）在渲染层里是 <button>，所以是 button。
 func (b *proseText) linkHit(d *ui.DrawContext, id gfx.ID, f proseFrag, r *proseRun, x, top float32) {
-	d.Canvas.HitWithOptions(id, gfx.Rect{X: x, Y: top, Width: f.w, Height: b.line}, f.text,
-		gfx.HitOptions{Role: gfx.RoleLink, Cursor: gfx.PointerCursorHand})
+	role := gfx.RoleLink
+	if r.linkChip {
+		role = gfx.RoleButton
+	}
+	// 站内链接小块的 px-0.5 在按钮盒里：命中区（与可访问外框）连两侧的内边距一起，折行的真正两端才有。
+	left, right := x, x+f.w
+	if r.linkChip {
+		if f.chipL {
+			left -= proseLinkPadX
+		}
+		if f.chipR {
+			right += proseLinkPadX
+		}
+	}
+	d.Canvas.HitWithOptions(id, gfx.Rect{X: left, Y: top, Width: right - left, Height: b.line}, f.text,
+		gfx.HitOptions{Role: role, Cursor: gfx.PointerCursorHand})
 	if d.Canvas.Clicked(id) {
 		href, open := r.href, b.onLink
 		d.Canvas.AfterPaint(func() { open(href) })

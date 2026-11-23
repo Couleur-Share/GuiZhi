@@ -156,7 +156,7 @@ func (s *Screen) graphHint(c ui.C) {
 		Children(func() {
 			l.Text(c.Key("text"), locales.WikiPanelGraphHint(), kit.TextXS, kit.WeightNormal, t.SidebarForeground.WithAlpha(0.6), kit.Centered(), kit.Wrapped())
 			ui.Row(c.Key("back-wrap")).MarginTop(l.Space(2)).Children(func() {
-				if s.textLink(c.Key("back"), locales.WikiViewCatalog(), kit.TextXS, false) {
+				if s.textLink(c.Key("back"), locales.WikiViewCatalog(), kit.TextXS, false, 0) {
 					s.spawn(func() { s.Store.SetViewMode(ViewCatalog) })
 				}
 			})

@@ -1,6 +1,8 @@
 package wiki
 
 import (
+	"strings"
+
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
@@ -79,16 +81,16 @@ func (s *Screen) searchBox(c ui.C, v View) {
 	l := s.Look
 	t := l.T
 	c = c.Key("search")
-	ui.Row(c).FillWidth().Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1.5)).PadSides(0, l.Space(2.5), 0, l.Space(2.5)).
-		Draw(func(d *ui.DrawContext) {
+	ui.Row(c).FillWidth().Height(l.Rem(2)).Items(ui.Center).Gap(l.Space(1.5)).PadSides(0, l.Space(2.5)+1, 0, l.Space(2.5)+1). // px-2.5 加 1px 边框（边框画在盒内，不占布局）
+																	Draw(func(d *ui.DrawContext) {
 			l.PaintSurface(d, kit.Surface{Bg: t.Background.WithAlpha(0.6), Border: t.Border, BorderW: 1, Radius: s.radiusLG()})
 		}).Children(func() {
 		l.Icon(c.Key("icon"), icons.Search, l.Rem(0.875), t.MutedForeground.WithAlpha(0.7)).Shrink(0)
 		placeholder := locales.WikiFilterPlaceholder()
 		l.Input(c.Key("input"), &s.search, placeholder, placeholder, kit.InputSpec{
 			Size: l.Rem(0.75), Weight: kit.WeightNormal, Color: t.Foreground, Placeholder: t.MutedForeground.WithAlpha(0.6),
-			Height: l.Rem(1.5),
-		}).Grow(1).Shrink(1).MinWidth(0)
+			Height: l.Rem(1), // 渲染层的 <input> 没有内边距，高度就是 text-xs 的行高 16px（Viva 的输入框至少 Size+6 高，居中后文字偏低；MarginBottom(1) 把它托回，小/中/大三档都对上）
+		}).Grow(1).Shrink(1).MinWidth(0).MarginBottom(1)
 		if v.Searching {
 			l.Spinner(c.Key("spin"), l.Rem(0.875), t.MutedForeground)
 		}
@@ -183,7 +185,8 @@ func (s *Screen) catalogRow(c ui.C, v View, e services.WikiCatalogEntry) ui.Box 
 	// 行在窗口里的序号会变：命中区与盒子都按页面 ID 命名，状态才不会串到别的行上。
 	id := ui.ID(c.Key("hit-" + e.ID))
 	box := ui.Column(c.Key("row-"+e.ID)).FillWidth().PadSides(l.Space(2), l.Space(2.5), l.Space(2), l.Space(2.5))
-	box, hover := s.hitButton(c, id, box, e.Title, "", false)
+	backlinks := v.BacklinkCounts[e.ID]
+	box, hover := s.hitButton(c, id, box, catalogRowName(e, backlinks), "", false)
 	bg := kit.MixToken(tokens.Transparent, t.Accent.WithAlpha(0.5), hover)
 	if selected {
 		bg = t.Primary.WithAlpha(0.1)
@@ -192,7 +195,6 @@ func (s *Screen) catalogRow(c ui.C, v View, e services.WikiCatalogEntry) ui.Box 
 	if selected {
 		titleColor, titleWeight = t.Primary, kit.WeightMedium
 	}
-	backlinks := v.BacklinkCounts[e.ID]
 	box = box.Draw(func(d *ui.DrawContext) {
 		if d.State.FocusVisible {
 			l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), s.radiusLG())
@@ -227,4 +229,23 @@ func (s *Screen) catalogRow(c ui.C, v View, e services.WikiCatalogEntry) ui.Box 
 		s.spawn(func() { s.Store.SelectPage(id) })
 	}
 	return box
+}
+
+// catalogRowName 是页面行的可访问名：渲染层的行是一个按钮，名字由它的内容拼成——标题、手动编辑的铅笔（图片名）、类型徽标、摘要、被引用数，
+// 以空格相连。对照的 L1 按整串名字配对，只写标题会配不上。
+func catalogRowName(e services.WikiCatalogEntry, backlinks int) string {
+	parts := []string{e.Title}
+	if e.ManualEditedAt != nil {
+		parts = append(parts, locales.WikiManualEdited())
+	}
+	parts = append(parts, kindLabel(e.Kind))
+	if e.Summary != "" {
+		parts = append(parts, e.Summary)
+	}
+	if backlinks > 0 {
+		parts = append(parts, locales.WikiBacklinkCount(backlinks))
+	} else {
+		parts = append(parts, locales.WikiOrphanHint())
+	}
+	return strings.Join(parts, " ")
 }

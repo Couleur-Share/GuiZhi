@@ -28,6 +28,10 @@ func (s *Screen) syncDraft(v View) {
 // editorRows 是编辑框的行数（rows={20}）。
 const editorRows = 20
 
+// editorLine 是编辑框每行的高度：渲染层 text-[13px] leading-relaxed（1.625 × 13）。
+// 框高按它算，保证下面的说明与按钮落在与渲染层相同的位置；Viva 的多行框自己的行高是字号加 7，所以框内可见行数略少（已知差异，见 editor 的注释）。
+const editorLine = 21.125
+
 // editor 是正文编辑区：space-y-2，一块多行输入、一句说明、保存与取消。
 // 输入框是 w-full rounded-xl border border-border bg-background/60 p-3，聚焦时边框 primary/50。
 // 已知差异：渲染层是等宽 13px 字体、可拖拽改高；这里沿用 kit.TextArea 的正文字号与固定行数。
@@ -37,8 +41,9 @@ func (s *Screen) editor(c ui.C, v View) {
 	d := &s.detail
 	c = c.Key("editor")
 	ui.Column(c).FillWidth().Gap(l.Space(2)).Children(func() {
-		height := editorRows*(l.Theme.Metrics.FontSizeM+7) + 2*l.Space(3) + 2
-		ui.Stack(c.Key("box")).FillWidth().Height(height).Children(func() {
+		// 渲染层 rows={20}：13px 等宽字、leading-relaxed（21.125px）× 20 行 + p-3 上下 + 边框 2px；框是 inline-block，块级父盒的行盒在它下面多留一截基线下沿（约 0.375rem）。
+		height := editorRows*editorLine + 2*l.Space(3) + 2
+		ui.Stack(c.Key("box")).FillWidth().Height(height).MarginBottom(l.Rem(0.375)).Children(func() {
 			sid := ui.ID(c.Key("surface"))
 			p := l.HoverProgress(c, sid, 0, d.editFocus, kit.DurationDefault)
 			border := kit.MixToken(t.Border, t.Primary.WithAlpha(0.5), p)

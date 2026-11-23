@@ -1,13 +1,10 @@
 package wiki
 
 import (
-	"math"
-
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 
 	"guizhi-mygo-shell/native/services"
-	"guizhi-mygo-shell/viva/icons"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
 )
@@ -26,15 +23,15 @@ func (s *Screen) updateSuggestion(c ui.C, page services.WikiPage) {
 	t := l.T
 	sv := s.Store.Suggestion().View()
 	legacy := LegacyCoverage(page.PromptVersion)
-	if !legacy && sv.Error == "" && !sv.Stale && sv.Suggestion == nil {
+	if !s.suggestionShown(page) {
 		return
 	}
 	c = c.Key("suggestion")
 	ui.Column(c).FillWidth().Gap(l.Space(2)).Children(func() {
 		if legacy {
-			ui.Flow(c.Key("legacy")).FillWidth().Items(ui.Center).Gap(l.Space(2)).LineGap(0).Children(func() {
+			ui.Flow(c.Key("legacy")).FillWidth().Items(ui.Center).Gap(0).LineGap(0).Children(func() {
 				l.Text(c.Key("text"), locales.WikiLegacyCoverage(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).Shrink(1).MinWidth(0)
-				if s.textLink(c.Key("upgrade"), locales.WikiUpgradeSources(), kit.TextSM, true) {
+				if s.textLink(c.Key("upgrade"), locales.WikiUpgradeSources(), kit.TextSM, true, l.Space(2)) { // ml-2
 					s.OpenCompileDialog()
 				}
 			})
@@ -51,6 +48,32 @@ func (s *Screen) updateSuggestion(c ui.C, page services.WikiPage) {
 			s.suggestionPanel(c, *sv.Suggestion)
 		}
 	})
+}
+
+// suggestionShown 报告更新建议区块这一帧有没有内容：旧版覆盖的提示、读取失败、建议已过期或有待审阅的建议，任一为真。
+// 渲染层区块自己的外框（space-y-2）一直在，没内容时是个空块，它两侧的外边距会穿过它折叠。
+func (s *Screen) suggestionShown(page services.WikiPage) bool {
+	sv := s.Store.Suggestion().View()
+	return LegacyCoverage(page.PromptVersion) || sv.Error != "" || sv.Stale || sv.Suggestion != nil
+}
+
+// followAfterProse 是正文之后下一个有外边距的兄弟的上外边距，与正文最后一块的下外边距折叠（取较大者，见 kit.ProseFollowed）：
+// 更新建议区块有内容时它本身没有外边距，两者不折叠；没内容时它是空块，外边距穿过它：先是待复核提示（my-3），再是来源块（mt-6）。
+func (s *Screen) followAfterProse(v View, page services.WikiPage) float32 {
+	l := s.Look
+	if s.suggestionShown(page) {
+		return 0
+	}
+	sources := v.Detail.Sources
+	for _, src := range sources {
+		if src.NeedsReview() {
+			return l.Space(3)
+		}
+	}
+	if len(sources) > 0 {
+		return l.Space(6)
+	}
+	return 0
 }
 
 // alertLine 是一行带直播属性（role=alert）的危险色文字。
@@ -77,15 +100,16 @@ func (s *Screen) suggestionPanel(c ui.C, sg services.WikiSuggestion) {
 			l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.25)})
 		}).Children(func() {
 		id := ui.ID(c.Key("summary"))
-		row := ui.Row(c.Key("summary-row")).FillWidth().Items(ui.Center).Gap(l.Space(1.5))
-		row, _ = s.hitButton(c, id, row, sg.Reason, "", u.open)
-		turn := l.HoverProgress(c, id, 1, u.open, kit.DurationQuick)
+		// <summary> 的标记是浏览器自带的 disclosure 三角（行内，list-style-position: inside），不是图标：文字让出它的宽度。
+		marker := kit.ChromeDisclosureMarker(l.Rem(kit.TextSM.Size), l.Rem(kit.TextSM.Line), l.Scale)
+		row := ui.Row(c.Key("summary-row")).FillWidth().Items(ui.Center).PadSides(0, 0, 0, marker.Advance)
+		row, _ = s.hitDisclosure(c, id, row, sg.Reason, u.open)
 		row.Draw(func(d *ui.DrawContext) {
+			kit.PaintDisclosure(d, d.Rect, marker, u.open, t.Foreground)
 			if d.State.FocusVisible {
 				l.PaintRing(d, 2, t.Primary.WithAlpha(0.5), l.Rem(0.25))
 			}
 		}).Children(func() {
-			s.rotIcon(c.Key("marker"), icons.ChevronRight, l.Rem(0.875), t.Foreground, float32(math.Pi/2)*turn)
 			l.Text(c.Key("reason"), sg.Reason, kit.TextSM, kit.WeightNormal, t.Foreground, kit.Wrapped()).Grow(1).Shrink(1).MinWidth(0)
 		})
 		if row.Clicked() {
@@ -102,7 +126,7 @@ func (s *Screen) suggestionPanel(c ui.C, sg services.WikiSuggestion) {
 		l.ScrollArea(c.Key("body"), [4]float32{}, func() {
 			l.Text(c.Key("body-text"), sg.Draft.Body, kit.TextSM, kit.WeightNormal, t.Foreground, kit.Wrapped())
 		}).FillWidth().MaxHeight(l.Rem(18)).MarginTop(l.Space(3)).MarginBottom(l.Space(3))
-		accept := l.Button(c.Key("accept"), kit.ButtonSpec{Label: locales.WikiSuggestionAccept()}, s.uiPrimaryStyle())
+		accept := l.Button(c.Key("accept"), kit.ButtonSpec{Label: locales.WikiSuggestionAccept()}, s.uiPrimaryStyle()).Self(ui.Start) // 按钮不拉伸：details 里是块级盒内的 inline-block
 		if accept.Clicked() {
 			s.spawn(func() { s.Store.Suggestion().Accept() })
 		}

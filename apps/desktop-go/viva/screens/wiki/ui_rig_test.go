@@ -185,8 +185,18 @@ func (r *uiRig) frames(n int) {
 	}
 }
 
+// node 按角色与可访问名找节点。页面行的可访问名是整行内容（标题 类型 摘要 引用数，见 catalogRowName）：
+// 没有恰好同名的按钮时，按「名字加空格」的前缀找，这样用例仍可以只写页面标题。
 func (r *uiRig) node(role gfx.Role, name string) (app.AccessNode, bool) {
-	return r.session.AccessByRole(role, name)
+	if n, ok := r.session.AccessByRole(role, name); ok || role != gfx.RoleButton {
+		return n, ok
+	}
+	for _, n := range r.session.Access() {
+		if n.Role == role && strings.HasPrefix(n.Label, name+" ") {
+			return n, true
+		}
+	}
+	return app.AccessNode{}, false
 }
 
 func (r *uiRig) has(role gfx.Role, name string) bool {

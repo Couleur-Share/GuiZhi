@@ -70,6 +70,9 @@ var knownRed = map[string]redPin{
 	// 映射表都没有规则；输入框外框同上。勾选符 ☑ 在渲染层里是彩色表情字形、Viva 画成单色符号，墨迹总量比 1.25（L2/ink-mass）。
 	"app.window.ask.article-global": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/box", "L2/ink", "L2/ink-mass"}, Max: 7},
 	"app.window.library.detail-ask": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/box", "L2/ink", "L2/ink-mass"}, Max: 7},
+	// B-078（M3-5a）：Wiki 编辑态的正文编辑框是 ui.TextArea——字体（等宽 13px 对主题字体）、行距（21.125 对固定 21）、
+	// 无障碍名（渲染层的 textarea 没有名字、Viva 叫「编辑」）与铅笔图标的角色（image，G-027 同类）都不同；其余场景整页对上。
+	"app.window.wiki.edit": {Ledger: "B-078", Kinds: []string{"L1/extra-node", "L1/missing-node", "L1/unmapped-role", "L2/alignment", "L2/ink", "L2/text-width", "L2/wrapped-pitch"}, Max: 14},
 }
 
 func checkKnownRed(t *testing.T, sceneID string, pin redPin, rep *parity.Report) {
