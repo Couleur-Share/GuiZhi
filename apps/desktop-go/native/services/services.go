@@ -52,6 +52,9 @@ type Services struct {
 	// Wiki 是 Wiki 模块（目录、搜索、详情与编辑、关系图谱、全文编译、更新建议）的数据层（见 wiki.go）；
 	// nil 时 Wiki 模块按「尚未迁移」处理，测试与对照里不关心 Wiki 时可以不给。
 	Wiki Wiki
+	// Themed 是主题阅读（AI 阅读页：生成、状态、任务、设置引导与导出）的数据层（见 themed.go）；
+	// nil 时「AI 阅读」入口按「尚未迁移」处理，测试与对照里不关心主题阅读时可以不给。
+	Themed ThemedReading
 
 	// Log 是错误日志；nil 时界面只弹提示、不留痕（测试里不关心日志时可以不给）。
 	Log Logger
