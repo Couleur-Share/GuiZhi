@@ -216,3 +216,28 @@ func TestShowThemedTaskRemembersTheRequestedSourceAsAIReading(t *testing.T) {
 		}
 	}
 }
+
+// 编辑状态必须交给主题阅读：编辑期间模式是「编辑」而不是 AI 阅读，结束编辑回到原文（不是回到 AI 阅读）。
+func TestThemedEditingFeedsModeAndFinishingReturnsToOriginal(t *testing.T) {
+	t.Parallel()
+	svc := &servicestest.ThemedFake{}
+	svc.PutPage(themedNote, services.ThemedPage{ID: "page-1"})
+	rr := themedRig(t, svc)
+	rr.openCard(detailNoteID)
+	if mv := rr.themed.ModeView(); !mv.Active || mv.Editing {
+		t.Fatalf("前置：应在 AI 阅读且未编辑: %+v", mv)
+	}
+	rr.click(gfx.RoleButton, rr.editButtonName())
+	rr.frames(3)
+	if mv := rr.themed.ModeView(); !mv.Editing || mv.Active {
+		t.Fatalf("编辑期间主题阅读应处于编辑态、AI 阅读退出: %+v", mv)
+	}
+	rr.click(gfx.RoleButton, locales.ThemedReadingReaderFinishEditing())
+	rr.frames(3)
+	if mv := rr.themed.ModeView(); mv.Editing || mv.Active {
+		t.Fatalf("结束编辑回到原文，不回 AI 阅读: %+v", mv)
+	}
+	if rr.has(gfx.RoleCombobox, locales.ThemedReadingReaderSettings()) {
+		t.Fatal("结束编辑后阅读区是原文，不画「阅读页设置」")
+	}
+}

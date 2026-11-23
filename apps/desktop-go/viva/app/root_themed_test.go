@@ -3,12 +3,14 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vivaui/viva/gfx"
 
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/native/services/servicestest"
 	"guizhi-mygo-shell/viva/locales"
+	libraryscreen "guizhi-mygo-shell/viva/screens/library"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	"guizhi-mygo-shell/viva/screens/shell"
 )
@@ -22,13 +24,14 @@ type themedEnv struct {
 	f        *rootFixture
 	svc      *servicestest.ThemedFake
 	inbox    *servicestest.Inbox
+	prefs    *servicestest.Prefs
 	external []string
 }
 
 // openThemedRoot 打开 Root：知识库里有 n1（带正文），处理中心里有 n1 的待复核，主题阅读用假服务；wired 为假时不装配主题阅读。
 func openThemedRoot(t *testing.T, module shell.Module, wired bool, mutate func(*Options, *servicestest.ThemedFake)) *themedEnv {
 	t.Helper()
-	env := &themedEnv{svc: &servicestest.ThemedFake{}, inbox: &servicestest.Inbox{}}
+	env := &themedEnv{svc: &servicestest.ThemedFake{}, inbox: &servicestest.Inbox{}, prefs: &servicestest.Prefs{}}
 	env.inbox.SetList(inboxTestList())
 	lib := &servicestest.Library{}
 	lib.Seed(services.LibraryCounts{All: 2, Uncategorized: 2}, nil, nil)
@@ -42,7 +45,7 @@ func openThemedRoot(t *testing.T, module shell.Module, wired bool, mutate func(*
 		o.Services.Inbox = env.inbox
 		o.Services.Library = lib
 		o.Services.AI = &servicestest.AISettingsFake{}
-		o.Services.Prefs = &servicestest.Prefs{}
+		o.Services.Prefs = env.prefs
 		o.Services.OpenExternal = func(url string) error { env.external = append(env.external, url); return nil }
 		if wired {
 			o.Services.Themed = env.svc
@@ -152,6 +155,10 @@ func TestRootThemedInboxTaskOpensTheItemInAIReading(t *testing.T) {
 	})
 	if scope := f.root.library.Store.View().Filters.Scope; scope != services.LibraryScopeAll {
 		t.Errorf("范围应设为全部，实际 %q", scope)
+	}
+	// 条目的阅读记忆也要记成这份内容的 AI 阅读（渲染层 patchContentReadingMemory）：下次打开仍停在这份内容的 AI 阅读。
+	if mem, ok := libraryscreen.LoadReadingMemory(e.prefs, "n1", time.Now()); !ok || mem.Tab != libraryscreen.TabBody || !mem.ThemedBySource["body"] {
+		t.Errorf("任务对应的内容应记入阅读记忆（正文标签、AI 主题视图）：%+v ok=%v", mem, ok)
 	}
 	// 离开处理中心后再回来是列表，不是上次的任务页。
 	f.root.runOnUI(func() { f.root.win.Module = shell.ModuleInbox })

@@ -538,3 +538,41 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 	t.Fatalf("等待超时: %s", what)
 }
+
+// 旧内容的操作收尾只能释放自己那份内容的忙标记：A 的导出还在途时切到 B 并发起 B 的删除，A 收尾后 B 仍在忙（同一时间只允许一个操作）。
+func TestStaleOperationEndDoesNotReleaseNewItemsBusy(t *testing.T) {
+	r := newRig(t)
+	r.svc.PutPage(reqA, services.ThemedPage{ID: "page-a"})
+	r.svc.PutPage(reqB, services.ThemedPage{ID: "page-b"})
+	r.svc.SetExportPath("C:/out.html")
+	r.open(reqA)
+	releaseA, arrivedA := r.svc.Hold(servicestest.ThemedOpExport)
+	doneA := make(chan bool, 1)
+	go func() { doneA <- r.reading.ExportHTML(false, false) }()
+	<-arrivedA
+	r.open(reqB)
+	releaseB, arrivedB := r.svc.Hold(servicestest.ThemedOpRemove)
+	doneB := make(chan bool, 1)
+	go func() { doneB <- r.reading.Remove() }()
+	<-arrivedB
+	if v := r.view(); v.ItemID != reqB.ItemID || !v.Busy {
+		t.Fatalf("前置：B 的删除应在进行: %+v", v)
+	}
+	releaseA()
+	if !<-doneA {
+		t.Fatal("A 的导出应成功")
+	}
+	if v := r.view(); v.ItemID != reqB.ItemID || !v.Busy {
+		t.Fatalf("A 的旧操作收尾不能释放 B 正在进行的操作的忙标记: %+v", v)
+	}
+	if r.reading.Remove() {
+		t.Fatal("B 的删除还没结束，不能再发起第二个操作")
+	}
+	releaseB()
+	if !<-doneB {
+		t.Fatal("B 的删除应成功")
+	}
+	if r.view().Busy {
+		t.Fatal("B 的操作结束后应释放忙标记")
+	}
+}

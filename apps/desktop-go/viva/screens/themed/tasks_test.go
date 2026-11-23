@@ -238,3 +238,27 @@ func TestTaskFilter(t *testing.T) {
 		t.Fatalf("旧格式任务不能继续，不算「可继续」: %v", got)
 	}
 }
+
+// 读取期间推送来的任务与读到的更新时间相同（同一毫秒内又变了一次）：以推送为准，不能被旧快照盖掉。
+func TestTaskListPushWithEqualTimestampWinsOverLoad(t *testing.T) {
+	fake := &servicestest.ThemedFake{}
+	task := fake.PutTask(services.ThemedTask{
+		ItemID: "a", SourceKind: "body", UpdatedAt: 50,
+		State: services.ThemedTaskRunning, Stage: services.ThemedStageDesign,
+	})
+	svc := &staleList{ThemedFake: fake, snap: []services.ThemedTask{task}, arrived: make(chan struct{}), release: make(chan struct{})}
+	r := newRig(t)
+	l := NewTaskList(svc, r.guard, func() {})
+	t.Cleanup(l.Detach)
+	l.Spawn = func(fn func()) { go fn() }
+	l.Attach()
+	<-svc.arrived
+	pushed := task
+	pushed.State, pushed.Stage = services.ThemedTaskCompleted, services.ThemedStageDone // UpdatedAt 与读取快照相同
+	l.onProgress(pushed)
+	close(svc.release)
+	waitFor(t, "读取完成", func() bool { return !l.View().Loading })
+	if got := l.View().Tasks[0]; got.State != services.ThemedTaskCompleted {
+		t.Fatalf("同一时刻的推送应覆盖读到的旧状态: %+v", got)
+	}
+}
