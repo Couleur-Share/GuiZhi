@@ -463,6 +463,33 @@ func TestRestorePreviousRevision(t *testing.T) {
 	r.wantToast(kit.ToastSuccess, locales.WikiRevisionRestored(), "")
 }
 
+// 有多份历史版本时回滚的是最近一份（新的在前，下标 0），不是最早的那份。
+func TestRestorePreviousRevisionPicksTheNewest(t *testing.T) {
+	r := newRig(t)
+	r.seed()
+	r.ready()
+	r.store.SelectPage("alpha")
+	for _, body := range []string{"v2", "v3"} {
+		r.store.BeginEdit()
+		r.store.SetDraft(body)
+		if !r.store.SaveDraft() {
+			t.Fatalf("保存 %s：%+v", body, r.toasts())
+		}
+	}
+	if got := len(r.view().Revisions); got != 2 {
+		t.Fatalf("两次保存应留下两份历史版本：%d", got)
+	}
+	if !r.store.RestorePreviousRevision() {
+		t.Fatalf("回滚：%+v", r.toasts())
+	}
+	if p, _ := r.svc.Page("alpha"); p.Body != "v2" {
+		t.Fatalf("应回到最近一次被覆盖前的内容 v2，而不是最早的原文：%q", p.Body)
+	}
+	if got := r.view().Detail.Page.Body; got != "v2" {
+		t.Fatalf("详情应跟着重读：%q", got)
+	}
+}
+
 func TestRestoreFailureAndNoSelection(t *testing.T) {
 	r := newRig(t)
 	r.seed()

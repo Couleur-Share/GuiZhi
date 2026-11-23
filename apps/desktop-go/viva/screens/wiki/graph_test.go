@@ -169,6 +169,11 @@ func TestNodeAtPicksNearest(t *testing.T) {
 	if got := m.NodeAt(0.08, 0, 0.5); got != 1 {
 		t.Fatalf("两个都在半径内时取最近的：%d", got)
 	}
+	// 最近的排在前面：不能因为后面还有一个半径内的节点就改选它（只认「最后一个在半径内的」会在这里选错）。
+	first := GraphModel{Nodes: []GraphNode{{ID: "a", X: 0.1, Y: 0}, {ID: "b", X: 0, Y: 0}}}
+	if got := first.NodeAt(0.08, 0, 0.5); got != 0 {
+		t.Fatalf("最近的是排在前面的 a：%d", got)
+	}
 }
 
 func TestKindIndexAndTruncateLabel(t *testing.T) {

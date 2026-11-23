@@ -83,6 +83,9 @@ func TestUISuggestionStaleTokenAsksToRecheck(t *testing.T) {
 	if !r.hasButton("sources changed") {
 		t.Error("新建议应继续留在面板里供核对")
 	}
+	if r.hasButton(locales.WikiSuggestionAccept()) || r.hasText("second draft") {
+		t.Errorf("建议一换（令牌变了）折叠面板应收起，让用户重新展开核对：%q", r.session.Texts())
+	}
 }
 
 func TestUISuggestionLoadFailureShowsReason(t *testing.T) {

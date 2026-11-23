@@ -170,6 +170,36 @@ func TestUIGraphDragPansWithoutOpeningPage(t *testing.T) {
 	}
 }
 
+// 命中半径是图坐标里的 8，随缩放一起放大：放大到 4.5 倍后屏幕上是 36 px，偏离节点中心 20 px 的点击仍命中它；
+// 缩小到 0.1 倍后只有不到 1 px，偏离 4 px 的点击落空（半径若不随缩放换算，恒为 8 px，两处都会判反）。
+func TestUIGraphHitRadiusScalesWithZoom(t *testing.T) {
+	r := newUIRig(t, withSeed)
+	m := r.openGraph()
+	x, y := r.nodeXY(m, "beta")
+	r.scrollBy(x, y, -1000) // exp(1.5) ≈ 4.5 倍，指针下的点不动
+	if z := r.screen.graph.zoom; z < 4 {
+		t.Fatalf("前置：应已放大到 4 倍以上：%.2f", z)
+	}
+	bx, by := r.nodeXY(m, "beta")
+	r.clickAt(bx+20, by)
+	if got := r.store.View().SelectedPageID; got != "beta" {
+		t.Fatalf("放大后偏离中心 20 px 仍在命中半径内：%q", got)
+	}
+
+	r = newUIRig(t, withSeed)
+	m = r.openGraph()
+	x, y = r.nodeXY(m, "beta")
+	r.scrollBy(x, y, 4000) // 缩到下限 0.1 倍
+	if z := r.screen.graph.zoom; math.Abs(z-minZoom) > 1e-9 {
+		t.Fatalf("前置：应缩到下限：%v", z)
+	}
+	bx, by = r.nodeXY(m, "beta")
+	r.clickAt(bx+4, by)
+	if v := r.store.View(); v.Mode != ViewGraph || v.SelectedPageID != "" {
+		t.Fatalf("缩小后命中半径不到 1 px，偏离 4 px 不该命中：mode=%v selected=%q", v.Mode, v.SelectedPageID)
+	}
+}
+
 func TestUIGraphTinyMoveStillCountsAsClick(t *testing.T) {
 	r := newUIRig(t, withSeed)
 	m := r.openGraph()

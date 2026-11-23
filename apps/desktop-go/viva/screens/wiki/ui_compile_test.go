@@ -77,6 +77,32 @@ func TestUICompileDialogPreviewDefaultsToSelectingEntries(t *testing.T) {
 	}
 }
 
+// 待复核等不可执行的资料只列出、不能勾选：复选框禁用，点它也不改变选择；可执行的那条照常可勾。
+func TestUICompileUnselectableEntryCheckboxIsDisabled(t *testing.T) {
+	r := newUIRig(t, withSeed, func(r *uiRig) {
+		r.svc.SetPreview(previewOf(
+			candidate("ok", services.WikiCandidateReady, 2, 0),
+			candidate("rv", services.WikiCandidateReview, 2, 0),
+		))
+	})
+	r.openCompile()
+	ok, foundOK := r.node(gfx.RoleCheckbox, entryName("ok", 2))
+	rv, foundRV := r.node(gfx.RoleCheckbox, entryName("rv", 2))
+	if !foundOK || !foundRV {
+		t.Fatalf("两条资料都应列出：%v %v %q", foundOK, foundRV, r.session.Texts())
+	}
+	if ok.Disabled {
+		t.Error("可执行的资料不该禁用")
+	}
+	if !rv.Disabled {
+		t.Error("待复核的资料复选框应禁用")
+	}
+	r.click(gfx.RoleCheckbox, entryName("rv", 2))
+	if got := r.store.Compile().View().Selected; len(got) != 1 || got[0] != "ok" {
+		t.Fatalf("点禁用的复选框不改变选择：%v", got)
+	}
+}
+
 func TestUICompileUncheckingChangesSelectionAndEstimate(t *testing.T) {
 	r := newUIRig(t, withSeed, withReady(3))
 	r.openCompile()
