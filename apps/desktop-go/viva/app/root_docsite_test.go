@@ -202,6 +202,21 @@ func TestRootDocSiteLoadErrorThenRetry(t *testing.T) {
 	f.waitFrames(t, "重试后读到批次", func() bool { return f.hasButtonContaining("docs.example.com/j1/") })
 }
 
+// 目标合集下拉读的是知识库的合集：Root 把知识库服务接给文档站 Store，展开下拉能选到知识库里的两个合集。
+func TestRootDocSiteCollectionSelectListsTheLibraryCollections(t *testing.T) {
+	docs := &servicestest.DocSite{}
+	f, _, _ := openAuthDocRoot(t, nil, docs, nil)
+	f.openDocSite(t)
+	f.waitFrames(t, "文档站读到知识库的合集", func() bool { return len(f.root.imports.DocSite.View().Collections) == 2 })
+
+	f.clickRole(t, gfx.RoleCombobox, locales.WebCaptureCollection())
+	for _, name := range []string{locales.WebCaptureUnfiled(), "工作", "灵感"} {
+		if _, ok := f.session.AccessByRole(gfx.RoleOption, name); !ok {
+			t.Errorf("目标合集下拉里应有「%s」；画面上有 %q", name, f.session.Texts())
+		}
+	}
+}
+
 // 没装配 DocSite 的 Root：「采集文档站」仍是「尚未迁移」的占位，返回钮回到队列。
 func TestRootDocSiteUnwiredKeepsThePlaceholder(t *testing.T) {
 	f, _, _ := openAuthDocRoot(t, nil, nil, nil)

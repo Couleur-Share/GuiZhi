@@ -221,6 +221,18 @@ func TestNativeImportsDocSiteDecodesOddPayloads(t *testing.T) {
 	}
 }
 
+// create 回了空字符串的批次 id 与没回 id 一样是错误：界面不能拿一个空 id 去轮询或选中批次。
+func TestNativeImportsDocSiteCreateRejectsEmptyID(t *testing.T) {
+	b := newSystemBridge()
+	b.handlers["crawl:create"] = func(context.Context, []json.RawMessage) (any, error) {
+		return json.RawMessage(`{"ok":true,"data":""}`), nil
+	}
+	id, err := docSiteAdapter{b: b}.CreateJob(t.Context(), services.CrawlInput{})
+	if err == nil || !strings.Contains(err.Error(), "批次 id") || id != "" {
+		t.Errorf("空批次 id 应报错：id=%q err=%v", id, err)
+	}
+}
+
 // 创建请求的形状与渲染层 webCapture.create 一致：directory 为空时不带、合集为空是 null、重复策略与上限原样给出。
 func TestNativeImportsDocSiteCreateRequestShape(t *testing.T) {
 	b := newSystemBridge()

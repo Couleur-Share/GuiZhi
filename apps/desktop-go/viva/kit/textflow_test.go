@@ -183,6 +183,20 @@ func TestWrapBreakAllTiledRowsConcatenateToTheText(t *testing.T) {
 	}
 }
 
+// 带硬换行的文字也首尾相接：换行符并回上一行的行尾，文字以换行结尾时最后一行是那个换行符（行内文字按约定没有硬换行，
+// 但 wrapBreakAllTiled 的「拼起来是原文」不能因此丢字符，textFlow 才不会按错位的行长数偏移）。
+func TestWrapBreakAllTiledKeepsHardNewlines(t *testing.T) {
+	measure := func(s string) float32 { return float32(len([]rune(s))) * 10 }
+	for _, text := range []string{"ab\ncd\n", "abcdef \nghijkl ", "ab\n\ncd", "\n"} {
+		for _, w := range []float32{35, 80, 200} {
+			rows := wrapBreakAllTiled(text, w, measure)
+			if got := strings.Join(rows, ""); got != text {
+				t.Errorf("宽度 %v：%q 折成 %q，拼起来不是原文", w, text, rows)
+			}
+		}
+	}
+}
+
 // TextFlowBreakAll：网址放不下时在最后放得下的字符处断开（不在 / 之类的分隔符之后），每一截仍是一个 Label。
 func TestTextFlowBreakAllCutsTheLastRunAtTheLastFittingCharacter(t *testing.T) {
 	runs := []string{"新增", " · ", "https://docs.example.com/guide/page-1"}
