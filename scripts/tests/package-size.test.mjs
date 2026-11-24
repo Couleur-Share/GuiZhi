@@ -94,3 +94,5 @@ test("仓库里的预算文件可解析，且发布用的上限是有限的正�
   const budget = JSON.parse(fs.readFileSync(DEFAULT_BUDGET_FILE, "utf8"));
   assert.ok(Number.isInteger(budget.installer.maxBytes) && budget.installer.maxBytes > 0, "预算必须是正整数");
 });
+
+import "./third-party-licenses.test.mjs";

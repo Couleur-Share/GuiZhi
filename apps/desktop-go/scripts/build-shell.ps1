@@ -38,6 +38,17 @@ Remove-Item (Join-Path $outDir "dist") -Recurse -Force -ErrorAction SilentlyCont
 Copy-Item $dist (Join-Path $outDir "dist") -Recurse
 Copy-Item (Join-Path $shell "reading_libraries.json") $outDir
 
+# 第三方许可证随包（Viva 为 Apache-2.0，要求再分发时附带 LICENSE 与 NOTICE；go-winio 为 MIT）。
+# 清单与 build-installer.ps1 的必备项、scripts/tests/third-party-licenses.test.mjs 的完整性检查保持一致：third-party 下新增文件必须同时加进来。
+$licenseFiles = @("viva\LICENSE", "viva\NOTICE", "viva\THIRD_PARTY_NOTICES.md", "go-winio\LICENSE")
+foreach ($rel in $licenseFiles) {
+  $src = Join-Path $root "third-party\$rel"
+  if (-not (Test-Path $src)) { throw "缺少第三方许可证文件 $src，拒绝构建不带许可证的发布目录" }
+  $dst = Join-Path $outDir "third-party\$rel"
+  New-Item -ItemType Directory -Force (Split-Path $dst) | Out-Null
+  Copy-Item $src $dst -Force
+}
+
 # MyGo 0.9 起 SQLite 是原生模块（Sqlitecore.dll），必须随发布目录放在 exe 同目录，否则全新机器首次启动必败。
 # 取库、校验与下载逻辑集中在 ensure-sqlitecore.ps1（pnpm shot 的隔离构建也用它），原因与细节见该脚本头部。
 & (Join-Path $PSScriptRoot "ensure-sqlitecore.ps1") -Out $outDir -GoRoot $shell   # 失败时脚本自己 throw，$ErrorActionPreference=Stop 会中止构建

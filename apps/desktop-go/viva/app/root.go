@@ -214,6 +214,7 @@ func (r *Root) mountLibrary(invalidate func()) {
 	view.Panel = r.library.Panel
 	view.Workspace = r.library.Workspace
 	view.HidePanel = r.library.FocusReading
+	view.OccludePanelShadow = r.library.OccludePanelShadow // 吸附表头盖住侧栏右缘外阴影的那一段（B-048）
 	r.win.Modules[shell.ModuleLibrary] = view
 	r.win.OnSearch = r.library.SearchTyped
 	if r.importsStore != nil {

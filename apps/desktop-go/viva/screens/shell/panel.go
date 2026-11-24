@@ -17,6 +17,13 @@ type ModuleView struct {
 	Workspace func(c ui.C)
 	// HidePanel 非空且返回真时，这一帧整块二级侧栏（含紧凑布局下的浮层与遮罩）不挂载：知识库的专注阅读（渲染层 App.tsx 的 !(isFocusReadingMode && appModule === "library")）。
 	HidePanel func() bool
+	// OccludePanelShadow 非空时，每帧在补画二级侧栏右缘外阴影（paintPanelEdgeShadow）时询问：工作区里有没有层级比侧栏高的不透明横条
+	// 盖住了阴影所在的那一列（知识库表格横向滚动后吸附的表头 thead，z-30 高于侧栏的 z-20，台账 B-048）。
+	// 返回画布绝对逻辑坐标下被盖住的纵向区间 [top, bottom]；ok 为假或 bottom <= top 表示没有。
+	// 只在整条阴影都落在这条横条之下时才报告（横条的左缘到不了侧栏右缘就不算盖住）。
+	// 调用时机是整行的 DrawOver：Viva 先画完子元素的 Draw 再跑父级的 DrawOver（viva@v0.6.4 ui/paint.go 的 132–143 行），
+	// 所以工作区在本帧 Draw 里记下的几何，这里读到的就是同一帧的。
+	OccludePanelShadow func() (top, bottom float32, ok bool)
 }
 
 // panelBounds 是二级侧栏的宽度范围（渲染层 ui.store.ts 的 SIDEBAR_PANEL_WIDTH_*）。
@@ -67,15 +74,43 @@ func (w *Window) body(c ui.C) {
 // Viva 的侧栏画在工作区之前、又自带裁剪（Clip），阴影要么被工作区盖住、要么被自己的裁剪截掉，所以放在整行的 DrawOver 里补画：
 // 投影盒子按侧栏的矩形算（盒子自己的部分挖掉），只留落在右缘外那一条里的部分，宽度取阴影的三倍标准差加水平偏移。
 //
-// 近似：渲染层里吸附的表头（z-30）盖在这条阴影之上；表格横向滚动、表头压住这两列像素时（table-scrolled 的表头一段），
-// Viva 的阴影盖在表头上：表头那一段的右缘外，浅色多出 3、1 个灰阶，深色多出 5、3、1、1 个灰阶（像素实测，台账 B-048）。
+// 渲染层里吸附的表头（z-30）盖在这条阴影之上：表格横向滚动、表头压住这几列像素时（table-scrolled 的表头一段），
+// 表头不透明的底色把阴影盖掉。Viva 的补画在整行的 DrawOver 里、晚于一切子元素，所以靠 ModuleView.OccludePanelShadow
+// 问工作区要被盖住的纵向区间，把目标条切成上下两段（台账 B-048）：投影盒子仍是整个侧栏，只收窄裁剪条，高斯投影在切口处严丝合缝。
+//
+// 残余（台账 B-048）：表头左缘落在阴影条里面、还没越过侧栏右缘时（横向滚动量落在一个 reach 宽的窗口内），表头只盖住条的一部分，
+// 工作区一侧不报告，这一段仍按整条补画——与此前的行为相同，只在这个窗口里多出 1–5 个灰阶。
 func (w *Window) paintPanelEdgeShadow(d *ui.DrawContext) {
 	l := w.Look
 	sh := l.T.UiPanelStrongShadow
 	reach := sh.Blur*1.5 + max(sh.X, -sh.X) + 1
 	aside := gfx.Rect{X: d.Rect.X, Y: d.Rect.Y, Width: w.panelWidth(), Height: d.Rect.Height}
 	strip := gfx.Rect{X: aside.X + aside.Width, Y: aside.Y, Width: reach, Height: aside.Height}
-	l.PaintCastShadow(d, aside, strip, 0, sh)
+	var top, bottom float32
+	var occluded bool
+	if view := w.Modules[w.module()]; view.OccludePanelShadow != nil {
+		top, bottom, occluded = view.OccludePanelShadow()
+	}
+	for _, part := range shadowStripParts(strip, top, bottom, occluded) {
+		l.PaintCastShadow(d, aside, part, 0, sh)
+	}
+}
+
+// shadowStripParts 把阴影目标条按被盖住的纵向区间 [top, bottom] 切成上下最多两段（高度大于 0 才保留）；没有被盖住时就是整条。
+// 上段是 [strip.Y, min(top, 条下沿)]，下段是 [max(bottom, strip.Y), 条下沿]；区间完全在条外时落成整条（一段）。
+func shadowStripParts(strip gfx.Rect, top, bottom float32, occluded bool) []gfx.Rect {
+	if !occluded || bottom <= top {
+		return []gfx.Rect{strip}
+	}
+	end := strip.Y + strip.Height
+	var parts []gfx.Rect
+	if upper := min(top, end); upper > strip.Y {
+		parts = append(parts, gfx.Rect{X: strip.X, Y: strip.Y, Width: strip.Width, Height: upper - strip.Y})
+	}
+	if lower := max(bottom, strip.Y); lower < end {
+		parts = append(parts, gfx.Rect{X: strip.X, Y: lower, Width: strip.Width, Height: end - lower})
+	}
+	return parts
 }
 
 // panelScrim 是紧凑布局下侧栏浮层后面的遮罩：absolute inset-0 bg-black/20，点它收起；tabIndex=-1，不进 Tab 序列。

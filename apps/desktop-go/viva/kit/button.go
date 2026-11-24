@@ -39,6 +39,13 @@ type ButtonStyle struct {
 	// FocusRing 为真时环跟 :focus 走（点击后仍留着），否则只在键盘聚焦（:focus-visible）时画。
 	Ring      tokens.Color
 	FocusRing bool
+	// RingOffset 非零时，聚焦环与按钮之间隔着这么宽的一圈留白（Tailwind 的 ring-offset-N，逻辑像素；box-shadow 的第一层，
+	// 色值取 RingOffsetColor），环整体向外推 RingOffset。零值（缺省）环紧贴按钮，与此前相同。
+	// 留白画在按钮底色之外，底色透明（ghost）时它是实心的一圈，环在它外面，两圈都不透出下面的内容。
+	RingOffset float32
+	// RingOffsetColor 是留白的颜色；零值取页面底色（ring-offset-background）。渲染层没写 ring-offset-background 时
+	// Tailwind 的缺省留白色是 #fff（--tw-ring-offset-color），调用方照源码显式给 tokens.White。
+	RingOffsetColor tokens.Color
 
 	// Transition 是状态变化的过渡档位；DurationNone 表示直接切换（渲染层没有写 transition-*）。
 	Transition DurationName
@@ -103,6 +110,23 @@ type ButtonSpec struct {
 
 // ringColor 是全局 button:focus-visible 的 ring-2 ring-primary/50。
 func (l *Look) ringColor() tokens.Color { return l.T.Primary.WithAlpha(0.5) }
+
+// paintOffsetRing 画带留白的聚焦环（ring-2 加 ring-offset-N，台账 B-039）：box-shadow 是两层，
+// 第一层 `0 0 0 Npx 留白色` 紧贴按钮，第二层 `0 0 0 (N+2)px 环色` 在它外面；这里拆成两圈空心环，
+// 留白一圈宽 N、环一圈宽 2 且以按钮外扩 N 的矩形为内沿（圆角相应加 N），两圈之间、环与按钮之间都不重叠，半透明的环色也不会叠色。
+// 留白色缺省取页面底色。
+func (l *Look) paintOffsetRing(d *ui.DrawContext, ring tokens.Color, st ButtonStyle) {
+	gap := st.RingOffsetColor
+	if gap == (tokens.Color{}) {
+		gap = l.T.Background
+	}
+	l.PaintRingBand(d, st.RingOffset, gap, st.Radius)
+	scale := d.Canvas.PixelScale()
+	outer := SnapRect(d.Rect, scale)
+	sub := *d
+	sub.Rect = gfx.Rect{X: outer.X - st.RingOffset, Y: outer.Y - st.RingOffset, Width: outer.Width + 2*st.RingOffset, Height: outer.Height + 2*st.RingOffset}
+	l.PaintRingBand(&sub, 2, ring, st.Radius+st.RingOffset)
+}
 
 // orSame 取悬停色；零值表示悬停不变，返回 base。
 func orSame(hover, base tokens.Color) tokens.Color {
@@ -213,7 +237,9 @@ func (l *Look) Button(c ui.C, spec ButtonSpec, st ButtonStyle) ui.Box {
 			}
 			// box-shadow 的环只出现在边框盒外侧：底色不透明时画实心环、靠随后的底色盖住内部；
 			// 底色透明或半透明（ghost 钮、悬停过渡中）时改画空心环，环里才不会透出环色。
-			if bgNow.A < 1 {
+			if st.RingOffset > 0 {
+				l.paintOffsetRing(d, ring, st)
+			} else if bgNow.A < 1 {
 				l.PaintRingBand(d, 2, ring, st.Radius)
 			} else {
 				l.PaintRing(d, 2, ring, st.Radius)

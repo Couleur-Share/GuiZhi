@@ -3,9 +3,9 @@ package services
 // 来源平台识别：对应 packages/shared/utils/{video-platforms,forum-platforms,source-platforms}.ts。
 // 判定完全由 URL 决定。
 //
-// 桌面外壳（main 包）的 source_platforms.go 里有同一份判定（由 make-golden.mts 的 importUtil 基准逐例对拍）；
-// main 包不能被界面层引用，所以这里留一份给原生界面（任务详情的平台图标与名称）。两处一起改，
-// source_platform_test.go 的用例与外壳侧的对拍用例是同一批输入（台账登记：重复实现的代价与收敛时机见 B-018）。
+// 这里是来源平台识别的唯一实现（B-018 已收敛）：桌面外壳（main 包）的 source_platforms.go 只是转发包装，
+// 由 make-golden.mts 的 importUtil 基准逐例对拍；原生界面（任务详情的平台图标与名称）直接用这里导出的函数。
+// 改判定只改这一处；source_platform_test.go 与外壳侧的对拍用例是同一批输入。
 
 import (
 	"regexp"
@@ -68,76 +68,113 @@ func isNgaHostname(h string) bool {
 		h == "nga.178.com" || strings.HasSuffix(h, ".nga.178.com")
 }
 
-// detectForumPlatform 对应 detectForumPlatform 的平台部分；认不出返回 ""。
-func detectForumPlatform(raw string) string {
+// ForumTarget 对应 ForumTarget：论坛平台名与帖子标识。
+type ForumTarget struct{ Platform, TopicID string }
+
+// DetectForumTarget 对应 detectForumPlatform：认不出返回 nil。
+// NGA 的 tid 按 ECMAScript trim 去首尾空白（isJSSpace），与 JS 的 searchParams.get("tid") 在参数缺失时同为空串。
+func DetectForumTarget(raw string) *ForumTarget {
 	u, err := whatwg.Parse(raw)
 	if err != nil {
-		return ""
+		return nil
 	}
 	host, path := strings.ToLower(u.Hostname()), u.Pathname()
 	if host == "v2ex.com" || strings.HasSuffix(host, ".v2ex.com") {
-		if v2exTopicRe.MatchString(path) {
-			return "v2ex"
+		if m := v2exTopicRe.FindStringSubmatch(path); m != nil {
+			return &ForumTarget{"v2ex", m[1]}
 		}
-		return ""
+		return nil
 	}
 	if host == "nodeseek.com" || host == "www.nodeseek.com" {
-		if nodeseekTopicRe.MatchString(path) {
-			return "nodeseek"
+		if m := nodeseekTopicRe.FindStringSubmatch(path); m != nil {
+			return &ForumTarget{"nodeseek", m[1]}
 		}
 	}
 	if isNgaHostname(host) && ngaReadRe.MatchString(path) {
 		tid := strings.TrimFunc(u.SearchParams().Get("tid"), isJSSpace)
 		if digitsOnlyRe.MatchString(tid) {
-			return "nga"
+			return &ForumTarget{"nga", tid}
 		}
 	}
 	if host == "linux.do" || strings.HasSuffix(host, ".linux.do") {
-		if discourseTopicRe.MatchString(path) {
-			return "linuxdo"
+		if m := discourseTopicRe.FindStringSubmatch(path); m != nil {
+			return &ForumTarget{"linuxdo", m[1]}
 		}
 	}
 	if host == "meta.appinn.net" {
-		if discourseTopicRe.MatchString(path) {
-			return "appinn"
+		if m := discourseTopicRe.FindStringSubmatch(path); m != nil {
+			return &ForumTarget{"appinn", m[1]}
 		}
 	}
 	if host == "2libra.com" || host == "www.2libra.com" {
-		if twolibraPostRe.MatchString(path) {
-			return "twolibra"
+		if m := twolibraPostRe.FindStringSubmatch(path); m != nil {
+			return &ForumTarget{"twolibra", m[2]}
 		}
 	}
-	return ""
+	return nil
 }
 
 // DetectVideoPlatform 是 detectVideoPlatform 的导出：认不出返回 ""。详情据此判断在线视频能不能转写。
 func DetectVideoPlatform(raw string) string { return detectVideoPlatform(raw) }
 
-// DetectForumPlatform 是 detectForumPlatform 的导出：认不出返回 ""。详情据此判断论坛讨论能不能刷新。
-func DetectForumPlatform(raw string) string { return detectForumPlatform(raw) }
+// DetectForumPlatform 是 DetectForumTarget 的平台部分：认不出返回 ""。详情据此判断论坛讨论能不能刷新。
+func DetectForumPlatform(raw string) string {
+	if f := DetectForumTarget(raw); f != nil {
+		return f.Platform
+	}
+	return ""
+}
 
-// sourceCommentsDomains 是能采集来源评论的平台与域名：platform-capture.ts 的 PLATFORM_DOMAINS 里抖音与小红书两项。
-var sourceCommentsDomains = []struct {
-	platform string
-	domains  []string
+// platformCaptureDomains 对应 platform-capture.ts 的 PLATFORM_DOMAINS：登录态采集平台与域名（按判定顺序）。
+var platformCaptureDomains = []struct {
+	name    string
+	domains []string
 }{
 	{"xiaohongshu", []string{"xiaohongshu.com", "xhslink.com", "xhslink.cn"}},
 	{"douyin", []string{"douyin.com", "iesdouyin.com"}},
+	{"linuxdo", []string{"linux.do"}},
+	{"nodeseek", []string{"nodeseek.com"}},
 }
 
-// DetectSourceCommentsPlatform 对应 detectSourceCommentsPlatform：独立来源评论只对抖音与小红书开放，
-// 且必须是 https 链接、域名是平台域名或其子域；认不出返回 ""。
-// 重复实现的登记见文件头（B-018）：与 main 包 detectPlatformCapturePlatform 的这两项判定一致。
-func DetectSourceCommentsPlatform(raw string) string {
+// IsAllowedPlatformURL 对应 isAllowedPlatformURL：必须是 https、域名是该平台域名或其子域；
+// NodeSeek 还要求域名精确是 nodeseek.com / www.nodeseek.com，且不带端口与用户名密码。
+func IsAllowedPlatformURL(platform, raw string) bool {
 	u, err := whatwg.Parse(raw)
-	if err != nil || u.Protocol() != "https:" {
-		return ""
+	if err != nil {
+		return false
+	}
+	if platform == "nodeseek" && (u.Username() != "" || u.Password() != "" || u.Port() != "" ||
+		(u.Hostname() != "nodeseek.com" && u.Hostname() != "www.nodeseek.com")) {
+		return false
+	}
+	if u.Protocol() != "https:" {
+		return false
 	}
 	host := strings.ToLower(u.Hostname())
-	for _, p := range sourceCommentsDomains {
-		if isHostOrSubdomain(host, p.domains...) {
-			return p.platform
+	for _, p := range platformCaptureDomains {
+		if p.name == platform {
+			return isHostOrSubdomain(host, p.domains...)
 		}
+	}
+	return false
+}
+
+// DetectPlatformCapturePlatform 对应 detectPlatformCapturePlatform：认不出返回 ""。
+func DetectPlatformCapturePlatform(raw string) string {
+	for _, p := range platformCaptureDomains {
+		if IsAllowedPlatformURL(p.name, raw) {
+			return p.name
+		}
+	}
+	return ""
+}
+
+// DetectSourceCommentsPlatform 对应 detectSourceCommentsPlatform：独立来源评论只对抖音与小红书开放
+// （复用 DetectPlatformCapturePlatform 的 https 与域名校验）；认不出或属于其它登录态平台返回 ""。
+func DetectSourceCommentsPlatform(raw string) string {
+	switch p := DetectPlatformCapturePlatform(raw); p {
+	case "xiaohongshu", "douyin":
+		return p
 	}
 	return ""
 }
@@ -162,8 +199,8 @@ func ResolveSourcePlatform(sourceKind, sourceURI string) (platform string, ok bo
 	if v := detectVideoPlatform(sourceURI); v != "" {
 		return v, true
 	}
-	if f := detectForumPlatform(sourceURI); f != "" {
-		return f, true
+	if f := DetectForumTarget(sourceURI); f != nil {
+		return f.Platform, true
 	}
 	return "web", true
 }

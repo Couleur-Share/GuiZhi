@@ -179,6 +179,7 @@ func (s *Screen) tableHead(c ui.C, v View, cols []tableColumn, geo stickyGeometr
 	ui.Row(c.Key("thead")).FillWidth().Shrink(0).MarginTop(geo.headerTop).Items(ui.Stretch).
 		PadSides(0, 0, 0.5, 0).
 		Draw(func(d *ui.DrawContext) {
+			s.noteTableHead(d) // 表头盖住侧栏右缘外阴影的纵向区间（B-048）
 			rect := d.Rect
 			rect.Width -= geo.overflow // 越出面板内缘的部分被裁掉，圆角落在面板的内缘上
 			rect.Height -= 0.5

@@ -45,6 +45,8 @@ type tableState struct {
 	firstRow string
 	// reveal 是「选中行滚进视口」的状态（tablereveal.go）。
 	reveal tableReveal
+	// head 是吸附表头对侧栏阴影的遮挡记录（tablehead_shadow.go，台账 B-048）。
+	head headShadow
 	// window 是行列的窗口（kit.RowWindow，台账 B-047）；overscan 大于 0 时覆盖默认的上下多声明行数（测试用）。
 	window   kit.RowWindow
 	overscan int
@@ -252,6 +254,7 @@ func (s *Screen) tableTop() float32 {
 func (s *Screen) stickyAt(view kit.Scroll2D, minW float32) stickyGeometry {
 	l := s.Look
 	padX := l.Space(tableAreaPadX)
+	s.table.head.noteView(view) // 表头压住侧栏阴影的几何（B-048）要用滚动区的位置与视口
 	g := stickyGeometry{headerTop: max(0, view.Offset-s.tableTop())}
 	// 表头不能越出表格：表格滚出去了，吸附的表头跟着走（它的包含块是表格）。
 	if h := s.table.tableH; h > 0 {

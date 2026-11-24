@@ -23,7 +23,7 @@ func (l *Look) UISecondaryButton(size UIButtonSize) ButtonStyle {
 	st := l.UIGhostButton(size)
 	st.Bg, st.BgHover = t.UiSurfaceBg, t.UiSurfaceBg
 	st.Border, st.BorderW, st.Shadow = t.UiSurfaceBorder, 1, t.UiSurfaceShadow
-	st.Ring, st.FocusRing = tokens.Color{}, false
+	st.Ring, st.FocusRing, st.RingOffset = tokens.Color{}, false, 0
 	return st
 }
 
@@ -32,8 +32,11 @@ func (l *Look) UISecondaryButton(size UIButtonSize) ButtonStyle {
 // 禁用时 opacity-50（ButtonStyle 的 DisabledOpacity 缺省 0.5）。
 //
 // 只做了 ghost 与 secondary：primary、danger 两个变体等到第一处用到它们的界面迁入时再加，由那里的对照守住。
-// 与渲染层不同之处（台账 B-039）：聚焦环没有 ring-offset-2 的那一圈留白，按下时没有 active:scale-[0.98] 的缩放；
-// 两者都只在键盘或鼠标按住的瞬间可见，静止的画面不受影响。
+// 聚焦环带 ring-offset-2 的留白（台账 B-039 的前一半，M4 Step 1 补上）：渲染层 Button.tsx 的类是 `focus:ring-2 focus:ring-offset-2 focus:ring-border`，
+// 没写 ring-offset-background，tailwind.config.js 也没有配 ringOffsetColor，所以留白色是 Tailwind 缺省的 #fff（--tw-ring-offset-color），
+// 深色主题里也是白的；组件类带 focus: 变体（特异性 0,2,0），盖得过全局 `button:focus-visible { ring-offset-0 }`（0,1,1），键盘聚焦时同样有留白。
+// 与渲染层仍不同之处：按下时没有 active:scale-[0.98] 的缩放（Viva v0.6.4 没有按钮盒与文字的按下缩放原语——Presence.Scale 只用于浮层进出场且文字不随缩放，台账 B-039 后半），
+// 只在鼠标按住的瞬间可见，静止的画面不受影响。
 func (l *Look) UIGhostButton(size UIButtonSize) ButtonStyle {
 	t := l.T
 	st := ButtonStyle{
@@ -41,6 +44,7 @@ func (l *Look) UIGhostButton(size UIButtonSize) ButtonStyle {
 		Fg: t.Foreground, Bg: tokens.Transparent, BgHover: t.Accent,
 		Transition: DurationBase,
 		Ring:       t.Border, FocusRing: true, // focus:ring-2 focus:ring-border：环跟 :focus 走，点击后仍留着
+		RingOffset: 2, RingOffsetColor: tokens.White, // focus:ring-offset-2：缺省留白色 #fff
 	}
 	switch size {
 	case UIButtonMD:

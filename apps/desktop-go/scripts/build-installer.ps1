@@ -10,6 +10,10 @@ $shellDir = (Resolve-Path $Shell).Path
 if (-not (Test-Path (Join-Path $shellDir "GuiZhi.exe"))) { throw "$shellDir 里没有 GuiZhi.exe，请先运行 .\apps\desktop-go\scripts\build-shell.ps1" }
 # 没有 SQLite 原生库的包在全新机器（离线或访问不了 GitHub）上首次启动必败，所以拒绝打包。
 if (-not (Test-Path (Join-Path $shellDir "Sqlitecore.dll"))) { throw "$shellDir 里没有 Sqlitecore.dll，请用最新的 .\apps\desktop-go\scripts\build-shell.ps1 重新构建" }
+# 不带第三方许可证的包不能分发（Viva 的 Apache-2.0 与 go-winio 的 MIT 都要求随包附带许可证文本）。
+foreach ($rel in @("third-party\viva\LICENSE", "third-party\go-winio\LICENSE")) {
+  if (-not (Test-Path (Join-Path $shellDir $rel))) { throw "$shellDir 里没有 $rel，请用最新的 .\apps\desktop-go\scripts\build-shell.ps1 重新构建" }
+}
 $cfg = Join-Path $root "apps\desktop-go\electron-builder.mygo.cjs"
 $out = Join-Path $root "apps\desktop-go\out\installer"
 if (Test-Path $out) { Get-ChildItem $out -File | Remove-Item -Force }

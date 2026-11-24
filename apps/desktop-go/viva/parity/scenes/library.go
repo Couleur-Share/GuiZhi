@@ -199,7 +199,7 @@ func libraryEnvScene(id string, opt libraryOptions, steps libraryEnvStep, mode p
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleLibrary,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F", Notifier: notifier,
 			Modules: map[shellscreen.Module]shellscreen.ModuleView{
-				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace, HidePanel: screen.FocusReading},
+				shellscreen.ModuleLibrary: {Panel: screen.Panel, Workspace: workspace, HidePanel: screen.FocusReading, OccludePanelShadow: screen.OccludePanelShadow},
 			},
 		}
 		// 窗口级键盘（方向键、Home、End、空格，B-045）与生产同一处接线：经 Look.KeyHook，焦点从此刻的画布读。

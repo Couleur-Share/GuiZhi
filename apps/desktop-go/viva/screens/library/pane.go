@@ -149,6 +149,7 @@ func (s *Screen) Workspace(c ui.C) {
 }
 
 func (s *Screen) workspaceBody(c ui.C) {
+	s.table.head.resetFrame() // 吸附表头对侧栏阴影的遮挡由本帧表头的 Draw 重新记下（B-048）
 	s.ensureMounted()
 	s.loadPane()
 	s.wsShown = true
