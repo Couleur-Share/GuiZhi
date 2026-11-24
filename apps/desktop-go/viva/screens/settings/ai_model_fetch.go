@@ -303,7 +303,7 @@ func (a *AI) modelCategory(c ui.C, f *fetchState, cat string, models []services.
 					ic = icons.ChevronRight
 				}
 				l.Icon(c.Key("chev"), ic, l.Rem(0.75), t.MutedForeground).Shrink(0)
-				brandBadge(l, c.Key("brand"), cat, l.Rem(1), t.Muted, t.Primary, l.Rem(0.25), 9)
+				l.ProviderBrandIcon(c.Key("brand"), cat, 16) // span.shrink-0 里的裸图标，16px（没有底盒）
 				l.Text(c.Key("name"), label, kit.TextXS, kit.WeightMedium, t.Foreground)
 				ui.Row(c.Key("count")).PadSides(l.Space(0.5), l.Space(1), l.Space(0.5), l.Space(1)).
 					Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: t.Muted, Radius: l.Rem(0.25)}) }).

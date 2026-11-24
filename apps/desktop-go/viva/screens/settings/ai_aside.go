@@ -14,7 +14,7 @@ import (
 )
 
 // aside 是左侧栏（`app-wallpaper-panel` 14rem）：「模型路由」入口、供应商搜索、供应商列表与底部的「添加供应商」。
-// 窄窗口时叠在内容上方，只占最多 18rem 高，列表自己滚动。
+// 窄窗口时叠在内容上方，高度与面板按 grid 的 auto 行规则分配（见 aiRowsLayout），列表自己滚动。
 func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 	l := a.Look
 	t := l.T
@@ -22,7 +22,7 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 	if wide {
 		col = col.Width(l.Rem(14)).FillHeight().PadRight(1)
 	} else {
-		col = col.FillWidth().MaxHeight(l.Rem(18)).PadBottom(1)
+		col = col.FillWidth().PadBottom(1) // 窄窗口的高度由 aiRowsLayout 分配
 	}
 	col.Draw(func(d *ui.DrawContext) {
 		l.PaintSurface(d, kit.Surface{Bg: t.UiPanelBg, Shadow: t.UiPanelShadow})
@@ -34,15 +34,24 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 	}).Children(func() {
 		a.asideTop(c.Key("top"))
 		if len(groups) == 0 {
-			// 没有供应商：说明文字在剩余高度里居中（flex min-h-0 flex-1 items-center justify-center p-6 text-center）；窄窗口里侧栏封顶 18rem，
+			// 没有供应商：说明文字在剩余高度里居中（flex min-h-0 flex-1 items-center justify-center p-6 text-center）；窄窗口里侧栏被压到 grid 分给它的高度时，
 			// 这一块按 flex-shrink 让出高度（内容被裁，底部的「添加供应商」留在可见区）。
 			ui.Row(c.Key("list")).FillWidth().Grow(1).Shrink(1).MinHeight(0).Items(ui.Center).Justify(ui.Center).Pad(l.Space(6)).Children(func() {
 				l.Text(c.Key("empty"), locales.SettingsAiWorkbenchNoModels(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped(), kit.Centered())
 			})
 		} else {
-			l.ScrollArea(c.Key("list"), [4]float32{l.Space(2), l.Space(2), l.Space(2), l.Space(2)}, func() {
+			pad := l.Space(2)
+			list := l.ScrollAreaView(c.Key("list"), [4]float32{pad, pad, pad, pad}, func(v kit.ScrollView) {
+				// 窄窗口：列表自然高度（flex-1 min-h-0 overflow-y-auto 的 max-content 贡献）是侧栏自然高度的一部分，
+				// 滚动区自己的预测高度不含内容，取上一帧布局量到的内容高度；变了就补一帧。
+				if !wide && a.rows.setAsideList(v.Content+2*pad) {
+					c.Canvas().RequestFrame()
+				}
 				a.providerList(c.Key("rows"), groups)
 			}).FillWidth().Grow(1).MinHeight(0)
+			if !wide {
+				list.Height(a.rows.asideList).Shrink(1)
+			}
 		}
 		ui.Column(c.Key("add")).FillWidth().Pad(l.Space(3)).
 			PadSides(l.Space(3)+1, l.Space(3), l.Space(3), l.Space(3)).
@@ -192,7 +201,7 @@ func (a *AI) providerRow(c ui.C, g services.AIEndpointGroup) {
 		dot = t.MutedForeground.WithAlpha(0.4)
 	}
 	box.Draw(func(d *ui.DrawContext) { l.PaintSurface(d, surface) }).Children(func() {
-		brandBadge(l, c.Key("brand"), category, l.Rem(1.75), t.Muted, t.Primary, l.Rem(0.5), 12)
+		brandBadge(l, c.Key("brand"), category, l.Rem(1.75), 17, t.Muted, mdRadius(l)) // h-7 w-7 rounded-md bg-muted，图标 17px
 		ui.Column(c.Key("text")).Grow(1).MinWidth(0).Children(func() {
 			l.Text(c.Key("name"), name, kit.TextSM, kit.WeightMedium, t.Foreground, kit.Ellipsis()).MinWidth(0)
 			l.TextPx(c.Key("detail"), detail, 11, 16.5, kit.WeightNormal, t.MutedForeground, kit.Ellipsis()).MinWidth(0)

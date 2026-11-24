@@ -352,6 +352,20 @@ func (c *WallpaperCache) Err() error {
 	return c.err
 }
 
+// Retained 是缓存此刻占住的位图字节数（源图加各份已渲染结果；与源图共用像素的渲染结果不重复计）。
+// 没有壁纸（文件名为空、已关闭、读取失败）时为 0；用于确认「关闭背景图就释放内存」，也方便诊断。
+func (c *WallpaperCache) Retained() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	total := len(c.src.Pix)
+	for _, r := range c.renders {
+		if !r.shared {
+			total += len(r.bmp.Pix)
+		}
+	}
+	return total
+}
+
 // Close 丢弃全部缓存并让后台结果作废，之后 Bitmap 恒返回 ok 为假；可重复调用。
 func (c *WallpaperCache) Close() {
 	c.mu.Lock()

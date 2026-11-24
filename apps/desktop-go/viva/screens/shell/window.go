@@ -46,6 +46,11 @@ type Window struct {
 	// PanelResizer 是二级侧栏宽度的拖拽状态：Width 由装配代码用已保存的宽度初始化。
 	PanelResizer kit.ColumnResizerState
 
+	// Wallpaper 非空时在窗口根背景之上、毛玻璃遮罩之下画整窗壁纸（渲染层 App.tsx 的 BackgroundImageBackdrop，台账 B-020）；
+	// d.Rect 是整个窗口。由外壳（viva/app）接上，壁纸没有启用时它自己清缓存并什么也不画。
+	// 不用 Canvas.DrawBackdrop：它画在整帧最底层，会被根背景（不透明的 Background）整个盖住。
+	Wallpaper func(d *ui.DrawContext)
+
 	// Notifier 是窗口的提示通道（渲染层的 Toast）；nil 时不画提示。提示宿主是覆盖层，在整个页面声明完之后才声明。
 	Notifier *kit.Notifier
 
@@ -169,7 +174,15 @@ func (w *Window) toggleSidebar(c ui.C) {
 func (w *Window) View(c ui.C) {
 	l := w.Look
 	ui.Row(c).Fill().Draw(func(d *ui.DrawContext) {
+		// 渲染层的叠放：bg-background → 壁纸（BackgroundImageBackdrop 的位图）→ app-wallpaper-blanket 遮罩 → app-wallpaper-shell（壁纸模式下透明）→ 页面。
+		// rail、顶栏与各页的 Ui* 令牌在壁纸模式下是半透明玻璃色，自然叠在这三层之上。
 		l.PaintSurface(d, kit.Surface{Bg: l.T.Background})
+		if w.Wallpaper != nil {
+			w.Wallpaper(d)
+		}
+		if l.Glass {
+			l.PaintSurface(d, kit.Surface{Bg: l.T.UiBlanketBg})
+		}
 	}).Children(func() {
 		w.rail(c)
 		ui.Column(c).Grow(1).FillHeight().MinWidth(0).Children(func() {
@@ -206,6 +219,9 @@ func (w *Window) closeDialogView(c ui.C) {
 // content 是顶栏下面、侧栏右边的区域：设置页，或当前模块的工作区。
 func (w *Window) content(c ui.C) {
 	l := w.Look
+	if w.Page != PageSettings && w.Settings != nil {
+		w.Settings.Release() // 不在设置页：释放显示设置预览舞台的壁纸缓存（离开设置页就不再占内存）
+	}
 	if w.Page == PageHome {
 		if view, ok := w.Modules[w.module()]; ok && view.Workspace != nil {
 			view.Workspace(c)

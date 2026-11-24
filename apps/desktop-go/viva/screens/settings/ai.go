@@ -71,6 +71,7 @@ type AI struct {
 	jobs     []aiSaveJob
 	inflight bool
 
+	rows     aiRowsLayout // 窄窗口里侧栏与面板的两行高度（ai_rows.go）
 	panel    aiPanel
 	selected string // 选中的端点分组键
 	search   ui.Field
@@ -273,13 +274,20 @@ func (a *AI) workbench(c ui.C) {
 // workbenchBody 是左侧栏加右侧面板。
 func (a *AI) workbenchBody(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 	l := a.Look
+	// 宽窗口是一行两列（14rem 加 1fr）；窄窗口是 grid 的两个 auto 行，高度按 aiRowsLayout 分配（不再给侧栏一个固定上限）。
 	box := ui.Row(c)
 	if !wide {
-		box = ui.Column(c)
+		box = ui.CustomLayout(c, &a.rows)
 	}
+	pad := [4]float32{l.Space(5), l.Space(6), l.Space(5), l.Space(6)}
 	box.FillWidth().Grow(1).MinHeight(0).Children(func() {
 		a.aside(c.Key("aside"), groups, wide)
-		l.ScrollArea(c.Key("main"), [4]float32{l.Space(5), l.Space(6), l.Space(5), l.Space(6)}, func() {
+		l.ScrollAreaView(c.Key("main"), pad, func(v kit.ScrollView) {
+			// 面板的自然高度（max-content）是 grid 行高的输入：滚动区自己的预测高度不含内容，取上一帧布局量到的内容高度；
+			// 它变了就补一帧，窄窗口里侧栏与面板的分界在下一帧到位。
+			if !wide && a.rows.setDetail(v.Content+pad[0]+pad[2]) {
+				c.Canvas().RequestFrame()
+			}
 			ui.Column(c.Key("body")).FillWidth().Children(func() {
 				l.Heading(c, 1, locales.SettingsAi(), kit.TextLG, kit.WeightSemibold, l.T.Foreground).MarginBottom(l.Space(4))
 				if g := a.selectedGroup(groups); a.panel == panelProvider && g != nil {

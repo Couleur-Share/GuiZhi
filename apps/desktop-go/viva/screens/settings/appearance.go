@@ -26,7 +26,10 @@ type Appearance struct {
 	// PickBackground 打开系统图片选择框，把选中的图片存进图片目录，返回存下的文件名；用户取消时返回空串。
 	// 在后台线程里调用，完成后外壳用 Wake 请求重绘。nil 表示宿主还没接上选图。
 	PickBackground func() (fileName string, err error)
-	// Wake 请求界面重绘（后台选图完成时调用，任意线程）。
+	// LoadBackground 按文件名读出应用图片目录里的背景图字节（预览舞台用）；在后台线程里调用，可以阻塞。
+	// nil 表示宿主没接上读图，预览按「读取失败」画损坏的回退图标。预览缓存在第一次需要时按此刻的值建好，之后换这个字段不会生效。
+	LoadBackground func(fileName string) ([]byte, error)
+	// Wake 请求界面重绘（后台选图与读图完成时调用，任意线程）。
 	Wake func()
 
 	picking     bool           // 正在选图（渲染层 isPickingBackground）：按钮禁用，防重入
@@ -40,6 +43,24 @@ type Appearance struct {
 	picker      kit.ColorPickerState // 自定义颜色的十六进制文本框
 	sideBySide  bool                 // 两个滑块是否并排（md 断点以上），每帧由背景图分区算出
 	swatchRow   kit.EqualCells       // 主题色带的版面（跨帧保留；Center 在 themeColor 里每帧置位）
+	// preview 是预览舞台的壁纸位图缓存：第一次画有图的舞台时才建，离开分区或设置页时 Close 并丢弃（无图时不占内存）。
+	preview *kit.WallpaperCache
+}
+
+// Close 释放预览舞台的壁纸位图缓存；可重复调用，之后再画有图的舞台会重新建缓存、重新读取。
+func (a *Appearance) Close() {
+	if a.preview != nil {
+		a.preview.Close()
+		a.preview = nil
+	}
+}
+
+// PreviewRetained 返回预览舞台缓存当前占用的位图字节数；没有缓存（无图、已离开分区）时为 0。供测试与内存排查。
+func (a *Appearance) PreviewRetained() int {
+	if a.preview == nil {
+		return 0
+	}
+	return a.preview.Retained()
 }
 
 // pickOutcome 是后台选图的结果。

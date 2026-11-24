@@ -1,6 +1,8 @@
 package scenes
 
 import (
+	"context"
+	"encoding/json"
 	"slices"
 
 	"github.com/vivaui/viva/gfx"
@@ -15,6 +17,7 @@ import (
 	"guizhi-mygo-shell/viva/parity"
 	settingsscreen "guizhi-mygo-shell/viva/screens/settings"
 	shellscreen "guizhi-mygo-shell/viva/screens/shell"
+	themedscreen "guizhi-mygo-shell/viva/screens/themed"
 )
 
 // 设置页三个外围分区（M3-2b：采集与转写、MCP 设置、AI 模型服务）的对照场景，与 React 采集器
@@ -59,6 +62,24 @@ func newAdvancedServices(fix parity.SettingsAdvancedFixture, withAI bool) advanc
 	return s
 }
 
+// readingSearchPanel 是 AI 页里的「联网搜索」块（ReadingSearchSettings，台账 B-074 / B-076）：
+// React 采集会话读到夹具里的搜索状态并渲染这一块（AISettingsPrototype 的最后一块之前），所以 Viva 一侧也挂上同一份状态的默认主题界面。
+// 每次渲染各建一份假服务与界面，不跨渲染共享。
+func readingSearchPanel(look *kit.Look, fix parity.SettingsAdvancedFixture) func(c ui.C) {
+	var reply struct {
+		Search services.ThemedSearchStatus `json:"search"`
+	}
+	if err := json.Unmarshal(fix.ReadingSearch, &reply); err != nil {
+		panic(err) // 夹具是编译进来的常量，解码失败是程序错误
+	}
+	svc := &servicestest.ThemedFake{}
+	svc.SetSearch(reply.Search)
+	screen := themedscreen.New(svc, kit.Guard{}, nil)
+	screen.SetContext(context.Background())
+	screen.Look = look
+	return screen.SearchPanel
+}
+
 // advancedShell 是整窗里设置页的壳：Active 指定分区，三个分区的服务来自 svc。
 func advancedShell(look *kit.Look, active settingsscreen.SectionID, fix parity.SettingsAdvancedFixture, svc advancedServices) *shellscreen.Window {
 	return &shellscreen.Window{
@@ -66,6 +87,7 @@ func advancedShell(look *kit.Look, active settingsscreen.SectionID, fix parity.S
 		Settings: &settingsscreen.Shell{
 			Look: look, Store: settingsscreen.NewMemStore(settings.Default()), Active: active,
 			CaptureTools: svc.capture, Solver: svc.solver, MCP: svc.mcp, AI: svc.ai, Platform: fix.Platform,
+			ReadingSearch: readingSearchPanel(look, fix),
 		},
 	}
 }
@@ -147,6 +169,10 @@ func mcpScene(id string, waivers ...parity.Waiver) parity.Scene {
 // aiLoaded 是「AI 模型服务」页的后台读取（配置、用量）都已上屏的判定：
 // 有数据时是端点名与用量块的分组钮，空配置时是「还没有添加任何模型」说明（用量块为零也有一行说明，随同一批读取到齐）。
 func aiLoaded(s *headless.Session, fix parity.SettingsAdvancedFixture, withAI bool) bool {
+	// 联网搜索块的读取是后台的：React 采集同样等「搜索服务」标签出现。
+	if !snapshotHasText(s, locales.SettingsReadingSearchProvider()) {
+		return false
+	}
 	if !withAI {
 		// 说明文字在窄侧栏里折成多行，画面上的文字是逐行的：只认开头几个字。
 		return snapshotHasText(s, string([]rune(locales.SettingsAiWorkbenchNoModels())[:6])) && snapshotHasText(s, locales.SettingsAiUsageEmpty(30))
@@ -172,7 +198,7 @@ func aiScene(id string, withAI bool, waivers ...parity.Waiver) parity.Scene {
 	prepare := func(look *kit.Look) (func(c ui.C), func(s *headless.Session) error) {
 		fix := settingsAdvancedFixture()
 		svc := newAdvancedServices(fix, withAI)
-		a := &settingsscreen.AI{Look: look, Service: svc.ai}
+		a := &settingsscreen.AI{Look: look, Service: svc.ai, Search: readingSearchPanel(look, fix)}
 		return a.Page, func(s *headless.Session) error { return waitAILoaded(s, fix, withAI) }
 	}
 	return parity.Scene{

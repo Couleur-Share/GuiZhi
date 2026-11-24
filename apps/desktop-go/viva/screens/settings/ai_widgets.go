@@ -110,15 +110,17 @@ func fieldLabel(l *kit.Look, c ui.C, text string) {
 	l.Text(c, text, kit.TextXS, kit.WeightNormal, l.T.MutedForeground).MarginBottom(l.Space(1))
 }
 
-// brandBadge 是品牌图标的替身：渲染层按供应商或模型家族画 15 套品牌 SVG（<img>，有 alt 但不是文本节点），
-// Viva 没有这批图标，只画底色徽标加一个居中的实心圆点。圆点不是文字：换成首字母会多出一个文本节点，
-// 把后面的文字序列整体错位（M3-2b 实测，AI 页 L1 一次错位 41 处）。
-// category 与 fontPx 暂不参与绘制，留给补齐品牌图标时按分类选图。
-func brandBadge(l *kit.Look, c ui.C, category string, box float32, bg, fg tokens.Color, radius float32, fontPx float32) {
-	_, _ = category, fontPx
+// brandBadge 是「圆角底盒里居中放一枚品牌图标」：渲染层的
+//
+//	<span class="flex h-N w-N shrink-0 items-center justify-center rounded-R bg-B text-primary">{getCategoryIcon(category, icon)}</span>
+//
+// box 是底盒边长（rem 换算后的像素），icon 是图标边长（getCategoryIcon 的字面像素，不随字号档缩放），bg 是底色，radius 是底盒圆角。
+// 图标是 kit.Look.ProviderBrandIcon：有品牌 logo 的分类画位图，Custom / Other 画渐变方块，其余是首字母圆；
+// 它们的颜色都自带（img 不吃 text-primary），所以这里不需要前景色。台账 B-075。
+func brandBadge(l *kit.Look, c ui.C, category string, box, icon float32, bg tokens.Color, radius float32) {
 	badge := ui.Row(c).Size(box, box).Shrink(0).Items(ui.Center).Justify(ui.Center).
 		Draw(func(d *ui.DrawContext) { l.PaintSurface(d, kit.Surface{Bg: bg, Radius: radius}) })
-	badge.Children(func() { statusDot(l, c.Key("mark"), box/2, fg, 0, 0) })
+	badge.Children(func() { l.ProviderBrandIcon(c.Key("icon"), category, icon) })
 }
 
 // statusDot 是状态点：size 的圆，ringW 大于 0 时外面带一圈同色半透明的环（ring-[3px]）。

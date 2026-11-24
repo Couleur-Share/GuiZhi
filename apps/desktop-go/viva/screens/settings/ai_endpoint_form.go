@@ -141,13 +141,21 @@ func (a *AI) endpointBody(c ui.C, f *endpointForm) {
 			fieldLabel(l, c.Key("label"), locales.SettingsAiWorkbenchProviderType())
 			options := make([]kit.SelectOption, 0, len(services.AIProviderPresets()))
 			for _, p := range services.AIProviderPresets() {
-				options = append(options, kit.SelectOption{Value: p.ID, Label: providerOptionLabel(p)})
+				// 面板里每一行都是「图标 + 名字」（EndpointFormModal 的 providerOptions：getCategoryIcon(item.iconCategory, 18)，aria-hidden）。
+				category := p.IconCategory
+				options = append(options, kit.SelectOption{
+					Value: p.ID, Label: providerOptionLabel(p),
+					Leading: func(c ui.C) { l.ProviderBrandIcon(c, category, 18) },
+				})
 			}
-			if picked, changed := l.Select(c.Key("select"), &f.provSel, kit.SelectSpec{
-				Label: locales.SettingsAiWorkbenchProviderType(), Value: f.provider, Options: options, Width: -1,
-				// 触发按钮里的品牌图标（18px，aria-hidden）：没有品牌图标时用同尺寸的徽标替身，文字起点与渲染层一致（台账 B-075）。
-				Leading: func(c ui.C) { brandBadge(l, c, preset.ID, 18, t.Primary.WithAlpha(0.1), t.Primary, 4, 0) },
-			}); changed {
+			spec := kit.SelectSpec{Label: locales.SettingsAiWorkbenchProviderType(), Value: f.provider, Options: options, Width: -1}
+			if hasPreset {
+				// 触发按钮里是当前值的「图标 + 名字」：同一枚 18px 品牌图标（aria-hidden，不进可访问树，台账 B-075）。
+				// 当前值不是预设时渲染层的触发钮没有选中项、也就没有图标，这里同样不画。
+				category := preset.IconCategory
+				spec.Leading = func(c ui.C) { l.ProviderBrandIcon(c, category, 18) }
+			}
+			if picked, changed := l.Select(c.Key("select"), &f.provSel, spec); changed {
 				f.changeProvider(picked)
 			}
 			l.TextPx(c.Key("hint"), locales.SettingsAiWorkbenchProviderTypeHint(typeLabel), 11, 16.5, kit.WeightNormal, t.MutedForeground, kit.Wrapped()).MarginTop(l.Space(1))

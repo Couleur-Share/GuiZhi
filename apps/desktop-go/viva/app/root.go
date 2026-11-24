@@ -71,6 +71,9 @@ type Root struct {
 	notifier *kit.Notifier
 	guard    kit.Guard
 
+	// wallpaper 是整窗壁纸的位图缓存（root_wallpaper.go）：壁纸启用时按窗口尺寸渲染，关闭时清空释放，关窗口时 Close。
+	wallpaper *kit.WallpaperCache
+
 	look     *kit.Look
 	lookSpec kit.Spec
 	canvas   *gfx.Canvas // 窗口的画布（第一次绘制时记下）：窗口级键盘读此刻的焦点
@@ -107,8 +110,10 @@ func NewRoot(opts Options, invalidate func()) *Root {
 		CaptureTools: opts.Services.CaptureTools, MCP: opts.Services.MCP, AI: opts.Services.AI, Collections: opts.Services.Library, Platform: opts.Platform,
 		AppVersion: opts.AppVersion, OpenExternal: opts.Services.OpenExternal,
 	}
+	r.mountWallpaper(invalidate)
 	r.win = &shell.Window{
 		Settings:        r.settings,
+		Wallpaper:       r.paintWallpaper,
 		Notifier:        r.notifier,
 		SearchShortcut:  opts.SearchShortcut,
 		CaptureShortcut: opts.CaptureShortcut,
@@ -470,6 +475,7 @@ func (r *Root) Close() {
 	if r.themed != nil {
 		r.themed.Close()
 	}
+	r.closeWallpaper()
 	if r.stopImports != nil {
 		r.stopImports()
 	}

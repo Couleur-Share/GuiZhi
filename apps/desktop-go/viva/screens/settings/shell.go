@@ -61,8 +61,9 @@ type Shell struct {
 	// OnBack 是点「返回」时的回调（回到知识库等模块页）。
 	OnBack func()
 
-	// PickBackground 与 Wake 交给「显示设置」页的背景图分区（见 Appearance 同名字段）。
+	// PickBackground、LoadBackground 与 Wake 交给「显示设置」页的背景图分区（见 Appearance 同名字段）。
 	PickBackground func() (fileName string, err error)
+	LoadBackground func(fileName string) ([]byte, error)
 	Wake           func()
 	// Locale 是时间的区域写法（系统区域，kit.ParseDateLocale）；零值按中文。
 	Locale kit.DateLocale
@@ -139,6 +140,11 @@ func (s *Shell) remount() {
 		return
 	}
 	switch s.mounted {
+	case SectionAppearance:
+		// 显示设置没有后台订阅，页面状态（滑块、色板）照旧保留；只释放背景图预览的位图缓存（回来时重新读取并渲染）。
+		if s.appearance != nil {
+			s.appearance.Close()
+		}
 	case SectionData:
 		if s.data != nil {
 			s.data.Close()
@@ -173,6 +179,22 @@ func (s *Shell) remount() {
 		s.about = nil
 	}
 	s.mounted = s.section()
+}
+
+// Release 释放设置页此刻占着的可再生资源（目前只有显示设置背景图预览的位图缓存）：窗口不在设置页时每帧调用，关窗口时再调一次，
+// 可重复调用。与 remount 不同，它不改变当前分区；回到设置页后预览按需重新读取。
+func (s *Shell) Release() {
+	if s.appearance != nil {
+		s.appearance.Close()
+	}
+}
+
+// PreviewRetained 返回显示设置页背景图预览持有的位图字节数；页面没建或已释放时为 0。供测试与内存排查。
+func (s *Shell) PreviewRetained() int {
+	if s.appearance == nil {
+		return 0
+	}
+	return s.appearance.PreviewRetained()
 }
 
 // section 返回当前分区。
@@ -210,7 +232,7 @@ func (s *Shell) content(c ui.C) {
 			s.appearance = &Appearance{}
 		}
 		a := s.appearance
-		a.Look, a.Store, a.Guard, a.PickBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.Wake
+		a.Look, a.Store, a.Guard, a.PickBackground, a.LoadBackground, a.Wake = l, s.Store, s.Guard, s.PickBackground, s.LoadBackground, s.Wake
 		a.Page(c)
 	case SectionData:
 		if s.data == nil {

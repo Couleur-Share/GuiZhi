@@ -113,9 +113,14 @@ func (a *Appearance) previewStage(c ui.C, cur settings.UI) {
 	l := a.Look
 	t := l.T
 	surface := kit.Surface{Bg: t.SettingsInputBg, Border: t.SettingsInputBorder, BorderW: 1, Radius: l.Rem(0.75)}
+	hasImage := cur.BackgroundImageFileName != ""
+	if !hasImage {
+		a.Close() // 没有图：不占位图内存
+	}
 	stage := l.AspectBox(c.Key("stage"), 16.0/9, func() {
-		if cur.BackgroundImageFileName != "" {
-			return // 有图时的预览（壁纸与示意界面）尚未迁移，见台账 B-020
+		if hasImage {
+			a.previewStageContent(c, cur) // 壁纸加缩微外壳，见 appearance_preview.go
+			return
 		}
 		ui.Column(c).Items(ui.Center).Justify(ui.Center).Gap(l.Space(2)).Children(func() {
 			l.Icon(c, icons.Image, l.Rem(2), kit.Fade(t.MutedForeground, 0.5))
@@ -123,6 +128,11 @@ func (a *Appearance) previewStage(c ui.C, cur settings.UI) {
 		})
 	})
 	stage.Draw(func(d *ui.DrawContext) { l.PaintSurface(d, surface) })
+	if hasImage {
+		// 内容按矩形铺到边框之内，会盖住圆角处的边框环：把边框环补画在内容之上。
+		ring := kit.Surface{Border: surface.Border, BorderW: surface.BorderW, Radius: surface.Radius}
+		stage.DrawOver(func(d *ui.DrawContext) { l.PaintSurface(d, ring) })
+	}
 }
 
 // sliderBlock 是一个滑块块（space-y-2）：上面是「图标 + 标签」与右侧数值，下面是滑块。

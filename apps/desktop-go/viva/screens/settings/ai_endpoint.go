@@ -138,7 +138,7 @@ func (a *AI) endpointHeader(c ui.C, g services.AIEndpointGroup, engine, wide boo
 		DrawOver(func(d *ui.DrawContext) { l.PaintEdge(d, kit.EdgeBottom, 1, t.Border) }).
 		Children(func() {
 			ui.Row(c.Key("who")).Grow(1).MinWidth(0).Items(ui.Center).Gap(l.Space(3)).Children(func() {
-				brandBadge(l, c.Key("brand"), services.EndpointCategory(g.Provider, g.Models), l.Rem(2.5), t.Primary.WithAlpha(0.1), t.Primary, l.Rem(0.75), 16)
+				brandBadge(l, c.Key("brand"), services.EndpointCategory(g.Provider, g.Models), l.Rem(2.5), 20, t.Primary.WithAlpha(0.1), l.Rem(0.75)) // h-10 w-10 rounded-xl bg-primary/10，图标 20px
 				ui.Column(c.Key("text")).Grow(1).MinWidth(0).Children(func() {
 					ui.Row(c.Key("title")).FillWidth().Items(ui.Center).Gap(l.Space(2.5)).Children(func() {
 						l.Heading(c.Key("name"), 4, name, kit.TextStyle{Size: 1, Line: 1.25}, kit.WeightSemibold, t.Foreground, kit.Ellipsis()).MinWidth(0)
@@ -428,7 +428,7 @@ func (a *AI) modelRow(c ui.C, m services.AIModel, routes []string, last, wide, e
 		}
 		row.FillWidth().Items(ui.Center).Justify(ui.Between).Gap(l.Space(3)).PadSides(l.Space(3), l.Space(4), l.Space(3), l.Space(4)).Children(func() {
 			ui.Row(c.Key("who")).MinWidth(0).Items(ui.Center).Gap(l.Space(3)).Children(func() {
-				brandBadge(l, c.Key("brand"), services.ModelCategory(m.Provider, firstNonEmptyStr(m.Model, m.ID), ""), l.Rem(2.25), t.Muted, t.Primary, mdRadius(l), 14)
+				brandBadge(l, c.Key("brand"), services.ModelCategory(m.Provider, firstNonEmptyStr(m.Model, m.ID), ""), l.Rem(2.25), 20, t.Muted, mdRadius(l)) // h-9 w-9 rounded-md bg-muted，图标 20px
 				ui.Column(c.Key("name")).MinWidth(0).Children(func() {
 					l.Text(c.Key("title"), firstNonEmptyStr(m.Name, m.Model), kit.TextSM, kit.WeightMedium, t.Foreground, kit.Ellipsis()).MinWidth(0)
 					if m.Name != "" {
