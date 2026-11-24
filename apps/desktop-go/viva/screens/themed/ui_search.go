@@ -20,7 +20,11 @@ type searchUI struct {
 	provider kit.SelectState
 }
 
-// SearchPanel 画「联网搜索」设置块（SettingSectionBody，与 AI 分区其余块同宽）。每一帧由设置页在 AI 分区里调用。
+// SearchPanel 画「联网搜索」设置块（与 AI 分区其余块同宽）。每一帧由设置页在 AI 分区里调用。
+//
+// 版面照 ReadingSearchSettings 的 section：`space-y-3 rounded-xl border border-border p-4`，不是设置页通用的
+// 「卡片外标题」——标题 h3（text-base font-medium，前景色）与说明（text-sm 弱化）都在边框里面，没有卡片底色。
+// 1920×1080 对拍实测：React 外框 [248,851]、标题 [265,868,1302×24]、说明 [265,904,1302×20]、默认开关行 [265,936]（含 border-b）。
 func (s *Screen) SearchPanel(c ui.C) {
 	l := s.Look
 	u := &s.search
@@ -36,9 +40,14 @@ func (s *Screen) SearchPanel(c ui.C) {
 		u.synced = ""
 	}
 	c = c.Key("themed-search")
-	l.SettingSectionBody(c, locales.SettingsReadingSearchTitle(), func() {
+	t := l.T
+	frame := kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)} // rounded-xl border border-border，无底色
+	ui.Column(c.Key("section")).FillWidth().Pad(1).Draw(func(d *ui.DrawContext) {
+		l.PaintSurface(d, frame)
+	}).Children(func() {
 		ui.Column(c.Key("body")).FillWidth().Gap(l.Space(3)).Pad(l.Space(4)).Children(func() {
-			s.smallText(c.Key("desc"), locales.SettingsReadingSearchDesc())
+			l.Heading(c.Key("title"), 3, locales.SettingsReadingSearchTitle(), kit.TextBase, kit.WeightMedium, t.Foreground)
+			s.bodyText(c.Key("desc"), locales.SettingsReadingSearchDesc(), t.MutedForeground)
 			if v.Status == nil {
 				s.searchLoading(c.Key("loading"), v)
 				return
@@ -78,18 +87,19 @@ func (s *Screen) searchForm(c ui.C, v SearchView) {
 	busy := v.Busy != ""
 
 	// 生成阅读页时默认联网搜索：开关一拨动就保存。
-	ui.Row(c.Key("default")).FillWidth().Items(ui.Center).Justify(ui.Between).Gap(l.Space(4)).Children(func() {
-		ui.Column(c.Key("text")).Shrink(1).MinWidth(0).Gap(l.Space(0.5)).Children(func() {
-			l.Text(c.Key("label"), locales.SettingsReadingSearchDefault(), kit.TextSM, kit.WeightMedium, t.Foreground, kit.Wrapped())
-			s.smallText(c.Key("desc"), locales.SettingsReadingSearchDefaultDesc())
-		})
-		on := v.Status.DefaultEnabled
-		// 以 Clicked 为准而不是比较 on：on 是每帧新建的局部变量，Viva 的写回落在上一帧那一份上。
-		if l.SwitchWith(c.Key("switch"), &on, kit.SwitchSpec{Label: locales.SettingsReadingSearchDefault(), Disabled: busy}).Clicked() {
-			want := !v.Status.DefaultEnabled
-			s.spawn(func() { s.Search.SetDefault(want) })
-		}
-	})
+	// 渲染层用的是设置页共用的 SettingItem（px-4 py-3 加 border-b，不是最后一项），这里同样用 kit.SettingItem。
+	l.SettingItem(c.Key("default"), kit.SettingRow{
+		Label:       locales.SettingsReadingSearchDefault(),
+		Description: locales.SettingsReadingSearchDefaultDesc(),
+		Control: func() {
+			on := v.Status.DefaultEnabled
+			// 以 Clicked 为准而不是比较 on：on 是每帧新建的局部变量，Viva 的写回落在上一帧那一份上。
+			if l.SwitchWith(c.Key("switch"), &on, kit.SwitchSpec{Label: locales.SettingsReadingSearchDefault(), Disabled: busy}).Clicked() {
+				want := !v.Status.DefaultEnabled
+				s.spawn(func() { s.Search.SetDefault(want) })
+			}
+		},
+	}, false)
 
 	// 搜索服务。
 	ui.Column(c.Key("provider")).FillWidth().Gap(l.Space(1.5)).Children(func() {
@@ -125,7 +135,8 @@ func (s *Screen) keyInput(c ui.C, v SearchView) {
 	t := l.T
 	u := &s.search
 	name := ProviderName(v.Provider) + " API Key"
-	ui.Column(c).FillWidth().Gap(l.Space(1.5)).Children(func() {
+	// 渲染层是 `<label className="block text-sm">API Key<input className="mt-1 ...">`：标签与输入框之间 mt-1（4px）。
+	ui.Column(c).FillWidth().Gap(l.Space(1)).Children(func() {
 		l.Text(c.Key("label"), "API Key", kit.TextSM, kit.WeightNormal, t.Foreground)
 		box := l.SettingsPasswordInput(c.Key("field"), &u.key, &u.showKey, kit.SettingsInputSpec{
 			Name: name, Placeholder: v.KeyPlaceholder(),

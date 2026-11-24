@@ -16,7 +16,7 @@ var docsiteFixtureJSON []byte
 
 // DocSiteVariant 是一组读取结果：批次列表、各批次的页面明细，以及场景里点开页面明细的那个批次（空表示不点）。
 type DocSiteVariant struct {
-	Jobs     []services.CrawlJob            `json:"jobs"`
+	Jobs     []services.CrawlJob             `json:"jobs"`
 	Pages    map[string][]services.CrawlPage `json:"pages"`
 	Selected string                          `json:"selected"`
 }

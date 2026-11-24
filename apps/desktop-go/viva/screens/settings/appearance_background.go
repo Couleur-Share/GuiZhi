@@ -127,7 +127,13 @@ func (a *Appearance) previewStage(c ui.C, cur settings.UI) {
 			l.Text(c, locales.SettingsBackgroundImageEmpty(), kit.TextSM, kit.WeightNormal, t.MutedForeground)
 		})
 	})
-	stage.Draw(func(d *ui.DrawContext) { l.PaintSurface(d, surface) })
+	base := surface
+	if hasImage {
+		// 有图时边框环只在内容之上画一次：这里先画底色。壁纸模式的边框与底色都是半透明的（白 18% / 24%），
+		// 画两遍会让边框比渲染层亮一倍（M3-6c 实测：整窗壁纸下舞台一圈边框深色亮 15 个灰阶、浅色亮 4 个）。
+		base.BorderW = 0
+	}
+	stage.Draw(func(d *ui.DrawContext) { l.PaintSurface(d, base) })
 	if hasImage {
 		// 内容按矩形铺到边框之内，会盖住圆角处的边框环：把边框环补画在内容之上。
 		ring := kit.Surface{Border: surface.Border, BorderW: surface.BorderW, Radius: surface.Radius}

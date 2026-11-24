@@ -19,14 +19,24 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 	l := a.Look
 	t := l.T
 	col := ui.Column(c).Shrink(0)
+	// 边框：渲染层两个分支的 aside 类名不同——有供应商时是 `border-b lg:border-b-0 lg:border-r`（窄窗口下边框、宽窗口右边框），
+	// 空配置时只有 `border-r`（窄窗口也是右边框，没有下边框）。右边框让内容盒窄 1px（800×600 实测空配置侧栏内部 495 宽），
+	// 下边框的 1px 又是窄窗口 grid 行的基础高度（空配置侧栏 256 / 面板 296，有供应商 256.5 / 295.5，见 aiRowsLayout）。
+	right := wide || len(groups) == 0
+	a.rows.baseAside = 0
+	if !right {
+		a.rows.baseAside = 1
+	}
 	if wide {
 		col = col.Width(l.Rem(14)).FillHeight().PadRight(1)
+	} else if right {
+		col = col.FillWidth().PadRight(1) // 窄窗口的高度由 aiRowsLayout 分配
 	} else {
-		col = col.FillWidth().PadBottom(1) // 窄窗口的高度由 aiRowsLayout 分配
+		col = col.FillWidth().PadBottom(1)
 	}
 	col.Draw(func(d *ui.DrawContext) {
 		l.PaintSurface(d, kit.Surface{Bg: t.UiPanelBg, Shadow: t.UiPanelShadow})
-		if wide {
+		if right {
 			l.PaintEdge(d, kit.EdgeRight, 1, t.UiPanelBorder)
 		} else {
 			l.PaintEdge(d, kit.EdgeBottom, 1, t.UiPanelBorder)
@@ -35,8 +45,9 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 		a.asideTop(c.Key("top"))
 		if len(groups) == 0 {
 			// 没有供应商：说明文字在剩余高度里居中（flex min-h-0 flex-1 items-center justify-center p-6 text-center）；窄窗口里侧栏被压到 grid 分给它的高度时，
-			// 这一块按 flex-shrink 让出高度（内容被裁，底部的「添加供应商」留在可见区）。
-			ui.Row(c.Key("list")).FillWidth().Grow(1).Shrink(1).MinHeight(0).Items(ui.Center).Justify(ui.Center).Pad(l.Space(6)).Children(func() {
+			// 这一块按 flex-shrink 让出高度，但缩不到内边距以下（min-h-0 只去掉内容的最小高度，p-6 的上下 48px 还在）：
+			// 800×600 的实测是列表停在 48px，说明文字溢出内容盒仍画出来，「添加供应商」被挤出侧栏下沿 34px（渲染层 facts：侧栏 256、添加块 225～290）。
+			ui.Row(c.Key("list")).FillWidth().Grow(1).Shrink(1).MinHeight(2 * l.Space(6)).Items(ui.Center).Justify(ui.Center).Pad(l.Space(6)).Children(func() {
 				l.Text(c.Key("empty"), locales.SettingsAiWorkbenchNoModels(), kit.TextSM, kit.WeightNormal, t.MutedForeground, kit.Wrapped(), kit.Centered())
 			})
 		} else {
@@ -48,7 +59,7 @@ func (a *AI) aside(c ui.C, groups []services.AIEndpointGroup, wide bool) {
 					c.Canvas().RequestFrame()
 				}
 				a.providerList(c.Key("rows"), groups)
-			}).FillWidth().Grow(1).MinHeight(0)
+			}).FillWidth().Grow(1).MinHeight(2 * pad) // min-h-0 的滚动区仍缩不到 p-2 的上下内边距以下
 			if !wide {
 				list.Height(a.rows.asideList).Shrink(1)
 			}

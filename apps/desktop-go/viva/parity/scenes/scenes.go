@@ -609,6 +609,11 @@ func monoFieldWaivers(subject string, maxWidth float64) []parity.Waiver {
 // appearanceStore 给显示设置页一份与外观一致的设置：渲染层的变体把主题模式、主题色预设与字号设成变体的取值，
 // 页面上选中的分段与色板因此跟着变体走（出厂默认的主题模式是「跟随系统」，不能直接用）。
 func appearanceStore(look *kit.Look) settingsscreen.Store {
+	return settingsscreen.NewMemStore(appearanceValues(look))
+}
+
+// appearanceValues 是 appearanceStore 的设置内容（壁纸场景在它之上再叠背景图设置）。
+func appearanceValues(look *kit.Look) settings.Values {
 	v := settings.Default()
 	v.UI.ThemeMode = settings.ThemeMode(look.Spec.Mode)
 	v.UI.FontSize = settings.FontSize(look.Spec.FontSize)
@@ -617,7 +622,7 @@ func appearanceStore(look *kit.Look) settingsscreen.Store {
 			v.UI.ThemeColor, v.UI.ThemeHue, v.UI.ThemeSaturation = p.ID, p.Hue, p.Saturation
 		}
 	}
-	return settingsscreen.NewMemStore(v)
+	return v
 }
 
 // generalScene 是「应用设置」页的场景：内容区（设置页的滚动区）对照；steps 把页面带到要对照的状态（可为空）。

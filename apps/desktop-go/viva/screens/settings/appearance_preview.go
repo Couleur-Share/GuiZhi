@@ -85,9 +85,18 @@ func (a *Appearance) previewRail(c ui.C, gt tokens.Tokens,
 	bar(ui.Column(c.Key("rail")).Width(l.Space(20)).Shrink(0).FillHeight().Justify(ui.Between).Gap(l.Space(2)).PadSides(p, p+1, p, p),
 		kit.Surface{Bg: gt.UiPanelStrongBg, Shadow: gt.UiPanelStrongShadow}, kit.EdgeRight, gt.UiPanelStrongBorder).Children(func() {
 		ui.Column(c.Key("items")).FillWidth().Gap(l.Space(2)).Children(func() {
-			paint(ui.Row(c.Key("strong")).FillWidth().Height(l.Space(5)), surfaceBox(md, true))
-			paint(ui.Row(c.Key("one")).FillWidth().Height(l.Space(4)), surfaceBox(md, false))
-			paint(ui.Row(c.Key("two")).FillWidth().Height(l.Space(4)), surfaceBox(md, false))
+			// 左栏里的条目带 backdrop-filter（.app-left-rail-glass 把 --app-ui-surface-backdrop 设成模糊，别处的表面是 none）：
+			// 渲染层里条目背后的「左栏底色」被合成两遍——一遍是左栏自己的底，一遍在条目的 backdrop 图像里再叠回来，
+			// 条目的半透明底色再压在上面（实测：条目中心 = 左栏底色再叠一层同样的白 42% 后，再压条目的白 40% / 30%，
+			// 逐通道与渲染层一致；去掉所有 backdrop-filter 后这三条的差异消失）。Viva 没有 backdrop-filter，按这个结果把左栏底色在条目下多垫一遍。
+			pill := func(strong bool) kit.Surface {
+				s := surfaceBox(md, strong)
+				s.Backdrop = gt.UiPanelStrongBg
+				return s
+			}
+			paint(ui.Row(c.Key("strong")).FillWidth().Height(l.Space(5)), pill(true))
+			paint(ui.Row(c.Key("one")).FillWidth().Height(l.Space(4)), pill(false))
+			paint(ui.Row(c.Key("two")).FillWidth().Height(l.Space(4)), pill(false))
 		})
 		// .sidebar-tag-section 在壁纸模式下盖过 app-wallpaper-panel：底色是区块令牌、没有阴影。
 		paint(ui.Row(c.Key("tags")).FillWidth().Height(l.Space(8)), kit.Surface{Bg: gt.UiSectionBg, Radius: lg})
@@ -133,6 +142,20 @@ func (a *Appearance) previewSection(c ui.C, gt tokens.Tokens,
 	})
 }
 
+// stageBase 是舞台自己的底色（舞台根元素的 bg-background）。窗口没开壁纸时是不透明的背景色；窗口开了壁纸时，
+// 根上的 app-background-mode-image 让它命中 `.app-background-mode-image .bg-background`（后代选择器：舞台自己带的同名类不算，
+// 要祖先带）：浅色 hsl(var(--background) / 0.22)、深色 / 0.3，透出的是窗口自己的壁纸与卡片
+// （M3-6c 实测：开着壁纸时舞台内部浅色深色各差 4–8 个灰阶，关着壁纸时逐值相同）。
+func (a *Appearance) stageBase(gt tokens.Tokens) tokens.Color {
+	if !a.Look.Glass {
+		return gt.Background
+	}
+	if a.Look.Dark {
+		return gt.Background.WithAlpha(0.3)
+	}
+	return gt.Background.WithAlpha(0.22)
+}
+
 // previewStageContent 画有图时的舞台内容（在 1px 边框之内，铺满 overflow-hidden 的内框）。
 func (a *Appearance) previewStageContent(c ui.C, cur settings.UI) {
 	l := a.Look
@@ -146,9 +169,9 @@ func (a *Appearance) previewStageContent(c ui.C, cur settings.UI) {
 	layer := kit.WallpaperLayer{Cache: a.preview, File: cur.BackgroundImageFileName, Opacity: opacity, Blur: blur, Tokens: gt}
 	ui.Column(c.Key("mini")).Fill().Pad(1).Children(func() { // 1px：app-settings-input 的边框
 		ui.Column(c.Key("canvas")).Fill().Clip().Draw(func(d *ui.DrawContext) {
-			l.PaintSurface(d, kit.Surface{Bg: gt.Background})  // bg-background：先铺不透明的底，壁纸淡出时透出的是它
-			l.PaintWallpaperLayer(d, layer)                    // BackgroundImageBackdrop 的位图，或读不出来时损坏的回退图标
-			l.PaintSurface(d, kit.Surface{Bg: gt.UiBlanketBg}) // app-wallpaper-blanket 遮罩
+			l.PaintSurface(d, kit.Surface{Bg: a.stageBase(gt)}) // bg-background：先铺底，壁纸淡出时透出的是它
+			l.PaintWallpaperLayer(d, layer)                     // BackgroundImageBackdrop 的位图，或读不出来时损坏的回退图标
+			l.PaintSurface(d, kit.Surface{Bg: gt.UiBlanketBg})  // app-wallpaper-blanket 遮罩
 		}).Children(func() { a.previewShell(c, gt) })
 	})
 }

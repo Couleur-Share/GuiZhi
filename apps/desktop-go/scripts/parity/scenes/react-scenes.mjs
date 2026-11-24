@@ -25,6 +25,7 @@ import { SETTINGS_ADVANCED_SCENES } from "./react-settings-advanced-scenes.mjs";
 import { CAPTURE_SCENES } from "./react-capture-scenes.mjs";
 import { ASK_SCENES } from "./react-ask-scenes.mjs";
 import { THEMED_SCENES } from "./react-themed-scenes.mjs";
+import { WALLPAPER_SCENES } from "./react-wallpaper-scenes.mjs";
 import { OVERLAYS_SCENES } from "./react-overlays-scenes.mjs";
 import { WIKI_SCENES } from "./react-wiki-scenes.mjs";
 import { DOCSITE_SCENES } from "./react-docsite-scenes.mjs";
@@ -476,6 +477,8 @@ export const SCENES = {
   // Wiki（M3-5a）：空态、页面详情、编辑态、更新建议、编译对话框；场景在 react-wiki-scenes.mjs（关系图谱不纳入像素对拍）
   ...WIKI_SCENES,
   ...THEMED_SCENES,
+  // 显示设置背景图三个整窗场景（M3-6c，B-020）：未启用、启用、启用并虚化；场景在 react-wallpaper-scenes.mjs
+  ...WALLPAPER_SCENES,
   ...OVERLAYS_SCENES,
   // 采集文档站页（M3-6b）：初始态、实际范围预览、运行中批次、已暂停且有失败项的批次；场景在 react-docsite-scenes.mjs
   ...DOCSITE_SCENES,

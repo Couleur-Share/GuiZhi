@@ -285,6 +285,7 @@ func (a *AI) workbenchBody(c ui.C, groups []services.AIEndpointGroup, wide bool)
 		l.ScrollAreaView(c.Key("main"), pad, func(v kit.ScrollView) {
 			// 面板的自然高度（max-content）是 grid 行高的输入：滚动区自己的预测高度不含内容，取上一帧布局量到的内容高度；
 			// 它变了就补一帧，窄窗口里侧栏与面板的分界在下一帧到位。
+			a.rows.baseDetail = pad[0] + pad[2]
 			if !wide && a.rows.setDetail(v.Content+pad[0]+pad[2]) {
 				c.Canvas().RequestFrame()
 			}
