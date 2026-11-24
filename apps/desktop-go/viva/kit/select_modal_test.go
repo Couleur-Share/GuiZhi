@@ -23,7 +23,7 @@ func (p *selectInModalPage) view(l *Look, c ui.C) {
 		Body: func(c ui.C) {
 			if v, ok := l.Select(c.Key("select"), &p.st, SelectSpec{
 				Label: "关闭窗口行为", Value: p.value, Width: l.Rem(10),
-				Options: []SelectOption{{"ask", "每次询问"}, {"minimize", "最小化到托盘"}, {"exit", "退出应用"}},
+				Options: []SelectOption{{Value: "ask", Label: "每次询问"}, {Value: "minimize", Label: "最小化到托盘"}, {Value: "exit", Label: "退出应用"}},
 			}); ok {
 				p.value = v
 			}

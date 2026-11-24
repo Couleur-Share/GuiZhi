@@ -231,7 +231,7 @@ func (f *FlareSolverr) check() {
 	cfg := f.config()
 	ctx, cancel := context.WithCancel(context.Background())
 	f.cancel = cancel
-	solver, wake := f.Solver, f.Wake
+	solver, wake, g := f.Solver, f.Wake, f.Guard // goroutine 里只用拷好的局部变量：Network 每帧会改写 f.Guard 等字段
 	go func() {
 		var err error
 		if solver == nil {
@@ -243,7 +243,7 @@ func (f *FlareSolverr) check() {
 			return // 块已经被卸载：不再提示，也没有界面可改
 		}
 		if err != nil {
-			f.Guard.Report(locales.WebCaptureSolverAction(), err)
+			g.Report(locales.WebCaptureSolverAction(), err)
 		}
 		f.mb.post(wake, func() {
 			f.busy = false

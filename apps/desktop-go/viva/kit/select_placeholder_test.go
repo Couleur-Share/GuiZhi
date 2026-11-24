@@ -16,7 +16,7 @@ func TestSelectShowsItsPlaceholderWhenNothingIsSelected(t *testing.T) {
 		ui.Column(c).Fill().Pad(24).Children(func() {
 			l.Select(c, &st, SelectSpec{
 				Label: "原文版本", Value: value, Width: l.Rem(12), Placeholder: "选择",
-				Options: []SelectOption{{"a", "甲版本"}, {"b", "乙版本"}},
+				Options: []SelectOption{{Value: "a", Label: "甲版本"}, {Value: "b", Label: "乙版本"}},
 			})
 		})
 	}
@@ -60,7 +60,7 @@ func TestSelectWithoutPlaceholderShowsNothingWhenNothingIsSelected(t *testing.T)
 	var st SelectState
 	h := openPage(t, still(), 400, 200, func(l *Look, c ui.C) {
 		ui.Column(c).Fill().Pad(24).Children(func() {
-			l.Select(c, &st, SelectSpec{Label: "原文版本", Value: "", Width: l.Rem(12), Options: []SelectOption{{"a", "甲版本"}}})
+			l.Select(c, &st, SelectSpec{Label: "原文版本", Value: "", Width: l.Rem(12), Options: []SelectOption{{Value: "a", Label: "甲版本"}}})
 		})
 	})
 	node, ok := h.node(gfx.RoleCombobox, "原文版本")
@@ -76,7 +76,7 @@ func TestCompactSelectShowsItsPlaceholderInMutedColor(t *testing.T) {
 		ui.Column(c).Fill().Pad(24).Children(func() {
 			l.Select(c, &st, SelectSpec{
 				Label: "数量", Value: "", Placeholder: "选择",
-				Options: []SelectOption{{"20", "20 条"}},
+				Options: []SelectOption{{Value: "20", Label: "20 条"}},
 				Trigger: &SelectTriggerStyle{Height: 28, PadX: 8, Radius: 6, FontPx: 12, LinePx: 16, Bg: l.T.Background, Border: l.T.Border, BorderW: 1},
 			})
 		})

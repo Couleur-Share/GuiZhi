@@ -188,7 +188,7 @@ func (a *AI) deleteDialogs(c ui.C) {
 // runTest 在后台对模型做一次连通性测试（走 Go 壳代理）；切走分区时请求被取消、结果丢弃。
 // 没能发起测试（服务未接）也当作失败结果交给 done，原因进日志。
 func (a *AI) runTest(m services.AIModel, done func(services.AITestOutcome)) {
-	svc := a.Service
+	svc, g := a.Service, a.Guard // 后台闭包只用界面线程上拷好的局部变量（见 reload）
 	a.w.load(a.Wake, func(ctx context.Context) func() {
 		out, err := services.AITestOutcome{}, errAIUnavailable
 		if svc != nil {
@@ -197,7 +197,7 @@ func (a *AI) runTest(m services.AIModel, done func(services.AITestOutcome)) {
 		if err != nil {
 			out = services.AITestOutcome{Error: redact(err.Error(), m.APIKey)}
 			if ctx.Err() == nil {
-				a.Guard.Background(locales.SettingsTestConnection(), err)
+				g.Background(locales.SettingsTestConnection(), err)
 			}
 		}
 		out.Error = redact(out.Error, m.APIKey)

@@ -29,6 +29,10 @@ type Services struct {
 	Settings Settings
 	Prefs    Prefs
 
+	// BackgroundImages 是显示设置里背景图的选图、存图与读图（见 appearance_images.go）；
+	// nil 时「选择图片」按「宿主没接上选图」提示失败、背景图画读取失败的回退态（测试与对照里不接线）。
+	BackgroundImages BackgroundImages
+
 	// Shortcuts、Solver 与 Updater 是设置页「快捷键」「网络与 FlareSolverr」「关于」分区的系统能力（见 settings_system.go）；
 	// nil 时对应的动作按「不可用」处理：快捷键显示默认值、测试连接与检查更新弹失败提示（测试与对照里不接线）。
 	Shortcuts Shortcuts

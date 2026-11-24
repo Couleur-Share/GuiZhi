@@ -20,6 +20,10 @@ const (
 type SelectOption struct {
 	Value string
 	Label string
+	// Leading 非空时在面板里这一行的文字左侧画前导图标（与文字之间 gap-2；渲染层的选项标签是「图标加名字」的 flex 容器）；
+	// 图标不进可访问树，行的可访问名仍是 Label。nil 时行的布局与像素与没有这个字段时完全相同。
+	// 触发按钮上的前导图标另由 SelectSpec.Leading 画（它跟随当前值，不随选项）。
+	Leading func(c ui.C)
 }
 
 // SelectState 是一个下拉的界面状态：由持有它的屏幕保存。
@@ -31,7 +35,8 @@ type SelectState struct {
 
 // SelectSpec 描述一个下拉。
 type SelectSpec struct {
-	// Leading 非空时在触发按钮的文字前画一枚前导标记（图标，不进可访问树）；只用于默认触发样式，面板里的选项行不画。
+	// Leading 非空时在触发按钮的文字前画一枚前导标记（图标，不进可访问树）；只用于默认触发样式。
+	// 面板里的选项行各自的前导图标用 SelectOption.Leading。
 	Leading func(c ui.C)
 	Label   string // 可访问名（aria-label）
 	Value   string // 当前值
@@ -204,6 +209,9 @@ func (l *Look) selectOption(c ui.C, opt SelectOption, selected bool, inner gfx.R
 			d.Canvas.Unclip()
 		})
 	row.Children(func() {
+		if opt.Leading != nil {
+			opt.Leading(c.Key("lead"))
+		}
 		l.Text(c, opt.Label, TextSM, weight, color, Ellipsis()).Grow(1).Shrink(1)
 		if selected {
 			l.Icon(c, icons.Check, l.Rem(1), color).Shrink(0)

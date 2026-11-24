@@ -208,13 +208,14 @@ func (a *Appearance) startPick() {
 		return
 	}
 	a.picking = true
+	pick, wake := a.PickBackground, a.Wake // goroutine 里只用拷好的局部变量：Shell 每帧会改写这两个字段
 	go func() {
-		name, err := a.PickBackground()
+		name, err := pick()
 		a.pickMu.Lock()
 		a.pickResult = &pickOutcome{fileName: name, err: err}
 		a.pickMu.Unlock()
-		if a.Wake != nil {
-			a.Wake()
+		if wake != nil {
+			wake()
 		}
 	}()
 }

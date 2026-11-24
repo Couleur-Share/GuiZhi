@@ -24,7 +24,7 @@ type aiUsage struct {
 // loadUsage 读取最近 30 天的用量。interactive 表示用户点了刷新：此时才有「刷新中」状态。
 // 失败一律弹错误提示：否则会伪装成「还没有调用记录」。
 func (a *AI) loadUsage(interactive bool) {
-	svc := a.Service
+	svc, g := a.Service, a.Guard // 后台闭包只用界面线程上拷好的局部变量（见 reload）
 	if interactive {
 		a.usage.refreshing = true
 	}
@@ -34,7 +34,7 @@ func (a *AI) loadUsage(interactive bool) {
 			sum, err = svc.UsageSummary(ctx, usageWindowDays)
 		}
 		if err != nil && ctx.Err() == nil {
-			a.Guard.Fail(locales.SettingsAiUsageLoadFailed(), locales.SettingsAi(), err)
+			g.Fail(locales.SettingsAiUsageLoadFailed(), locales.SettingsAi(), err)
 		}
 		return func() {
 			a.usage.refreshing = false

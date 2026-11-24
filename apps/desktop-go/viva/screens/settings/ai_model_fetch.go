@@ -63,7 +63,7 @@ func fetchFeedback(r services.AIFetchModelsResult) (kit.ToastKind, string) {
 
 // fetchRemote 经 Go 壳（SSRF 防护）拉取远端模型列表，结果交给 done。密钥只用于这次请求，绝不进错误文字。
 func (a *AI) fetchRemote(ep modelEndpoint, done func(services.AIFetchModelsResult)) {
-	svc := a.Service
+	svc, g := a.Service, a.Guard // 后台闭包只用界面线程上拷好的局部变量（见 reload）
 	a.w.load(a.Wake, func(ctx context.Context) func() {
 		res, err := services.AIFetchModelsResult{}, errAIUnavailable
 		if svc != nil {
@@ -72,7 +72,7 @@ func (a *AI) fetchRemote(ep modelEndpoint, done func(services.AIFetchModelsResul
 		if err != nil {
 			res = services.AIFetchModelsResult{Error: redact(err.Error(), ep.apiKey)}
 			if ctx.Err() == nil {
-				a.Guard.Background(locales.SettingsFetchModels(), err)
+				g.Background(locales.SettingsFetchModels(), err)
 			}
 		}
 		res.Error = redact(res.Error, ep.apiKey)

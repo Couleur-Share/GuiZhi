@@ -229,16 +229,18 @@ func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 		Solver:       solverAdapter{b: b},
 		Updater:      updaterAdapter{b: b, hub: hub},
 		Data:         dataAdapter{b: b},
-		Backup:       backupAdapter{b: b},
-		CaptureTools: captureToolsAdapter{b: b, hub: hub},
-		MCP:          mcpAdapter{b: b},
-		AI:           aiSettingsAdapter{b: b},
-		Ask:          newAskAdapter(b),
-		Wiki:         newWikiAdapter(b),
-		Themed:       newThemedAdapter(b, hub),
-		Migration:    migrationAdapter{b: b},
-		Log:          logAdapter{b: b},
-		OpenExternal: webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
+
+		BackgroundImages: newBackgroundImagesAdapter(b),
+		Backup:           backupAdapter{b: b},
+		CaptureTools:     captureToolsAdapter{b: b, hub: hub},
+		MCP:              mcpAdapter{b: b},
+		AI:               aiSettingsAdapter{b: b},
+		Ask:              newAskAdapter(b),
+		Wiki:             newWikiAdapter(b),
+		Themed:           newThemedAdapter(b, hub),
+		Migration:        migrationAdapter{b: b},
+		Log:              logAdapter{b: b},
+		OpenExternal:     webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
 	}
 }
 

@@ -136,7 +136,8 @@ func (a *AI) notify(kind kit.ToastKind, message string) {
 
 // reload 读取整份配置；读不出来和「还没配置」在界面上长得一样，所以失败要画出来（LoadErrorState）。
 func (a *AI) reload() {
-	svc := a.Service
+	// 后台闭包只能用在界面线程上拷好的局部变量：Shell 每帧会改写 a.Guard 等字段，闭包里直接读会与之数据竞争。
+	svc, g := a.Service, a.Guard
 	a.loadErr = ""
 	a.w.load(a.Wake, func(ctx context.Context) func() {
 		cfg, err := services.AIConfig{}, errAIUnavailable
@@ -144,7 +145,7 @@ func (a *AI) reload() {
 			cfg, err = svc.Load(ctx)
 		}
 		if err != nil && ctx.Err() == nil {
-			a.Guard.Background(locales.SettingsAi(), err)
+			g.Background(locales.SettingsAi(), err)
 		}
 		return func() {
 			if err != nil {

@@ -57,7 +57,7 @@ func (p *selectPage) view(l *Look, c ui.C) {
 		ui.Row(c).FillWidth().Children(func() {
 			if v, ok := l.Select(c, &p.st, SelectSpec{
 				Label: "关闭窗口行为", Value: p.value, Width: l.Rem(10),
-				Options: []SelectOption{{"ask", "每次询问"}, {"minimize", "最小化到托盘"}, {"exit", "退出应用"}},
+				Options: []SelectOption{{Value: "ask", Label: "每次询问"}, {Value: "minimize", Label: "最小化到托盘"}, {Value: "exit", Label: "退出应用"}},
 			}); ok {
 				p.picks = append(p.picks, v)
 				p.value = v
@@ -184,5 +184,90 @@ func TestSelectPanelPaddingPressKeepsOpen(t *testing.T) {
 	}
 	if len(p.picks) != 0 {
 		t.Errorf("按在内边距上不应选中任何项：%v", p.picks)
+	}
+}
+
+// 选项行的前导图标（SelectOption.Leading）：画在文字左侧、与文字相隔 gap-2（8px）、垂直居中、不进可访问树与文字清单；
+// 没有 Leading 的行布局不变（文字紧贴 px-3 的左内边距）。
+func TestSelectOptionLeadingIconSitsBeforeTheLabel(t *testing.T) {
+	var st SelectState
+	st.Open = true
+	var lead gfx.Rect
+	view := func(l *Look, c ui.C) {
+		ui.Column(c).Fill().Pad(24).Children(func() {
+			l.Select(c, &st, SelectSpec{
+				Label: "供应商", Value: "", Width: l.Rem(10), // 不选中任何项：触发按钮不显示选项文字，下面数的就只有面板里的行
+				Options: []SelectOption{
+					{Value: "plain", Label: "无图标"},
+					{Value: "icon", Label: "有图标", Leading: func(c ui.C) {
+						ui.Slot(c).Size(16, 16).Shrink(0).Background(l.Col(l.T.Primary)).DrawOver(func(d *ui.DrawContext) { lead = d.Rect })
+					}},
+				},
+			})
+		})
+	}
+	h := openPage(t, still(), 600, 400, view)
+	plain, ok1 := h.node(gfx.RoleOption, "无图标")
+	icon, ok2 := h.node(gfx.RoleOption, "有图标")
+	if !ok1 || !ok2 {
+		t.Fatal("两个选项都应出现，可访问名是各自的文字")
+	}
+	var plainX, iconX float32 = -1, -1
+	for _, text := range h.session.Snapshot().Texts {
+		switch text.Value {
+		case "无图标":
+			plainX = text.Bounds.X
+		case "有图标":
+			iconX = text.Bounds.X
+		}
+	}
+	if plainX < 0 || iconX < 0 {
+		t.Fatalf("没有找到选项文字：%v %v", plainX, iconX)
+	}
+	if want := plain.Bounds.X + 12; math.Abs(float64(plainX-want)) > 0.01 {
+		t.Errorf("无前导图标的行文字起点 %g，应贴在 px-3 左内边距 %g", plainX, want)
+	}
+	if want := icon.Bounds.X + 12; math.Abs(float64(lead.X-want)) > 0.01 || lead.Width != 16 || lead.Height != 16 {
+		t.Errorf("前导图标 %+v，应从 px-3 处开始、16×16", lead)
+	}
+	if want := lead.X + lead.Width + 8; math.Abs(float64(iconX-want)) > 0.01 {
+		t.Errorf("有前导图标的行文字起点 %g，应在图标右侧 gap-2：%g", iconX, want)
+	}
+	if mid, rowMid := lead.Y+lead.Height/2, icon.Bounds.Y+icon.Bounds.Height/2; math.Abs(float64(mid-rowMid)) > 0.5 {
+		t.Errorf("前导图标应垂直居中：%g vs %g", mid, rowMid)
+	}
+	var texts int
+	for _, text := range h.session.Snapshot().Texts {
+		if text.Value == "有图标" || text.Value == "无图标" {
+			texts++
+		}
+	}
+	if texts != 2 {
+		t.Errorf("前导图标不应多出文字节点：选项文字出现 %d 次，期望 2", texts)
+	}
+}
+
+// 前导图标不改变选择行为：点有图标的行照常选中并关闭。
+func TestSelectOptionWithLeadingStillPicks(t *testing.T) {
+	var st SelectState
+	st.Open = true
+	var picked []string
+	view := func(l *Look, c ui.C) {
+		ui.Column(c).Fill().Pad(24).Children(func() {
+			if v, ok := l.Select(c, &st, SelectSpec{
+				Label: "供应商", Value: "a", Width: l.Rem(10),
+				Options: []SelectOption{
+					{Value: "a", Label: "甲"},
+					{Value: "b", Label: "乙", Leading: func(c ui.C) { ui.Slot(c).Size(16, 16).Shrink(0) }},
+				},
+			}); ok {
+				picked = append(picked, v)
+			}
+		})
+	}
+	h := openPage(t, still(), 600, 400, view)
+	h.click("乙")
+	if len(picked) != 1 || picked[0] != "b" || st.Open {
+		t.Fatalf("应选中 b 并关闭：%v open=%v", picked, st.Open)
 	}
 }

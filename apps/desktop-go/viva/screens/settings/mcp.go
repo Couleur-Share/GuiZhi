@@ -54,7 +54,7 @@ func (m *MCP) Close() {
 // refresh 读取接入信息与范围（渲染层 refresh）；读不出来和「没配置」在界面上长得一样，所以失败要画出来。
 func (m *MCP) refresh() {
 	m.checking = true
-	svc := m.Service
+	svc, g := m.Service, m.Guard // 后台闭包只用界面线程上拷好的局部变量：Shell 每帧会改写 m.Guard
 	m.w.load(m.Wake, func(ctx context.Context) func() {
 		var (
 			cfg   services.MCPConfig
@@ -67,7 +67,7 @@ func (m *MCP) refresh() {
 			}
 		}
 		if err != nil && ctx.Err() == nil {
-			m.Guard.Background(locales.SettingsMcp(), err)
+			g.Background(locales.SettingsMcp(), err)
 		}
 		return func() {
 			m.checking = false
@@ -82,7 +82,7 @@ func (m *MCP) refresh() {
 
 // loadCollections 读取合集列表（范围选择器）；失败只进日志，选择器仍可用「未归合集」。
 func (m *MCP) loadCollections() {
-	src := m.Collections
+	src, g := m.Collections, m.Guard
 	if src == nil {
 		return
 	}
@@ -90,7 +90,7 @@ func (m *MCP) loadCollections() {
 		list, err := src.Collections(ctx)
 		if err != nil {
 			if ctx.Err() == nil {
-				m.Guard.Background(locales.SettingsMcpScopeTitle(), err)
+				g.Background(locales.SettingsMcpScopeTitle(), err)
 			}
 			return func() {}
 		}
