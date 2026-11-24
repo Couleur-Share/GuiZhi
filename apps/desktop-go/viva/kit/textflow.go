@@ -24,22 +24,49 @@ func (l *Look) TextFlow(c ui.C, st TextStyle, weight float32, color tokens.Color
 
 // TextFlowPx 与 TextFlow 相同，字号与行高直接给逻辑像素（渲染层里 text-[11px] 这类 px 字面量不随字号档缩放）。
 func (l *Look) TextFlowPx(c ui.C, size, line, weight float32, color tokens.Color, width float32, runs ...string) ui.Box {
-	return l.textFlow(c, size, line, weight, color, width, false, runs)
+	return l.textFlow(c, size, line, weight, color, width, false, WrapText, runs)
+}
+
+// TextFlowBreakAll 与 TextFlow 相同，只是折行按 break-all（Tailwind 的 break-all：字母与数字也逐字可断，见 breakall.go）：
+// 渲染层里 `{状态} · {网址}` 这样带 break-all 的几个相邻文本节点，网址放不下时在最后放得下的字符处断开，
+// 不是在 / . 之类的分隔符之后断。各段仍各画成一个 Label（节点数与渲染层的文本节点一一对应）。
+func (l *Look) TextFlowBreakAll(c ui.C, st TextStyle, weight float32, color tokens.Color, width float32, runs ...string) ui.Box {
+	return l.textFlow(c, l.Rem(st.Size), l.Rem(st.Line), weight, color, width, false, wrapBreakAllTiled, runs)
+}
+
+// wrapBreakAllTiled 是 WrapBreakAll 的「首尾相接」版：WrapBreakAll 折行时去掉了行尾悬挂的空格与下一行行首的空格，
+// 各行拼起来比原文短；textFlow 要按各行长度在拼起来的整段上数偏移，所以把去掉的空格并回上一行的行尾（它们本来就悬挂在那里）。
+func wrapBreakAllTiled(text string, width float32, measure func(string) float32) []string {
+	rows := WrapBreakAll(text, width, measure)
+	out := make([]string, 0, len(rows))
+	pos := 0
+	for i, row := range rows {
+		start := pos + strings.Index(text[pos:], row)
+		if i > 0 && start > pos {
+			out[i-1] += text[pos:start]
+		}
+		pos = start + len(row)
+		out = append(out, row)
+	}
+	if n := len(out); n > 0 {
+		out[n-1] += text[pos:]
+	}
+	return out
 }
 
 // TextFlowCentered 与 TextFlow 相同，只是每一行在容器里居中（渲染层的 text-align: center，按钮里的文字默认就是这样）：
 // 折成几行，每一行的几截作为一个整体各自居中。
 func (l *Look) TextFlowCentered(c ui.C, st TextStyle, weight float32, color tokens.Color, width float32, runs ...string) ui.Box {
-	return l.textFlow(c, l.Rem(st.Size), l.Rem(st.Line), weight, color, width, true, runs)
+	return l.textFlow(c, l.Rem(st.Size), l.Rem(st.Line), weight, color, width, true, WrapText, runs)
 }
 
-func (l *Look) textFlow(c ui.C, size, line, weight float32, color tokens.Color, width float32, center bool, runs []string) ui.Box {
+func (l *Look) textFlow(c ui.C, size, line, weight float32, color tokens.Color, width float32, center bool, wrap func(string, float32, func(string) float32) []string, runs []string) ui.Box {
 	canvas := c.Canvas()
 	measure := func(s string) float32 { return canvas.TextWidthWeight(s, size, weight) }
 	joined := strings.Join(runs, "")
 	rows := []string{joined}
 	if width > 0 && joined != "" {
-		rows = WrapText(joined, width, measure)
+		rows = wrap(joined, width, measure)
 	}
 	outer := ui.Column(c)
 	if center {

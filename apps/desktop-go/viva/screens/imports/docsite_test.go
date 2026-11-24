@@ -336,7 +336,7 @@ func TestDocSiteSelect(t *testing.T) {
 	}
 }
 
-// PagesLoaded 区分「页还没读到」与「读到了、但这个批次没有页」：界面只在后者提示「还没有发现页面」。
+// PagesLoaded 区分「页还没读到」与「读到了、但这个批次确实没有页」两种状态，防止读取失败时把未加载误当成空列表。
 func TestDocSitePagesLoadedFlag(t *testing.T) {
 	h := newDocHarness(t)
 	h.svc.SetJobs(crawlJob("j1", services.CrawlJobRunning, nil), crawlJob("j2", services.CrawlJobRunning, nil))

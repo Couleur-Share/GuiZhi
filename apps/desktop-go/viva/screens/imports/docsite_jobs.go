@@ -16,15 +16,11 @@ import (
 // docPagesMaxHeight 是页面明细列表的最大高度（max-h-80 = 20rem），超出在列表里滚动。
 const docPagesMaxHeight = 20
 
-// docJobs 是批次列表（space-y-3）。第一次读取成功且没有批次时写一句空态说明；还没读到或读取失败时不写——
-// 那两种情形里「没有批次」都不是事实（读取失败由页面顶部的错误态说明）。
+// docJobs 是批次列表（space-y-3）。没有批次时什么也不画：渲染层 jobs.map 对空数组不写任何提示，
+// 读取失败由页面顶部的错误态（LoadErrorState）说明，不会被画成「没有批次」。
 func (s *Screen) docJobs(c ui.C, v DocSiteView) {
 	l := s.Look
 	ui.Column(c.Key("jobs")).FillWidth().Gap(l.Space(3)).Children(func() {
-		if v.HasLoaded && v.LoadError == "" && len(v.Jobs) == 0 {
-			l.Text(c.Key("empty"), locales.NativeDocSiteEmpty(), kit.TextSM, kit.WeightNormal, l.T.MutedForeground, kit.Wrapped())
-			return
-		}
 		for _, job := range v.Jobs {
 			s.docJob(c.Key("job-"+job.ID), v, job)
 		}
@@ -42,8 +38,8 @@ func (s *Screen) docJob(c ui.C, v DocSiteView, job services.CrawlJob) {
 			l.PaintSurface(d, kit.Surface{Border: t.Border, BorderW: 1, Radius: l.Rem(0.75)})
 		}).
 		Children(func() {
-			title := JobTitleURL(job) + " \u00b7 " + JobStatusLabel(job.Status)
-			if s.docClickable(c.Key("title"), title, kit.TextSM, "") {
+			// 渲染层是 {网址} · {状态}：三个相邻的文本节点。
+			if s.docClickable(c.Key("title"), kit.TextSM, &s.docUI.titleW, JobTitleURL(job), " \u00b7 ", JobStatusLabel(job.Status)) {
 				id := job.ID
 				st.Select(s.baseCtx(), id)
 			}
@@ -103,17 +99,9 @@ func (s *Screen) docActions(c ui.C, v DocSiteView, job services.CrawlJob) {
 }
 
 // docPages 是选中批次的页面明细（max-h-80 overflow-auto space-y-2）：每页一行「状态 · 网址」，失败页下面写原因。
-// 读回来之前什么也不画；读回来是空的写一句说明。
+// 渲染层选中批次后总是渲染这个列表：读回来之前、或读回来没有页面时它是高度为 0 的空列表（不写任何说明文字）。
 func (s *Screen) docPages(c ui.C, v DocSiteView) {
 	l := s.Look
-	t := l.T
-	if !v.PagesLoaded {
-		return
-	}
-	if len(v.Pages) == 0 {
-		l.Text(c.Key("no-pages"), locales.NativeDocSiteNoPages(), kit.TextXS, kit.WeightNormal, t.MutedForeground, kit.Wrapped())
-		return
-	}
 	l.ScrollArea(c.Key("pages"), [4]float32{}, func() {
 		ui.Column(c.Key("pages-list")).FillWidth().Gap(l.Space(2)).Children(func() {
 			for _, p := range v.Pages {
@@ -123,19 +111,13 @@ func (s *Screen) docPages(c ui.C, v DocSiteView) {
 	}).FillWidth().MaxHeight(l.Rem(docPagesMaxHeight))
 }
 
-// docPage 是一个页面：text-xs break-all。已入库的页面（有关联条目）整行可点，打开知识库里的条目。
+// docPage 是一个页面：text-xs break-all 的纯展示行（渲染层的 <li> 不可点，不跳知识库）。
 func (s *Screen) docPage(c ui.C, p services.CrawlPage) {
 	l := s.Look
 	t := l.T
-	text := PageStatusLabel(p.Status) + " \u00b7 " + p.URL
 	ui.Column(c).FillWidth().Children(func() {
-		if p.ItemID != "" && s.Hooks.OpenItem != nil {
-			if s.docClickable(c.Key("link"), text, kit.TextXS, locales.ImportsOpenItem()) {
-				s.Hooks.OpenItem(p.ItemID)
-			}
-		} else {
-			l.TextBreakAll(c.Key("text"), text, kit.TextXS, kit.WeightNormal, t.Foreground)
-		}
+		// 渲染层是 {状态} · {网址}：三个相邻的文本节点。
+		s.docFlow(c.Key("text"), kit.TextXS, t.Foreground, &s.docUI.pageW, PageStatusLabel(p.Status), " \u00b7 ", p.URL)
 		if p.Error != "" {
 			l.TextBreakAll(c.Key("error"), p.Error, kit.TextXS, kit.WeightNormal, t.Destructive)
 		}

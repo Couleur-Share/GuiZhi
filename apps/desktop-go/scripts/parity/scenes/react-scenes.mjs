@@ -27,6 +27,7 @@ import { ASK_SCENES } from "./react-ask-scenes.mjs";
 import { THEMED_SCENES } from "./react-themed-scenes.mjs";
 import { OVERLAYS_SCENES } from "./react-overlays-scenes.mjs";
 import { WIKI_SCENES } from "./react-wiki-scenes.mjs";
+import { DOCSITE_SCENES } from "./react-docsite-scenes.mjs";
 import { SETTINGS_CONTENT_SCROLLER, openSettingsSection, scrollSettingsToEnd } from "../lib/react-settings-nav.mjs";
 
 /**
@@ -476,6 +477,8 @@ export const SCENES = {
   ...WIKI_SCENES,
   ...THEMED_SCENES,
   ...OVERLAYS_SCENES,
+  // 采集文档站页（M3-6b）：初始态、实际范围预览、运行中批次、已暂停且有失败项的批次；场景在 react-docsite-scenes.mjs
+  ...DOCSITE_SCENES,
   "settings.shell": {
     module: "settings",
     region: SETTINGS_SHELL,

@@ -43,10 +43,6 @@
     "setup": {
       "loadError": "没能读取 AI 配置（{{reason}}），下面的完成状态可能不准确。"
     },
-    "docSite": {
-      "empty": "还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。",
-      "noPages": "这个批次还没有发现页面。"
-    },
     "shell": {
       "notMigrated": "「{{module}}」还没有迁移到原生界面",
       "notMigratedHint": "这是开发中的原生界面（feat/native-ui）。该模块仍在 React 版里，原生版会在后续里程碑补齐。",

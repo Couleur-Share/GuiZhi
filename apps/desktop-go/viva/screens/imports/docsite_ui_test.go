@@ -71,6 +71,24 @@ func (d *docRig) openPage() {
 	}
 }
 
+// hasRuns 报告画面上是否有这几段文字相邻地依次画出（渲染层的几个相邻文本节点各画成一个 Label，按文字顺序排在一起）。
+func (d *docRig) hasRuns(runs ...string) bool {
+	texts := d.session.Texts()
+	for i := 0; i+len(runs) <= len(texts); i++ {
+		ok := true
+		for k, run := range runs {
+			if texts[i+k] != run {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
+}
+
 // poll 让 2 秒的轮询到点（读取同步发生），再出几帧让画面跟上。
 func (d *docRig) poll() {
 	d.t.Helper()
@@ -158,7 +176,7 @@ func TestDocPageOpensWithFormAndDisabledStart(t *testing.T) {
 		t.Errorf("还没填入口时开始按钮应禁用：%+v 找到=%v", n, ok)
 	}
 	want := locales.WebCaptureActualScope() + locales.WebCaptureValidScope() + locales.WebCaptureScopeHint()
-	if !d.hasText(want) {
+	if !d.hasRuns(locales.WebCaptureActualScope(), locales.WebCaptureValidScope(), locales.WebCaptureScopeHint()) {
 		t.Errorf("范围无效时应提示「%s」；画面上有 %q", want, d.session.Texts())
 	}
 	if d.listCalls() == 0 {
@@ -283,8 +301,7 @@ func TestDocPageCloseStopsPolling(t *testing.T) {
 func TestDocPageScopePreviewFollowsTheEntryUrl(t *testing.T) {
 	d := openedDocs(t, nil)
 	d.fill(locales.WebCaptureEntryUrl(), "https://docs.example.com/guide/intro.html")
-	want := locales.WebCaptureActualScope() + "https://docs.example.com/guide/" + locales.WebCaptureScopeHint()
-	if !d.hasText(want) {
+	if !d.hasRuns(locales.WebCaptureActualScope(), "https://docs.example.com/guide/", locales.WebCaptureScopeHint()) {
 		t.Fatalf("应预览入口所在目录；画面上有 %q", d.session.Texts())
 	}
 	if n, _ := d.node(gfx.RoleButton, locales.WebCaptureStart()); n.Disabled {
@@ -300,15 +317,15 @@ func TestDocPageDirectoryOverridesAndInvalidDirectoryDisablesStart(t *testing.T)
 	d := openedDocs(t, nil)
 	d.fill(locales.WebCaptureEntryUrl(), "https://docs.example.com/guide/intro.html")
 	d.fill(locales.WebCaptureDirectoryScope(), "/guide/api")
-	if !d.hasText(locales.WebCaptureActualScope() + "https://docs.example.com/guide/api/" + locales.WebCaptureScopeHint()) {
+	if !d.hasRuns(locales.WebCaptureActualScope(), "https://docs.example.com/guide/api/", locales.WebCaptureScopeHint()) {
 		t.Fatalf("目录范围应覆盖入口目录；画面上有%q", d.session.Texts())
 	}
 	d.fill(locales.WebCaptureDirectoryScope(), "guide")
-	if !d.hasText(locales.WebCaptureActualScope()+locales.WebCaptureValidScope()+locales.WebCaptureScopeHint()) || !d.disabledStart() {
+	if !d.hasRuns(locales.WebCaptureActualScope(), locales.WebCaptureValidScope(), locales.WebCaptureScopeHint()) || !d.disabledStart() {
 		t.Fatalf("目录没有以 / 开头应无效且禁用开始；画面上有 %q", d.session.Texts())
 	}
 	d.fill(locales.WebCaptureDirectoryScope(), "")
-	if !d.hasText(locales.WebCaptureActualScope()+"https://docs.example.com/guide/"+locales.WebCaptureScopeHint()) || d.disabledStart() {
+	if !d.hasRuns(locales.WebCaptureActualScope(), "https://docs.example.com/guide/", locales.WebCaptureScopeHint()) || d.disabledStart() {
 		t.Fatalf("清空目录应回到入口所在目录；画面上有 %q", d.session.Texts())
 	}
 }
@@ -534,26 +551,25 @@ func TestDocPageJobStatusLabels(t *testing.T) {
 	}
 }
 
-// 读到的批次为空：空态说明；读取失败时不写（那不是「没有批次」）。
-func TestDocPageEmptyStateOnlyAfterASuccessfulRead(t *testing.T) {
+// 没有批次时表单下面什么也不画（渲染层 jobs.map 对空数组不写任何提示，不加空态说明）；
+// 读取失败走整块错误态（LoadErrorState）而不是「没有批次」。
+func TestDocPageNoJobsDrawsNothingBelowTheForm(t *testing.T) {
 	d := openedDocs(t, nil)
-	if !d.hasText(locales.NativeDocSiteEmpty()) {
-		t.Errorf("读到空列表应写空态说明；画面上有 %q", d.session.Texts())
+	if d.listCalls() == 0 {
+		t.Fatal("打开页面应读过一次批次列表")
+	}
+	if d.hasTextLike("\u00b7") || d.has(gfx.RoleStatus, "") {
+		t.Errorf("没有批次时不应有批次卡片、说明或错误态；画面上有 %q", d.session.Texts())
+	}
+	// 最后一段文字是「实际范围」提示：它之后没有别的文字。
+	texts := d.session.Texts()
+	if want := locales.WebCaptureStart(); texts[len(texts)-1] != want {
+		t.Errorf("没有批次时画面应止于「%s」按钮；末尾是 %q", want, texts[len(texts)-1])
 	}
 	failing := openedDocs(t, func(site *servicestest.DocSite, _ *fakeCollections) { site.FailOn("list", errors.New("db locked")) })
-	if failing.hasText(locales.NativeDocSiteEmpty()) {
-		t.Error("读取失败不能画成「没有批次」")
+	if !failing.has(gfx.RoleStatus, "") || !failing.hasText("db locked") {
+		t.Errorf("读取失败应显示错误态与原因；画面上有 %q", failing.session.Texts())
 	}
-	// 还没读到（读取卡住）时也不写空态。
-	pending := newDocRig(t, nil)
-	release := pending.site.HoldList()
-	pending.store.Spawn = func(fn func()) { go fn() }
-	pending.openPage()
-	if pending.hasText(locales.NativeDocSiteEmpty()) {
-		t.Error("还没读到时不能写空态")
-	}
-	release()
-	waitFor(t, "读到空列表", func() bool { pending.frames(1); return pending.hasText(locales.NativeDocSiteEmpty()) })
 }
 
 // 读取失败整块错误态（带原因与重试），不是空列表；排除故障后点重试恢复。
@@ -619,7 +635,7 @@ func TestDocPageSelectJobShowsItsPages(t *testing.T) {
 	if d.store.View().Selected != "j1" {
 		t.Fatalf("应选中 j1，得 %q", d.store.View().Selected)
 	}
-	if !d.hasText(locales.WebCaptureAdded()+" \u00b7 https://a.com/p1") || !d.hasText(locales.WebCaptureFailed()+" \u00b7 https://a.com/p2") {
+	if !d.hasRuns(locales.WebCaptureAdded(), " \u00b7 ", "https://a.com/p1") || !d.hasRuns(locales.WebCaptureFailed(), " \u00b7 ", "https://a.com/p2") {
 		t.Fatalf("应列出 j1 的页面；画面上有 %q", d.session.Texts())
 	}
 	if !d.hasText("HTTP 404") {
@@ -630,58 +646,51 @@ func TestDocPageSelectJobShowsItsPages(t *testing.T) {
 	}
 	// 切到 j2：j1 的页面收起、显示 j2 的。
 	d.click(gfx.RoleButton, jobTitle("j2", locales.WebCaptureCapturing()))
-	if d.hasTextLike("https://a.com/p1") || !d.hasText(locales.WebCapturePending()+" \u00b7 https://a.com/q1") {
+	if d.hasTextLike("https://a.com/p1") || !d.hasRuns(locales.WebCapturePending(), " \u00b7 ", "https://a.com/q1") {
 		t.Errorf("切换后应只显示 j2 的页面；画面上有 %q", d.session.Texts())
 	}
 	// 轮询：页面状态变化跟上。
 	d.site.SetPages("j2", crawlPage("j2", "q1", services.CrawlPageAdded))
 	d.poll()
-	if !d.hasText(locales.WebCaptureAdded() + " \u00b7 https://a.com/q1") {
+	if !d.hasRuns(locales.WebCaptureAdded(), " \u00b7 ", "https://a.com/q1") {
 		t.Errorf("轮询后页面状态应更新；画面上有 %q", d.session.Texts())
 	}
 }
 
-// 已入库的页面（有关联条目）是可点的按钮，点了经 OpenItem 打开知识库里的条目；没有条目的页面是纯文字。
-func TestDocPageClickingAStoredPageOpensTheItem(t *testing.T) {
+// 页面明细的每一行都是纯展示的文字：渲染层的 <li> 不可点，已入库（有关联条目）的页面也不跳知识库，没有悬停提示。
+func TestDocPageRowsArePlainTextEvenWhenStored(t *testing.T) {
 	d := openedDocs(t, pagesFixture())
+	var opened []string
+	d.screen.Hooks.OpenItem = func(id string) { opened = append(opened, id) }
 	d.click(gfx.RoleButton, jobTitle("j1", locales.WebCaptureCompleted()))
-	added := locales.WebCaptureAdded() + " \u00b7 https://a.com/p1"
-	failed := locales.WebCaptureFailed() + " \u00b7 https://a.com/p2"
-	n, ok := d.node(gfx.RoleButton, added)
-	if !ok {
-		t.Fatalf("已入库的页面应是按钮；画面上有 %q", d.session.Texts())
+	const added, failed = "https://a.com/p1", "https://a.com/p2"
+	addedRow := locales.WebCaptureAdded() + " \u00b7 " + added
+	failedRow := locales.WebCaptureFailed() + " \u00b7 " + failed
+	if !d.hasRuns(locales.WebCaptureAdded(), " \u00b7 ", added) || !d.hasRuns(locales.WebCaptureFailed(), " \u00b7 ", failed) {
+		t.Fatalf("页面应显示；画面上有 %q", d.session.Texts())
 	}
-	if n.Description != locales.ImportsOpenItem() && n.Hint != locales.ImportsOpenItem() {
-		t.Errorf("按钮应带「%s」的提示：%+v", locales.ImportsOpenItem(), n)
+	if d.has(gfx.RoleButton, addedRow) || d.has(gfx.RoleButton, failedRow) || d.has(gfx.RoleButton, added) || d.has(gfx.RoleButton, failed) {
+		t.Error("页面行不应是按钮")
 	}
-	if d.has(gfx.RoleButton, failed) {
-		t.Error("没有关联条目的页面不应可点")
+	if _, hinted := d.hintHit(locales.ImportsOpenItem()); hinted {
+		t.Errorf("页面行不应声明「%s」提示", locales.ImportsOpenItem())
 	}
-	d.click(gfx.RoleButton, added)
-	if !slices.Equal(d.opened, []string{"item-1"}) {
-		t.Errorf("点已入库的页面应打开条目 item-1，实际 %v", d.opened)
+	d.clickText(added, 0)
+	if len(opened) != 0 {
+		t.Errorf("点页面行不应打开条目，实际 %v", opened)
 	}
 }
 
-// 没有注入 OpenItem 时已入库的页面是纯文字，不是什么都不做的按钮。
-func TestDocPageStoredPageIsPlainTextWithoutOpenItem(t *testing.T) {
-	d := openedDocs(t, pagesFixture())
-	d.screen.Hooks.OpenItem = nil
-	d.click(gfx.RoleButton, jobTitle("j1", locales.WebCaptureCompleted()))
-	if d.has(gfx.RoleButton, locales.WebCaptureAdded()+" \u00b7 https://a.com/p1") {
-		t.Error("没有 OpenItem 时不应有可点的页面")
-	}
-	if !d.hasText(locales.WebCaptureAdded() + " \u00b7 https://a.com/p1") {
-		t.Error("页面仍应显示")
-	}
-}
-
-// 选中的批次还没有页面：写一句说明；读回来之前不写。
-func TestDocPageSelectedJobWithoutPages(t *testing.T) {
+// 选中的批次没有页面（读回来之前或确实没有）：只是一个空列表，不写任何说明文字。
+func TestDocPageSelectedJobWithoutPagesDrawsNothing(t *testing.T) {
 	d := openedDocs(t, setJobs(crawlJob("j1", services.CrawlJobRunning, nil)))
+	before := len(d.session.Texts())
 	d.click(gfx.RoleButton, jobTitle("j1", locales.WebCaptureCapturing()))
-	if !d.hasText(locales.NativeDocSiteNoPages()) {
-		t.Errorf("没有页面应写说明；画面上有 %q", d.session.Texts())
+	if d.store.View().Selected != "j1" {
+		t.Fatalf("应选中 j1，得 %q", d.store.View().Selected)
+	}
+	if after := len(d.session.Texts()); after != before {
+		t.Errorf("没有页面时不应多出任何文字：之前 %d 段，之后 %d 段：%q", before, after, d.session.Texts())
 	}
 }
 
@@ -691,27 +700,37 @@ func TestDocPageManyPagesScrollInsideTheList(t *testing.T) {
 		site.SetJobs(crawlJob("j1", services.CrawlJobRunning, map[string]int{services.CrawlPageAdded: 300}))
 		var pages []services.CrawlPage
 		for i := 0; i < 300; i++ {
-			p := crawlPage("j1", "p"+strconv.Itoa(i), services.CrawlPageAdded)
-			p.ItemID = "item-" + strconv.Itoa(i) // 有关联条目的页是按钮：被裁掉的按钮不进无障碍树，以此判断哪些在视口里
-			pages = append(pages, p)
+			pages = append(pages, crawlPage("j1", "p"+strconv.Itoa(i), services.CrawlPageAdded))
 		}
 		site.SetPages("j1", pages...)
 	})
 	d.click(gfx.RoleButton, jobTitle("j1", locales.WebCaptureCapturing()))
-	first := locales.WebCaptureAdded() + " \u00b7 https://a.com/p0"
-	last := locales.WebCaptureAdded() + " \u00b7 https://a.com/p299"
-	if !d.has(gfx.RoleButton, first) {
-		t.Fatalf("应显示第一页；画面上有 %q", d.session.Texts()[:10])
+	const first, last = "https://a.com/p0", "https://a.com/p299"
+	if !d.hasRuns(locales.WebCaptureAdded(), " \u00b7 ", first) || !d.hasRuns(locales.WebCaptureAdded(), " \u00b7 ", last) {
+		t.Fatalf("300 页都应在列表里；画面上有 %d 段文字", len(d.session.Texts()))
 	}
-	if d.has(gfx.RoleButton, last) {
-		t.Fatal("最后一页应在列表的视口之外")
+	// 被裁掉的文字仍在画面文字里（只是画不出来），所以用位置判断：列表是固定高度（max-h-80 = 20rem），
+	// 在列表里滚动时只有列表内容移动，批次标题（列表之外）纹丝不动，整页没有被撑长。
+	titleName := jobTitle("j1", locales.WebCaptureCapturing())
+	title0, _ := d.node(gfx.RoleButton, titleName)
+	x, y, _ := d.textCenter(first, 0)
+	_, lastY0, _ := d.textCenter(last, 0)
+	if lastY0 < y+1000 {
+		t.Fatalf("300 页的列表内容应远长于列表的视口：第一页 y=%.0f，最后一页 y=%.0f", y, lastY0)
 	}
-	// 在列表里向下滚到底：末尾的页进入视口，第一页出去（窗口比列表矮，最后一两页仍可能在窗口之外，故取靠近末尾的一页）。
-	near := locales.WebCaptureAdded() + " \u00b7 https://a.com/p290"
-	n, _ := d.node(gfx.RoleButton, first)
-	d.scrollBy(n.Bounds.X+n.Bounds.Width/2, n.Bounds.Y+n.Bounds.Height/2, 30000)
-	if !d.has(gfx.RoleButton, near) || d.has(gfx.RoleButton, first) {
-		t.Errorf("滚到底之后应看到靠近末尾的页、第一页出视口；first=%v near=%v", d.has(gfx.RoleButton, first), d.has(gfx.RoleButton, near))
+	d.scrollBy(x, y, 30000)
+	title1, _ := d.node(gfx.RoleButton, titleName)
+	if title1.Bounds.Y != title0.Bounds.Y {
+		t.Errorf("在列表里滚动不应带动整页：批次标题 y %.1f → %.1f", title0.Bounds.Y, title1.Bounds.Y)
+	}
+	_, firstY1, _ := d.textCenter(first, 0)
+	_, lastY1, _ := d.textCenter(last, 0)
+	if firstY1 >= y-1000 {
+		t.Errorf("滚到底之后第一页应移出列表的视口：y %.0f → %.0f", y, firstY1)
+	}
+	// 末尾的页落在列表的视口里：离批次标题不超过列表高度（20rem）加一点余量。
+	if lastY1 > title1.Bounds.Y+d.screen.Look.Rem(docPagesMaxHeight)+200 || lastY1 < title1.Bounds.Y {
+		t.Errorf("滚到底之后最后一页应落在列表的视口里：标题 y=%.0f，最后一页 y=%.0f", title1.Bounds.Y, lastY1)
 	}
 }
 

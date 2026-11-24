@@ -1,0 +1,124 @@
+{
+  "scope": {
+    "url": "https://docs.example.com/guide/getting-started.html",
+    "directory": "/guide/reference"
+  },
+  "variants": {
+    "empty": {
+      "jobs": [],
+      "pages": {},
+      "selected": ""
+    },
+    "running": {
+      "selected": "crawl-running",
+      "jobs": [
+        {
+          "id": "crawl-running",
+          "input": {
+            "purpose": "documents",
+            "seeds": [{ "url": "https://docs.example.com/guide/", "mode": "directory", "directory": "/guide/" }],
+            "collectionId": null,
+            "maxPages": 50,
+            "maxDepth": 2,
+            "duplicatePolicy": "skip"
+          },
+          "status": "running",
+          "createdAt": 1794790000000,
+          "updatedAt": 1794790600000,
+          "counts": { "pending": 9, "running": 2, "added": 14, "duplicate": 3, "updated": 1, "unchanged": 2, "failed": 1 }
+        },
+        {
+          "id": "crawl-done",
+          "input": {
+            "purpose": "documents",
+            "seeds": [{ "url": "https://wiki.example.org/handbook/onboarding/", "mode": "directory", "directory": "/handbook/onboarding/" }],
+            "collectionId": null,
+            "maxPages": 100,
+            "maxDepth": 3,
+            "duplicatePolicy": "update"
+          },
+          "status": "completed",
+          "createdAt": 1794780000000,
+          "updatedAt": 1794781200000,
+          "counts": { "added": 12, "updated": 2, "unchanged": 5 }
+        }
+      ],
+      "pages": {
+        "crawl-running": [
+          { "id": "p-01", "jobId": "crawl-running", "url": "https://docs.example.com/guide/intro.html", "depth": 0, "seedIndex": 0, "status": "added" },
+          { "id": "p-02", "jobId": "crawl-running", "url": "https://docs.example.com/guide/install.html", "depth": 1, "seedIndex": 0, "status": "added" },
+          { "id": "p-03", "jobId": "crawl-running", "url": "https://docs.example.com/guide/quickstart.html", "depth": 1, "seedIndex": 0, "status": "duplicate" },
+          { "id": "p-04", "jobId": "crawl-running", "url": "https://docs.example.com/guide/config/index.html", "depth": 1, "seedIndex": 0, "status": "updated" },
+          { "id": "p-05", "jobId": "crawl-running", "url": "https://docs.example.com/guide/faq.html", "depth": 1, "seedIndex": 0, "status": "unchanged" },
+          { "id": "p-06", "jobId": "crawl-running", "url": "https://docs.example.com/guide/api/overview.html", "depth": 2, "seedIndex": 0, "status": "running" },
+          { "id": "p-07", "jobId": "crawl-running", "url": "https://docs.example.com/guide/api/auth.html", "depth": 2, "seedIndex": 0, "status": "running" },
+          { "id": "p-08", "jobId": "crawl-running", "url": "https://docs.example.com/guide/api/errors.html", "depth": 2, "seedIndex": 0, "status": "pending" },
+          { "id": "p-09", "jobId": "crawl-running", "url": "https://docs.example.com/guide/changelog.html", "depth": 1, "seedIndex": 0, "status": "pending" },
+          { "id": "p-10", "jobId": "crawl-running", "url": "https://docs.example.com/guide/legacy/v1.html", "depth": 2, "seedIndex": 0, "status": "failed", "error": "HTTP 404：页面不存在或已被移除" }
+        ]
+      }
+    },
+    "failed": {
+      "selected": "crawl-paused",
+      "jobs": [
+        {
+          "id": "crawl-paused",
+          "input": {
+            "purpose": "documents",
+            "seeds": [{ "url": "https://docs.example.com/api/v2/", "mode": "directory", "directory": "/api/v2/" }],
+            "collectionId": null,
+            "maxPages": 80,
+            "maxDepth": 3,
+            "duplicatePolicy": "update"
+          },
+          "status": "paused",
+          "createdAt": 1794790000000,
+          "updatedAt": 1794790900000,
+          "error": "部分页面被站点的抓取规则（robots.txt）禁止，已自动跳过。",
+          "counts": { "added": 21, "pending-version": 2, "failed": 4, "skipped": 6 }
+        },
+        {
+          "id": "crawl-interrupted",
+          "input": {
+            "purpose": "documents",
+            "seeds": [{ "url": "https://blog.example.net/archive/2026/", "mode": "directory", "directory": "/archive/2026/" }],
+            "collectionId": null,
+            "maxPages": 50,
+            "maxDepth": 2,
+            "duplicatePolicy": "skip"
+          },
+          "status": "interrupted",
+          "createdAt": 1794780000000,
+          "updatedAt": 1794780500000,
+          "counts": { "pending": 30, "added": 8 }
+        },
+        {
+          "id": "crawl-canceled",
+          "input": {
+            "purpose": "documents",
+            "seeds": [{ "url": "https://kb.example.io/help/", "mode": "directory", "directory": "/help/" }],
+            "collectionId": null,
+            "maxPages": 50,
+            "maxDepth": 2,
+            "duplicatePolicy": "skip"
+          },
+          "status": "canceled",
+          "createdAt": 1794770000000,
+          "updatedAt": 1794770300000,
+          "counts": { "added": 3, "canceled": 11 }
+        }
+      ],
+      "pages": {
+        "crawl-paused": [
+          { "id": "q-01", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/index.html", "depth": 0, "seedIndex": 0, "status": "added" },
+          { "id": "q-02", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/users.html", "depth": 1, "seedIndex": 0, "status": "added" },
+          { "id": "q-03", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/billing.html", "depth": 1, "seedIndex": 0, "status": "pending-version" },
+          { "id": "q-04", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/internal/keys.html", "depth": 2, "seedIndex": 0, "status": "skipped" },
+          { "id": "q-05", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/search.html", "depth": 1, "seedIndex": 0, "status": "failed", "error": "请求超时（15 秒），站点没有响应" },
+          { "id": "q-06", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/export.html", "depth": 1, "seedIndex": 0, "status": "failed", "error": "HTTP 503：服务暂时不可用" },
+          { "id": "q-07", "jobId": "crawl-paused", "url": "https://docs.example.com/api/v2/webhooks.html", "depth": 2, "seedIndex": 0, "status": "failed", "error": "无法解析页面内容" }
+        ]
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ package imports
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -57,10 +58,10 @@ func (s *Screen) Panel(c ui.C) {
 			s.entryButtons(c)
 		})
 
-		// 「任务概览」分组标题：flex items-center gap-2 px-3 pb-1 pt-4，右边一条 h-px 的分隔线。
+		// 「任务概览」分组标题：flex items-center gap-2 px-3 pb-1 pt-4，右边一条 h-px 的分隔线；文字 uppercase（英文界面画成全大写，中文不变）。
 		ui.Row(c.Key("overview")).FillWidth().Items(ui.Center).Gap(l.Space(2)).
 			PadSides(l.Space(4), l.Space(3), l.Space(1), l.Space(3)).Children(func() {
-			l.TextTracked(c.Key("overview-label"), locales.ImportsPanelOverview(), kit.TextXS, kit.WeightMedium,
+			l.TextTracked(c.Key("overview-label"), strings.ToUpper(locales.ImportsPanelOverview()), kit.TextXS, kit.WeightMedium,
 				t.SidebarForeground.WithAlpha(0.8), 0.025)
 			ui.Row(c.Key("overview-rule")).Grow(1).Height(1).Draw(func(d *ui.DrawContext) {
 				l.PaintSurface(d, kit.Surface{Bg: t.SidebarBorder.WithAlpha(0.6)})

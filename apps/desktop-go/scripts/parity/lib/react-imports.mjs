@@ -158,6 +158,12 @@ async function reloadClean(session) {
 }
 
 /**
+ * 给其他模块的场景用（文档站页在采集页里，侧栏与 rail 角标仍读采集队列）：先登记采集队列的页面初始化脚本与固定时钟，
+ * 其余模块自己的脚本必须在它之后登记——两个脚本都要在 window.api 上装 setter，后登记的接着前一个的 setter 往下接。
+ */
+export { ensureRegistered as ensureImportsRegistered, CONFIG_KEY as IMPORTS_CONFIG_KEY };
+
+/**
  * 进入采集页：写配置 → reload（让替换赶在渲染层启动之前）→ 点 rail「采集」。
  * options：{ mode: "data"|"empty"|"loading"|"error", errorMessage, paused, hasMore, overrides }；
  * overrides 是按任务 id 覆盖夹具字段的表（{ "task-completed": { refreshOfItemId: "item-005" } }）。

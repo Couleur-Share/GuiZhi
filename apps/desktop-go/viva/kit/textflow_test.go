@@ -2,6 +2,7 @@ package kit
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/vivaui/viva/gfx"
@@ -166,5 +167,42 @@ func TestTextFlowKeepsBlankRunsAsSpaceOnly(t *testing.T) {
 	want := canvas.TextWidthWeight("甲", size, WeightMedium) + canvas.TextWidthWeight(" ", size, WeightMedium)
 	if got := texts[1].Bounds.X - texts[0].Bounds.X; math.Abs(float64(got-want)) > 0.01 {
 		t.Fatalf("「乙」相隔 %v，期望「甲」加一个空格的宽度 %v", got, want)
+	}
+}
+
+// break-all 的折行去掉了行尾与行首的空格；并回上一行之后各行首尾相接，拼起来正好是原文（textFlow 按行长数偏移）。
+func TestWrapBreakAllTiledRowsConcatenateToTheText(t *testing.T) {
+	measure := func(s string) float32 { return float32(len([]rune(s))) * 10 }
+	for _, text := range []string{"新增 · https://docs.example.com/guide/a/b/c", "abcdef ghijkl mnopqr", "短", ""} {
+		for _, w := range []float32{0, 35, 80, 200} {
+			rows := wrapBreakAllTiled(text, w, measure)
+			if got := strings.Join(rows, ""); got != text {
+				t.Errorf("宽度 %v：%q 折成 %q，拼起来不是原文", w, text, rows)
+			}
+		}
+	}
+}
+
+// TextFlowBreakAll：网址放不下时在最后放得下的字符处断开（不在 / 之类的分隔符之后），每一截仍是一个 Label。
+func TestTextFlowBreakAllCutsTheLastRunAtTheLastFittingCharacter(t *testing.T) {
+	runs := []string{"新增", " · ", "https://docs.example.com/guide/page-1"}
+	h := openPage(t, still(), 400, 200, func(l *Look, c ui.C) {
+		ui.Column(c).Pad(10).Children(func() {
+			l.TextFlowBreakAll(c.Key("flow"), TextXS, WeightNormal, l.T.Foreground, 150, runs...)
+		})
+	})
+	texts := h.session.Snapshot().Texts
+	if len(texts) < 4 {
+		t.Fatalf("应至少有四个 Label（两段短的与网址的两截以上）：%+v", texts)
+	}
+	if texts[0].Value != "新增" || texts[1].Value != " · " {
+		t.Fatalf("前两段应原样各一个 Label：%+v", texts)
+	}
+	var url string
+	for _, tx := range texts[2:] {
+		url += tx.Value
+	}
+	if url != runs[2] {
+		t.Fatalf("网址各截拼起来 = %q，期望 %q", url, runs[2])
 	}
 }

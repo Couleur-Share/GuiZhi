@@ -27,6 +27,9 @@ type importsOptions struct {
 	// overrides 在夹具任务上补字段（按任务 id）：对应 React 采集器 enterImports 的 overrides，
 	// 用来造夹具里没有的状态（来源刷新待确认、手机端的接收时间）。
 	overrides map[string]func(*services.ImportTask)
+	// docSite 非空时给界面装上「采集文档站」整页的状态（夹具 docsite-fixture.json 里同名的数据组），
+	// 场景步骤负责点进文档站页（docsite.go）。
+	docSite string
 }
 
 // fakeImports 是采集队列的夹具实现：按服务端口径（import_list.go）从固定任务集里筛选，
@@ -329,6 +332,8 @@ type importsEnv struct {
 	screen *importsscreen.Screen
 	// compact 表示视口处于紧凑布局（≤ 1179.98px）：二级侧栏默认收起，要先点顶栏的「展开」才点得到里面的按钮。
 	compact bool
+	// docSite 是夹具 docsite-fixture.json 里这个场景用的数据组名（没有文档站页的场景为空）。
+	docSite string
 }
 
 // importsSteps 是采集场景的操作步骤；nil 表示不操作。
@@ -347,7 +352,7 @@ func importsScene(id string, opt importsOptions, steps importsSteps, waivers ...
 		}
 		ctx := context.Background()
 		store := importsscreen.NewStore(newFakeImports(fix, opt), kit.Guard{}, nil)
-		env := &importsEnv{store: store, ctx: ctx, fix: fix, compact: look.Viewport <= compactMaxWidth}
+		env := &importsEnv{store: store, ctx: ctx, fix: fix, compact: look.Viewport <= compactMaxWidth, docSite: opt.docSite}
 		// 对照要确定：不起真实定时器，后台动作同步执行。
 		store.After = func(time.Duration, func()) func() { return func() {} }
 		store.Spawn = func(fn func()) { fn() }
@@ -364,6 +369,9 @@ func importsScene(id string, opt importsOptions, steps importsSteps, waivers ...
 			Locale: kit.ParseDateLocale(fix.Locale),
 		}
 		env.screen = screen
+		if opt.docSite != "" {
+			screen.DocSite = newDocSiteStore(opt.docSite)
+		}
 		w := &shellscreen.Window{
 			Look: look, Page: shellscreen.PageHome, Module: shellscreen.ModuleImports,
 			OwnControls: true, SearchShortcut: "Alt+Shift+F",
@@ -374,6 +382,7 @@ func importsScene(id string, opt importsOptions, steps importsSteps, waivers ...
 		view := func(c ui.C) {
 			w.ActiveImports = store.View().ActiveCount
 			w.View(c)
+			screen.EndFrame() // 根每帧都收尾（root.go）：文档站页这一帧没画出来就摘掉它的轮询
 		}
 		var run func(s *headless.Session) error
 		if steps != nil {

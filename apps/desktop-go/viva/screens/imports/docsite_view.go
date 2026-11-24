@@ -2,6 +2,7 @@ package imports
 
 import (
 	"context"
+	"math"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"guizhi-mygo-shell/native/services"
 	"guizhi-mygo-shell/viva/kit"
 	"guizhi-mygo-shell/viva/locales"
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // 「采集文档站」整页（渲染层 components/imports/DocumentSitePanel.tsx）：返回、标题、创建采集批次的表单、实际范围预览、
@@ -21,6 +23,9 @@ import (
 type docSiteUI struct {
 	url, dir, pages, depth ui.Field
 	collection, policy     kit.SelectState
+
+	// scopeW、titleW、pageW 是实际范围、批次标题、页面行上一帧量到的宽度：break-all 的多段文字按它折行（docFlow）。
+	scopeW, titleW, pageW float32
 
 	inited   bool // 输入框已用 Store 里的表单值起过一次文字
 	attached bool // 本页挂着轮询（Attach 过且还没 Detach）
@@ -104,14 +109,22 @@ func (s *Screen) leaveDocuments() {
 	s.DocSite.Detach()
 }
 
+// docStrutDrop 是行内块按钮的上缘比行顶低多少：按钮落在行内基线上，基线位置取整，所以是 0.1875rem 向下取整
+// （小 / 中 / 大三档根字号 14 / 16 / 18 px 对 2 / 3 / 3 px，三档都在渲染层里量过）。
+func (s *Screen) docStrutDrop() float32 {
+	return float32(math.Floor(float64(s.Look.Rem(0.1875))))
+}
+
 // docBack 是左上角的返回钮：text-sm text-muted-foreground 的纯文字按钮。
+// 渲染层的 <button> 是块里的行内块，所在行被父级 24px 的行高撑成 24px，按钮（20px 高）落在行内基线上，上缘比行顶低 3px；
+// 这里用一个 24px 高的行加 3px 的上边距复刻（docStrutDrop，随字号档缩放）。
 func (s *Screen) docBack(c ui.C) {
 	l := s.Look
 	t := l.T
-	ui.Row(c.Key("back-row")).FillWidth().Children(func() {
+	ui.Row(c.Key("back-row")).FillWidth().Height(l.Rem(1.5)).Items(ui.Start).Children(func() {
 		b := l.Button(c.Key("back"), kit.ButtonSpec{Label: locales.WebCaptureBack()}, kit.ButtonStyle{
 			Radius: l.Rem(0.25), Text: kit.TextSM, Weight: kit.WeightNormal, Fg: t.MutedForeground,
-		})
+		}).MarginTop(s.docStrutDrop())
 		if b.Clicked() {
 			s.leaveDocuments()
 		}
@@ -213,8 +226,23 @@ func (s *Screen) docScope(c ui.C, v DocSiteView) {
 	if scope == "" {
 		scope = locales.WebCaptureValidScope()
 	}
-	text := locales.WebCaptureActualScope() + scope + locales.WebCaptureScopeHint()
-	s.Look.TextBreakAll(c.Key("scope"), text, kit.TextSM, kit.WeightNormal, s.Look.T.MutedForeground)
+	// 渲染层是三个相邻的文本节点（前缀、范围、说明），采集到的文字序列也是三段：用 TextFlowBreakAll 各画一个 Label。
+	s.docFlow(c.Key("scope"), kit.TextSM, s.Look.T.MutedForeground, &s.docUI.scopeW,
+		locales.WebCaptureActualScope(), scope, locales.WebCaptureScopeHint())
+}
+
+// docFlow 画几段相邻文本节点拼成的 break-all 文字（渲染层 `{a} · {b}` 的 JSX）：折行宽度取这一块上一帧量到的宽度
+// （首帧按一行排，量到宽度之后再出一帧；各块的宽度分别记在 *width 里）。
+func (s *Screen) docFlow(c ui.C, st kit.TextStyle, color tokens.Color, width *float32, runs ...string) ui.Box {
+	return s.Look.TextFlowBreakAll(c, st, kit.WeightNormal, color, *width, runs...).FillWidth().Draw(func(d *ui.DrawContext) { s.docMeasure(d, width) })
+}
+
+// docMeasure 记下这一帧容器的宽度（取 1/64 px 精度）；变了就再出一帧，让折行跟上。
+func (s *Screen) docMeasure(d *ui.DrawContext, width *float32) {
+	if w := float32(math.Round(float64(d.Rect.Width)*64)) / 64; w > 0 && w != *width {
+		*width = w
+		d.Canvas.RequestFrame()
+	}
 }
 
 // docStart 是「开始采集」按钮：rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50；
@@ -227,6 +255,7 @@ func (s *Screen) docStart(c ui.C, v DocSiteView) {
 		b := l.Button(c.Key("start"), kit.ButtonSpec{Label: locales.WebCaptureStart(), Disabled: !v.CanStart()}, kit.ButtonStyle{
 			PadX: l.Space(4), PadY: l.Space(2), Radius: l.Rem(0.75), Text: kit.TextSM, Weight: kit.WeightNormal,
 			Fg: t.PrimaryForeground, Bg: t.Primary, Transition: kit.DurationNone,
+			Surface: t.UiSectionBg, // 禁用时渲染层把整枚按钮合成一层再淡出：文字按整层淡出算（台账 C-008 / B-058）
 		})
 		if b.Clicked() {
 			st.Spawn(func() { st.Start(s.baseCtx()) })
@@ -234,18 +263,30 @@ func (s *Screen) docStart(c ui.C, v DocSiteView) {
 	})
 }
 
-// docClickable 是一段可点的折行文字（break-all）：悬停变主色，键盘可达。返回这一帧是否被点。
-// hint 是悬停提示（也是可访问描述），补充文字之外的信息；空串不带提示。
-func (s *Screen) docClickable(c ui.C, text string, st kit.TextStyle, hint string) bool {
+// docClickable 是一段可点的折行文字（渲染层的 <button className="text-left … break-all">）：没有悬停变色，键盘可达。
+// 返回这一帧是否被点。runs 是按钮里相邻的文本节点（可访问名是它们拼起来的整句）。
+//
+// 渲染层的 <button> 是块里的行内块：宽度只到文字右缘（放不下才撑满并折行），所在行被父级 24px 的行高撑起。
+// 一行时按钮落在行内基线上，上缘比行顶低 3px、行高 24px；折成几行时按钮顶到行顶，行底多 1px。
+// 这里用一个撑满宽度的行装按钮：行的宽度就是文字的折行宽度（docFlow 在它上面量），按钮只占文字的宽度。
+func (s *Screen) docClickable(c ui.C, st kit.TextStyle, width *float32, runs ...string) bool {
 	l := s.Look
-	t := l.T
-	id := ui.ID(c)
-	box := ui.Column(c).FillWidth().HitWith(id, text, gfx.HitOptions{
-		Role: gfx.RoleButton, Description: l.HintDescription(id, hint), Hint: hint, Cursor: gfx.PointerCursorHand,
+	name := strings.Join(runs, "")
+	size := l.Rem(st.Size)
+	canvas := c.Canvas()
+	lines := kit.WrapBreakAll(name, *width, func(t string) float32 { return canvas.TextWidthWeight(t, size, kit.WeightNormal) })
+	slot := ui.Row(c.Key("slot")).FillWidth().Items(ui.Start)
+	if len(lines) <= 1 {
+		slot = slot.PadTop(s.docStrutDrop()).MinHeight(l.Rem(1.5))
+	} else {
+		slot = slot.PadBottom(l.Rem(0.0625))
+	}
+	clicked := false
+	slot.Draw(func(d *ui.DrawContext) { s.docMeasure(d, width) }).Children(func() {
+		box := ui.Column(c).HitWith(ui.ID(c), name, gfx.HitOptions{Role: gfx.RoleButton, Cursor: gfx.PointerCursorHand})
+		l.TabStop(box)
+		box.Children(func() { l.TextFlowBreakAll(c.Key("text"), st, kit.WeightNormal, l.T.Foreground, *width, runs...) })
+		clicked = box.Clicked()
 	})
-	l.TabStop(box)
-	p := l.HoverProgress(c, id, 0, box.State().Hovered, kit.DurationDefault)
-	ink := kit.MixToken(t.Foreground, t.Primary, p)
-	box.Children(func() { l.TextBreakAll(c.Key("text"), text, st, kit.WeightNormal, ink) })
-	return box.Clicked()
+	return clicked
 }

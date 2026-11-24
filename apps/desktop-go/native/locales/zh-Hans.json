@@ -3802,8 +3802,6 @@
       }
     }
   },
-  "native_docSite_empty": "还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。",
-  "native_docSite_noPages": "这个批次还没有发现页面。",
   "native_shell_notMigrated": "「{module}」还没有迁移到原生界面",
   "@native_shell_notMigrated": {
     "placeholders": {

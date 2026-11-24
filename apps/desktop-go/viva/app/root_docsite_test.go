@@ -93,8 +93,8 @@ func listCount(docs *servicestest.DocSite) int {
 
 // ---- 采集文档站（B-013） ----
 
-// 点页头「采集文档站」打开整页，读到的批次列在页上；选中批次，点已入库的页面，切到知识库并选中那条目。
-func TestRootDocSiteListsBatchesAndOpensAStoredPage(t *testing.T) {
+// 点页头「采集文档站」打开整页，读到的批次列在页上；选中批次后页面明细是纯展示行：点已入库的页面不跳知识库（渲染层 <li> 不可点）。
+func TestRootDocSiteListsBatchesAndShowsPagesAsPlainRows(t *testing.T) {
 	docs := &servicestest.DocSite{}
 	docs.SetJobs(crawlJobFixture("j1", services.CrawlJobCompleted))
 	docs.SetPages("j1", services.CrawlPage{ID: "p1", JobID: "j1", URL: "https://docs.example.com/j1/intro", Status: services.CrawlPageAdded, ItemID: "n1"})
@@ -107,14 +107,22 @@ func TestRootDocSiteListsBatchesAndOpensAStoredPage(t *testing.T) {
 	f.waitFrames(t, "读到批次列表", func() bool { return f.hasButtonContaining("docs.example.com/j1/") })
 
 	f.clickButtonContaining(t, "docs.example.com/j1/")
-	f.waitFrames(t, "读到页面明细", func() bool { return f.hasButtonContaining("docs.example.com/j1/intro") })
+	f.waitFrames(t, "读到页面明细", func() bool { return f.session.HasText("docs.example.com/j1/intro") })
 
-	f.clickButtonContaining(t, "docs.example.com/j1/intro")
-	store := f.root.library.Store
-	f.waitFrames(t, "知识库里选中那条目", func() bool {
-		d := store.View().Detail
-		return f.root.Window().Module == shell.ModuleLibrary && d.Item != nil && d.Item.ID == "n1"
-	})
+	if f.hasButtonContaining("docs.example.com/j1/intro") {
+		t.Fatalf("页面行是纯展示，不应是按钮；画面上有 %q", f.session.Texts())
+	}
+	for _, tx := range f.session.Snapshot().Texts {
+		if tx.Value == "https://docs.example.com/j1/intro" {
+			if err := f.session.Click(tx.Bounds.X+tx.Bounds.Width/2, tx.Bounds.Y+tx.Bounds.Height/2); err != nil {
+				t.Fatalf("点击页面行失败：%v", err)
+			}
+		}
+	}
+	f.frames(t, 5)
+	if f.root.Window().Module == shell.ModuleLibrary {
+		t.Fatalf("点页面行不应切到知识库")
+	}
 }
 
 func (f *rootFixture) clickButtonContaining(t *testing.T, part string) {
@@ -186,8 +194,8 @@ func TestRootDocSiteLoadErrorThenRetry(t *testing.T) {
 	f.openDocSite(t)
 
 	f.waitFrames(t, "显示读取失败", func() bool { return f.session.HasText(locales.CommonRetry()) })
-	if f.session.HasText(locales.NativeDocSiteEmpty()) {
-		t.Error("读取失败不能渲染成「还没有采集批次」")
+	if f.hasButtonContaining("docs.example.com/j1/") {
+		t.Error("读取失败时不应渲染出批次")
 	}
 	docs.FailOn("list", nil)
 	f.clickRole(t, gfx.RoleButton, locales.CommonRetry())

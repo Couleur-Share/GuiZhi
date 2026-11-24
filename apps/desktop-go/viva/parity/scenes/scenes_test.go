@@ -65,6 +65,14 @@ var knownRed = map[string]redPin{
 	// G-027（M3-6a 延伸）：更新说明里的列表项是 ListMarker、设置清单的各区块是带名字的 region，映射表没有规则；这两个场景的 L2、L3 全部通过，只因 L1 未通过。
 	"app.window.overlays.update-available": {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 1},
 	"app.window.overlays.setup-checklist":  {Ledger: "G-027", Kinds: []string{"L1/unmapped-role"}, Max: 1},
+	// G-027（M3-6b 延伸）：文档站页的「最多页数」「发现深度」是 <input type=number>（spinbutton），任务卡是 <article>——映射表都没有规则
+	// （unmapped-role），Viva 把两个数字框表达成 textfield，于是多两个 extra-node。四个场景的 L2、L3 在中档全部通过，
+	// 只有 `docsite-failed` 另有一条 L2/ink-mass：批次标题里 14px 的「·」（单独一个文本节点的 1px 笔画字形），两边位置一致，
+	// 起点只差 0.003px（React 632.359、Viva 632.356），放大看是亚像素相位落在不同的栅格档（成因是推断），墨迹量比 0.84。
+	"app.window.imports.docsite-empty":   {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 3},
+	"app.window.imports.docsite-scope":   {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 3},
+	"app.window.imports.docsite-running": {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role"}, Max: 4},
+	"app.window.imports.docsite-failed":  {Ledger: "G-027", Kinds: []string{"L1/extra-node", "L1/unmapped-role", "L2/ink-mass"}, Max: 5},
 	// B-062（M3-4）：多行输入框的无障碍外框有最小高度（ui.TextArea 的 a11y 矩形不随 Height 缩小，全局输入框 47 对 36），
 	// 占位文字的行高也是字号加 7（21 对 20），所以外框差与占位文字墨迹 −1；画出来的输入框本身与渲染层一致（L3 0.006%）。
 	"app.window.ask.empty":          {Ledger: "B-062", Kinds: []string{"L2/box", "L2/ink"}, Max: 2},

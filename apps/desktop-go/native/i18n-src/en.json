@@ -43,10 +43,6 @@
     "setup": {
       "loadError": "The AI configuration could not be read ({{reason}}), so the completion status below may be inaccurate."
     },
-    "docSite": {
-      "empty": "No capture batches yet. Enter an entry URL and choose “Start capture”; the batch will appear here.",
-      "noPages": "No pages have been discovered in this batch yet."
-    },
     "shell": {
       "notMigrated": "\"{{module}}\" has not been moved to the native UI yet",
       "notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone.",
