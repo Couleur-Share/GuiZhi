@@ -221,6 +221,8 @@ func (a logAdapter) AppError(scope, action, message string) {
 func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 	return services.Services{
 		Imports:      importsAdapter{b: b, hub: hub},
+		DocSite:      docSiteAdapter{b: b},
+		PlatformAuth: platformAuthAdapter{b: b},
 		Library:      libraryAdapter{b: b, hub: hub},
 		Inbox:        newInboxAdapter(b),
 		Shortcuts:    shortcutsAdapter{b: b},

@@ -14,6 +14,11 @@ import "time"
 type Services struct {
 	Imports Imports
 
+	// DocSite 是「采集文档站」整页的批次能力（见 imports_docsite.go），PlatformAuth 是登录态重试与 NodeSeek 验证用的平台账号能力
+	// （见 imports_auth.go）；nil 时对应入口按「不可用」处理，测试与对照里不关心时可以不给。
+	DocSite      DocSite
+	PlatformAuth PlatformAuth
+
 	// Library 是知识库侧栏的数据（计数、合集、标签）；nil 时知识库模块按「尚未迁移」处理。
 	Library Library
 
