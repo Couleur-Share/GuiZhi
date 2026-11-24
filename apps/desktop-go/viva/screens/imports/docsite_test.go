@@ -336,6 +336,27 @@ func TestDocSiteSelect(t *testing.T) {
 	}
 }
 
+// PagesLoaded 区分「页还没读到」与「读到了、但这个批次没有页」：界面只在后者提示「还没有发现页面」。
+func TestDocSitePagesLoadedFlag(t *testing.T) {
+	h := newDocHarness(t)
+	h.svc.SetJobs(crawlJob("j1", services.CrawlJobRunning, nil), crawlJob("j2", services.CrawlJobRunning, nil))
+	h.svc.SetPages("j2", crawlPage("j2", "b", services.CrawlPageAdded))
+
+	h.store.Select(bg, "j1")
+	if v := h.store.View(); v.Selected != "j1" || !v.PagesLoaded || len(v.Pages) != 0 {
+		t.Fatalf("读到了、确实没有页：%+v", v)
+	}
+	h.store.Select(bg, "j2")
+	if v := h.store.View(); !v.PagesLoaded || len(v.Pages) != 1 {
+		t.Fatalf("切到 j2 后读到一页：%+v", v)
+	}
+	h.svc.FailOn("get", errors.New("boom"))
+	h.store.Select(bg, "j1")
+	if v := h.store.View(); v.Selected != "j1" || v.PagesLoaded {
+		t.Fatalf("切换后读取失败：不能把「没读到」当成「没有页」：%+v", v)
+	}
+}
+
 // ---- 目标合集 ----
 
 func TestDocSiteLoadCollections(t *testing.T) {

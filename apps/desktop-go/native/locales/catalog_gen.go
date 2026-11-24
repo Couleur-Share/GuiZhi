@@ -20022,6 +20022,26 @@ func (msgs Messages) NativeSetupLoadError(reason any) string {
 	return Catalog.Format(msgs.locale, "native_setup_loadError", map[string]any{"reason": reason})
 }
 
+// NativeDocSiteEmpty says "还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。"
+// in the language the app shows.
+func NativeDocSiteEmpty() string { return In(i18n.Locale()).NativeDocSiteEmpty() }
+
+// NativeDocSiteEmpty says "还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。"
+// in the language of msgs.
+func (msgs Messages) NativeDocSiteEmpty() string {
+	return Catalog.Format(msgs.locale, "native_docSite_empty", nil)
+}
+
+// NativeDocSiteNoPages says "这个批次还没有发现页面。"
+// in the language the app shows.
+func NativeDocSiteNoPages() string { return In(i18n.Locale()).NativeDocSiteNoPages() }
+
+// NativeDocSiteNoPages says "这个批次还没有发现页面。"
+// in the language of msgs.
+func (msgs Messages) NativeDocSiteNoPages() string {
+	return Catalog.Format(msgs.locale, "native_docSite_noPages", nil)
+}
+
 // NativeShellNotMigrated says "「{module}」还没有迁移到原生界面"
 // in the language the app shows.
 func NativeShellNotMigrated(module any) string {

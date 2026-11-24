@@ -15315,6 +15315,22 @@ func NativeSetupLoadError(reason any) string {
 	return "没能读取 AI 配置（" + fmtArg(reason) + "），下面的完成状态可能不准确。"
 }
 
+// NativeDocSiteEmpty 是 native.docSite.empty：还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。
+func NativeDocSiteEmpty() string {
+	if useEn() {
+		return "No capture batches yet. Enter an entry URL and choose “Start capture”; the batch will appear here."
+	}
+	return "还没有采集批次。填好入口网址后点「开始采集」，批次会出现在这里。"
+}
+
+// NativeDocSiteNoPages 是 native.docSite.noPages：这个批次还没有发现页面。
+func NativeDocSiteNoPages() string {
+	if useEn() {
+		return "No pages have been discovered in this batch yet."
+	}
+	return "这个批次还没有发现页面。"
+}
+
 // NativeShellNotMigrated 是 native.shell.notMigrated：「{{module}}」还没有迁移到原生界面
 func NativeShellNotMigrated(module any) string {
 	if useEn() {

@@ -53,6 +53,9 @@ type Screen struct {
 	// Guard 是变更类操作的失败通道（与 Store 里的是同一个）；Guard.Notify 同时是提示条的入口。
 	Guard kit.Guard
 	Hooks Hooks
+	// DocSite 是「采集文档站」整页的状态（渲染层 DocumentSitePanel）；为空（装配不全的自动化实例、旧单测）时
+	// 点「采集文档站」仍显示「尚未迁移」的占位页。
+	DocSite *DocSiteStore
 
 	// Now 返回当前时间；对照与测试注入固定时钟。空表示取系统时钟。
 	Now func() time.Time
@@ -65,7 +68,8 @@ type Screen struct {
 	searchFocus  bool   // 上一帧搜索框是否有焦点（边框高亮跟它走，晚一帧不可见）
 	queryStop    func()
 	mounted      bool
-	documents    bool   // 工作区显示「采集文档站」而不是任务队列（渲染层 ImportsWorkspace 的 view）
+	documents    bool // 工作区显示「采集文档站」而不是任务队列（渲染层 ImportsWorkspace 的 view）
+	docUI        docSiteUI
 	detailTaskID string // 详情弹窗打开的任务 id；空表示没开
 	detail       detailState
 	clear        *clearConfirm

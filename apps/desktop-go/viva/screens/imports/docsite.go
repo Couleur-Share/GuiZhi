@@ -46,6 +46,8 @@ type DocSiteView struct {
 	// Selected 是展开了页面明细的批次 id；Pages 是它的页面（刚选中、还没读到时为空）。
 	Selected string
 	Pages    []services.CrawlPage
+	// PagesLoaded 报告 Pages 是否已是选中批次读回来的结果：刚选中、还没读到之前为假，界面据此区分「还在读」与「这个批次还没有页面」。
+	PagesLoaded bool
 	// HasLoaded 为假且 LoadError 非空时界面整页显示加载失败，而不是「没有批次」。
 	HasLoaded bool
 	LoadError string
@@ -253,7 +255,7 @@ func (s *DocSiteStore) Load(ctx context.Context) {
 	} else {
 		s.view.Jobs, s.view.HasLoaded, s.view.LoadError = jobs, true, ""
 		if selected != "" {
-			s.view.Pages = detail.Pages
+			s.view.Pages, s.view.PagesLoaded = detail.Pages, true
 		}
 	}
 	s.mu.Unlock()
@@ -299,7 +301,7 @@ func (s *DocSiteStore) Select(ctx context.Context, id string) {
 		s.mu.Unlock()
 		return
 	}
-	s.view.Selected, s.view.Pages = id, nil
+	s.view.Selected, s.view.Pages, s.view.PagesLoaded = id, nil, false
 	s.loadRev++
 	s.mu.Unlock()
 	s.wake()

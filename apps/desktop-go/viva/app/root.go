@@ -165,6 +165,17 @@ func (r *Root) mountImports(invalidate func()) {
 			},
 		},
 	}
+	// 采集文档站整页（B-013）：合集下拉读知识库的合集；没有装配 DocSite 时「采集文档站」仍是「尚未迁移」的占位。
+	// 页面在每帧画完后（EndFrame）检查自己有没有被画，切走模块或页面就停掉轮询，关窗口时 Close 再兜一次。
+	if docs := r.opts.Services.DocSite; docs != nil {
+		r.imports.DocSite = importsscreen.NewDocSiteStore(docs, r.opts.Services.Library, r.guard, invalidate)
+	}
+	// 登录态重试与站点验证（B-015）：详情弹窗与任务行的四个钩子接到平台账号能力上；没有装配 PlatformAuth 时钩子为空，
+	// 对应按钮照旧什么都不做（与单测里没有外壳的行为一致）。
+	if auth := r.opts.Services.PlatformAuth; auth != nil {
+		retry := &importsscreen.AuthRetry{Auth: auth, Retry: r.importsStore, Guard: r.guard, Ctx: r.ctx}
+		retry.Install(&r.imports.Hooks)
+	}
 	r.win.Modules[shell.ModuleImports] = shell.ModuleView{Panel: r.imports.Panel, Workspace: r.imports.Workspace}
 }
 
@@ -403,6 +414,9 @@ func (r *Root) View(c ui.C) {
 	r.syncInbox()
 	r.syncOverlays()
 	r.win.View(c)
+	if r.imports != nil {
+		r.imports.EndFrame() // 文档站页这一帧没画（切走了模块或页面）就停掉它的轮询
+	}
 	if r.library != nil {
 		r.library.EndFrame()
 	}
@@ -443,6 +457,9 @@ func (r *Root) Close() {
 	r.closeOverlays()
 	if r.importsStore != nil {
 		r.importsStore.FlushRemovals()
+	}
+	if r.imports != nil {
+		r.imports.Close() // 停掉文档站页的轮询与在途的读取
 	}
 	if r.library != nil {
 		r.library.Store.FlushRemovals()

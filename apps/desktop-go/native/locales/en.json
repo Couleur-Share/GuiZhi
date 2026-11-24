@@ -1914,6 +1914,8 @@
   "native_update_releasedOn": "Released {date}",
   "native_migration_sourcePath": "Legacy database: {path}",
   "native_setup_loadError": "The AI configuration could not be read ({reason}), so the completion status below may be inaccurate.",
+  "native_docSite_empty": "No capture batches yet. Enter an entry URL and choose “Start capture”; the batch will appear here.",
+  "native_docSite_noPages": "No pages have been discovered in this batch yet.",
   "native_shell_notMigrated": "\"{module}\" has not been moved to the native UI yet",
   "native_shell_notMigratedHint": "This is the native UI under development (feat/native-ui). The module still lives in the React app; the native version arrives in a later milestone.",
   "native_shell_commandAction": "Handle window command",
