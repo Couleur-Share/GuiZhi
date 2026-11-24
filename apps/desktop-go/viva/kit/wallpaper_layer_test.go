@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/vivaui/viva/ui"
+
+	"guizhi-mygo-shell/viva/tokens"
 )
 
 // layerPage 在 200×100 的页里画一层壁纸：整页一行，Draw 里调 PaintWallpaperLayer。file 与 opacity 由调用方每帧改。
@@ -140,5 +142,32 @@ func TestWallpaperCacheRetained(t *testing.T) {
 	c.Close()
 	if c.Retained() != 0 {
 		t.Errorf("Close 后应为 0：%d", c.Retained())
+	}
+}
+
+// 回退层用调用方给的令牌画：默认主题里 muted 与背景只差一两个灰阶，用默认令牌分不出「画了回退」与「什么也没画」，
+// 所以这里把 muted 换成纯蓝，回退底（蓝 30% 叠在页面底色上）与图标周围都必须带蓝；读取失败时不画回退层的实现会留下页面底色。
+func TestPaintWallpaperLayerFallbackUsesGivenTokens(t *testing.T) {
+	loader := &wallpaperLoader{errs: map[string]error{"gone.png": errors.New("open gone.png: file not found")}}
+	cache, _ := newTestCache(loader)
+	t.Cleanup(cache.Close)
+	h := openPage(t, still(), 200, 100, func(l *Look, c ui.C) {
+		tk := l.T
+		tk.Muted = tokens.RGBA(0, 0, 255, 1)
+		ui.Row(c).Fill().Draw(func(d *ui.DrawContext) {
+			l.PaintWallpaperLayer(d, WallpaperLayer{Cache: cache, File: "gone.png", Opacity: 1, Tokens: tk})
+		})
+	})
+	waitFor(t, "读取失败", func() bool { h.frames(1); return cache.Failed() })
+	h.frames(2)
+	img, err := h.session.Image()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bg := h.look.T.Background
+	want := tokens.RGBA(0, 0, 255, 0.3).Over(bg)
+	got := img.RGBAAt(4, 4)
+	if !byteNear(got.R, want.R, 2) || !byteNear(got.G, want.G, 2) || !byteNear(got.B, want.B, 2) {
+		t.Errorf("回退底应是纯蓝 30%% 叠在页面底色上 %+v，得到 %v（页面底色 %+v）", want, got, bg)
 	}
 }

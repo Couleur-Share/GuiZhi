@@ -62,6 +62,13 @@ func TestSearchShowsSavedConfiguration(t *testing.T) {
 			t.Fatalf("应显示 %q；画面上有 %q", want, r.session.Texts())
 		}
 	}
+	// 标题是卡片边框里的 h3（RoleHeading），不能只靠 textHas：说明文字里也含有标题的字样。
+	if !r.has(gfx.RoleHeading, locales.SettingsReadingSearchTitle()) {
+		t.Fatalf("卡片应有标题 %q；画面上有 %q", locales.SettingsReadingSearchTitle(), r.session.Texts())
+	}
+	if !r.textHas(locales.SettingsReadingSearchDefaultDesc()) {
+		t.Fatalf("默认开关行应有说明 %q；画面上有 %q", locales.SettingsReadingSearchDefaultDesc(), r.session.Texts())
+	}
 	if line := r.screen.Search.View().StatusLine(); line == "" || !r.textHas(line) {
 		t.Fatalf("应显示状态行 %q；画面上有 %q", line, r.session.Texts())
 	}

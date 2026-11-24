@@ -537,7 +537,9 @@ func TestPickBackgroundOutcomes(t *testing.T) {
 	t.Run("取消", func(t *testing.T) {
 		store := sscreen.NewMemStore(nsettings.Default())
 		picked := make(chan struct{}, 1)
+		logs, notify := &logRecorder{}, kit.NewNotifier(nil)
 		r, _ := openAppearanceWith(t, store, func(a *sscreen.Appearance) {
+			a.Guard = kit.Guard{Log: logs, Notify: notify}
 			a.PickBackground = func() (string, error) { picked <- struct{}{}; return "", nil }
 			a.Wake = func() {}
 		})
@@ -552,6 +554,9 @@ func TestPickBackgroundOutcomes(t *testing.T) {
 		r.frames(3)
 		if store.Updates != 0 {
 			t.Errorf("取消选图不应写入设置，写入 %d 次", store.Updates)
+		}
+		if got := logs.all(); len(got) != 0 || len(notify.Queued()) != 0 {
+			t.Errorf("取消选图不是失败，不应记日志也不应弹提示：日志 %q，提示 %d 条", got, len(notify.Queued()))
 		}
 		if n, ok := r.node(gfx.RoleButton, locales.SettingsSelectBackgroundImage()); !ok || n.Disabled {
 			t.Error("取消后按钮应恢复可点")

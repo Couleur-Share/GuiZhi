@@ -225,3 +225,21 @@ func TestRootAppearancePreviewReleasedOnLeave(t *testing.T) {
 		t.Errorf("离开设置页应释放预览：%d", got)
 	}
 }
+
+// 关窗口时设置页预览持有的位图一并释放：窗口仍停在设置页的显示设置分区，不靠下一帧的离开逻辑。
+func TestRootCloseReleasesAppearancePreview(t *testing.T) {
+	bg := &servicestest.BackgroundImagesFake{}
+	bg.Put("wall.png", wallpaperPNG(t, color.NRGBA{R: 255, A: 255}))
+	f := openRoot(t, func(o *Options) { o.Services.BackgroundImages = bg })
+	f.root.settings.Active = sscreen.SectionAppearance
+	f.setBackground(t, "wall.png", true)
+	f.frames(t, 3)
+	if err := f.session.Scroll(gfx.ScrollEvent{X: 700, Y: 400, DeltaY: 4000, Precise: true}); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "预览读完", func() bool { f.frames(t, 1); return f.root.settings.PreviewRetained() > 0 })
+	f.root.closeWallpaper()
+	if got := f.root.settings.PreviewRetained(); got != 0 {
+		t.Errorf("关窗口应释放设置页预览：%d", got)
+	}
+}
