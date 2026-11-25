@@ -555,6 +555,24 @@ func TestSmartClassifyWithoutSelectedUnclassifiedIsNoop(t *testing.T) {
 	}
 }
 
+// 未在归类时「停止」是 no-op：即使已选中未归合集的条目，也不能因帧内视图过期而启动新一轮归类。
+func TestStopSmartClassifyWhenIdleIsNoOp(t *testing.T) {
+	r := classifyRig(t, "u1", "u2")
+	calls := len(r.svc.Calls())
+
+	r.store.StopSmartClassify()
+
+	if r.svc.CallCount("Classify") != 0 || len(r.svc.AppliedCalls()) != 0 || r.classified != 0 {
+		t.Fatalf("空闲时停止不应请求 AI 或写入分类：%v", r.svc.Calls())
+	}
+	if len(r.svc.Calls()) != calls || len(r.toasts()) != 0 {
+		t.Fatalf("空闲时停止什么都不做：%v", r.svc.Calls())
+	}
+	if v := r.view(); v.Classifying || v.Classify != (ClassifyProgress{}) {
+		t.Fatalf("空闲时停止后仍应是未归类状态：%+v", v)
+	}
+}
+
 // 开始时按每批 20 条估算总批数；每批完成后更新进度。
 func TestSmartClassifyShowsEstimatedTotalThenProgress(t *testing.T) {
 	ids := make([]string, 45)

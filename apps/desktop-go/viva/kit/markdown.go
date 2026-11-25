@@ -510,6 +510,7 @@ const mdInlineMaxDepth = 8
 
 // parseInlineStyled 在已有样式 st 下解析 s；st 里只用样式标志与 Href。
 func parseInlineStyled(s string, st MdSpan, depth int) []MdSpan {
+	memo := &inlineMemo{}
 	var out []MdSpan
 	var buf strings.Builder
 	flush := func() {
@@ -541,7 +542,7 @@ func parseInlineStyled(s string, st MdSpan, depth int) []MdSpan {
 			}
 		case c == '`':
 			n := runLen(s, i, '`')
-			if j := findBacktickClose(s, i+n, n); j >= 0 {
+			if j := memo.closeBacktick(s, i+n, n); j >= 0 {
 				flush()
 				code := strings.ReplaceAll(s[i+n:j], "\n", " ")
 				if len(code) >= 2 && code[0] == ' ' && code[len(code)-1] == ' ' && strings.TrimSpace(code) != "" {
@@ -571,7 +572,7 @@ func parseInlineStyled(s string, st MdSpan, depth int) []MdSpan {
 				i++
 			}
 		case (c == '*' || c == '_') && depth < mdInlineMaxDepth:
-			if consumed, spans, ok := parseEmphasis(s, i, st, depth); ok {
+			if consumed, spans, ok := parseEmphasis(s, i, st, depth, memo); ok {
 				flush()
 				out = append(out, spans...)
 				i += consumed
@@ -583,7 +584,7 @@ func parseInlineStyled(s string, st MdSpan, depth int) []MdSpan {
 		case c == '~' && depth < mdInlineMaxDepth:
 			n := runLen(s, i, '~')
 			if n == 2 {
-				if j := findDelimClose(s, i+2, '~', 2); j > i+2 && !startsWithSpace(s[i+2:]) {
+				if j := memo.closeDelim(s, i+2, '~', 2); j > i+2 && !startsWithSpace(s[i+2:]) {
 					flush()
 					inner := st
 					inner.Strike = true
@@ -662,6 +663,64 @@ func parseInlineStyled(s string, st MdSpan, depth int) []MdSpan {
 	return out
 }
 
+// inlineMemo 记住「同一个 s 内已扫到末尾仍找不到闭合符」的结果，避免 "*a *a *a ..." 这类
+// 病态输入每个未闭合定界符都扫一遍全文（O(N²)）。只在 parseInlineStyled 的单次调用内使用，s 不变。
+//
+// 记忆是精确的（与不记忆逐字等价）：
+//   - 反引号：findBacktickClose 只数「极大连续反引号串」，from 总是某串的末尾且只增不减，
+//     故 (n) 一次扫空，之后任何更靠后的同 n 查询必然也扫空。
+//   - 定界符：findDelimClose 带 skipLiteral 跳跃（转义、行内代码），不同起点的扫描链可能错位
+//     （例如主循环跳过链接/URL 后落在上一条链「跳过」的代码区间内部）。因此失败时记录那条链
+//     经过的下标，只有后续查询的起点恰在链上才直接判 -1；否则退回真实扫描。
+//     只有 findDelimClose 本身返回 -1 才记忆；`_` 后随字母数字被拒属于找到闭合符之后的判断，不记忆。
+type inlineMemo struct {
+	delim [3][4]delimFail // [* _ ~][n=1..3]
+	tick  map[int]struct{}
+}
+
+type delimFail struct{ visited []bool }
+
+// closeDelim 等价于 findDelimClose(s, from, ch, n)，对已确认无闭合符的扫描链直接返回 -1。
+func (m *inlineMemo) closeDelim(s string, from int, ch byte, n int) int {
+	var slot *delimFail
+	if n >= 1 && n <= 3 {
+		switch ch {
+		case '*':
+			slot = &m.delim[0][n]
+		case '_':
+			slot = &m.delim[1][n]
+		case '~':
+			slot = &m.delim[2][n]
+		}
+	}
+	if slot != nil && from < len(slot.visited) && slot.visited[from] {
+		return -1
+	}
+	j := findDelimClose(s, from, ch, n)
+	if j < 0 && slot != nil && from < len(s) {
+		// 失败后再走一遍并记下扫描链（只在失败时付出，成功路径零额外开销）。
+		visited := make([]bool, len(s)+1)
+		findDelimCloseTrace(s, from, ch, n, visited)
+		slot.visited = visited
+	}
+	return j
+}
+
+// closeBacktick 等价于 findBacktickClose(s, from, n)，同一 s 内同长度扫空过一次后不再重复扫。
+func (m *inlineMemo) closeBacktick(s string, from, n int) int {
+	if _, dead := m.tick[n]; dead {
+		return -1
+	}
+	j := findBacktickClose(s, from, n)
+	if j < 0 {
+		if m.tick == nil {
+			m.tick = make(map[int]struct{})
+		}
+		m.tick[n] = struct{}{}
+	}
+	return j
+}
+
 func isASCIIPunct(b byte) bool {
 	return (b >= '!' && b <= '/') || (b >= ':' && b <= '@') || (b >= '[' && b <= '`') || (b >= '{' && b <= '~')
 }
@@ -729,7 +788,16 @@ func skipLiteral(s string, i int) int {
 
 // findDelimClose 找 from 之后长度恰好为 n、前面不是空白的 ch 串，返回它的起点；没有返回 -1。
 func findDelimClose(s string, from int, ch byte, n int) int {
+	return findDelimCloseTrace(s, from, ch, n, nil)
+}
+
+// findDelimCloseTrace 同 findDelimClose；visited 非 nil 时把扫描循环顶部经过的每个下标标 true（长度须 > len(s)），
+// 供 inlineMemo 判断后续查询是否落在同一条扫描链上。
+func findDelimCloseTrace(s string, from int, ch byte, n int, visited []bool) int {
 	for i := from; i < len(s); {
+		if visited != nil {
+			visited[i] = true
+		}
 		if skip := skipLiteral(s, i); skip > 0 {
 			i += skip
 			continue
@@ -748,7 +816,7 @@ func findDelimClose(s string, from int, ch byte, n int) int {
 }
 
 // parseEmphasis 尝试把 s[i] 起的 * 或 _ 串解析成强调：返回消耗的字节数与结果。
-func parseEmphasis(s string, i int, st MdSpan, depth int) (consumed int, spans []MdSpan, ok bool) {
+func parseEmphasis(s string, i int, st MdSpan, depth int, memo *inlineMemo) (consumed int, spans []MdSpan, ok bool) {
 	ch := s[i]
 	n := runLen(s, i, ch)
 	if n > 3 || startsWithSpace(s[i+n:]) {
@@ -757,7 +825,7 @@ func parseEmphasis(s string, i int, st MdSpan, depth int) (consumed int, spans [
 	if ch == '_' && i > 0 && isAlnumBefore(s, i) {
 		return 0, nil, false
 	}
-	j := findDelimClose(s, i+n, ch, n)
+	j := memo.closeDelim(s, i+n, ch, n)
 	if j < 0 {
 		return 0, nil, false
 	}

@@ -38,12 +38,15 @@ func canvasOf(t *testing.T) (*Look, *gfx.Canvas) {
 // 这是 TextNoKern 占位的依据（台账 A-026：字符宽度两边一致，差的只是字偶对）。
 func TestNoKernWidthMatchesChromium(t *testing.T) {
 	look, canvas := canvasOf(t)
-	for _, g := range noKernGolden {
-		got := float64(look.NoKernWidth(canvas, g.text, g.size, WeightMedium))
-		if math.Abs(got-g.width) > 0.03 {
-			t.Errorf("%q（%v px）：逐字符求和 %.3f，渲染层 %.3f", g.text, g.size, got, g.width)
+	t.Run("渲染层实测宽度", func(t *testing.T) {
+		skipWin11FontMetricsInCI(t)
+		for _, g := range noKernGolden {
+			got := float64(look.NoKernWidth(canvas, g.text, g.size, WeightMedium))
+			if math.Abs(got-g.width) > 0.03 {
+				t.Errorf("%q（%v px）：逐字符求和 %.3f，渲染层 %.3f", g.text, g.size, got, g.width)
+			}
 		}
-	}
+	})
 	// 带字偶距的整行宽度比逐字符求和窄（含拉丁字母的标题），汉字的字宽两边一致。
 	title := "YouTube: The Future of Local-First Software"
 	kerned := float64(canvas.TextWidthWeight(title, 14, WeightMedium))
@@ -59,6 +62,7 @@ func TestNoKernWidthMatchesChromium(t *testing.T) {
 // 折行翻转：可用宽度 284.125 px 落在 Viva 的整行宽（带字偶距，放得下）与渲染层的整行宽（不做字偶距，放不下）之间，
 // 渲染层折成两行，第一行到「Local-First」，第二行是「Software」（facts.json 里两个文字矩形宽 227.531 与 58.844）。
 func TestWrapNoKernFlipsLikeChromium(t *testing.T) {
+	skipWin11FontMetricsInCI(t)
 	look, canvas := canvasOf(t)
 	title := "YouTube: The Future of Local-First Software"
 	const avail = 284.125

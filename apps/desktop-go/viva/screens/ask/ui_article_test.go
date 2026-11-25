@@ -369,6 +369,15 @@ func TestUIArticleRunningShowsStopLocksWebSwitchAndEnterDoesNotSend(t *testing.T
 	})
 	r.store.Article().SetDraft(r.draftKey(), "slow question")
 	r.frames(2)
+	// goroutines 模式下首帧发起的异步加载在慢机上可能还没完成：加载中发送按钮是禁用的（Loading 时 composer Disabled）。
+	// 等加载结束且发送按钮可用再点，否则点在禁用按钮上永远等不到 Running。
+	r.settle("加载完成且发送按钮可用", func() bool {
+		if r.articleView().Loading {
+			return false
+		}
+		n, ok := r.node(gfx.RoleButton, locales.AskSend())
+		return ok && !n.Disabled
+	})
 	r.clickButton(locales.AskSend())
 	r.settle("回答进行中", func() bool { return r.articleView().Running })
 	if !r.hasButton(locales.AskStop()) || r.hasButton(locales.AskSend()) {

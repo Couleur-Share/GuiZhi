@@ -6,10 +6,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"guizhi-mygo-shell/viva/parity"
 	"guizhi-mygo-shell/viva/parity/scenes"
 )
+
+// 入库的 React 事实样本在 UTC+8 的机器上采集，settings.data 等日期按本地时区格式化；
+// 固定为 UTC+8（中国无夏令时，与 apps/desktop-go/main_test.go 一致），UTC 的 CI 上就不会差 8 小时。
+func TestMain(m *testing.M) {
+	time.Local = time.FixedZone("CST", 8*3600)
+	os.Exit(m.Run())
+}
 
 // redPin 固定一个「已登记在台账、对照目前仍未通过」的场景此刻的失败形态（M2-4 起，台账 G-029）。
 type redPin struct {
@@ -183,6 +191,9 @@ func TestKnownRedPointsToOpenLedgerItems(t *testing.T) {
 // 入库的只有事实 JSON：不需要 WebView2，也不依赖基准目录里的 PNG；像素与墨迹的比较见 cmd/vivaparity。
 // 样本由 scripts/parity/export-testdata.mjs 导出；换了字体、令牌或屏幕后，样本要在重新采集后重新导出。
 func TestScenesMatchReactFacts(t *testing.T) {
+	if os.Getenv("CI") != "" && os.Getenv("GUIZHI_RUN_WIN11_PARITY") != "1" {
+		t.Skip("CI 的 Windows Server 英文环境缺少 Win11 中文版字体度量，跳过入库 Win11 React 事实对拍；本地 Win11 或设置 GUIZHI_RUN_WIN11_PARITY=1 时照常执行")
+	}
 	th, err := parity.DefaultThresholds()
 	if err != nil {
 		t.Fatal(err)

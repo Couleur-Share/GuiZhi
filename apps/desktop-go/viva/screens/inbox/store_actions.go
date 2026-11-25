@@ -225,6 +225,21 @@ func (s *Store) reportSemanticNotice(notice *services.InboxSemanticNotice) {
 
 // ---- AI 智能归类 ----
 
+// StopSmartClassify 只停止正在进行的归类：加锁取出 cancel，放锁后调用，不阻塞。
+// 没有在归类时是安全的 no-op，绝不启动新一轮——UI 线程据帧初的视图快照判断「正在归类」后点击停止，
+// 期间归类可能已自然结束；若此时仍调 ToggleSmartClassify 会落入启动分支，在 UI 线程同步跑完整轮 AI 归类。
+func (s *Store) StopSmartClassify() {
+	s.mu.Lock()
+	var cancel context.CancelFunc
+	if s.classify != nil {
+		cancel = s.classify.cancel
+	}
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
 // ToggleSmartClassify 是「AI 智能归类 / 停止归类」按钮（渲染层 runSmartClassification）：
 // 没有在归类时对选中的未归合集条目开始归类；正在归类时再次触发就是取消，取消后不写入任何分类。
 // 开始后同步执行到结束（调用方放在后台）。

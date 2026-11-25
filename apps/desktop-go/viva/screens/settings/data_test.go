@@ -175,8 +175,10 @@ func TestDataListAndFolderButtons(t *testing.T) {
 		return !r.disabled(gfx.RoleButton, locales.SettingsOpenBackupsDir())
 	})
 	r.press(gfx.RoleButton, locales.SettingsOpenBackupsDir())
+	// 每次按下都在后台 goroutine 调 OpenPath：先等第一次记录到位再按第二个，调用顺序才确定。
+	waitUntil(r, "打开备份目录", func() bool { return len(e.data.CallsOf("OpenPath")) == 1 })
 	r.press(gfx.RoleButton, locales.SettingsOpenLogs())
-	waitUntil(r, "两次打开目录", func() bool { return len(e.data.CallsOf("OpenPath")) == 2 })
+	waitUntil(r, "打开日志目录", func() bool { return len(e.data.CallsOf("OpenPath")) == 2 })
 	calls := e.data.CallsOf("OpenPath")
 	if calls[0].Args[0] != `C:\fake\userdata\backups` || calls[1].Args[0] != `C:\fake\userdata\logs` {
 		t.Errorf("打开的目录不对：%v", calls)

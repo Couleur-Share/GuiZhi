@@ -387,6 +387,12 @@ func TestRootCopyReportIncludesTheCaptureBrowser(t *testing.T) {
 	}
 	f.clickRole(t, gfx.RoleButton, locales.ImportsTaskDetail())
 	f.clickRole(t, gfx.RoleButton, locales.ImportsCopyReport())
+	// 复制经 Store.Spawn 异步写入剪贴板：先等写入到达，再检查内容。
+	waitUntil(t, "复制诊断信息写入剪贴板", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(copied) >= 1
+	})
 
 	mu.Lock()
 	defer mu.Unlock()

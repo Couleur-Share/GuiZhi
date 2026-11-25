@@ -111,10 +111,23 @@ func (r *rig) stageBounds() (b image.Rectangle, n int) {
 	return b, n
 }
 
-// stageLoaded 等到预览读完图并画出来。
+// previewSrcBytes 是 previewPNG（64×36）解码后的源位图字节数。
+const previewSrcBytes = 64 * 36 * 4
+
+// stageLoaded 等到预览读完图并真正画出来。
+// 壁纸加载分两步：先解码源图（Retained == 源图字节数），再在后台按舞台参数渲染（Retained 超过源图字节数）；
+// 只等 Retained > 0 在慢机上会停在第一步，舞台还没画出。不虚化且可见度 100% 时渲染结果与源图共用像素（Retained 恒等于源图字节数），
+// 此时没有字节数可看，改等截图里出现壁纸透出的偏红像素。
 func (r *rig) stageLoaded(a *sscreen.Appearance) {
 	r.t.Helper()
 	waitUntil(r, "预览位图读完", func() bool { return a.PreviewRetained() > 0 })
+	waitUntil(r, "预览舞台壁纸渲染完成", func() bool {
+		if a.PreviewRetained() > previewSrcBytes {
+			return true
+		}
+		_, n := r.stageBounds()
+		return n > 0
+	})
 	r.frames(3)
 }
 
@@ -209,7 +222,7 @@ func TestBackgroundPreviewFollowsOpacityAndBlur(t *testing.T) {
 	if faint >= full {
 		t.Errorf("可见度 10%% 的偏红像素（%d）应少于 100%%（%d）", faint, full)
 	}
-	src := 64 * 36 * 4
+	src := previewSrcBytes
 	if got := aSharp.PreviewRetained(); got != src {
 		t.Errorf("不虚化且可见度 100%% 时只占源图：%d，期望 %d", got, src)
 	}

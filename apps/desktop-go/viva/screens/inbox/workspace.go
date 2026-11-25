@@ -239,7 +239,15 @@ func (s *Screen) organizeButtons(c ui.C, v View) {
 			}
 		}
 		if l.Button(c.Key("smart"), spec, smart).Clicked() {
-			s.Store.Spawn(func() { s.Store.ToggleSmartClassify(s.Ctx) })
+			if v.Classifying {
+				// 停止归类：StopSmartClassify 只加锁调 cancel() 就返回、不阻塞，同步调用才能立刻取消；
+				// 丢进后台 goroutine 会让取消与正在收尾的批次竞态，导致取消后仍写入分类。
+				// 不用 ToggleSmartClassify：帧初的 v.Classifying 可能已过期（归类刚自然结束），
+				// Toggle 会落入启动分支在 UI 线程同步跑完整轮归类；Stop 在此时是 no-op。
+				s.Store.StopSmartClassify()
+			} else {
+				s.Store.Spawn(func() { s.Store.ToggleSmartClassify(s.Ctx) }) // 开始归类要等模型批次，放后台
+			}
 		}
 	}
 
