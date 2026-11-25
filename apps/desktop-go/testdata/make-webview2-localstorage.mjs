@@ -160,7 +160,7 @@ async function main() {
   let result = null;
   let failure = null;
   try {
-    child = spawn(args.executable, ["-dist", args.dist, "-userdata", userDataDir, "-db", dbFile, "-bench"], {
+    child = spawn(args.executable, ["-dist", args.dist, "-userdata", userDataDir, "-db", dbFile, "-bench", "-viva=false"], {
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
       env: {

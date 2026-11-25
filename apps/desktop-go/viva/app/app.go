@@ -72,6 +72,15 @@ type Options struct {
 	// HoverRefreshHere 在键盘滚动、Tab 滚动、列表换内容之后被调用，请求窗口在指针此刻的位置补一次指针移动（台账 B-037）。
 	// 空表示用系统实现（Windows 上取光标位置、指针在本窗口上时 PostMessage(WM_MOUSEMOVE)）；无头测试注入记录器。
 	HoverRefreshHere func()
+
+	// 窗口位置与大小记忆（台账 B-027）：以下都可为空，空值时行为与此前完全相同（无头测试、截图、基准实例不给）。
+	// Origin 是内容区左上角打开的屏幕位置（逻辑像素）；nil 交给系统摆放。
+	Origin *gfx.Point
+	// OnFrameChange 在内容区移动或改变大小时被调用（窗口线程；最大化、最小化、全屏期间 Windows 不报）。
+	OnFrameChange func(gfx.Rect)
+	// OnMaximize、OnFullscreen 报告最大化与全屏状态的切换（含系统发起的）。
+	OnMaximize   func(maximized bool)
+	OnFullscreen func(fullscreen bool)
 }
 
 // Run 打开窗口并阻塞到窗口关闭；返回时进程即将退出。
@@ -111,6 +120,8 @@ func Run(opts Options) error {
 			ClearColor:     clearColor(look.Col(look.T.Background)),
 		})
 		bindInput(&config, root)
+		config.Origin, config.OnFrameChange = opts.Origin, opts.OnFrameChange
+		config.OnMaximize, config.OnFullscreen = opts.OnMaximize, opts.OnFullscreen
 		// 外壳任务在 OnWake 里排空：窗口隐藏（收在托盘）时 Viva 仍会在重绘之前调用它，托盘的创建与销毁不会卡在隐藏的窗口里。
 		prevWake := config.OnWake
 		config.OnWake = func() {

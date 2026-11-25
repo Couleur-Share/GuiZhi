@@ -56,6 +56,11 @@ type Library struct {
 	videoTestDeps     *videoDeps    // 测试注入：非 nil 时视频采集用它替换设置读取与真实依赖
 	pickDirectory     func(title string) (string, error)
 	saveFileDialog    func(title, defaultPath string, filters []dialogFilter) (string, error)
+	// 系统外壳的打开能力（外部链接、打开文件/目录、资源管理器定位）：main 默认接 mygo.Shell，Viva 路径换成不依赖 mygo 事件循环的实现
+	// （viva_platform.go）。测试不注入时走 library_shell.go 里的安全兜底。
+	openExternal     func(url string) error
+	openPath         func(path string) error
+	showItemInFolder func(path string)
 	// 主题阅读一族迁移前的接入点：取消这些条目的主题阅读任务；返回仍被主题阅读快照租用的资产文件名
 	cancelThemedReading     func(ids []string)
 	leasedSnapshotAssets    func() []string

@@ -150,6 +150,12 @@ type shellRig struct {
 
 func newShellRig(t *testing.T, closeAction settings.CloseAction, systemShortcuts bool) *shellRig {
 	t.Helper()
+	return newShellRigWith(t, closeAction, systemShortcuts, nil)
+}
+
+// newShellRigWith 在 Attach 之前给调用方一次调整外壳与设置的机会（登录项、启动即隐藏等启动期行为要在 Attach 前配好）。
+func newShellRigWith(t *testing.T, closeAction settings.CloseAction, systemShortcuts bool, configure func(r *shellRig)) *shellRig {
+	t.Helper()
 	dir := t.TempDir()
 	r := &shellRig{t: t, lc: newAppLifecycle(true), hub: newPushHub(), set: &servicestest.Settings{}, host: &fakeVivaHost{}}
 	r.lib = &Library{configDir: dir, paths: Paths{UserData: dir}}
@@ -168,6 +174,9 @@ func newShellRig(t *testing.T, closeAction settings.CloseAction, systemShortcuts
 			r.keys = append(r.keys, s)
 			return func() { r.mu.Lock(); r.stops++; r.mu.Unlock() }, nil
 		}}
+	if configure != nil {
+		configure(r)
+	}
 	r.shell.attachHost(r.host)
 	t.Cleanup(r.shell.Shutdown)
 	return r

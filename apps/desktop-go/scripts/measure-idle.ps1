@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   测量归知进程树的空闲私有工作集（原生界面迁移的验收口径）。
 
@@ -33,9 +33,14 @@
                         都开这个开关，才能排除「内存搬进显存」的假象。
 
 .EXAMPLE
+  # Viva 产品默认外壳（-bench 默认进入 Viva）：
   pwsh -NoProfile -File apps/desktop-go/scripts/measure-idle.ps1 `
-    -Exe D:\Project\GuiZhi-baseline\apps\desktop-go\out\win-x64\GuiZhi.exe `
-    -DbSource D:\Project\GuiZhi-bench\seed\data\knowledge.db -Label react-0.8.3
+    -Exe D:\Project\GuiZhi-bench\m4-build\guizhi-viva.exe `
+    -DbSource D:\Project\GuiZhi-bench\seed\data\knowledge.db -Label viva-default
+
+.EXAMPLE
+  # 旧版 React WebView2 基线（当前壳默认 Viva，测 React 需显式传 -viva=false；基线旧二进制则直接传其路径）：
+  pwsh -NoProfile -Command "& 'apps/desktop-go/scripts/measure-idle.ps1' -Exe D:\path\GuiZhi.exe -DbSource D:\Project\GuiZhi-bench\seed\data\knowledge.db -Label react-0.8.3 -ExtraArgs @('-viva=false')"
 
 .EXAMPLE
   # 原生版（feat/native-ui）：-native 与 -bench 同用，起始页首次加载有结果后打印 READY。

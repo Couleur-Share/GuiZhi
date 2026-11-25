@@ -13,7 +13,7 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/egoist/mygo"
+	vapp "github.com/vivaui/viva/app"
 
 	"guizhi-mygo-shell/native/services"
 )
@@ -240,7 +240,7 @@ func newNativeServices(b *Bridge, hub *pushHub) services.Services {
 		Themed:           newThemedAdapter(b, hub),
 		Migration:        migrationAdapter{b: b},
 		Log:              logAdapter{b: b},
-		OpenExternal:     webLinkOpener(func(u string) error { return mygo.Shell.OpenExternal(u) }),
+		OpenExternal:     webLinkOpener(vapp.OpenURL),
 	}
 }
 

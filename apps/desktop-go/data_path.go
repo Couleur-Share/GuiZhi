@@ -18,8 +18,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/egoist/mygo"
 )
 
 const (
@@ -601,8 +599,8 @@ func (l *Library) registerDataPath(b *Bridge) {
 		return openDirectoryPath(p, openPathDeps{
 			appDataPath: l.appDataPath(), homePath: home, localAppDataPath: local,
 			lstat: os.Lstat, stat: os.Stat,
-			openPath:         func(s string) error { return mygo.Shell.OpenPath(s) },
-			showItemInFolder: func(s string) { mygo.Shell.ShowItemInFolder(s) },
+			openPath:         l.shellOpenPath,
+			showItemInFolder: l.shellShowItemInFolder,
 		}), nil
 	}
 }

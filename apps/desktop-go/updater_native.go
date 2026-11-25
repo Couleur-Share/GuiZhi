@@ -7,8 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/egoist/mygo"
 )
 
 // defaultChangelogPaths 随包的 CHANGELOG.md 候选位置（可执行文件旁的 resources/ 或同级）。
@@ -39,9 +37,9 @@ func (l *Library) registerUpdater(b *Bridge, isPackaged bool, quit func()) *Upda
 		cacheDir:       filepath.Join(localApp, "guizhi-updater"),
 		changelogPaths: defaultChangelogPaths,
 		push:           l.pushMain,
-		openExternal:   func(s string) error { return mygo.Shell.OpenExternal(s) },
-		openPath:       func(s string) error { return mygo.Shell.OpenPath(s) },
-		showInFolder:   func(s string) { mygo.Shell.ShowItemInFolder(s) },
+		openExternal:   l.shellOpenExternal,
+		openPath:       l.shellOpenPath,
+		showInFolder:   l.shellShowItemInFolder,
 		downloadsDir:   func() string { return filepath.Join(home, "Downloads") },
 		spawnInstaller: spawnDetached,
 		quit:           quit,

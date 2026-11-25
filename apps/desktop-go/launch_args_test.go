@@ -54,6 +54,15 @@ func TestLaunchArgsDoNotBreakFlagParse(t *testing.T) {
 	}
 }
 
+// 登录项参数不是命令行开关：任何路径让它留在参数列表里时，flag.Parse 也不能因它退出（mygo 的 init 通常已摘掉它）。
+func TestStripLaunchArgsDropsLoginItemArg(t *testing.T) {
+	got := stripLaunchArgs([]string{"--mygo-opened-at-login", "-userdata", "x", "--hidden"})
+	want := []string{"-userdata", "x"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v want %v", got, want)
+	}
+}
+
 type discardWriter struct{}
 
 func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }

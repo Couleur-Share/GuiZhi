@@ -79,6 +79,15 @@ type vivaShell struct {
 	// registerShortcut 注册系统级快捷键；缺省 Viva 的 RegisterGlobalShortcut，测试注入记录器。
 	registerShortcut func(vapp.GlobalShortcut, func()) (func(), error)
 	instance         *vivaInstance // 单实例锁，可为空
+	// manageLoginItem 为真时接开机自启（台账 B-024）：登录项由 lc.setLoginItem 写，随设置里的「开机自启」变化。
+	// 只有真实实例（非自动化、没有显式 -userdata/-db）才开：临时测试运行绝不改写系统登录项。
+	manageLoginItem bool
+	// packaged 为真（安装包构建）且启动时设置已是开：启动期把旧版登记刷新到当前安装路径；初始为关时启动期不动注册表。
+	packaged bool
+	// startHidden 为真时窗口建好后直接驻留托盘（登录项拉起且设置了启动时隐藏，或带 --hidden）。
+	startHidden bool
+	// windowState 记录窗口位置与大小（台账 B-027）；为空表示不记。关闭请求时先落盘，即使这次关闭被拦下。
+	windowState *vivaWindowStatePersister
 
 	mu      sync.Mutex
 	host    vivaHost
@@ -119,10 +128,56 @@ func (s *vivaShell) attachHost(h vivaHost) {
 	if s.instance != nil {
 		s.instance.SetHandler(lc.onSecondInstance)
 	}
+	if s.manageLoginItem {
+		s.watchLoginItem()
+	}
+	if s.startHidden { // 登录项拉起：窗口直接驻留托盘，点托盘或第二个实例拉起即显示
+		lc.createTray()
+		h.Hide()
+		lc.emitVisibility(false)
+	}
+}
+
+// watchLoginItem 接开机自启（B-024）：安装包构建且启动时设置已开，刷新一次旧版登记（路径可能还指着旧安装位置）；
+// 之后设置里的「开机自启」每次变化都写登录项。启动时设置为关不动注册表（用户可能在任务管理器里自己管理）。
+func (s *vivaShell) watchLoginItem() {
+	last := false
+	if v, err := s.settings.Snapshot(); err != nil {
+		logAppErrorf("app", "设置开机自启", "读取设置失败：%s", err.Error())
+	} else {
+		last = v.App.LaunchAtStartup
+		if last && s.packaged {
+			s.applyLoginItem(true)
+		}
+	}
+	var mu sync.Mutex // 订阅者在写入方的 goroutine 上同步调用，可能并发
+	s.addCloser(s.settings.Subscribe(func(v settings.Values) {
+		mu.Lock()
+		changed := v.App.LaunchAtStartup != last
+		last = v.App.LaunchAtStartup
+		mu.Unlock()
+		if changed {
+			s.applyLoginItem(v.App.LaunchAtStartup)
+		}
+	}))
+}
+
+// applyLoginItem 写登录项；失败只记日志（不阻断设置保存）。
+func (s *vivaShell) applyLoginItem(open bool) {
+	s.lc.mu.Lock()
+	set := s.lc.setLoginItem
+	s.lc.mu.Unlock()
+	if set == nil {
+		return
+	}
+	if err := set(open); err != nil {
+		logAppErrorf("app", "设置开机自启", "%s", err.Error())
+	}
 }
 
 // OnCloseRequest 实现 vivaapp.Shell：用户关窗口时，按关闭行为决定弹对话框、隐藏到托盘或放行退出。
 func (s *vivaShell) OnCloseRequest() bool {
+	s.windowState.flush() // 即使这次关闭被拦下（隐藏到托盘），也先保存窗口位置与大小
 	handled := s.lc.onClose()
 	if handled {
 		log.Printf("[viva-shell] 关闭请求：已接管（隐藏到托盘，或弹出关闭对话框）")

@@ -7,11 +7,13 @@ package main
 // 界面经 native/services 的窄接口取数（适配器见 native_adapters.go），空闲时进程里没有任何 WebView；
 // 阅读视图、Wiki 图谱、mermaid、媒体按需开「岛」（viva/island，W1）。
 //
-// 切换到产品默认之前，-viva 只允许与 -bench 同用，且必须显式给 -db 与 -userdata：
-// 它还不是完整的产品界面，不应在真实数据目录上运行（见 docs/agents/viva-ui-development.md §7）。
+// Viva 是产品默认外壳（-viva 缺省为开）：不带 -viva 的正常启动就是它；传 -viva=false 回退旧 WebView2 渲染层（历史对照、排障）。
+// 显式 -native（原生界面开发路径）与显式 -shot（网页截图）仍走各自的旧路径，见 vivaFlags.active。
 //
-// -viva-shell 接上外壳生命周期（viva_shell.go）：关闭行为、托盘、按数据目录隔离的单实例。不带它时窗口一关就是退出，
-// 截图、对照与基准实例都是这样。系统级快捷键与登录项只在真实实例（非自动化）里接，切换为产品默认时一并启用。
+// 外壳生命周期（viva_shell.go：关闭行为、托盘、按数据目录隔离的单实例、系统级快捷键、登录项、窗口状态记忆）：
+// 真实产品启动默认接上；自动化实例（-bench / -shot）默认不接——不带 -viva-shell 时窗口一关就是退出，不占单实例锁、不抢快捷键，
+// 截图、对照与基准实例都是这样；显式传 -viva-shell 才在自动化实例里验证外壳（smoke-viva-shell.ps1）。
+// 登录项与窗口状态文件只在真实实例里读写，带 -userdata / -db 的临时运行不碰系统注册表。
 
 import (
 	"errors"
@@ -29,8 +31,10 @@ import (
 	"guizhi-mygo-shell/viva/tokens"
 )
 
-// vivaWindowClass 是 Viva 窗口的类名。Viva 把 WebView2 的 profile 放在 os.UserCacheDir()\<Class>\WebView2，
-// 所以必须是专用名：用 "GuiZhi" 会指向用户真实安装的 WebView2 配置。切换为产品默认时再决定正式名称。
+// vivaWindowClass 是 Viva 窗口的类名，也是正式产品名。Viva 的阅读岛、媒体岛把临时 WebView2 profile 放在
+// %LOCALAPPDATA%\guizhi-viva\WebView2（os.UserCacheDir()\<Class>\WebView2），与旧版 React 壳的 %LOCALAPPDATA%\GuiZhi\WebView2 物理隔离：
+// 既保护首次启动只读导入旧 localStorage（viva_legacy_import.go），也支持安全回退到旧版。
+// 绝不能改成 "GuiZhi"：那会指向旧版渲染层的 WebView2 配置，岛的临时目录清理会碰到它。
 const vivaWindowClass = "guizhi-viva"
 
 // vivaFlags 是 -viva 的命令行开关；必须在 flag.Parse 之前声明。
@@ -47,8 +51,8 @@ type vivaFlags struct {
 
 func declareVivaFlags() vivaFlags {
 	return vivaFlags{
-		on:     flag.Bool("viva", false, "Viva 原生界面（feat/viva-ui 开发中）：不加载 WebView 与渲染进程；必须与 -bench、-db、-userdata 同用"),
-		shell:  flag.Bool("viva-shell", false, "Viva 外壳生命周期（关闭行为、托盘、按数据目录隔离的单实例）：验证外壳用；系统级快捷键与登录项不接（自动化实例不抢用户的组合键）"),
+		on:     flag.Bool("viva", true, "Viva 原生界面（产品默认）：不加载 WebView 与渲染进程；传 -viva=false 回退旧 WebView2 渲染层（历史对照、排障）"),
+		shell:  flag.Bool("viva-shell", false, "Viva 外壳生命周期（关闭行为、托盘、按数据目录隔离的单实例）：真实启动默认开启（-viva-shell=false 关闭）；自动化实例（-bench/-shot）默认不接，传它才验证外壳（不抢用户的组合键、不改登录项）"),
 		width:  flag.Int("viva-width", 1280, "Viva 窗口宽度（逻辑像素）"),
 		height: flag.Int("viva-height", 800, "Viva 窗口高度（逻辑像素）"),
 		module: flag.String("viva-module", "library", "Viva 界面的起始页：library|inbox|ask|wiki|imports|settings"),
@@ -61,25 +65,44 @@ func declareVivaFlags() vivaFlags {
 // enabled 报告是否以 Viva 原生界面启动。
 func (f vivaFlags) enabled() bool { return f.on != nil && *f.on }
 
-// shellEnabled 报告是否接外壳生命周期（-viva-shell）：不接时窗口一关就是退出，没有托盘与单实例（截图、对照、基准实例）。
+// shellEnabled 报告是否显式给了 -viva-shell：自动化实例里只有显式给了才接外壳生命周期。
 func (f vivaFlags) shellEnabled() bool { return f.shell != nil && *f.shell }
 
-// checkLaunch 检查 -viva 的启动条件。它必须在解析数据目录、初始化数据库之前调用：
-// 不带 -db 时 main() 会按正式安装的规则推断出真实的数据目录并对它做初始化（租约、迁移、升级前备份），
-// 所以条件不满足时要在碰任何数据之前就退出，而不是等到 runViva 里才拒绝。
-func checkVivaLaunch(nativeOn, bench, dbGiven, userDataGiven bool) error {
+// active 报告本次启动是否走 Viva 路径。Viva 是产品默认（-viva 缺省为开），两条旧路径的显式开关优先：
+// 显式 -native 走原生界面开发路径（pnpm shot:native），显式 -shot <文件> 走网页截图（旧 WebView2 渲染层）；
+// 其余情况取 -viva 的值（显式 -viva=false 回退旧渲染层）。
+func (f vivaFlags) active(nativeOn, hasShot bool) bool {
+	if nativeOn || hasShot {
+		return false
+	}
+	return f.enabled()
+}
+
+// checkVivaLaunch 检查命令行开关的组合：显式 -viva 与另外两条路径互斥。它必须在解析数据目录、初始化数据库之前调用，
+// 冲突时在碰任何数据之前就退出。vivaOn 是 -viva 的取值，vivaExplicit 表示命令行是否显式给了 -viva。
+func checkVivaLaunch(vivaOn, vivaExplicit, nativeOn, hasShot bool) error {
 	switch {
-	case nativeOn:
+	case nativeOn && vivaExplicit && vivaOn:
 		return errors.New("-native 与 -viva 不能同时使用")
-	case !bench || !dbGiven || !userDataGiven:
-		return errors.New("-viva 目前只能与 -bench、-db、-userdata 同用：它还不是完整的产品界面，不应在真实数据目录上运行")
+	case hasShot && vivaExplicit && vivaOn:
+		return errors.New("-viva 不使用 -shot 网页截图参数（无头截图请用 vivaparity）")
 	}
 	return nil
 }
 
-// checkLaunch 用命令行的实际给定情况调用 checkVivaLaunch。
-func (f vivaFlags) checkLaunch(nativeOn, bench bool) error {
-	return checkVivaLaunch(nativeOn, bench, flagGiven("db"), flagGiven("userdata"))
+// shellActive 报告是否接外壳生命周期（关闭行为、托盘、按数据目录隔离的单实例、系统级快捷键、登录项、窗口状态）。
+// 自动化实例（-bench / -shot）只有显式 -viva-shell 才接，保持 measure-idle.ps1 与 smoke-viva-shell.ps1 的语义不变；
+// 真实产品启动默认接，仅显式 -viva-shell=false 时关闭。
+func (f vivaFlags) shellActive(automation bool) bool {
+	return f.shellActiveGiven(automation, flagGiven("viva-shell"))
+}
+
+// shellActiveGiven 是 shellActive 的纯逻辑：shellGiven 表示命令行是否显式给了 -viva-shell。
+func (f vivaFlags) shellActiveGiven(automation, shellGiven bool) bool {
+	if automation {
+		return f.shellEnabled()
+	}
+	return !shellGiven || f.shellEnabled()
 }
 
 // flagGiven 报告命令行是否显式给了某个开关。
@@ -200,9 +223,9 @@ type vivaBoot struct {
 
 // runViva 打开 Viva 窗口并阻塞到退出。
 func runViva(vb vivaBoot) error {
-	if err := vb.flags.checkLaunch(false, vb.bench); err != nil { // main() 已检查过一次；这里再守一次，防止别的调用方绕过
-		return err
-	}
+	// 平台能力换成 Viva 实现：这条路径下 mygo 的事件循环不运行，对话框、Shell、登录项用 mygo 会 panic 或永久等待。
+	// 必须在任何对话框、链接请求之前，所以放在最前面。
+	wireVivaPlatform(vb.lib)
 	module, page, err := vb.flags.startPage()
 	if err != nil {
 		return err
@@ -216,6 +239,9 @@ func runViva(vb vivaBoot) error {
 	// 自动化实例的 userdata 是一次性目录，不读用户的旧 WebView2 配置，也不会碰真实数据。
 	store := openUIPrefsStore(filepath.Join(vb.lib.paths.ConfigDir(), uiPrefsFileName), log.Printf)
 	nset := newNativeSettings(vb.lib, store, log.Printf)
+	if !vb.automation { // 真实实例：首次启动导入旧版 React 设置（只读复制，已初始化时幂等跳过，失败只记日志）
+		vb.importLegacySettings(nset)
+	}
 	hub := newPushHub()
 	vb.lib.setPush(hub.Dispatch) // 单监听推送 → 订阅者
 	svc := newNativeServices(vb.bridge, hub)
@@ -229,14 +255,12 @@ func runViva(vb vivaBoot) error {
 	if vb.bench {
 		go announceReady(ready.Load)
 	}
-	// 外壳生命周期只在 -viva-shell 时接：没有外壳时窗口一关就是退出（截图、对照、基准实例不能被关闭对话框拦住）。
-	var shellHook vivaapp.Shell
-	var vs *vivaShell
-	if vb.flags.shellEnabled() {
-		vs = &vivaShell{lc: vb.lc, lib: vb.lib, hub: hub, settings: nset, systemShortcuts: !vb.automation, instance: vb.instance}
-		shellHook = vs
-	}
-	err = vivaapp.Run(vivaapp.Options{
+	// 登录项写入：main() 给的默认实现依赖 mygo 事件循环，这里无条件换掉；只有真实实例且没有显式 -userdata/-db 才接注册表（B-024）。
+	manageLogin := vivaLoginManaged(vb.automation, flagGiven("userdata"), flagGiven("db"))
+	applyVivaLoginPolicy(vb.lc, manageLogin)
+
+	// 外壳生命周期：真实启动默认接；自动化实例只在显式 -viva-shell 时接（没有外壳时窗口一关就是退出，不能被关闭对话框拦住）。
+	opts := vivaapp.Options{
 		Class: vivaWindowClass, Title: "归知 GuiZhi",
 		Width: *vb.flags.width, Height: *vb.flags.height,
 		MinWidth: minWindowWidth, MinHeight: minWindowHeight,
@@ -249,12 +273,22 @@ func runViva(vb vivaBoot) error {
 		Platform:        nodePlatform(),
 		Appearance:      appearance,
 		ReaderMedia:     readerMedia(vb.lib.paths),
-		Shell:           shellHook,
+	}
+	var vs *vivaShell
+	var persist *vivaWindowStatePersister
+	if vb.flags.shellActive(vb.automation) {
+		vs = &vivaShell{lc: vb.lc, lib: vb.lib, hub: hub, settings: nset, systemShortcuts: !vb.automation, instance: vb.instance}
+		opts.Shell = vs
 		// 自动检查更新、旧库迁移确认与设置清单只在用户真正在用的外壳实例里弹出：自动化、截图与基准实例用真实服务，但不能被对话框盖住。
-		AutoOverlays: shellHook != nil && !vb.automation,
-	})
+		opts.AutoOverlays = !vb.automation
+		if !vb.automation {
+			persist = wireVivaRealShell(vs, &opts, vb.realShellInput(nset, manageLogin))
+		}
+	}
+	err = vivaapp.Run(opts)
+	persist.flush() // 事件循环已停：窗口位置与大小同步落盘（关闭请求时已落过一次，这里兜底系统关机等无关闭请求的退出）
 	if vs != nil {
-		vs.Shutdown() // 事件循环已停：摘托盘图标、撤销快捷键与订阅、释放单实例锁
+		vs.Shutdown() // 摘托盘图标、撤销快捷键与订阅、释放单实例锁
 	}
 	if err != nil {
 		return fmt.Errorf("Viva 窗口退出：%w", err)

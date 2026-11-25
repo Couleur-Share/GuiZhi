@@ -122,18 +122,20 @@ func main() {
 	bench := flag.Bool("bench", false, "基准模式：窗口放到屏幕外，渲染进程出现 topbar-search 后打印 READY，之后一直运行直到被终止")
 	mcpMode := flag.Bool("mcp", false, "以 stdio MCP server 方式运行（供 Cursor / Codex 等 AI IDE 拉起；stdout 仅 JSON-RPC）")
 	backupCLI := flag.Bool("backupcli", false, "备份仓库命令行（与 TS 实现对拍/互通验证用，子命令见 backup_cli.go）；之后的位置参数是子命令及其参数")
-	nf := declareNativeFlags() // 原生界面（feat/native-ui）的开关，见 native_boot.go
-	vf := declareVivaFlags()   // Viva 原生界面（feat/viva-ui）的开关，见 viva_boot.go
+	nf := declareNativeFlags()                       // 原生界面（feat/native-ui）的开关，见 native_boot.go
+	vf := declareVivaFlags()                         // Viva 原生界面（feat/viva-ui）的开关，见 viva_boot.go
+	rawArgs := append([]string(nil), os.Args[1:]...) // 原始参数副本：Viva 单实例锁把它转交给先到的实例
 	// 摘掉 --updated / --hidden / --force-run：它们是拉起参数，不是开关，见 launch_args.go
 	_ = flag.CommandLine.Parse(stripLaunchArgs(os.Args[1:]))
 	if *backupCLI {
 		os.Exit(runBackupCLI(flag.Args()))
 	}
-	if vf.enabled() { // 先于数据目录解析与数据库初始化：不满足隔离要求就在碰任何数据之前退出
-		if err := vf.checkLaunch(nf.enabled(), *bench); err != nil {
-			failStartup("", err, false)
-		}
+	// Viva 是产品默认外壳；显式 -native / -shot 走各自的旧路径（见 viva_boot.go 的 active）。
+	// 先于数据目录解析与数据库初始化：开关组合冲突就在碰任何数据之前退出。
+	if err := checkVivaLaunch(*vf.on, flagGiven("viva"), nf.enabled(), *shot != ""); err != nil {
+		failStartup("", err, *shot == "" && !*bench)
 	}
+	vivaOn := vf.active(nf.enabled(), *shot != "")
 	if *dbPath == "" { // 没有显式数据库：正式启动，路径按 Electron 版的规则推断（startup_paths.go）
 		exe, _ := os.Executable()
 		sp := resolveStartupPaths(startupPaths{Dist: *dist, UserData: *userData, AppData: *appData, Config: *configDir}, exe, packagedBuild == "true", defaultAppDataDir)
@@ -146,14 +148,14 @@ func main() {
 		runMcpServer(context.Background(), os.Stdin, os.Stdout, *userData)
 		return
 	}
-	if (*dist == "" && !nf.enabled() && !vf.enabled()) || *dbPath == "" { // 原生界面不加载渲染产物，不需要 dist
+	if (*dist == "" && !nf.enabled() && !vivaOn) || *dbPath == "" { // 原生界面（native、Viva）不加载渲染产物，不需要 dist
 		failStartup(*userData, errors.New("找不到渲染产物：请把 dist 目录放在可执行文件旁，或用 -dist 指定"), *shot == "" && !*bench)
 	}
 
 	waitForRelaunchParent()
 	automation := *shot != "" || *bench // 自动化实例：不占单实例锁、不建托盘、不抢系统快捷键
-	// Viva 路径不用 mygo 的单实例锁（它按应用名全局生效，会把参数转给用户正在运行的归知）：-viva-shell 用自己的、按数据目录隔离的锁。
-	if !automation && !vf.enabled() && !mygo.App.RequestSingleInstanceLock() {
+	// Viva 路径不用 mygo 的单实例锁（它按应用名全局生效，会把参数转给用户正在运行的归知）：Viva 外壳用自己的、按数据目录隔离的锁。
+	if !automation && !vivaOn && !mygo.App.RequestSingleInstanceLock() {
 		return // 已有实例在跑，参数已转交给它（它会把窗口带到前台）
 	}
 
@@ -163,8 +165,8 @@ func main() {
 		ud = filepath.Dir(filepath.Dir(*dbPath))
 	}
 	var vivaInst *vivaInstance
-	if vf.enabled() && vf.shellEnabled() { // 在碰数据库之前抢锁：后来者不该去争数据库租约
-		inst, primary, err := claimVivaInstance(ud, os.Args[1:])
+	if vivaOn && vf.shellActive(automation) { // 在碰数据库之前抢锁：后来者不该去争数据库租约
+		inst, primary, err := claimVivaInstance(ud, rawArgs)
 		if err != nil {
 			log.Printf("[viva-shell] 单实例锁不可用，按无锁继续：%v", err)
 		}
@@ -277,6 +279,13 @@ func main() {
 		}
 		return mygo.Dialog.Save(mygo.SaveDialogOptions{Title: title, DefaultPath: defaultPath, Filters: fs})
 	}
+	// 系统外壳的打开能力：React / native 路径走 mygo.Shell；Viva 路径立即换成不依赖 mygo 循环的实现（viva_platform.go），早于处理器登记与后台任务启动
+	lib.openExternal = func(s string) error { return mygo.Shell.OpenExternal(s) }
+	lib.openPath = func(s string) error { return mygo.Shell.OpenPath(s) }
+	lib.showItemInFolder = func(s string) { mygo.Shell.ShowItemInFolder(s) }
+	if vivaOn {
+		wireVivaPlatform(lib)
+	}
 	lib.relaunch = func() {
 		if exe, err := os.Executable(); err == nil {
 			cmd := exec.Command(exe, os.Args[1:]...)
@@ -318,7 +327,9 @@ func main() {
 	lib.registerDataPath(b)
 	lib.registerUpdater(b, packagedBuild == "true", quitApp) // 登记时就取函数值，退出时再按当前路径（mygo / Viva）分派
 	lc := newAppLifecycle(runtime.GOOS == "windows")
-	lc.setLoginItem = setLoginItemNative
+	if !vivaOn {
+		lc.setLoginItem = setLoginItemNative
+	}
 	lc.register(b)
 	if err := lib.imports.Recover(ctx); err != nil { // 恢复上次遗留的导入任务
 		log.Printf("[import] 恢复遗留任务失败：%v", err)
@@ -349,7 +360,7 @@ func main() {
 		}
 		return
 	}
-	if vf.enabled() { // Viva 原生界面：同样共用到此为止的初始化，之后不建 WebView、不绑定 Bridge
+	if vivaOn { // Viva 原生界面：同样共用到此为止的初始化，之后不建 WebView、不绑定 Bridge
 		err = runViva(vivaBoot{flags: vf, lib: lib, bridge: b, lc: lc, instance: vivaInst, automation: automation, bench: *bench})
 		shutdownLibrary(lib, shutdownDB)
 		if err != nil {
