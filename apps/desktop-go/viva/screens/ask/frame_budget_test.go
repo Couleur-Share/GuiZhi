@@ -59,6 +59,7 @@ func TestAskFrameBudget(t *testing.T) {
 						Gate: gate, Answer: services.AskAnswer{Text: "done"},
 					})
 				})
+				r.settle("首次加载结束", func() bool { return r.store.View().HasLoaded })
 				r.screen.setDraft("一个正在回答的问题")
 				r.frames(2)
 				r.clickButton(locales.AskSend())

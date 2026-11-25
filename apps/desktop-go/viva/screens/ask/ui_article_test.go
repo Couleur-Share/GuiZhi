@@ -2,6 +2,7 @@ package ask
 
 import (
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -57,6 +58,23 @@ func (r *uiRig) focusArticleInput() {
 }
 
 func (r *uiRig) articleView() ArticleView { return r.store.Article().View() }
+
+// prepareArticleSend 等首帧异步 Open 真正完成、写入草稿并等发送按钮可用。
+// goroutines 模式下 Open 置 Loading 之前 Loading 为 false 但 ItemID 还是空，只看 !Loading 会提前放行，
+// Ask 因 ItemID 不符直接返回 false；Loading 时发送按钮也是禁用的，点上去永远等不到 Running。
+func (r *uiRig) prepareArticleSend(draftKey, text string) {
+	r.t.Helper()
+	r.settle("面板加载完成", func() bool { v := r.articleView(); return !v.Loading && v.ItemID == "item-1" })
+	r.store.Article().SetDraft(draftKey, text)
+	r.frames(2)
+	r.settle("发送按钮可用", func() bool {
+		if r.articleView().Loading {
+			return false
+		}
+		n, ok := r.node(gfx.RoleButton, locales.AskSend())
+		return ok && !n.Disabled
+	})
+}
 
 func richTurn() aiflow.ArticleMessage {
 	m := articleDone("m1", "what is it?", "The answer is here.")
@@ -167,15 +185,17 @@ func TestUIArticleMessageCardRunningShowsStepAndDisablesRetry(t *testing.T) {
 	r := newArticleRig(t, goroutines, func(r *uiRig) {
 		r.svc.QueueArticle(servicestest.ArticleScript{Patches: []aiflow.ArticlePatch{{Step: &step}}, Gate: gate})
 	})
-	r.store.Article().SetDraft(r.draftKey(), "q")
-	r.frames(2)
+	var closeOnce sync.Once
+	closeGate := func() { closeOnce.Do(func() { close(gate) }) }
+	t.Cleanup(closeGate) // 中途失败也放行 gate，避免回答 goroutine 泄漏
+	r.prepareArticleSend(r.draftKey(), "q")
 	r.clickButton(locales.AskSend())
 	r.settle("回答进行中", func() bool { return r.articleView().Running && r.hasText(step) })
 	if n, ok := r.node(gfx.RoleButton, locales.AskRetryTurn()); !ok || !n.Disabled {
 		t.Fatal("回答中「重新回答」应禁用")
 	}
 	r.clickButton(locales.AskStop())
-	close(gate)
+	closeGate()
 	r.settle("回答已停止", func() bool { return !r.articleView().Running })
 }
 
@@ -367,19 +387,7 @@ func TestUIArticleRunningShowsStopLocksWebSwitchAndEnterDoesNotSend(t *testing.T
 	r := newArticleRig(t, goroutines, func(r *uiRig) {
 		r.svc.QueueArticle(servicestest.ArticleScript{Gate: gate})
 	})
-	// goroutines 模式下首帧异步 Open：goroutine 置 Loading 之前 Loading 为 false 但 ItemID 还是空，
-	// 只看 !Loading 会提前放行，Ask 因 ItemID 不符直接返回 false。先等 Open 真正完成再写草稿。
-	r.settle("面板加载完成", func() bool { v := r.articleView(); return !v.Loading && v.ItemID == "item-1" })
-	r.store.Article().SetDraft(r.draftKey(), "slow question")
-	r.frames(2)
-	// 加载中发送按钮是禁用的（Loading 时 composer Disabled）；等发送按钮可用再点，否则点在禁用按钮上永远等不到 Running。
-	r.settle("加载完成且发送按钮可用", func() bool {
-		if r.articleView().Loading {
-			return false
-		}
-		n, ok := r.node(gfx.RoleButton, locales.AskSend())
-		return ok && !n.Disabled
-	})
+	r.prepareArticleSend(r.draftKey(), "slow question")
 	r.clickButton(locales.AskSend())
 	r.settle("回答进行中", func() bool { return r.articleView().Running })
 	if !r.hasButton(locales.AskStop()) || r.hasButton(locales.AskSend()) {
@@ -765,14 +773,7 @@ func TestUIGlobalArticleStopsTheAnswerWhenItUnmounts(t *testing.T) {
 	r := newUIRig(t, withGlobalArticle(), goroutines, func(r *uiRig) {
 		r.svc.QueueArticle(servicestest.ArticleScript{Gate: gate})
 	})
-	// 先等首帧异步 Open 真正完成（ItemID 就位），否则 Ask 因 ItemID 不符直接返回 false。
-	r.settle("面板加载完成", func() bool { v := r.articleView(); return !v.Loading && v.ItemID == "item-1" })
-	r.store.Article().SetDraft(DraftKey("item-1", "a1"), "slow")
-	r.frames(2)
-	r.settle("发送按钮可用", func() bool {
-		n, ok := r.node(gfx.RoleButton, locales.AskSend())
-		return ok && !n.Disabled
-	})
+	r.prepareArticleSend(DraftKey("item-1", "a1"), "slow")
 	r.clickButton(locales.AskSend())
 	r.settle("回答进行中", func() bool { return r.articleView().Running })
 	r.hidden = true // 切走：本文对话卸载
