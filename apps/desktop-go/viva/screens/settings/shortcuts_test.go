@@ -1,9 +1,12 @@
 package settings_test
 
 import (
+	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
@@ -334,5 +337,55 @@ func TestShortcutsModeChange(t *testing.T) {
 	}
 	if n := r.modeBox(idx); n.Value != locales.SettingsShortcutModeGlobal() {
 		t.Errorf("成功后范围应是「全局」，得到 %q", n.Value)
+	}
+}
+
+// gatedShortcuts 让 Get 先取下当时的配置、再卡在 gate 上：模拟「首轮读取很慢，旧结果在用户保存之后才送达」。
+type gatedShortcuts struct {
+	*servicestest.Shortcuts
+	entered, gate, returned chan struct{}
+}
+
+func (g *gatedShortcuts) Get(ctx context.Context) (services.ShortcutConfig, error) {
+	cfg, err := g.Shortcuts.Get(ctx)
+	close(g.entered)
+	<-g.gate
+	defer close(g.returned)
+	return cfg, err
+}
+
+// 首轮读取比用户的保存慢：旧读取结果送达后，不能把刚清除的快捷键与刚改的触发范围盖回旧值。
+func TestShortcutsStaleLoadDoesNotOverwriteLocalEdit(t *testing.T) {
+	inner := &servicestest.Shortcuts{}
+	g := &gatedShortcuts{Shortcuts: inner, entered: make(chan struct{}), gate: make(chan struct{}), returned: make(chan struct{})}
+	var once sync.Once
+	release := func() { once.Do(func() { close(g.gate) }) }
+	t.Cleanup(release) // 失败提前退出时也要放行，免得后台 goroutine 泄漏
+
+	env := newEnv()
+	r := openPage(t, func(look *kit.Look) func(c ui.C) {
+		s := &sscreen.Shortcuts{Look: look, Guard: env.guard(), Wake: func() {}, Service: g}
+		t.Cleanup(s.Close)
+		return s.Page
+	})
+	<-g.entered // 首轮读取已取走旧配置，但还没送回界面
+
+	r.clickNode(gfx.RoleButton, locales.SettingsClearShortcutFor(showAppLabel))
+	r.pickMode(1, locales.SettingsShortcutModeGlobal())
+	if len(inner.Saves()) != 1 || len(inner.ModeSets()) != 1 {
+		t.Fatalf("应各保存一次，得到 %v / %v", inner.Saves(), inner.ModeSets())
+	}
+
+	release()
+	<-g.returned
+	for i := 0; i < 20; i++ { // 旧结果经邮箱回到界面线程，给它足够的帧
+		r.frames(1)
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !r.hasText(locales.SettingsNotSet()) || r.has(gfx.RoleButton, locales.SettingsClearShortcutFor(showAppLabel)) {
+		t.Error("旧读取结果不应把已清除的快捷键盖回去")
+	}
+	if n := r.modeBox(1); n.Value != locales.SettingsShortcutModeGlobal() {
+		t.Errorf("旧读取结果不应把已改的触发范围盖回去，得到 %q", n.Value)
 	}
 }

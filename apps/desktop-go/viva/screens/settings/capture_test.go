@@ -80,7 +80,10 @@ func TestCaptureEngineRowsShowStatus(t *testing.T) {
 	r := e.open(t)
 
 	// yt-dlp：内置版已就绪，状态行是「版本 · 来源」。
+	// 三个引擎并发探测：全部落地后再断言文字与探测次数。
 	waitText(r, locales.SettingsCaptureStateReady())
+	waitText(r, locales.SettingsCaptureStateOptional())
+	waitText(r, locales.SettingsFunasrDiskHint())
 	if !r.hasText(services.FormatEngineVersion("2026.03.17") + " · " + locales.SettingsCaptureSourceManaged()) {
 		t.Error("已就绪的引擎应显示「版本 · 来源」")
 	}
@@ -356,6 +359,8 @@ func TestCapturePlatformLoginLogoutAndCancel(t *testing.T) {
 
 	r.clickNth(gfx.RoleButton, locales.SettingsPlatformLogin(), 0)
 	waitButton(r, locales.CommonCancel())
+	// 「取消」在点击时同步出现，PlatformLogin 在后台 goroutine 里才被调用：等调用落地再断言。
+	waitUntil(r, "登录已送出", func() bool { return len(e.cap.Logins()) == 1 })
 	if logins := e.cap.Logins(); len(logins) != 1 || logins[0].Platform != services.PlatformXiaohongshu || logins[0].Force {
 		t.Fatalf("登录调用 = %+v", logins)
 	}
@@ -467,6 +472,8 @@ func TestCaptureFunasrInstallShowsPhases(t *testing.T) {
 	e.cap.FunasrGate = gate
 	r := e.open(t)
 	waitText(r, locales.SettingsFunasrDiskHint())
+	// 第二个安装按钮要等 ffmpeg 与本地转写引擎都探测完才有序号可按。
+	waitUntil(r, "两个安装按钮", func() bool { return len(r.named(gfx.RoleButton, locales.SettingsCaptureInstall())) == 2 })
 	r.pressNth(gfx.RoleButton, locales.SettingsCaptureInstall(), 1) // 第二个是本地转写引擎
 	waitUntil(r, "订阅进度", func() bool { return e.cap.FunasrSubscribers() == 1 })
 
@@ -491,6 +498,7 @@ func TestCaptureFunasrUpdateFlow(t *testing.T) {
 	waitText(r, "v1.2.0")
 
 	// 先检查、有更新才给更新按钮（第一个「检查更新」是 yt-dlp 行的，本地转写引擎是第二个）。
+	waitUntil(r, "两个检查更新按钮", func() bool { return len(r.named(gfx.RoleButton, locales.SettingsCaptureCheckUpdate())) == 2 })
 	r.pressNth(gfx.RoleButton, locales.SettingsCaptureCheckUpdate(), 1)
 	update := locales.SettingsCaptureUpdateTo("v1.3.0")
 	waitButton(r, update)

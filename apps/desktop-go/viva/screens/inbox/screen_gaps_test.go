@@ -67,6 +67,8 @@ func TestRowDismissWarningBusyOnlyAffectsTheClickedTask(t *testing.T) {
 	}
 	r := newUIRig(t, []services.InboxItem{warn("t2"), warn("t3")}, goroutines)
 	release := r.svc.Hold("AcknowledgeImportWarning")
+	// 首轮 Refresh 在真 goroutine 里跑：等两条警告行都出现再断言与点击。
+	r.settle("两条警告行出现", func() bool { return r.count(gfx.RoleButton, locales.InboxDismissWarning()) == 2 })
 	if got := r.count(gfx.RoleButton, locales.InboxDismissWarning()); got != 2 {
 		t.Fatalf("两条带警告的任务应各有一个「不再提醒」，实际 %d 个", got)
 	}

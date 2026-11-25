@@ -351,6 +351,8 @@ func TestRowDismissWarningShowsBusyAndDisablesButton(t *testing.T) {
 	var release func()
 	r := newUIRig(t, []services.InboxItem{warn}, goroutines)
 	release = r.svc.Hold("AcknowledgeImportWarning")
+	// 首轮 Refresh 在真 goroutine 里跑：等警告行出现再点。
+	r.settle("警告行出现", func() bool { return r.has(gfx.RoleButton, locales.InboxDismissWarning()) })
 	r.clickButton(locales.InboxDismissWarning())
 	r.settle("按钮进入处理中", func() bool { return r.has(gfx.RoleButton, locales.InboxProcessing()) })
 	if n, _ := r.node(gfx.RoleButton, locales.InboxProcessing()); !n.Disabled {
@@ -392,6 +394,8 @@ func TestAggregateRunningDisablesBothButtonsAndShowsProgress(t *testing.T) {
 		r.svc.SetSemanticStatus(services.InboxSemanticStatus{Configured: true, EligibleItems: 10, IndexedItems: 6})
 		release = r.svc.Hold("RunSemanticIndexing")
 	})
+	// 首轮 Refresh 在真 goroutine 里跑：等两个聚合行都出现再点。
+	r.settle("两个聚合行出现", func() bool { return r.count(gfx.RoleButton, locales.InboxRunNow()) == 2 })
 	r.clickNthButton(locales.InboxRunNow(), 0)
 	r.settle("语义索引进入执行", func() bool { return r.has(gfx.RoleButton, locales.InboxIndexing()) })
 	if n, _ := r.node(gfx.RoleButton, locales.InboxIndexing()); !n.Disabled {
@@ -589,6 +593,10 @@ func TestSmartClassifyShowsProgressAndSecondClickStopsWithoutWriting(t *testing.
 		r.svc.SetAssignments(map[string]string{"u1": "论文", "u2": "论文"})
 		r.svc.SetClassifyBatches(2)
 		release = r.svc.HoldClassifyAfter(1)
+	})
+	// 首轮 Refresh 在真 goroutine 里跑：等列表加载完、筛选按钮出现再点。
+	r.settle("初始列表加载完成", func() bool {
+		return !r.store.View().IsLoading && r.has(gfx.RoleButton, filterName(locales.InboxFilterUnclassified(), 2))
 	})
 	r.clickButton(filterName(locales.InboxFilterUnclassified(), 2))
 	r.click(gfx.RoleCheckbox, locales.InboxSelectAllVisible())

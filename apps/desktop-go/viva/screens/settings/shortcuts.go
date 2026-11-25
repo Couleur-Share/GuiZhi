@@ -58,6 +58,9 @@ type Shortcuts struct {
 	recorders    [4]recorder
 	modeSels     [4]kit.SelectState
 
+	// accelDirty / modeDirty：用户已保存过快捷键 / 触发范围（只在 UI 线程读写），之后送达的首轮读取不再覆盖对应状态。
+	accelDirty, modeDirty bool
+
 	started bool
 	cancel  context.CancelFunc
 	mb      mailbox
@@ -100,12 +103,15 @@ func (s *Shortcuts) load() {
 				s.Guard.Fail(locales.SettingsShortcutLoadFailed(), locales.SettingsShortcutLoadFailed(), err)
 				return
 			}
-			if cfg.Accelerators != nil {
+			// 首轮读取比用户的保存慢到时，旧结果不能把刚保存的值盖回去。
+			if cfg.Accelerators != nil && !s.accelDirty {
 				s.accelerators = cloneStrings(cfg.Accelerators)
 			}
-			for _, it := range shortcutItems {
-				if mode := cfg.Modes[it.action]; mode != "" {
-					s.modes[it.action] = mode
+			if !s.modeDirty {
+				for _, it := range shortcutItems {
+					if mode := cfg.Modes[it.action]; mode != "" {
+						s.modes[it.action] = mode
+					}
 				}
 			}
 		})
@@ -273,6 +279,7 @@ func (s *Shortcuts) persist(action, accel, success string) {
 		return
 	}
 	s.accelerators = next
+	s.accelDirty = true
 	s.Guard.Succeed(success)
 	s.changed()
 }
@@ -290,6 +297,7 @@ func (s *Shortcuts) setMode(action, mode string) {
 	})
 	if ok {
 		s.modes = next
+		s.modeDirty = true
 		s.changed()
 	}
 }
