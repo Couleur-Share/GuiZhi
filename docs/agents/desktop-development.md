@@ -7,7 +7,8 @@
 ## 技术栈
 
 - Go（模块 `guizhi-mygo-shell`）+ MyGo v0.8.3 + WebView2；官方仅支持 Windows 11+ x64
-- 界面：React 18 + TypeScript 5 + Vite 6 + Zustand 5 + Tailwind CSS 3 + i18next（zh / en），源码在 `apps/desktop/src/renderer`
+- 默认界面（2026-11-25 起）：Viva v0.6.4 原生界面（`apps/desktop-go/viva`、`native` 与 `viva_*.go`）；阅读区与图片灯箱是内嵌的 WebView2 岛（`viva/reader`，页面由渲染层源码打包）。传 `-viva=false` 回退旧的 React 整窗 WebView2 外壳，`pnpm shot` 即经 `-viva=false` 验证渲染层回退与阅读组件；原生界面的对拍与约定见 [viva-ui-development.md](./viva-ui-development.md)
+- 回退界面与阅读岛页面：React 18 + TypeScript 5 + Vite 6 + Zustand 5 + Tailwind CSS 3 + i18next（zh / en），源码在 `apps/desktop/src/renderer`
 - SQLite：MyGo 0.9 起是原生模块（`Sqlitecore.dll`，放在 exe 同目录、随安装包发布；0.8.x 时叫 `mygo-sqlite3.dll`），schema 与迁移来自 `packages/db`
 - goja：在 Go 里运行由 TS 生成的 JS 产物（主题阅读管线、快照净化、渲染脚本），源码在 `apps/desktop-go/jsrc`
 - pnpm monorepo：`apps/desktop`（界面与预加载源码）、`apps/desktop-go`（Go 壳与构建链）、`packages/{core,db,shared}`
@@ -19,7 +20,9 @@ apps/desktop/src/
 ├── preload/     # contextBridge 白名单：window.api.* 与 window.electron（壳能力）
 └── renderer/    # React UI：components、stores、services、i18n
 apps/desktop-go/
-├── *.go             # 窗口/托盘/快捷键、SQLite、IPC 处理器、采集、AI 代理、备份、更新器
+├── *.go             # 窗口/托盘/快捷键、SQLite、IPC 处理器、采集、AI 代理、备份、更新器；viva_*.go 是 Viva 外壳接线
+├── viva/            # Viva 原生界面（默认）：kit 控件、screens 各模块、reader 阅读岛、parity 对拍工具
+├── native/          # 原生界面的服务层与设置等（services、settings 等，与界面解耦）
 ├── shim/            # `electron` 模块的替身：把 preload 的 invoke/send/on 接到 Go（见下）
 ├── jsrc/ + jsgen/   # goja 产物的 TS 源码与生成脚本（产物入库，CI 校验一致）
 ├── vite.*.config.ts # 渲染进程与 preload 的构建配置

@@ -42,7 +42,11 @@ function rig() {
   return {
     bridge,
     sent,
-    post: (message: HostMessage) => act(() => void handler?.(message)),
+    post: (message: HostMessage) => {
+      act(() => {
+        handler?.(message);
+      });
+    },
     events<T extends PageEvent["t"]>(t: T) {
       return sent.filter((event): event is Extract<PageEvent, { t: T }> => event.t === t);
     },
@@ -693,7 +697,7 @@ describe("阅读岛页面：网页快照的本地图片", () => {
     const { frame, events } = mount();
     expect(frame.getAttribute("srcdoc")).toBe(DOC);
     expect(frame.style.visibility).toBe("");
-    act(() => void frame.dispatchEvent(new Event("load")));
+    act(() => { frame.dispatchEvent(new Event("load")); });
     expect(events("rendered")).toEqual([{ t: "rendered", seq: 1 }]);
   });
 
@@ -704,13 +708,13 @@ describe("阅读岛页面：网页快照的本地图片", () => {
     const { frame, events } = mount(snapshotView({ document: doc, assets: ["local-image://a.png"] }));
     expect(frame.getAttribute("srcdoc")).toBe("");
     expect(frame.style.visibility).toBe("hidden");
-    act(() => void frame.dispatchEvent(new Event("load"))); // 空白占位的加载
+    act(() => { frame.dispatchEvent(new Event("load")); }); // 空白占位的加载
     expect(events("rendered")).toEqual([]);
 
     await act(async () => release(imageResponse()));
     await waitFor(() => expect(frame.getAttribute("srcdoc")).toContain(dataUrlOf("image/png", PNG, 0)));
     expect(frame.style.visibility).toBe("");
-    act(() => void frame.dispatchEvent(new Event("load")));
+    act(() => { frame.dispatchEvent(new Event("load")); });
     expect(events("rendered")).toEqual([{ t: "rendered", seq: 1 }]);
   });
 

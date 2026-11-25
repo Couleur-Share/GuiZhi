@@ -58,7 +58,14 @@ function rig() {
       };
     },
   };
-  return { bridge, post: (message: HostMessage) => act(() => void handler?.(message)) };
+  return {
+    bridge,
+    post: (message: HostMessage) => {
+      act(() => {
+        handler?.(message);
+      });
+    },
+  };
 }
 
 function view(kind: HostView["view"], patch: Partial<HostView> = {}): HostView {

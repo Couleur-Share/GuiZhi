@@ -1,13 +1,13 @@
 # 归知 GuiZhi — 开发约定
 
-归知是本地优先的 AI 个人知识库：Go + WebView2 桌面外壳（基于 MyGo）加 React + TypeScript 界面，pnpm monorepo。
+归知是本地优先的 AI 个人知识库：桌面端默认是 Go + Viva 原生界面（`apps/desktop-go/viva` 与 `native`；阅读区与灯箱内嵌 WebView2 岛，页面源码复用 React + TypeScript），传 `-viva=false` 可回退旧的 React + WebView2 整窗外壳（基于 MyGo）；pnpm monorepo。
 界面骨架源自 PromptHub v0.5.9；AGPL-3.0 归属说明见 `NOTICE`。具体依赖版本以当前 `package.json` 与 `apps/desktop-go/go.mod` 为准。
 Electron 版已于 2026-11-13 退役，终版保存在分支 `electron-final`、标签 `electron-final-0.28.x`；删除主进程前的完整状态是标签 `pre-electron-removal`。
 
 ## 源码与数据边界
 
-- `apps/desktop-go`：桌面外壳——窗口、托盘、IPC 处理器、SQLite、采集、AI 请求代理、备份、更新器，以及构建、安装包与截图工具链。
-- `apps/desktop/src/renderer`：React 界面与状态；`apps/desktop/src/preload`：`window.api` 白名单，经 `apps/desktop-go/shim` 接到 Go 处理器。
+- `apps/desktop-go`：桌面外壳——窗口、托盘、IPC 处理器、SQLite、采集、AI 请求代理、备份、更新器，以及构建、安装包与截图工具链；其中 `viva`（Viva 原生界面）与 `native`（原生界面服务层）是默认界面。
+- `apps/desktop/src/renderer`：React 界面与状态；现同时供阅读岛打包（`pnpm --filter @guizhi/desktop-go gen` 含阅读岛构建）与 `-viva=false` 回退、`pnpm shot` 使用；`apps/desktop/src/preload`：`window.api` 白名单，经 `apps/desktop-go/shim` 接到 Go 处理器。
 - `packages/core`：AI 配置与客户端；`packages/db`：SQLite schema 与迁移；`packages/shared`：跨进程类型和 IPC 常量。
 - 渲染进程不直接访问系统能力，一律走 preload 白名单。IPC 频道集中在 `packages/shared/constants/ipc-channels.ts`；`apps/desktop-go/ipc_channels_gen.go` 由 preload 扫描生成，新增频道必须同时补 Go 处理器。
 - 数据库在用户数据目录的 `data/knowledge.db`，WAL 模式（`db_wal.go`）：库打开时不要只拷主文件（最近的写入可能还在 `-wal`），备份用 `VACUUM INTO`，字节级保存现场用 `copyDatabaseFiles`，换库前用 `checkpointLiveWAL`；旧 .NET 数据库仅作只读迁移源。AI 配置在 `config/ai-models.json`，AI HTTP/流式请求经 Go 壳代理。
@@ -58,7 +58,7 @@ Go 侧在 `apps/desktop-go` 下运行 `go vet ./...` 与 `go test -count=1 ./...
 - 追溯旧实现与设计原因时，在 [实现历史](docs/agents/implementation-history.md) 中按模块搜索。它是历史资料，当前行为以源码和实测为准，无需每次全文加载。
 - 新增功能、设置项或改动外围功能前，先读 [产品边界](docs/product-scope.md)；冻结中的功能只修安全、崩溃与数据问题。
 - 发版时读取 `.cursor/skills/guizhi-release/SKILL.md`。
-- 在 `feat/native-ui` 分支上改原生界面（`apps/desktop-go/native/`、`native_*.go`）前，先读 [原生界面开发约定](docs/agents/native-ui-development.md)；界面验证用 `pnpm shot:native`（只构建 Go 壳），立项依据与关卡见 [native-ui-evaluation.md](docs/agents/native-ui-evaluation.md)。
+- 改 Viva 原生界面（`apps/desktop-go/viva/`、`native/`、`viva_*.go`）前，先读 [Viva 原生界面开发约定](docs/agents/viva-ui-development.md)；界面差异与偏差登记见 [Viva 原生界面对等台账](docs/agents/viva-parity-ledger.md)。
 - 手机收集中转服务的自托管说明见 [mobile-capture-ops.md](docs/mobile-capture-ops.md)；生产服务器的部署与升级约束属于维护者本机配置，不随仓库公开，由本机 skill `guizhi-linux-preflight` 指引。
 
 ## Linux 收集服务预检
