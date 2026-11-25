@@ -2,6 +2,7 @@ package library
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -582,7 +583,17 @@ func TestSourceRefreshButtonAndWhereItGoes(t *testing.T) {
 	imports := &servicestest.Imports{}
 	web := shellRig(t, func(r *rig) { r.screen.Imports = imports })
 	web.pick(detailNoteID)
+	// 刷新在 s.Guard.Go 的后台 goroutine 里入队：点击后要等异步完成再读，否则慢机（CI）上读到空。
+	until := func(r *rig, cond func() bool) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for !cond() && time.Now().Before(deadline) {
+			r.frames(1)
+			time.Sleep(5 * time.Millisecond)
+		}
+	}
 	web.click(gfx.RoleButton, locales.LibraryRefreshSource())
+	until(web, func() bool { return len(imports.Enqueued()) >= 1 })
 	queued := imports.Enqueued()
 	if len(queued) != 1 {
 		t.Fatalf("刷新应向采集队列入一个任务，实际 %+v", queued)
@@ -601,6 +612,7 @@ func TestSourceRefreshButtonAndWhereItGoes(t *testing.T) {
 	wechat := shellRig(t, func(r *rig) { r.screen.Imports = imports })
 	wechat.pick(detailReviewID)
 	wechat.click(gfx.RoleButton, locales.LibraryRefreshSource())
+	until(wechat, func() bool { return slices.Contains(wechat.svc.Calls(), "SupplementWechat") })
 	var supplemented bool
 	for _, call := range wechat.svc.Calls() {
 		supplemented = supplemented || call == "SupplementWechat"

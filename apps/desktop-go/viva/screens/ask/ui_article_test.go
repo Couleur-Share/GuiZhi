@@ -367,10 +367,12 @@ func TestUIArticleRunningShowsStopLocksWebSwitchAndEnterDoesNotSend(t *testing.T
 	r := newArticleRig(t, goroutines, func(r *uiRig) {
 		r.svc.QueueArticle(servicestest.ArticleScript{Gate: gate})
 	})
+	// goroutines 模式下首帧异步 Open：goroutine 置 Loading 之前 Loading 为 false 但 ItemID 还是空，
+	// 只看 !Loading 会提前放行，Ask 因 ItemID 不符直接返回 false。先等 Open 真正完成再写草稿。
+	r.settle("面板加载完成", func() bool { v := r.articleView(); return !v.Loading && v.ItemID == "item-1" })
 	r.store.Article().SetDraft(r.draftKey(), "slow question")
 	r.frames(2)
-	// goroutines 模式下首帧发起的异步加载在慢机上可能还没完成：加载中发送按钮是禁用的（Loading 时 composer Disabled）。
-	// 等加载结束且发送按钮可用再点，否则点在禁用按钮上永远等不到 Running。
+	// 加载中发送按钮是禁用的（Loading 时 composer Disabled）；等发送按钮可用再点，否则点在禁用按钮上永远等不到 Running。
 	r.settle("加载完成且发送按钮可用", func() bool {
 		if r.articleView().Loading {
 			return false
@@ -763,8 +765,14 @@ func TestUIGlobalArticleStopsTheAnswerWhenItUnmounts(t *testing.T) {
 	r := newUIRig(t, withGlobalArticle(), goroutines, func(r *uiRig) {
 		r.svc.QueueArticle(servicestest.ArticleScript{Gate: gate})
 	})
+	// 先等首帧异步 Open 真正完成（ItemID 就位），否则 Ask 因 ItemID 不符直接返回 false。
+	r.settle("面板加载完成", func() bool { v := r.articleView(); return !v.Loading && v.ItemID == "item-1" })
 	r.store.Article().SetDraft(DraftKey("item-1", "a1"), "slow")
 	r.frames(2)
+	r.settle("发送按钮可用", func() bool {
+		n, ok := r.node(gfx.RoleButton, locales.AskSend())
+		return ok && !n.Disabled
+	})
 	r.clickButton(locales.AskSend())
 	r.settle("回答进行中", func() bool { return r.articleView().Running })
 	r.hidden = true // 切走：本文对话卸载

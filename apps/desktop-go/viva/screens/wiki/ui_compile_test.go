@@ -27,9 +27,8 @@ func entryName(id string, blocks int) string {
 func (r *uiRig) openCompile() {
 	r.t.Helper()
 	r.clickButton(locales.WikiCompileDialog())
-	if !r.store.Compile().View().Open {
-		r.t.Fatalf("对话框应打开：%q", r.session.Texts())
-	}
+	// goroutines 模式下 Open 跑在后台 goroutine 里，点击后要等它置位，不能立即同步检查。
+	r.settle("对话框应打开", func() bool { return r.store.Compile().View().Open })
 }
 
 func TestUICompileToolbarLabelFollowsPendingCount(t *testing.T) {

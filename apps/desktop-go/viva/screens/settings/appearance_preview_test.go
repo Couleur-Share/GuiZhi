@@ -82,9 +82,16 @@ func openPreview(t *testing.T, store sscreen.Store, tweak func(a *sscreen.Appear
 	return r, a
 }
 
-// reddish 是壁纸透出来的像素：壁纸是纯红，叠上半透明的浅色遮罩与缩微面板后仍是 R=255、G=B 的粉红；\r\n// 界面其余部分是中性色，文字的亚像素边缘也不会正好 G=B。
+// reddish 是壁纸透出来的像素：壁纸是纯红，叠上半透明的浅色遮罩与缩微面板后仍是 R≈255、G≈B 的粉红；
+// 界面其余部分是中性色，文字的亚像素边缘也不会 R 高而 G≈B 且 R−G 差距够大。
+// 容差：CI 的 Windows Server 用 D3D11 WARP 软光栅，半透明混合的通道取整会差 ±1~4（同仓 wallpaper_layer_test 也只要求 R>240、byteNear 2），
+// 故不要求 R==255、G==B 的精确值，只要求红度明显（R−G ≥ 25）。
 func reddish(c color.RGBA) bool {
-	return c.R == 255 && c.G == c.B && c.G > 20 && c.G < 220
+	gbDiff := int(c.G) - int(c.B)
+	if gbDiff < 0 {
+		gbDiff = -gbDiff
+	}
+	return c.R >= 245 && gbDiff <= 4 && c.G > 20 && c.G < 220 && int(c.R)-int(c.G) >= 25
 }
 
 // stageBounds 是截图里偏红像素的外接矩形与个数。
@@ -251,6 +258,7 @@ func TestBackgroundPickSuccessShowsPreviewThenDisableKeepsIt(t *testing.T) {
 	}
 	r.clickNode(gfx.RoleButton, locales.SettingsSelectBackgroundImage())
 	waitUntil(r, "选图结果写入", func() bool { return store.Values().UI.BackgroundImageFileName == "wall.png" })
+	r.scrollToEnd() // 选图后多出舞台，页面变长，再滚一次到底
 	r.stageLoaded(a)
 	if v := store.Values().UI; !v.BackgroundImageEnabled {
 		t.Fatalf("选图后应自动启用：%+v", v)

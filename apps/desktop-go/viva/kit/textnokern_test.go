@@ -47,13 +47,17 @@ func TestNoKernWidthMatchesChromium(t *testing.T) {
 			}
 		}
 	})
-	// 带字偶距的整行宽度比逐字符求和窄（含拉丁字母的标题），汉字的字宽两边一致。
-	title := "YouTube: The Future of Local-First Software"
-	kerned := float64(canvas.TextWidthWeight(title, 14, WeightMedium))
-	plain := float64(look.NoKernWidth(canvas, title, 14, WeightMedium))
-	if kerned >= plain-1 {
-		t.Errorf("整行量宽 %.3f 应明显窄于逐字符求和 %.3f（字偶距）", kerned, plain)
-	}
+	// 带字偶距的整行宽度比逐字符求和窄（含拉丁字母的标题）；CI 的英文版 Windows Server 回退字体没有对应字偶对，两者相等，故门控。
+	t.Run("拉丁字偶距", func(t *testing.T) {
+		skipWin11FontMetricsInCI(t)
+		title := "YouTube: The Future of Local-First Software"
+		kerned := float64(canvas.TextWidthWeight(title, 14, WeightMedium))
+		plain := float64(look.NoKernWidth(canvas, title, 14, WeightMedium))
+		if kerned >= plain-1 {
+			t.Errorf("整行量宽 %.3f 应明显窄于逐字符求和 %.3f（字偶距）", kerned, plain)
+		}
+	})
+	// 汉字的字宽两边一致（没有字偶对），CI 照常检查。
 	if got, want := look.NoKernWidth(canvas, "汉字", 14, WeightMedium), canvas.TextWidthWeight("汉字", 14, WeightMedium); math.Abs(float64(got-want)) > 1e-3 {
 		t.Errorf("汉字没有字偶对：逐字符求和 %v 应等于整行量宽 %v", got, want)
 	}
