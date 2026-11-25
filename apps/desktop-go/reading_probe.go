@@ -14,6 +14,9 @@ import (
 
 const readingProbeBinding = "gzReading"
 
+// 检查页的静态空白文档：无任何网络请求，供沙箱 srcdoc iframe 挂载。
+const readingProbeBlankURL = `data:text/html,<!doctype html><meta charset="utf-8"><body></body>`
+
 func (l *Library) probeReadingPage(rh *renderHost, ctx context.Context, versionJSON string) (string, error) {
 	v, err := jsParse(versionJSON)
 	if err != nil {
@@ -76,8 +79,14 @@ func (l *Library) probeReadingPage(rh *renderHost, ctx context.Context, versionJ
 		}
 		_, _ = b.d.callT("", "Target.detachFromTarget", map[string]any{"sessionId": sid}, 5*time.Second)
 	}()
+	loaded := make(chan struct{}, 1)
 	b.d.setSession(sid, func(m cdpMsg) {
 		switch m.Method {
+		case "Page.loadEventFired":
+			select {
+			case loaded <- struct{}{}:
+			default:
+			}
 		case "Runtime.bindingCalled":
 			var p struct{ Name, Payload string }
 			json.Unmarshal(m.Params, &p)
@@ -101,6 +110,35 @@ func (l *Library) probeReadingPage(rh *renderHost, ctx context.Context, versionJ
 		params any
 	}{
 		{"Page.enable", nil},
+		// 不能直接在初始 about:blank 上挂沙箱 srcdoc iframe：Edge WebView2 158 在初始 about:blank 主文档
+		// 附着不透明源（sandbox 无 allow-same-origin）的 about:srcdoc iframe 时，浏览器进程会立刻断开（CDP 1006）。
+		// 先导航到无网络请求的 data: 静态文档，再注入绑定与 iframe。
+		{"Page.navigate", map[string]any{"url": readingProbeBlankURL}},
+	} {
+		if _, err := call(c.method, c.params); err != nil {
+			unhealthy = true
+			return "", fmt.Errorf("初始化检查窗口失败（%s）：%w", c.method, err)
+		}
+	}
+	loadTimer := time.NewTimer(5 * time.Second)
+	defer loadTimer.Stop()
+	select {
+	case <-loaded:
+	case <-ctx.Done():
+		unhealthy = true
+		return "", ctx.Err()
+	case <-b.d.closed:
+		unhealthy = true
+		return "", fmt.Errorf("初始化检查窗口失败：CDP 连接已断开")
+	case <-loadTimer.C:
+		unhealthy = true
+		return "", fmt.Errorf("初始化检查窗口失败：空白文档加载超时")
+	}
+	// Page.navigate 会重建执行上下文，Runtime 相关设置放到加载完成之后，确保绑定落在最终文档上。
+	for _, c := range []struct {
+		method string
+		params any
+	}{
 		{"Runtime.enable", nil},
 		{"Runtime.addBinding", map[string]any{"name": readingProbeBinding}},
 	} {

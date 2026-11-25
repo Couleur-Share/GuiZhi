@@ -10,7 +10,7 @@ import (
 	"guizhi-mygo-shell/native/locales"
 )
 
-// acceptedByMyGo 复刻 mygo internal/accelerator 的 parseKey/modifier 词汇表（v0.9.1），
+// acceptedByMyGo 复刻 mygo internal/accelerator 的 parseKey/modifier 词汇表（v0.10.0），
 // 用来保证录制器写出的每个键名与修饰键名都是 mygo.GlobalShortcut.Register 认得的——
 // 写出一个注册时才报「unknown key」的组合，用户要到重启后才发现快捷键没生效。
 // 升级 MyGo 时对照 internal/accelerator/accelerator.go 复核这里。

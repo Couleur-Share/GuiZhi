@@ -8,7 +8,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.5
 	github.com/coder/websocket v1.8.15
 	github.com/dop251/goja v0.0.0-20261110204830-f493a2b600d6
-	github.com/egoist/mygo v0.9.1
+	github.com/egoist/mygo v0.10.0
 	github.com/nlnwa/whatwg-url v0.6.2
 	github.com/refraction-networking/utls v1.8.2
 	github.com/syndtr/goleveldb v1.0.0
