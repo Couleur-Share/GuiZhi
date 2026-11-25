@@ -2,9 +2,11 @@ package main
 
 // 灰度发布的更新通道对拍（本地 httptest 假 GitHub，不联网）。
 //
-// 场景 S1–S6 与「用真实 electron-updater 6.8.9 + Electron 45 跑同一套假源」的实测结果一一对应
-// （见 spikes/MYGO-MIGRATION.md「灰度发布结论与更新通道约束」）：Go 壳的更新器必须给出与 Electron 版一致的选择，
-// 否则同一批用户在两个壳里会看到不同的更新。
+// 场景 S1–S6 最初与「用真实 electron-updater 6.8.9 + Electron 45 跑同一套假源」的实测结果一一对应
+// （见 spikes/MYGO-MIGRATION.md「灰度发布结论与更新通道约束」）。
+// Electron 版退役后，预览通道不再复刻 electron-updater 的 atom 过滤（自定义预发布通道只匹配同名通道、
+// 按发布先后取最新，会让 0.29.0-go.x 看不到更高的正式版）：官方源与镜像源统一按 semver 取最高版本，
+// 正式版与预发布版共同参与比较，同版本偏好正式版。S4/S5/S6/G3 据此记录；S1/S2/S3/G1/G2/G4 行为不变。
 // 另外两条（G1/G2）固定电子构建器产物命名与 CI 上传集合不一致带来的坑。
 
 import (
@@ -66,9 +68,10 @@ func TestUpdaterGrayChannelScenarios(t *testing.T) {
 		{"S1 稳定通道 Electron 0.28.0，存在 go.1 预发布", "0.28.0", "stable", []string{"v0.29.0-go.1", "v0.28.0"}, "0.28.0", false},
 		{"S2 预览通道 Electron 0.28.0，同上", "0.28.0", "preview", []string{"v0.29.0-go.1", "v0.28.0"}, "0.29.0-go.1", true},
 		{"S3 灰度 go.1 + 稳定通道，主线发 0.29.0", "0.29.0-go.1", "stable", []string{"v0.29.0", "v0.29.0-go.1", "v0.28.0"}, "0.29.0", true},
-		{"S4 灰度 go.1 + 预览通道，主线发 0.29.0", "0.29.0-go.1", "preview", []string{"v0.29.0", "v0.29.0-go.1", "v0.28.0"}, "0.29.0-go.1", false},
-		{"S5 灰度 go.1 + 预览通道，出现 go.2", "0.29.0-go.1", "preview", []string{"v0.29.0-go.2", "v0.29.0", "v0.29.0-go.1", "v0.28.0"}, "0.29.0-go.2", true},
-		{"S6 预览通道 0.28.0，主线 0.28.1 比 go.1 晚发", "0.28.0", "preview", []string{"v0.28.1", "v0.29.0-go.1", "v0.28.0"}, "0.28.1", true},
+		{"S4 灰度 go.1 + 预览通道，主线发 0.29.0（升级到正式版）", "0.29.0-go.1", "preview", []string{"v0.29.0", "v0.29.0-go.1", "v0.28.0"}, "0.29.0", true},
+		{"S5 灰度 go.1 + 预览通道，纯预发布递增到 go.2", "0.29.0-go.1", "preview", []string{"v0.29.0-go.2", "v0.29.0-go.1", "v0.28.0"}, "0.29.0-go.2", true},
+		{"S5b 灰度 go.1 + 预览通道，0.29.0 与 go.2 并存时正式版胜出", "0.29.0-go.1", "preview", []string{"v0.29.0-go.2", "v0.29.0", "v0.29.0-go.1", "v0.28.0"}, "0.29.0", true},
+		{"S6 预览通道 0.28.0，主线 0.28.1 比 go.1 晚发（按 semver 仍取 go.1）", "0.28.0", "preview", []string{"v0.28.1", "v0.29.0-go.1", "v0.28.0"}, "0.29.0-go.1", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -111,16 +114,16 @@ func TestUpdaterGrayPrereleaseWithoutManifestFails(t *testing.T) {
 	}
 }
 
-// G3：镜像（generic）路径在预览通道按 semver 取最高并钉 tag，官方源按 atom 发布先后取最新——
-// 主线 0.28.1 晚于 go.1 发布时两者不同（S6）。记录下来，灰度期两个来源可能让预览用户看到不同版本。
-func TestUpdaterGrayMirrorAndOfficialDiverge(t *testing.T) {
+// G3：预览通道下官方源与镜像源统一按 semver 取最高并以同一 tag 为准——
+// 主线 0.28.1 晚于 go.1 发布时两者都选 go.1（S6）。此前官方源按 atom 发布先后取 0.28.1，两个来源会分歧。
+func TestUpdaterGrayMirrorAndOfficialAgree(t *testing.T) {
 	f := newUpdaterFixture(t, "0.28.0")
 	setupGray(f, "v0.28.1", "v0.29.0-go.1", "v0.28.0")
 	v, _, e := checkVersion(t, f, "preview")
-	if e != "" || v != "0.28.1" {
-		t.Fatalf("官方源应得到 0.28.1: %q %q", v, e)
+	if e != "" || v != "0.29.0-go.1" {
+		t.Fatalf("官方源应得到 0.29.0-go.1: %q %q", v, e)
 	}
-	if f.u.lastFeed.tag != "v0.29.0-go.1" {
+	if f.u.lastFeed.tag != "v0.29.0-go.1" || f.u.lastFeed.resolvedTag != "v0.29.0-go.1" {
 		t.Fatalf("镜像应钉 go.1（按 semver 取最高），实际 %+v", f.u.lastFeed)
 	}
 }

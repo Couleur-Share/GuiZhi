@@ -3,8 +3,9 @@ package main
 // 应用内更新：对应 apps/desktop/src/main/updater.ts 及其依赖的 electron-updater（NSIS 安装包 + GitHub Releases / 镜像 generic 源）。
 //
 // 流程与 electron-updater 6.x 一致：
-//   检查：官方源先取 releases.atom 与 /releases/latest 定 tag（预览通道按 atom 选 tag），再读 <tag>/latest.yml；
-//         镜像源直接读 <镜像地址>/latest.yml。版本比 compareVersions，更高才算有更新。
+//   检查：稳定通道官方源取 /releases/latest 定 tag；预览通道先经 GitHub API 按 semver 选最高版本
+//         （正式版与预发布版共同参与，同版本偏好正式版），官方源与镜像源口径一致，再读 <tag>/<渠道>.yml 或 latest.yml；
+//         releases.atom 仅用于补齐发布说明。镜像源直接读 <镜像地址>/latest.yml。版本比 compareVersions，更高才算有更新。
 //   下载：校验和为 sha512(base64)；缓存目录 %LOCALAPPDATA%\<app>-updater\pending，命中且校验通过则直接视为已下载。
 //   安装：以 `--updated --force-run` 启动安装包后退出本进程（quitAndInstall(false, true)）。
 // 与原实现的有意差异、未覆盖的部分记录在 spikes/MYGO-MIGRATION.md。
@@ -166,8 +167,9 @@ type updaterDeps struct {
 }
 
 type feedContext struct {
-	channel string
-	tag     string
+	channel     string
+	tag         string // 镜像源用：仅当选中预发布版时钉 tag，正式版为空（走 latest/download）
+	resolvedTag string // 预览通道经 GitHub API 按 semver 选出的完整 tag（正式版或预发布版），官方源直接采用
 }
 
 type feedProvider struct {
@@ -315,47 +317,85 @@ func prereleaseChannelOf(v string) string {
 	return fmt.Sprint(p.prerelease[0])
 }
 
-func (u *Updater) githubLatest(ctx context.Context, allowPrerelease bool) (*updateManifest, *feedProvider, error) {
-	basePath := "/" + updaterOwner + "/" + updaterRepo + "/releases"
+// fetchReleasesAtom 读取 releases.atom 并解析条目（最新发布在前）。
+func (u *Updater) fetchReleasesAtom(ctx context.Context, basePath string) ([]atomEntry, error) {
 	feedXML, err := u.get(ctx, u.d.githubBase+basePath+".atom", map[string]string{"Accept": "application/xml, application/atom+xml, text/xml, */*"})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	var feed struct {
 		Entries []atomEntry `xml:"entry"`
 	}
 	if err := xml.Unmarshal(feedXML, &feed); err != nil {
-		return nil, nil, fmt.Errorf("Cannot parse releases feed: %v,\nXML:\n%s", err, feedXML)
+		return nil, fmt.Errorf("Cannot parse releases feed: %v,\nXML:\n%s", err, feedXML)
 	}
-	if len(feed.Entries) == 0 {
+	return feed.Entries, nil
+}
+
+// pickHighestAtomEntry 在 atom 条目里按 semver 选最高版本（正式版与预发布版共同参与，同版本偏好正式版；
+// 同级保留 atom 中更靠前的条目），与 pickPreviewFeedRelease 口径一致。
+func pickHighestAtomEntry(entries []atomEntry) (string, atomEntry, bool) {
+	var (
+		bestTag   string
+		bestEntry atomEntry
+		found     bool
+	)
+	for _, e := range entries {
+		tag, ok := entryTag(e)
+		if !ok || parseVersion(tag) == nil {
+			continue
+		}
+		if !found {
+			bestTag, bestEntry, found = tag, e, true
+			continue
+		}
+		cmp := compareVersions(normalizeVersion(tag), normalizeVersion(bestTag))
+		if cmp > 0 || (cmp == 0 && isPrereleaseVersion(bestTag) && !isPrereleaseVersion(tag)) {
+			bestTag, bestEntry = tag, e
+		}
+	}
+	return bestTag, bestEntry, found
+}
+
+// githubLatest 读取官方 GitHub 源的最新清单。
+//   - 稳定通道（allowPrerelease=false）：以 /releases/latest 的 tag 为准。
+//   - 预览通道且 resolvedTag 非空：tag 已由 GitHub API 按 semver 选定，直接采用；
+//     releases.atom 只用来补齐 ReleaseName / ReleaseNotes，失败或缺条目都不阻断检查。
+//   - 预览通道且 resolvedTag 为空（直接调用的回退路径）：在 atom 条目中按 semver 选最高版本。
+//
+// 历史上这里照搬 electron-updater 6.8.9 的 atom 过滤（自定义预发布通道只匹配同名通道），
+// 会让 0.29.0-go.2 看不到更高的正式版；Electron 版退役后不再保留该行为。
+func (u *Updater) githubLatest(ctx context.Context, allowPrerelease bool, resolvedTag string) (*updateManifest, *feedProvider, error) {
+	basePath := "/" + updaterOwner + "/" + updaterRepo + "/releases"
+	pinned := allowPrerelease && resolvedTag != ""
+	entries, err := u.fetchReleasesAtom(ctx, basePath)
+	if err != nil {
+		if !pinned {
+			return nil, nil, err
+		}
+		log.Printf("[updater] releases.atom 不可用，仅用于补充发布说明，继续使用 API 选定的 %s: %v", resolvedTag, err)
+		entries = nil
+	}
+	if len(entries) == 0 && !pinned {
 		return nil, nil, errors.New("No published versions on GitHub")
 	}
-	latest := feed.Entries[0]
+	var latest atomEntry
+	if len(entries) > 0 {
+		latest = entries[0]
+	}
 	tag := ""
-	if allowPrerelease {
-		current := prereleaseChannelOf(u.d.currentVersion())
-		if current == "" {
-			// 当前是正式版且允许预发布：Atom 里第一条（可能是预发布）
-			tag, _ = entryTag(latest)
-		} else {
-			for _, e := range feed.Entries {
-				hrefTag, ok := entryTag(e)
-				if !ok || parseVersion(hrefTag) == nil {
-					continue
-				}
-				hrefChannel := prereleaseChannelOf(hrefTag)
-				shouldFetch := current == "alpha" || current == "beta"
-				isCustom := hrefChannel != "" && hrefChannel != "alpha" && hrefChannel != "beta"
-				mismatch := current == "beta" && hrefChannel == "alpha"
-				if shouldFetch && !isCustom && !mismatch {
-					tag, latest = hrefTag, e
-					break
-				}
-				if hrefChannel != "" && hrefChannel == current {
-					tag, latest = hrefTag, e
-					break
-				}
+	if pinned {
+		tag = resolvedTag
+		latest = atomEntry{} // 只接受与选定 tag 匹配的条目作为说明回退
+		for _, e := range entries {
+			if t, ok := entryTag(e); ok && t == tag {
+				latest = e
+				break
 			}
+		}
+	} else if allowPrerelease {
+		if t, e, ok := pickHighestAtomEntry(entries); ok {
+			tag, latest = t, e
 		}
 	} else {
 		body, err := u.get(ctx, u.d.githubBase+basePath+"/latest", map[string]string{"Accept": "application/json"})
@@ -369,7 +409,7 @@ func (u *Updater) githubLatest(ctx context.Context, allowPrerelease bool) (*upda
 			return nil, nil, fmt.Errorf("Unable to find latest version on GitHub: %v", err)
 		}
 		tag = info.TagName
-		for _, e := range feed.Entries {
+		for _, e := range entries {
 			if t, ok := entryTag(e); ok && t == tag {
 				latest = e
 				break
@@ -561,7 +601,7 @@ func (u *Updater) resolveFeedContext(ctx context.Context, channel string) (feedC
 	if choice == nil {
 		return feedContext{}, errors.New("Update check failed: No published release is currently available.")
 	}
-	return feedContext{channel: channel, tag: releaseTagForPreviewFeed(choice)}, nil
+	return feedContext{channel: channel, tag: releaseTagForPreviewFeed(choice), resolvedTag: choice.TagName}, nil
 }
 
 type checkOutcome struct {
@@ -570,7 +610,7 @@ type checkOutcome struct {
 }
 
 // checkOnce 对应 autoUpdater.checkForUpdates()：推送 checking → available / not-available，失败推送 error。
-func (u *Updater) checkOnce(ctx context.Context, feedURL string, official bool, allowPrerelease bool) (*checkOutcome, error) {
+func (u *Updater) checkOnce(ctx context.Context, feedURL string, official bool, allowPrerelease bool, resolvedTag string) (*checkOutcome, error) {
 	u.send(map[string]any{"status": "checking"})
 	var (
 		m   *updateManifest
@@ -578,7 +618,7 @@ func (u *Updater) checkOnce(ctx context.Context, feedURL string, official bool, 
 		err error
 	)
 	if official {
-		m, p, err = u.githubLatest(ctx, allowPrerelease)
+		m, p, err = u.githubLatest(ctx, allowPrerelease, resolvedTag)
 	} else {
 		m, p, err = u.genericLatest(ctx, feedURL)
 	}
@@ -646,13 +686,13 @@ func (u *Updater) Check(ctx context.Context, raw json.RawMessage) map[string]any
 	if req.UseMirror {
 		for _, mirror := range u.d.mirrors(feed.channel, feed.tag) {
 			log.Printf("[updater] Using %s mirror for check: %s", feed.channel, mirror)
-			if o, err := u.checkOnce(ctx, mirror, false, allow); err == nil {
+			if o, err := u.checkOnce(ctx, mirror, false, allow, ""); err == nil {
 				return record(o)
 			}
 		}
 		return fail(feed, "All mirror sources failed. Please try disabling mirror acceleration.")
 	}
-	o, err := u.checkOnce(ctx, "", true, allow)
+	o, err := u.checkOnce(ctx, "", true, allow, feed.resolvedTag)
 	if err != nil {
 		return fail(feed, "Update check failed: "+err.Error())
 	}

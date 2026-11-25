@@ -36,6 +36,7 @@ type updaterFixture struct {
 	apiReleases string
 	ymlOK       func(tag, file string) bool // 非 nil 时决定某个 tag 下哪些 .yml 存在（灰度通道对拍用）
 	dir         string
+	atomStatus  int // 非 0 时 releases.atom 返回该 HTTP 状态码（模拟 atom 抖动）
 }
 
 func sha512b64(b []byte) string {
@@ -51,6 +52,10 @@ func newUpdaterFixture(t *testing.T, current string) *updaterFixture {
 	repo := "/" + updaterOwner + "/" + updaterRepo + "/releases"
 	mux := http.NewServeMux()
 	mux.HandleFunc(repo+".atom", func(w http.ResponseWriter, r *http.Request) {
+		if f.atomStatus != 0 {
+			http.Error(w, "atom unavailable", f.atomStatus)
+			return
+		}
 		var b strings.Builder
 		b.WriteString(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">`)
 		for _, tag := range f.atomTags {
@@ -357,6 +362,94 @@ func TestUpdaterPreviewChannel(t *testing.T) {
 	r := f.u.Check(ctx, rawOpts(map[string]any{"channel": "preview", "trigger": "manual"}))
 	if r["success"] != false {
 		t.Fatalf("empty preview = %v", r)
+	}
+}
+
+// 回归：自定义预发布通道（0.29.0-go.2）在预览通道 + 官方源下必须能检测到更高的正式版。
+// 旧实现照搬 electron-updater 的 atom 过滤，只匹配同名 "go" 通道，正式版被跳过后误报「已是最新」。
+func TestUpdaterPreviewCustomPrereleaseSeesStable(t *testing.T) {
+	ctx := context.Background()
+	preview := rawOpts(map[string]any{"channel": "preview"})
+	checkedVersion := func(res map[string]any) any {
+		return res["result"].(map[string]any)["updateInfo"].(map[string]any)["version"]
+	}
+
+	t.Run("更高的正式版", func(t *testing.T) {
+		f := newUpdaterFixture(t, "0.29.0-go.2")
+		setupGray(f, "v0.30.0", "v0.29.0", "v0.29.0-go.2")
+		res := f.u.Check(ctx, preview)
+		if res["success"] != true || res["updateAvailable"] != true || checkedVersion(res) != "0.30.0" {
+			t.Fatalf("check = %v", res)
+		}
+		if f.u.lastFeed.tag != "" || f.u.lastFeed.resolvedTag != "v0.30.0" {
+			t.Fatalf("正式版不应钉 tag（mirror 走 latest/download），feed = %+v", f.u.lastFeed)
+		}
+		if r := f.u.Download(ctx, preview); r["success"] != true {
+			t.Fatalf("download = %v", r)
+		}
+		if sum, _ := fileSHA512(f.u.installerPath); sum != sha512b64(f.installer) {
+			t.Fatal("下载文件校验和不一致")
+		}
+	})
+
+	t.Run("跨预发布渠道升级", func(t *testing.T) {
+		f := newUpdaterFixture(t, "0.29.0-go.2")
+		setupGray(f, "v0.31.0-rc.1", "v0.30.0", "v0.29.0-go.2")
+		res := f.u.Check(ctx, preview)
+		if res["success"] != true || res["updateAvailable"] != true || checkedVersion(res) != "0.31.0-rc.1" {
+			t.Fatalf("check = %v", res)
+		}
+		if f.u.lastFeed.tag != "v0.31.0-rc.1" || f.u.lastFeed.resolvedTag != "v0.31.0-rc.1" {
+			t.Fatalf("feed = %+v", f.u.lastFeed)
+		}
+	})
+
+	for _, code := range []int{http.StatusInternalServerError, http.StatusNotFound} {
+		t.Run(fmt.Sprintf("atom 返回 %d 不影响检查", code), func(t *testing.T) {
+			f := newUpdaterFixture(t, "0.29.0-go.2")
+			setupGray(f, "v0.30.0", "v0.29.0", "v0.29.0-go.2")
+			f.atomStatus = code
+			res := f.u.Check(ctx, preview)
+			if res["success"] != true || res["updateAvailable"] != true || checkedVersion(res) != "0.30.0" {
+				t.Fatalf("check = %v", res)
+			}
+			if names := f.statusNames(); strings.Contains(strings.Join(names, ","), "error") {
+				t.Fatalf("atom 抖动不应推送 error 状态: %v", names)
+			}
+		})
+	}
+
+	t.Run("预览通道下 atom 失败且清单缺失仍报错", func(t *testing.T) {
+		f := newUpdaterFixture(t, "0.29.0-go.2")
+		setupGray(f, "v0.30.0", "v0.29.0-go.2")
+		f.atomStatus = http.StatusInternalServerError
+		f.ymlOK = func(string, string) bool { return false }
+		if res := f.u.Check(ctx, preview); res["success"] != false {
+			t.Fatalf("清单缺失应失败: %v", res)
+		}
+	})
+
+	// 直接调用 githubLatest 且没有 API 选定结果：按 atom 条目 semver 取最高，同版本偏好正式版。
+	for _, c := range []struct {
+		name string
+		tags []string
+		want string
+	}{
+		{"正式版高于当前自定义预发布", []string{"v0.30.0", "v0.29.0-go.2"}, "v0.30.0"},
+		{"同版本偏好正式版", []string{"v0.29.0-go.2", "v0.29.0", "v0.28.0"}, "v0.29.0"},
+		{"semver 最高者不受 atom 顺序影响", []string{"v0.28.1", "v0.29.0-go.1", "v0.28.0"}, "v0.29.0-go.1"},
+	} {
+		t.Run("githubLatest 无 resolvedTag："+c.name, func(t *testing.T) {
+			f := newUpdaterFixture(t, "0.29.0-go.2")
+			setupGray(f, c.tags...)
+			m, p, err := f.u.githubLatest(ctx, true, "")
+			if err != nil {
+				t.Fatalf("githubLatest: %v", err)
+			}
+			if p.tag != c.want || m.Version != strings.TrimPrefix(c.want, "v") {
+				t.Fatalf("得到 tag=%s version=%s，期望 %s", p.tag, m.Version, c.want)
+			}
+		})
 	}
 }
 
